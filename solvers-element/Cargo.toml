@@ -1,0 +1,22 @@
+[package]
+name = "solvers-element"
+version = "0.1.0"
+edition = "2021"
+authors = ["Matthew Scroggs <matthew.w.scroggs@gmail.com>"]
+description = "A library for the evaluation of finite element basis functions."
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-solvers/solvers-element"
+repository = "https://github.com/rusty-solvers/solvers-element"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "solvers_element"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+solvers-tools = { path = "../solvers-tools"}
+paste = "1.*"
+libc = "0.2"
+approx = "0.5"

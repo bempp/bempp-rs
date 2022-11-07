@@ -1,0 +1,29 @@
+[package]
+name = "solvers-quadrature"
+version = "0.0.1"
+authors = ["Timo Betcke"]
+edition = "2021"
+description = "A quadrature library for boundary element computations."
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-solvers/solvers"
+repository = "https://github.com/rusty-solvers/solvers"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "solvers_quadrature"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+solvers-element = {path = "../solvers-element"}
+lazy_static = "1.4"
+paste = "1.*"
+approx = "0.5"
+itertools = "0.10"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[package.metadata.docs.rs]
+rustdoc-args = [ "--html-in-header", "katex-header.html" ]
