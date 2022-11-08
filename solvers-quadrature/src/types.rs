@@ -26,7 +26,7 @@ pub struct NumericalQuadratureDefinition {
 }
 
 /// Definition of a quadrature rule for double test/trial integrals.
-/// 
+///
 /// This is necessary in cases where such integrals cannot be evaluated via
 /// tensor application of rules for one simplex, such as for integration of
 /// weak singularities (e.g. Duffy transformation rules).
@@ -59,10 +59,7 @@ pub struct TestTrialNumericalQuadratureDefinition {
     /// Hence, the first point starts at position zero, the second point at
     /// position d, and the third point at position 2d.
     pub trial_points: Vec<f64>,
-
 }
-
-
 
 /// Storage for connectivity information.
 ///
@@ -107,5 +104,4 @@ pub trait SingularQuadratureGenerator {
         order: usize,
         connectivity: CellToCellConnectivity,
     ) -> Result<(NumericalQuadratureDefinition, NumericalQuadratureDefinition), ()>;
-
 }

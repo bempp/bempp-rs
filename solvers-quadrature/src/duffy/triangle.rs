@@ -3,7 +3,7 @@ use crate::types::{NumericalQuadratureDefinition, TestTrialNumericalQuadratureDe
 use itertools::Itertools;
 
 /// Apply a callable to each tuple chunk (single point) of an array.
-/// 
+///
 /// Each 2-tuple in `points` represents a 2d point. The callable is applied to
 /// each point and transforms it to a new point.
 fn transform_coords(points: &mut Vec<f64>, fun: &impl Fn((f64, f64)) -> (f64, f64)) {
@@ -516,7 +516,7 @@ mod test {
         // We create two triangles, the reference triangle
         // (0, 0), (1,0). (0, 1)
         // and the second triangle with coordinates
-        // (2, 0), (1, 1), (1, 0) 
+        // (2, 0), (1, 1), (1, 0)
         // We integrate the Green's function against those two triangles.
 
         // First we need to create the reference map to the second triangle.
@@ -576,5 +576,4 @@ mod test {
             max_relative = 1E-13
         );
     }
-
 }
