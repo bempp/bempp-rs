@@ -1,0 +1,36 @@
+name: 🧪 Test
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 7 * * 1"
+
+jobs:
+  run-tests-rust:
+    name: Run tests (Rust)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust-version: ["stable", "beta", "nightly"]
+    steps:
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-version }}
+          components: rustfmt
+      - uses: actions/checkout@v2
+      - name: Style checks
+        run: |
+          cargo fmt -- --check
+      - name: Build rust library
+        run: |
+          cargo build
+          cargo build --release
+      - name: Run tests
+        run: |
+          cargo test
