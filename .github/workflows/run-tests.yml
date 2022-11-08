@@ -24,9 +24,9 @@ jobs:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt
       - uses: actions/checkout@v2
-      #- name: Style checks
-      #  run: |
-      #    cargo fmt -- --check
+      - name: Style checks
+        run: |
+          cargo fmt -- --check
       - name: Build rust library
         run: |
           cargo build
