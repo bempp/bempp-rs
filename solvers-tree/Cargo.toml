@@ -19,7 +19,7 @@ itertools = "0.10"
 mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
 memoffset = "0.6"
 rand = "0.8.4"
-hyksort = {git = "https://github.com/skailasa/hyksort", branch = "main"}
+hyksort = {git = "https://github.com/rusty-solvers/hyksort", branch = "main"}
 vtkio = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
