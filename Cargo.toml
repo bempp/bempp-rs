@@ -2,5 +2,4 @@
 
 members = ["element",
            "quadrature",
-           "tools",
-           "tree"]
+           "tools"]
