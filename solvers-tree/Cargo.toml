@@ -1,0 +1,30 @@
+[package]
+name = "solvers-tree"
+version = "1.1.0"
+authors = ["Timo Betcke <timo.betcke@gmail.com>", "Srinath Kailasa <srinathkailasa@gmail.com>"]
+edition = "2021"
+description = "Octree data structures in Rust."
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-fast-solvers/solvers-tree"
+repository = "https://github.com/rusty-fast-solvers/solvers-tree"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "rusty_tree"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+itertools = "0.10"
+mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
+memoffset = "0.6"
+rand = "0.8.4"
+hyksort = {git = "https://github.com/rusty-solvers/hyksort", branch = "main"}
+vtkio = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Build hdf5 dep from source until bug regarding 'H5Pget_fapl_direct' not being
+# included on Linux builds is released.
+hdf5 = {git = "https://github.com/aldanor/hdf5-rust.git", branch = "master"}
+
