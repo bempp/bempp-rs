@@ -20,7 +20,7 @@ pub unsafe extern "C" fn distributed_tree_from_points(
 ) -> *mut DistributedTree {
     let points = std::slice::from_raw_parts(p_points, npoints);
     let world = std::mem::ManuallyDrop::new(
-        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
+        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap(),
     );
     Box::into_raw(Box::new(DistributedTree::new(points, balanced, &world)))
 }
@@ -56,21 +56,30 @@ pub unsafe extern "C" fn distributed_tree_balanced(p_tree: *const DistributedTre
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn distributed_tree_points_to_keys_get(p_tree: *const DistributedTree, p_point: *const Point) -> *mut MortonKey {
+pub unsafe extern "C" fn distributed_tree_points_to_keys_get(
+    p_tree: *const DistributedTree,
+    p_point: *const Point,
+) -> *mut MortonKey {
     let tree = &*p_tree;
     let point = *p_point;
     Box::into_raw(Box::new(*tree.points_to_keys.get(&point).unwrap()))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn distributed_tree_keys_to_npoints_get(p_tree: *const DistributedTree, p_key: *const MortonKey) -> usize {
+pub unsafe extern "C" fn distributed_tree_keys_to_npoints_get(
+    p_tree: *const DistributedTree,
+    p_key: *const MortonKey,
+) -> usize {
     let tree = &*p_tree;
     let key = *p_key;
     tree.keys_to_points.get(&key).unwrap().len()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn distributed_tree_keys_to_points_get(p_tree: *const DistributedTree, p_key: *const MortonKey) -> *const Point {
+pub unsafe extern "C" fn distributed_tree_keys_to_points_get(
+    p_tree: *const DistributedTree,
+    p_key: *const MortonKey,
+) -> *const Point {
     let tree = &*p_tree;
     let key = *p_key;
     let points = tree.keys_to_points.get(&key).unwrap();
@@ -89,7 +98,7 @@ pub unsafe extern "C" fn distributed_tree_write_vtk(
 
     let tree = &*p_tree;
     let world = std::mem::ManuallyDrop::new(
-        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
+        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap(),
     );
 
     DistributedTree::write_vtk(&world, filename, tree);
@@ -108,7 +117,7 @@ pub unsafe extern "C" fn distributed_tree_write_hdf5(
     let tree = &*p_tree;
 
     let world = std::mem::ManuallyDrop::new(
-        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
+        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap(),
     );
     DistributedTree::write_hdf5(&world, filename, tree).unwrap();
 }
@@ -123,7 +132,7 @@ pub unsafe extern "C" fn distributed_tree_read_hdf5(
     let filepath = filepath_slice.to_string();
 
     let world = std::mem::ManuallyDrop::new(
-        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap()
+        UserCommunicator::from_raw(*(world as *const MPI_Comm)).unwrap(),
     );
 
     Box::into_raw(Box::new(DistributedTree::read_hdf5(&world, filepath)))

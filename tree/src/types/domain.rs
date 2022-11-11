@@ -99,11 +99,7 @@ impl Domain {
             .unwrap()
             .diameter[2];
 
-        let max_diameter = [
-            max_x,
-            max_y,
-            max_z,
-        ];
+        let max_diameter = [max_x, max_y, max_z];
 
         Domain {
             origin: min_origin,
