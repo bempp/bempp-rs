@@ -29,7 +29,11 @@ pub unsafe extern "C" fn point_clone(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn point_index(ptr: *const Point, len: usize, idx: usize) -> *mut &'static Point {
+pub unsafe extern "C" fn point_index(
+    ptr: *const Point,
+    len: usize,
+    idx: usize,
+) -> *mut &'static Point {
     let slice = std::slice::from_raw_parts(ptr, len);
     Box::into_raw(Box::new(&slice[idx]))
 }

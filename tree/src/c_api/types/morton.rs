@@ -70,7 +70,7 @@ pub unsafe extern "C" fn morton_key_to_coordinates(
     p_diameter: *const [PointType; 3],
     p_coord: *mut [PointType; 3],
 ) {
-    let origin: &[PointType; 3] =  p_origin.as_ref().unwrap();
+    let origin: &[PointType; 3] = p_origin.as_ref().unwrap();
     let diameter: &[PointType; 3] = p_diameter.as_ref().unwrap();
 
     let domain = Domain {
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn morton_key_box_coordinates(
     p_diameter: *const [PointType; 3],
     box_coord: *mut [PointType; 24],
 ) {
-    let origin: &[PointType; 3] =  p_origin.as_ref().unwrap();
+    let origin: &[PointType; 3] = p_origin.as_ref().unwrap();
     let diameter: &[PointType; 3] = p_diameter.as_ref().unwrap();
 
     let domain = Domain {
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn morton_key_is_descendent(
 
 #[no_mangle]
 pub unsafe extern "C" fn morton_key_delete(p_morton_key: *mut MortonKey) {
-        drop(Box::from_raw(p_morton_key));
+    drop(Box::from_raw(p_morton_key));
 }
 
 #[no_mangle]

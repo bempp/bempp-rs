@@ -8,7 +8,7 @@ use vtkio::model::*;
 
 use serde::Serialize;
 
-use crate::types::{domain::Domain};
+use crate::types::domain::Domain;
 
 // VTK compatible dataset for visualization
 pub trait VTK {

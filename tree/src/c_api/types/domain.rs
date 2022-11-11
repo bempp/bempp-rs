@@ -21,9 +21,7 @@ pub unsafe extern "C" fn domain_from_global_points(
     comm: *mut usize,
 ) -> *mut Domain {
     let points = std::slice::from_raw_parts(p_points, npoints);
-    let comm = std::mem::ManuallyDrop::new(
-        UserCommunicator::from_raw(*comm as MPI_Comm).unwrap(),
-    );
+    let comm = std::mem::ManuallyDrop::new(UserCommunicator::from_raw(*comm as MPI_Comm).unwrap());
     let domain = Domain::from_global_points(points, &comm);
 
     Box::into_raw(Box::new(domain))

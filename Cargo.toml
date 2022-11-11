@@ -1,5 +1,5 @@
 [workspace]
 
-members = ["solvers-element",
-           "solvers-tools",
-           "solvers-quadrature"]
+members = ["element",
+           "quadrature",
+           "tools"]

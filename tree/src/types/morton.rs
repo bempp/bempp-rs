@@ -41,7 +41,6 @@ pub struct MortonKey {
     pub morton: KeyType,
 }
 
-
 /// Vector of **MortonKeys**.
 pub type MortonKeys = Vec<MortonKey>;
 

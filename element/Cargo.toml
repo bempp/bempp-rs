@@ -16,7 +16,7 @@ name = "solvers_element"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../solvers-tools"}
+solvers-tools = { path = "../tools"}
 paste = "1.*"
 libc = "0.2"
 approx = "0.5"
