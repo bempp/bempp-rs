@@ -12,32 +12,26 @@ pub enum MapType {
     L2Piola = 3,
 }
 
-pub fn identity_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
+pub fn identity_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
-pub fn identity_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
+pub fn identity_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
-pub fn contravariant_piola_push_forward<
-    'a,
-    'b,
-    F: FiniteElement,
-    F2: FiniteElement,
-    C: ReferenceCell,
->(
+pub fn contravariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -84,16 +78,10 @@ pub fn contravariant_piola_push_forward<
     }
 }
 
-pub fn contravariant_piola_pull_back<
-    'a,
-    'b,
-    F: FiniteElement,
-    F2: FiniteElement,
-    C: ReferenceCell,
->(
+pub fn contravariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -139,16 +127,10 @@ pub fn contravariant_piola_pull_back<
     }
 }
 
-pub fn covariant_piola_push_forward<
-    'a,
-    'b,
-    F: FiniteElement,
-    F2: FiniteElement,
-    C: ReferenceCell,
->(
+pub fn covariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -199,10 +181,10 @@ pub fn covariant_piola_push_forward<
     }
 }
 
-pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
+pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -248,10 +230,10 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C:
     }
 }
 
-pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
+pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -294,10 +276,10 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: Ref
     }
 }
 
-pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
+pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -347,6 +329,53 @@ mod test {
     use crate::map::*;
     use approx::*;
 
+    pub struct TestPhysicalCell<'a, F: FiniteElement, C: ReferenceCell> {
+        reference_cell: &'a C,
+        vertices: &'a [f64],
+        coordinate_element: &'a F,
+        gdim: usize,
+        tdim: usize,
+        npts: usize,
+    }
+
+    impl<'a, F: FiniteElement, C: ReferenceCell> TestPhysicalCell<'a, F, C> {
+        pub fn new(
+            reference_cell: &'a C,
+            vertices: &'a [f64],
+            coordinate_element: &'a F,
+            gdim: usize,
+        ) -> Self {
+            let tdim = reference_cell.dim();
+            let npts = vertices.len() / gdim;
+            Self {
+                reference_cell,
+                vertices,
+                coordinate_element,
+                gdim,
+                tdim,
+                npts,
+            }
+        }
+    }
+
+    impl<'a, F: FiniteElement, C: ReferenceCell> PhysicalCell<'a, F> for TestPhysicalCell<'a, F, C> {
+        fn tdim(&self) -> usize {
+            self.tdim
+        }
+        fn gdim(&self) -> usize {
+            self.gdim
+        }
+        fn coordinate_element(&self) -> &'a F {
+            self.coordinate_element
+        }
+        fn npts(&self) -> usize {
+            self.npts
+        }
+        fn vertices(&self) -> &'a [f64] {
+            self.vertices
+        }
+    }
+
     #[test]
     fn test_identity() {
         let e = LagrangeElementTriangleDegree1 {};
@@ -359,7 +388,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
@@ -391,7 +420,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
@@ -429,7 +458,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
@@ -464,7 +493,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
