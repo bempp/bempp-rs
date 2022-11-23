@@ -1,5 +1,11 @@
 //! Duffy rules for triangles.
-use crate::types::{NumericalQuadratureDefinition, TestTrialNumericalQuadratureDefinition};
+use crate::{
+    simplex_rules::simplex_rule,
+    types::{
+        CellToCellConnectivity, NumericalQuadratureDefinition, QuadratureError,
+        TestTrialNumericalQuadratureDefinition,
+    },
+};
 use itertools::Itertools;
 
 /// Apply a callable to each tuple chunk (single point) of an array.
@@ -346,6 +352,49 @@ fn vertex_adjacent_triangles(
     }
 }
 
+pub fn triangle_duffy(
+    connectivity: &CellToCellConnectivity,
+    npoints: usize,
+) -> Result<TestTrialNumericalQuadratureDefinition, QuadratureError> {
+    let rule = simplex_rule(solvers_element::cell::ReferenceCellType::Interval, npoints)?;
+
+    match connectivity.connectivity_dimension {
+        // Identical triangles
+        2 => Ok(identical_triangles(&rule)),
+        0 => {
+            // Triangles have adjacent vertex
+            if connectivity.local_indices.len() != 1 {
+                Err(QuadratureError::ConnectivityError)
+            } else {
+                let (test_singular_vertex, trial_singular_vertex) = connectivity.local_indices[0];
+                Ok(vertex_adjacent_triangles(
+                    &rule,
+                    test_singular_vertex,
+                    trial_singular_vertex,
+                ))
+            }
+        }
+        1 => {
+            // Triangles have adjacent edge
+            if connectivity.local_indices.len() != 2 {
+                Err(QuadratureError::ConnectivityError)
+            } else {
+                let first_pair = connectivity.local_indices[0];
+                let second_pair = connectivity.local_indices[1];
+
+                let test_singular_edge = (first_pair.0, second_pair.0);
+                let trial_singular_edge = (first_pair.1, second_pair.1);
+                Ok(edge_adjacent_triangles(
+                    &rule,
+                    test_singular_edge,
+                    trial_singular_edge,
+                ))
+            }
+        }
+        _ => Err(QuadratureError::ConnectivityError),
+    }
+}
+
 #[cfg(test)]
 
 mod test {
@@ -380,13 +429,13 @@ mod test {
 
     #[test]
     fn test_identical_triangles() {
-        use crate::simplex_rules::simplex_rule;
-        use crate::types::ReferenceCellType;
-
         let compute_integral = |npoints: usize| -> f64 {
-            let rule = simplex_rule(ReferenceCellType::Interval, npoints).unwrap();
+            let connectivity = CellToCellConnectivity {
+                connectivity_dimension: 2,
+                local_indices: Vec::new(),
+            };
 
-            let singular_rule = identical_triangles(&rule);
+            let singular_rule = triangle_duffy(&connectivity, npoints).unwrap();
 
             let mut sum = 0.0;
 
@@ -441,9 +490,6 @@ mod test {
 
     #[test]
     fn test_edge_adjacent_triangles() {
-        use crate::simplex_rules::simplex_rule;
-        use crate::types::ReferenceCellType;
-
         // We create two triangles, the reference triangle
         // (0, 0), (1,0). (0, 1)
         // and the second triangle with coordinates
@@ -456,9 +502,12 @@ mod test {
             |point: (f64, f64)| -> (f64, f64) { (1.0 - point.1, point.0 + point.1) };
 
         let compute_integral = |npoints: usize| -> f64 {
-            let rule = simplex_rule(ReferenceCellType::Interval, npoints).unwrap();
+            let connectivity = CellToCellConnectivity {
+                connectivity_dimension: 1,
+                local_indices: vec![(1, 0), (2, 2)],
+            };
 
-            let singular_rule = edge_adjacent_triangles(&rule, (1, 2), (0, 2));
+            let singular_rule = triangle_duffy(&connectivity, npoints).unwrap();
 
             let mut sum = 0.0;
 
@@ -510,9 +559,6 @@ mod test {
 
     #[test]
     fn test_vertex_adjacent_triangles() {
-        use crate::simplex_rules::simplex_rule;
-        use crate::types::ReferenceCellType;
-
         // We create two triangles, the reference triangle
         // (0, 0), (1,0). (0, 1)
         // and the second triangle with coordinates
@@ -525,9 +571,16 @@ mod test {
             |point: (f64, f64)| -> (f64, f64) { (2.0 - point.0 - point.1, point.0) };
 
         let compute_integral = |npoints: usize| -> f64 {
-            let rule = simplex_rule(ReferenceCellType::Interval, npoints).unwrap();
+            let connectivity = CellToCellConnectivity {
+                connectivity_dimension: 0,
+                local_indices: vec![(1, 2)],
+            };
 
-            let singular_rule = vertex_adjacent_triangles(&rule, 1, 2);
+            let singular_rule = triangle_duffy(&connectivity, npoints).unwrap();
+
+            // let rule = simplex_rule(ReferenceCellType::Interval, npoints).unwrap();
+
+            // let singular_rule = vertex_adjacent_triangles(&rule, 1, 2);
 
             let mut sum = 0.0;
 
