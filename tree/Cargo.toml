@@ -26,5 +26,5 @@ serde_json = "1.0"
 
 # Build hdf5 dep from source until bug regarding 'H5Pget_fapl_direct' not being
 # included on Linux builds is released.
-hdf5 = {git = "https://github.com/aldanor/hdf5-rust.git", branch = "master"}
+# hdf5 = {git = "https://github.com/aldanor/hdf5-rust.git", branch = "master"}
 
