@@ -15,7 +15,6 @@ use mpi::{
     Address,
 };
 
-use hdf5::H5Type;
 use serde::{Deserialize, Serialize};
 use vtkio::model::*;
 
@@ -25,14 +24,14 @@ use crate::{
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
-    data::{HDF5, JSON, VTK},
+    data::{JSON, VTK},
     types::{domain::Domain, point::PointType},
 };
 
 pub type KeyType = u64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, H5Type)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 /// Representation of a Morton key with an 'anchor' specifying the origin of the node it encodes
 /// with respect to the deepest level of the octree, as well as 'morton', a bit-interleaved single
 /// integer representation.
@@ -384,24 +383,6 @@ impl Hash for MortonKey {
 }
 
 impl JSON for Vec<MortonKey> {}
-
-impl HDF5<MortonKey> for Vec<MortonKey> {
-    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()> {
-        let file = hdf5::File::create(filename)?;
-        let keys = file.new_dataset::<MortonKey>().create("keys")?;
-        keys.write(self)?;
-
-        Ok(())
-    }
-
-    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<MortonKey>> {
-        let file = hdf5::File::open(filepath)?;
-        let keys = file.dataset("keys")?;
-        let keys: Vec<MortonKey> = keys.read_raw::<MortonKey>()?;
-
-        Ok(keys)
-    }
-}
 
 /// Serialize a Morton Key for VTK visualization.
 fn serialize_morton_key(key: MortonKey, domain: &Domain) -> Vec<f64> {

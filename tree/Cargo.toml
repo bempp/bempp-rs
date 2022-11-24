@@ -16,10 +16,10 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 itertools = "0.10"
-mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
+mpi = "0.6.*"
 memoffset = "0.6"
-rand = "0.8.4"
-hyksort = {git = "https://github.com/rusty-solvers/hyksort", branch = "main"}
+rand = "0.8.*"
+hyksort = { path = "../hyksort"}
 vtkio = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

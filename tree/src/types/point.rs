@@ -4,7 +4,6 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
-use hdf5::H5Type;
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
@@ -13,14 +12,14 @@ use mpi::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::{HDF5, JSON},
+    data::JSON,
     types::morton::{KeyType, MortonKey},
 };
 
 pub type PointType = f64;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, H5Type)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
 /// the octree node in which it lies. The ordering of Points is determined by their Morton Key.
 pub struct Point {
@@ -92,21 +91,3 @@ impl Hash for Point {
 }
 
 impl JSON for Vec<Point> {}
-
-impl HDF5<Point> for Vec<Point> {
-    fn write_hdf5<P: AsRef<Path>>(&self, filename: P) -> hdf5::Result<()> {
-        let file = hdf5::File::create(filename)?;
-        let points = file.new_dataset::<Point>().create("points")?;
-        points.write(self)?;
-
-        Ok(())
-    }
-
-    fn read_hdf5<P: AsRef<Path>>(filepath: P) -> hdf5::Result<Vec<Point>> {
-        let file = hdf5::File::open(filepath)?;
-        let points = file.dataset("points")?;
-        let points: Vec<Point> = points.read_raw::<Point>()?;
-
-        Ok(points)
-    }
-}
