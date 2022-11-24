@@ -5,12 +5,12 @@ use std::convert::TryInto;
 use rand::Rng;
 
 use mpi::collective::SystemOperation;
-use mpi::datatype::{PartitionMut};
-use mpi::topology::{Rank};
-use mpi::topology::{UserCommunicator};
-use mpi::traits::*;
-use mpi::{Count};
+use mpi::datatype::PartitionMut;
 use mpi::request::WaitGuard;
+use mpi::topology::Rank;
+use mpi::topology::UserCommunicator;
+use mpi::traits::*;
+use mpi::Count;
 
 use superslice::*;
 
@@ -38,9 +38,9 @@ where
 
     // Determine number of samples for splitters, beta=20 taken from paper
     let beta = 20;
-    let numerator: f64 = (beta*k*(arr_len as Count)) as f64;
+    let numerator: f64 = (beta * k * (arr_len as Count)) as f64;
     let denominator: f64 = problem_size as f64;
-    let mut split_count: Count = (numerator/denominator).ceil() as Count;
+    let mut split_count: Count = (numerator / denominator).ceil() as Count;
     if split_count > arr_len as Count {
         split_count = arr_len as Count;
     }
@@ -98,15 +98,16 @@ where
     let root_rank = 0;
     let root_process = comm.process_at_rank(root_rank);
     let mut global_disp: Vec<u64> = vec![0; global_split_count as usize];
-    
+
     for i in 0..(global_split_count as usize) {
         if comm.rank() == root_rank {
-            comm
-                .process_at_rank(root_rank)
-                .reduce_into_root(&disp[i], &mut global_disp[i], SystemOperation::sum());
+            comm.process_at_rank(root_rank).reduce_into_root(
+                &disp[i],
+                &mut global_disp[i],
+                SystemOperation::sum(),
+            );
         } else {
-            comm 
-                .process_at_rank(root_rank)
+            comm.process_at_rank(root_rank)
                 .reduce_into(&disp[i], SystemOperation::sum());
         }
     }
@@ -119,7 +120,9 @@ where
 
     for i in 0..k {
         let mut _disp = 0;
-        let optimal_splitter: i64 = (((i + 1) as u64) * problem_size / (k as u64 + 1)).try_into().unwrap();
+        let optimal_splitter: i64 = (((i + 1) as u64) * problem_size / (k as u64 + 1))
+            .try_into()
+            .unwrap();
 
         for j in 0..(global_split_count as usize) {
             if (global_disp[j] as i64 - optimal_splitter).abs()
@@ -162,7 +165,6 @@ where
     }
 
     while p > 1 && problem_size > 0 {
-
         // Find size of color block
         let color_size = p / k;
         assert_eq!(color_size * k, p);
@@ -224,7 +226,8 @@ where
                         &partner_process,
                     );
 
-                    recv_disp[(recv_iter + 1) as usize] = recv_disp[recv_iter as usize] + recv_size[recv_iter as usize];
+                    recv_disp[(recv_iter + 1) as usize] =
+                        recv_disp[recv_iter as usize] + recv_size[recv_iter as usize];
                     recv_cnt[recv_iter as usize] = recv_size[recv_iter as usize];
                     recv_iter += 1;
                 }
@@ -267,10 +270,13 @@ where
                     assert!(s_lidx <= s_ridx);
 
                     mpi::request::scope(|scope| {
-                        let _rreq = WaitGuard::from(partner_process
-                            .immediate_receive_into(scope, &mut arr_[r_lidx..r_ridx]));
-                        let sreq = WaitGuard::from(partner_process
-                            .immediate_synchronous_send(scope, &arr[s_lidx..s_ridx]));
+                        let _rreq = WaitGuard::from(
+                            partner_process
+                                .immediate_receive_into(scope, &mut arr_[r_lidx..r_ridx]),
+                        );
+                        let _sreq = WaitGuard::from(
+                            partner_process.immediate_synchronous_send(scope, &arr[s_lidx..s_ridx]),
+                        );
                     });
 
                     recv_iter += 1;

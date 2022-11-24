@@ -4,8 +4,6 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
 
-use vtkio::model::*;
-
 use serde::Serialize;
 
 use crate::types::domain::Domain;

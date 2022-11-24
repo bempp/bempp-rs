@@ -128,16 +128,10 @@ unsafe impl Equivalence for Domain {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
-
     use rand::prelude::*;
     use rand::SeedableRng;
 
-    use crate::{
-        constants::{NCRIT, ROOT},
-        distributed::DistributedTree,
-        types::{domain::Domain, morton::MortonKey},
-    };
+    use crate::types::domain::Domain;
 
     const NPOINTS: u64 = 100000;
 

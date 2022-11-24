@@ -1,5 +1,5 @@
 //! Wrappers for Distributed Tree interface
-use mpi::{ffi::MPI_Comm, topology::UserCommunicator, traits::*};
+use mpi::{ffi::MPI_Comm, topology::UserCommunicator};
 use std::ffi::CStr;
 use std::os::raw::c_char;
 

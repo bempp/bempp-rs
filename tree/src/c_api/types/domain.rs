@@ -1,5 +1,5 @@
 //! Wrappers for methods on Domains.
-use mpi::{ffi::MPI_Comm, topology::UserCommunicator, traits::*};
+use mpi::{ffi::MPI_Comm, topology::UserCommunicator};
 
 use crate::types::{domain::Domain, point::PointType};
 

@@ -6,7 +6,6 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
-use std::path::Path;
 use std::path::PathBuf;
 
 use memoffset::offset_of;
@@ -858,18 +857,6 @@ mod tests {
     }
 
     #[test]
-    pub fn test_find_key_in_direct() {
-        let point = [0.5, 0.5, 0.5];
-        let domain: Domain = Domain {
-            diameter: [1., 1., 1.],
-            origin: [0., 0., 0.],
-        };
-
-        let key = MortonKey::from_point(&point, &domain);
-        let direction = [1, 0, 0];
-    }
-
-    #[test]
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
         let domain: Domain = Domain {
@@ -877,7 +864,6 @@ mod tests {
             origin: [0., 0., 0.],
         };
         let key = MortonKey::from_point(&point, &domain);
-        let ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
 
         // Simple case, at the leaf level
         {
@@ -890,7 +876,7 @@ mod tests {
             // Test that the displacements are correct
             let displacement = 1 << (DEEPEST_LEVEL - key.level()) as i64;
             let anchor = key.anchor;
-            let mut expected: [[i64; 3]; 26] = [
+            let expected: [[i64; 3]; 26] = [
                 [-displacement, -displacement, -displacement],
                 [-displacement, -displacement, 0],
                 [-displacement, -displacement, displacement],
@@ -949,7 +935,7 @@ mod tests {
             // Test that the displacements are correct
             let displacement = 1 << (DEEPEST_LEVEL - parent.level()) as i64;
             let anchor = key.anchor;
-            let mut expected: [[i64; 3]; 26] = [
+            let expected: [[i64; 3]; 26] = [
                 [-displacement, -displacement, -displacement],
                 [-displacement, -displacement, 0],
                 [-displacement, -displacement, displacement],

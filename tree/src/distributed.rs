@@ -1,10 +1,9 @@
 //! Data structures and methods to create distributed Octrees with MPI.
 
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 
 use mpi::{
-    datatype::{Partition, PartitionMut},
+    datatype::PartitionMut,
     topology::{Rank, UserCommunicator},
     traits::*,
     Count,
@@ -197,8 +196,8 @@ impl DistributedTree {
         points: &Points,
         mut blocktree: MortonKeys,
     ) -> (HashMap<MortonKey, Points>, HashMap<Point, MortonKey>) {
-        let mut split_blocktree: MortonKeys = Vec::new();
-        let mut blocks_to_points = DistributedTree::assign_nodes_to_points(&blocktree, points);
+        let split_blocktree;
+        let mut blocks_to_points;
 
         loop {
             let mut new_blocktree: MortonKeys = Vec::new();
@@ -266,7 +265,7 @@ impl DistributedTree {
     ) -> Points {
         let mut received_points: Points = Vec::new();
 
-        let mut min_seed = MortonKey::default();
+        let min_seed;
 
         if rank == 0 {
             min_seed = points.iter().min().unwrap().key;
@@ -380,8 +379,7 @@ impl DistributedTree {
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        let (keys, points, points_to_keys, keys_to_points) =
-            DistributedTree::unbalanced_tree(world, points, domain);
+        let (keys, points, _, _) = DistributedTree::unbalanced_tree(world, points, domain);
 
         // 1. Create a minimal balanced octree for local octants spanning their domain and linearize
         let local_balanced = Tree { keys };

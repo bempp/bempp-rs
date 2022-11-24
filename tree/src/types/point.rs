@@ -2,7 +2,6 @@
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
 
 use memoffset::offset_of;
 use mpi::{
