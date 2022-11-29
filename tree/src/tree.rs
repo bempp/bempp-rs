@@ -1,28 +1,32 @@
-use crate::types::{
-    domain::Domain,
-    morton::{MortonKey, MortonKeys},
-    point::{Point, PointType, Points},
+use mpi::topology::UserCommunicator;
+
+use crate::{
+    types::{
+        point::{PointType, Point, Points},
+        morton::{MortonKey, MortonKeys},
+        domain::Domain
+    }
 };
 
 pub trait Tree {
     // Create a new tree that is optionally balanced
-    pub fn new(points: &[[PointType; 3]], balanced: bool) -> Self;
+    fn new(points: &[[PointType; 3]], balanced: bool, comm: Option<UserCommunicator>) -> Self;
 
     // Get balancing information
-    pub fn get_balanced() -> bool;
+    fn get_balanced(&self) -> bool;
 
     // Get all keys, gets local keys in multi-node setting
-    pub fn get_keys() -> MortonKeys;
+    fn get_keys(&self) -> &MortonKeys;
 
     // Get all points, gets local keys in multi-node setting
-    pub fn get_points() -> Points;
+    fn get_points(&self) -> &Points;
 
     // Get domain, gets global domain in multi-node setting
-    pub fn get_domain() -> Domain;
+    fn get_domain(&self) -> &Domain;
 
     // Get tree node key associated with a given point
-    pub fn map_point_to_key(point: &Point) -> &MortonKey;
+    fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey>;
 
     // Get points associated with a tree node key
-    pub fn map_key_to_points(key: &MortonKey) -> &Points;
+    fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points>;
 }

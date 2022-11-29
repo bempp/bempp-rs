@@ -1,23 +1,21 @@
 //! Data structures and methods to create distributed OcSingleNodetrees with MPI.
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::HashMap};
 
 use mpi::{
-    datatype::PartitionMut,
     topology::{Rank, UserCommunicator},
     traits::*,
-    Count,
 };
 
 use hyksort::hyksort::hyksort;
 
 use crate::{
     constants::{K, NCRIT, ROOT},
-    data::VTK,
-    single_node::SingleNodeTree,
+    single_node::{assign_points_to_nodes, assign_nodes_to_points},
+    tree::Tree,
     types::{
         domain::Domain,
-        morton::{MortonKey, MortonKeys},
+        morton::{MortonKey, MortonKeys, complete_region},
         point::{Point, PointType, Points},
     },
 };
@@ -54,7 +52,7 @@ impl MultiNodeTree {
 
         if balanced {
             let (keys, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::balanced_SingleNodetree(world, points, &domain);
+                MultiNodeTree::balanced_tree(world, points, &domain);
 
             MultiNodeTree {
                 balanced,
@@ -66,7 +64,7 @@ impl MultiNodeTree {
             }
         } else {
             let (keys, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::unbalanced_SingleNodetree(world, points, &domain);
+                MultiNodeTree::unbalanced_tree(world, points, &domain);
 
             MultiNodeTree {
                 balanced,
@@ -80,12 +78,12 @@ impl MultiNodeTree {
     }
 
     /// Complete a distributed block SingleNodetree from the seed octants, algorithm 4 in [1] (parallel).
-    fn complete_blockSingleNodetree(
+    fn complete_blocktree(
         seeds: &mut MortonKeys,
         &rank: &Rank,
         &size: &Rank,
         world: &UserCommunicator,
-    ) -> SingleNodeTree {
+    ) -> MortonKeys {
         // Define the SingleNodetree's global domain with the finest first/last descendants
         if rank == 0 {
             let ffc_root = ROOT.finest_first_child();
@@ -124,13 +122,13 @@ impl MultiNodeTree {
         }
 
         // Complete region between seeds at each process
-        let mut complete = SingleNodeTree { keys: Vec::new() };
+        let mut complete =MortonKeys{keys: Vec::new()};
 
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
             let b = seeds[i + 1];
 
-            let mut tmp: MortonKeys = SingleNodeTree::complete_region(&a, &b);
+            let mut tmp: Vec<MortonKey> = complete_region(&a, &b);
             complete.keys.push(a);
             complete.keys.append(&mut tmp);
         }
@@ -143,67 +141,20 @@ impl MultiNodeTree {
         complete
     }
 
-    /// Create a mapping between points and ocSingleNodetree nodes, assumed to overlap.
-    fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
-        let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
 
-        let mut map: HashMap<Point, MortonKey> = HashMap::new();
-
-        for point in points.iter() {
-            if nodes.contains(&point.key) {
-                map.insert(*point, point.key);
-            } else {
-                let mut ancestors: MortonKeys = point.key.ancestors().into_iter().collect();
-                ancestors.sort();
-                for ancestor in ancestors {
-                    if nodes.contains(&ancestor) {
-                        map.insert(*point, ancestor);
-                        break;
-                    }
-                }
-            };
-        }
-        map
-    }
-
-    /// Create a mapping between ocSingleNodetree nodes and the points they contain, assumed to overlap.
-    pub fn assign_nodes_to_points(
-        keys: &MortonKeys,
-        points: &Points,
-    ) -> HashMap<MortonKey, Points> {
-        let keys: HashSet<MortonKey> = keys.iter().cloned().collect();
-        let mut map: HashMap<MortonKey, Points> = HashMap::new();
-
-        for point in points.iter() {
-            if keys.contains(&point.key) {
-                map.entry(point.key).or_insert(Vec::new()).push(*point);
-            } else {
-                let mut ancestors: MortonKeys = point.key.ancestors().into_iter().collect();
-                ancestors.sort();
-
-                for ancestor in ancestors {
-                    if keys.contains(&ancestor) {
-                        map.entry(ancestor).or_insert(Vec::new()).push(*point);
-                        break;
-                    }
-                }
-            }
-        }
-        map
-    }
     /// Split ocSingleNodetree nodes (blocks) by counting how many particles they contain.
     fn split_blocks(
         points: &Points,
         mut blockSingleNodetree: MortonKeys,
     ) -> (HashMap<MortonKey, Points>, HashMap<Point, MortonKey>) {
-        let split_blockSingleNodetree;
+        let split_blocktree;
         let mut blocks_to_points;
 
         loop {
-            let mut new_blockSingleNodetree: MortonKeys = Vec::new();
+            let mut new_blocktree: MortonKeys = MortonKeys{keys: Vec::new()};
 
             // Map between blocks and the leaves they contain
-            blocks_to_points = MultiNodeTree::assign_nodes_to_points(&blockSingleNodetree, points);
+            blocks_to_points = assign_nodes_to_points(&blockSingleNodetree, points);
 
             // Generate a new blockSingleNodetree with a block's children if they violate the NCRIT constraint
             let mut check = 0;
@@ -212,44 +163,44 @@ impl MultiNodeTree {
 
                 if npoints > NCRIT {
                     let mut children = block.children();
-                    new_blockSingleNodetree.append(&mut children);
+                    new_blocktree.append(&mut children);
                 } else {
-                    new_blockSingleNodetree.push(block);
+                    new_blocktree.push(block);
                     check += 1;
                 }
             }
 
             if check == blocks_to_points.len() {
-                split_blockSingleNodetree = new_blockSingleNodetree;
+                split_blocktree = new_blocktree;
                 break;
             } else {
-                blockSingleNodetree = new_blockSingleNodetree;
+                blockSingleNodetree = new_blocktree;
             }
         }
 
         // Create bidirectional maps between points and keys of the final SingleNodetree.
         (
-            MultiNodeTree::assign_nodes_to_points(&split_blockSingleNodetree, points),
-            MultiNodeTree::assign_points_to_nodes(points, &split_blockSingleNodetree),
+            assign_nodes_to_points(&split_blocktree, points),
+            assign_points_to_nodes(points, &split_blocktree),
         )
     }
 
     /// Find the seeds, defined as coarsest leaf/leaves, at each processor [1].
-    fn find_seeds(leaves: &[MortonKey]) -> MortonKeys {
+    fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
         let min: MortonKey = *leaves.iter().min().unwrap();
         let max: MortonKey = *leaves.iter().max().unwrap();
 
         // Complete the region between the least and greatest leaves.
-        let mut complete = SingleNodeTree::complete_region(&min, &max);
+        let mut complete = complete_region(&min, &max);
         complete.push(min);
         complete.push(max);
 
         // Find seeds by filtering for leaves at coarsest level
         let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
-        let mut seeds: MortonKeys = complete
+        let mut seeds: MortonKeys = MortonKeys{keys: complete
             .into_iter()
             .filter(|k| k.level() == coarsest_level)
-            .collect();
+            .collect()};
 
         seeds.sort();
         seeds
@@ -312,7 +263,7 @@ impl MultiNodeTree {
     }
 
     /// Specialization for unbalanced SingleNodetrees.
-    pub fn unbalanced_SingleNodetree(
+    pub fn unbalanced_tree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
@@ -340,21 +291,20 @@ impl MultiNodeTree {
         let comm = world.duplicate();
         hyksort(&mut points, K, comm);
 
-        // 2.ii Find unique leaf keys on each processor and place in a SingleNodeTree
-        let keys: MortonKeys = points.iter().map(|p| p.key).collect();
-
-        let mut SingleNodetree = SingleNodeTree { keys };
+        // 2.ii Find unique leaf keys on each processor
+        let mut local = MortonKeys { keys: points.iter().map(|p| p.key).collect() };
+        
         // 3. Linearise received keys (remove overlaps if they exist).
-        SingleNodetree.linearize();
+        local.linearize();
 
         // 4. Complete region spanned by node.
-        SingleNodetree.complete();
+        local.complete();
 
         // 5.i Find seeds and compute the coarse blockSingleNodetree
-        let mut seeds = MultiNodeTree::find_seeds(&SingleNodetree.keys);
+        let mut seeds = MultiNodeTree::find_seeds(&local);
 
-        let blockSingleNodetree =
-            MultiNodeTree::complete_blockSingleNodetree(&mut seeds, &rank, &size, world);
+        let block_tree =
+            MultiNodeTree::complete_blocktree(&mut seeds, &rank, &size, world);
 
         // 5.ii any data below the min seed sent to partner process
         let points = MultiNodeTree::transfer_points_to_blockSingleNodetree(
@@ -363,15 +313,15 @@ impl MultiNodeTree {
 
         // 6. Split blocks based on ncrit constraint
         let (keys_to_points, points_to_keys) =
-            MultiNodeTree::split_blocks(&points, blockSingleNodetree.keys);
+            MultiNodeTree::split_blocks(&points, block_tree);
 
-        let mut keys: MortonKeys = keys_to_points.keys().cloned().collect();
+        let mut keys = MortonKeys{keys: keys_to_points.keys().cloned().collect()};
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
 
     /// Specialization for balanced SingleNodetrees.
-    pub fn balanced_SingleNodetree(
+    pub fn balanced_tree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
@@ -381,14 +331,13 @@ impl MultiNodeTree {
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        let (keys, points, _, _) = MultiNodeTree::unbalanced_SingleNodetree(world, points, domain);
+        let (mut keys, points, _, _) = MultiNodeTree::unbalanced_tree(world, points, domain);
 
         // 1. Create a minimal balanced ocSingleNodetree for local octants spanning their domain and linearize
-        let local_balanced = SingleNodeTree { keys };
-        local_balanced.balance();
+        keys.balance();
 
         // 2. Find new  maps between points and locally balanced SingleNodetree
-        let points_to_keys = MultiNodeTree::assign_points_to_nodes(&points, &local_balanced);
+        let points_to_keys = assign_points_to_nodes(&points, &keys);
         let mut points: Points = points
             .iter()
             .map(|p| Point {
@@ -401,12 +350,9 @@ impl MultiNodeTree {
         // 3. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();
         hyksort(&mut points, K, comm);
-        let balanced_keys: MortonKeys = points.iter().map(|p| p.key).collect();
+        let mut balanced_keys = MortonKeys{keys: points.iter().map(|p| p.key).collect()};
 
-        let mut balanced = SingleNodeTree {
-            keys: balanced_keys,
-        };
-        balanced.linearize();
+        balanced_keys.linearize();
 
         // 4. Find final bidirectional maps to non-overlapping SingleNodetree
         let points: Points = points
@@ -417,63 +363,53 @@ impl MultiNodeTree {
                 key: MortonKey::from_point(&p.coordinate, domain),
             })
             .collect();
-        let points_to_keys = MultiNodeTree::assign_points_to_nodes(&points, &balanced);
-        let keys_to_points = MultiNodeTree::assign_nodes_to_points(&balanced, &points);
+        let points_to_keys = assign_points_to_nodes(&points, &keys);
+        let keys_to_points = assign_nodes_to_points(&keys, &points);
 
-        let mut keys: MortonKeys = keys_to_points.keys().cloned().collect();
+        let mut keys: MortonKeys = MortonKeys{keys: keys_to_points.keys().cloned().collect()};
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
 
-    /// Serialize a MultiNodeTree's keys to VTK for visualization.
-    pub fn write_vtk(world: &UserCommunicator, filename: String, SingleNodetree: &MultiNodeTree) {
-        let comm = world.duplicate();
-        let rank = comm.rank();
-        let size = comm.size();
+}
 
-        // Communicate global leaves and global domain
-        let root_rank = 0;
-        let root_process = comm.process_at_rank(root_rank);
 
-        // Gather the keys
-        let local_keys = &SingleNodetree.keys;
+impl Tree for MultiNodeTree {
 
-        let nlocal_keys: Count = SingleNodetree.keys.len() as Count;
+    // Create a new tree that is optionally balanced
+    fn new(points: &[[PointType; 3]], balanced: bool, comm: Option<UserCommunicator>) -> Self {
 
-        let mut global_key_counts: Vec<Count> = vec![0; size as usize];
+        let comm = comm.unwrap();
+        MultiNodeTree::new(points, balanced, &comm)
+    }
 
-        if rank == root_rank {
-            root_process.gather_into_root(&nlocal_keys, &mut global_key_counts[..]);
-        } else {
-            root_process.gather_into(&nlocal_keys);
-        }
+    // Get balancing information
+    fn get_balanced(&self) -> bool {
+        self.balanced
+    }
 
-        // Write to file on root process
-        if rank == root_rank {
-            // Calculate point and key displacements
-            let global_key_displs: Vec<Count> = global_key_counts
-                .iter()
-                .scan(0, |acc, &x| {
-                    let tmp = *acc;
-                    *acc += x;
-                    Some(tmp)
-                })
-                .collect();
+    // Get all keys, gets local keys in multi-node setting
+    fn get_keys(&self) -> &MortonKeys {
+        &self.keys
+    }
 
-            // Buffer for global keys
-            let global_key_count: usize = global_key_counts.iter().sum::<Count>() as usize;
-            let mut global_keys: MortonKeys = vec![MortonKey::default(); global_key_count as usize];
+    // Get all points, gets local keys in multi-node setting
+    fn get_points(&self) -> &Points {
+        &self.points
+    }
 
-            let mut key_partition = PartitionMut::new(
-                &mut global_keys[..],
-                global_key_counts.clone(),
-                &global_key_displs[..],
-            );
-            root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
+    // Get domain, gets global domain in multi-node setting
+    fn get_domain(&self) -> &Domain {
+        &&self.domain
+    }
 
-            global_keys.write_vtk(filename, &SingleNodetree.domain);
-        } else {
-            root_process.gather_varcount_into(&local_keys[..]);
-        }
+    // Get points associated with a tree node key
+    fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
+        self.points_to_keys.get(point)
+    }
+
+    // Get points associated with a tree node key
+    fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
+        self.keys_to_points.get(key)
     }
 }
