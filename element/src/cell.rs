@@ -89,7 +89,7 @@ pub trait PhysicalCell<'a, F: FiniteElement> {
     fn gdim(&self) -> usize;
     fn coordinate_element(&self) -> &'a F;
     fn npts(&self) -> usize;
-    fn vertices(&self) -> &'a [f64];
+    fn vertex(&self, vertex_number: usize) -> &'a [f64];
 }
 
 #[cfg(test)]

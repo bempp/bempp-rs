@@ -58,10 +58,10 @@ pub fn contravariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElem
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
             det_j = j[0] * j[3] - j[1] * j[2];
 
@@ -108,10 +108,10 @@ pub fn contravariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement
             jinv[2] = 0.0;
             jinv[3] = 0.0;
             for gp in 0..geometry_npts {
-                jinv[3] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv[1] -= derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv[2] -= derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                jinv[0] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                jinv[3] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv[1] -= derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv[2] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                jinv[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
 
             for i in 0..nbasis {
@@ -157,10 +157,10 @@ pub fn covariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement 
             jinv_t[2] = 0.0;
             jinv_t[3] = 0.0;
             for gp in 0..geometry_npts {
-                jinv_t[3] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv_t[2] -= derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv_t[1] -= derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                jinv_t[0] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                jinv_t[3] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv_t[2] -= derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv_t[1] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                jinv_t[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
             det_j = jinv_t[0] * jinv_t[3] - jinv_t[1] * jinv_t[2];
             jinv_t[0] /= det_j;
@@ -211,10 +211,10 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + '
             j_t[2] = 0.0;
             j_t[3] = 0.0;
             for gp in 0..geometry_npts {
-                j_t[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j_t[2] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j_t[1] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j_t[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j_t[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j_t[2] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j_t[1] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j_t[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
 
             for i in 0..nbasis {
@@ -260,10 +260,10 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
             det_j = j[0] * j[3] - j[1] * j[2];
 
@@ -306,10 +306,10 @@ pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
             det_j = j[0] * j[3] - j[1] * j[2];
 
@@ -371,8 +371,8 @@ mod test {
         fn npts(&self) -> usize {
             self.npts
         }
-        fn vertices(&self) -> &'a [f64] {
-            self.vertices
+        fn vertex(&self, vertex_number: usize) -> &'a [f64] {
+            &self.vertices[self.tdim * (vertex_number)..self.tdim * (vertex_number + 1)]
         }
     }
 
