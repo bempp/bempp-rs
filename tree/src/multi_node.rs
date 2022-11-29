@@ -353,11 +353,13 @@ impl MultiNodeTree {
         // 5.i Find seeds and compute the coarse blockSingleNodetree
         let mut seeds = MultiNodeTree::find_seeds(&SingleNodetree.keys);
 
-        let blockSingleNodetree = MultiNodeTree::complete_blockSingleNodetree(&mut seeds, &rank, &size, world);
+        let blockSingleNodetree =
+            MultiNodeTree::complete_blockSingleNodetree(&mut seeds, &rank, &size, world);
 
         // 5.ii any data below the min seed sent to partner process
-        let points =
-            MultiNodeTree::transfer_points_to_blockSingleNodetree(world, &points, &seeds, &rank, &size);
+        let points = MultiNodeTree::transfer_points_to_blockSingleNodetree(
+            world, &points, &seeds, &rank, &size,
+        );
 
         // 6. Split blocks based on ncrit constraint
         let (keys_to_points, points_to_keys) =

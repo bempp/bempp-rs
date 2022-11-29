@@ -8,8 +8,8 @@ use std::{
 use itertools::Itertools;
 
 use crate::{
-    constants::DEEPEST_LEVEL, 
-    types::morton::{MortonKey, MortonKeys}
+    constants::DEEPEST_LEVEL,
+    types::morton::{MortonKey, MortonKeys},
 };
 
 /// Interface for a local (non-distributed) Tree.
