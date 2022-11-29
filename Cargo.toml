@@ -2,4 +2,6 @@
 
 members = ["element",
            "quadrature",
-           "tools"]
+           "tools",
+           "fmm",
+           "traits"]
