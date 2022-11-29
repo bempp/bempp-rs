@@ -7,18 +7,21 @@ use std::{
 
 use itertools::Itertools;
 
-use crate::{constants::DEEPEST_LEVEL, types::morton::MortonKey};
+use crate::{
+    constants::DEEPEST_LEVEL, 
+    types::morton::{MortonKey, MortonKeys}
+};
 
 /// Interface for a local (non-distributed) Tree.
 #[derive(Debug)]
-pub struct Tree {
+pub struct SingleNodeTree {
     /// The nodes that span the tree, defined by its leaf nodes, not necessarily complete.
-    pub keys: Vec<MortonKey>,
+    pub keys: MortonKeys,
 }
 
-impl Tree {
+impl SingleNodeTree {
     /// Linearize (remove overlaps) a vector of keys. The input must be sorted. Algorithm 7 in [1].
-    pub fn linearize_keys(keys: Vec<MortonKey>) -> Vec<MortonKey> {
+    pub fn linearize_keys(keys: MortonKeys) -> MortonKeys {
         let nkeys = keys.len();
 
         // Then we remove the ancestors.
@@ -42,15 +45,15 @@ impl Tree {
     }
 
     /// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in [1].
-    pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
+    pub fn complete_region(a: &MortonKey, b: &MortonKey) -> MortonKeys {
         let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
         let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
 
         a_ancestors.remove(a);
         b_ancestors.remove(b);
 
-        let mut minimal_tree: Vec<MortonKey> = Vec::new();
-        let mut work_list: Vec<MortonKey> = a.finest_ancestor(b).children().into_iter().collect();
+        let mut minimal_tree: MortonKeys = Vec::new();
+        let mut work_list: MortonKeys = a.finest_ancestor(b).children().into_iter().collect();
 
         while !work_list.is_empty() {
             let current_item = work_list.pop().unwrap();
@@ -69,7 +72,7 @@ impl Tree {
 
     /// Complete the region between all elements in an tree that doesn't necessarily span
     /// the domain defined by its least and greatest nodes.
-    pub fn complete(self: &mut Tree) {
+    pub fn complete(self: &mut SingleNodeTree) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
         let mut completion = Tree::complete_region(a, b);
@@ -80,22 +83,22 @@ impl Tree {
     }
 
     /// Wrapper for linearize_keys over all keys in Tree.
-    pub fn linearize(self: &mut Tree) {
+    pub fn linearize(self: &mut SingleNodeTree) {
         self.keys.sort();
         self.keys = Tree::linearize_keys(self.keys.clone());
     }
 
     /// Wrapper for sorting a tree, by its keys.
-    pub fn sort(self: &mut Tree) {
+    pub fn sort(self: &mut SingleNodeTree) {
         self.keys.sort();
     }
 
     /// Enforce a 2:1 balance for a tree, and remove any overlaps.
-    pub fn balance(&self) -> Tree {
+    pub fn balance(&self) -> SingleNodeTree {
         let mut balanced: HashSet<MortonKey> = self.keys.iter().cloned().collect();
 
         for level in (0..DEEPEST_LEVEL).rev() {
-            let work_list: Vec<MortonKey> = balanced
+            let work_list: MortonKeys = balanced
                 .iter()
                 .filter(|key| key.level() == level)
                 .cloned()
@@ -119,22 +122,22 @@ impl Tree {
             }
         }
 
-        let mut balanced: Vec<MortonKey> = balanced.into_iter().collect();
+        let mut balanced: MortonKeys = balanced.into_iter().collect();
         balanced.sort();
-        let linearized = Tree::linearize_keys(balanced);
-        Tree { keys: linearized }
+        let linearized = SingleNodeTree::linearize_keys(balanced);
+        SingleNodeTree { keys: linearized }
     }
 }
 
-impl Deref for Tree {
-    type Target = Vec<MortonKey>;
+impl Deref for SingleNodeTree {
+    type Target = MortonKeys;
 
     fn deref(&self) -> &Self::Target {
         &self.keys
     }
 }
 
-impl DerefMut for Tree {
+impl DerefMut for SingleNodeTree {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.keys
     }
@@ -149,7 +152,7 @@ mod tests {
 
     use crate::types::{domain::Domain, morton::MortonKey, point::Point};
 
-    fn tree_fixture() -> Tree {
+    fn tree_fixture() -> SingleNodeTree {
         let npoints: u64 = 1000;
 
         let domain = Domain {
@@ -178,9 +181,9 @@ mod tests {
             })
             .collect();
 
-        let keys: Vec<MortonKey> = points.iter().map(|p| p.key).collect();
+        let keys: MortonKeys = points.iter().map(|p| p.key).collect();
 
-        Tree { keys }
+        SingleNodeTree { keys }
     }
 
     #[test]
@@ -200,7 +203,7 @@ mod tests {
         assert!(unique.len() == tree.len());
 
         // Test that a linearized tree contains no overlaps
-        let mut copy: Vec<MortonKey> = tree.keys.iter().cloned().collect();
+        let mut copy: MortonKeys = tree.keys.iter().cloned().collect();
         for &key in tree.iter() {
             let ancestors = key.ancestors();
             copy.retain(|&k| k != key);
@@ -222,7 +225,7 @@ mod tests {
             morton: 0b111111111111111111111111111111111111111111111111000000000010000,
         };
 
-        let region = Tree::complete_region(&a, &b);
+        let region = SingleNodeTree::complete_region(&a, &b);
 
         let fa = a.finest_ancestor(&b);
 

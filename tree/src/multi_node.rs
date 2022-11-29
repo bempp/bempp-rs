@@ -1,4 +1,4 @@
-//! Data structures and methods to create distributed Octrees with MPI.
+//! Data structures and methods to create distributed OcSingleNodetrees with MPI.
 
 use std::collections::{HashMap, HashSet};
 
@@ -14,7 +14,7 @@ use hyksort::hyksort::hyksort;
 use crate::{
     constants::{K, NCRIT, ROOT},
     data::VTK,
-    single_node::Tree,
+    single_node::SingleNodeTree,
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
@@ -22,41 +22,41 @@ use crate::{
     },
 };
 
-/// Interface for a distributed tree, adaptive by default.
-pub struct DistributedTree {
+/// Interface for a distributed SingleNodetree, adaptive by default.
+pub struct MultiNodeTree {
     /// Balancing is optional.
     pub balanced: bool,
 
     ///  A vector of Cartesian points.
     pub points: Points,
 
-    /// The nodes that span the tree, defined by its leaf nodes.
+    /// The nodes that span the SingleNodetree, defined by its leaf nodes.
     pub keys: MortonKeys,
 
-    /// Domain spanned by the points in the tree.
+    /// Domain spanned by the points in the SingleNodetree.
     pub domain: Domain,
 
-    /// Map between the points and the nodes in the tree.
+    /// Map between the points and the nodes in the SingleNodetree.
     pub points_to_keys: HashMap<Point, MortonKey>,
 
-    /// Map between the nodes in the tree and the points they contain.
+    /// Map between the nodes in the SingleNodetree and the points they contain.
     pub keys_to_points: HashMap<MortonKey, Points>,
 }
 
-impl DistributedTree {
-    /// Create a new DistributedTree from a set of distributed points which define a domain.
+impl MultiNodeTree {
+    /// Create a new MultiNodeTree from a set of distributed points which define a domain.
     pub fn new(
         points: &[[PointType; 3]],
         balanced: bool,
         world: &UserCommunicator,
-    ) -> DistributedTree {
+    ) -> MultiNodeTree {
         let domain = Domain::from_global_points(points, world);
 
         if balanced {
             let (keys, points, points_to_keys, keys_to_points) =
-                DistributedTree::balanced_tree(world, points, &domain);
+                MultiNodeTree::balanced_SingleNodetree(world, points, &domain);
 
-            DistributedTree {
+            MultiNodeTree {
                 balanced,
                 points,
                 keys,
@@ -66,9 +66,9 @@ impl DistributedTree {
             }
         } else {
             let (keys, points, points_to_keys, keys_to_points) =
-                DistributedTree::unbalanced_tree(world, points, &domain);
+                MultiNodeTree::unbalanced_SingleNodetree(world, points, &domain);
 
-            DistributedTree {
+            MultiNodeTree {
                 balanced,
                 points,
                 keys,
@@ -79,14 +79,14 @@ impl DistributedTree {
         }
     }
 
-    /// Complete a distributed block tree from the seed octants, algorithm 4 in [1] (parallel).
-    fn complete_blocktree(
+    /// Complete a distributed block SingleNodetree from the seed octants, algorithm 4 in [1] (parallel).
+    fn complete_blockSingleNodetree(
         seeds: &mut MortonKeys,
         &rank: &Rank,
         &size: &Rank,
         world: &UserCommunicator,
-    ) -> Tree {
-        // Define the tree's global domain with the finest first/last descendants
+    ) -> SingleNodeTree {
+        // Define the SingleNodetree's global domain with the finest first/last descendants
         if rank == 0 {
             let ffc_root = ROOT.finest_first_child();
             let min = seeds.iter().min().unwrap();
@@ -124,13 +124,13 @@ impl DistributedTree {
         }
 
         // Complete region between seeds at each process
-        let mut complete = Tree { keys: Vec::new() };
+        let mut complete = SingleNodeTree { keys: Vec::new() };
 
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
             let b = seeds[i + 1];
 
-            let mut tmp: MortonKeys = Tree::complete_region(&a, &b);
+            let mut tmp: MortonKeys = SingleNodeTree::complete_region(&a, &b);
             complete.keys.push(a);
             complete.keys.append(&mut tmp);
         }
@@ -143,7 +143,7 @@ impl DistributedTree {
         complete
     }
 
-    /// Create a mapping between points and octree nodes, assumed to overlap.
+    /// Create a mapping between points and ocSingleNodetree nodes, assumed to overlap.
     fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
         let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
 
@@ -166,7 +166,7 @@ impl DistributedTree {
         map
     }
 
-    /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
+    /// Create a mapping between ocSingleNodetree nodes and the points they contain, assumed to overlap.
     pub fn assign_nodes_to_points(
         keys: &MortonKeys,
         points: &Points,
@@ -191,46 +191,46 @@ impl DistributedTree {
         }
         map
     }
-    /// Split octree nodes (blocks) by counting how many particles they contain.
+    /// Split ocSingleNodetree nodes (blocks) by counting how many particles they contain.
     fn split_blocks(
         points: &Points,
-        mut blocktree: MortonKeys,
+        mut blockSingleNodetree: MortonKeys,
     ) -> (HashMap<MortonKey, Points>, HashMap<Point, MortonKey>) {
-        let split_blocktree;
+        let split_blockSingleNodetree;
         let mut blocks_to_points;
 
         loop {
-            let mut new_blocktree: MortonKeys = Vec::new();
+            let mut new_blockSingleNodetree: MortonKeys = Vec::new();
 
             // Map between blocks and the leaves they contain
-            blocks_to_points = DistributedTree::assign_nodes_to_points(&blocktree, points);
+            blocks_to_points = MultiNodeTree::assign_nodes_to_points(&blockSingleNodetree, points);
 
-            // Generate a new blocktree with a block's children if they violate the NCRIT constraint
+            // Generate a new blockSingleNodetree with a block's children if they violate the NCRIT constraint
             let mut check = 0;
             for (&block, points) in blocks_to_points.iter() {
                 let npoints = points.len();
 
                 if npoints > NCRIT {
                     let mut children = block.children();
-                    new_blocktree.append(&mut children);
+                    new_blockSingleNodetree.append(&mut children);
                 } else {
-                    new_blocktree.push(block);
+                    new_blockSingleNodetree.push(block);
                     check += 1;
                 }
             }
 
             if check == blocks_to_points.len() {
-                split_blocktree = new_blocktree;
+                split_blockSingleNodetree = new_blockSingleNodetree;
                 break;
             } else {
-                blocktree = new_blocktree;
+                blockSingleNodetree = new_blockSingleNodetree;
             }
         }
 
-        // Create bidirectional maps between points and keys of the final tree.
+        // Create bidirectional maps between points and keys of the final SingleNodetree.
         (
-            DistributedTree::assign_nodes_to_points(&split_blocktree, points),
-            DistributedTree::assign_points_to_nodes(points, &split_blocktree),
+            MultiNodeTree::assign_nodes_to_points(&split_blockSingleNodetree, points),
+            MultiNodeTree::assign_points_to_nodes(points, &split_blockSingleNodetree),
         )
     }
 
@@ -240,7 +240,7 @@ impl DistributedTree {
         let max: MortonKey = *leaves.iter().max().unwrap();
 
         // Complete the region between the least and greatest leaves.
-        let mut complete = Tree::complete_region(&min, &max);
+        let mut complete = SingleNodeTree::complete_region(&min, &max);
         complete.push(min);
         complete.push(max);
 
@@ -255,8 +255,8 @@ impl DistributedTree {
         seeds
     }
 
-    // Transfer points based on the coarse distributed blocktree.
-    fn transfer_points_to_blocktree(
+    // Transfer points based on the coarse distributed blockSingleNodetree.
+    fn transfer_points_to_blockSingleNodetree(
         world: &UserCommunicator,
         points: &[Point],
         seeds: &[MortonKey],
@@ -311,8 +311,8 @@ impl DistributedTree {
         received_points
     }
 
-    /// Specialization for unbalanced trees.
-    pub fn unbalanced_tree(
+    /// Specialization for unbalanced SingleNodetrees.
+    pub fn unbalanced_SingleNodetree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
@@ -340,36 +340,36 @@ impl DistributedTree {
         let comm = world.duplicate();
         hyksort(&mut points, K, comm);
 
-        // 2.ii Find unique leaf keys on each processor and place in a Tree
+        // 2.ii Find unique leaf keys on each processor and place in a SingleNodeTree
         let keys: MortonKeys = points.iter().map(|p| p.key).collect();
 
-        let mut tree = Tree { keys };
+        let mut SingleNodetree = SingleNodeTree { keys };
         // 3. Linearise received keys (remove overlaps if they exist).
-        tree.linearize();
+        SingleNodetree.linearize();
 
         // 4. Complete region spanned by node.
-        tree.complete();
+        SingleNodetree.complete();
 
-        // 5.i Find seeds and compute the coarse blocktree
-        let mut seeds = DistributedTree::find_seeds(&tree.keys);
+        // 5.i Find seeds and compute the coarse blockSingleNodetree
+        let mut seeds = MultiNodeTree::find_seeds(&SingleNodetree.keys);
 
-        let blocktree = DistributedTree::complete_blocktree(&mut seeds, &rank, &size, world);
+        let blockSingleNodetree = MultiNodeTree::complete_blockSingleNodetree(&mut seeds, &rank, &size, world);
 
         // 5.ii any data below the min seed sent to partner process
         let points =
-            DistributedTree::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
+            MultiNodeTree::transfer_points_to_blockSingleNodetree(world, &points, &seeds, &rank, &size);
 
         // 6. Split blocks based on ncrit constraint
         let (keys_to_points, points_to_keys) =
-            DistributedTree::split_blocks(&points, blocktree.keys);
+            MultiNodeTree::split_blocks(&points, blockSingleNodetree.keys);
 
         let mut keys: MortonKeys = keys_to_points.keys().cloned().collect();
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
 
-    /// Specialization for balanced trees.
-    pub fn balanced_tree(
+    /// Specialization for balanced SingleNodetrees.
+    pub fn balanced_SingleNodetree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
@@ -379,14 +379,14 @@ impl DistributedTree {
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        let (keys, points, _, _) = DistributedTree::unbalanced_tree(world, points, domain);
+        let (keys, points, _, _) = MultiNodeTree::unbalanced_SingleNodetree(world, points, domain);
 
-        // 1. Create a minimal balanced octree for local octants spanning their domain and linearize
-        let local_balanced = Tree { keys };
+        // 1. Create a minimal balanced ocSingleNodetree for local octants spanning their domain and linearize
+        let local_balanced = SingleNodeTree { keys };
         local_balanced.balance();
 
-        // 2. Find new  maps between points and locally balanced tree
-        let points_to_keys = DistributedTree::assign_points_to_nodes(&points, &local_balanced);
+        // 2. Find new  maps between points and locally balanced SingleNodetree
+        let points_to_keys = MultiNodeTree::assign_points_to_nodes(&points, &local_balanced);
         let mut points: Points = points
             .iter()
             .map(|p| Point {
@@ -401,12 +401,12 @@ impl DistributedTree {
         hyksort(&mut points, K, comm);
         let balanced_keys: MortonKeys = points.iter().map(|p| p.key).collect();
 
-        let mut balanced = Tree {
+        let mut balanced = SingleNodeTree {
             keys: balanced_keys,
         };
         balanced.linearize();
 
-        // 4. Find final bidirectional maps to non-overlapping tree
+        // 4. Find final bidirectional maps to non-overlapping SingleNodetree
         let points: Points = points
             .iter()
             .map(|p| Point {
@@ -415,16 +415,16 @@ impl DistributedTree {
                 key: MortonKey::from_point(&p.coordinate, domain),
             })
             .collect();
-        let points_to_keys = DistributedTree::assign_points_to_nodes(&points, &balanced);
-        let keys_to_points = DistributedTree::assign_nodes_to_points(&balanced, &points);
+        let points_to_keys = MultiNodeTree::assign_points_to_nodes(&points, &balanced);
+        let keys_to_points = MultiNodeTree::assign_nodes_to_points(&balanced, &points);
 
         let mut keys: MortonKeys = keys_to_points.keys().cloned().collect();
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
 
-    /// Serialize a DistributedTree's keys to VTK for visualization.
-    pub fn write_vtk(world: &UserCommunicator, filename: String, tree: &DistributedTree) {
+    /// Serialize a MultiNodeTree's keys to VTK for visualization.
+    pub fn write_vtk(world: &UserCommunicator, filename: String, SingleNodetree: &MultiNodeTree) {
         let comm = world.duplicate();
         let rank = comm.rank();
         let size = comm.size();
@@ -434,9 +434,9 @@ impl DistributedTree {
         let root_process = comm.process_at_rank(root_rank);
 
         // Gather the keys
-        let local_keys = &tree.keys;
+        let local_keys = &SingleNodetree.keys;
 
-        let nlocal_keys: Count = tree.keys.len() as Count;
+        let nlocal_keys: Count = SingleNodetree.keys.len() as Count;
 
         let mut global_key_counts: Vec<Count> = vec![0; size as usize];
 
@@ -469,7 +469,7 @@ impl DistributedTree {
             );
             root_process.gather_varcount_into_root(&local_keys[..], &mut key_partition);
 
-            global_keys.write_vtk(filename, &tree.domain);
+            global_keys.write_vtk(filename, &SingleNodetree.domain);
         } else {
             root_process.gather_varcount_into(&local_keys[..]);
         }
