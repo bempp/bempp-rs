@@ -1,4 +1,4 @@
-//! Data structures and methods to create distributed OcSingleNodetrees with MPI.
+//! Data structures and methods to create distributed octrees with MPI.
 
 use std::{collections::HashMap};
 
@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-/// Interface for a distributed SingleNodetree, adaptive by default.
+/// Concrete distributed multi-node tree.
 pub struct MultiNodeTree {
     /// Balancing is optional.
     pub balanced: bool,
@@ -28,16 +28,16 @@ pub struct MultiNodeTree {
     ///  A vector of Cartesian points.
     pub points: Points,
 
-    /// The nodes that span the SingleNodetree, defined by its leaf nodes.
+    /// The nodes that span the tree, defined by its leaf nodes.
     pub keys: MortonKeys,
 
-    /// Domain spanned by the points in the SingleNodetree.
+    /// Domain spanned by the points in the tree.
     pub domain: Domain,
 
-    /// Map between the points and the nodes in the SingleNodetree.
+    /// Map between the points and the nodes in the tree.
     pub points_to_keys: HashMap<Point, MortonKey>,
 
-    /// Map between the nodes in the SingleNodetree and the points they contain.
+    /// Map between the nodes in the tree and the points they contain.
     pub keys_to_points: HashMap<MortonKey, Points>,
 }
 
@@ -77,14 +77,14 @@ impl MultiNodeTree {
         }
     }
 
-    /// Complete a distributed block SingleNodetree from the seed octants, algorithm 4 in [1] (parallel).
+    /// Complete a distributed block tree from the seed octants, algorithm 4 in [1] (parallel).
     fn complete_blocktree(
         seeds: &mut MortonKeys,
         &rank: &Rank,
         &size: &Rank,
         world: &UserCommunicator,
     ) -> MortonKeys {
-        // Define the SingleNodetree's global domain with the finest first/last descendants
+        // Define the tree's global domain with the finest first/last descendants
         if rank == 0 {
             let ffc_root = ROOT.finest_first_child();
             let min = seeds.iter().min().unwrap();
@@ -122,7 +122,7 @@ impl MultiNodeTree {
         }
 
         // Complete region between seeds at each process
-        let mut complete =MortonKeys{keys: Vec::new()};
+        let mut complete = MortonKeys{keys: Vec::new()};
 
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
@@ -142,10 +142,10 @@ impl MultiNodeTree {
     }
 
 
-    /// Split ocSingleNodetree nodes (blocks) by counting how many particles they contain.
+    /// Split tree nodes (blocks) by counting how many particles they contain.
     fn split_blocks(
         points: &Points,
-        mut blockSingleNodetree: MortonKeys,
+        mut blocktree: MortonKeys,
     ) -> (HashMap<MortonKey, Points>, HashMap<Point, MortonKey>) {
         let split_blocktree;
         let mut blocks_to_points;
@@ -154,9 +154,9 @@ impl MultiNodeTree {
             let mut new_blocktree: MortonKeys = MortonKeys{keys: Vec::new()};
 
             // Map between blocks and the leaves they contain
-            blocks_to_points = assign_nodes_to_points(&blockSingleNodetree, points);
+            blocks_to_points = assign_nodes_to_points(&blocktree, points);
 
-            // Generate a new blockSingleNodetree with a block's children if they violate the NCRIT constraint
+            // Generate a new blocktree with a block's children if they violate the NCRIT constraint
             let mut check = 0;
             for (&block, points) in blocks_to_points.iter() {
                 let npoints = points.len();
@@ -174,11 +174,11 @@ impl MultiNodeTree {
                 split_blocktree = new_blocktree;
                 break;
             } else {
-                blockSingleNodetree = new_blocktree;
+                blocktree = new_blocktree;
             }
         }
 
-        // Create bidirectional maps between points and keys of the final SingleNodetree.
+        // Create bidirectional maps between points and keys of the final tree.
         (
             assign_nodes_to_points(&split_blocktree, points),
             assign_points_to_nodes(points, &split_blocktree),
@@ -206,8 +206,8 @@ impl MultiNodeTree {
         seeds
     }
 
-    // Transfer points based on the coarse distributed blockSingleNodetree.
-    fn transfer_points_to_blockSingleNodetree(
+    // Transfer points based on the coarse distributed blocktree.
+    fn transfer_points_to_blocktree(
         world: &UserCommunicator,
         points: &[Point],
         seeds: &[MortonKey],
@@ -216,13 +216,11 @@ impl MultiNodeTree {
     ) -> Points {
         let mut received_points: Points = Vec::new();
 
-        let min_seed;
-
-        if rank == 0 {
-            min_seed = points.iter().min().unwrap().key;
+        let min_seed = if rank == 0 {
+            points.iter().min().unwrap().key
         } else {
-            min_seed = *seeds.iter().min().unwrap();
-        }
+            *seeds.iter().min().unwrap()
+        };
 
         let prev_rank = if rank > 0 { rank - 1 } else { size - 1 };
         let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
@@ -262,7 +260,7 @@ impl MultiNodeTree {
         received_points
     }
 
-    /// Specialization for unbalanced SingleNodetrees.
+    /// Specialization for unbalanced tree.
     pub fn unbalanced_tree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
@@ -300,14 +298,14 @@ impl MultiNodeTree {
         // 4. Complete region spanned by node.
         local.complete();
 
-        // 5.i Find seeds and compute the coarse blockSingleNodetree
+        // 5.i Find seeds and compute the coarse blocktree
         let mut seeds = MultiNodeTree::find_seeds(&local);
 
         let block_tree =
             MultiNodeTree::complete_blocktree(&mut seeds, &rank, &size, world);
 
         // 5.ii any data below the min seed sent to partner process
-        let points = MultiNodeTree::transfer_points_to_blockSingleNodetree(
+        let points = MultiNodeTree::transfer_points_to_blocktree(
             world, &points, &seeds, &rank, &size,
         );
 
@@ -320,7 +318,7 @@ impl MultiNodeTree {
         (keys, points, points_to_keys, keys_to_points)
     }
 
-    /// Specialization for balanced SingleNodetrees.
+    /// Specialization for balanced tree.
     pub fn balanced_tree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
@@ -333,10 +331,10 @@ impl MultiNodeTree {
     ) {
         let (mut keys, points, _, _) = MultiNodeTree::unbalanced_tree(world, points, domain);
 
-        // 1. Create a minimal balanced ocSingleNodetree for local octants spanning their domain and linearize
+        // 1. Create a minimal balanced octree for local octants spanning their domain and linearize
         keys.balance();
 
-        // 2. Find new  maps between points and locally balanced SingleNodetree
+        // 2. Find new  maps between points and locally balanced tree
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let mut points: Points = points
             .iter()
@@ -354,7 +352,7 @@ impl MultiNodeTree {
 
         balanced_keys.linearize();
 
-        // 4. Find final bidirectional maps to non-overlapping SingleNodetree
+        // 4. Find final bidirectional maps to non-overlapping tree
         let points: Points = points
             .iter()
             .map(|p| Point {
@@ -400,7 +398,7 @@ impl Tree for MultiNodeTree {
 
     // Get domain, gets global domain in multi-node setting
     fn get_domain(&self) -> &Domain {
-        &&self.domain
+        &self.domain
     }
 
     // Get points associated with a tree node key

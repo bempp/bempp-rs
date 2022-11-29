@@ -1,4 +1,4 @@
-//! Data Structures and methods to create Octrees on a single node.
+//! Data Structures and methods to create octrees on a single node.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -17,7 +17,7 @@ use crate::{
     }
 };
 
-/// Interface for a local (non-distributed) Tree.
+/// Concrete local (non-distributed) Tree.
 #[derive(Debug)]
 pub struct SingleNodeTree {
     /// Balancing is optional.
@@ -95,7 +95,7 @@ impl SingleNodeTree {
 
         let domain = Domain::from_local_points(points);
         
-        let mut points: Points = points
+        let points: Points = points
             .iter()
             .enumerate()
             .map(|(i, p)| Point {
@@ -109,34 +109,24 @@ impl SingleNodeTree {
 
             if balanced {
                 keys.balance();
-                let keys_to_points = assign_nodes_to_points(&keys, &points);
-                let points_to_keys = assign_points_to_nodes(&points, &keys);
-                SingleNodeTree {
-                    balanced,
-                    points,
-                    keys,
-                    domain,
-                    points_to_keys,
-                    keys_to_points
-                }
-            } else {
-                let keys_to_points = assign_nodes_to_points(&keys, &points);
-                let points_to_keys = assign_points_to_nodes(&points, &keys);
-                SingleNodeTree {
-                    balanced,
-                    points,
-                    keys,
-                    domain,
-                    points_to_keys,
-                    keys_to_points
-                }
-        }
+            }
+                            
+            let keys_to_points = assign_nodes_to_points(&keys, &points);
+            let points_to_keys = assign_points_to_nodes(&points, &keys);
+            SingleNodeTree {
+                balanced,
+                points,
+                keys,
+                domain,
+                points_to_keys,
+                keys_to_points
+            }
     }
 }
 
 impl Tree for SingleNodeTree {
 
-    fn new(points: &[[PointType; 3]], balanced: bool, comm: Option<UserCommunicator>) -> SingleNodeTree {
+    fn new(points: &[[PointType; 3]], balanced: bool, _comm: Option<UserCommunicator>) -> SingleNodeTree {
         SingleNodeTree::new(points, balanced)
     }
 
@@ -168,5 +158,30 @@ impl Tree for SingleNodeTree {
     // Get points associated with a tree node key
     fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
         self.keys_to_points.get(key)
+    }
+}
+
+
+mod tests {
+
+    use super::*;
+
+    #[test]
+    pub fn test_assign_points_to_nodes() {
+        assert!(true);
+    }
+    
+    #[test]
+    pub fn test_assign_nodes_to_points() {
+        assert!(true);
+    }
+
+    #[test]
+    pub fn test_unbalanced_tree() {
+        assert!(true);
+    }
+    
+    pub fn test_balanced_tree() {
+        assert!(true);
     }
 }

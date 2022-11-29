@@ -19,7 +19,6 @@
 //! Algorithms (2002)
 
 pub mod constants;
-pub mod data;
 pub mod multi_node;
 pub mod single_node;
 pub mod tree;

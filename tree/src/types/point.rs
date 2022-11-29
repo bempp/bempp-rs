@@ -11,7 +11,6 @@ use mpi::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::JSON,
     types::morton::{KeyType, MortonKey},
 };
 
@@ -89,4 +88,3 @@ impl Hash for Point {
     }
 }
 
-impl JSON for Vec<Point> {}
