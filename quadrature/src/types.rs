@@ -2,6 +2,12 @@
 
 pub use solvers_element::cell::*;
 
+#[derive(Debug)]
+pub enum QuadratureError {
+    RuleNotFound,
+    ConnectivityError,
+}
+
 /// Definition of a numerical quadrature rule.
 pub struct NumericalQuadratureDefinition {
     /// The dimension d of a single point.
@@ -78,7 +84,7 @@ pub struct CellToCellConnectivity {
     /// to describe that the connection is possible through multiple
     /// entities, e.g. if cell to cell connectivity is described via
     /// matched up vertices.
-    pub local_indices: (Vec<usize>, Vec<usize>),
+    pub local_indices: Vec<(usize, usize)>,
 }
 
 /// A trait for obtaining a numerical quadrature rule. Depending
