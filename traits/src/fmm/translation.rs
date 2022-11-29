@@ -1,9 +1,7 @@
 //! Traits for dealing with translation operators
-use crate::traits::tree::Node;
-use cauchy::Scalar;
+use super::tree::Node;
 
 pub trait Translation {
-    type Item: Scalar;
     type Node: Node;
 
     // Particle to Multipole
