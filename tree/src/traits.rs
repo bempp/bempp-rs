@@ -1,5 +1,3 @@
-use mpi::topology::UserCommunicator;
-
 use crate::{
     types::{
         point::{PointType, Point, Points},
@@ -9,9 +7,6 @@ use crate::{
 };
 
 pub trait Tree {
-    // Create a new tree that is optionally balanced
-    fn new(points: &[[PointType; 3]], balanced: bool, comm: Option<UserCommunicator>) -> Self;
-
     // Get balancing information
     fn get_balanced(&self) -> bool;
 

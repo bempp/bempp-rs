@@ -1,44 +1,14 @@
-//! Data Structures and methods to create octrees on a single node.
-
-use std::{
-    collections::{HashMap, HashSet},
-};
-
-use mpi::{
-    topology::{UserCommunicator}
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
-    tree::Tree,
     types::{
-        morton::{MortonKey, MortonKeys},
+        domain::Domain,
         point::{PointType, Point, Points},
-        domain::Domain
-    }
+        morton::{MortonKey, MortonKeys},
+        single_node::SingleNodeTree,
+    },
+    traits::Tree,
 };
-
-/// Concrete local (non-distributed) Tree.
-#[derive(Debug)]
-pub struct SingleNodeTree {
-    /// Balancing is optional.
-    pub balanced: bool,
-
-    ///  A vector of Cartesian points.
-    pub points: Points,
-
-    /// The nodes that span the SingleNodeTree, defined by its leaf nodes.
-    pub keys: MortonKeys,
-
-    /// Domain spanned by the points in the SingleNodeTree.
-    pub domain: Domain,
-
-    /// Map between the points and the nodes in the SingleNodeTree.
-    pub points_to_keys: HashMap<Point, MortonKey>,
-
-    /// Map between the nodes in the SingleNodetree and the points they contain.
-    pub keys_to_points: HashMap<MortonKey, Points>,
-}
-
 
 /// Create a mapping between points and octree nodes, assumed to overlap.
 pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
@@ -126,10 +96,6 @@ impl SingleNodeTree {
 
 impl Tree for SingleNodeTree {
 
-    fn new(points: &[[PointType; 3]], balanced: bool, _comm: Option<UserCommunicator>) -> SingleNodeTree {
-        SingleNodeTree::new(points, balanced)
-    }
-
     // Get balancing information
     fn get_balanced(&self) -> bool {
         self.balanced
@@ -184,4 +150,5 @@ mod tests {
     pub fn test_balanced_tree() {
         assert!(true);
     }
+
 }

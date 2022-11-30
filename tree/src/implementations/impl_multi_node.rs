@@ -1,6 +1,4 @@
-//! Data structures and methods to create distributed octrees with MPI.
-
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use mpi::{
     topology::{Rank, UserCommunicator},
@@ -11,35 +9,19 @@ use hyksort::hyksort::hyksort;
 
 use crate::{
     constants::{K, NCRIT, ROOT},
-    single_node::{assign_points_to_nodes, assign_nodes_to_points},
-    tree::Tree,
+    traits::Tree,
     types::{
         domain::Domain,
-        morton::{MortonKey, MortonKeys, complete_region},
+        morton::{MortonKey, MortonKeys},
         point::{Point, PointType, Points},
+        multi_node::MultiNodeTree,
     },
+    implementations::{
+        impl_single_node::{assign_nodes_to_points, assign_points_to_nodes},
+        impl_morton::complete_region
+    }
 };
 
-/// Concrete distributed multi-node tree.
-pub struct MultiNodeTree {
-    /// Balancing is optional.
-    pub balanced: bool,
-
-    ///  A vector of Cartesian points.
-    pub points: Points,
-
-    /// The nodes that span the tree, defined by its leaf nodes.
-    pub keys: MortonKeys,
-
-    /// Domain spanned by the points in the tree.
-    pub domain: Domain,
-
-    /// Map between the points and the nodes in the tree.
-    pub points_to_keys: HashMap<Point, MortonKey>,
-
-    /// Map between the nodes in the tree and the points they contain.
-    pub keys_to_points: HashMap<MortonKey, Points>,
-}
 
 impl MultiNodeTree {
     /// Create a new MultiNodeTree from a set of distributed points which define a domain.
@@ -373,13 +355,6 @@ impl MultiNodeTree {
 
 
 impl Tree for MultiNodeTree {
-
-    // Create a new tree that is optionally balanced
-    fn new(points: &[[PointType; 3]], balanced: bool, comm: Option<UserCommunicator>) -> Self {
-
-        let comm = comm.unwrap();
-        MultiNodeTree::new(points, balanced, &comm)
-    }
 
     // Get balancing information
     fn get_balanced(&self) -> bool {
