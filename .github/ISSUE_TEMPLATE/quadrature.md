@@ -6,5 +6,3 @@ labels: solvers-quadrature
 assignees: ''
 
 ---
-
-**Describe the issue**
