@@ -20,5 +20,4 @@
 
 pub mod constants;
 pub mod implementations;
-pub mod traits;
 pub mod types;

@@ -1,5 +1,5 @@
 //! Traits for dealing with translation operators
-use super::tree::Node;
+use super::fmmtree::Node;
 
 pub trait Translation {
     type Node: Node;

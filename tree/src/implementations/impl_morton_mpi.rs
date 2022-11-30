@@ -1,7 +1,4 @@
-use crate::types::{
-    morton::{KeyType, MortonKey},
-    point::PointType,
-};
+use crate::types::morton::{KeyType, MortonKey};
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},

@@ -6,6 +6,7 @@ use mpi::{
 };
 
 use hyksort::hyksort::hyksort;
+use solvers_traits::tree::Tree;
 
 use crate::{
     constants::{K, NCRIT, ROOT},
@@ -13,7 +14,6 @@ use crate::{
         impl_morton::complete_region,
         impl_single_node::{assign_nodes_to_points, assign_points_to_nodes},
     },
-    traits::Tree,
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
@@ -358,6 +358,12 @@ impl MultiNodeTree {
 }
 
 impl Tree for MultiNodeTree {
+    type Domain = Domain;
+    type Point = Point;
+    type Points = Points;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
+
     // Get balancing information
     fn get_balanced(&self) -> bool {
         self.balanced

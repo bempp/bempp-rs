@@ -3,3 +3,4 @@
 pub mod fmm;
 pub mod general;
 pub mod types;
+pub mod tree;

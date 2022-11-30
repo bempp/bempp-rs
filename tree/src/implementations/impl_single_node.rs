@@ -1,13 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    traits::Tree,
-    types::{
-        domain::Domain,
-        morton::{MortonKey, MortonKeys},
-        point::{Point, PointType, Points},
-        single_node::SingleNodeTree,
-    },
+use solvers_traits::tree::Tree;
+
+use crate::types::{
+    domain::Domain,
+    morton::{MortonKey, MortonKeys},
+    point::{Point, PointType, Points},
+    single_node::SingleNodeTree,
 };
 
 /// Create a mapping between points and octree nodes, assumed to overlap.
@@ -96,6 +95,12 @@ impl SingleNodeTree {
 }
 
 impl Tree for SingleNodeTree {
+    type Domain = Domain;
+    type Point = Point;
+    type Points = Points;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
+
     // Get balancing information
     fn get_balanced(&self) -> bool {
         self.balanced
@@ -126,7 +131,6 @@ impl Tree for SingleNodeTree {
         self.keys_to_points.get(key)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
