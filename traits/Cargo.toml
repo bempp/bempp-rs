@@ -1,0 +1,20 @@
+[package]
+name = "solvers-traits"
+version = "0.0.1"
+authors = ["Timo Betcke"]
+edition = "2021"
+description = "Traits for all solvers components."
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-solvers/solvers"
+repository = "https://github.com/rusty-solvers/solvers"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "solvers_traits"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+cauchy="0.4.*"
+thiserror="1.*"

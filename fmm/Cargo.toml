@@ -1,0 +1,21 @@
+[package]
+name = "solvers-fmm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
+description = "FMM in Rust"
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-solvers/solvers"
+repository = "https://github.com/rusty-solvers/solvers"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "solvers_fmm"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+solvers-tools = { path = "../tools"}
+approx = "0.5"
+cauchy = "0.4"

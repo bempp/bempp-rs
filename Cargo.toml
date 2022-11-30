@@ -4,4 +4,6 @@ members = ["element",
            "quadrature",
            "tools",
            "tree",
-           "hyksort"]
+           "hyksort",
+           "fmm",
+           "traits"]
