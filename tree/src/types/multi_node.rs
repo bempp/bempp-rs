@@ -1,13 +1,12 @@
 //! Data structures and methods to create distributed octrees with MPI.
 
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use crate::types::{
-    domain::{Domain},
+    domain::Domain,
     morton::{MortonKey, MortonKeys},
-    point::{Point, Points}
+    point::{Point, Points},
 };
-
 
 /// Concrete distributed multi-node tree.
 pub struct MultiNodeTree {

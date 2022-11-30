@@ -29,4 +29,3 @@ impl Hash for Point {
         self.key.hash(state);
     }
 }
-

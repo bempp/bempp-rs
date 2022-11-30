@@ -1,14 +1,12 @@
-
+use crate::types::{
+    morton::{KeyType, MortonKey},
+    point::PointType,
+};
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
     Address,
 };
-use crate::types::{
-    morton::{KeyType, MortonKey},
-    point::PointType
-};
-
 
 unsafe impl Equivalence for MortonKey {
     type Out = UserDatatype;

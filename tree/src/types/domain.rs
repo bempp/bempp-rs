@@ -1,10 +1,6 @@
 //! Data structures and methods for defining the computational domain.
 
-use crate::{
-    types::{
-        point::PointType,
-    }
-};
+use crate::types::point::PointType;
 
 /// A domain is defined by an origin coordinate, and its diameter along all three Cartesian axes.
 #[repr(C)]

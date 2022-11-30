@@ -15,5 +15,6 @@ pub struct MortonKey {
 
 /// Vector of **MortonKeys**.
 #[derive(Clone, Debug, Default)]
-pub struct MortonKeys{ pub keys: Vec<MortonKey> }
-
+pub struct MortonKeys {
+    pub keys: Vec<MortonKey>,
+}

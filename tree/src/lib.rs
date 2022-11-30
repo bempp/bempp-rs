@@ -19,6 +19,6 @@
 //! Algorithms (2002)
 
 pub mod constants;
+pub mod implementations;
 pub mod traits;
 pub mod types;
-pub mod implementations;

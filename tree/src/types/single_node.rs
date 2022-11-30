@@ -1,15 +1,11 @@
 //! Data Structures and methods to create octrees on a single node.
 
-use std::{
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
-use crate::{
-    types::{
-        morton::{MortonKey, MortonKeys},
-        point::{Point, Points},
-        domain::Domain
-    }
+use crate::types::{
+    domain::Domain,
+    morton::{MortonKey, MortonKeys},
+    point::{Point, Points},
 };
 
 /// Concrete local (non-distributed) Tree.

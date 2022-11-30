@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    traits::Tree,
     types::{
         domain::Domain,
-        point::{PointType, Point, Points},
         morton::{MortonKey, MortonKeys},
+        point::{Point, PointType, Points},
         single_node::SingleNodeTree,
     },
-    traits::Tree,
 };
 
 /// Create a mapping between points and octree nodes, assumed to overlap.
@@ -20,7 +20,9 @@ pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Po
         if nodes.contains(&point.key) {
             map.insert(*point, point.key);
         } else {
-            let mut ancestors: MortonKeys = MortonKeys{keys: point.key.ancestors().into_iter().collect()};
+            let mut ancestors: MortonKeys = MortonKeys {
+                keys: point.key.ancestors().into_iter().collect(),
+            };
             ancestors.sort();
             for ancestor in ancestors.keys {
                 if nodes.contains(&ancestor) {
@@ -34,10 +36,7 @@ pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Po
 }
 
 /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
-pub fn assign_nodes_to_points(
-    keys: &MortonKeys,
-    points: &Points,
-) -> HashMap<MortonKey, Points> {
+pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<MortonKey, Points> {
     let keys: HashSet<MortonKey> = keys.iter().cloned().collect();
     let mut map: HashMap<MortonKey, Points> = HashMap::new();
 
@@ -45,7 +44,9 @@ pub fn assign_nodes_to_points(
         if keys.contains(&point.key) {
             map.entry(point.key).or_insert(Vec::new()).push(*point);
         } else {
-            let mut ancestors: MortonKeys = MortonKeys{keys: point.key.ancestors().into_iter().collect()};
+            let mut ancestors: MortonKeys = MortonKeys {
+                keys: point.key.ancestors().into_iter().collect(),
+            };
             ancestors.sort();
 
             for ancestor in ancestors.keys {
@@ -60,11 +61,9 @@ pub fn assign_nodes_to_points(
 }
 
 impl SingleNodeTree {
-
     pub fn new(points: &[[PointType; 3]], balanced: bool) -> SingleNodeTree {
-
         let domain = Domain::from_local_points(points);
-        
+
         let points: Points = points
             .iter()
             .enumerate()
@@ -74,28 +73,29 @@ impl SingleNodeTree {
                 key: MortonKey::from_point(p, &domain),
             })
             .collect();
-        
-            let mut keys = MortonKeys { keys: points.iter().map(|p| p.key).collect() };
 
-            if balanced {
-                keys.balance();
-            }
-                            
-            let keys_to_points = assign_nodes_to_points(&keys, &points);
-            let points_to_keys = assign_points_to_nodes(&points, &keys);
-            SingleNodeTree {
-                balanced,
-                points,
-                keys,
-                domain,
-                points_to_keys,
-                keys_to_points
-            }
+        let mut keys = MortonKeys {
+            keys: points.iter().map(|p| p.key).collect(),
+        };
+
+        if balanced {
+            keys.balance();
+        }
+
+        let keys_to_points = assign_nodes_to_points(&keys, &points);
+        let points_to_keys = assign_points_to_nodes(&points, &keys);
+        SingleNodeTree {
+            balanced,
+            points,
+            keys,
+            domain,
+            points_to_keys,
+            keys_to_points,
+        }
     }
 }
 
 impl Tree for SingleNodeTree {
-
     // Get balancing information
     fn get_balanced(&self) -> bool {
         self.balanced
@@ -127,7 +127,6 @@ impl Tree for SingleNodeTree {
     }
 }
 
-
 mod tests {
 
     use super::*;
@@ -136,7 +135,7 @@ mod tests {
     pub fn test_assign_points_to_nodes() {
         assert!(true);
     }
-    
+
     #[test]
     pub fn test_assign_nodes_to_points() {
         assert!(true);
@@ -146,9 +145,8 @@ mod tests {
     pub fn test_unbalanced_tree() {
         assert!(true);
     }
-    
+
     pub fn test_balanced_tree() {
         assert!(true);
     }
-
 }

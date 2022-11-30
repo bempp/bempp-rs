@@ -6,12 +6,7 @@ use mpi::{
     Address,
 };
 
-use crate::{
-    types::{
-        domain::Domain,
-        point::PointType
-    }
-};
+use crate::types::{domain::Domain, point::PointType};
 
 unsafe impl Equivalence for Domain {
     type Out = UserDatatype;
@@ -31,7 +26,6 @@ unsafe impl Equivalence for Domain {
 }
 
 impl Domain {
-
     /// Compute the points domain over all nodes.
     pub fn from_global_points(local_points: &[[PointType; 3]], comm: &UserCommunicator) -> Domain {
         let size = comm.size();

@@ -1,9 +1,7 @@
-use crate::{
-    types::{
-        point::{PointType, Point, Points},
-        morton::{MortonKey, MortonKeys},
-        domain::Domain
-    }
+use crate::types::{
+    domain::Domain,
+    morton::{MortonKey, MortonKeys},
+    point::{Point, PointType, Points},
 };
 
 pub trait Tree {

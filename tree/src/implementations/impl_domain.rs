@@ -1,7 +1,4 @@
-use crate::types::{
-    point::PointType,
-    domain::Domain
-};
+use crate::types::{domain::Domain, point::PointType};
 
 impl Domain {
     /// Compute the domain defined by a set of points on a local node.

@@ -1,13 +1,8 @@
 //! Data structures and methods for Cartesian Points in 3D.
 
-use std::cmp::Ordering;
-use std::hash::{Hash, Hasher};
-
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    types::morton::MortonKey,
-};
+use crate::types::morton::MortonKey;
 
 pub type PointType = f64;
 

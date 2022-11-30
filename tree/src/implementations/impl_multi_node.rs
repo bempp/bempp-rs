@@ -9,19 +9,18 @@ use hyksort::hyksort::hyksort;
 
 use crate::{
     constants::{K, NCRIT, ROOT},
+    implementations::{
+        impl_morton::complete_region,
+        impl_single_node::{assign_nodes_to_points, assign_points_to_nodes},
+    },
     traits::Tree,
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
-        point::{Point, PointType, Points},
         multi_node::MultiNodeTree,
+        point::{Point, PointType, Points},
     },
-    implementations::{
-        impl_single_node::{assign_nodes_to_points, assign_points_to_nodes},
-        impl_morton::complete_region
-    }
 };
-
 
 impl MultiNodeTree {
     /// Create a new MultiNodeTree from a set of distributed points which define a domain.
@@ -104,7 +103,7 @@ impl MultiNodeTree {
         }
 
         // Complete region between seeds at each process
-        let mut complete = MortonKeys{keys: Vec::new()};
+        let mut complete = MortonKeys { keys: Vec::new() };
 
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
@@ -123,7 +122,6 @@ impl MultiNodeTree {
         complete
     }
 
-
     /// Split tree nodes (blocks) by counting how many particles they contain.
     fn split_blocks(
         points: &Points,
@@ -133,7 +131,7 @@ impl MultiNodeTree {
         let mut blocks_to_points;
 
         loop {
-            let mut new_blocktree: MortonKeys = MortonKeys{keys: Vec::new()};
+            let mut new_blocktree: MortonKeys = MortonKeys { keys: Vec::new() };
 
             // Map between blocks and the leaves they contain
             blocks_to_points = assign_nodes_to_points(&blocktree, points);
@@ -179,10 +177,12 @@ impl MultiNodeTree {
 
         // Find seeds by filtering for leaves at coarsest level
         let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
-        let mut seeds: MortonKeys = MortonKeys{keys: complete
-            .into_iter()
-            .filter(|k| k.level() == coarsest_level)
-            .collect()};
+        let mut seeds: MortonKeys = MortonKeys {
+            keys: complete
+                .into_iter()
+                .filter(|k| k.level() == coarsest_level)
+                .collect(),
+        };
 
         seeds.sort();
         seeds
@@ -272,8 +272,10 @@ impl MultiNodeTree {
         hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor
-        let mut local = MortonKeys { keys: points.iter().map(|p| p.key).collect() };
-        
+        let mut local = MortonKeys {
+            keys: points.iter().map(|p| p.key).collect(),
+        };
+
         // 3. Linearise received keys (remove overlaps if they exist).
         local.linearize();
 
@@ -283,19 +285,18 @@ impl MultiNodeTree {
         // 5.i Find seeds and compute the coarse blocktree
         let mut seeds = MultiNodeTree::find_seeds(&local);
 
-        let block_tree =
-            MultiNodeTree::complete_blocktree(&mut seeds, &rank, &size, world);
+        let block_tree = MultiNodeTree::complete_blocktree(&mut seeds, &rank, &size, world);
 
         // 5.ii any data below the min seed sent to partner process
-        let points = MultiNodeTree::transfer_points_to_blocktree(
-            world, &points, &seeds, &rank, &size,
-        );
+        let points =
+            MultiNodeTree::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
 
         // 6. Split blocks based on ncrit constraint
-        let (keys_to_points, points_to_keys) =
-            MultiNodeTree::split_blocks(&points, block_tree);
+        let (keys_to_points, points_to_keys) = MultiNodeTree::split_blocks(&points, block_tree);
 
-        let mut keys = MortonKeys{keys: keys_to_points.keys().cloned().collect()};
+        let mut keys = MortonKeys {
+            keys: keys_to_points.keys().cloned().collect(),
+        };
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
@@ -330,7 +331,9 @@ impl MultiNodeTree {
         // 3. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();
         hyksort(&mut points, K, comm);
-        let mut balanced_keys = MortonKeys{keys: points.iter().map(|p| p.key).collect()};
+        let mut balanced_keys = MortonKeys {
+            keys: points.iter().map(|p| p.key).collect(),
+        };
 
         balanced_keys.linearize();
 
@@ -346,16 +349,15 @@ impl MultiNodeTree {
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let keys_to_points = assign_nodes_to_points(&keys, &points);
 
-        let mut keys: MortonKeys = MortonKeys{keys: keys_to_points.keys().cloned().collect()};
+        let mut keys: MortonKeys = MortonKeys {
+            keys: keys_to_points.keys().cloned().collect(),
+        };
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
-
 }
 
-
 impl Tree for MultiNodeTree {
-
     // Get balancing information
     fn get_balanced(&self) -> bool {
         self.balanced

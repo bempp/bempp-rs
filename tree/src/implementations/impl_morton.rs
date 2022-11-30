@@ -1,10 +1,9 @@
 use itertools::{izip, Itertools};
 use std::{
-    collections::HashSet,
-    ops::{Deref, DerefMut},
     cmp::Ordering,
+    collections::HashSet,
     hash::{Hash, Hasher},
-
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -15,8 +14,8 @@ use crate::{
     },
     types::{
         domain::Domain,
+        morton::{KeyType, MortonKey, MortonKeys},
         point::PointType,
-        morton::{KeyType, MortonKey, MortonKeys}
     },
 };
 
@@ -59,8 +58,7 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
         let current_item = work_list.pop().unwrap();
         if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item) {
             minimal_tree.push(current_item);
-        } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item))
-        {
+        } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item)) {
             let mut children = current_item.children();
             work_list.append(&mut children);
         }
@@ -71,8 +69,7 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
 }
 
 impl MortonKeys {
-  
-    /// Complete the region between all elements in an vector of Morton keys that doesn't 
+    /// Complete the region between all elements in an vector of Morton keys that doesn't
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
         let a = self.keys.iter().min().unwrap();
@@ -124,7 +121,9 @@ impl MortonKeys {
             }
         }
 
-        let mut balanced = MortonKeys{keys: balanced.into_iter().collect()};
+        let mut balanced = MortonKeys {
+            keys: balanced.into_iter().collect(),
+        };
         balanced.sort();
         balanced.linearize();
         self.keys = balanced.keys;
@@ -578,7 +577,6 @@ impl Hash for MortonKey {
         self.morton.hash(state);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
