@@ -1,7 +1,20 @@
 [workspace]
 
-members = ["element",
-           "quadrature",
-           "tools",
-           "fmm",
-           "traits"]
+members = [
+    "element",
+    "quadrature",
+    "tools",
+    "tree",
+    "hyksort",
+    "fmm",
+    "traits"
+]
+
+default-members = [
+    "element",
+    "quadrature",
+    "tools",
+    "tree",
+    "fmm",
+    "traits"
+]

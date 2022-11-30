@@ -1,9 +1,8 @@
 //! Crate wide constants.
 
 use crate::types::morton::{KeyType, MortonKey};
-use mpi::topology::Rank;
 
-pub const K: Rank = 2;
+pub const K: i32 = 2;
 
 pub const NCRIT: usize = 150;
 
