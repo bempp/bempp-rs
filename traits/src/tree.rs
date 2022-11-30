@@ -1,5 +1,4 @@
 pub trait Tree {
-
     type Domain;
     type Point;
     type Points;

@@ -1,4 +1,4 @@
 //! FMM traits
 
-pub mod translation;
 pub mod fmmtree;
+pub mod translation;
