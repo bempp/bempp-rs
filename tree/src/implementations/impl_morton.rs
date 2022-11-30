@@ -145,7 +145,7 @@ impl DerefMut for MortonKeys {
 }
 
 /// Serialize a Morton Key for VTK visualization.
-fn serialize_morton_key(key: MortonKey, domain: &Domain) -> Vec<f64> {
+pub fn serialize_morton_key(key: &MortonKey, domain: &Domain) -> Vec<f64> {
     let anchor = key.anchor;
 
     let mut serialized = Vec::<PointType>::with_capacity(24);
@@ -549,6 +549,10 @@ impl MortonKey {
             .filter(|d| !d.is_none())
             .map(|d| d.unwrap())
             .collect()
+    }
+
+    pub fn serialize(&self, domain: &Domain) -> Vec<f64> {
+        serialize_morton_key(self, domain)
     }
 }
 

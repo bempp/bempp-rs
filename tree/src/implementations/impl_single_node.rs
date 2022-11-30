@@ -127,6 +127,8 @@ impl Tree for SingleNodeTree {
     }
 }
 
+
+#[cfg(test)]
 mod tests {
 
     use super::*;

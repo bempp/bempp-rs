@@ -1,7 +1,7 @@
 use crate::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},
-    point::{Point, PointType, Points},
+    point::{Point, Points},
 };
 
 pub trait Tree {

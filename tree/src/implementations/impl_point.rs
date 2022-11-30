@@ -29,3 +29,11 @@ impl Hash for Point {
         self.key.hash(state);
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    pub fn test_ordering() {
+        assert!(true)
+    }
+}
