@@ -1,5 +1,5 @@
 ---
-name: `/tree`
+name: solvers-tree
 about: Create a issue relates to the solvers-tree crate
 title: ''
 labels: solvers-tree
