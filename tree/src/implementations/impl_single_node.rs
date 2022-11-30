@@ -148,6 +148,7 @@ mod tests {
         assert!(true);
     }
 
+    #[test]
     pub fn test_balanced_tree() {
         assert!(true);
     }

@@ -33,6 +33,7 @@ impl Hash for Point {
 #[cfg(test)]
 mod tests {
 
+    #[test]
     pub fn test_ordering() {
         assert!(true)
     }
