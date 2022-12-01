@@ -136,24 +136,44 @@ impl Tree for SingleNodeTree {
 mod tests {
 
     use super::*;
+    use rand::prelude::*;
+    use rand::SeedableRng;
+
+    /// Test fixture for NPOINTS randomly distributed points.
+    fn points_fixture(npoints: usize) -> Vec<[f64; 3]> {
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..1.0);
+        let mut points = Vec::new();
+
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
+        points
+    }
 
     #[test]
     pub fn test_assign_points_to_nodes() {
-        assert!(true);
-    }
+        let points = points_fixture(1000);
+        let unbalanced = SingleNodeTree::new(&points, false);
+        let balanced = SingleNodeTree::new(&points, true);
 
-    #[test]
-    pub fn test_assign_nodes_to_points() {
-        assert!(true);
-    }
+        // Test that all points have been assigned
+        let keys = unbalanced.get_keys();
+        let mut npoints = 0;
+        for key in keys.iter() {
+            npoints += unbalanced.map_key_to_points(&key).unwrap().len();
+        }
+        assert!(npoints == unbalanced.get_points().len());
 
-    #[test]
-    pub fn test_unbalanced_tree() {
-        assert!(true);
-    }
-
-    #[test]
-    pub fn test_balanced_tree() {
-        assert!(true);
+        let keys = balanced.get_keys();
+        let mut npoints = 0;
+        for key in keys.iter() {
+            npoints += balanced.map_key_to_points(&key).unwrap().len();
+        }
+        assert!(npoints == balanced.get_points().len());
     }
 }

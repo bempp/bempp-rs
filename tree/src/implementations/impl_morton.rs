@@ -774,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sorting() {
+    fn test_ordering() {
         let npoints = 1000;
         let mut range = rand::thread_rng();
         let mut points: Vec<[PointType; 3]> = Vec::new();

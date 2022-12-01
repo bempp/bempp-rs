@@ -11,8 +11,8 @@ use solvers_tree::{
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
-        single_node::SingleNodeTree,
         point::{PointType, Points},
+        single_node::SingleNodeTree,
     },
 };
 
@@ -33,7 +33,6 @@ fn points_fixture() -> Vec<[f64; 3]> {
     }
     points
 }
-
 
 fn main() {
     // Single Node Tree

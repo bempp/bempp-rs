@@ -32,9 +32,47 @@ impl Hash for Point {
 
 #[cfg(test)]
 mod tests {
+    use rand::prelude::*;
+    use rand::Rng;
+    use rand::SeedableRng;
+
+    use crate::types::{
+        domain::Domain,
+        morton::MortonKey,
+        point::{Point, PointType, Points},
+    };
 
     #[test]
-    pub fn test_ordering() {
-        assert!(true)
+    fn test_ordering() {
+        let npoints = 1000;
+        let mut range = rand::thread_rng();
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+
+        for _ in 0..npoints {
+            points.push([range.gen(), range.gen(), range.gen()]);
+        }
+
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let mut points: Points = points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                global_idx: i,
+                key: MortonKey::from_point(p, &domain),
+            })
+            .collect();
+
+        points.sort();
+
+        for i in 0..(points.len() - 1) {
+            let a = points[i];
+            let b = points[i + 1];
+            assert!(a <= b);
+        }
     }
 }
