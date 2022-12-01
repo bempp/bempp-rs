@@ -5,18 +5,18 @@ use rand::SeedableRng;
 
 use mpi::{
     environment::Universe,
-    topology::{UserCommunicator, SystemCommunicator},
-    traits::*
+    topology::{SystemCommunicator, UserCommunicator},
+    traits::*,
 };
 
 use solvers_tree::{
+    constants::{NCRIT, ROOT},
     types::{
-        morton::{MortonKey, MortonKeys},
         domain::Domain,
+        morton::{MortonKey, MortonKeys},
+        multi_node::MultiNodeTree,
         point::{PointType, Points},
-        multi_node::MultiNodeTree
     },
-    constants::{ROOT, NCRIT},
 };
 
 const NPOINTS: u64 = 5000;
@@ -68,7 +68,7 @@ fn test_span(tree: &MortonKeys) {
     let max_level = tree.iter().map(|block| block.level()).max().unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
-    
+
     let mut level = 0;
     let mut uniform = vec![ROOT];
     while level < max_level {
@@ -88,7 +88,6 @@ fn test_span(tree: &MortonKeys) {
         .into_iter()
         .filter(|node| min <= node && node <= max)
         .collect();
-
 
     // Test that each member of the uniform tree, or their ancestors are contained within the
     // tree.

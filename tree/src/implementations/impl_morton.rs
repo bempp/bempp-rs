@@ -585,10 +585,14 @@ impl Hash for MortonKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
+    use crate::types::{
+        domain::Domain,
+        morton::MortonKey,
+        point::{Point, Points},
+    };
     use rand::prelude::*;
+    use rand::Rng;
     use rand::SeedableRng;
-    use crate::types::{domain::Domain, point::{Point, Points}, morton::MortonKey};
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {
@@ -655,12 +659,11 @@ mod tests {
     }
 
     fn keys_fixture() -> MortonKeys {
- 
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
         let mut points: Vec<[PointType; 3]> = Vec::new();
         let npoints = 1000;
-    
+
         for _ in 0..npoints {
             points.push([
                 between.sample(&mut range),
@@ -668,7 +671,7 @@ mod tests {
                 between.sample(&mut range),
             ])
         }
-        
+
         let domain = Domain::from_local_points(&points);
 
         let points: Points = points

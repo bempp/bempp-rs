@@ -41,7 +41,7 @@ pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<Mor
 
     for point in points.iter() {
         if keys.contains(&point.key) {
-            map.entry(point.key).or_insert(Vec::new()).push(*point);
+            map.entry(point.key).or_default().push(*point);
         } else {
             let mut ancestors: MortonKeys = MortonKeys {
                 keys: point.key.ancestors().into_iter().collect(),
@@ -50,7 +50,7 @@ pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<Mor
 
             for ancestor in ancestors.keys {
                 if keys.contains(&ancestor) {
-                    map.entry(ancestor).or_insert(Vec::new()).push(*point);
+                    map.entry(ancestor).or_default().push(*point);
                     break;
                 }
             }
