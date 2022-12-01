@@ -9,6 +9,7 @@ homepage = "https://github.com/rusty-fast-solvers/solvers-tree"
 repository = "https://github.com/rusty-fast-solvers/solvers-tree"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
+autoexamples = false
 
 [lib]
 name = "solvers_tree"
