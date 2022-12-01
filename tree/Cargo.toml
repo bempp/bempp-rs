@@ -11,7 +11,7 @@ keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "rusty_tree"
+name = "solvers_tree"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]

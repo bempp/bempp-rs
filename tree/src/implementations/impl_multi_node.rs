@@ -140,7 +140,6 @@ impl MultiNodeTree {
             let mut check = 0;
             for (&block, points) in blocks_to_points.iter() {
                 let npoints = points.len();
-
                 if npoints > NCRIT {
                     let mut children = block.children();
                     new_blocktree.append(&mut children);
@@ -316,7 +315,6 @@ impl MultiNodeTree {
 
         // 1. Create a minimal balanced octree for local octants spanning their domain and linearize
         keys.balance();
-
         // 2. Find new  maps between points and locally balanced tree
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let mut points: Points = points
@@ -346,14 +344,11 @@ impl MultiNodeTree {
                 key: MortonKey::from_point(&p.coordinate, domain),
             })
             .collect();
-        let points_to_keys = assign_points_to_nodes(&points, &keys);
-        let keys_to_points = assign_nodes_to_points(&keys, &points);
+        let points_to_keys = assign_points_to_nodes(&points, &balanced_keys);
+        let keys_to_points = assign_nodes_to_points(&balanced_keys, &points);
 
-        let mut keys: MortonKeys = MortonKeys {
-            keys: keys_to_points.keys().cloned().collect(),
-        };
-        keys.sort();
-        (keys, points, points_to_keys, keys_to_points)
+        balanced_keys.sort();
+        (balanced_keys, points, points_to_keys, keys_to_points)
     }
 }
 

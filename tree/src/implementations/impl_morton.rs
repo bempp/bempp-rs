@@ -586,6 +586,9 @@ impl Hash for MortonKey {
 mod tests {
     use super::*;
     use rand::Rng;
+    use rand::prelude::*;
+    use rand::SeedableRng;
+    use crate::types::{domain::Domain, point::{Point, Points}, morton::MortonKey};
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {
@@ -649,6 +652,38 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn keys_fixture() -> MortonKeys {
+ 
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..1.0);
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+        let npoints = 1000;
+    
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
+        
+        let domain = Domain::from_local_points(&points);
+
+        let points: Points = points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                global_idx: i,
+                key: MortonKey::from_point(p, &domain),
+            })
+            .collect();
+
+        let keys: Vec<MortonKey> = points.iter().map(|p| p.key).collect();
+
+        MortonKeys { keys }
     }
 
     #[test]
@@ -1003,6 +1038,84 @@ mod tests {
 
             for i in 0..26 {
                 assert!(expected[i] == result[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_complete_region() {
+        let a: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 16,
+        };
+        let b: MortonKey = MortonKey {
+            anchor: [65535, 65535, 65535],
+            morton: 0b111111111111111111111111111111111111111111111111000000000010000,
+        };
+
+        let region = complete_region(&a, &b);
+
+        let fa = a.finest_ancestor(&b);
+
+        let min = region.iter().min().unwrap();
+        let max = region.iter().max().unwrap();
+
+        // Test that bounds are satisfied
+        assert!(a <= *min);
+        assert!(b >= *max);
+
+        // Test that FCA is an ancestor of all nodes in the result
+        for node in region.iter() {
+            let ancestors = node.ancestors();
+            assert!(ancestors.contains(&fa));
+        }
+
+        // Test that completed region doesn't contain its bounds
+        assert!(!region.contains(&a));
+        assert!(!region.contains(&b));
+
+        // Test that the compeleted region doesn't contain any overlaps
+        for node in region.iter() {
+            let mut ancestors = node.ancestors();
+            ancestors.remove(node);
+            for ancestor in ancestors.iter() {
+                assert!(!region.contains(ancestor))
+            }
+        }
+
+        // Test that the region is sorted
+        for i in 0..region.iter().len() - 1 {
+            let a = region[i];
+            let b = region[i + 1];
+
+            assert!(a <= b);
+        }
+    }
+
+    #[test]
+    fn test_linearize() {
+        let mut keys = keys_fixture();
+        keys.linearize();
+
+        // Test that a linearized tree is sorted
+        for i in 0..(keys.iter().len() - 1) {
+            let a = keys[i];
+            let b = keys[i + 1];
+            assert!(a <= b);
+        }
+
+        // Test that elements in a linearized tree are unique
+        let unique: HashSet<MortonKey> = keys.iter().cloned().collect();
+        assert!(unique.len() == keys.len());
+
+        // Test that a linearized tree contains no overlaps
+        let mut copy: Vec<MortonKey> = keys.keys.iter().cloned().collect();
+        for &key in keys.iter() {
+            let ancestors = key.ancestors();
+            copy.retain(|&k| k != key);
+
+            for ancestor in &ancestors {
+                assert!(!copy.contains(ancestor))
             }
         }
     }
