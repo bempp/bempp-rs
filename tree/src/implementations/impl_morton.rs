@@ -1051,5 +1051,8 @@ mod tests {
 
         // test that we can call keys as an iterator
         keys.iter().sorted();
+
+        // test that iterator index resets to 0
+        assert!(keys.index == 0);
     }
 }
