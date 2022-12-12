@@ -11,8 +11,8 @@ use crate::types::{
 /// Concrete local (non-distributed) Tree.
 #[derive(Debug)]
 pub struct SingleNodeTree {
-    /// Balancing is optional.
-    pub balanced: bool,
+    /// Adaptivity is optional.
+    pub adaptive: bool,
 
     ///  A vector of Cartesian points.
     pub points: Points,

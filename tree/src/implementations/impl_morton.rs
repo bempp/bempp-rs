@@ -69,6 +69,12 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
 }
 
 impl MortonKeys {
+    pub fn new() -> MortonKeys {
+        MortonKeys {
+            keys: Vec::new(),
+            index: 0,
+        }
+    }
     /// Complete the region between all elements in an vector of Morton keys that doesn't
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
@@ -226,18 +232,13 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// `level` - The level of the tree at which the point will be mapped.
 /// `origin` - The origin of the bounding box.
 /// `diameter` - The diameter of the bounding box in each dimension.
-fn point_to_anchor(
-    point: &[PointType; 3],
-    level: KeyType,
-    origin: &[PointType; 3],
-    diameter: &[PointType; 3],
-) -> [KeyType; 3] {
+pub fn point_to_anchor(point: &[PointType; 3], level: KeyType, domain: &Domain) -> [KeyType; 3] {
     let mut anchor: [KeyType; 3] = [0, 0, 0];
 
     let level_size = (1 << level) as PointType;
 
     for (anchor_value, point_value, &origin_value, &diameter_value) in
-        izip!(&mut anchor, point, origin, diameter)
+        izip!(&mut anchor, point, &domain.origin, &domain.diameter)
     {
         *anchor_value =
             ((point_value - origin_value) * level_size / diameter_value).floor() as KeyType
@@ -252,7 +253,7 @@ fn point_to_anchor(
 ///
 /// # Arguments
 /// `anchor` - A vector with 4 elements defining the integer coordinates and level.
-fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
+pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
     let x = anchor[0];
     let y = anchor[1];
     let z = anchor[2];
@@ -305,7 +306,7 @@ impl MortonKey {
 
     /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
     pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
-        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
+        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain);
         MortonKey::from_anchor(&anchor)
     }
 
