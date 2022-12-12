@@ -123,7 +123,7 @@ impl MortonKeys {
 
         let mut balanced = MortonKeys {
             keys: balanced.into_iter().collect(),
-            index: 0
+            index: 0,
         };
         balanced.sort();
         balanced.linearize();
@@ -150,7 +150,7 @@ impl Iterator for MortonKeys {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.keys.len() {
-            return None
+            return None;
         }
 
         self.index += 1;
@@ -599,8 +599,8 @@ impl Hash for MortonKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
     use rand::prelude::*;
+    use rand::Rng;
     use rand::SeedableRng;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
@@ -1025,11 +1025,10 @@ mod tests {
 
     #[test]
     pub fn test_morton_keys_iterator() {
-
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
         let mut points: Vec<[PointType; 3]> = Vec::new();
-        
+
         let npoints = 1000;
         for _ in 0..npoints {
             points.push([
@@ -1040,7 +1039,7 @@ mod tests {
         }
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
-            diameter: [1.0, 1.0, 1.0]
+            diameter: [1.0, 1.0, 1.0],
         };
 
         let keys = points
@@ -1048,14 +1047,9 @@ mod tests {
             .map(|p| MortonKey::from_point(p, &domain))
             .collect();
 
-        let keys = MortonKeys {
-            keys,
-            index: 0
-        };
+        let keys = MortonKeys { keys, index: 0 };
 
         // test that we can call keys as an iterator
         keys.iter().sorted();
-        
     }
-    
 }

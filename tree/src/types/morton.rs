@@ -17,5 +17,5 @@ pub struct MortonKey {
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys {
     pub keys: Vec<MortonKey>,
-    pub index: usize
+    pub index: usize,
 }
