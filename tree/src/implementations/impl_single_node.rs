@@ -21,6 +21,7 @@ pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Po
         } else {
             let mut ancestors: MortonKeys = MortonKeys {
                 keys: point.key.ancestors().into_iter().collect(),
+                index: 0
             };
             ancestors.sort();
             for ancestor in ancestors.keys {
@@ -45,6 +46,7 @@ pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<Mor
         } else {
             let mut ancestors: MortonKeys = MortonKeys {
                 keys: point.key.ancestors().into_iter().collect(),
+                index: 0
             };
             ancestors.sort();
 
@@ -75,6 +77,7 @@ impl SingleNodeTree {
 
         let mut keys = MortonKeys {
             keys: points.iter().map(|p| p.key).collect(),
+            index: 0
         };
 
         if balanced {

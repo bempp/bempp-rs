@@ -123,6 +123,7 @@ impl MortonKeys {
 
         let mut balanced = MortonKeys {
             keys: balanced.into_iter().collect(),
+            index: 0
         };
         balanced.sort();
         balanced.linearize();
@@ -141,6 +142,19 @@ impl Deref for MortonKeys {
 impl DerefMut for MortonKeys {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.keys
+    }
+}
+
+impl Iterator for MortonKeys {
+    type Item = MortonKey;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.keys.len() {
+            return None
+        }
+
+        self.index += 1;
+        self.keys.get(self.index).copied()
     }
 }
 
@@ -586,6 +600,8 @@ impl Hash for MortonKey {
 mod tests {
     use super::*;
     use rand::Rng;
+    use rand::prelude::*;
+    use rand::SeedableRng;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {
@@ -756,7 +772,7 @@ mod tests {
             .collect();
 
         keys.sort();
-        let mut tree = MortonKeys { keys };
+        let mut tree = MortonKeys { keys, index: 0 };
         tree.linearize();
 
         // Test that Z order is maintained when sorted
@@ -1006,4 +1022,40 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    pub fn test_morton_keys_iterator() {
+
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..1.0);
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+        
+        let npoints = 1000;
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
+        let domain = Domain {
+            origin: [0.0, 0.0, 0.0],
+            diameter: [1.0, 1.0, 1.0]
+        };
+
+        let keys = points
+            .iter()
+            .map(|p| MortonKey::from_point(p, &domain))
+            .collect();
+
+        let keys = MortonKeys {
+            keys,
+            index: 0
+        };
+
+        // test that we can call keys as an iterator
+        keys.iter().sorted();
+        
+    }
+    
 }
