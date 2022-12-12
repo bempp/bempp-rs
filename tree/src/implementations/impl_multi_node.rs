@@ -9,9 +9,9 @@ use hyksort::hyksort::hyksort;
 use solvers_traits::tree::Tree;
 
 use crate::{
-    constants::{K, NCRIT, ROOT},
+    constants::{DEEPEST_LEVEL, K, NCRIT, ROOT},
     implementations::{
-        impl_morton::complete_region,
+        impl_morton::{complete_region, encode_anchor, point_to_anchor},
         impl_single_node::{assign_nodes_to_points, assign_points_to_nodes},
     },
     types::{
@@ -26,17 +26,22 @@ impl MultiNodeTree {
     /// Create a new MultiNodeTree from a set of distributed points which define a domain.
     pub fn new(
         points: &[[PointType; 3]],
-        balanced: bool,
+        adaptive: bool,
+        n_crit: Option<usize>,
+        depth: Option<u64>,
         world: &UserCommunicator,
     ) -> MultiNodeTree {
         let domain = Domain::from_global_points(points, world);
 
-        if balanced {
+        let n_crit = n_crit.unwrap_or(NCRIT);
+        let depth = depth.unwrap_or(DEEPEST_LEVEL);
+
+        if adaptive {
             let (keys, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::balanced_tree(world, points, &domain);
+                MultiNodeTree::adaptive_tree(world, points, &domain, n_crit);
 
             MultiNodeTree {
-                balanced,
+                adaptive,
                 points,
                 keys,
                 domain,
@@ -45,10 +50,10 @@ impl MultiNodeTree {
             }
         } else {
             let (keys, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::unbalanced_tree(world, points, &domain);
+                MultiNodeTree::uniform_tree(world, points, &domain, &depth);
 
             MultiNodeTree {
-                balanced,
+                adaptive,
                 points,
                 keys,
                 domain,
@@ -103,7 +108,7 @@ impl MultiNodeTree {
         }
 
         // Complete region between seeds at each process
-        let mut complete = MortonKeys { keys: Vec::new() };
+        let mut complete = MortonKeys::new();
 
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
@@ -115,7 +120,7 @@ impl MultiNodeTree {
         }
 
         if rank == (size - 1) {
-            complete.keys.push(*seeds.last().unwrap());
+            complete.keys.push(seeds.last().unwrap());
         }
 
         complete.sort();
@@ -123,15 +128,12 @@ impl MultiNodeTree {
     }
 
     /// Split tree nodes (blocks) by counting how many particles they contain.
-    fn split_blocks(
-        points: &Points,
-        mut blocktree: MortonKeys,
-    ) -> (HashMap<MortonKey, Points>, HashMap<Point, MortonKey>) {
+    fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -> MortonKeys {
         let split_blocktree;
         let mut blocks_to_points;
 
         loop {
-            let mut new_blocktree: MortonKeys = MortonKeys { keys: Vec::new() };
+            let mut new_blocktree = MortonKeys::new();
 
             // Map between blocks and the leaves they contain
             blocks_to_points = assign_nodes_to_points(&blocktree, points);
@@ -141,7 +143,7 @@ impl MultiNodeTree {
             for (&block, points) in blocks_to_points.iter() {
                 let npoints = points.len();
 
-                if npoints > NCRIT {
+                if npoints > n_crit {
                     let mut children = block.children();
                     new_blocktree.append(&mut children);
                 } else {
@@ -158,11 +160,7 @@ impl MultiNodeTree {
             }
         }
 
-        // Create bidirectional maps between points and keys of the final tree.
-        (
-            assign_nodes_to_points(&split_blocktree, points),
-            assign_points_to_nodes(points, &split_blocktree),
-        )
+        split_blocktree
     }
 
     /// Find the seeds, defined as coarsest leaf/leaves, at each processor [1].
@@ -182,6 +180,7 @@ impl MultiNodeTree {
                 .into_iter()
                 .filter(|k| k.level() == coarsest_level)
                 .collect(),
+            index: 0,
         };
 
         seeds.sort();
@@ -242,11 +241,74 @@ impl MultiNodeTree {
         received_points
     }
 
-    /// Specialization for unbalanced tree.
-    pub fn unbalanced_tree(
+    /// Specialization for uniform trees
+    pub fn uniform_tree(
         world: &UserCommunicator,
         points: &[[PointType; 3]],
         domain: &Domain,
+        depth: &u64,
+    ) -> (
+        MortonKeys,
+        Points,
+        HashMap<Point, MortonKey>,
+        HashMap<MortonKey, Points>,
+    ) {
+        let keys = MortonKeys {
+            keys: points
+                .iter()
+                .map(|p| {
+                    let anchor = point_to_anchor(p, *depth, &domain);
+                    MortonKey {
+                        morton: encode_anchor(&anchor, *depth),
+                        anchor: anchor,
+                    }
+                })
+                .collect(),
+            index: 0,
+        };
+
+        let mut points = keys
+            .iter()
+            .zip(points)
+            .enumerate()
+            .map(|(index, (key, point))| Point {
+                coordinate: *point,
+                global_idx: index,
+                key: *key,
+            })
+            .collect();
+
+        // 2.i Perform parallel Morton sort over encoded points
+        let comm = world.duplicate();
+        hyksort(&mut points, K, comm);
+
+        // 2.ii Find unique leaf keys on each processor
+        let mut keys = MortonKeys {
+            keys: points.iter().map(|p| p.key).collect(),
+            index: 0,
+        };
+
+        // 3. Linearise received keys (remove overlaps if they exist).
+        keys.linearize();
+
+        // 4. Create bi-directional maps between keys and points
+        let points_to_keys = assign_points_to_nodes(&points, &keys);
+        let keys_to_points = assign_nodes_to_points(&keys, &points);
+
+        let mut keys: MortonKeys = MortonKeys {
+            keys: keys_to_points.keys().cloned().collect(),
+            index: 0,
+        };
+        keys.sort();
+        (keys, points, points_to_keys, keys_to_points)
+    }
+
+    /// Specialization for adaptive tree.
+    pub fn adaptive_tree(
+        world: &UserCommunicator,
+        points: &[[PointType; 3]],
+        domain: &Domain,
+        n_crit: usize,
     ) -> (
         MortonKeys,
         Points,
@@ -274,6 +336,7 @@ impl MultiNodeTree {
         // 2.ii Find unique leaf keys on each processor
         let mut local = MortonKeys {
             keys: points.iter().map(|p| p.key).collect(),
+            index: 0,
         };
 
         // 3. Linearise received keys (remove overlaps if they exist).
@@ -292,32 +355,13 @@ impl MultiNodeTree {
             MultiNodeTree::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
 
         // 6. Split blocks based on ncrit constraint
-        let (keys_to_points, points_to_keys) = MultiNodeTree::split_blocks(&points, block_tree);
+        let mut keys = MultiNodeTree::split_blocks(&points, block_tree, n_crit);
 
-        let mut keys = MortonKeys {
-            keys: keys_to_points.keys().cloned().collect(),
-        };
+        // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
         keys.sort();
-        (keys, points, points_to_keys, keys_to_points)
-    }
-
-    /// Specialization for balanced tree.
-    pub fn balanced_tree(
-        world: &UserCommunicator,
-        points: &[[PointType; 3]],
-        domain: &Domain,
-    ) -> (
-        MortonKeys,
-        Points,
-        HashMap<Point, MortonKey>,
-        HashMap<MortonKey, Points>,
-    ) {
-        let (mut keys, points, _, _) = MultiNodeTree::unbalanced_tree(world, points, domain);
-
-        // 1. Create a minimal balanced octree for local octants spanning their domain and linearize
         keys.balance();
 
-        // 2. Find new  maps between points and locally balanced tree
+        // 8. Find new maps between points and locally balanced tree
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let mut points: Points = points
             .iter()
@@ -328,16 +372,17 @@ impl MultiNodeTree {
             })
             .collect();
 
-        // 3. Perform another distributed sort and remove overlaps locally
+        // 9. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();
         hyksort(&mut points, K, comm);
         let mut balanced_keys = MortonKeys {
             keys: points.iter().map(|p| p.key).collect(),
+            index: 0,
         };
 
         balanced_keys.linearize();
 
-        // 4. Find final bidirectional maps to non-overlapping tree
+        // 10. Find final bidirectional maps to non-overlapping tree
         let points: Points = points
             .iter()
             .map(|p| Point {
@@ -351,6 +396,7 @@ impl MultiNodeTree {
 
         let mut keys: MortonKeys = MortonKeys {
             keys: keys_to_points.keys().cloned().collect(),
+            index: 0,
         };
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
@@ -364,9 +410,9 @@ impl Tree for MultiNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    // Get balancing information
-    fn get_balanced(&self) -> bool {
-        self.balanced
+    // Get adaptivity information
+    fn get_adaptive(&self) -> bool {
+        self.adaptive
     }
 
     // Get all keys, gets local keys in multi-node setting
