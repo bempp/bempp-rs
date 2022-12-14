@@ -34,8 +34,12 @@ impl Domain {
             .unwrap()[2];
 
         Domain {
-            origin: [min_x-err, min_y-err, min_z-err],
-            diameter: [(max_x - min_x)+2.*err, (max_y - min_y)+2.*err, (max_z - min_z)+2.*err],
+            origin: [min_x - err, min_y - err, min_z - err],
+            diameter: [
+                (max_x - min_x) + 2. * err,
+                (max_y - min_y) + 2. * err,
+                (max_z - min_z) + 2. * err,
+            ],
         }
     }
 }

@@ -2,9 +2,10 @@ use itertools::{izip, Itertools};
 use std::{
     cmp::Ordering,
     collections::HashSet,
+    error::Error,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
-    error::Error,
+    vec,
 };
 
 use crate::{
@@ -200,39 +201,33 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 fn point_to_anchor(
     point: &[PointType; 3],
     level: KeyType,
-    domain: &Domain
+    domain: &Domain,
 ) -> Result<[KeyType; 3], Box<dyn Error>> {
-    
     // Check if point is in the domain
     let mut contained = true;
-    for (p, d, o) in izip!(point, domain.diameter, domain.origin) {
-        contained = (o < *p) && (*p < o+d);
+    for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
+        contained = (o < p) && (p < o + d);
     }
 
     match contained {
         true => {
             let mut anchor = [KeyType::default(); 3];
 
-            let displacement: Vec<f64> = domain.origin
+            let side_length: Vec<f64> = domain
+                .diameter
                 .iter()
-                .zip(domain.diameter.iter())
-                .map(|(&d, &o)| d-o)
+                .map(|d| d / ((1 << level) as f64))
                 .collect();
-             
-            let side_length: Vec<f64> = domain.diameter
-                .iter()
-                .map(|d|  d/((1 << level) as f64))
-                .collect();
-            
+
             for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
-                *a = ((p-o)/s).floor() as KeyType;
+                *a = ((p - o) / s).floor() as KeyType;
             }
             Ok(anchor)
         }
         false => {
             panic!("Point not in Domain")
         }
-    } 
+    }
 }
 
 /// Encode an anchor.
@@ -294,7 +289,7 @@ impl MortonKey {
 
     /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
     pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
-        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain);
+        let anchor = point_to_anchor(point, DEEPEST_LEVEL, domain);
         MortonKey::from_anchor(&anchor.unwrap())
     }
 
@@ -379,8 +374,8 @@ impl MortonKey {
         ancestors.contains(self)
     }
 
-    /// Check if key is descendent of another key
-    pub fn is_descendent(&self, other: &MortonKey) -> bool {
+    /// Check if key is descendant of another key
+    pub fn is_descendant(&self, other: &MortonKey) -> bool {
         other.is_ancestor(self)
     }
 
@@ -398,6 +393,28 @@ impl MortonKey {
         }
 
         ancestors
+    }
+
+    /// Return descendants `n` levels down from a key
+    pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey>, Box<dyn Error>> {
+        let valid: bool = self.level() + n <= DEEPEST_LEVEL;
+
+        match valid {
+            false => {
+                panic!("Cannot find descendants below level {:?}", DEEPEST_LEVEL)
+            }
+            true => {
+                let mut descendants = vec![*self];
+                for _ in 0..n {
+                    let mut tmp: Vec<MortonKey> = Vec::new();
+                    for key in descendants {
+                        tmp.append(&mut key.children());
+                    }
+                    descendants = tmp;
+                }
+                Ok(descendants)
+            }
+        }
     }
 
     /// Find the finest ancestor of key and another key
@@ -553,7 +570,6 @@ impl MortonKey {
             .map(|d| d.unwrap())
             .collect()
     }
-
 }
 
 impl PartialEq for MortonKey {
@@ -584,6 +600,8 @@ impl Hash for MortonKey {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
     use rand::prelude::*;
     use rand::Rng;
@@ -757,15 +775,15 @@ mod tests {
             .map(|p| MortonKey::from_point(&p, &domain))
             .collect();
 
+        // Add duplicates to ensure equality is also sorted
+        let mut replica = keys.iter().cloned().collect();
+        keys.append(&mut replica);
         keys.sort();
-        let mut tree = MortonKeys { keys, index: 0 };
-        tree.linearize();
 
         // Test that Z order is maintained when sorted
-        for i in 0..(tree.keys.len() - 1) {
-            let a = tree.keys[i];
-            let b = tree.keys[i + 1];
-
+        for i in 0..(keys.len() - 1) {
+            let a = keys[i];
+            let b = keys[i + 1];
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
     }
@@ -1045,13 +1063,13 @@ mod tests {
     fn test_point_to_anchor() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
-       
+
         // Test points in the domain
         let point = [0.9999, 0.9999, 0.9999];
         let level = 2;
-        let anchor  = point_to_anchor(&point, level, &domain);
+        let anchor = point_to_anchor(&point, level, &domain);
         let expected = [3, 3, 3];
 
         for (i, a) in anchor.unwrap().iter().enumerate() {
@@ -1059,20 +1077,18 @@ mod tests {
         }
 
         let domain = Domain {
-            
             origin: [-0.5, -0.5, -0.5],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
 
         let point = [-0.499, -0.499, -0.499];
         let level = 1;
-        let anchor  = point_to_anchor(&point, level, &domain);
+        let anchor = point_to_anchor(&point, level, &domain);
         let expected = [0, 0, 0];
 
         for (i, a) in anchor.unwrap().iter().enumerate() {
             assert_eq!(a, &expected[i])
         }
-        
     }
 
     #[test]
@@ -1080,13 +1096,13 @@ mod tests {
     fn test_point_to_anchor_fails() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
-       
+
         // Test a point not in the domain
         let point = [0.9, 0.9, 1.9];
         let level = 2;
-        let anchor  = point_to_anchor(&point, level, &domain);
+        let anchor = point_to_anchor(&point, level, &domain);
     }
 
     #[test]
@@ -1094,12 +1110,53 @@ mod tests {
     fn test_point_to_anchor_fails_negative_domain() {
         let domain = Domain {
             origin: [-0.5, -0.5, -0.5],
-            diameter: [1., 1., 1.]
+            diameter: [1., 1., 1.],
         };
-       
+
         // Test a point not in the domain
         let point = [-0.5, -0.5, -0.5];
         let level = 2;
-        let anchor  = point_to_anchor(&point, level, &domain);
+        let anchor = point_to_anchor(&point, level, &domain);
+    }
+
+    #[test]
+    fn test_encode_anchor() {
+        let anchor = [1, 0, 1];
+        let level = 1;
+        let morton = encode_anchor(&anchor, level);
+        let expected = 0b101000000000000001;
+        assert_eq!(expected, morton);
+
+        let anchor = [3, 3, 3];
+        let level = 2;
+        let morton = encode_anchor(&anchor, level);
+        let expected = 0b111111000000000000010;
+        assert_eq!(expected, morton);
+    }
+
+    #[test]
+    fn test_find_descendants() {
+        let key = MortonKey {
+            morton: 0,
+            anchor: [0, 0, 0],
+        };
+
+        let descendants = key.descendants(1).unwrap();
+        assert_eq!(descendants.len(), 8);
+
+        // Ensure this also works for other keys in hierarchy
+        let key = descendants[0];
+        let descendants = key.descendants(2).unwrap();
+        assert_eq!(descendants.len(), 64);
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot find descendants below level 16")]
+    fn test_find_descendants_panics() {
+        let key = MortonKey {
+            morton: 0,
+            anchor: [0, 0, 0],
+        };
+        let descendants = key.descendants(17).unwrap();
     }
 }
