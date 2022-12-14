@@ -89,7 +89,7 @@ impl SingleNodeTree {
                 keys: points
                     .iter()
                     .map(|p| {
-                        let anchor = point_to_anchor(p, depth, &domain);
+                        let anchor = point_to_anchor(p, depth, &domain).unwrap();
                         MortonKey {
                             morton: encode_anchor(&anchor, depth),
                             anchor: anchor,
