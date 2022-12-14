@@ -7,15 +7,9 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use solvers_traits::tree::Tree;
 
-use solvers_tree::{
-    constants::{DEEPEST_LEVEL, ROOT},
-    types::{
-        domain::Domain,
-        morton::{MortonKey, MortonKeys},
-        multi_node::MultiNodeTree,
-        point::{Point, PointType, Points},
-        single_node::SingleNodeTree,
-    },
+use solvers_tree::types::{
+    domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
+    single_node::SingleNodeTree,
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
