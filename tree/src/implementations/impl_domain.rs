@@ -1,8 +1,12 @@
 use crate::types::{domain::Domain, point::PointType};
 
 impl Domain {
-    /// Compute the domain defined by a set of points on a local node.
+    /// Compute the domain defined by a set of points on a local node. When defined by a set of points
+    /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
+    /// ensure correct Morton Encoding.
     pub fn from_local_points(points: &[[PointType; 3]]) -> Domain {
+        // Increase size of bounding box to capture all points
+        let err: f64 = 0.1;
         let max_x = points
             .iter()
             .max_by(|a, b| a[0].partial_cmp(&b[0]).unwrap())
@@ -30,8 +34,12 @@ impl Domain {
             .unwrap()[2];
 
         Domain {
-            origin: [min_x, min_y, min_z],
-            diameter: [max_x - min_x, max_y - min_y, max_z - min_z],
+            origin: [min_x - err, min_y - err, min_z - err],
+            diameter: [
+                (max_x - min_x) + 2. * err,
+                (max_y - min_y) + 2. * err,
+                (max_z - min_z) + 2. * err,
+            ],
         }
     }
 }
