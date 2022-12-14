@@ -122,8 +122,8 @@ fn main() {
     // Setup tree parameters
     let adaptive = false;
     let n_crit: Option<_> = None;
-    let depth = Some(2);
-    let n_points = 1000;
+    let depth = Some(4);
+    let n_points = 10000;
 
     let points = points_fixture(n_points);
 

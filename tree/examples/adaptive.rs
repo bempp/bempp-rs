@@ -92,12 +92,6 @@ fn test_span(points: &[[f64; 3]], tree: &MultiNodeTree) {
             .collect();
         assert!(int.iter().len() > 0);
     }
-    // // Test that we really do get a subset of the uniform tree
-    // assert_eq!(uniform.len(), tree.get_keys().len());
-
-    // for (a, &b) in izip!(uniform, tree.get_keys().iter()) {
-    //     assert_eq!(a, b);
-    // }
 }
 
 fn test_adaptive(tree: &MultiNodeTree) {
