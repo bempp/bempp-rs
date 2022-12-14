@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
+use itertools::izip;
 use rand::prelude::*;
 use rand::SeedableRng;
 
@@ -14,6 +15,7 @@ use solvers_traits::{
     tree::Tree
 };
 
+use solvers_tree::types::single_node::SingleNodeTree;
 use solvers_tree::{
     constants::{ROOT, DEEPEST_LEVEL},
     types::{
@@ -74,28 +76,28 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 }
 
 /// Test that the tree spans the entire domain specified by the point distribution.
-fn test_span(tree: &MultiNodeTree) {
+fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tree: &MultiNodeTree) {
 
-    let leaf_set: HashSet<MortonKey> = tree.get_keys().iter().cloned().collect();
-    let points: Points = tree.get_points().to_vec();
-    let max_level = leaf_set.iter().map(|l| l.level()).max().unwrap();
+    let min: &MortonKey = tree.get_keys().iter().min().unwrap();
+    let max:&MortonKey = tree.get_keys().iter().max().unwrap();
+    let block_set: HashSet<MortonKey> = tree.get_keys().iter().cloned().collect();
+    let max_level = tree.get_keys().iter().map(|block| block.level()).max().unwrap();
 
-    for point in tree.get_points() {
-        let ancestors: HashSet<MortonKey> = point.key.ancestors().iter().cloned().collect();
-        
-        let int = ancestors.intersection(&leaf_set).collect_vec();
-        assert!(int.len() > 0);
+    // Generate a uniform tree at the max level, and filter for range in this processor
+    let mut uniform = SingleNodeTree::new(points, false, n_crit, depth);
+    let uniform: Vec<MortonKey> = uniform
+        .get_keys()
+        .iter()
+        .cloned()
+        .filter(|node| min <= node && node <= max)
+        .collect();
+
+    // Test that we really do get a subset of the uniform tree
+    assert_eq!(uniform.len(), tree.get_keys().len());
+    
+    for (a, &b) in izip!(uniform, tree.get_keys().iter()) {
+        assert_eq!(a, b);
     }
-
-    let mut min_leaf_set: HashSet<MortonKey> = HashSet::new();
-    for point in tree.get_points() {
-        min_leaf_set.insert(point.key.clone());
-    }
-
-    let mut tst: Vec<MortonKey> = min_leaf_set.iter().cloned().collect();
-    tst.sort();
-    println!("{:?} \n", tst);
-    assert!(false);
 }
 
 fn test_uniform(tree: &MultiNodeTree, depth: u64) {
@@ -131,13 +133,13 @@ fn main() {
     // Setup tree parameters
     let adaptive = false;
     let n_crit: Option<_> = None;
-    let depth = Some(1);
-    let n_points = 10000;
+    let depth = Some(2);
+    let n_points = 1000;
 
     let points = points_fixture(n_points);
 
     let tree = MultiNodeTree::new(&points, adaptive, n_crit.clone(), depth, &comm);
-    test_span(&tree);
+    test_span(&points, n_crit, depth, &tree);
     test_global_bounds(&comm);
     test_uniform(&tree, depth.unwrap());
     test_no_overlaps(&comm, &tree);
