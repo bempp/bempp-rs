@@ -86,12 +86,21 @@ fn test_span(tree: &MultiNodeTree) {
         let int = ancestors.intersection(&leaf_set).collect_vec();
         assert!(int.len() > 0);
     }
+
+    let mut min_leaf_set: HashSet<MortonKey> = HashSet::new();
+    for point in tree.get_points() {
+        min_leaf_set.insert(point.key.clone());
+    }
+
+    println!("min leaf vec {:?}", min_leaf_set.len());
+    assert!(false);
 }
 
-fn test_uniform(tree: &MultiNodeTree) {
+fn test_uniform(tree: &MultiNodeTree, depth: u64) {
     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
     let first = levels[0];
     assert_eq!(true, levels.iter().all(|level| *level == first));
+    
 }
 
 /// Test that the globally defined domain contains all the points at a given node.
