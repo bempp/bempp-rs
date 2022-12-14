@@ -4,6 +4,7 @@ use std::{
     collections::HashSet,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
+    error::Error,
 };
 
 use crate::{
@@ -158,35 +159,6 @@ impl Iterator for MortonKeys {
     }
 }
 
-/// Serialize a Morton Key for VTK visualization.
-pub fn serialize_morton_key(key: &MortonKey, domain: &Domain) -> Vec<f64> {
-    let anchor = key.anchor;
-
-    let mut serialized = Vec::<PointType>::with_capacity(24);
-
-    let disp = 1 << (LEVEL_DISPLACEMENT + 1 - key.level() as usize);
-
-    let anchors = [
-        [anchor[0], anchor[1], anchor[2]],
-        [disp + anchor[0], anchor[1], anchor[2]],
-        [anchor[0], disp + anchor[1], anchor[2]],
-        [disp + anchor[0], disp + anchor[1], anchor[2]],
-        [anchor[0], anchor[1], disp + anchor[2]],
-        [disp + anchor[0], anchor[1], disp + anchor[2]],
-        [anchor[0], disp + anchor[1], disp + anchor[2]],
-        [disp + anchor[0], disp + anchor[1], disp + anchor[2]],
-    ];
-
-    for anchor in anchors.iter() {
-        let coords = MortonKey::from_anchor(anchor).to_coordinates(domain);
-        for index in 0..3 {
-            serialized.push(coords[index]);
-        }
-    }
-
-    serialized
-}
-
 /// Return the level associated with a key.
 fn find_level(morton: KeyType) -> KeyType {
     morton & LEVEL_MASK
@@ -229,21 +201,42 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 fn point_to_anchor(
     point: &[PointType; 3],
     level: KeyType,
-    origin: &[PointType; 3],
-    diameter: &[PointType; 3],
-) -> [KeyType; 3] {
-    let mut anchor: [KeyType; 3] = [0, 0, 0];
-
-    let level_size = (1 << level) as PointType;
-
-    for (anchor_value, point_value, &origin_value, &diameter_value) in
-        izip!(&mut anchor, point, origin, diameter)
-    {
-        *anchor_value =
-            ((point_value - origin_value) * level_size / diameter_value).floor() as KeyType
+    domain: &Domain
+) -> Result<[KeyType; 3], Box<dyn Error>> {
+    
+    // Check if point is in the domain
+    let mut contained = true;
+    for (p, d, o) in izip!(point, domain.diameter, domain.origin) {
+        contained = (o <= *p) && (*p <= o+d);
     }
 
-    anchor
+    match contained {
+        true => {
+            let mut anchor = [KeyType::default(); 3];
+
+            let displacement: Vec<f64> = domain.origin
+                .iter()
+                .zip(domain.diameter.iter())
+                .map(|(&d, &o)| d-o)
+                .collect();
+             
+            let side_length: Vec<f64> = domain.diameter
+                .iter()
+                .map(|d|  d/((1 << level) as f64))
+                .collect();
+            
+            for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
+        
+                *a = ((p-o)/s).floor() as KeyType;
+            }
+            Ok(anchor)
+        }
+        false => {
+            panic!("Point not in Domain")
+        }
+    }
+
+ 
 }
 
 /// Encode an anchor.
@@ -305,8 +298,8 @@ impl MortonKey {
 
     /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
     pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
-        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
-        MortonKey::from_anchor(&anchor)
+        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain);
+        MortonKey::from_anchor(&anchor.unwrap())
     }
 
     /// Return the parent
@@ -565,9 +558,6 @@ impl MortonKey {
             .collect()
     }
 
-    pub fn serialize(&self, domain: &Domain) -> Vec<f64> {
-        serialize_morton_key(self, domain)
-    }
 }
 
 impl PartialEq for MortonKey {
@@ -1054,5 +1044,47 @@ mod tests {
 
         // test that iterator index resets to 0
         assert!(keys.index == 0);
+    }
+
+    #[test]
+    fn test_point_to_anchor() {
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.]
+        };
+       
+        // Test points in the domain
+        let point = [0.9, 0.9, 0.9];
+        let level = 2;
+        let anchor  = point_to_anchor(&point, level, &domain);
+        let expected = [3, 3, 3];
+
+        for (i, a) in anchor.unwrap().iter().enumerate() {
+            assert_eq!(a, &expected[i])
+        }
+
+        let point = [0.9, 0.1, 0.1];
+        let level = 1;
+        let anchor  = point_to_anchor(&point, level, &domain);
+        let expected = [1, 0, 0];
+
+        for (i, a) in anchor.unwrap().iter().enumerate() {
+            assert_eq!(a, &expected[i])
+        }
+        
+    }
+
+    #[test]
+    #[should_panic(expected = "Point not in Domain")]
+    fn test_point_to_anchor_fails() {
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.]
+        };
+       
+        // Test a point not in the domain
+        let point = [0.9, 0.9, 1.9];
+        let level = 2;
+        let anchor  = point_to_anchor(&point, level, &domain);
     }
 }
