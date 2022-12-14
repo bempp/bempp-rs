@@ -2,15 +2,7 @@
 
 use crate::cell::*;
 use crate::element::*;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-#[repr(u8)]
-pub enum MapType {
-    Identity = 0,
-    CovariantPiola = 1,
-    ContravariantPiola = 2,
-    L2Piola = 3,
-}
+pub use solvers_traits::element::MapType;
 
 pub fn identity_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
