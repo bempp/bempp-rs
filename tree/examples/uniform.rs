@@ -92,7 +92,9 @@ fn test_span(tree: &MultiNodeTree) {
         min_leaf_set.insert(point.key.clone());
     }
 
-    println!("min leaf vec {:?}", min_leaf_set.len());
+    let mut tst: Vec<MortonKey> = min_leaf_set.iter().cloned().collect();
+    tst.sort();
+    println!("{:?} \n", tst);
     assert!(false);
 }
 
@@ -129,7 +131,7 @@ fn main() {
     // Setup tree parameters
     let adaptive = false;
     let n_crit: Option<_> = None;
-    let depth = Some(4);
+    let depth = Some(1);
     let n_points = 10000;
 
     let points = points_fixture(n_points);
@@ -137,6 +139,6 @@ fn main() {
     let tree = MultiNodeTree::new(&points, adaptive, n_crit.clone(), depth, &comm);
     test_span(&tree);
     test_global_bounds(&comm);
-    test_uniform(&tree);
+    test_uniform(&tree, depth.unwrap());
     test_no_overlaps(&comm, &tree);
 }
