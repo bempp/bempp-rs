@@ -771,16 +771,18 @@ mod tests {
             .iter()
             .map(|p| MortonKey::from_point(&p, &domain))
             .collect();
+        
+        // Add duplicates to keys, to test ordering in terms of equality
+        let mut cpy: Vec<MortonKey> = keys.iter().cloned().collect();
+        keys.append(&mut cpy);
 
-        keys.sort();
         let mut tree = MortonKeys { keys, index: 0 };
-        tree.linearize();
+        tree.sort();
 
         // Test that Z order is maintained when sorted
         for i in 0..(tree.keys.len() - 1) {
             let a = tree.keys[i];
             let b = tree.keys[i + 1];
-
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
     }
