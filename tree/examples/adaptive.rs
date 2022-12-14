@@ -1,28 +1,21 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use itertools::Itertools;
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use mpi::{
-    environment::Universe,
-    topology::{UserCommunicator},
-    traits::*
-};
+use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
-use solvers_traits::{
-    tree::Tree
-};
+use solvers_traits::tree::Tree;
 
 use solvers_tree::{
-    constants::{ROOT, DEEPEST_LEVEL},
+    constants::{DEEPEST_LEVEL, ROOT},
     types::{
-        single_node::{SingleNodeTree},
-        multi_node::{MultiNodeTree},
-        point::{PointType, Point, Points},
+        domain::Domain,
         morton::{MortonKey, MortonKeys},
-        domain::{Domain}
-    }
+        multi_node::MultiNodeTree,
+        point::{Point, PointType, Points},
+        single_node::SingleNodeTree,
+    },
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
@@ -77,11 +70,15 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 /// Test that the tree spans the entire domain specified by the point distribution.
 /// Test that the tree spans the entire domain specified by the point distribution.
 fn test_span(points: &[[f64; 3]], tree: &MultiNodeTree) {
-
     let min: &MortonKey = tree.get_keys().iter().min().unwrap();
-    let max:&MortonKey = tree.get_keys().iter().max().unwrap();
+    let max: &MortonKey = tree.get_keys().iter().max().unwrap();
     let block_set: HashSet<MortonKey> = tree.get_keys().iter().cloned().collect();
-    let max_level = tree.get_keys().iter().map(|block| block.level()).max().unwrap();
+    let max_level = tree
+        .get_keys()
+        .iter()
+        .map(|block| block.level())
+        .max()
+        .unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
     let mut uniform = SingleNodeTree::new(points, false, None, Some(max_level));
@@ -103,13 +100,11 @@ fn test_span(points: &[[f64; 3]], tree: &MultiNodeTree) {
     }
     // // Test that we really do get a subset of the uniform tree
     // assert_eq!(uniform.len(), tree.get_keys().len());
-    
+
     // for (a, &b) in izip!(uniform, tree.get_keys().iter()) {
     //     assert_eq!(a, b);
     // }
 }
-
-
 
 fn test_adaptive(tree: &MultiNodeTree) {
     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
@@ -132,7 +127,6 @@ fn test_global_bounds(world: &UserCommunicator) {
         assert!(domain.origin[2] <= point[2] && point[2] <= domain.origin[2] + domain.diameter[2]);
     }
 }
-
 
 fn main() {
     // Setup an MPI environment

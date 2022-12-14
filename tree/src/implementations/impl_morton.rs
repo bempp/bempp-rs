@@ -780,7 +780,7 @@ mod tests {
             .iter()
             .map(|p| MortonKey::from_point(&p, &domain))
             .collect();
-        
+
         // Add duplicates to keys, to test ordering in terms of equality
         let mut cpy: Vec<MortonKey> = keys.iter().cloned().collect();
         keys.append(&mut cpy);
