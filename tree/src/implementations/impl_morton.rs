@@ -196,8 +196,7 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// # Arguments
 /// `point` - The (x, y, z) coordinates of the point to map.
 /// `level` - The level of the tree at which the point will be mapped.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
+/// `domain` - The computational domain defined by the point set.
 fn point_to_anchor(
     point: &[PointType; 3],
     level: KeyType,
@@ -207,7 +206,7 @@ fn point_to_anchor(
     // Check if point is in the domain
     let mut contained = true;
     for (p, d, o) in izip!(point, domain.diameter, domain.origin) {
-        contained = (o <= *p) && (*p <= o+d);
+        contained = (o < *p) && (*p < o+d);
     }
 
     match contained {
@@ -226,7 +225,6 @@ fn point_to_anchor(
                 .collect();
             
             for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
-        
                 *a = ((p-o)/s).floor() as KeyType;
             }
             Ok(anchor)
@@ -234,9 +232,7 @@ fn point_to_anchor(
         false => {
             panic!("Point not in Domain")
         }
-    }
-
- 
+    } 
 }
 
 /// Encode an anchor.
@@ -820,7 +816,6 @@ mod tests {
         let children = key.children();
 
         for child in &children {
-            println!("child {:?} expected {:?}", child, expected);
             assert!(expected.contains(child));
         }
     }
@@ -1054,7 +1049,7 @@ mod tests {
         };
        
         // Test points in the domain
-        let point = [0.9, 0.9, 0.9];
+        let point = [0.9999, 0.9999, 0.9999];
         let level = 2;
         let anchor  = point_to_anchor(&point, level, &domain);
         let expected = [3, 3, 3];
@@ -1063,10 +1058,16 @@ mod tests {
             assert_eq!(a, &expected[i])
         }
 
-        let point = [0.9, 0.1, 0.1];
+        let domain = Domain {
+            
+            origin: [-0.5, -0.5, -0.5],
+            diameter: [1., 1., 1.]
+        };
+
+        let point = [-0.499, -0.499, -0.499];
         let level = 1;
         let anchor  = point_to_anchor(&point, level, &domain);
-        let expected = [1, 0, 0];
+        let expected = [0, 0, 0];
 
         for (i, a) in anchor.unwrap().iter().enumerate() {
             assert_eq!(a, &expected[i])
@@ -1084,6 +1085,20 @@ mod tests {
        
         // Test a point not in the domain
         let point = [0.9, 0.9, 1.9];
+        let level = 2;
+        let anchor  = point_to_anchor(&point, level, &domain);
+    }
+
+    #[test]
+    #[should_panic(expected = "Point not in Domain")]
+    fn test_point_to_anchor_fails_negative_domain() {
+        let domain = Domain {
+            origin: [-0.5, -0.5, -0.5],
+            diameter: [1., 1., 1.]
+        };
+       
+        // Test a point not in the domain
+        let point = [-0.5, -0.5, -0.5];
         let level = 2;
         let anchor  = point_to_anchor(&point, level, &domain);
     }
