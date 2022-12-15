@@ -276,22 +276,17 @@ impl MultiNodeTree {
         hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor
-        let key_set: HashSet<MortonKey> = points.iter().map(|p| p.key).collect();
-        let key_vals: Vec<MortonKey> = key_set.into_iter().collect::<Vec<MortonKey>>();
         let mut keys = MortonKeys {
-            keys: key_vals,
+            keys: points.iter().map(|p| p.key).collect(),
             index: 0,
         };
+        keys.linearize();
 
         // 3. Create bi-directional maps between keys and points
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let keys_to_points = assign_nodes_to_points(&keys, &points);
 
-        let mut keys: MortonKeys = MortonKeys {
-            keys: keys_to_points.keys().cloned().collect(),
-            index: 0,
-        };
-        keys.sort();
+        // keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
 
@@ -354,14 +349,14 @@ impl MultiNodeTree {
         locally_balanced.balance();
 
         // 8. Find new maps between points and locally balanced tree
-        let points_to_keys = assign_points_to_nodes(&points, &locally_balanced);
+        let points_to_locally_balanced = assign_points_to_nodes(&points, &locally_balanced);
 
         let mut points: Points = points
             .iter()
             .map(|p| Point {
                 coordinate: p.coordinate,
                 global_idx: p.global_idx,
-                key: *points_to_keys.get(p).unwrap(),
+                key: *points_to_locally_balanced.get(p).unwrap(),
             })
             .collect();
 
@@ -379,13 +374,7 @@ impl MultiNodeTree {
         let points_to_keys = assign_points_to_nodes(&points, &globally_balanced);
         let keys_to_points = assign_nodes_to_points(&globally_balanced, &points);
 
-        let mut keys: MortonKeys = MortonKeys {
-            keys: keys_to_points.keys().cloned().collect(),
-            index: 0,
-        };
-
-        keys.sort();
-        (keys, points, points_to_keys, keys_to_points)
+        (globally_balanced, points, points_to_keys, keys_to_points)
     }
 }
 

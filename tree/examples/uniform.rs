@@ -67,9 +67,12 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 
 /// Test that the tree spans the entire domain specified by the point distribution.
 fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tree: &MultiNodeTree) {
-    let min: &MortonKey = tree.get_keys().iter().min().unwrap();
-    let max: &MortonKey = tree.get_keys().iter().max().unwrap();
-    let block_set: HashSet<MortonKey> = tree.get_keys().iter().cloned().collect();
+    let mut keys: Vec<MortonKey> = tree.get_keys().iter().cloned().collect();
+    keys.sort();
+
+    let min: &MortonKey = keys.iter().min().unwrap();
+    let max: &MortonKey = keys.iter().max().unwrap();
+    let block_set: HashSet<MortonKey> = keys.iter().cloned().collect();
     let max_level = tree
         .get_keys()
         .iter()
@@ -88,9 +91,9 @@ fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tre
     uniform.sort();
 
     // Test that we really do get a subset of the uniform tree
-    assert_eq!(uniform.len(), tree.keys.len());
+    assert_eq!(uniform.len(), keys.len());
 
-    for (a, &b) in izip!(uniform, tree.get_keys().iter()) {
+    for (a, &b) in izip!(uniform, keys.iter()) {
         assert_eq!(a, b);
     }
 }
