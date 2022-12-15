@@ -1144,7 +1144,7 @@ mod tests {
         // Test a point not in the domain
         let point = [0.9, 0.9, 1.9];
         let level = 2;
-        let anchor = point_to_anchor(&point, level, &domain);
+        let _anchor = point_to_anchor(&point, level, &domain);
     }
 
     #[test]
@@ -1158,7 +1158,7 @@ mod tests {
         // Test a point not in the domain
         let point = [-0.5, -0.5, -0.5];
         let level = 2;
-        let anchor = point_to_anchor(&point, level, &domain);
+        let _anchor = point_to_anchor(&point, level, &domain);
     }
 
     #[test]

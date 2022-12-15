@@ -33,4 +33,4 @@ jobs:
           cargo build --release
       - name: Run tests
         run: |
-          cargo test
+          cargo test --lib
