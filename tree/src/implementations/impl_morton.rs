@@ -134,15 +134,7 @@ impl MortonKeys {
         };
         balanced.linearize();
         balanced.sort();
-        test_overlaps(&balanced);
         self.keys = balanced.keys;
-    }
-}
-
-fn test_overlaps(keys: &MortonKeys) {
-    for i in 0..keys.iter().len() - 1 {
-        assert!(keys[i] <= keys[i + 1]);
-        assert!(keys[i] != keys[i + 1]);
     }
 }
 
