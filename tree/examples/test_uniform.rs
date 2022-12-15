@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use itertools::izip;
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -10,10 +8,7 @@ use solvers_traits::tree::Tree;
 
 use solvers_tree::types::single_node::SingleNodeTree;
 use solvers_tree::types::{
-    domain::Domain,
-    morton::{MortonKey, MortonKeys},
-    multi_node::MultiNodeTree,
-    point::PointType,
+    domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
@@ -72,16 +67,9 @@ fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tre
 
     let min: &MortonKey = keys.iter().min().unwrap();
     let max: &MortonKey = keys.iter().max().unwrap();
-    let block_set: HashSet<MortonKey> = keys.iter().cloned().collect();
-    let max_level = tree
-        .get_keys()
-        .iter()
-        .map(|block| block.level())
-        .max()
-        .unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
-    let mut uniform = SingleNodeTree::new(points, false, n_crit, depth);
+    let uniform = SingleNodeTree::new(points, false, n_crit, depth);
     let mut uniform: Vec<MortonKey> = uniform
         .get_keys()
         .iter()
@@ -98,7 +86,7 @@ fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tre
     }
 }
 
-fn test_uniform(tree: &MultiNodeTree, depth: u64) {
+fn test_uniform(tree: &MultiNodeTree) {
     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
     let first = levels[0];
     assert_eq!(true, levels.iter().all(|level| *level == first));
@@ -129,14 +117,29 @@ fn main() {
     // Setup tree parameters
     let adaptive = false;
     let n_crit: Option<_> = None;
+    let k: Option<_> = None;
     let depth = Some(4);
     let n_points = 10000;
 
     let points = points_fixture(n_points);
 
-    let tree = MultiNodeTree::new(&points, adaptive, n_crit.clone(), depth, &comm);
+    let tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
     test_span(&points, n_crit, depth, &tree);
+
+    if world.rank() == 0 {
+        println!("\t ... test_span passed on uniform tree");
+    }
+
     test_global_bounds(&comm);
-    test_uniform(&tree, depth.unwrap());
+    if world.rank() == 0 {
+        println!("\t ... test_global_bounds passed on uniform tree");
+    }
+    test_uniform(&tree);
+    if world.rank() == 0 {
+        println!("\t ... test_uniform passed on uniform tree");
+    }
     test_no_overlaps(&comm, &tree);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on uniform tree");
+    }
 }

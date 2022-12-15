@@ -290,7 +290,7 @@ impl MortonKey {
         let morton = encode_anchor(anchor, DEEPEST_LEVEL);
 
         MortonKey {
-            anchor: anchor.clone(),
+            anchor: *anchor,
             morton,
         }
     }

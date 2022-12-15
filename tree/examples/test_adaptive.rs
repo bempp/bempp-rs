@@ -41,7 +41,6 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
     let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
 
-    let process = world.process_at_rank(rank);
     let previous_process = world.process_at_rank(previous_rank);
     let next_process = world.process_at_rank(next_rank);
 
@@ -78,7 +77,7 @@ fn test_span(points: &[[f64; 3]], tree: &MultiNodeTree) {
         .unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
-    let mut uniform = SingleNodeTree::new(points, false, None, Some(max_level));
+    let uniform = SingleNodeTree::new(points, false, None, Some(max_level));
     let uniform: Vec<MortonKey> = uniform
         .get_keys()
         .iter()
@@ -128,14 +127,27 @@ fn main() {
     // Setup tree parameters
     let adaptive = true;
     let n_crit = Some(50);
-    let depth: Option<u64> = None;
+    let depth: Option<_> = None;
     let n_points = 10000;
+    let k: Option<_> = None;
 
     let points = points_fixture(n_points);
 
-    let tree = MultiNodeTree::new(&points, adaptive, n_crit.clone(), depth, &comm);
+    let tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
     test_span(&points, &tree);
+    if world.rank() == 0 {
+        println!("\t ... test_span passed on adaptive tree");
+    }
     test_global_bounds(&comm);
+    if world.rank() == 0 {
+        println!("\t ... test_global_bounds passed on adaptive tree");
+    }
     test_adaptive(&tree);
+    if world.rank() == 0 {
+        println!("\t ... test_adaptive passed on adaptive tree");
+    }
     test_no_overlaps(&comm, &tree);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on adaptive tree");
+    }
 }
