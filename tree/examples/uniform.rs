@@ -10,7 +10,10 @@ use solvers_traits::tree::Tree;
 
 use solvers_tree::types::single_node::SingleNodeTree;
 use solvers_tree::types::{
-    domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
+    domain::Domain,
+    morton::{MortonKey, MortonKeys},
+    multi_node::MultiNodeTree,
+    point::PointType,
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
@@ -76,15 +79,16 @@ fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tre
 
     // Generate a uniform tree at the max level, and filter for range in this processor
     let mut uniform = SingleNodeTree::new(points, false, n_crit, depth);
-    let uniform: Vec<MortonKey> = uniform
+    let mut uniform: Vec<MortonKey> = uniform
         .get_keys()
         .iter()
         .cloned()
         .filter(|node| min <= node && node <= max)
         .collect();
+    uniform.sort();
 
     // Test that we really do get a subset of the uniform tree
-    assert_eq!(uniform.len(), tree.get_keys().len());
+    assert_eq!(uniform.len(), tree.keys.len());
 
     for (a, &b) in izip!(uniform, tree.get_keys().iter()) {
         assert_eq!(a, b);

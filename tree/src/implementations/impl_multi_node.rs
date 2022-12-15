@@ -253,28 +253,21 @@ impl MultiNodeTree {
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        let keys = MortonKeys {
-            keys: points
-                .iter()
-                .map(|p| {
-                    let anchor = point_to_anchor(p, *depth, &domain).unwrap();
-                    MortonKey {
-                        morton: encode_anchor(&anchor, *depth),
-                        anchor: anchor,
-                    }
-                })
-                .collect(),
-            index: 0,
-        };
-
-        let mut points = keys
+        let mut points: Points = points
             .iter()
-            .zip(points)
             .enumerate()
-            .map(|(index, (key, point))| Point {
-                coordinate: *point,
-                global_idx: index,
-                key: *key,
+            .map(|(i, p)| {
+                let anchor = point_to_anchor(p, *depth, &domain).unwrap();
+                let key = MortonKey {
+                    morton: encode_anchor(&anchor, *depth),
+                    anchor,
+                };
+
+                Point {
+                    coordinate: *p,
+                    global_idx: i,
+                    key,
+                }
             })
             .collect();
 
@@ -283,15 +276,14 @@ impl MultiNodeTree {
         hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor
+        let key_set: HashSet<MortonKey> = points.iter().map(|p| p.key).collect();
+        let key_vals: Vec<MortonKey> = key_set.into_iter().collect::<Vec<MortonKey>>();
         let mut keys = MortonKeys {
-            keys: points.iter().map(|p| p.key).collect(),
+            keys: key_vals,
             index: 0,
         };
 
-        // 3. Linearise received keys (remove overlaps if they exist).
-        keys.linearize();
-
-        // 4. Create bi-directional maps between keys and points
+        // 3. Create bi-directional maps between keys and points
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let keys_to_points = assign_nodes_to_points(&keys, &points);
 
