@@ -1,4 +1,4 @@
-use itertools::{izip, Itertools};
+use itertools::izip;
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -416,7 +416,7 @@ impl MortonKey {
             true => {
                 let mut descendants = vec![*self];
                 for _ in 0..n {
-                    let mut tmp =  Vec::<MortonKey>::new();
+                    let mut tmp = Vec::<MortonKey>::new();
                     for key in descendants {
                         tmp.append(&mut key.children());
                     }
@@ -592,12 +592,14 @@ impl Hash for MortonKey {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use std::vec;
 
-    use super::*;
     use rand::prelude::*;
     use rand::Rng;
     use rand::SeedableRng;
+
+    use super::*;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {
