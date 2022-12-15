@@ -51,12 +51,10 @@ fn main () {
     }
     
     // Test that each node's portion is locally sorted
-
     for i in 0..(arr.iter().len() -1) {
 
         let a = arr[i];
         let b = arr[i+1];
-
         assert!(a <= b);
     }
 
