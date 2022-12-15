@@ -369,12 +369,26 @@ impl MultiNodeTree {
             keys: points.iter().map(|p| p.key).collect(),
             index: 0,
         };
+        globally_balanced.linearize();
 
         // 10. Find final bidirectional maps to non-overlapping tree
-        let points_to_keys = assign_points_to_nodes(&points, &globally_balanced);
-        let keys_to_points = assign_nodes_to_points(&globally_balanced, &points);
+        let points_to_globally_balanced = assign_points_to_nodes(&points, &globally_balanced);
+        let globally_balanced_to_points = assign_nodes_to_points(&globally_balanced, &points);
+        let mut points: Points = points
+            .iter()
+            .map(|p| Point {
+                coordinate: p.coordinate,
+                global_idx: p.global_idx,
+                key: *points_to_globally_balanced.get(p).unwrap(),
+            })
+            .collect();
 
-        (globally_balanced, points, points_to_keys, keys_to_points)
+        (
+            globally_balanced,
+            points,
+            points_to_globally_balanced,
+            globally_balanced_to_points,
+        )
     }
 }
 
