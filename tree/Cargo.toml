@@ -21,9 +21,6 @@ memoffset = "0.6"
 rand = "0.8.*"
 hyksort = { path = "../hyksort", optional = true}
 solvers-traits = { path = "../traits" }
-vtkio = "0.6"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]

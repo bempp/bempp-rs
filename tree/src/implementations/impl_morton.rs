@@ -23,26 +23,25 @@ use crate::{
 
 /// Linearize (remove overlaps) a vector of keys. The input must be sorted. Algorithm 7 in [1].
 pub fn linearize_keys(keys: &Vec<MortonKey>) -> Vec<MortonKey> {
-    let nkeys = keys.len();
+    let depth = keys.iter().map(|k| k.level()).max().unwrap();
+    let mut key_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
-    // Then we remove the ancestors.
-    let mut new_keys = Vec::<MortonKey>::with_capacity(keys.len());
+    for level in (0..=depth).rev() {
+        let work_set: Vec<&MortonKey> = keys.iter().filter(|&&k| k.level() == level).collect();
 
-    // Now check pairwise for ancestor relationship and only add to new vector if item
-    // is not an ancestor of the next item. Add final element.
-    keys.iter()
-        .enumerate()
-        .tuple_windows::<((_, _), (_, _))>()
-        .for_each(|((_, a), (j, b))| {
-            if !a.is_ancestor(b) {
-                new_keys.push(*a);
+        for work_item in work_set.iter() {
+            let mut ancestors = work_item.ancestors();
+            ancestors.remove(work_item);
+            for ancestor in ancestors.iter() {
+                if key_set.contains(ancestor) {
+                    key_set.remove(ancestor);
+                }
             }
-            if j == (nkeys - 1) {
-                new_keys.push(*b);
-            }
-        });
+        }
+    }
 
-    new_keys
+    let result: Vec<MortonKey> = key_set.into_iter().collect();
+    result
 }
 
 /// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in [1].
@@ -107,7 +106,7 @@ impl MortonKeys {
         for level in (0..DEEPEST_LEVEL).rev() {
             let work_list: Vec<MortonKey> = balanced
                 .iter()
-                .filter(|key| key.level() == level)
+                .filter(|&key| key.level() == level)
                 .cloned()
                 .collect();
 
@@ -133,9 +132,17 @@ impl MortonKeys {
             keys: balanced.into_iter().collect(),
             index: 0,
         };
-        balanced.sort();
         balanced.linearize();
+        balanced.sort();
+        test_overlaps(&balanced);
         self.keys = balanced.keys;
+    }
+}
+
+fn test_overlaps(keys: &MortonKeys) {
+    for i in 0..keys.iter().len() - 1 {
+        assert!(keys[i] <= keys[i + 1]);
+        assert!(keys[i] != keys[i + 1]);
     }
 }
 
@@ -761,6 +768,17 @@ mod tests {
         assert_eq!(anchor, actual);
     }
 
+    // #[test]
+    // fn test_ord() {
+    //     let a = MortonKey { anchor: [32768, 12288, 12288], morton: 4672484613396889604 };
+    //     let b = MortonKey { anchor: [32768, 0, 0], morton: 4611686018427387906 };
+
+    //     assert!(a != b);
+
+    //     println!("{:?} \n\n {:?}", a.ancestors().contains(&b), b);
+    //     assert!(a < b);
+
+    // }
     #[test]
     fn test_sorting() {
         let npoints = 1000;
@@ -1070,6 +1088,20 @@ mod tests {
     }
 
     #[test]
+    fn test_linearize_keys() {
+        let key = MortonKey {
+            morton: 15,
+            anchor: [0, 0, 0],
+        };
+
+        let ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
+        let linearized = linearize_keys(&ancestors);
+
+        assert_eq!(linearized.len(), 1);
+        assert_eq!(linearized[0], key);
+    }
+
+    #[test]
     fn test_point_to_anchor() {
         let domain = Domain {
             origin: [0., 0., 0.],
@@ -1167,6 +1199,6 @@ mod tests {
             morton: 0,
             anchor: [0, 0, 0],
         };
-        let descendants = key.descendants(17).unwrap();
+        let _descendants = key.descendants(17);
     }
 }

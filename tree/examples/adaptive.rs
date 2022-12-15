@@ -31,8 +31,8 @@ pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
 /// Test that the leaves on separate nodes do not overlap.
 fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     // Communicate bounds from each process
-    let max = tree.get_keys().iter().max().unwrap();
-    let min = *tree.get_keys().iter().min().unwrap();
+    let max = tree.keys.iter().max().unwrap();
+    let min = tree.keys.iter().min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
@@ -41,23 +41,26 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
     let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
 
+    let process = world.process_at_rank(rank);
     let previous_process = world.process_at_rank(previous_rank);
     let next_process = world.process_at_rank(next_rank);
 
-    // Send min to partner
-    if rank > 0 {
-        previous_process.send(&min);
+    // Send max to partner
+    if rank < (size - 1) {
+        next_process.send(max);
     }
 
-    let mut partner_min = MortonKey::default();
+    let mut partner_max = MortonKey::default();
 
-    if rank < (size - 1) {
-        next_process.receive_into(&mut partner_min);
+    if rank > 0 {
+        previous_process.receive_into(&mut partner_max);
     }
 
     // Test that the partner's minimum node is greater than the process's maximum node
-    if rank < size - 1 {
-        assert!(max < &partner_min)
+    if rank > 0 {
+        // println!("rank {:?} \n min {:?} \n partner max {:?} \n min level {:?} \n partner max level {:?} \n is ancesctor {:?} \n\n",
+        // rank, min, partner_max, min.level(), partner_max.level(), partner_max.ancestors().contains(min));
+        assert!(partner_max < *min)
     }
 }
 

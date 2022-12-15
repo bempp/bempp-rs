@@ -23,14 +23,11 @@ pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Po
         if nodes.contains(&point.key) {
             map.insert(*point, point.key);
         } else {
-            let mut ancestors: MortonKeys = MortonKeys {
-                keys: point.key.ancestors().into_iter().collect(),
-                index: 0,
-            };
-            ancestors.sort();
-            for ancestor in ancestors.keys {
+            let ancestors = point.key.ancestors();
+
+            for ancestor in ancestors.iter() {
                 if nodes.contains(&ancestor) {
-                    map.insert(*point, ancestor);
+                    map.insert(*point, *ancestor);
                     break;
                 }
             }
@@ -248,7 +245,7 @@ mod tests {
     pub fn test_uniform_tree() {
         let points = points_fixture(10000);
         let depth = 4;
-        let n_crit = 150;
+        let n_crit = 15;
         let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
 
         // Test that particle constraint is met at this level

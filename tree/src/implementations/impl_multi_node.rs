@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use mpi::{
     topology::{Rank, UserCommunicator},
     traits::*,
 };
 
-use hyksort::hyksort::hyksort;
+use hyksort::hyksort;
 use solvers_traits::tree::Tree;
 
 use crate::{
@@ -331,6 +331,7 @@ impl MultiNodeTree {
 
         // 2.i Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
+
         hyksort(&mut points, K, comm);
 
         // 2.ii Find unique leaf keys on each processor
@@ -355,14 +356,14 @@ impl MultiNodeTree {
             MultiNodeTree::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
 
         // 6. Split blocks based on ncrit constraint
-        let mut keys = MultiNodeTree::split_blocks(&points, block_tree, n_crit);
+        let mut locally_balanced = MultiNodeTree::split_blocks(&points, block_tree, n_crit);
 
         // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
-        keys.sort();
-        keys.balance();
+        locally_balanced.balance();
 
         // 8. Find new maps between points and locally balanced tree
-        let points_to_keys = assign_points_to_nodes(&points, &keys);
+        let points_to_keys = assign_points_to_nodes(&points, &locally_balanced);
+
         let mut points: Points = points
             .iter()
             .map(|p| Point {
@@ -374,30 +375,23 @@ impl MultiNodeTree {
 
         // 9. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();
+
         hyksort(&mut points, K, comm);
-        let mut balanced_keys = MortonKeys {
+
+        let mut globally_balanced = MortonKeys {
             keys: points.iter().map(|p| p.key).collect(),
             index: 0,
         };
 
-        balanced_keys.linearize();
-
         // 10. Find final bidirectional maps to non-overlapping tree
-        let points: Points = points
-            .iter()
-            .map(|p| Point {
-                coordinate: p.coordinate,
-                global_idx: p.global_idx,
-                key: MortonKey::from_point(&p.coordinate, domain),
-            })
-            .collect();
-        let points_to_keys = assign_points_to_nodes(&points, &keys);
-        let keys_to_points = assign_nodes_to_points(&keys, &points);
+        let points_to_keys = assign_points_to_nodes(&points, &globally_balanced);
+        let keys_to_points = assign_nodes_to_points(&globally_balanced, &points);
 
         let mut keys: MortonKeys = MortonKeys {
             keys: keys_to_points.keys().cloned().collect(),
             index: 0,
         };
+
         keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
