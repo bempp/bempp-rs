@@ -1,4 +1,4 @@
-use itertools::{izip, Itertools};
+use itertools::izip;
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Linearize (remove overlaps) a vector of keys. The input must be sorted. Algorithm 7 in [1].
-pub fn linearize_keys(keys: &Vec<MortonKey>) -> Vec<MortonKey> {
+pub fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     let depth = keys.iter().map(|k| k.level()).max().unwrap();
     let mut key_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
