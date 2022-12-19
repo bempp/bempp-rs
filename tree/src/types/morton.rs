@@ -7,7 +7,9 @@ pub type KeyType = u64;
 /// with respect to the deepest level of the octree, as well as 'morton', a bit-interleaved single
 /// integer representation.
 pub struct MortonKey {
+    // Lower left corner of key
     pub anchor: [KeyType; 3],
+    // Morton encoded represententation
     pub morton: KeyType,
 }
 

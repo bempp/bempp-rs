@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
 use solvers_traits::tree::Tree;
 
 use crate::{
@@ -82,20 +83,24 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
         if !adaptive {
+            
             encoded_keys = MortonKeys {
                 keys: points
-                    .iter()
-                    .map(|p| {
-                        let anchor = point_to_anchor(p, depth, &domain).unwrap();
-                        MortonKey {
-                            morton: encode_anchor(&anchor, depth),
-                            anchor,
-                        }
-                    })
-                    .collect(),
+                        .iter()
+                        .map(|p| MortonKey::from_point(p, &domain))
+                        .collect(),
                 index: 0,
             };
 
+            // Map keys to specified depth
+            encoded_keys = encoded_keys
+                .iter()
+                .map(|&k| { 
+                    let ancestors: Vec<MortonKey> = k.ancestors().into_iter().collect(); 
+                    ancestors[depth as usize]
+                })
+                .collect();
+            
             encoded_points = encoded_keys
                 .iter()
                 .zip(points)
@@ -106,8 +111,10 @@ impl SingleNodeTree {
                     key: *key,
                 })
                 .collect();
-
+    
             encoded_keys.linearize();
+
+
         } else {
             // If adaptive tree, can continue globbing, must also balance
             let mut level = DEEPEST_LEVEL;
@@ -178,6 +185,14 @@ impl SingleNodeTree {
             keys_to_points,
         }
     }
+
+    fn u_list(&self, key: &MortonKey) {}
+
+    fn v_list(&self) {}
+
+    fn w_list(&self) {}
+
+    fn x_list(&self) {}
 }
 
 impl Tree for SingleNodeTree {

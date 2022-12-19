@@ -256,24 +256,51 @@ impl MultiNodeTree {
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        let mut points: Points = points
-            .iter()
-            .enumerate()
-            .map(|(i, p)| {
-                let anchor = point_to_anchor(p, *depth, &domain).unwrap();
-                let key = MortonKey {
-                    morton: encode_anchor(&anchor, *depth),
-                    anchor,
-                };
+        // let mut points: Points = points
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(i, p)| {
+        //         let anchor = point_to_anchor(p, *depth, &domain).unwrap();
+        //         let key = MortonKey {
+        //             morton: encode_anchor(&anchor, *depth),
+        //             anchor,
+        //         };
 
-                Point {
-                    coordinate: *p,
-                    global_idx: i,
-                    key,
-                }
+        //         Point {
+        //             coordinate: *p,
+        //             global_idx: i,
+        //             key,
+        //         }
+        //     })
+        //     .collect();
+        let mut keys = MortonKeys {
+            keys: points
+                    .iter()
+                    .map(|p| MortonKey::from_point(p, &domain))
+                    .collect(),
+            index: 0,
+        };
+
+        // Map keys to specified depth
+        keys = encoded_keys
+            .iter()
+            .map(|&k| { 
+                let ancestors: Vec<MortonKey> = k.ancestors().into_iter().collect(); 
+                ancestors[depth as usize]
             })
             .collect();
 
+        let mut points = keys
+            .iter()
+            .zip(points)
+            .enumerate()
+            .map(|(index, (key, point))| Point {
+                coordinate: *point,
+                global_idx: index,
+                key: *key,
+            })
+            .collect();
+    
         // 2.i Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
         hyksort(&mut points, k, comm);
