@@ -4,6 +4,7 @@ pub use solvers_element::cell::ReferenceCellType;
 
 use crate::simplex_rule_definitions::SIMPLEX_RULE_DEFINITIONS;
 use crate::types::NumericalQuadratureDefinition;
+use crate::types::QuadratureError;
 
 /// Return a simplex rule for a given number of points.
 ///
@@ -11,7 +12,7 @@ use crate::types::NumericalQuadratureDefinition;
 pub fn simplex_rule(
     cell_type: ReferenceCellType,
     npoints: usize,
-) -> Result<NumericalQuadratureDefinition, ()> {
+) -> Result<NumericalQuadratureDefinition, QuadratureError> {
     let dim: usize = match cell_type {
         ReferenceCellType::Interval => 1,
         ReferenceCellType::Triangle => 2,
@@ -35,7 +36,7 @@ pub fn simplex_rule(
             points: points.iter().copied().collect(),
         })
     } else {
-        Err(())
+        Err(QuadratureError::RuleNotFound)
     }
 }
 
