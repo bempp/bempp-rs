@@ -78,6 +78,11 @@ impl MortonKeys {
             index: 0,
         }
     }
+
+    pub fn add(&mut self, item: MortonKey) {
+        self.keys.push(item);
+    }
+
     /// Complete the region between all elements in an vector of Morton keys that doesn't
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
@@ -170,6 +175,17 @@ impl Iterator for MortonKeys {
 
         self.index += 1;
         self.keys.get(self.index).copied()
+    }
+}
+
+impl FromIterator<MortonKey> for MortonKeys {
+    fn from_iter<I: IntoIterator<Item=MortonKey>>(iter: I) -> Self {
+        let mut c = MortonKeys::new();
+
+        for i in iter {
+            c.add(i);
+        }
+        c
     }
 }
 
