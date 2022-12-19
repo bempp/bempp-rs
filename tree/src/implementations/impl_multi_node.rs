@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 
 use mpi::{
@@ -52,7 +53,7 @@ impl MultiNodeTree {
             }
         } else {
             let (keys, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::uniform_tree(world, k, points, &domain, &depth);
+                MultiNodeTree::uniform_tree(world, k, points, &domain, depth);
 
             MultiNodeTree {
                 adaptive,
@@ -249,27 +250,24 @@ impl MultiNodeTree {
         k: i32,
         points: &[[PointType; 3]],
         domain: &Domain,
-        depth: &u64,
+        depth: u64,
     ) -> (
         MortonKeys,
         Points,
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        let mut points: Points = points
+        // Encode points at deepest level, and map to specified depth
+        let mut points = points
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let anchor = point_to_anchor(p, *depth, &domain).unwrap();
-                let key = MortonKey {
-                    morton: encode_anchor(&anchor, *depth),
-                    anchor,
-                };
-
+                let key = MortonKey::from_point(p, &domain);
+                let ancestors: MortonKeys = key.ancestors().into_iter().sorted().collect();
                 Point {
                     coordinate: *p,
+                    key: ancestors[depth as usize],
                     global_idx: i,
-                    key,
                 }
             })
             .collect();

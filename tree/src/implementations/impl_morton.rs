@@ -179,7 +179,7 @@ impl Iterator for MortonKeys {
 }
 
 impl FromIterator<MortonKey> for MortonKeys {
-    fn from_iter<I: IntoIterator<Item=MortonKey>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = MortonKey>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
 
         for i in iter {

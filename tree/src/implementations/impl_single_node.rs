@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 use solvers_traits::tree::Tree;
@@ -82,31 +83,26 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
         if !adaptive {
-            encoded_keys = MortonKeys {
-                keys: points
-                    .iter()
-                    .map(|p| {
-                        let anchor = point_to_anchor(p, depth, &domain).unwrap();
-                        MortonKey {
-                            morton: encode_anchor(&anchor, depth),
-                            anchor,
-                        }
-                    })
-                    .collect(),
-                index: 0,
-            };
-
-            encoded_points = encoded_keys
+            // Encode points at deepest level, and map to specified depth
+            encoded_points = points
                 .iter()
-                .zip(points)
                 .enumerate()
-                .map(|(index, (key, point))| Point {
-                    coordinate: *point,
-                    global_idx: index,
-                    key: *key,
+                .map(|(i, p)| {
+                    let key = MortonKey::from_point(p, &domain);
+                    let ancestors: MortonKeys = key.ancestors().into_iter().sorted().collect();
+
+                    Point {
+                        coordinate: *p,
+                        key: ancestors[depth as usize],
+                        global_idx: i,
+                    }
                 })
                 .collect();
 
+            encoded_keys = MortonKeys {
+                keys: encoded_points.iter().map(|p| p.key).collect(),
+                index: 0,
+            };
             encoded_keys.linearize();
         } else {
             // If adaptive tree, can continue globbing, must also balance
