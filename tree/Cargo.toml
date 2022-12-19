@@ -11,19 +11,16 @@ keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "rusty_tree"
+name = "solvers_tree"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
 itertools = "0.10"
-mpi = {version = "0.6.*", optional = true}
+mpi = { version = "0.6.*", optional = true }
 memoffset = "0.6"
 rand = "0.8.*"
-hyksort = { path = "../hyksort", optional = true}
+hyksort = { path = "../hyksort", optional = true }
 solvers-traits = { path = "../traits" }
-vtkio = "0.6"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]

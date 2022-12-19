@@ -10,8 +10,8 @@ use crate::types::{
 
 /// Concrete distributed multi-node tree.
 pub struct MultiNodeTree {
-    /// Balancing is optional.
-    pub balanced: bool,
+    /// Adaptivity is optional.
+    pub adaptive: bool,
 
     ///  A vector of Cartesian points.
     pub points: Points,
