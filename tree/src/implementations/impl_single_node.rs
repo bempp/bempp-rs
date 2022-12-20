@@ -44,7 +44,6 @@ pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<Mor
 
     for point in points.iter() {
         if keys.contains(&point.key) {
-            // println!("Here {:?}", i);
             map.entry(point.key).or_default().push(*point);
         } else {
             let ancestor = point

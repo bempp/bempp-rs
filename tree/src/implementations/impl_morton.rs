@@ -602,15 +602,6 @@ impl MortonKey {
 
             let min = ra + rb;
             let max = 3.0_f64.sqrt() * (ra + rb);
-            println!(
-                "centre a {:?} b {:?} distance {:?} min {:?} max {:?} contained {:?}",
-                ca,
-                cb,
-                distance,
-                min,
-                max,
-                distance.iter().any(|&d| (min <= d && d <= max))
-            );
             distance.iter().any(|&d| (min <= d && d <= max))
         }
     }
@@ -801,17 +792,6 @@ mod tests {
         assert_eq!(anchor, actual);
     }
 
-    // #[test]
-    // fn test_ord() {
-    //     let a = MortonKey { anchor: [32768, 12288, 12288], morton: 4672484613396889604 };
-    //     let b = MortonKey { anchor: [32768, 0, 0], morton: 4611686018427387906 };
-
-    //     assert!(a != b);
-
-    //     println!("{:?} \n\n {:?}", a.ancestors().contains(&b), b);
-    //     assert!(a < b);
-
-    // }
     #[test]
     fn test_sorting() {
         let npoints = 1000;
