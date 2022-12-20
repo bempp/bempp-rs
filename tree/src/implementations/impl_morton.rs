@@ -44,6 +44,40 @@ fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     result
 }
 
+
+// Only works on complete trees.
+fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
+
+    let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
+    for level in (0..=DEEPEST_LEVEL).rev() {
+        
+        let work_list: Vec<MortonKey> = balanced
+            .iter()
+            .filter(|&key| key.level() == level)
+            .cloned()
+            .collect();
+
+        for key in work_list.iter() {
+
+            let neighbors = key.neighbors();
+            for neighbor in neighbors {
+
+                let parent = neighbor.parent();
+                
+                if !balanced.contains(&neighbor) && !balanced.contains(&parent) {
+                    balanced.insert(parent);
+                    if parent.level() > 0 {
+                        for sibling in parent.siblings() {
+                            balanced.insert(sibling);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    balanced
+}
+
 /// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in [1].
 pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
     let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
@@ -115,39 +149,7 @@ impl MortonKeys {
 
     /// Enforce a 2:1 balance for a vector of Morton keys, and remove any overlaps.
     pub fn balance(&mut self) {
-        let mut balanced: HashSet<MortonKey> = self.keys.iter().cloned().collect();
-        for level in (0..self.depth()).rev() {
-            let work_list: Vec<MortonKey> = balanced
-                .iter()
-                .filter(|&key| key.level() == level)
-                .cloned()
-                .collect();
-
-            for key in work_list {
-                let neighbors = key.neighbors();
-
-                for neighbor in neighbors {
-                    let parent = neighbor.parent();
-                    if !balanced.contains(&neighbor) && !balanced.contains(&neighbor) {
-                        balanced.insert(parent);
-
-                        if parent.level() > 0 {
-                            for sibling in parent.siblings() {
-                                balanced.insert(sibling);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut balanced = MortonKeys {
-            keys: balanced.into_iter().collect(),
-            index: 0,
-        };
-        balanced.linearize();
-        balanced.sort();
-        self.keys = balanced.keys;
+        self.keys = balance_keys(&self).into_iter().collect();
     }
 }
 
@@ -578,6 +580,36 @@ impl MortonKey {
             .map(|d| d.unwrap())
             .collect()
     }
+
+    /// Check if two keys are adjacent with respect to each other
+    pub fn is_adjacent(&self, other: &MortonKey) -> bool {
+        let ancestors = self.ancestors();
+        let other_ancestors = other.ancestors();
+
+        // If either key overlaps they cannot be adjacent.
+        if ancestors.contains(other) || other_ancestors.contains(self) {
+            false
+        } else {
+            // Calculate distance between centres of each node
+            let da = 1 << (DEEPEST_LEVEL - self.level());
+            let db = 1 << (DEEPEST_LEVEL - other.level());
+            let ra = (da as f64) * 0.5;
+            let rb = (db as f64) * 0.5;
+
+            let ca: Vec<f64> = self.anchor.iter().map(|&x| (x as f64) + ra).collect();
+            let cb: Vec<f64> = other.anchor.iter().map(|&x| (x as f64) + rb).collect();
+
+            let distance: Vec<f64> = ca.iter().zip(cb.iter()).map(|(a, b)| (b - a).abs()).collect();
+
+            let min = ra + rb;
+            let max = 3.0_f64.sqrt() * (ra + rb);
+
+            // println!("centre a {:?} b {:?} distance {:?} min {:?} max {:?} contained {:?}", 
+            // ca, cb, distance, min, max, distance.iter().any(|&d| (min <= d && d <= max)));
+            distance.iter().any(|&d| (min <= d && d <= max))
+        }
+    }
+
 }
 
 impl PartialEq for MortonKey {
@@ -1247,5 +1279,57 @@ mod tests {
 
             assert!(a <= b);
         }
+    }
+
+    #[test]
+    pub fn test_balance() {
+        
+        let a = MortonKey::from_anchor(&[0, 0, 0]);
+        let b = MortonKey::from_anchor(&[1, 1, 1]);
+
+        let mut complete = complete_region(&a, &b);
+        let start_val = vec![a];
+        let end_val = vec![b];
+        complete = start_val
+            .into_iter()
+            .chain(complete.into_iter())
+            .chain(end_val.into_iter())
+            .collect();
+        let mut tree = MortonKeys {
+            keys: complete,
+            index: 0
+        };
+
+        tree.balance();
+        tree.linearize();
+        tree.sort();
+
+        // Test for overlaps in balanced tree
+        for key in tree.iter() {
+
+            if !tree.iter().contains(key) {
+                let mut ancestors = key.ancestors();
+                ancestors.remove(key);
+                
+                for ancestor in ancestors.iter() {
+                    assert!(!tree.keys.contains(ancestor));
+                }
+            }
+        }
+
+        // Test that adjacent keys are 2:1 balanced
+        for key in tree.iter() {
+            let adjacent_levels: Vec<u64> = tree
+                .iter()
+                .cloned()
+                .filter(|k| key.is_adjacent(k))
+                .map(|a| a.level())
+                .collect();
+            
+            for l in adjacent_levels.iter() {
+                assert!(l.abs_diff(key.level()) <= 1);
+            }
+        }
+
     }
 }
