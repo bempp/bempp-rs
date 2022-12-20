@@ -78,7 +78,7 @@ fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tre
         .collect();
     uniform.sort();
 
-    // // Test that we really do get a subset of the uniform tree
+    // Test that we really do get a subset of the uniform tree
     assert_eq!(uniform.len(), keys.len());
 
     for (a, &b) in izip!(uniform, keys.iter()) {
