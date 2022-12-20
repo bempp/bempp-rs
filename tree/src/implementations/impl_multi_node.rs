@@ -345,6 +345,7 @@ impl MultiNodeTree {
 
         // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
         locally_balanced.balance();
+        locally_balanced.linearize();
 
         // 8. Find new maps between points and locally balanced tree
         let points_to_locally_balanced = assign_points_to_nodes(&points, &locally_balanced);
