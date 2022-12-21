@@ -69,7 +69,7 @@ fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tre
     let max: &MortonKey = keys.iter().max().unwrap();
 
     // Generate a uniform tree at the max level, and filter for range in this processor
-    let uniform = SingleNodeTree::new(points, false, n_crit, depth);
+    let mut uniform = SingleNodeTree::new(points, false, n_crit, depth);
     let mut uniform: Vec<MortonKey> = uniform
         .get_keys()
         .iter()

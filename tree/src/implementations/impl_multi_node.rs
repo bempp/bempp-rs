@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 
 use mpi::{
@@ -52,7 +53,7 @@ impl MultiNodeTree {
             }
         } else {
             let (keys, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::uniform_tree(world, k, points, &domain, &depth);
+                MultiNodeTree::uniform_tree(world, k, points, &domain, depth);
 
             MultiNodeTree {
                 adaptive,
@@ -249,57 +250,28 @@ impl MultiNodeTree {
         k: i32,
         points: &[[PointType; 3]],
         domain: &Domain,
-        depth: &u64,
+        depth: u64,
     ) -> (
         MortonKeys,
         Points,
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        // let mut points: Points = points
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, p)| {
-        //         let anchor = point_to_anchor(p, *depth, &domain).unwrap();
-        //         let key = MortonKey {
-        //             morton: encode_anchor(&anchor, *depth),
-        //             anchor,
-        //         };
-
-        //         Point {
-        //             coordinate: *p,
-        //             global_idx: i,
-        //             key,
-        //         }
-        //     })
-        //     .collect();
-        let mut keys = MortonKeys {
-            keys: points
-                    .iter()
-                    .map(|p| MortonKey::from_point(p, &domain))
-                    .collect(),
-            index: 0,
-        };
-
-        // Map keys to specified depth
-        keys = encoded_keys
+        // Encode points at deepest level, and map to specified depth
+        let mut points = points
             .iter()
-            .map(|&k| { 
-                let ancestors: Vec<MortonKey> = k.ancestors().into_iter().collect(); 
-                ancestors[depth as usize]
-            })
-            .collect();
-
-        let mut points = keys
-            .iter()
-            .zip(points)
             .enumerate()
-            .map(|(index, (key, point))| Point {
-                coordinate: *point,
-                global_idx: index,
-                key: *key,
+            .map(|(i, p)| {
+                let key = MortonKey::from_point(p, &domain);
+                let ancestors: MortonKeys = key.ancestors().into_iter().sorted().collect();
+                Point {
+                    coordinate: *p,
+                    key: ancestors[depth as usize],
+                    global_idx: i,
+                }
             })
             .collect();
+
     
         // 2.i Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
@@ -374,6 +346,7 @@ impl MultiNodeTree {
 
         // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
         locally_balanced.balance();
+        locally_balanced.linearize();
 
         // 8. Find new maps between points and locally balanced tree
         let points_to_locally_balanced = assign_points_to_nodes(&points, &locally_balanced);

@@ -57,8 +57,6 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 
     // Test that the partner's minimum node is greater than the process's maximum node
     if rank > 0 {
-        // println!("rank {:?} \n min {:?} \n partner max {:?} \n min level {:?} \n partner max level {:?} \n is ancesctor {:?} \n\n",
-        // rank, min, partner_max, min.level(), partner_max.level(), partner_max.ancestors().contains(min));
         assert!(partner_max < *min)
     }
 }
