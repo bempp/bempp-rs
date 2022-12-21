@@ -594,15 +594,22 @@ impl MortonKey {
             let ca: Vec<f64> = self.anchor.iter().map(|&x| (x as f64) + ra).collect();
             let cb: Vec<f64> = other.anchor.iter().map(|&x| (x as f64) + rb).collect();
 
-            let distance: Vec<f64> = ca
-                .iter()
-                .zip(cb.iter())
-                .map(|(a, b)| (b - a).abs())
-                .collect();
+            let distance: Vec<f64> = ca.iter().zip(cb.iter()).map(|(a, b)| b - a).collect();
 
-            let min = ra + rb;
-            let max = 3.0_f64.sqrt() * (ra + rb);
-            distance.iter().any(|&d| (min <= d && d <= max))
+            let min = -ra - rb;
+            let max = ra + rb;
+            let mut result = true;
+
+            // println!("da {:?} db {:?} ca {:?} cb {:?} distance {:?}, min {:?} max {:?}",
+            // da, db, ca, cb, distance, min, max);
+
+            for &d in distance.iter() {
+                if d > max || d < min {
+                    result = false
+                }
+            }
+
+            result
         }
     }
 }
@@ -1348,10 +1355,10 @@ mod tests {
 
         // Test keys on different levels
         let anchor_a = [0, 0, 0];
-        let a = MortonKey::from_anchor(&anchor_a);
+        let mut a = MortonKey::from_anchor(&anchor_a);
+        a = a.parent();
         let anchor_b = [2, 2, 2];
-        let mut b = MortonKey::from_anchor(&anchor_b);
-        b = b.parent();
+        let b = MortonKey::from_anchor(&anchor_b);
         assert!(a.is_adjacent(&b));
     }
 }

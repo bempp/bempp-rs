@@ -4,7 +4,8 @@ use std::collections::{HashMap, HashSet};
 use solvers_traits::tree::Tree;
 
 use crate::{
-    constants::{DEEPEST_LEVEL, NCRIT},
+    constants::{DEEPEST_LEVEL, NCRIT, ROOT},
+    implementations::impl_morton::complete_region,
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
@@ -73,7 +74,7 @@ impl SingleNodeTree {
         let domain = Domain::from_local_points(points);
 
         // Encode to max user specified depth, if specified, otherwise encode an adaptive tree using n_crit
-        let encoded_points: Points;
+        let mut encoded_points: Points;
         let mut encoded_keys: MortonKeys;
 
         let n_crit = n_crit.unwrap_or(NCRIT);
@@ -100,64 +101,121 @@ impl SingleNodeTree {
                 keys: encoded_points.iter().map(|p| p.key).collect(),
                 index: 0,
             };
+
             encoded_keys.linearize();
         } else {
-            // If adaptive tree, can continue globbing, must also balance
-            let mut level = DEEPEST_LEVEL;
-            let mut curr = MortonKeys {
-                keys: points
-                    .iter()
-                    .map(|p| MortonKey::from_point(p, &domain))
-                    .collect(),
-                index: 0,
-            };
-
-            loop {
-                // Gather hashmap of globbable parents
-                let globbable = curr
-                    .iter()
-                    .fold(HashMap::<MortonKey, usize>::new(), |mut m, x| {
-                        *m.entry(x.parent()).or_default() += 1;
-                        m
-                    });
-
-                let new = MortonKeys {
-                    keys: curr
-                        .iter()
-                        .map(|&key| {
-                            let parent = key.parent();
-                            if *globbable.get(&parent).unwrap() < n_crit {
-                                parent
-                            } else {
-                                key
-                            }
-                        })
-                        .collect(),
-                    index: 0,
-                };
-                level -= 1;
-                // Break loop if can't glob anymore
-                if level == 0 || globbable.values().all(|&v| v >= n_crit) {
-                    encoded_keys = curr;
-                    break;
-                }
-                curr = new;
-            }
-
-            encoded_points = encoded_keys
+            // Encode points at deepest level
+            encoded_points = points
                 .iter()
-                .zip(points)
                 .enumerate()
-                .map(|(index, (key, point))| Point {
-                    coordinate: *point,
-                    global_idx: index,
-                    key: *key,
+                .map(|(i, p)| Point {
+                    coordinate: *p,
+                    key: MortonKey::from_point(p, &domain),
+                    global_idx: i,
                 })
                 .collect();
 
-            // Balance and linearize adaptive tree
-            encoded_keys.balance();
-            encoded_keys.linearize();
+            // Find unique keys corresponding to the points
+            let mut complete = MortonKeys {
+                keys: encoded_points.iter().map(|p| p.key).collect_vec(),
+                index: 0,
+            };
+
+            complete.linearize();
+
+            // Complete the region spanned by the points
+            complete.complete();
+
+            // Find seeds (coarsest node(s))
+            let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
+
+            let mut seeds: MortonKeys = MortonKeys {
+                keys: complete
+                    .into_iter()
+                    .filter(|k| k.level() == coarsest_level)
+                    .collect_vec(),
+                index: 0,
+            };
+
+            seeds.sort();
+
+            // The tree's domain is defined by the finest first/last descendants
+            let ffc_root = ROOT.finest_first_child();
+            let min = seeds.iter().min().unwrap();
+            let fa = ffc_root.finest_ancestor(min);
+            let first_child = fa.children().into_iter().min().unwrap();
+            seeds.push(first_child);
+
+            let flc_root = ROOT.finest_last_child();
+            let max = seeds.iter().max().unwrap();
+            let fa = flc_root.finest_ancestor(max);
+            let last_child = fa.children().into_iter().max().unwrap();
+            seeds.push(last_child);
+
+            seeds.sort();
+
+            let mut blocktree = MortonKeys::new();
+
+            for i in 0..(seeds.iter().len() - 1) {
+                let a = seeds[i];
+                let b = seeds[i + 1];
+                let mut tmp = complete_region(&a, &b);
+                blocktree.keys.push(a);
+                blocktree.keys.append(&mut tmp);
+            }
+
+            blocktree.keys.push(seeds.last().unwrap());
+
+            blocktree.sort();
+
+            let mut locally_balanced;
+            let mut blocks_to_points;
+            loop {
+                let mut new_blocktree = MortonKeys::new();
+
+                // Map between blocks and the leaves they contain
+                blocks_to_points = assign_nodes_to_points(&blocktree, &encoded_points);
+
+                // Generate a new blocktree with a block's children if they violate the n_crit parameter
+                let mut check = 0;
+                for (&block, points) in blocks_to_points.iter() {
+                    let npoints = points.len();
+
+                    if npoints > n_crit {
+                        let mut children = block.children();
+                        new_blocktree.append(&mut children);
+                    } else {
+                        new_blocktree.push(block);
+                        check += 1;
+                    }
+                }
+
+                // Return if we cycle through all blocks without splitting
+                if check == blocks_to_points.len() {
+                    locally_balanced = new_blocktree;
+                    break;
+                } else {
+                    blocktree = new_blocktree;
+                }
+            }
+
+            locally_balanced.balance();
+            locally_balanced.linearize();
+
+            // Find new maps between points and locally balanced tree
+            let points_to_locally_balanced =
+                assign_points_to_nodes(&encoded_points, &locally_balanced);
+
+            encoded_points = encoded_points
+                .iter()
+                .map(|p| Point {
+                    coordinate: p.coordinate,
+                    global_idx: p.global_idx,
+                    key: *points_to_locally_balanced.get(p).unwrap(),
+                })
+                .collect();
+
+            encoded_keys = locally_balanced;
         }
 
         let keys_to_points = assign_nodes_to_points(&encoded_keys, &encoded_points);
@@ -255,23 +313,50 @@ mod tests {
         assert!(first == depth);
     }
 
-    // #[test]
-    // pub fn test_adaptive_tree() {
-    //     let points = points_fixture(10000);
-    //     let adaptive = true;
-    //     let n_crit = 15;
-    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
+    #[test]
+    pub fn test_adaptive_tree() {
+        let points = points_fixture(1000);
+        let adaptive = true;
+        let n_crit = 15;
+        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
 
-    //     // Test that particle constraint is met
-    //     for (_, (_, points)) in tree.keys_to_points.iter().enumerate() {
-    //         assert!(points.len() <= n_crit);
-    //     }
+        // Test that particle constraint is met
+        for (_, (_, points)) in tree.keys_to_points.iter().enumerate() {
+            assert!(points.len() <= n_crit);
+        }
 
-    //     // Test that tree is not uniform
-    //     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
-    //     let first = levels[0];
-    //     assert_eq!(false, levels.iter().all(|level| *level == first));
-    // }
+        // Test that tree is not uniform
+        let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
+        let first = levels[0];
+        assert_eq!(false, levels.iter().all(|level| *level == first));
+
+        // Test for overlaps in balanced tree
+        let keys: Vec<MortonKey> = tree.keys.iter().cloned().collect();
+        for key in keys.iter() {
+            if !keys.iter().contains(key) {
+                let mut ancestors = key.ancestors();
+                ancestors.remove(key);
+
+                for ancestor in ancestors.iter() {
+                    assert!(!keys.contains(ancestor));
+                }
+            }
+        }
+
+        // Test that adjacent keys are 2:1 balanced
+        for key in keys.iter() {
+            let adjacent_levels: Vec<u64> = keys
+                .iter()
+                .cloned()
+                .filter(|k| key.is_adjacent(k))
+                .map(|a| a.level())
+                .collect();
+
+            for l in adjacent_levels.iter() {
+                assert!(l.abs_diff(key.level()) <= 1);
+            }
+        }
+    }
 
     pub fn test_no_overlaps_helper(tree: &SingleNodeTree) {
         let tree_set: HashSet<MortonKey> = tree.get_keys().clone().collect();
