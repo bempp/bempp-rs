@@ -272,7 +272,6 @@ impl MultiNodeTree {
             })
             .collect();
 
-    
         // 2.i Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
         hyksort(&mut points, k, comm);

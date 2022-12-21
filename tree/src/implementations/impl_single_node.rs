@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use itertools::Itertools;
 use solvers_traits::tree::Tree;
 
 use crate::{
@@ -104,8 +103,6 @@ impl SingleNodeTree {
             };
 
             encoded_keys.linearize();
-
-
         } else {
             // Encode points at deepest level
             encoded_points = points
