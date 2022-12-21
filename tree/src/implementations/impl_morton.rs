@@ -600,9 +600,6 @@ impl MortonKey {
             let max = ra + rb;
             let mut result = true;
 
-            // println!("da {:?} db {:?} ca {:?} cb {:?} distance {:?}, min {:?} max {:?}",
-            // da, db, ca, cb, distance, min, max);
-
             for &d in distance.iter() {
                 if d > max || d < min {
                     result = false
