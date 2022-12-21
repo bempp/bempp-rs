@@ -205,8 +205,7 @@ impl SingleNodeTree {
             balanced.linearize();
 
             // Find new maps between points and balanced tree
-            let points_to_balanced =
-                assign_points_to_nodes(&encoded_points, &balanced);
+            let points_to_balanced = assign_points_to_nodes(&encoded_points, &balanced);
 
             encoded_points = encoded_points
                 .iter()
