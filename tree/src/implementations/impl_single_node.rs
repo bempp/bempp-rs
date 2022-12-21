@@ -168,7 +168,8 @@ impl SingleNodeTree {
 
             blocktree.sort();
 
-            let mut locally_balanced;
+            // Split the blocks based on the n_crit constraint
+            let mut balanced;
             let mut blocks_to_points;
             loop {
                 let mut new_blocktree = MortonKeys::new();
@@ -192,30 +193,31 @@ impl SingleNodeTree {
 
                 // Return if we cycle through all blocks without splitting
                 if check == blocks_to_points.len() {
-                    locally_balanced = new_blocktree;
+                    balanced = new_blocktree;
                     break;
                 } else {
                     blocktree = new_blocktree;
                 }
             }
 
-            locally_balanced.balance();
-            locally_balanced.linearize();
+            // Balance and linearize
+            balanced.balance();
+            balanced.linearize();
 
-            // Find new maps between points and locally balanced tree
-            let points_to_locally_balanced =
-                assign_points_to_nodes(&encoded_points, &locally_balanced);
+            // Find new maps between points and balanced tree
+            let points_to_balanced =
+                assign_points_to_nodes(&encoded_points, &balanced);
 
             encoded_points = encoded_points
                 .iter()
                 .map(|p| Point {
                     coordinate: p.coordinate,
                     global_idx: p.global_idx,
-                    key: *points_to_locally_balanced.get(p).unwrap(),
+                    key: *points_to_balanced.get(p).unwrap(),
                 })
                 .collect();
 
-            encoded_keys = locally_balanced;
+            encoded_keys = balanced;
         }
 
         let keys_to_points = assign_nodes_to_points(&encoded_keys, &encoded_points);
