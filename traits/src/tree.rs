@@ -31,7 +31,6 @@ pub trait Tree {
 /// Locally Essential Trees take care of ghost nodes on other processors, and have access to all
 /// the information they need to build the interaction lists for a tree.
 pub trait LocallyEssentialTree {
-
     type RawTree: Tree;
     type NodeIndex;
     type NodeIndices;

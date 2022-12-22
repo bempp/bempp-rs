@@ -419,7 +419,7 @@ impl Tree for MultiNodeTree {
     fn get_keys(&self) -> &MortonKeys {
         &self.keys
     }
-    
+
     // Get all keys as aset, gets local keys in multi-node setting
     fn get_keys_set(&self) -> &MortonKeys {
         &self.keys_set

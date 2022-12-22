@@ -280,10 +280,10 @@ impl Tree for SingleNodeTree {
     fn get_keys(&self) -> &MortonKeys {
         &self.keys
     }
-    
+
     fn get_keys_set(&self) -> &Self::NodeIndicesSet {
         &self.keys_set
-    }   
+    }
 
     // Get all points, gets local keys in multi-node setting
     fn get_points(&self) -> &Points {

@@ -107,11 +107,13 @@ impl FmmTree for KiFmmTree {
     }
 
     // Composed of adjacent siblings and neighbours,
-    fn get_near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {
-        
-    }
+    fn get_near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
 
-    fn get_interaction_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
+    fn get_interaction_list<'a>(
+        &'a self,
+        node_index: Self::NodeIndex,
+    ) -> Option<Self::IndexIter<'a>> {
+    }
 
     fn get_x_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
 

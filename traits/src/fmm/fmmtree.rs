@@ -49,7 +49,10 @@ pub trait FmmTree {
     fn get_near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
 
     // Get the interaction list.
-    fn get_interaction_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
+    fn get_interaction_list<'a>(
+        &'a self,
+        node_index: Self::NodeIndex,
+    ) -> Option<Self::IndexIter<'a>>;
 
     // Get the x list.
     fn get_x_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
