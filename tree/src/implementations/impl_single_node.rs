@@ -77,25 +77,27 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL) as usize;
 
         if adaptive {
-            let (keys, points, points_to_keys, keys_to_points) =
+            let (keys, keys_set, points, points_to_keys, keys_to_points) =
                 SingleNodeTree::adaptive_tree(points, &domain, n_crit);
 
             SingleNodeTree {
                 adaptive,
                 points,
                 keys,
+                keys_set,
                 domain,
                 points_to_keys,
                 keys_to_points,
             }
         } else {
-            let (keys, points, points_to_keys, keys_to_points) =
+            let (keys, keys_set, points, points_to_keys, keys_to_points) =
                 SingleNodeTree::uniform_tree(points, &domain, depth);
 
             SingleNodeTree {
                 adaptive,
                 points,
                 keys,
+                keys_set,
                 domain,
                 points_to_keys,
                 keys_to_points,
@@ -109,6 +111,7 @@ impl SingleNodeTree {
         depth: usize,
     ) -> (
         MortonKeys,
+        HashSet<MortonKey>,
         Points,
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
@@ -136,10 +139,11 @@ impl SingleNodeTree {
 
         keys.linearize();
 
+        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
         let keys_to_points = assign_nodes_to_points(&keys, &points);
         let points_to_keys = assign_points_to_nodes(&points, &keys);
 
-        (keys, points, points_to_keys, keys_to_points)
+        (keys, keys_set, points, points_to_keys, keys_to_points)
     }
 
     pub fn adaptive_tree(
@@ -148,6 +152,7 @@ impl SingleNodeTree {
         n_crit: usize,
     ) -> (
         MortonKeys,
+        HashSet<MortonKey>,
         Points,
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
@@ -266,14 +271,55 @@ impl SingleNodeTree {
 
         let keys_to_points = assign_nodes_to_points(&balanced, &points);
         let keys = balanced;
-
-        (keys, points, points_to_keys, keys_to_points)
+        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        (keys, keys_set, points, points_to_keys, keys_to_points)
     }
 
-    fn u_list(&self, key: &MortonKey) {}
+    // Calculate near field interaction list of leaf keys.
+    fn near_field(&self, key: &MortonKey) -> Vec<MortonKey> {
+        let mut result = Vec::<MortonKey>::new();
+        let neighbours = key.neighbors();
 
-    fn v_list(&self) {}
+        // Child level
+        let mut neighbors_children_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .map(|n| n.children())
+            .flatten()
+            .filter(|nc| key.is_adjacent(nc))
+            .collect();
 
+        // Key level
+        let mut neighbors_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .filter(|n| self.keys_set.contains(n) && key.is_adjacent(n))
+            .cloned()
+            .collect();
+
+        // Parent level
+        let mut neighbors_parents_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .map(|n| n.parent())
+            .filter(|np| self.keys_set.contains(np) && key.is_adjacent(np))
+            .collect();
+
+        result.append(&mut neighbors_children_adj);
+        result.append(&mut neighbors_adj);
+        result.append(&mut neighbors_parents_adj);
+
+        result
+    }
+
+    fn v_list(&self, key: &MortonKey) -> Vec<MortonKey> {
+        key.parent()
+            .neighbors()
+            .iter()
+            .map(|pn| pn.children())
+            .flatten()
+            .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
+            .collect_vec()
+    }
+
+    // Calculate M2P interactions of leaf key.
     fn w_list(&self) {}
 
     fn x_list(&self) {}

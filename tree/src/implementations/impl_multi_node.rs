@@ -40,25 +40,27 @@ impl MultiNodeTree {
         let k = k.unwrap_or(K);
 
         if adaptive {
-            let (keys, points, points_to_keys, keys_to_points) =
+            let (keys, keys_set, points, points_to_keys, keys_to_points) =
                 MultiNodeTree::adaptive_tree(world, k, points, &domain, n_crit);
 
             MultiNodeTree {
                 adaptive,
                 points,
                 keys,
+                keys_set,
                 domain,
                 points_to_keys,
                 keys_to_points,
             }
         } else {
-            let (keys, points, points_to_keys, keys_to_points) =
+            let (keys, keys_set, points, points_to_keys, keys_to_points) =
                 MultiNodeTree::uniform_tree(world, k, points, &domain, depth);
 
             MultiNodeTree {
                 adaptive,
                 points,
                 keys,
+                keys_set,
                 domain,
                 points_to_keys,
                 keys_to_points,
@@ -253,6 +255,7 @@ impl MultiNodeTree {
         depth: u64,
     ) -> (
         MortonKeys,
+        HashSet<MortonKey>,
         Points,
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
@@ -282,13 +285,14 @@ impl MultiNodeTree {
             index: 0,
         };
         keys.linearize();
+        keys.sort();
 
         // 3. Create bi-directional maps between keys and points
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let keys_to_points = assign_nodes_to_points(&keys, &points);
 
-        // keys.sort();
-        (keys, points, points_to_keys, keys_to_points)
+        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        (keys, keys_set, points, points_to_keys, keys_to_points)
     }
 
     /// Specialization for adaptive tree.
@@ -300,6 +304,7 @@ impl MultiNodeTree {
         n_crit: usize,
     ) -> (
         MortonKeys,
+        HashSet<MortonKey>,
         Points,
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
@@ -381,9 +386,11 @@ impl MultiNodeTree {
                 key: *points_to_globally_balanced.get(p).unwrap(),
             })
             .collect();
-
+        
+        let globally_balanced_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
         (
             globally_balanced,
+            globally_balanced_set,
             points,
             points_to_globally_balanced,
             globally_balanced_to_points,
