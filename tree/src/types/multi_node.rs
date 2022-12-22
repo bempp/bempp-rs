@@ -18,7 +18,7 @@ pub struct MultiNodeTree {
 
     /// The nodes that span the tree, defined by its leaf nodes.
     pub keys: MortonKeys,
-    
+
     /// The nodes that span the tree, defined by its leaf nodes, as a set.
     pub keys_set: HashSet<MortonKey>,
 

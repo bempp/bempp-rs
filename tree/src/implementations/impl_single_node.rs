@@ -77,45 +77,19 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL) as usize;
 
         if adaptive {
-            let (keys, keys_set, points, points_to_keys, keys_to_points) =
-                SingleNodeTree::adaptive_tree(points, &domain, n_crit);
-
-            SingleNodeTree {
-                adaptive,
-                points,
-                keys,
-                keys_set,
-                domain,
-                points_to_keys,
-                keys_to_points,
-            }
+            SingleNodeTree::adaptive_tree(adaptive, points, &domain, n_crit)
         } else {
-            let (keys, keys_set, points, points_to_keys, keys_to_points) =
-                SingleNodeTree::uniform_tree(points, &domain, depth);
-
-            SingleNodeTree {
-                adaptive,
-                points,
-                keys,
-                keys_set,
-                domain,
-                points_to_keys,
-                keys_to_points,
-            }
+            SingleNodeTree::uniform_tree(adaptive, points, &domain, depth)
         }
     }
 
+    /// Constructor for uniform trees
     pub fn uniform_tree(
+        adaptive: bool,
         points: &[[PointType; 3]],
-        domain: &Domain,
+        &domain: &Domain,
         depth: usize,
-    ) -> (
-        MortonKeys,
-        HashSet<MortonKey>,
-        Points,
-        HashMap<Point, MortonKey>,
-        HashMap<MortonKey, Points>,
-    ) {
+    ) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
         let points: Points = points
             .iter()
@@ -143,20 +117,24 @@ impl SingleNodeTree {
         let keys_to_points = assign_nodes_to_points(&keys, &points);
         let points_to_keys = assign_points_to_nodes(&points, &keys);
 
-        (keys, keys_set, points, points_to_keys, keys_to_points)
+        SingleNodeTree {
+            adaptive,
+            points,
+            keys,
+            keys_set,
+            domain,
+            points_to_keys,
+            keys_to_points,
+        }
     }
 
+    /// Constructor for adaptive trees
     pub fn adaptive_tree(
+        adaptive: bool,
         points: &[[PointType; 3]],
-        domain: &Domain,
+        &domain: &Domain,
         n_crit: usize,
-    ) -> (
-        MortonKeys,
-        HashSet<MortonKey>,
-        Points,
-        HashMap<Point, MortonKey>,
-        HashMap<MortonKey, Points>,
-    ) {
+    ) -> SingleNodeTree {
         // Encode points at deepest level
         let mut points: Points = points
             .iter()
@@ -272,7 +250,16 @@ impl SingleNodeTree {
         let keys_to_points = assign_nodes_to_points(&balanced, &points);
         let keys = balanced;
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
-        (keys, keys_set, points, points_to_keys, keys_to_points)
+
+        SingleNodeTree {
+            adaptive,
+            points,
+            keys,
+            keys_set,
+            domain,
+            points_to_keys,
+            keys_to_points,
+        }
     }
 
     // Calculate near field interaction list of leaf keys.
@@ -283,8 +270,7 @@ impl SingleNodeTree {
         // Child level
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
-            .map(|n| n.children())
-            .flatten()
+            .flat_map(|n| n.children())
             .filter(|nc| key.is_adjacent(nc))
             .collect();
 
@@ -309,12 +295,11 @@ impl SingleNodeTree {
         result
     }
 
-    fn v_list(&self, key: &MortonKey) -> Vec<MortonKey> {
+    fn interaction_list(&self, key: &MortonKey) -> Vec<MortonKey> {
         key.parent()
             .neighbors()
             .iter()
-            .map(|pn| pn.children())
-            .flatten()
+            .flat_map(|pn| pn.children())
             .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
             .collect_vec()
     }
@@ -322,6 +307,7 @@ impl SingleNodeTree {
     // Calculate M2P interactions of leaf key.
     fn w_list(&self) {}
 
+    // Calculate P2L interactions of leaf key.
     fn x_list(&self) {}
 }
 

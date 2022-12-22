@@ -253,13 +253,7 @@ impl MultiNodeTree {
         points: &[[PointType; 3]],
         domain: &Domain,
         depth: u64,
-    ) -> (
-        MortonKeys,
-        HashSet<MortonKey>,
-        Points,
-        HashMap<Point, MortonKey>,
-        HashMap<MortonKey, Points>,
-    ) {
+    ) -> MultiNodeTree {
         // Encode points at deepest level, and map to specified depth
         let mut points = points
             .iter()
@@ -292,7 +286,14 @@ impl MultiNodeTree {
         let keys_to_points = assign_nodes_to_points(&keys, &points);
 
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
-        (keys, keys_set, points, points_to_keys, keys_to_points)
+
+        MultiNodeTree {
+            keys,
+            keys_set,
+            points,
+            points_to_keys,
+            keys_to_points,
+        }
     }
 
     /// Specialization for adaptive tree.
@@ -302,13 +303,7 @@ impl MultiNodeTree {
         points: &[[PointType; 3]],
         domain: &Domain,
         n_crit: usize,
-    ) -> (
-        MortonKeys,
-        HashSet<MortonKey>,
-        Points,
-        HashMap<Point, MortonKey>,
-        HashMap<MortonKey, Points>,
-    ) {
+    ) -> MultiNodeTree {
         // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
         let mut points: Points = points
             .iter()
@@ -386,15 +381,16 @@ impl MultiNodeTree {
                 key: *points_to_globally_balanced.get(p).unwrap(),
             })
             .collect();
-        
+
         let globally_balanced_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
-        (
-            globally_balanced,
-            globally_balanced_set,
+
+        MultiNodeTree {
+            keys: globally_balanced,
+            keys_set: globally_balanced_set,
             points,
-            points_to_globally_balanced,
-            globally_balanced_to_points,
-        )
+            points_to_keys: points_to_globally_balanced,
+            keys_to_points: globally_balanced_to_points,
+        }
     }
 }
 

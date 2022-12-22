@@ -389,7 +389,7 @@ impl MortonKey {
     /// an encoding on the deepest level.
     pub fn siblings(&self) -> Vec<MortonKey> {
         let mut siblings: HashSet<MortonKey> = self.parent().children().into_iter().collect();
-        siblings.remove(&self);
+        siblings.remove(self);
         siblings.into_iter().collect_vec()
     }
 
