@@ -36,6 +36,10 @@ impl KiFmmNodes3D {
             index: 0,
         }
     }
+
+    fn add(&mut self, elem: KiFmmNode3D) {
+        self.nodes.push(elem);
+    }
 }
 
 pub struct KiFmmTree {
@@ -85,7 +89,7 @@ impl FromIterator<KiFmmNode3D> for KiFmmNodes3D {
         let mut res = KiFmmNodes3D::new();
 
         for item in iter {
-            res.nodes.push(item)
+            res.add(item)
         }
         res
     }
@@ -103,25 +107,26 @@ impl FmmTree for KiFmmTree {
     }
 
     // Composed of adjacent siblings and neighbours,
-    fn near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
+    fn get_near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {
+    }
 
-    fn interaction_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
+    fn get_interaction_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
 
     fn get_x_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
 
     fn get_w_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
 
-    fn level(&self, node_index: Self::NodeIndex) -> Option<usize> {
+    fn get_level(&self, node_index: Self::NodeIndex) -> Option<usize> {
         Some(node_index.node.level() as usize)
     }
 
-    fn parent(&self, node_index: Self::NodeIndex) -> Option<Self::NodeIndex> {
+    fn get_parent(&self, node_index: Self::NodeIndex) -> Option<Self::NodeIndex> {
         Some(Self::NodeIndex {
             node: node_index.node.parent(),
         })
     }
 
-    fn children<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {
+    fn get_children<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {
         let children = node_index.node.children();
         let children = children
             .iter()
