@@ -392,6 +392,14 @@ impl MultiNodeTree {
             keys_to_points: globally_balanced_to_points,
         }
     }
+
+    pub fn near_field(&self, key: &MortonKey) -> Vec<MortonKey> {}
+
+    pub fn interaction_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
+
+    pub fn w_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
+
+    pub fn x_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
 }
 
 impl Tree for MultiNodeTree {
@@ -400,6 +408,7 @@ impl Tree for MultiNodeTree {
     type Points = Points;
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
+    type NodeIndicesSet = HashSet<MortonKey>;
 
     // Get adaptivity information
     fn get_adaptive(&self) -> bool {
@@ -409,6 +418,11 @@ impl Tree for MultiNodeTree {
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &MortonKeys {
         &self.keys
+    }
+    
+    // Get all keys as aset, gets local keys in multi-node setting
+    fn get_keys_set(&self) -> &MortonKeys {
+        &self.keys_set
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -430,4 +444,10 @@ impl Tree for MultiNodeTree {
     fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
         self.keys_to_points.get(key)
     }
+}
+
+impl LocallyEssentialTree for MultiNodeTree {
+    type RawTree = MultiNodeTree;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
 }

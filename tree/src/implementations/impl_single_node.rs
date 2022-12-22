@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use solvers_traits::tree::Tree;
+use solvers_traits::tree::{LocallyEssentialTree, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, NCRIT, ROOT},
@@ -261,9 +261,62 @@ impl SingleNodeTree {
             keys_to_points,
         }
     }
+}
+
+impl Tree for SingleNodeTree {
+    type Domain = Domain;
+    type Point = Point;
+    type Points = Points;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
+    type NodeIndicesSet = HashSet<MortonKey>;
+
+    // Get adaptivity information
+    fn get_adaptive(&self) -> bool {
+        self.adaptive
+    }
+
+    // Get all keys, gets local keys in multi-node setting
+    fn get_keys(&self) -> &MortonKeys {
+        &self.keys
+    }
+    
+    fn get_keys_set(&self) -> &Self::NodeIndicesSet {
+        &self.keys_set
+    }   
+
+    // Get all points, gets local keys in multi-node setting
+    fn get_points(&self) -> &Points {
+        &self.points
+    }
+
+    // Get domain, gets global domain in multi-node setting
+    fn get_domain(&self) -> &Domain {
+        &self.domain
+    }
+
+    // Get tree node key associated with a given point
+    fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
+        self.points_to_keys.get(point)
+    }
+
+    // Get points associated with a tree node key
+    fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
+        self.keys_to_points.get(key)
+    }
+}
+
+impl LocallyEssentialTree for SingleNodeTree {
+    type RawTree = SingleNodeTree;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
+
+    fn get_let(&self) -> &Self::RawTree {
+        self
+    }
 
     // Calculate near field interaction list of leaf keys.
-    fn near_field(&self, key: &MortonKey) -> Vec<MortonKey> {
+    fn get_near_field(&self, key: &MortonKey) -> MortonKeys {
         let mut result = Vec::<MortonKey>::new();
         let neighbours = key.neighbors();
 
@@ -292,74 +345,51 @@ impl SingleNodeTree {
         result.append(&mut neighbors_adj);
         result.append(&mut neighbors_parents_adj);
 
-        result
+        MortonKeys {
+            keys: result,
+            index: 0,
+        }
     }
 
     // Calculate compressible far field interactions of leaf & other keys.
-    fn interaction_list(&self, key: &MortonKey) -> Vec<MortonKey> {
-        key.parent()
-            .neighbors()
-            .iter()
-            .flat_map(|pn| pn.children())
-            .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
-            .collect_vec()
+    fn get_interaction_list(&self, key: &MortonKey) -> MortonKeys {
+        MortonKeys {
+            keys: key
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
+                .collect_vec(),
+            index: 0,
+        }
     }
 
     // Calculate M2P interactions of leaf key.
-    fn w_list(&self, key: &MortonKey) -> Vec<MortonKey> {
+    fn get_w_list(&self, key: &MortonKey) -> MortonKeys {
         // Child level
-        key.neighbors()
-            .iter()
-            .flat_map(|n| n.children())
-            .filter(|nc| !key.is_adjacent(nc))
-            .collect_vec()
+        MortonKeys {
+            keys: key
+                .neighbors()
+                .iter()
+                .flat_map(|n| n.children())
+                .filter(|nc| !key.is_adjacent(nc))
+                .collect_vec(),
+            index: 0,
+        }
     }
 
     // Calculate P2L interactions of leaf key.
-    fn x_list(&self, key: &MortonKey) -> Vec<MortonKey> {
-        key.parent()
-            .neighbors()
-            .into_iter()
-            .filter(|pn| !key.is_adjacent(pn))
-            .collect_vec()
-    }
-}
-
-impl Tree for SingleNodeTree {
-    type Domain = Domain;
-    type Point = Point;
-    type Points = Points;
-    type NodeIndex = MortonKey;
-    type NodeIndices = MortonKeys;
-
-    // Get adaptivity information
-    fn get_adaptive(&self) -> bool {
-        self.adaptive
-    }
-
-    // Get all keys, gets local keys in multi-node setting
-    fn get_keys(&self) -> &MortonKeys {
-        &self.keys
-    }
-
-    // Get all points, gets local keys in multi-node setting
-    fn get_points(&self) -> &Points {
-        &self.points
-    }
-
-    // Get domain, gets global domain in multi-node setting
-    fn get_domain(&self) -> &Domain {
-        &self.domain
-    }
-
-    // Get tree node key associated with a given point
-    fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
-        self.points_to_keys.get(point)
-    }
-
-    // Get points associated with a tree node key
-    fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
-        self.keys_to_points.get(key)
+    fn get_x_list(&self, key: &MortonKey) -> MortonKeys {
+        MortonKeys {
+            keys: key
+                .parent()
+                .neighbors()
+                .into_iter()
+                .filter(|pn| !key.is_adjacent(pn))
+                .collect_vec(),
+            index: 0,
+        }
     }
 }
 
