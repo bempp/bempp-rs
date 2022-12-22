@@ -295,6 +295,7 @@ impl SingleNodeTree {
         result
     }
 
+    // Calculate compressible far field interactions of leaf & other keys.
     fn interaction_list(&self, key: &MortonKey) -> Vec<MortonKey> {
         key.parent()
             .neighbors()
@@ -305,10 +306,23 @@ impl SingleNodeTree {
     }
 
     // Calculate M2P interactions of leaf key.
-    fn w_list(&self) {}
+    fn w_list(&self, key: &MortonKey) -> Vec<MortonKey> {
+        // Child level
+        key.neighbors()
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| !key.is_adjacent(nc))
+            .collect_vec()
+    }
 
     // Calculate P2L interactions of leaf key.
-    fn x_list(&self) {}
+    fn x_list(&self, key: &MortonKey) -> Vec<MortonKey> {
+        key.parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| !key.is_adjacent(pn))
+            .collect_vec()
+    }
 }
 
 impl Tree for SingleNodeTree {
