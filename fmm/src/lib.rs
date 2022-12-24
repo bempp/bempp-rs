@@ -52,7 +52,7 @@ pub struct KiFmmTree {
             Points = Points,
             NodeIndex = MortonKey,
             NodeIndices = MortonKeys,
-            NodeIndicesSet = HashSet<MortonKey>
+            NodeIndicesSet = HashSet<MortonKey>,
         >,
     >,
 }
