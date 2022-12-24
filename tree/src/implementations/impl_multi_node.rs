@@ -57,6 +57,7 @@ impl MultiNodeTree {
             let min = seeds.iter().min().unwrap();
             let fa = ffc_root.finest_ancestor(min);
             let first_child = fa.children().into_iter().min().unwrap();
+            // println!("HERE {:?}", first_child);
             seeds.push(first_child);
             seeds.sort();
         }
@@ -66,6 +67,7 @@ impl MultiNodeTree {
             let max = seeds.iter().max().unwrap();
             let fa = flc_root.finest_ancestor(max);
             let last_child = fa.children().into_iter().max().unwrap();
+            // println!("HERE {:?}", last_child);
             seeds.push(last_child);
         }
 
@@ -101,6 +103,7 @@ impl MultiNodeTree {
         }
 
         if rank == (size - 1) {
+            // println!("HERE {:?}", seeds.last().unwrap());
             complete.keys.push(seeds.last().unwrap());
         }
 
@@ -351,12 +354,64 @@ impl MultiNodeTree {
         // 5.ii any data below the min seed sent to partner process
         let points = MultiNodeTree::transfer_points_to_blocktree(world, &points, &seeds);
 
+        let block_set: HashSet<MortonKey> = block_tree.iter().cloned().collect();
+        
+        // let max_level = block_tree
+        // .iter()
+        // .map(|block| block.level())
+        // .max()
+        // .unwrap();
+
+        // let max = block_tree.iter().max().unwrap().clone();
+        // let min = block_tree.iter().min().unwrap().clone();
         // 6. Split blocks based on ncrit constraint
         let mut locally_balanced = MultiNodeTree::split_blocks(&points, block_tree, n_crit);
+        
+        let max_level = locally_balanced 
+        .iter()
+        .map(|block| block.level())
+        .max()
+        .unwrap();
 
+        let max = locally_balanced.iter().max().unwrap().clone();
+        let min = locally_balanced.iter().min().unwrap().clone();
+
+     
+        
         // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
-        locally_balanced.balance();
-        locally_balanced.linearize();
+        // locally_balanced.balance();
+        // locally_balanced.linearize();
+
+        let locally_balanced_set: HashSet<MortonKey> = locally_balanced.iter().cloned().collect();
+
+        let diameter = 1 << (DEEPEST_LEVEL - max_level as u64);
+        println!("diameter {:?}", diameter);
+        let uniform = MortonKeys {
+            keys: (0..LEVEL_SIZE)
+                .step_by(diameter)
+                .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
+                .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
+                .map(|anchor| {
+                    let morton = encode_anchor(&anchor, max_level as u64);
+                    MortonKey { anchor, morton }
+                })
+                .filter(|node| (&min <= node) && (node <= &max))
+                .collect(),
+            index: 0,
+        };
+
+        for node in uniform.iter() {
+            let ancestors = node.ancestors();
+            let int: Vec<MortonKey> = ancestors
+                .intersection(&locally_balanced_set)
+                .into_iter()
+                .cloned()
+                .collect();
+            println!("key {:?} level {:?} int {:?} contained {:?} min {:?} max {:?}", 
+            node, node.level(), int, (node >= &min) && (node <= &max), min, max);
+            assert!(int.iter().len() > 0);
+        }
+
 
         // 8. Find new maps between points and locally balanced tree
         let points_to_locally_balanced = assign_points_to_nodes(&points, &locally_balanced);
@@ -379,6 +434,7 @@ impl MultiNodeTree {
             keys: points.iter().map(|p| p.key).collect(),
             index: 0,
         };
+        
         globally_balanced.linearize();
 
         // 10. Find final bidirectional maps to non-overlapping tree
