@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use mpi::{
     topology::{Rank, UserCommunicator},
@@ -7,17 +7,17 @@ use mpi::{
 };
 
 use hyksort::hyksort;
-use solvers_traits::tree::Tree;
+use solvers_traits::tree::{LocallyEssentialTree, Tree};
 
 use crate::{
-    constants::{DEEPEST_LEVEL, K, NCRIT, ROOT},
+    constants::{DEEPEST_LEVEL, K, LEVEL_SIZE, NCRIT, ROOT},
     implementations::{
         impl_morton::{complete_region, encode_anchor, point_to_anchor},
         impl_single_node::{assign_nodes_to_points, assign_points_to_nodes},
     },
     types::{
         domain::Domain,
-        morton::{MortonKey, MortonKeys},
+        morton::{KeyType, MortonKey, MortonKeys},
         multi_node::MultiNodeTree,
         point::{Point, PointType, Points},
     },
@@ -40,31 +40,9 @@ impl MultiNodeTree {
         let k = k.unwrap_or(K);
 
         if adaptive {
-            let (keys, keys_set, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::adaptive_tree(world, k, points, &domain, n_crit);
-
-            MultiNodeTree {
-                adaptive,
-                points,
-                keys,
-                keys_set,
-                domain,
-                points_to_keys,
-                keys_to_points,
-            }
+            MultiNodeTree::adaptive_tree(world, k, points, &domain, n_crit)
         } else {
-            let (keys, keys_set, points, points_to_keys, keys_to_points) =
-                MultiNodeTree::uniform_tree(world, k, points, &domain, depth);
-
-            MultiNodeTree {
-                adaptive,
-                points,
-                keys,
-                keys_set,
-                domain,
-                points_to_keys,
-                keys_to_points,
-            }
+            MultiNodeTree::uniform_tree(world, k, points, &domain, depth)
         }
     }
 
@@ -273,13 +251,38 @@ impl MultiNodeTree {
         let comm = world.duplicate();
         hyksort(&mut points, k, comm);
 
-        // 2.ii Find unique leaf keys on each processor
+        // 2.ii Find complete tree at specified depth, and filter for range on this processor.
+        let diameter = 1 << (DEEPEST_LEVEL - depth as u64);
+
+        let rank = world.rank();
+        let size = world.size();
+
+        let min = points.iter().min().unwrap().key;
+        let max = points.iter().max().unwrap().key;
+
         let mut keys = MortonKeys {
-            keys: points.iter().map(|p| p.key).collect(),
+            keys: (0..LEVEL_SIZE)
+                .step_by(diameter)
+                .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
+                .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
+                .map(|anchor| {
+                    let morton = encode_anchor(&anchor, depth as u64);
+                    MortonKey { anchor, morton }
+                })
+                .collect(),
             index: 0,
         };
-        keys.linearize();
-        keys.sort();
+
+        if rank == 0 {
+            keys = keys.into_iter().filter(|key| key <= &max).collect();
+        } else if rank == size - 1 {
+            keys = keys.into_iter().filter(|key| &min <= key).collect();
+        } else {
+            keys = keys
+                .into_iter()
+                .filter(|key| &min <= key && key <= &max)
+                .collect();
+        }
 
         // 3. Create bi-directional maps between keys and points
         let points_to_keys = assign_points_to_nodes(&points, &keys);
@@ -287,12 +290,20 @@ impl MultiNodeTree {
 
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
+        let min = keys.iter().min().unwrap();
+        let max = keys.iter().max().unwrap();
+        let range = [world.rank() as KeyType, min.morton, max.morton];
+
         MultiNodeTree {
+            comm: world.duplicate(),
+            adaptive: false,
             keys,
             keys_set,
+            domain: *domain,
             points,
             points_to_keys,
             keys_to_points,
+            range,
         }
     }
 
@@ -384,22 +395,31 @@ impl MultiNodeTree {
 
         let globally_balanced_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
 
+        let min = globally_balanced.iter().min().unwrap();
+        let max = globally_balanced.iter().max().unwrap();
+
+        let range = [world.rank() as KeyType, min.morton, max.morton];
+
         MultiNodeTree {
+            comm: world.duplicate(),
+            adaptive: true,
             keys: globally_balanced,
             keys_set: globally_balanced_set,
+            domain: *domain,
             points,
             points_to_keys: points_to_globally_balanced,
             keys_to_points: globally_balanced_to_points,
+            range,
         }
     }
 
-    pub fn near_field(&self, key: &MortonKey) -> Vec<MortonKey> {}
+    // pub fn near_field(&self, key: &MortonKey) -> Vec<MortonKey> {}
 
-    pub fn interaction_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
+    // pub fn interaction_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
 
-    pub fn w_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
+    // pub fn w_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
 
-    pub fn x_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
+    // pub fn x_list(&self, key: &MortonKey) -> Vec<MortonKey> {}
 }
 
 impl Tree for MultiNodeTree {
@@ -421,7 +441,7 @@ impl Tree for MultiNodeTree {
     }
 
     // Get all keys as aset, gets local keys in multi-node setting
-    fn get_keys_set(&self) -> &MortonKeys {
+    fn get_keys_set(&self) -> &HashSet<MortonKey> {
         &self.keys_set
     }
 
@@ -450,4 +470,29 @@ impl LocallyEssentialTree for MultiNodeTree {
     type RawTree = MultiNodeTree;
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
+
+    fn get_let(&self) {
+        // Each process adds all ancestor octants to its local tree
+
+        // Communicate ranges globally using AllGather
+        let rank = self.comm.rank();
+        let size = self.comm.size();
+
+        let mut ranges = vec![0 as KeyType; (size as usize) * 3];
+
+        self.comm.all_gather_into(&self.range, &mut ranges);
+
+        // println!("Ranges at rank {:?}: \n {:?} \n \n", rank, ranges);
+
+        // Find contributor processors for this rank
+
+        if self.comm.rank() == 0 {
+            for chunk in ranges.chunks_exact(3) {
+                let rank = chunk[0];
+                let min = chunk[1];
+                let max = chunk[2];
+                println!("rank {:?} min {:?} max {:?}", rank, min, max)
+            }
+        }
+    }
 }

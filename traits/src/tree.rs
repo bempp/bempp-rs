@@ -31,14 +31,15 @@ pub trait Tree {
 /// Locally Essential Trees take care of ghost nodes on other processors, and have access to all
 /// the information they need to build the interaction lists for a tree.
 pub trait LocallyEssentialTree {
+
     type RawTree: Tree;
     type NodeIndex;
     type NodeIndices;
 
-    fn get_let(&self) -> &Self::RawTree;
-
-    fn get_near_field(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    fn get_interaction_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    fn get_x_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    fn get_w_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    // fn get_let(&self) -> &Self::RawTree;
+    fn get_let(&self);
+    // fn get_near_field(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    // fn get_interaction_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    // fn get_x_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    // fn get_w_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
 }
