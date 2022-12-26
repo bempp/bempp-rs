@@ -16,6 +16,7 @@ use crate::{
 
 /// Create a mapping between points and octree nodes, assumed to overlap.
 pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
+
     let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
 
     let mut map: HashMap<Point, MortonKey> = HashMap::new();
@@ -42,6 +43,11 @@ pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Po
 pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<MortonKey, Points> {
     let keys: HashSet<MortonKey> = keys.iter().cloned().collect();
     let mut map: HashMap<MortonKey, Points> = HashMap::new();
+
+    // Add all keys to the map, even if they don't contain points
+    for &key in keys.iter() {
+        map.entry(key).or_default();
+    }
 
     for point in points.iter() {
         if keys.contains(&point.key) {
