@@ -257,16 +257,14 @@ impl MultiNodeTree {
         HashMap<Point, MortonKey>,
         HashMap<MortonKey, Points>,
     ) {
-        // Encode points at deepest level, and map to specified depth
+        // Encode points at specified depth
         let mut points = points
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let key = MortonKey::from_point(p, &domain);
-                let ancestors: MortonKeys = key.ancestors().into_iter().sorted().collect();
                 Point {
                     coordinate: *p,
-                    key: ancestors[depth as usize],
+                    key: MortonKey::from_point(p, &domain, depth),
                     global_idx: i,
                 }
             })
@@ -287,7 +285,6 @@ impl MultiNodeTree {
         let points_to_keys = assign_points_to_nodes(&points, &keys);
         let keys_to_points = assign_nodes_to_points(&keys, &points);
 
-        // keys.sort();
         (keys, points, points_to_keys, keys_to_points)
     }
 
@@ -311,7 +308,7 @@ impl MultiNodeTree {
             .map(|(i, p)| Point {
                 coordinate: *p,
                 global_idx: i,
-                key: MortonKey::from_point(p, domain),
+                key: MortonKey::from_point(p, domain, DEEPEST_LEVEL),
             })
             .collect();
 

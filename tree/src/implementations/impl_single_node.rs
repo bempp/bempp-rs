@@ -85,15 +85,10 @@ impl SingleNodeTree {
             encoded_points = points
                 .iter()
                 .enumerate()
-                .map(|(i, p)| {
-                    let key = MortonKey::from_point(p, &domain);
-                    let ancestors: MortonKeys = key.ancestors().into_iter().sorted().collect();
-
-                    Point {
-                        coordinate: *p,
-                        key: ancestors[depth as usize],
-                        global_idx: i,
-                    }
+                .map(|(i, p)| Point {
+                    coordinate: *p,
+                    key: MortonKey::from_point(p, &domain, depth),
+                    global_idx: i,
                 })
                 .collect();
 
@@ -110,7 +105,7 @@ impl SingleNodeTree {
                 .enumerate()
                 .map(|(i, p)| Point {
                     coordinate: *p,
-                    key: MortonKey::from_point(p, &domain),
+                    key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                     global_idx: i,
                 })
                 .collect();
