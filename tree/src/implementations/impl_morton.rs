@@ -799,6 +799,25 @@ mod tests {
     }
 
     #[test]
+    fn test_siblings() {
+        
+        // Test that we get the same siblings for a pair of siblings
+        let a = [0, 0, 0];
+        let b = [1, 1, 1];
+
+        let a = MortonKey::from_anchor(&a, DEEPEST_LEVEL);
+        let b = MortonKey::from_anchor(&b, DEEPEST_LEVEL);
+        let mut sa = a.siblings();
+        let mut sb = b.siblings();
+        sa.sort();
+        sb.sort();
+
+        for (a, b) in sa.iter().zip(sb.iter()) {
+            assert_eq!(a, b)
+        }
+    }
+    
+    #[test]
     fn test_sorting() {
         let npoints = 1000;
         let mut range = rand::thread_rng();

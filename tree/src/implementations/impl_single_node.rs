@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use solvers_traits::tree::Tree;
 
 use crate::{
-    constants::{DEEPEST_LEVEL, NCRIT, ROOT, LEVEL_SIZE},
+    constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
@@ -94,13 +94,10 @@ impl SingleNodeTree {
         let points: Points = points
             .iter()
             .enumerate()
-            .map(|(i, p)| {
-
-                Point {
-                    coordinate: *p,
-                    key: MortonKey::from_point(p, &domain, depth as u64),
-                    global_idx: i,
-                }
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, depth as u64),
+                global_idx: i,
             })
             .collect();
 
@@ -140,6 +137,7 @@ impl SingleNodeTree {
         &domain: &Domain,
         n_crit: usize,
     ) -> SingleNodeTree {
+        
         // Encode points at deepest level
         let mut points: Points = points
             .iter()
@@ -219,6 +217,7 @@ impl SingleNodeTree {
                 let npoints = points.len();
 
                 if npoints > n_crit {
+
                     let mut children = block.children();
                     new_blocktree.append(&mut children);
                 } else {
@@ -236,10 +235,12 @@ impl SingleNodeTree {
             }
         }
 
+        balanced.sort();
+        
         // Balance and linearize
         balanced.balance();
         balanced.linearize();
-
+        
         // Find new maps between points and balanced tree
         let points_to_keys = assign_points_to_nodes(&points, &balanced);
 
@@ -393,6 +394,34 @@ mod tests {
                 assert!(l.abs_diff(key.level()) <= 1);
             }
         }
+
+        // Test that the the adaptive tree is complete
+        let max_level = keys.iter().map(|k| k.level()).max().unwrap();
+        let diameter = 1 << (DEEPEST_LEVEL - max_level as u64);
+
+        let uniform = MortonKeys {
+            keys: (0..LEVEL_SIZE)
+                .step_by(diameter)
+                .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
+                .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
+                .map(|anchor| {
+                    let morton = encode_anchor(&anchor, max_level as u64);
+                    MortonKey { anchor, morton }
+                })
+                .collect(),
+            index: 0,
+        };
+
+        let uniform_set: HashSet<MortonKey> = uniform.keys.into_iter().collect();
+        for node in uniform_set.iter() {
+
+            let ancestors = node.ancestors();
+
+            let int: Vec<&MortonKey> = ancestors.intersection(&uniform_set).collect();
+
+            assert!(int.len() > 0);
+        }
+    
     }
 
     pub fn test_no_overlaps_helper(tree: &SingleNodeTree) {
