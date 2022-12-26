@@ -261,12 +261,10 @@ impl MultiNodeTree {
         let mut points = points
             .iter()
             .enumerate()
-            .map(|(i, p)| {
-                Point {
-                    coordinate: *p,
-                    key: MortonKey::from_point(p, &domain, depth),
-                    global_idx: i,
-                }
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, depth),
+                global_idx: i,
             })
             .collect();
 
