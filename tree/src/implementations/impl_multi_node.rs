@@ -77,7 +77,7 @@ impl MultiNodeTree {
 
         let diameter = 1 << (DEEPEST_LEVEL - depth as u64);
 
-        let mut keys = MortonKeys {
+        let mut leaves = MortonKeys {
             keys: (0..LEVEL_SIZE)
                 .step_by(diameter)
                 .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
@@ -92,30 +92,30 @@ impl MultiNodeTree {
         };
 
         // 3. Create bi-directional maps between keys and points
-        let points_to_keys = assign_points_to_nodes(&points, &keys);
-        let keys_to_points = assign_nodes_to_points(&keys, &points);
+        let points_to_leaves= assign_points_to_nodes(&points, &leaves);
+        let leaves_to_points = assign_nodes_to_points(&leaves, &points);
         
         // Only retain keys that contain points
-        keys = MortonKeys {
-            keys: keys_to_points.keys().cloned().collect(),
+        leaves = MortonKeys {
+            keys: leaves_to_points.keys().cloned().collect(),
             index: 0,
         };
 
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
 
-        let min = keys.iter().min().unwrap();
-        let max = keys.iter().max().unwrap();
+        let min = leaves.iter().min().unwrap();
+        let max = leaves.iter().max().unwrap();
         let range = [world.rank() as KeyType, min.morton, max.morton];
         
         MultiNodeTree {
             world: world.duplicate(),
             adaptive: false,
             points,
-            keys,
-            keys_set,
+            leaves,
+            leaves_set,
             domain: *domain,
-            points_to_keys,
-            keys_to_points,
+            points_to_leaves,
+            leaves_to_points,
             range
         }
     }
@@ -207,7 +207,7 @@ impl MultiNodeTree {
             })
             .collect();
         
-        let keys_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
 
         let min = globally_balanced.iter().min().unwrap();
         let max = globally_balanced.iter().max().unwrap();
@@ -217,11 +217,11 @@ impl MultiNodeTree {
             world: world.duplicate(),
             adaptive: true,
             points,
-            keys: globally_balanced,
-            keys_set,
+            leaves: globally_balanced,
+            leaves_set,
             domain: *domain,
-            points_to_keys: points_to_globally_balanced,
-            keys_to_points: globally_balanced_to_points,
+            points_to_leaves: points_to_globally_balanced,
+            leaves_to_points: globally_balanced_to_points,
             range
         }
     }
@@ -344,7 +344,7 @@ impl Tree for MultiNodeTree {
 
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &MortonKeys {
-        &self.keys
+        &self.leaves
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -359,11 +359,11 @@ impl Tree for MultiNodeTree {
 
     // Get points associated with a tree node key
     fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
-        self.points_to_keys.get(point)
+        self.points_to_leaves.get(point)
     }
 
     // Get points associated with a tree node key
     fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
-        self.keys_to_points.get(key)
+        self.leaves_to_points.get(key)
     }
 }

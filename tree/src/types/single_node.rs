@@ -17,18 +17,18 @@ pub struct SingleNodeTree {
     ///  A vector of Cartesian points.
     pub points: Points,
 
-    /// The nodes that span the tree, defined by its leaf nodes.
-    pub keys: MortonKeys,
+    /// The leaves that span the tree, defined by its leaf nodes.
+    pub leaves: MortonKeys,
     
     /// The nodes that span the tree, defined by its leaf nodes, as a set.
-    pub keys_set: HashSet<MortonKey>,
+    pub leaves_set: HashSet<MortonKey>,
 
     /// Domain spanned by the points in the SingleNodeTree.
     pub domain: Domain,
 
     /// Map between the points and the nodes in the SingleNodeTree.
-    pub points_to_keys: HashMap<Point, MortonKey>,
+    pub points_to_leaves: HashMap<Point, MortonKey>,
 
     /// Map between the nodes in the SingleNodetree and the points they contain.
-    pub keys_to_points: HashMap<MortonKey, Points>,
+    pub leaves_to_points: HashMap<MortonKey, Points>,
 }

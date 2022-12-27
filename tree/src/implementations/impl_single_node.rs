@@ -156,7 +156,7 @@ impl SingleNodeTree {
         // Generate complete tree at specified depth
         let diameter = 1 << (DEEPEST_LEVEL - depth);
 
-        let mut keys = MortonKeys {
+        let mut leaves = MortonKeys {
             keys: (0..LEVEL_SIZE)
                 .step_by(diameter)
                 .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
@@ -169,25 +169,25 @@ impl SingleNodeTree {
             index: 0,
         };
 
-        let keys_to_points = assign_nodes_to_points(&keys, &points);
-        let points_to_keys = assign_points_to_nodes(&points, &keys);
+        let leaves_to_points = assign_nodes_to_points(&leaves, &points);
+        let points_to_leaves = assign_points_to_nodes(&points, &leaves);
 
         // Only retain keys that contain points
-        keys = MortonKeys {
-            keys: keys_to_points.keys().cloned().collect(),
+        leaves = MortonKeys {
+            keys: leaves_to_points.keys().cloned().collect(),
             index: 0,
         };
         
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
 
         SingleNodeTree {
             adaptive,
             points,
-            keys,
-            keys_set,
+            leaves,
+            leaves_set,
             domain,
-            points_to_keys,
-            keys_to_points,
+            points_to_leaves,
+            leaves_to_points,
         }
     }
 
@@ -233,29 +233,29 @@ impl SingleNodeTree {
         balanced.linearize();
 
         // Find new maps between points and balanced tree
-        let points_to_keys = assign_points_to_nodes(&points, &balanced);
+        let points_to_leaves = assign_points_to_nodes(&points, &balanced);
 
         points = points
             .iter()
             .map(|p| Point {
                 coordinate: p.coordinate,
                 global_idx: p.global_idx,
-                key: *points_to_keys.get(p).unwrap(),
+                key: *points_to_leaves.get(p).unwrap(),
             })
             .collect();
 
-        let keys_to_points = assign_nodes_to_points(&balanced, &points);
-        let keys = balanced;
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_to_points = assign_nodes_to_points(&balanced, &points);
+        let leaves = balanced;
+        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
 
         SingleNodeTree {
             adaptive,
             points,
-            keys,
-            keys_set,
+            leaves,
+            leaves_set,
             domain,
-            points_to_keys,
-            keys_to_points,
+            points_to_leaves,
+            leaves_to_points,
         }
     }
 
@@ -305,7 +305,7 @@ impl Tree for SingleNodeTree {
 
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &MortonKeys {
-        &self.keys
+        &self.leaves
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -320,12 +320,12 @@ impl Tree for SingleNodeTree {
 
     // Get tree node key associated with a given point
     fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
-        self.points_to_keys.get(point)
+        self.points_to_leaves.get(point)
     }
 
     // Get points associated with a tree node key
     fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
-        self.keys_to_points.get(key)
+        self.leaves_to_points.get(key)
     }
 }
 
@@ -360,7 +360,7 @@ mod tests {
         let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
 
         // Test that particle constraint is met at this level
-        for (_, (_, points)) in tree.keys_to_points.iter().enumerate() {
+        for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
             assert!(points.len() <= n_crit);
         }
 
@@ -381,7 +381,7 @@ mod tests {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
 
         // Test that particle constraint is met
-        for (_, (_, points)) in tree.keys_to_points.iter().enumerate() {
+        for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
             assert!(points.len() <= n_crit);
         }
 
@@ -391,7 +391,7 @@ mod tests {
         assert_eq!(false, levels.iter().all(|level| *level == first));
 
         // Test for overlaps in balanced tree
-        let keys: Vec<MortonKey> = tree.keys.iter().cloned().collect();
+        let keys: Vec<MortonKey> = tree.leaves.iter().cloned().collect();
         for key in keys.iter() {
             if !keys.iter().contains(key) {
                 let mut ancestors = key.ancestors();

@@ -36,8 +36,8 @@ pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
 /// Test that the leaves on separate nodes do not overlap.
 fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     // Communicate bounds from each process
-    let max = tree.keys.iter().max().unwrap();
-    let min = tree.keys.iter().min().unwrap();
+    let max = tree.leaves.iter().max().unwrap();
+    let min = tree.leaves.iter().min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
