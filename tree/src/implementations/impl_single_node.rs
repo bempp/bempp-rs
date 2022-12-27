@@ -291,12 +291,14 @@ impl SingleNodeTree {
         blocktree
     }
 }
+
 impl Tree for SingleNodeTree {
     type Domain = Domain;
     type Point = Point;
     type Points = Points;
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
+    type NodeIndicesSet = HashSet<MortonKey>;
 
     // Get adaptivity information
     fn get_adaptive(&self) -> bool {
@@ -306,6 +308,10 @@ impl Tree for SingleNodeTree {
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &MortonKeys {
         &self.leaves
+    }
+
+    fn get_keys_set(&self) -> &HashSet<MortonKey> {
+        &self.leaves_set
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -435,4 +441,91 @@ mod tests {
         test_no_overlaps_helper(&uniform);
         test_no_overlaps_helper(&adaptive);
     }
+}
+
+impl LocallyEssentialTree for SingleNodeTree {
+    type RawTree = SingleNodeTree;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
+
+    fn get_let(&self) {
+        // self
+    }
+
+    // // Calculate near field interaction list of leaf keys.
+    // fn get_near_field(&self, key: &MortonKey) -> MortonKeys {
+    //     let mut result = Vec::<MortonKey>::new();
+    //     let neighbours = key.neighbors();
+
+    //     // Child level
+    //     let mut neighbors_children_adj: Vec<MortonKey> = neighbours
+    //         .iter()
+    //         .flat_map(|n| n.children())
+    //         .filter(|nc| key.is_adjacent(nc))
+    //         .collect();
+
+    //     // Key level
+    //     let mut neighbors_adj: Vec<MortonKey> = neighbours
+    //         .iter()
+    //         .filter(|n| self.leaves_set.contains(n) && key.is_adjacent(n))
+    //         .cloned()
+    //         .collect();
+
+    //     // Parent level
+    //     let mut neighbors_parents_adj: Vec<MortonKey> = neighbours
+    //         .iter()
+    //         .map(|n| n.parent())
+    //         .filter(|np| self.leaves_set.contains(np) && key.is_adjacent(np))
+    //         .collect();
+
+    //     result.append(&mut neighbors_children_adj);
+    //     result.append(&mut neighbors_adj);
+    //     result.append(&mut neighbors_parents_adj);
+
+    //     MortonKeys {
+    //         keys: result,
+    //         index: 0,
+    //     }
+    // }
+
+    // // Calculate compressible far field interactions of leaf & other keys.
+    // fn get_interaction_list(&self, key: &MortonKey) -> MortonKeys {
+    //     MortonKeys {
+    //         keys: key
+    //             .parent()
+    //             .neighbors()
+    //             .iter()
+    //             .flat_map(|pn| pn.children())
+    //             .filter(|pnc| self.leaves_set.contains(pnc) && key.is_adjacent(pnc))
+    //             .collect_vec(),
+    //         index: 0,
+    //     }
+    // }
+
+    // // Calculate M2P interactions of leaf key.
+    // fn get_w_list(&self, key: &MortonKey) -> MortonKeys {
+    //     // Child level
+    //     MortonKeys {
+    //         keys: key
+    //             .neighbors()
+    //             .iter()
+    //             .flat_map(|n| n.children())
+    //             .filter(|nc| !key.is_adjacent(nc))
+    //             .collect_vec(),
+    //         index: 0,
+    //     }
+    // }
+
+    // // Calculate P2L interactions of leaf key.
+    // fn get_x_list(&self, key: &MortonKey) -> MortonKeys {
+    //     MortonKeys {
+    //         keys: key
+    //             .parent()
+    //             .neighbors()
+    //             .into_iter()
+    //             .filter(|pn| !key.is_adjacent(pn))
+    //             .collect_vec(),
+    //         index: 0,
+    //     }
+    // }
 }

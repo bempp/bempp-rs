@@ -1,4 +1,4 @@
-use itertools::izip;
+use itertools::{izip, Itertools};
 use std::{
     cmp::Ordering,
     collections::HashSet,

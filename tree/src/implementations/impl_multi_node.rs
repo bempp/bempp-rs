@@ -336,6 +336,7 @@ impl Tree for MultiNodeTree {
     type Points = Points;
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
+    type NodeIndicesSet = HashSet<MortonKey>;
 
     // Get adaptivity information
     fn get_adaptive(&self) -> bool {
@@ -345,6 +346,10 @@ impl Tree for MultiNodeTree {
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &MortonKeys {
         &self.leaves
+    }
+
+    fn get_keys_set(&self) -> &HashSet<MortonKey> {
+        &self.leaves_set
     }
 
     // Get all points, gets local keys in multi-node setting
