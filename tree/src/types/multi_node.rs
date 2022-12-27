@@ -1,7 +1,7 @@
 //! Data structures and methods to create distributed octrees with MPI.
 use mpi::topology::UserCommunicator;
 
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 use crate::types::{
     domain::Domain,
@@ -11,7 +11,6 @@ use crate::types::{
 
 /// Concrete distributed multi-node tree.
 pub struct MultiNodeTree {
-
     /// Global communicator for this Tree
     pub world: UserCommunicator,
 
@@ -23,7 +22,7 @@ pub struct MultiNodeTree {
 
     /// The leaf nodes that span the tree, defined by its leaf nodes.
     pub leaves: MortonKeys,
-    
+
     /// The leaf nodes that span the tree, defined by its leaf nodes, as a set.
     pub leaves_set: HashSet<MortonKey>,
 

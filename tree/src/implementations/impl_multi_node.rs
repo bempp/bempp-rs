@@ -92,9 +92,9 @@ impl MultiNodeTree {
         };
 
         // 3. Create bi-directional maps between keys and points
-        let points_to_leaves= assign_points_to_nodes(&points, &leaves);
+        let points_to_leaves = assign_points_to_nodes(&points, &leaves);
         let leaves_to_points = assign_nodes_to_points(&leaves, &points);
-        
+
         // Only retain keys that contain points
         leaves = MortonKeys {
             keys: leaves_to_points.keys().cloned().collect(),
@@ -106,7 +106,7 @@ impl MultiNodeTree {
         let min = leaves.iter().min().unwrap();
         let max = leaves.iter().max().unwrap();
         let range = [world.rank() as KeyType, min.morton, max.morton];
-        
+
         MultiNodeTree {
             world: world.duplicate(),
             adaptive: false,
@@ -116,7 +116,7 @@ impl MultiNodeTree {
             domain: *domain,
             points_to_leaves,
             leaves_to_points,
-            range
+            range,
         }
     }
 
@@ -206,7 +206,7 @@ impl MultiNodeTree {
                 key: *points_to_globally_balanced.get(p).unwrap(),
             })
             .collect();
-        
+
         let leaves_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
 
         let min = globally_balanced.iter().min().unwrap();
@@ -222,10 +222,10 @@ impl MultiNodeTree {
             domain: *domain,
             points_to_leaves: points_to_globally_balanced,
             leaves_to_points: globally_balanced_to_points,
-            range
+            range,
         }
     }
-    
+
     /// Complete a distributed block tree from the seed octants, algorithm 4 in [1] (parallel).
     fn complete_blocktree(world: &UserCommunicator, seeds: &mut MortonKeys) -> MortonKeys {
         let rank = world.rank();

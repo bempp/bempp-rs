@@ -177,7 +177,7 @@ impl SingleNodeTree {
             keys: leaves_to_points.keys().cloned().collect(),
             index: 0,
         };
-        
+
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
 
         SingleNodeTree {
