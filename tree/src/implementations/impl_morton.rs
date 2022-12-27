@@ -800,7 +800,6 @@ mod tests {
 
     #[test]
     fn test_siblings() {
-        
         // Test that we get the same siblings for a pair of siblings
         let a = [0, 0, 0];
         let b = [1, 1, 1];
@@ -816,7 +815,7 @@ mod tests {
             assert_eq!(a, b)
         }
     }
-    
+
     #[test]
     fn test_sorting() {
         let npoints = 1000;
