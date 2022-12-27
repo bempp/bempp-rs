@@ -240,8 +240,10 @@ pub fn point_to_anchor(
                 .map(|d| d / ((1 << level) as f64))
                 .collect();
 
+            let scaling_factor = 1 << (DEEPEST_LEVEL - level);
+
             for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
-                *a = ((p - o) / s).floor() as KeyType;
+                *a = (((p - o) / s).floor()) as KeyType * scaling_factor;
             }
             Ok(anchor)
         }
@@ -298,9 +300,9 @@ impl MortonKey {
         MortonKey { anchor, morton }
     }
 
-    /// Return a `MortonKey` type from the anchor on the deepest level
-    pub fn from_anchor(anchor: &[KeyType; 3]) -> Self {
-        let morton = encode_anchor(anchor, DEEPEST_LEVEL);
+    /// Return a `MortonKey` type from the anchor at a given level
+    pub fn from_anchor(anchor: &[KeyType; 3], level: u64) -> Self {
+        let morton = encode_anchor(anchor, level);
 
         MortonKey {
             anchor: *anchor,
@@ -309,9 +311,9 @@ impl MortonKey {
     }
 
     /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
-    pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
-        let anchor = point_to_anchor(point, DEEPEST_LEVEL, domain).unwrap();
-        MortonKey::from_anchor(&anchor)
+    pub fn from_point(point: &[PointType; 3], domain: &Domain, level: u64) -> Self {
+        let anchor = point_to_anchor(point, level, domain).unwrap();
+        MortonKey::from_anchor(&anchor, level)
     }
 
     /// Return the parent, keys encoded with respect to the deepest level.
@@ -797,6 +799,24 @@ mod tests {
     }
 
     #[test]
+    fn test_siblings() {
+        // Test that we get the same siblings for a pair of siblings
+        let a = [0, 0, 0];
+        let b = [1, 1, 1];
+
+        let a = MortonKey::from_anchor(&a, DEEPEST_LEVEL);
+        let b = MortonKey::from_anchor(&b, DEEPEST_LEVEL);
+        let mut sa = a.siblings();
+        let mut sb = b.siblings();
+        sa.sort();
+        sb.sort();
+
+        for (a, b) in sa.iter().zip(sb.iter()) {
+            assert_eq!(a, b)
+        }
+    }
+
+    #[test]
     fn test_sorting() {
         let npoints = 1000;
         let mut range = rand::thread_rng();
@@ -813,7 +833,7 @@ mod tests {
 
         let mut keys: Vec<MortonKey> = points
             .iter()
-            .map(|p| MortonKey::from_point(&p, &domain))
+            .map(|p| MortonKey::from_point(&p, &domain, DEEPEST_LEVEL))
             .collect();
 
         // Add duplicates to keys, to test ordering in terms of equality
@@ -891,7 +911,7 @@ mod tests {
         };
         let point = [0.5, 0.5, 0.5];
 
-        let key = MortonKey::from_point(&point, &domain);
+        let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         let mut ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
         ancestors.sort();
@@ -946,7 +966,7 @@ mod tests {
             diameter: [1., 1., 1.],
             origin: [0., 0., 0.],
         };
-        let key = MortonKey::from_point(&point, &domain);
+        let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         // Simple case, at the leaf level
         {
@@ -997,7 +1017,7 @@ mod tests {
                         (n[2] + (anchor[2] as i64)) as u64,
                     ]
                 })
-                .map(|anchor| MortonKey::from_anchor(&anchor))
+                .map(|anchor| MortonKey::from_anchor(&anchor, DEEPEST_LEVEL))
                 .collect();
             expected.sort();
 
@@ -1056,7 +1076,7 @@ mod tests {
                         (n[2] + (anchor[2] as i64)) as u64,
                     ]
                 })
-                .map(|anchor| MortonKey::from_anchor(&anchor))
+                .map(|anchor| MortonKey::from_anchor(&anchor, DEEPEST_LEVEL))
                 .map(|key| MortonKey {
                     anchor: key.anchor,
                     morton: ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT)
@@ -1092,7 +1112,7 @@ mod tests {
 
         let keys = points
             .iter()
-            .map(|p| MortonKey::from_point(p, &domain))
+            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
             .collect();
 
         let keys = MortonKeys { keys, index: 0 };
@@ -1129,7 +1149,7 @@ mod tests {
         let point = [0.9999, 0.9999, 0.9999];
         let level = 2;
         let anchor = point_to_anchor(&point, level, &domain);
-        let expected = [3, 3, 3];
+        let expected = [49152, 49152, 49152];
 
         for (i, a) in anchor.unwrap().iter().enumerate() {
             assert_eq!(a, &expected[i])
@@ -1271,8 +1291,8 @@ mod tests {
 
     #[test]
     pub fn test_balance() {
-        let a = MortonKey::from_anchor(&[0, 0, 0]);
-        let b = MortonKey::from_anchor(&[1, 1, 1]);
+        let a = MortonKey::from_anchor(&[0, 0, 0], DEEPEST_LEVEL);
+        let b = MortonKey::from_anchor(&[1, 1, 1], DEEPEST_LEVEL);
 
         let mut complete = complete_region(&a, &b);
         let start_val = vec![a];
@@ -1326,7 +1346,7 @@ mod tests {
             diameter: [1., 1., 1.],
         };
 
-        let key = MortonKey::from_point(&point, &domain);
+        let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         let mut ancestors = key.ancestors();
         ancestors.remove(&key);
@@ -1352,10 +1372,23 @@ mod tests {
 
         // Test keys on different levels
         let anchor_a = [0, 0, 0];
-        let mut a = MortonKey::from_anchor(&anchor_a);
-        a = a.parent();
+        let mut a = MortonKey::from_anchor(&anchor_a, DEEPEST_LEVEL - 1);
         let anchor_b = [2, 2, 2];
-        let b = MortonKey::from_anchor(&anchor_b);
+        let b = MortonKey::from_anchor(&anchor_b, DEEPEST_LEVEL);
         assert!(a.is_adjacent(&b));
+    }
+
+    #[test]
+    fn test_encoding_is_always_absolute() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let a = MortonKey::from_point(&point, &domain, 1);
+        let b = MortonKey::from_point(&point, &domain, 16);
+        assert_ne!(a, b);
+        assert_eq!(a.anchor, b.anchor);
     }
 }

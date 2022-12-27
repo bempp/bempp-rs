@@ -35,6 +35,7 @@ mod tests {
     use rand::prelude::*;
     use rand::SeedableRng;
 
+    use crate::constants::DEEPEST_LEVEL;
     use crate::types::{
         domain::Domain,
         morton::MortonKey,
@@ -69,7 +70,7 @@ mod tests {
             .enumerate()
             .map(|(i, p)| Point {
                 coordinate: *p,
-                key: MortonKey::from_point(p, &domain),
+                key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
             })
             .collect();

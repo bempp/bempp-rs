@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 use solvers_traits::tree::Tree;
 
 use crate::{
-    constants::{DEEPEST_LEVEL, NCRIT, ROOT},
-    implementations::impl_morton::complete_region,
+    constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
+    implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
@@ -13,6 +13,58 @@ use crate::{
         single_node::SingleNodeTree,
     },
 };
+
+pub fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
+    let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
+
+    let mut seeds: MortonKeys = MortonKeys {
+        keys: leaves
+            .iter()
+            .filter(|k| k.level() == coarsest_level)
+            .cloned()
+            .collect_vec(),
+        index: 0,
+    };
+    seeds.sort();
+    seeds
+}
+
+/// Split tree coarse blocks by counting how many particles they contain.
+pub fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -> MortonKeys {
+    let split_blocktree;
+    let mut blocks_to_points;
+
+    loop {
+        let mut new_blocktree = MortonKeys::new();
+
+        // Map between blocks and the leaves they contain
+        // Blocks are being removed if they dont contain points, have to find a way to retain empty blocks.
+        blocks_to_points = assign_nodes_to_points(&blocktree, points);
+
+        // Generate a new blocktree with a block's children if they violate the n_crit parameter
+        let mut check = 0;
+        for (&block, points) in blocks_to_points.iter() {
+            let npoints = points.len();
+
+            if npoints > n_crit {
+                let mut children = block.children();
+                new_blocktree.append(&mut children);
+            } else {
+                new_blocktree.push(block);
+                check += 1;
+            }
+        }
+
+        // Return if we cycle through all blocks without splitting
+        if check == blocks_to_points.len() {
+            split_blocktree = new_blocktree;
+            break;
+        } else {
+            blocktree = new_blocktree;
+        }
+    }
+    split_blocktree
+}
 
 /// Create a mapping between points and octree nodes, assumed to overlap.
 pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
@@ -73,165 +125,172 @@ impl SingleNodeTree {
     ) -> SingleNodeTree {
         let domain = Domain::from_local_points(points);
 
-        // Encode to max user specified depth, if specified, otherwise encode an adaptive tree using n_crit
-        let mut encoded_points: Points;
-        let mut encoded_keys: MortonKeys;
-
         let n_crit = n_crit.unwrap_or(NCRIT);
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
-        if !adaptive {
-            // Encode points at deepest level, and map to specified depth
-            encoded_points = points
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let key = MortonKey::from_point(p, &domain);
-                    let ancestors: MortonKeys = key.ancestors().into_iter().sorted().collect();
-
-                    Point {
-                        coordinate: *p,
-                        key: ancestors[depth as usize],
-                        global_idx: i,
-                    }
-                })
-                .collect();
-
-            encoded_keys = MortonKeys {
-                keys: encoded_points.iter().map(|p| p.key).collect(),
-                index: 0,
-            };
-
-            encoded_keys.linearize();
+        if adaptive {
+            SingleNodeTree::adaptive_tree(adaptive, points, &domain, n_crit)
         } else {
-            // Encode points at deepest level
-            encoded_points = points
-                .iter()
-                .enumerate()
-                .map(|(i, p)| Point {
-                    coordinate: *p,
-                    key: MortonKey::from_point(p, &domain),
-                    global_idx: i,
-                })
-                .collect();
-
-            // Find unique keys corresponding to the points
-            let mut complete = MortonKeys {
-                keys: encoded_points.iter().map(|p| p.key).collect_vec(),
-                index: 0,
-            };
-
-            complete.linearize();
-
-            // Complete the region spanned by the points
-            complete.complete();
-
-            // Find seeds (coarsest node(s))
-            let coarsest_level = complete.iter().map(|k| k.level()).min().unwrap();
-
-            let mut seeds: MortonKeys = MortonKeys {
-                keys: complete
-                    .into_iter()
-                    .filter(|k| k.level() == coarsest_level)
-                    .collect_vec(),
-                index: 0,
-            };
-
-            seeds.sort();
-
-            // The tree's domain is defined by the finest first/last descendants
-            let ffc_root = ROOT.finest_first_child();
-            let min = seeds.iter().min().unwrap();
-            let fa = ffc_root.finest_ancestor(min);
-            let first_child = fa.children().into_iter().min().unwrap();
-            seeds.push(first_child);
-
-            let flc_root = ROOT.finest_last_child();
-            let max = seeds.iter().max().unwrap();
-            let fa = flc_root.finest_ancestor(max);
-            let last_child = fa.children().into_iter().max().unwrap();
-            seeds.push(last_child);
-
-            seeds.sort();
-
-            let mut blocktree = MortonKeys::new();
-
-            for i in 0..(seeds.iter().len() - 1) {
-                let a = seeds[i];
-                let b = seeds[i + 1];
-                let mut tmp = complete_region(&a, &b);
-                blocktree.keys.push(a);
-                blocktree.keys.append(&mut tmp);
-            }
-
-            blocktree.keys.push(seeds.last().unwrap());
-
-            blocktree.sort();
-
-            // Split the blocks based on the n_crit constraint
-            let mut balanced;
-            let mut blocks_to_points;
-            loop {
-                let mut new_blocktree = MortonKeys::new();
-
-                // Map between blocks and the leaves they contain
-                blocks_to_points = assign_nodes_to_points(&blocktree, &encoded_points);
-
-                // Generate a new blocktree with a block's children if they violate the n_crit parameter
-                let mut check = 0;
-                for (&block, points) in blocks_to_points.iter() {
-                    let npoints = points.len();
-
-                    if npoints > n_crit {
-                        let mut children = block.children();
-                        new_blocktree.append(&mut children);
-                    } else {
-                        new_blocktree.push(block);
-                        check += 1;
-                    }
-                }
-
-                // Return if we cycle through all blocks without splitting
-                if check == blocks_to_points.len() {
-                    balanced = new_blocktree;
-                    break;
-                } else {
-                    blocktree = new_blocktree;
-                }
-            }
-
-            // Balance and linearize
-            balanced.balance();
-            balanced.linearize();
-
-            // Find new maps between points and balanced tree
-            let points_to_balanced = assign_points_to_nodes(&encoded_points, &balanced);
-
-            encoded_points = encoded_points
-                .iter()
-                .map(|p| Point {
-                    coordinate: p.coordinate,
-                    global_idx: p.global_idx,
-                    key: *points_to_balanced.get(p).unwrap(),
-                })
-                .collect();
-
-            encoded_keys = balanced;
-        }
-
-        let keys_to_points = assign_nodes_to_points(&encoded_keys, &encoded_points);
-        let points_to_keys = assign_points_to_nodes(&encoded_points, &encoded_keys);
-        SingleNodeTree {
-            adaptive,
-            points: encoded_points,
-            keys: encoded_keys,
-            domain,
-            points_to_keys,
-            keys_to_points,
+            SingleNodeTree::uniform_tree(adaptive, points, &domain, depth)
         }
     }
-}
 
+    /// Constructor for uniform trees
+    pub fn uniform_tree(
+        adaptive: bool,
+        points: &[[PointType; 3]],
+        &domain: &Domain,
+        depth: u64,
+    ) -> SingleNodeTree {
+        // Encode points at deepest level, and map to specified depth
+        let points: Points = points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, depth),
+                global_idx: i,
+            })
+            .collect();
+
+        // Generate complete tree at specified depth
+        let diameter = 1 << (DEEPEST_LEVEL - depth);
+
+        let mut leaves = MortonKeys {
+            keys: (0..LEVEL_SIZE)
+                .step_by(diameter)
+                .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
+                .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
+                .map(|anchor| {
+                    let morton = encode_anchor(&anchor, depth);
+                    MortonKey { anchor, morton }
+                })
+                .collect(),
+            index: 0,
+        };
+
+        let leaves_to_points = assign_nodes_to_points(&leaves, &points);
+        let points_to_leaves = assign_points_to_nodes(&points, &leaves);
+
+        // Only retain keys that contain points
+        leaves = MortonKeys {
+            keys: leaves_to_points.keys().cloned().collect(),
+            index: 0,
+        };
+
+        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
+
+        SingleNodeTree {
+            adaptive,
+            points,
+            leaves,
+            leaves_set,
+            domain,
+            points_to_leaves,
+            leaves_to_points,
+        }
+    }
+
+    /// Constructor for adaptive trees
+    pub fn adaptive_tree(
+        adaptive: bool,
+        points: &[[PointType; 3]],
+        &domain: &Domain,
+        n_crit: usize,
+    ) -> SingleNodeTree {
+        // Encode points at deepest level
+        let mut points: Points = points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
+                global_idx: i,
+            })
+            .collect();
+
+        // Complete the region spanned by the points
+        let mut complete = MortonKeys {
+            keys: points.iter().map(|p| p.key).collect_vec(),
+            index: 0,
+        };
+
+        complete.linearize();
+        complete.complete();
+
+        // Find seeds (coarsest node(s))
+        let mut seeds = find_seeds(&complete);
+
+        // The tree's domain is defined by the finest first/last descendants
+        let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+
+        // Split the blocks based on the n_crit constraint
+        let mut balanced = split_blocks(&points, blocktree, n_crit);
+
+        // Balance and linearize
+        balanced.sort();
+        balanced.balance();
+        balanced.linearize();
+
+        // Find new maps between points and balanced tree
+        let points_to_leaves = assign_points_to_nodes(&points, &balanced);
+
+        points = points
+            .iter()
+            .map(|p| Point {
+                coordinate: p.coordinate,
+                global_idx: p.global_idx,
+                key: *points_to_leaves.get(p).unwrap(),
+            })
+            .collect();
+
+        let leaves_to_points = assign_nodes_to_points(&balanced, &points);
+        let leaves = balanced;
+        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
+
+        SingleNodeTree {
+            adaptive,
+            points,
+            leaves,
+            leaves_set,
+            domain,
+            points_to_leaves,
+            leaves_to_points,
+        }
+    }
+
+    pub fn complete_blocktree(seeds: &mut MortonKeys) -> MortonKeys {
+        let ffc_root = ROOT.finest_first_child();
+        let min = seeds.iter().min().unwrap();
+        let fa = ffc_root.finest_ancestor(min);
+        let first_child = fa.children().into_iter().min().unwrap();
+        seeds.push(first_child);
+
+        let flc_root = ROOT.finest_last_child();
+        let max = seeds.iter().max().unwrap();
+        let fa = flc_root.finest_ancestor(max);
+        let last_child = fa.children().into_iter().max().unwrap();
+        seeds.push(last_child);
+
+        seeds.sort();
+
+        let mut blocktree = MortonKeys::new();
+
+        for i in 0..(seeds.iter().len() - 1) {
+            let a = seeds[i];
+            let b = seeds[i + 1];
+            let mut tmp = complete_region(&a, &b);
+            blocktree.keys.push(a);
+            blocktree.keys.append(&mut tmp);
+        }
+
+        blocktree.keys.push(seeds.last().unwrap());
+
+        blocktree.sort();
+
+        blocktree
+    }
+}
 impl Tree for SingleNodeTree {
     type Domain = Domain;
     type Point = Point;
@@ -246,7 +305,7 @@ impl Tree for SingleNodeTree {
 
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &MortonKeys {
-        &self.keys
+        &self.leaves
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -261,12 +320,12 @@ impl Tree for SingleNodeTree {
 
     // Get tree node key associated with a given point
     fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
-        self.points_to_keys.get(point)
+        self.points_to_leaves.get(point)
     }
 
     // Get points associated with a tree node key
     fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
-        self.keys_to_points.get(key)
+        self.leaves_to_points.get(key)
     }
 }
 
@@ -301,7 +360,7 @@ mod tests {
         let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
 
         // Test that particle constraint is met at this level
-        for (_, (_, points)) in tree.keys_to_points.iter().enumerate() {
+        for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
             assert!(points.len() <= n_crit);
         }
 
@@ -322,7 +381,7 @@ mod tests {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
 
         // Test that particle constraint is met
-        for (_, (_, points)) in tree.keys_to_points.iter().enumerate() {
+        for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
             assert!(points.len() <= n_crit);
         }
 
@@ -332,7 +391,7 @@ mod tests {
         assert_eq!(false, levels.iter().all(|level| *level == first));
 
         // Test for overlaps in balanced tree
-        let keys: Vec<MortonKey> = tree.keys.iter().cloned().collect();
+        let keys: Vec<MortonKey> = tree.leaves.iter().cloned().collect();
         for key in keys.iter() {
             if !keys.iter().contains(key) {
                 let mut ancestors = key.ancestors();
