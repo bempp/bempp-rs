@@ -1,6 +1,5 @@
 //! Data Structures and methods to create octrees on a single node.
-
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 
 use crate::types::{
     domain::Domain,
@@ -11,14 +10,18 @@ use crate::types::{
 /// Concrete local (non-distributed) Tree.
 #[derive(Debug)]
 pub struct SingleNodeTree {
+
     /// Adaptivity is optional.
     pub adaptive: bool,
 
     ///  A vector of Cartesian points.
     pub points: Points,
 
-    /// The nodes that span the SingleNodeTree, defined by its leaf nodes.
+    /// The nodes that span the tree, defined by its leaf nodes.
     pub keys: MortonKeys,
+    
+    /// The nodes that span the tree, defined by its leaf nodes, as a set.
+    pub keys_set: HashSet<MortonKey>,
 
     /// Domain spanned by the points in the SingleNodeTree.
     pub domain: Domain,

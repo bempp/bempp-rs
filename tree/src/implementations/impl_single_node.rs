@@ -177,11 +177,14 @@ impl SingleNodeTree {
             keys: keys_to_points.keys().cloned().collect(),
             index: 0,
         };
+        
+        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
         SingleNodeTree {
             adaptive,
             points,
             keys,
+            keys_set,
             domain,
             points_to_keys,
             keys_to_points,
@@ -243,11 +246,13 @@ impl SingleNodeTree {
 
         let keys_to_points = assign_nodes_to_points(&balanced, &points);
         let keys = balanced;
+        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
         SingleNodeTree {
             adaptive,
             points,
             keys,
+            keys_set,
             domain,
             points_to_keys,
             keys_to_points,
