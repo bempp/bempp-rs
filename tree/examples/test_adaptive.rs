@@ -7,8 +7,13 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use solvers_traits::tree::Tree;
 
+use solvers_tree::constants::{DEEPEST_LEVEL, LEVEL_SIZE};
+use solvers_tree::implementations::impl_morton::encode_anchor;
 use solvers_tree::types::{
-    domain::Domain, morton::{MortonKey, MortonKeys}, multi_node::MultiNodeTree, point::PointType,
+    domain::Domain,
+    morton::{MortonKey, MortonKeys},
+    multi_node::MultiNodeTree,
+    point::PointType,
     single_node::SingleNodeTree,
 };
 
@@ -34,8 +39,8 @@ pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
 /// Test that the leaves on separate nodes do not overlap.
 fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     // Communicate bounds from each process
-    let max = tree.keys.iter().max().unwrap();
-    let min = tree.keys.iter().min().unwrap();
+    let max = tree.leaves.iter().max().unwrap();
+    let min = tree.leaves.iter().min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
@@ -62,63 +67,6 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     if rank > 0 {
         assert!(partner_max < *min)
     }
-}
-
-/// Test that the tree spans the entire domain specified by the point distribution.
-/// Test that the tree spans the entire domain specified by the point distribution.
-fn test_span(points: &[[f64; 3]], tree: &MultiNodeTree) {
-    let min: &MortonKey = tree.get_keys().iter().min().unwrap();
-    let max: &MortonKey = tree.get_keys().iter().max().unwrap();
-    let block_set: HashSet<MortonKey> = tree.keys.iter().cloned().collect();
-    let max_level = tree
-        .get_keys()
-        .iter()
-        .map(|block| block.level())
-        .max()
-        .unwrap();
-
-    // Generate a uniform tree at the max level, and filter for range in this processor
-    // let uniform = SingleNodeTree::new(points, false, None, Some(max_level));
-    // let uniform: Vec<MortonKey> = uniform
-    //     .get_keys()
-    //     .iter()
-    //     .cloned()
-    //     .collect();
-
-    let diameter = 1 << (DEEPEST_LEVEL - max_level as u64);
-    println!("diameter {:?}", diameter);
-    let uniform = MortonKeys {
-        keys: (0..LEVEL_SIZE)
-            .step_by(diameter)
-            .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
-            .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
-            .map(|anchor| {
-                let morton = encode_anchor(&anchor, max_level as u64);
-                MortonKey { anchor, morton }
-            })
-            .filter(|node| (min <= node) && (node <= max))
-            .collect(),
-        index: 0,
-    };
-
-    // let uniform_set: HashSet<MortonKey> = uniform.into_iter().collect(); 
-
-    // let mut keys: Vec<MortonKey> = tree.get_keys().iter().cloned().collect();
-    // keys.sort();
-
-    // println!("uniform 0 {:?} blocks0 {:?}", uniform[1], keys[1].level());
-
-    // for node in uniform.iter() {
-    //     let ancestors = node.ancestors();
-    //     let int: Vec<MortonKey> = ancestors
-    //         .intersection(&block_set)
-    //         .into_iter()
-    //         .cloned()
-    //         .collect();
-    //     // println!("key {:?} level {:?} int {:?} contained {:?} min {:?} max {:?}", 
-    //     // node, node.level(), int, (node >= min) && (node <= max), min, max);
-    //     assert!(int.iter().len() > 0);
-    // }
 }
 
 fn test_adaptive(tree: &MultiNodeTree) {
@@ -153,26 +101,23 @@ fn main() {
     let adaptive = true;
     let n_crit = Some(50);
     let depth: Option<_> = None;
-    let n_points = 10000;
+    let n_points = 1000;
     let k: Option<_> = None;
 
     let points = points_fixture(n_points);
 
     let tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
-    test_span(&points, &tree);
+
+    test_global_bounds(&comm);
     if world.rank() == 0 {
-        println!("\t ... test_span passed on adaptive tree");
+        println!("\t ... test_global_bounds passed on adaptive tree");
     }
-    // test_global_bounds(&comm);
-    // if world.rank() == 0 {
-    //     println!("\t ... test_global_bounds passed on adaptive tree");
-    // }
-    // test_adaptive(&tree);
-    // if world.rank() == 0 {
-    //     println!("\t ... test_adaptive passed on adaptive tree");
-    // }
-    // test_no_overlaps(&comm, &tree);
-    // if world.rank() == 0 {
-    //     println!("\t ... test_no_overlaps passed on adaptive tree");
-    // }
+    test_adaptive(&tree);
+    if world.rank() == 0 {
+        println!("\t ... test_adaptive passed on adaptive tree");
+    }
+    test_no_overlaps(&comm, &tree);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on adaptive tree");
+    }
 }
