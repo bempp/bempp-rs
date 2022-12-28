@@ -20,6 +20,9 @@ pub struct MultiNodeTree {
     ///  A vector of Cartesian points.
     pub points: Points,
 
+    /// All ancestors of leaves in tree, as a set.
+    pub keys_set: HashSet<MortonKey>,
+
     /// The leaf nodes that span the tree, defined by its leaf nodes.
     pub leaves: MortonKeys,
 

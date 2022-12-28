@@ -7,7 +7,7 @@ use mpi::{
 };
 
 use hyksort::hyksort;
-use solvers_traits::tree::Tree;
+use solvers_traits::tree::{LocallyEssentialTree, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, K, LEVEL_SIZE, NCRIT, ROOT},
@@ -103,6 +103,12 @@ impl MultiNodeTree {
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
 
+        let mut keys_set: HashSet<MortonKey> = HashSet::new();
+        for key in leaves.iter() {
+            let ancestors = key.ancestors();
+            keys_set.extend(&ancestors);
+        }
+
         let min = leaves.iter().min().unwrap();
         let max = leaves.iter().max().unwrap();
         let range = [world.rank() as KeyType, min.morton, max.morton];
@@ -111,6 +117,7 @@ impl MultiNodeTree {
             world: world.duplicate(),
             adaptive: false,
             points,
+            keys_set,
             leaves,
             leaves_set,
             domain: *domain,
@@ -208,6 +215,11 @@ impl MultiNodeTree {
             .collect();
 
         let leaves_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
+        let mut keys_set: HashSet<MortonKey> = HashSet::new();
+        for key in globally_balanced.iter() {
+            let ancestors = key.ancestors();
+            keys_set.extend(&ancestors);
+        }
 
         let min = globally_balanced.iter().min().unwrap();
         let max = globally_balanced.iter().max().unwrap();
@@ -217,6 +229,7 @@ impl MultiNodeTree {
             world: world.duplicate(),
             adaptive: true,
             points,
+            keys_set,
             leaves: globally_balanced,
             leaves_set,
             domain: *domain,
@@ -370,5 +383,165 @@ impl Tree for MultiNodeTree {
     // Get points associated with a tree node key
     fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
         self.leaves_to_points.get(key)
+    }
+}
+
+impl LocallyEssentialTree for MultiNodeTree {
+    type RawTree = MultiNodeTree;
+    type NodeIndex = MortonKey;
+    type NodeIndices = MortonKeys;
+
+    fn get_let(&self) {
+        // Each process adds all ancestor octants to its local tree
+
+        // Communicate ranges globally using AllGather
+        let rank = self.world.rank();
+        let size = self.world.size();
+
+        let mut ranges = vec![0 as KeyType; (size as usize) * 3];
+
+        self.world.all_gather_into(&self.range, &mut ranges);
+
+        // Compute LET from leaves, and all their ancestors
+        let mut let_set: HashSet<MortonKey> = HashSet::new();
+
+        for key in self.keys_set.iter() {
+            let result = self.get_interaction_list(key);
+            match result {
+                Some(mut v) => let_set.extend(&mut v),
+                None => {}
+            }
+        }
+
+        for leaf in self.leaves_set.iter() {
+            let mut u = self.get_near_field(leaf);
+            let mut x = self.get_x_list(leaf);
+            let mut w = self.get_w_list(leaf);
+            let_set.extend(&mut u);
+            let_set.extend(&mut x);
+            let_set.extend(&mut w);
+        }
+
+        let mut let_vec: Vec<MortonKey> = let_set.iter().cloned().collect();
+        let let_range = vec![let_vec.iter().min().unwrap().morton, let_vec.iter().max().unwrap().morton];
+
+        // Find contributor processors for this rank from the LET
+        let mut contributors: Vec<KeyType> = Vec::new();
+
+        for chunk in ranges.chunks_exact(3) {
+            let rank = chunk[0];
+            let min = chunk[1];
+            let max = chunk[2];
+            
+            // Check if ranges overlap
+            if (min <= let_range[0]) && (max >= let_range[1]) {
+                contributors.push(rank)
+            } else if (min >= let_range[0]) && (min <= let_range[1])  && (max >= let_range[1]) {
+                contributors.push(rank)
+            } else if (min <= let_range[0]) && (max >= let_range[0]) && (max <= let_range[1]) {
+                contributors.push(rank)
+            } else if (min >= let_range[0]) && (max <= let_range[1]) {
+                contributors.push(rank)
+            }
+        }        
+
+        // Find user processes for this rank from the LET
+        let mut users: Vec<KeyType> = Vec::new();
+
+        // Send required data from contributors to each node
+
+        // Send each contributor a request for leaf data
+
+        // Receive leaf data from contributor
+
+        println!(
+            "Rank {:?} Contributors={:?}",
+            self.world.rank(),
+            contributors
+        );
+
+        // Insert into leaves set, and update the keys set of all ancestors locally and return   
+    }
+
+    // Calculate near field interaction list of  keys.
+    fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {
+        let mut result = Vec::<MortonKey>::new();
+        let neighbours = leaf.neighbors();
+
+        // Child level
+        let mut neighbors_children_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| leaf.is_adjacent(nc))
+            .collect();
+
+        // Key level
+        let mut neighbors_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .filter(|n| leaf.is_adjacent(n))
+            .cloned()
+            .collect();
+
+        // Parent level
+        let mut neighbors_parents_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .map(|n| n.parent())
+            .filter(|np| leaf.is_adjacent(np))
+            .collect();
+
+        result.append(&mut neighbors_children_adj);
+        result.append(&mut neighbors_adj);
+        result.append(&mut neighbors_parents_adj);
+
+        MortonKeys {
+            keys: result,
+            index: 0,
+        }
+    }
+
+    // Calculate compressible far field interactions of leaf & other keys.
+    fn get_interaction_list(&self, key: &MortonKey) -> Option<MortonKeys> {
+        if key.level() >= 2 {
+            return Some(MortonKeys {
+                keys: key
+                    .parent()
+                    .neighbors()
+                    .iter()
+                    .flat_map(|pn| pn.children())
+                    .filter(|pnc| key.is_adjacent(pnc))
+                    .collect_vec(),
+                index: 0,
+            });
+        }
+        {
+            None
+        }
+    }
+
+    // Calculate M2P interactions of leaf key.
+    fn get_w_list(&self, leaf: &MortonKey) -> MortonKeys {
+        // Child level
+        MortonKeys {
+            keys: leaf
+                .neighbors()
+                .iter()
+                .flat_map(|n| n.children())
+                .filter(|nc| !leaf.is_adjacent(nc))
+                .collect_vec(),
+            index: 0,
+        }
+    }
+
+    // Calculate P2L interactions of leaf key.
+    fn get_x_list(&self, leaf: &MortonKey) -> MortonKeys {
+        MortonKeys {
+            keys: leaf
+                .parent()
+                .neighbors()
+                .into_iter()
+                .filter(|pn| !leaf.is_adjacent(pn))
+                .collect_vec(),
+            index: 0,
+        }
     }
 }

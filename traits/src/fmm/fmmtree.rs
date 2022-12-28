@@ -1,4 +1,3 @@
-//! Interfaces for FMM trees
 
 use crate::types::{Locality, Scalar};
 
@@ -16,18 +15,18 @@ pub trait Node {
     type NodeIndex;
     // Data view with a lifetime that depends on the
     // lifetime of the tree node.
-    type View<'a>: crate::general::IndexableView
-    where
-        Self: 'a;
+    // type View<'a>: crate::general::IndexableView
+    // where
+    //     Self: 'a;
 
     // Get the node geometry.
     fn node_geometry(&self) -> Self::Geometry;
 
-    // Get a view onto the data.
-    fn view<'a>(&'a self) -> Self::View<'a>;
+    // // Get a view onto the data.
+    // fn view<'a>(&'a self) -> Self::View<'a>;
 
-    // Get a mutable view onto the data.
-    fn view_mut<'a>(&'a mut self) -> Self::View<'a>;
+    // // Get a mutable view onto the data.
+    // fn view_mut<'a>(&'a mut self) -> Self::View<'a>;
 
     // Get the index of the node.
     fn node_index(&self) -> Self::NodeIndex;
@@ -46,10 +45,13 @@ pub trait FmmTree {
 
     // Get the near-field for local indices.
     // If the index is not local, `None` is returned.
-    fn near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
+    fn get_near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
 
     // Get the interaction list.
-    fn interaction_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
+    fn get_interaction_list<'a>(
+        &'a self,
+        node_index: Self::NodeIndex,
+    ) -> Option<Self::IndexIter<'a>>;
 
     // Get the x list.
     fn get_x_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
@@ -58,11 +60,11 @@ pub trait FmmTree {
     fn get_w_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
 
     // Get the level of the node.
-    fn level(&self, node_index: Self::NodeIndex) -> Option<usize>;
+    fn get_level(&self, node_index: Self::NodeIndex) -> Option<usize>;
 
-    // Get the ancestor of the node.
-    fn ancestor(&self, node_index: Self::NodeIndex) -> Option<Self::NodeIndex>;
+    // Get the parent of the node.
+    fn get_parent(&self, node_index: Self::NodeIndex) -> Option<Self::NodeIndex>;
 
-    // Get the desendents of the node.
-    fn descendents<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
+    // Get the children of the node.
+    fn get_children<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>>;
 }

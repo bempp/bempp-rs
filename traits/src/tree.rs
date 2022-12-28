@@ -37,8 +37,8 @@ pub trait LocallyEssentialTree {
 
     // fn get_let(&self) -> &Self::RawTree;
     fn get_let(&self);
-    // fn get_near_field(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    // fn get_interaction_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    // fn get_x_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    // fn get_w_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    fn get_near_field(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    fn get_interaction_list(&self, key: &Self::NodeIndex) -> Option<Self::NodeIndices>;
+    fn get_x_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+    fn get_w_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
 }
