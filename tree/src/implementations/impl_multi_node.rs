@@ -402,7 +402,8 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         self.world.all_gather_into(&self.range, &mut ranges);
 
-        // Compute LET from leaves, and all their ancestors
+        // Compute LET from leaves, and all their ancestors, even if
+        // they don't exist in the tree
         let mut let_set: HashSet<MortonKey> = HashSet::new();
 
         for key in self.keys_set.iter() {
@@ -423,45 +424,69 @@ impl LocallyEssentialTree for MultiNodeTree {
         }
 
         let mut let_vec: Vec<MortonKey> = let_set.iter().cloned().collect();
-        let let_range = vec![let_vec.iter().min().unwrap().morton, let_vec.iter().max().unwrap().morton];
 
-        // Find contributor processors for this rank from the LET
-        let mut contributors: Vec<KeyType> = Vec::new();
-
-        for chunk in ranges.chunks_exact(3) {
-            let rank = chunk[0];
-            let min = chunk[1];
-            let max = chunk[2];
+        // Calculate users and contributors for each key in LET
+        let mut contributors: Vec<Vec<KeyType>> = Vec::new();
+        let mut users: Vec<Vec<KeyType>> = Vec::new();
+        for key in let_vec.iter() {
+            // Calculate the contributor processors for this octant
+            let mut cont_tmp : Vec<KeyType> = Vec::new();
+            let mut user_tmp: Vec<KeyType> = Vec::new();
             
-            // Check if ranges overlap
-            if (min <= let_range[0]) && (max >= let_range[1]) {
-                contributors.push(rank)
-            } else if (min >= let_range[0]) && (min <= let_range[1])  && (max >= let_range[1]) {
-                contributors.push(rank)
-            } else if (min <= let_range[0]) && (max >= let_range[0]) && (max <= let_range[1]) {
-                contributors.push(rank)
-            } else if (min >= let_range[0]) && (max <= let_range[1]) {
-                contributors.push(rank)
+            for chunk in ranges.chunks_exact(3) {
+                let rank = chunk[0];
+                let min = chunk[1];
+                let max = chunk[2];
+    
+                // Check if ranges overlap, if so add to contributor list
+                if min <= key.morton && key.morton <= max {
+                    cont_tmp.push(rank);
+                } 
+
+                // Check if ranges overlap of the neighbors of the key's parent, if so
+                // add to user list
+                let mut colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
+                let mut cp_min = colleagues_parent.iter().min();
+                let mut cp_max = colleagues_parent.iter().max();
+
+                match (cp_min, cp_max) {
+                    (Some(cp_min), Some(cp_max)) => {
+                        let cp_min = cp_min.morton;
+                        let cp_max = cp_max.morton;
+                        if (min <= cp_min) && (cp_max <= max) {
+                            user_tmp.push(rank);
+                        } else if (cp_min <= min) && (cp_max >= min) && (cp_max <= max) {
+                            user_tmp.push(rank);
+                        } else if (cp_min > min) && (cp_min <= max) && (cp_max >= max) {
+                            user_tmp.push(rank);
+                        } else if (cp_min <= min) && (cp_max >= max) {
+                            user_tmp.push(rank)
+                        }
+                    },
+                    _ => (),
+                }
             }
-        }        
+            contributors.push(cont_tmp);
+            users.push(user_tmp);
+        }
 
-        // Find user processes for this rank from the LET
-        let mut users: Vec<KeyType> = Vec::new();
-
-        // Send required data from contributors to each node
-
-        // Send each contributor a request for leaf data
-
-        // Receive leaf data from contributor
+        // TODO: Send required data to user of each node
+        // Point Data
+        // Key Data 
 
         println!(
-            "Rank {:?} Contributors={:?}",
+            "Rank {:?} Key={:?} Users={:?} Contributors=={:?}",
             self.world.rank(),
-            contributors
+            let_vec[0],
+            users[0],
+            contributors[0]
         );
 
-        // Insert into leaves set, and update the keys set of all ancestors locally and return   
+        // TODO: Insert into leaves set, and update the keys set of all ancestors locally and return   
     }
+
+    // TODO: Final interaction list functions need to filter for what actually exists
+    // in the LET.
 
     // Calculate near field interaction list of  keys.
     fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {
