@@ -392,7 +392,7 @@ impl LocallyEssentialTree for MultiNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    fn get_let(&mut self) {
+    fn create_locally_essential_tree(&mut self) {
         // Communicate ranges globally using AllGather
         let rank = self.world.rank();
         let size = self.world.size();
@@ -404,27 +404,15 @@ impl LocallyEssentialTree for MultiNodeTree {
         let mut let_vec: Vec<MortonKey> = self.keys_set.iter().cloned().collect();
 
         // Calculate users and contributors for each leaf
-        let mut contributors: Vec<Vec<KeyType>> = Vec::new();
         let mut users: Vec<Vec<KeyType>> = Vec::new();
         for key in let_vec.iter() {
             // Calculate the contributor processors for this octant
-            let mut cont_tmp: Vec<KeyType> = Vec::new();
             let mut user_tmp: Vec<KeyType> = Vec::new();
 
             for chunk in ranges.chunks_exact(3) {
                 let rank = chunk[0];
                 let min = MortonKey::from_morton(chunk[1]);
                 let max = MortonKey::from_morton(chunk[2]);
-
-                // Check if ranges overlap, if so add to contributor list
-                if (&min <= key && key <= &max)
-                    || (min.ancestors().contains(&key))
-                    || (max.ancestors().contains(&key))
-                    || (key.ancestors().contains(&min))
-                    || (key.ancestors().contains(&max))
-                {
-                    cont_tmp.push(rank);
-                }
 
                 // Check if ranges overlap of the neighbors of the key's parent, if so
                 // add to user list
@@ -449,8 +437,6 @@ impl LocallyEssentialTree for MultiNodeTree {
                     user_tmp.push(rank)
                 }
             }
-
-            contributors.push(cont_tmp);
             users.push(user_tmp);
         }
 
@@ -557,9 +543,6 @@ impl LocallyEssentialTree for MultiNodeTree {
         }
     }
 
-    // TODO: Final interaction list functions need to filter for what actually exists
-    // in the LET.
-
     // Calculate near field interaction list of  keys.
     fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {
         let mut result = Vec::<MortonKey>::new();
@@ -569,13 +552,13 @@ impl LocallyEssentialTree for MultiNodeTree {
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| leaf.is_adjacent(nc))
+            .filter(|nc| self.keys_set.contains(nc) && leaf.is_adjacent(nc))
             .collect();
 
         // Key level
         let mut neighbors_adj: Vec<MortonKey> = neighbours
             .iter()
-            .filter(|n| leaf.is_adjacent(n))
+            .filter(|n| self.keys_set.contains(n) && leaf.is_adjacent(n))
             .cloned()
             .collect();
 
@@ -583,7 +566,7 @@ impl LocallyEssentialTree for MultiNodeTree {
         let mut neighbors_parents_adj: Vec<MortonKey> = neighbours
             .iter()
             .map(|n| n.parent())
-            .filter(|np| leaf.is_adjacent(np))
+            .filter(|np| self.leaves_set.contains(np) && leaf.is_adjacent(np))
             .collect();
 
         result.append(&mut neighbors_children_adj);
@@ -605,7 +588,7 @@ impl LocallyEssentialTree for MultiNodeTree {
                     .neighbors()
                     .iter()
                     .flat_map(|pn| pn.children())
-                    .filter(|pnc| key.is_adjacent(pnc))
+                    .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
                     .collect_vec(),
                 index: 0,
             });
@@ -623,7 +606,7 @@ impl LocallyEssentialTree for MultiNodeTree {
                 .neighbors()
                 .iter()
                 .flat_map(|n| n.children())
-                .filter(|nc| !leaf.is_adjacent(nc))
+                .filter(|nc| self.keys_set.contains(nc) && !leaf.is_adjacent(nc))
                 .collect_vec(),
             index: 0,
         }
@@ -636,7 +619,7 @@ impl LocallyEssentialTree for MultiNodeTree {
                 .parent()
                 .neighbors()
                 .into_iter()
-                .filter(|pn| !leaf.is_adjacent(pn))
+                .filter(|pn| self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
                 .collect_vec(),
             index: 0,
         }
