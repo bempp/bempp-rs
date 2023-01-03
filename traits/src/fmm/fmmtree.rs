@@ -1,4 +1,3 @@
-
 use crate::types::{Locality, Scalar};
 
 // Definition of a tree node.

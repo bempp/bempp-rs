@@ -625,7 +625,7 @@ impl LocallyEssentialTree for MultiNodeTree {
             println!("q_tmp {:?} k {:?}", q_tmp.len(), k);
             q.extend(q_tmp);
         }
-        
+
         // TODO: send leaves and points to where they need to go.
 
         // if rank == 1 {
