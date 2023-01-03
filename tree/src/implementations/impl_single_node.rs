@@ -459,9 +459,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    fn get_let(&mut self) {
-        // self
-    }
+    fn create_locally_essential_tree(&mut self) {}
 
     // Calculate near field interaction list of leaf keys.
     fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {
@@ -472,7 +470,7 @@ impl LocallyEssentialTree for SingleNodeTree {
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.keys_set.contains(nc) &&  leaf.is_adjacent(nc))
+            .filter(|nc| self.keys_set.contains(nc) && leaf.is_adjacent(nc))
             .collect();
 
         // Key level
@@ -522,7 +520,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     fn get_w_list(&self, leaf: &MortonKey) -> MortonKeys {
         // Child level
         MortonKeys {
-            keys: leaf 
+            keys: leaf
                 .neighbors()
                 .iter()
                 .flat_map(|n| n.children())
@@ -539,7 +537,7 @@ impl LocallyEssentialTree for SingleNodeTree {
                 .parent()
                 .neighbors()
                 .into_iter()
-                .filter(|pn|self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
+                .filter(|pn| self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
                 .collect_vec(),
             index: 0,
         }
