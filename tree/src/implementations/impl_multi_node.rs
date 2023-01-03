@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 use mpi::{
+    collective::SystemOperation,
     request::{CancelGuard, WaitGuard},
     topology::{Rank, UserCommunicator},
     traits::*,
@@ -392,7 +393,7 @@ impl LocallyEssentialTree for MultiNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    fn create_locally_essential_tree(&mut self) {
+    fn create_let(&mut self) {
         // Communicate ranges globally using AllGather
         let rank = self.world.rank();
         let size = self.world.size();
@@ -532,6 +533,7 @@ impl LocallyEssentialTree for MultiNodeTree {
                     &mut received_points_packet,
                     &partner_process,
                 );
+
                 // Insert into local tree
                 self.keys_set.extend(&received_leaf_packet);
                 self.leaves.extend(&received_leaf_packet);
@@ -541,6 +543,99 @@ impl LocallyEssentialTree for MultiNodeTree {
                 self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
             }
         }
+    }
+
+    fn load_balance_let(&mut self) {
+        // Repartition based on size of interaction lists for each leaf
+        // Use Algorithm 1 in Sundar et. al (2008)
+
+        let size = self.world.size();
+        let rank = self.world.rank();
+
+        let weights: Vec<i32> = self
+            .leaves
+            .iter()
+            .map(|l| {
+                (self.get_near_field(l).len() + self.get_x_list(l).len() + self.get_w_list(l).len())
+                    as i32
+            })
+            .collect();
+
+        let mut cum_weights: Vec<i32> = weights
+            .iter()
+            .scan(0, |acc, &x| {
+                *acc += x;
+                Some(*acc)
+            })
+            .collect();
+
+        let mut total_weight = 0i32;
+        let local_weight = cum_weights.last().unwrap().clone();
+        self.world
+            .scan_into(&local_weight, &mut total_weight, &SystemOperation::sum());
+
+        let mut prev_local_weight = 0i32;
+
+        if rank < size - 1 {
+            let next_rank = rank + 1;
+            let next_process = self.world.process_at_rank(next_rank);
+            next_process.send(&total_weight);
+        }
+
+        if rank > 0 {
+            let prev_rank = rank - 1;
+            let prev_process = self.world.process_at_rank(prev_rank);
+            prev_process.receive_into(&mut prev_local_weight);
+        }
+
+        cum_weights = cum_weights.iter().map(|x| x + prev_local_weight).collect();
+
+        if rank == size - 1 {
+            total_weight = cum_weights.last().unwrap().clone();
+        }
+        self.world
+            .process_at_rank(size - 1)
+            .broadcast_into(&mut total_weight);
+
+        let mean_weight: f32 = total_weight as f32 / self.world.size() as f32;
+
+        let k = total_weight % size;
+
+        let mut q: Vec<MortonKey> = Vec::new();
+
+        for p in 0..size {
+            let mut q_tmp: Vec<MortonKey> = Vec::new();
+            if p <= k {
+                for (i, &cw) in cum_weights.iter().enumerate() {
+                    if ((p - 1) as f32) * (mean_weight + 1.0) <= (cw as f32)
+                        && (cw as f32) < (p as f32) * (mean_weight + 1.0)
+                    {
+                        q_tmp.push(self.leaves[i])
+                    }
+                }
+            } else {
+                for (i, &cw) in cum_weights.iter().enumerate() {
+                    if ((p - 1) as f32) * (mean_weight) + (k as f32) <= (cw as f32)
+                        && (cw as f32) < ((p) as f32) * (mean_weight) + (k as f32)
+                    {
+                        q_tmp.push(self.leaves[i])
+                    }
+                }
+            }
+            println!("q_tmp {:?} k {:?}", q_tmp.len(), k);
+            q.extend(q_tmp);
+        }
+        
+        // TODO: send leaves and points to where they need to go.
+
+        // if rank == 1 {
+        println!(
+            "rank {:?} glbl weight {:?} {:?} \n \n",
+            rank,
+            q.len(),
+            total_weight
+        );
+        // }
     }
 
     // Calculate near field interaction list of  keys.

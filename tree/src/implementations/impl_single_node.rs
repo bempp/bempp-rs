@@ -459,7 +459,9 @@ impl LocallyEssentialTree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    fn create_locally_essential_tree(&mut self) {}
+    fn create_let(&mut self) {}
+
+    fn load_balance_let(&mut self) {}
 
     // Calculate near field interaction list of leaf keys.
     fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {

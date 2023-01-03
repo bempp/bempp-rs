@@ -36,7 +36,7 @@ fn main() {
 
     // Setup tree parameters
     let adaptive = true;
-    let n_crit = Some(15);
+    let n_crit = Some(150);
     let depth: Option<_> = None;
     let n_points = 10000;
     let k: Option<_> = None;
@@ -45,8 +45,6 @@ fn main() {
 
     let mut tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
 
-    tree.create_locally_essential_tree();
-
-    // println!("Interation list for {:?} is \n {:?} \n \n",
-    // tree.leaves[1], tree.get_interaction_list(&tree.leaves[1]).unwrap().len());
+    tree.create_let();
+    tree.load_balance_let();
 }
