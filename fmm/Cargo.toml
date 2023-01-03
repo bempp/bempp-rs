@@ -16,6 +16,7 @@ name = "solvers_fmm"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../tools"}
+solvers-tools = { path = "../tools" }
+solvers-tree = { path = "../tree" }
 approx = "0.5"
 cauchy = "0.4"
