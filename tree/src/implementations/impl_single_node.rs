@@ -459,7 +459,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    fn get_let(&self) {
+    fn get_let(&mut self) {
         // self
     }
 
@@ -498,7 +498,6 @@ impl LocallyEssentialTree for SingleNodeTree {
             index: 0,
         }
     }
-
 
     // Calculate compressible far field interactions of leaf & other keys.
     fn get_interaction_list(&self, key: &MortonKey) -> Option<MortonKeys> {

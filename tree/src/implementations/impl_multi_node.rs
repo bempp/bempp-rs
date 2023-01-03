@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 use mpi::{
+    request::{CancelGuard, WaitGuard},
     topology::{Rank, UserCommunicator},
     traits::*,
 };
@@ -391,9 +392,7 @@ impl LocallyEssentialTree for MultiNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
-    fn get_let(&self) {
-        // Each process adds all ancestor octants to its local tree
-
+    fn get_let(&mut self) {
         // Communicate ranges globally using AllGather
         let rank = self.world.rank();
         let size = self.world.size();
@@ -402,87 +401,160 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         self.world.all_gather_into(&self.range, &mut ranges);
 
-        // Compute LET from leaves, and all their ancestors, even if
-        // they don't exist in the tree
-        let mut let_set: HashSet<MortonKey> = HashSet::new();
+        let mut let_vec: Vec<MortonKey> = self.keys_set.iter().cloned().collect();
 
-        for key in self.keys_set.iter() {
-            let result = self.get_interaction_list(key);
-            match result {
-                Some(mut v) => let_set.extend(&mut v),
-                None => {}
-            }
-        }
-
-        for leaf in self.leaves_set.iter() {
-            let mut u = self.get_near_field(leaf);
-            let mut x = self.get_x_list(leaf);
-            let mut w = self.get_w_list(leaf);
-            let_set.extend(&mut u);
-            let_set.extend(&mut x);
-            let_set.extend(&mut w);
-        }
-
-        let mut let_vec: Vec<MortonKey> = let_set.iter().cloned().collect();
-
-        // Calculate users and contributors for each key in LET
+        // Calculate users and contributors for each leaf
         let mut contributors: Vec<Vec<KeyType>> = Vec::new();
         let mut users: Vec<Vec<KeyType>> = Vec::new();
         for key in let_vec.iter() {
             // Calculate the contributor processors for this octant
-            let mut cont_tmp : Vec<KeyType> = Vec::new();
+            let mut cont_tmp: Vec<KeyType> = Vec::new();
             let mut user_tmp: Vec<KeyType> = Vec::new();
-            
+
             for chunk in ranges.chunks_exact(3) {
                 let rank = chunk[0];
-                let min = chunk[1];
-                let max = chunk[2];
-    
+                let min = MortonKey::from_morton(chunk[1]);
+                let max = MortonKey::from_morton(chunk[2]);
+
                 // Check if ranges overlap, if so add to contributor list
-                if min <= key.morton && key.morton <= max {
+                if (&min <= key && key <= &max)
+                    || (min.ancestors().contains(&key))
+                    || (max.ancestors().contains(&key))
+                    || (key.ancestors().contains(&min))
+                    || (key.ancestors().contains(&max))
+                {
                     cont_tmp.push(rank);
-                } 
+                }
 
                 // Check if ranges overlap of the neighbors of the key's parent, if so
                 // add to user list
-                let mut colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
-                let mut cp_min = colleagues_parent.iter().min();
-                let mut cp_max = colleagues_parent.iter().max();
+                if key.level() > 1 {
+                    let mut colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
+                    let mut cp_min = colleagues_parent.iter().min();
+                    let mut cp_max = colleagues_parent.iter().max();
 
-                match (cp_min, cp_max) {
-                    (Some(cp_min), Some(cp_max)) => {
-                        let cp_min = cp_min.morton;
-                        let cp_max = cp_max.morton;
-                        if (min <= cp_min) && (cp_max <= max) {
-                            user_tmp.push(rank);
-                        } else if (cp_min <= min) && (cp_max >= min) && (cp_max <= max) {
-                            user_tmp.push(rank);
-                        } else if (cp_min > min) && (cp_min <= max) && (cp_max >= max) {
-                            user_tmp.push(rank);
-                        } else if (cp_min <= min) && (cp_max >= max) {
-                            user_tmp.push(rank)
+                    match (cp_min, cp_max) {
+                        (Some(cp_min), Some(cp_max)) => {
+                            if (cp_min >= &min) && (cp_max <= &max)
+                                || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
+                                || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
+                                || (cp_min <= &min) && (cp_max >= &max)
+                            {
+                                user_tmp.push(rank)
+                            }
                         }
-                    },
-                    _ => (),
+                        _ => (),
+                    }
+                } else if key.level() <= 1 {
+                    user_tmp.push(rank)
                 }
             }
+
             contributors.push(cont_tmp);
             users.push(user_tmp);
         }
 
-        // TODO: Send required data to user of each node
-        // Point Data
-        // Key Data 
+        let let_set: HashSet<MortonKey> = let_vec.iter().cloned().collect();
 
-        println!(
-            "Rank {:?} Key={:?} Users={:?} Contributors=={:?}",
-            self.world.rank(),
-            let_vec[0],
-            users[0],
-            contributors[0]
-        );
+        // Send required nodes to user of each node
+        for partner_rank in (0..self.world.size() as u64) {
+            if partner_rank != self.world.rank().try_into().unwrap() {
+                let key_packet: Vec<MortonKey> = let_vec
+                    .iter()
+                    .zip(users.iter())
+                    .filter(|(_, user)| user.contains(&partner_rank))
+                    .map(|(k, _)| *k)
+                    .collect();
 
-        // TODO: Insert into leaves set, and update the keys set of all ancestors locally and return   
+                let leaf_packet: Vec<MortonKey> =
+                    let_set.intersection(&self.leaves_set).cloned().collect();
+
+                let points_packet: Vec<Point> = self
+                    .points
+                    .iter()
+                    .filter(|p| leaf_packet.contains(&p.key))
+                    .cloned()
+                    .collect();
+
+                let partner_process = self.world.process_at_rank(partner_rank as i32);
+
+                //////////////////
+                let key_packet_size = key_packet.len() as u64;
+                let mut received_key_packet_size: u64 = 0;
+
+                mpi::point_to_point::send_receive_into(
+                    &key_packet_size,
+                    &partner_process,
+                    &mut received_key_packet_size,
+                    &partner_process,
+                );
+
+                let mut received_key_packet =
+                    vec![MortonKey::default(); received_key_packet_size as usize];
+
+                mpi::point_to_point::send_receive_into(
+                    &key_packet[..],
+                    &partner_process,
+                    &mut received_key_packet,
+                    &partner_process,
+                );
+
+                mpi::point_to_point::send_receive_into(
+                    &key_packet_size,
+                    &partner_process,
+                    &mut received_key_packet_size,
+                    &partner_process,
+                );
+
+                //////////////////
+                let leaf_packet_size = leaf_packet.len() as u64;
+                let mut received_leaf_packet_size: u64 = 0;
+
+                mpi::point_to_point::send_receive_into(
+                    &leaf_packet_size,
+                    &partner_process,
+                    &mut received_leaf_packet_size,
+                    &partner_process,
+                );
+
+                let mut received_leaf_packet =
+                    vec![MortonKey::default(); received_leaf_packet_size as usize];
+
+                mpi::point_to_point::send_receive_into(
+                    &leaf_packet[..],
+                    &partner_process,
+                    &mut received_leaf_packet,
+                    &partner_process,
+                );
+                //////////////////
+                let points_packet_size = points_packet.len() as u64;
+                let mut received_points_packet_size: u64 = 0;
+
+                mpi::point_to_point::send_receive_into(
+                    &points_packet_size,
+                    &partner_process,
+                    &mut received_points_packet_size,
+                    &partner_process,
+                );
+
+                let mut received_points_packet =
+                    vec![Point::default(); received_points_packet_size as usize];
+
+                mpi::point_to_point::send_receive_into(
+                    &points_packet[..],
+                    &partner_process,
+                    &mut received_points_packet,
+                    &partner_process,
+                );
+                // Insert into local tree
+                self.keys_set.extend(&received_leaf_packet);
+                self.leaves.extend(&received_leaf_packet);
+                self.leaves_set = self.leaves.iter().cloned().collect();
+                self.points.extend(&received_points_packet);
+                self.points_to_leaves = assign_points_to_nodes(&self.points, &self.leaves);
+                self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
+            }
+        }
     }
 
     // TODO: Final interaction list functions need to filter for what actually exists

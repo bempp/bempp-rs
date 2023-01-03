@@ -36,14 +36,14 @@ fn main() {
 
     // Setup tree parameters
     let adaptive = true;
-    let n_crit = Some(50);
+    let n_crit = Some(15);
     let depth: Option<_> = None;
-    let n_points = 500;
+    let n_points = 10000;
     let k: Option<_> = None;
 
     let points = points_fixture(n_points);
 
-    let tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
+    let mut tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
 
     tree.get_let();
 }
