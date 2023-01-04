@@ -18,4 +18,4 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 solvers-tools = { path = "../tools"}
 approx = "0.5"
-cauchy = "0.4"
+cauchy = "0.4.*"
