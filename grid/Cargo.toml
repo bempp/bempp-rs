@@ -1,0 +1,22 @@
+[package]
+name = "solvers-grid"
+version = "0.1.0"
+edition = "2021"
+authors = ["Matthew Scroggs <matthew.w.scroggs@gmail.com>"]
+description = "A library for the evaluation of finite element basis functions."
+license = "BSD-3-Clause"
+homepage = "https://github.com/rusty-solvers/solvers"
+repository = "https://github.com/rusty-solvers/solvers"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "solvers_grid"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+solvers-tools = { path = "../tools"}
+solvers-traits = { path = "../traits"}
+solvers-element = { path = "../element"}
+
