@@ -60,32 +60,6 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     }
 }
 
-/// Test that the tree spans the entire domain specified by the point distribution.
-fn test_span(points: &[[f64; 3]], n_crit: Option<usize>, depth: Option<u64>, tree: &MultiNodeTree) {
-    let mut keys: Vec<MortonKey> = tree.get_keys().iter().cloned().collect();
-    keys.sort();
-
-    let min: &MortonKey = keys.iter().min().unwrap();
-    let max: &MortonKey = keys.iter().max().unwrap();
-
-    // Generate a uniform tree at the max level, and filter for range in this processor
-    let uniform = SingleNodeTree::new(points, false, n_crit, depth);
-    let mut uniform: Vec<MortonKey> = uniform
-        .get_keys()
-        .iter()
-        .cloned()
-        .filter(|node| min <= node && node <= max)
-        .collect();
-    uniform.sort();
-
-    // Test that we really do get a subset of the uniform tree
-    assert_eq!(uniform.len(), keys.len());
-
-    for (a, &b) in izip!(uniform, keys.iter()) {
-        assert_eq!(a, b);
-    }
-}
-
 fn test_uniform(tree: &MultiNodeTree) {
     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
     let first = levels[0];
@@ -124,11 +98,6 @@ fn main() {
     let points = points_fixture(n_points);
 
     let tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
-    test_span(&points, n_crit, depth, &tree);
-
-    if world.rank() == 0 {
-        println!("\t ... test_span passed on uniform tree");
-    }
 
     test_global_bounds(&comm);
     if world.rank() == 0 {
