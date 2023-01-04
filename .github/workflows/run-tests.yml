@@ -34,7 +34,7 @@ jobs:
       - name: Run tests
         run: |
           cargo test --lib
-  run-tests-rust:
+  run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest
     strategy:
