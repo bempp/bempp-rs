@@ -46,6 +46,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - uses: actions/checkout@v3
-      - run: python3 -m pip install pytest-xdist
+      - name: Install Python requirements
+        run: python3 -m pip install pytest-xdist flake8
+      - name: Style checks
+        run: |
+          python3 -m flake8 python/test
+      - name: Install tomllib (for Python <3.11)
+        run: python3 -m pip install tomli
+        if: ${{ matrix.python-version == '3.7' || matrix.python-version == '3.8' || matrix.python-version == '3.9' || matrix.python-version == '3.10' }}
       - run: python3 -m pytest -n=auto python/test
         name: Run tests
