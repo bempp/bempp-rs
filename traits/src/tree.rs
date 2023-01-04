@@ -5,8 +5,8 @@ pub trait Tree {
     type NodeIndex;
     type NodeIndices;
 
-    // Get balancing information
-    fn get_balanced(&self) -> bool;
+    // Get adaptivity information
+    fn get_adaptive(&self) -> bool;
 
     // Get all keys, gets local keys in multi-node setting
     fn get_keys(&self) -> &Self::NodeIndices;

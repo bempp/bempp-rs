@@ -1,9 +1,11 @@
-use itertools::{izip, Itertools};
+use itertools::izip;
 use std::{
     cmp::Ordering,
     collections::HashSet,
+    error::Error,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
+    vec,
 };
 
 use crate::{
@@ -19,28 +21,56 @@ use crate::{
     },
 };
 
-/// Linearize (remove overlaps) a vector of keys. The input must be sorted. Algorithm 7 in [1].
-pub fn linearize_keys(keys: &Vec<MortonKey>) -> Vec<MortonKey> {
-    let nkeys = keys.len();
+/// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
+fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
+    let depth = keys.iter().map(|k| k.level()).max().unwrap();
+    let mut key_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
-    // Then we remove the ancestors.
-    let mut new_keys = Vec::<MortonKey>::with_capacity(keys.len());
+    for level in (0..=depth).rev() {
+        let work_set: Vec<&MortonKey> = keys.iter().filter(|&&k| k.level() == level).collect();
 
-    // Now check pairwise for ancestor relationship and only add to new vector if item
-    // is not an ancestor of the next item. Add final element.
-    keys.iter()
-        .enumerate()
-        .tuple_windows::<((_, _), (_, _))>()
-        .for_each(|((_, a), (j, b))| {
-            if !a.is_ancestor(b) {
-                new_keys.push(*a);
+        for work_item in work_set.iter() {
+            let mut ancestors = work_item.ancestors();
+            ancestors.remove(work_item);
+            for ancestor in ancestors.iter() {
+                if key_set.contains(ancestor) {
+                    key_set.remove(ancestor);
+                }
             }
-            if j == (nkeys - 1) {
-                new_keys.push(*b);
-            }
-        });
+        }
+    }
 
-    new_keys
+    let result: Vec<MortonKey> = key_set.into_iter().collect();
+    result
+}
+
+// Only works on complete trees.
+fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
+    let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
+    for level in (0..=DEEPEST_LEVEL).rev() {
+        let work_list: Vec<MortonKey> = balanced
+            .iter()
+            .filter(|&key| key.level() == level)
+            .cloned()
+            .collect();
+
+        for key in work_list.iter() {
+            let neighbors = key.neighbors();
+            for neighbor in neighbors {
+                let parent = neighbor.parent();
+
+                if !balanced.contains(&neighbor) && !balanced.contains(&parent) {
+                    balanced.insert(parent);
+                    if parent.level() > 0 {
+                        for sibling in parent.siblings() {
+                            balanced.insert(sibling);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    balanced
 }
 
 /// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in [1].
@@ -48,6 +78,7 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
     let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
     let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
 
+    // Remove endpoints from ancestors
     a_ancestors.remove(a);
     b_ancestors.remove(b);
 
@@ -64,26 +95,40 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
         }
     }
 
+    // Sort the minimal tree before returning
     minimal_tree.sort();
     minimal_tree
 }
 
 impl MortonKeys {
+    pub fn new() -> MortonKeys {
+        MortonKeys {
+            keys: Vec::new(),
+            index: 0,
+        }
+    }
+
+    pub fn add(&mut self, item: MortonKey) {
+        self.keys.push(item);
+    }
+
     /// Complete the region between all elements in an vector of Morton keys that doesn't
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
-        let mut completion = complete_region(a, b);
-        completion.push(*a);
-        completion.push(*b);
-        completion.sort();
-        self.keys = completion;
+        let completion = complete_region(a, b);
+        let start_val = vec![*a];
+        let end_val = vec![*b];
+        self.keys = start_val
+            .into_iter()
+            .chain(completion.into_iter())
+            .chain(end_val.into_iter())
+            .collect();
     }
 
     /// Wrapper for linearize_keys over all keys in vector of Morton keys.
     pub fn linearize(&mut self) {
-        self.keys.sort();
         self.keys = linearize_keys(&self.keys);
     }
 
@@ -92,41 +137,14 @@ impl MortonKeys {
         self.keys.sort();
     }
 
+    /// The depth is defined by the key at the maximum level in the final tree
+    pub fn depth(&self) -> u64 {
+        self.keys.iter().map(|k| k.level()).max().unwrap()
+    }
+
     /// Enforce a 2:1 balance for a vector of Morton keys, and remove any overlaps.
     pub fn balance(&mut self) {
-        let mut balanced: HashSet<MortonKey> = self.keys.iter().cloned().collect();
-
-        for level in (0..DEEPEST_LEVEL).rev() {
-            let work_list: Vec<MortonKey> = balanced
-                .iter()
-                .filter(|key| key.level() == level)
-                .cloned()
-                .collect();
-
-            for key in work_list {
-                let neighbors = key.neighbors();
-
-                for neighbor in neighbors {
-                    let parent = neighbor.parent();
-                    if !balanced.contains(&neighbor) && !balanced.contains(&neighbor) {
-                        balanced.insert(parent);
-
-                        if parent.level() > 0 {
-                            for sibling in parent.siblings() {
-                                balanced.insert(sibling);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut balanced = MortonKeys {
-            keys: balanced.into_iter().collect(),
-        };
-        balanced.sort();
-        balanced.linearize();
-        self.keys = balanced.keys;
+        self.keys = balance_keys(self).into_iter().collect();
     }
 }
 
@@ -144,38 +162,28 @@ impl DerefMut for MortonKeys {
     }
 }
 
-/// Serialize a Morton Key for VTK visualization.
-pub fn serialize_morton_key(key: &MortonKey, domain: &Domain) -> Vec<f64> {
-    let anchor = key.anchor;
+impl Iterator for MortonKeys {
+    type Item = MortonKey;
 
-    let mut serialized = Vec::<PointType>::with_capacity(24);
-
-    let disp = 1 << (LEVEL_DISPLACEMENT + 1 - key.level() as usize);
-
-    let anchors = [
-        [anchor[0], anchor[1], anchor[2]],
-        [disp + anchor[0], anchor[1], anchor[2]],
-        [anchor[0], disp + anchor[1], anchor[2]],
-        [disp + anchor[0], disp + anchor[1], anchor[2]],
-        [anchor[0], anchor[1], disp + anchor[2]],
-        [disp + anchor[0], anchor[1], disp + anchor[2]],
-        [anchor[0], disp + anchor[1], disp + anchor[2]],
-        [disp + anchor[0], disp + anchor[1], disp + anchor[2]],
-    ];
-
-    for anchor in anchors.iter() {
-        let coords = MortonKey::from_anchor(anchor).to_coordinates(domain);
-        for index in 0..3 {
-            serialized.push(coords[index]);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.keys.len() {
+            return None;
         }
-    }
 
-    serialized
+        self.index += 1;
+        self.keys.get(self.index).copied()
+    }
 }
 
-/// Return the level associated with a key.
-fn find_level(morton: KeyType) -> KeyType {
-    morton & LEVEL_MASK
+impl FromIterator<MortonKey> for MortonKeys {
+    fn from_iter<I: IntoIterator<Item = MortonKey>>(iter: I) -> Self {
+        let mut c = MortonKeys::new();
+
+        for i in iter {
+            c.add(i);
+        }
+        c
+    }
 }
 
 /// Helper function for decoding keys.
@@ -210,26 +218,39 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// # Arguments
 /// `point` - The (x, y, z) coordinates of the point to map.
 /// `level` - The level of the tree at which the point will be mapped.
-/// `origin` - The origin of the bounding box.
-/// `diameter` - The diameter of the bounding box in each dimension.
-fn point_to_anchor(
+/// `domain` - The computational domain defined by the point set.
+pub fn point_to_anchor(
     point: &[PointType; 3],
     level: KeyType,
-    origin: &[PointType; 3],
-    diameter: &[PointType; 3],
-) -> [KeyType; 3] {
-    let mut anchor: [KeyType; 3] = [0, 0, 0];
-
-    let level_size = (1 << level) as PointType;
-
-    for (anchor_value, point_value, &origin_value, &diameter_value) in
-        izip!(&mut anchor, point, origin, diameter)
-    {
-        *anchor_value =
-            ((point_value - origin_value) * level_size / diameter_value).floor() as KeyType
+    domain: &Domain,
+) -> Result<[KeyType; 3], Box<dyn Error>> {
+    // Check if point is in the domain
+    let mut contained = true;
+    for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
+        contained = (o < p) && (p < o + d);
     }
 
-    anchor
+    match contained {
+        true => {
+            let mut anchor = [KeyType::default(); 3];
+
+            let side_length: Vec<f64> = domain
+                .diameter
+                .iter()
+                .map(|d| d / ((1 << level) as f64))
+                .collect();
+
+            let scaling_factor = 1 << (DEEPEST_LEVEL - level);
+
+            for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
+                *a = (((p - o) / s).floor()) as KeyType * scaling_factor;
+            }
+            Ok(anchor)
+        }
+        false => {
+            panic!("Point not in Domain")
+        }
+    }
 }
 
 /// Encode an anchor.
@@ -238,7 +259,7 @@ fn point_to_anchor(
 ///
 /// # Arguments
 /// `anchor` - A vector with 4 elements defining the integer coordinates and level.
-fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
+pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
     let x = anchor[0];
     let y = anchor[1];
     let z = anchor[2];
@@ -269,7 +290,7 @@ impl MortonKey {
 
     /// Return the level
     pub fn level(&self) -> KeyType {
-        find_level(self.morton)
+        self.morton & LEVEL_MASK
     }
 
     /// Return a `MortonKey` type from a Morton index
@@ -279,23 +300,23 @@ impl MortonKey {
         MortonKey { anchor, morton }
     }
 
-    /// Return a `MortonKey` type from the anchor on the deepest level
-    pub fn from_anchor(anchor: &[KeyType; 3]) -> Self {
-        let morton = encode_anchor(anchor, DEEPEST_LEVEL);
+    /// Return a `MortonKey` type from the anchor at a given level
+    pub fn from_anchor(anchor: &[KeyType; 3], level: u64) -> Self {
+        let morton = encode_anchor(anchor, level);
 
         MortonKey {
-            anchor: anchor.to_owned(),
+            anchor: *anchor,
             morton,
         }
     }
 
     /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
-    pub fn from_point(point: &[PointType; 3], domain: &Domain) -> Self {
-        let anchor = point_to_anchor(point, DEEPEST_LEVEL, &domain.origin, &domain.diameter);
-        MortonKey::from_anchor(&anchor)
+    pub fn from_point(point: &[PointType; 3], domain: &Domain, level: u64) -> Self {
+        let anchor = point_to_anchor(point, level, domain).unwrap();
+        MortonKey::from_anchor(&anchor, level)
     }
 
-    /// Return the parent
+    /// Return the parent, keys encoded with respect to the deepest level.
     pub fn parent(&self) -> Self {
         let level = self.level();
         let morton = self.morton >> LEVEL_DISPLACEMENT;
@@ -311,7 +332,7 @@ impl MortonKey {
         MortonKey::from_morton(parent_morton)
     }
 
-    /// Return the first child
+    /// Return the first child.
     pub fn first_child(&self) -> Self {
         MortonKey {
             anchor: self.anchor,
@@ -319,7 +340,7 @@ impl MortonKey {
         }
     }
 
-    /// Return the first child on the deepest level
+    /// Return the first child on the deepest level.
     pub fn finest_first_child(&self) -> Self {
         MortonKey {
             anchor: self.anchor,
@@ -327,7 +348,7 @@ impl MortonKey {
         }
     }
 
-    /// Return the last child on the deepest level
+    /// Return the last child on the deepest level.
     pub fn finest_last_child(&self) -> Self {
         if self.level() < DEEPEST_LEVEL {
             let mut level_diff = DEEPEST_LEVEL - self.level();
@@ -345,7 +366,8 @@ impl MortonKey {
         }
     }
 
-    /// Return all children in order of their Morton indices
+    /// Return all children in order of their Morton indices, with respect to an encoding at
+    /// the deepest level.
     pub fn children(&self) -> Vec<MortonKey> {
         let level = self.level();
         let morton = self.morton() >> LEVEL_DISPLACEMENT;
@@ -365,7 +387,8 @@ impl MortonKey {
         children
     }
 
-    /// Return all children of the parent of the current Morton index
+    /// Return all children of the parent of the current Morton index, with respect to
+    /// an encoding on the deepest level.
     pub fn siblings(&self) -> Vec<MortonKey> {
         self.parent().children()
     }
@@ -376,8 +399,8 @@ impl MortonKey {
         ancestors.contains(self)
     }
 
-    /// Check if key is descendent of another key
-    pub fn is_descendent(&self, other: &MortonKey) -> bool {
+    /// Check if key is descendant of another key.
+    pub fn is_descendant(&self, other: &MortonKey) -> bool {
         other.is_ancestor(self)
     }
 
@@ -395,6 +418,28 @@ impl MortonKey {
         }
 
         ancestors
+    }
+
+    /// Return descendants `n` levels down from a key
+    pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey>, Box<dyn Error>> {
+        let valid: bool = self.level() + n <= DEEPEST_LEVEL;
+
+        match valid {
+            false => {
+                panic!("Cannot find descendants below level {:?}", DEEPEST_LEVEL)
+            }
+            true => {
+                let mut descendants = vec![*self];
+                for _ in 0..n {
+                    let mut tmp = Vec::<MortonKey>::new();
+                    for key in descendants {
+                        tmp.append(&mut key.children());
+                    }
+                    descendants = tmp;
+                }
+                Ok(descendants)
+            }
+        }
     }
 
     /// Find the finest ancestor of key and another key
@@ -479,24 +524,6 @@ impl MortonKey {
         serialized
     }
 
-    /// Return the anchor of the ancestor or descendent at the given level
-    /// Note that if `level > self.level()` then the returned anchor is the
-    /// same as `self.anchor`. The anchor
-    pub fn anchor_at_level(&self, level: KeyType) -> [KeyType; 3] {
-        let level_diff = (self.level() as i32) - (level as i32);
-
-        if level_diff <= 0 {
-            self.anchor().to_owned()
-        } else {
-            let mut parent = self.to_owned();
-            for _ in 0..level_diff {
-                parent = parent.parent();
-            }
-
-            parent.anchor().to_owned()
-        }
-    }
-
     /// Find key in a given direction.
     ///
     /// Returns the key obtained by moving direction\[j\] boxes into direction j
@@ -551,8 +578,38 @@ impl MortonKey {
             .collect()
     }
 
-    pub fn serialize(&self, domain: &Domain) -> Vec<f64> {
-        serialize_morton_key(self, domain)
+    /// Check if two keys are adjacent with respect to each other
+    pub fn is_adjacent(&self, other: &MortonKey) -> bool {
+        let ancestors = self.ancestors();
+        let other_ancestors = other.ancestors();
+
+        // If either key overlaps they cannot be adjacent.
+        if ancestors.contains(other) || other_ancestors.contains(self) {
+            false
+        } else {
+            // Calculate distance between centres of each node
+            let da = 1 << (DEEPEST_LEVEL - self.level());
+            let db = 1 << (DEEPEST_LEVEL - other.level());
+            let ra = (da as f64) * 0.5;
+            let rb = (db as f64) * 0.5;
+
+            let ca: Vec<f64> = self.anchor.iter().map(|&x| (x as f64) + ra).collect();
+            let cb: Vec<f64> = other.anchor.iter().map(|&x| (x as f64) + rb).collect();
+
+            let distance: Vec<f64> = ca.iter().zip(cb.iter()).map(|(a, b)| b - a).collect();
+
+            let min = -ra - rb;
+            let max = ra + rb;
+            let mut result = true;
+
+            for &d in distance.iter() {
+                if d > max || d < min {
+                    result = false
+                }
+            }
+
+            result
+        }
     }
 }
 
@@ -584,8 +641,14 @@ impl Hash for MortonKey {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use itertools::Itertools;
+    use std::vec;
+
+    use rand::prelude::*;
     use rand::Rng;
+    use rand::SeedableRng;
+
+    use super::*;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {
@@ -736,6 +799,24 @@ mod tests {
     }
 
     #[test]
+    fn test_siblings() {
+        // Test that we get the same siblings for a pair of siblings
+        let a = [0, 0, 0];
+        let b = [1, 1, 1];
+
+        let a = MortonKey::from_anchor(&a, DEEPEST_LEVEL);
+        let b = MortonKey::from_anchor(&b, DEEPEST_LEVEL);
+        let mut sa = a.siblings();
+        let mut sb = b.siblings();
+        sa.sort();
+        sb.sort();
+
+        for (a, b) in sa.iter().zip(sb.iter()) {
+            assert_eq!(a, b)
+        }
+    }
+
+    #[test]
     fn test_sorting() {
         let npoints = 1000;
         let mut range = rand::thread_rng();
@@ -752,18 +833,22 @@ mod tests {
 
         let mut keys: Vec<MortonKey> = points
             .iter()
-            .map(|p| MortonKey::from_point(&p, &domain))
+            .map(|p| MortonKey::from_point(&p, &domain, DEEPEST_LEVEL))
             .collect();
 
+        // Add duplicates to keys, to test ordering in terms of equality
+        let mut cpy: Vec<MortonKey> = keys.iter().cloned().collect();
+        keys.append(&mut cpy);
+
+        // Add duplicates to ensure equality is also sorted
+        let mut replica = keys.iter().cloned().collect();
+        keys.append(&mut replica);
         keys.sort();
-        let mut tree = MortonKeys { keys };
-        tree.linearize();
 
         // Test that Z order is maintained when sorted
-        for i in 0..(tree.keys.len() - 1) {
-            let a = tree.keys[i];
-            let b = tree.keys[i + 1];
-
+        for i in 0..(keys.len() - 1) {
+            let a = keys[i];
+            let b = keys[i + 1];
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
     }
@@ -814,7 +899,6 @@ mod tests {
         let children = key.children();
 
         for child in &children {
-            println!("child {:?} expected {:?}", child, expected);
             assert!(expected.contains(child));
         }
     }
@@ -827,7 +911,7 @@ mod tests {
         };
         let point = [0.5, 0.5, 0.5];
 
-        let key = MortonKey::from_point(&point, &domain);
+        let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         let mut ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
         ancestors.sort();
@@ -882,7 +966,7 @@ mod tests {
             diameter: [1., 1., 1.],
             origin: [0., 0., 0.],
         };
-        let key = MortonKey::from_point(&point, &domain);
+        let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         // Simple case, at the leaf level
         {
@@ -933,7 +1017,7 @@ mod tests {
                         (n[2] + (anchor[2] as i64)) as u64,
                     ]
                 })
-                .map(|anchor| MortonKey::from_anchor(&anchor))
+                .map(|anchor| MortonKey::from_anchor(&anchor, DEEPEST_LEVEL))
                 .collect();
             expected.sort();
 
@@ -992,7 +1076,7 @@ mod tests {
                         (n[2] + (anchor[2] as i64)) as u64,
                     ]
                 })
-                .map(|anchor| MortonKey::from_anchor(&anchor))
+                .map(|anchor| MortonKey::from_anchor(&anchor, DEEPEST_LEVEL))
                 .map(|key| MortonKey {
                     anchor: key.anchor,
                     morton: ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT)
@@ -1005,5 +1089,306 @@ mod tests {
                 assert!(expected[i] == result[i]);
             }
         }
+    }
+
+    #[test]
+    pub fn test_morton_keys_iterator() {
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..1.0);
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+
+        let npoints = 1000;
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
+        let domain = Domain {
+            origin: [0.0, 0.0, 0.0],
+            diameter: [1.0, 1.0, 1.0],
+        };
+
+        let keys = points
+            .iter()
+            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
+            .collect();
+
+        let keys = MortonKeys { keys, index: 0 };
+
+        // test that we can call keys as an iterator
+        keys.iter().sorted();
+
+        // test that iterator index resets to 0
+        assert!(keys.index == 0);
+    }
+
+    #[test]
+    fn test_linearize_keys() {
+        let key = MortonKey {
+            morton: 15,
+            anchor: [0, 0, 0],
+        };
+
+        let ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
+        let linearized = linearize_keys(&ancestors);
+
+        assert_eq!(linearized.len(), 1);
+        assert_eq!(linearized[0], key);
+    }
+
+    #[test]
+    fn test_point_to_anchor() {
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        // Test points in the domain
+        let point = [0.9999, 0.9999, 0.9999];
+        let level = 2;
+        let anchor = point_to_anchor(&point, level, &domain);
+        let expected = [49152, 49152, 49152];
+
+        for (i, a) in anchor.unwrap().iter().enumerate() {
+            assert_eq!(a, &expected[i])
+        }
+
+        let domain = Domain {
+            origin: [-0.5, -0.5, -0.5],
+            diameter: [1., 1., 1.],
+        };
+
+        let point = [-0.499, -0.499, -0.499];
+        let level = 1;
+        let anchor = point_to_anchor(&point, level, &domain);
+        let expected = [0, 0, 0];
+
+        for (i, a) in anchor.unwrap().iter().enumerate() {
+            assert_eq!(a, &expected[i])
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Point not in Domain")]
+    fn test_point_to_anchor_fails() {
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        // Test a point not in the domain
+        let point = [0.9, 0.9, 1.9];
+        let level = 2;
+        let _anchor = point_to_anchor(&point, level, &domain);
+    }
+
+    #[test]
+    #[should_panic(expected = "Point not in Domain")]
+    fn test_point_to_anchor_fails_negative_domain() {
+        let domain = Domain {
+            origin: [-0.5, -0.5, -0.5],
+            diameter: [1., 1., 1.],
+        };
+
+        // Test a point not in the domain
+        let point = [-0.5, -0.5, -0.5];
+        let level = 2;
+        let _anchor = point_to_anchor(&point, level, &domain);
+    }
+
+    #[test]
+    fn test_encode_anchor() {
+        let anchor = [1, 0, 1];
+        let level = 1;
+        let morton = encode_anchor(&anchor, level);
+        let expected = 0b101000000000000001;
+        assert_eq!(expected, morton);
+
+        let anchor = [3, 3, 3];
+        let level = 2;
+        let morton = encode_anchor(&anchor, level);
+        let expected = 0b111111000000000000010;
+        assert_eq!(expected, morton);
+    }
+
+    #[test]
+    fn test_find_descendants() {
+        let key = MortonKey {
+            morton: 0,
+            anchor: [0, 0, 0],
+        };
+
+        let descendants = key.descendants(1).unwrap();
+        assert_eq!(descendants.len(), 8);
+
+        // Ensure this also works for other keys in hierarchy
+        let key = descendants[0];
+        let descendants = key.descendants(2).unwrap();
+        assert_eq!(descendants.len(), 64);
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot find descendants below level 16")]
+    fn test_find_descendants_panics() {
+        let key = MortonKey {
+            morton: 0,
+            anchor: [0, 0, 0],
+        };
+        let _descendants = key.descendants(17);
+    }
+
+    #[test]
+    fn test_complete_region() {
+        let a: MortonKey = MortonKey {
+            anchor: [0, 0, 0],
+            morton: 16,
+        };
+        let b: MortonKey = MortonKey {
+            anchor: [65535, 65535, 65535],
+            morton: 0b111111111111111111111111111111111111111111111111000000000010000,
+        };
+
+        let region = complete_region(&a, &b);
+
+        let fa = a.finest_ancestor(&b);
+
+        let min = region.iter().min().unwrap().clone();
+        let max = region.iter().max().unwrap().clone();
+
+        // Test that bounds are satisfied
+        assert!(a <= min);
+        assert!(b >= max);
+
+        // Test that FCA is an ancestor of all nodes in the result
+        for node in region.iter() {
+            let ancestors = node.ancestors();
+            assert!(ancestors.contains(&fa));
+        }
+
+        // Test that completed region doesn't contain its bounds
+        assert!(!region.contains(&a));
+        assert!(!region.contains(&b));
+
+        // Test that the compeleted region doesn't contain any overlaps
+        for node in region.iter() {
+            let mut ancestors = node.ancestors();
+            ancestors.remove(node);
+            for ancestor in ancestors.iter() {
+                assert!(!region.contains(ancestor))
+            }
+        }
+
+        // Test that the region is sorted
+        for i in 0..region.iter().len() - 1 {
+            let a = region[i];
+            let b = region[i + 1];
+
+            assert!(a <= b);
+        }
+    }
+
+    #[test]
+    pub fn test_balance() {
+        let a = MortonKey::from_anchor(&[0, 0, 0], DEEPEST_LEVEL);
+        let b = MortonKey::from_anchor(&[1, 1, 1], DEEPEST_LEVEL);
+
+        let mut complete = complete_region(&a, &b);
+        let start_val = vec![a];
+        let end_val = vec![b];
+        complete = start_val
+            .into_iter()
+            .chain(complete.into_iter())
+            .chain(end_val.into_iter())
+            .collect();
+        let mut tree = MortonKeys {
+            keys: complete,
+            index: 0,
+        };
+
+        tree.balance();
+        tree.linearize();
+        tree.sort();
+
+        // Test for overlaps in balanced tree
+        for key in tree.iter() {
+            if !tree.iter().contains(key) {
+                let mut ancestors = key.ancestors();
+                ancestors.remove(key);
+
+                for ancestor in ancestors.iter() {
+                    assert!(!tree.keys.contains(ancestor));
+                }
+            }
+        }
+
+        // Test that adjacent keys are 2:1 balanced
+        for key in tree.iter() {
+            let adjacent_levels: Vec<u64> = tree
+                .iter()
+                .cloned()
+                .filter(|k| key.is_adjacent(k))
+                .map(|a| a.level())
+                .collect();
+
+            for l in adjacent_levels.iter() {
+                assert!(l.abs_diff(key.level()) <= 1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_adjacent() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+
+        let mut ancestors = key.ancestors();
+        ancestors.remove(&key);
+
+        // Test that overlapping nodes are not adjacent
+        for a in ancestors.iter() {
+            assert!(!key.is_adjacent(a))
+        }
+
+        // Test that siblings & neighbours are adjacent
+        let siblings = key.siblings();
+        let neighbors = key.neighbors();
+
+        for s in siblings.iter() {
+            if *s != key {
+                assert!(key.is_adjacent(s));
+            }
+        }
+
+        for n in neighbors.iter() {
+            assert!(key.is_adjacent(n));
+        }
+
+        // Test keys on different levels
+        let anchor_a = [0, 0, 0];
+        let mut a = MortonKey::from_anchor(&anchor_a, DEEPEST_LEVEL - 1);
+        let anchor_b = [2, 2, 2];
+        let b = MortonKey::from_anchor(&anchor_b, DEEPEST_LEVEL);
+        assert!(a.is_adjacent(&b));
+    }
+
+    #[test]
+    fn test_encoding_is_always_absolute() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let a = MortonKey::from_point(&point, &domain, 1);
+        let b = MortonKey::from_point(&point, &domain, 16);
+        assert_ne!(a, b);
+        assert_eq!(a.anchor, b.anchor);
     }
 }

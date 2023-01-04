@@ -1,2 +1,3 @@
-# rusty-cffi
-Tools to make communicating via C interfaces easier
+# Solvers
+
+Fast algorithms for dense matrix computations implementaed in Rust with Python interfaces. 
