@@ -34,3 +34,18 @@ jobs:
       - name: Run tests
         run: |
           cargo test --lib
+  run-tests-rust:
+    name: Run tests (Python)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v3
+      - run: python3 -m pip install pytest-xdist
+      - run: python3 -m pytest -n=auto python/test
+        name: Run tests
