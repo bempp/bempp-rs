@@ -3,8 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use mpi::{
     collective::SystemOperation,
-    datatype::{Partition, PartitionMut},
-    request::{CancelGuard, WaitGuard},
+    request::{WaitGuard},
     topology::{Rank, UserCommunicator},
     traits::*,
 };
@@ -19,6 +18,7 @@ use crate::{
         impl_single_node::{
             assign_nodes_to_points, assign_points_to_nodes, find_seeds, split_blocks,
         },
+        mpi_helpers::all_to_allv_sparse
     },
     types::{
         domain::Domain,
@@ -602,17 +602,19 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         let k = total_weight % size;
 
-        let mut q: Vec<Vec<MortonKey>> = Vec::new();
+        let mut packets: Vec<Vec<MortonKey>> = Vec::new();
+        let mut removed_indices: HashSet<usize> = HashSet::new();
         let mut packet_destinations = vec![0i32; size as usize];
 
         for p in 1..=size {
-            let mut q_tmp: Vec<MortonKey> = Vec::new();
+            let mut packet: Vec<MortonKey> = Vec::new();
             if p <= k {
                 for (i, &cw) in cum_weights.iter().enumerate() {
                     if ((p - 1) as f32) * (mean_weight + 1.0) <= (cw as f32)
                         && (cw as f32) < (p as f32) * (mean_weight + 1.0)
                     {
-                        q_tmp.push(self.leaves[i])
+                        packet.push(self.leaves[i]);
+                        removed_indices.insert(i as usize);
                     }
                 }
             } else {
@@ -620,86 +622,60 @@ impl LocallyEssentialTree for MultiNodeTree {
                     if ((p - 1) as f32) * (mean_weight) + (k as f32) <= (cw as f32)
                         && (cw as f32) < ((p) as f32) * (mean_weight) + (k as f32)
                     {
-                        q_tmp.push(self.leaves[i]);
+                        packet.push(self.leaves[i]);
+                        removed_indices.insert(i as usize);
                     }
                 }
             }
 
-            if rank != (p-1) && q_tmp.len() > 0 {
+            if rank != (p - 1) && packet.len() > 0 {
                 packet_destinations[(p - 1) as usize] = 1;
-                q.push(q_tmp);
+                packets.push(packet);
             }
         }
 
-        // Communicate how many processes to receive from
+        // Communicate number of packets being received by each process globally
         let mut to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(&packet_destinations, &mut to_receive, SystemOperation::sum());
+        self.world.all_reduce_into(
+            &packet_destinations,
+            &mut to_receive,
+            SystemOperation::sum(),
+        );
 
         let recv_count = to_receive[rank as usize];
         
-        packet_destinations = packet_destinations.into_iter().enumerate()
-            .filter(|(i, x)| x > &0 )
+        packet_destinations = packet_destinations
+            .into_iter()
+            .enumerate()
+            .filter(|(i, x)| x > &0)
             .map(|(i, _)| i as i32)
             .collect();
+
+        // Remove all data being sent
+        self.leaves_set = self
+            .leaves_set
+            .difference(&packets.iter().flatten().cloned().collect())
+            .cloned()
+            .collect();
+
+        self.leaves = self.leaves_set.iter().cloned().collect();
+
+        self.keys_set = self
+            .keys_set
+            .difference(&packets.iter().flatten().cloned().collect())
+            .cloned()
+            .collect();
+
+        let received_leaves = all_to_allv_sparse(&self.world, packets, packet_destinations, recv_count);
         
-        // Communicate the packet sizes to relevant destinations
-        for (i, packet) in q.iter().enumerate() {
-            let msg = vec![rank, packet.len() as i32];
-            
-            let partner_process = self.world.process_at_rank(packet_destinations[i]);
+        // Insert into local leaves and keys
+        self.leaves.extend(&received_leaves);
+        self.leaves_set = self.leaves.iter().cloned().collect();
+        self.keys_set.extend(&received_leaves);
 
-            mpi::request::scope(|scope| {
-                let _sreq = WaitGuard::from(partner_process.immediate_ready_send(scope, &msg[..]));
-            })
-        }
-
-        let mut receive_packet_lens = vec![0i32; recv_count as usize];
-        let mut receive_packet_source = vec![0i32; recv_count as usize];
-        
-        for i in (0..recv_count as usize) {
-            let mut len = vec![0i32; 2];
-
-            mpi::request::scope(|scope| {
-                let rreq = WaitGuard::from(self.world.any_process().immediate_receive_into(scope, &mut len));
-            });
-            
-            receive_packet_source[i] = len[0];
-            receive_packet_lens[i] = len[1];    
-        }
-
-        println!("rank {:?} receiveing {:?} from {:?}", rank, receive_packet_lens, receive_packet_source);
-   
-    //    for packet in q.iter() {
-    //     println!("RANK {:?} PACKET LEN {:?}", rank, packet.len())
-    //    }
-
-        
-    // All to All for bu
-
-    //    for (rank, packet) in q.iter().enumerate() {
-    //         let partner_process = self.world.process_at_rank(rank as i32);
-    //         let mut recv = 0i32; 
-    //         let msg = packet.len() as i32;
-    //         mpi::point_to_point::send_receive_into(
-    //             &msg,
-    //             &partner_process,
-    //             &mut recv,
-    //             &partner_process
-    //         );
-
-    //         println!("recv {:?}", recv)
-    //    }
-       
-
-    
-        // TODO: send leaves and points to where they need to go.
-
-        // Communicate send size
-
-        // println!("RANK {:?} RECV {:?}", rank, recv_size);
-
-        // if rank == 1 {
-        // }
+        // self.points.extend(&received_points_packet);
+        // self.points_to_leaves = assign_points_to_nodes(&self.points, &self.leaves);
+        // self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
     }
 
     // Calculate near field interaction list of  keys.
