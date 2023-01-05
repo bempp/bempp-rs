@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use mpi::{
     collective::SystemOperation,
+    datatype::{Partition, PartitionMut},
     request::{CancelGuard, WaitGuard},
     topology::{Rank, UserCommunicator},
     traits::*,
@@ -601,9 +602,10 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         let k = total_weight % size;
 
-        let mut q: Vec<MortonKey> = Vec::new();
+        let mut q: Vec<Vec<MortonKey>> = Vec::new();
+        let mut packet_destinations = vec![0i32; size as usize];
 
-        for p in 0..size {
+        for p in 1..=size {
             let mut q_tmp: Vec<MortonKey> = Vec::new();
             if p <= k {
                 for (i, &cw) in cum_weights.iter().enumerate() {
@@ -618,23 +620,85 @@ impl LocallyEssentialTree for MultiNodeTree {
                     if ((p - 1) as f32) * (mean_weight) + (k as f32) <= (cw as f32)
                         && (cw as f32) < ((p) as f32) * (mean_weight) + (k as f32)
                     {
-                        q_tmp.push(self.leaves[i])
+                        q_tmp.push(self.leaves[i]);
                     }
                 }
             }
-            println!("q_tmp {:?} k {:?}", q_tmp.len(), k);
-            q.extend(q_tmp);
+
+            if rank != (p-1) && q_tmp.len() > 0 {
+                packet_destinations[(p - 1) as usize] = 1;
+                q.push(q_tmp);
+            }
         }
 
+        // Communicate how many processes to receive from
+        let mut to_receive = vec![0i32; size as usize];
+        self.world.all_reduce_into(&packet_destinations, &mut to_receive, SystemOperation::sum());
+
+        let recv_count = to_receive[rank as usize];
+        
+        packet_destinations = packet_destinations.into_iter().enumerate()
+            .filter(|(i, x)| x > &0 )
+            .map(|(i, _)| i as i32)
+            .collect();
+        
+        // Communicate the packet sizes to relevant destinations
+        for (i, packet) in q.iter().enumerate() {
+            let msg = vec![rank, packet.len() as i32];
+            
+            let partner_process = self.world.process_at_rank(packet_destinations[i]);
+
+            mpi::request::scope(|scope| {
+                let _sreq = WaitGuard::from(partner_process.immediate_ready_send(scope, &msg[..]));
+            })
+        }
+
+        let mut receive_packet_lens = vec![0i32; recv_count as usize];
+        let mut receive_packet_source = vec![0i32; recv_count as usize];
+        
+        for i in (0..recv_count as usize) {
+            let mut len = vec![0i32; 2];
+
+            mpi::request::scope(|scope| {
+                let rreq = WaitGuard::from(self.world.any_process().immediate_receive_into(scope, &mut len));
+            });
+            
+            receive_packet_source[i] = len[0];
+            receive_packet_lens[i] = len[1];    
+        }
+
+        println!("rank {:?} receiveing {:?} from {:?}", rank, receive_packet_lens, receive_packet_source);
+   
+    //    for packet in q.iter() {
+    //     println!("RANK {:?} PACKET LEN {:?}", rank, packet.len())
+    //    }
+
+        
+    // All to All for bu
+
+    //    for (rank, packet) in q.iter().enumerate() {
+    //         let partner_process = self.world.process_at_rank(rank as i32);
+    //         let mut recv = 0i32; 
+    //         let msg = packet.len() as i32;
+    //         mpi::point_to_point::send_receive_into(
+    //             &msg,
+    //             &partner_process,
+    //             &mut recv,
+    //             &partner_process
+    //         );
+
+    //         println!("recv {:?}", recv)
+    //    }
+       
+
+    
         // TODO: send leaves and points to where they need to go.
 
+        // Communicate send size
+
+        // println!("RANK {:?} RECV {:?}", rank, recv_size);
+
         // if rank == 1 {
-        println!(
-            "rank {:?} glbl weight {:?} {:?} \n \n",
-            rank,
-            q.len(),
-            total_weight
-        );
         // }
     }
 
