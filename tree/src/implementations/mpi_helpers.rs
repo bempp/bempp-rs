@@ -13,9 +13,9 @@ use mpi::{
 /// to a subset of the communicator.
 pub fn all_to_allv_sparse<T>(
     world: &UserCommunicator, 
-    mut packets: Vec<Vec<T>>, 
-    mut packet_destinations: Vec<Count>,
-    recv_count: Count
+    mut packets: &Vec<Vec<T>>, 
+    mut packet_destinations: &Vec<Count>,
+    &recv_count: &Count
 ) -> Vec<T>
 where
     T: Default + Clone + Equivalence,

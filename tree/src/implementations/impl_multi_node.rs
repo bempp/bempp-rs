@@ -546,10 +546,9 @@ impl LocallyEssentialTree for MultiNodeTree {
         }
     }
 
+    // Repartition based on size of interaction lists for each leaf
+    // Use Algorithm 1 in Sundar et. al (2008)
     fn load_balance_let(&mut self) {
-        // Repartition based on size of interaction lists for each leaf
-        // Use Algorithm 1 in Sundar et. al (2008)
-
         let size = self.world.size();
         let rank = self.world.rank();
 
@@ -602,19 +601,22 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         let k = total_weight % size;
 
-        let mut packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut removed_indices: HashSet<usize> = HashSet::new();
+        let mut leaves_packets: Vec<Vec<MortonKey>> = Vec::new();
+        let mut points_packets: Vec<Vec<Point>> = Vec::new();
         let mut packet_destinations = vec![0i32; size as usize];
 
         for p in 1..=size {
-            let mut packet: Vec<MortonKey> = Vec::new();
+            let mut leaves_packet: Vec<MortonKey> = Vec::new();
+            let mut points_packet: Vec<Point> = Vec::new();
+
             if p <= k {
                 for (i, &cw) in cum_weights.iter().enumerate() {
                     if ((p - 1) as f32) * (mean_weight + 1.0) <= (cw as f32)
                         && (cw as f32) < (p as f32) * (mean_weight + 1.0)
                     {
-                        packet.push(self.leaves[i]);
-                        removed_indices.insert(i as usize);
+                        leaves_packet.push(self.leaves[i]);
+                        // println!("n points {:?}", self.leaves_to_points.get(&self.leaves[i]).unwrap().len())
+                        points_packet.extend(self.leaves_to_points.get(&self.leaves[i]).unwrap())
                     }
                 }
             } else {
@@ -622,15 +624,17 @@ impl LocallyEssentialTree for MultiNodeTree {
                     if ((p - 1) as f32) * (mean_weight) + (k as f32) <= (cw as f32)
                         && (cw as f32) < ((p) as f32) * (mean_weight) + (k as f32)
                     {
-                        packet.push(self.leaves[i]);
-                        removed_indices.insert(i as usize);
+                        leaves_packet.push(self.leaves[i]);
+                        // println!("n points {:?}", self.leaves_to_points.get(&self.leaves[i]).unwrap().len())
+                        points_packet.extend(self.leaves_to_points.get(&self.leaves[i]).unwrap())
                     }
                 }
             }
 
-            if rank != (p - 1) && packet.len() > 0 {
+            if rank != (p - 1) && leaves_packet.len() > 0 {
                 packet_destinations[(p - 1) as usize] = 1;
-                packets.push(packet);
+                leaves_packets.push(leaves_packet);
+                points_packets.push(points_packet);
             }
         }
 
@@ -654,7 +658,7 @@ impl LocallyEssentialTree for MultiNodeTree {
         // Remove all data being sent
         self.leaves_set = self
             .leaves_set
-            .difference(&packets.iter().flatten().cloned().collect())
+            .difference(&leaves_packets.iter().flatten().cloned().collect())
             .cloned()
             .collect();
 
@@ -662,20 +666,29 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         self.keys_set = self
             .keys_set
-            .difference(&packets.iter().flatten().cloned().collect())
+            .difference(&leaves_packets.iter().flatten().cloned().collect())
             .cloned()
             .collect();
 
-        let received_leaves = all_to_allv_sparse(&self.world, packets, packet_destinations, recv_count);
+        // This line works as leaves being sent have already been removed
+        self.points = self
+            .leaves
+            .iter()
+            .map(|leaf| self.leaves_to_points.get(leaf).unwrap())
+            .cloned()
+            .flatten()
+            .collect();
+
+        let received_leaves = all_to_allv_sparse(&self.world, &leaves_packets, &packet_destinations, &recv_count);
+        let received_points = all_to_allv_sparse(&self.world, &points_packets, &packet_destinations, &recv_count);
         
-        // Insert into local leaves and keys
+        // Insert into local keys and points, recompute maps
         self.leaves.extend(&received_leaves);
         self.leaves_set = self.leaves.iter().cloned().collect();
         self.keys_set.extend(&received_leaves);
-
-        // self.points.extend(&received_points_packet);
-        // self.points_to_leaves = assign_points_to_nodes(&self.points, &self.leaves);
-        // self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
+        self.points.extend(&received_points);
+        self.points_to_leaves = assign_points_to_nodes(&self.points, &self.leaves);
+        self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
     }
 
     // Calculate near field interaction list of  keys.
