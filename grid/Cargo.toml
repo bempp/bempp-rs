@@ -1,9 +1,9 @@
 [package]
-name = "solvers-fmm"
+name = "solvers-grid"
 version = "0.1.0"
 edition = "2021"
-authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
-description = "FMM in Rust"
+authors = ["Matthew Scroggs <matthew.w.scroggs@gmail.com>"]
+description = "A library for the evaluation of finite element basis functions."
 license = "BSD-3-Clause"
 homepage = "https://github.com/rusty-solvers/solvers"
 repository = "https://github.com/rusty-solvers/solvers"
@@ -12,11 +12,11 @@ keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_fmm"
+name = "solvers_grid"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../tools" }
-solvers-tree = { path = "../tree" }
-approx = "0.5"
-cauchy = "0.4.*"
+solvers-tools = { path = "../tools"}
+solvers-traits = { path = "../traits"}
+solvers-element = { path = "../element"}
+
