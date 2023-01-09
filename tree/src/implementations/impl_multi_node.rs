@@ -404,9 +404,11 @@ impl LocallyEssentialTree for MultiNodeTree {
 
         let mut let_vec: Vec<MortonKey> = self.keys_set.iter().cloned().collect();
 
-        // Calculate users for each leaf
+        // Calculate users for each key in LET
         let mut users: Vec<Vec<Rank>> = Vec::new();
-        let mut packet_destinations = vec![0 as Rank; size as usize];
+        let mut key_packet_destinations = vec![0 as Rank; size as usize];
+        let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
+        let mut point_packet_destinations = vec![0 as Rank; size as usize];
 
         for key in let_vec.iter() {
             let mut user_tmp: Vec<Rank> = Vec::new();
@@ -420,9 +422,8 @@ impl LocallyEssentialTree for MultiNodeTree {
                 // Check if ranges overlap of the neighbors of the key's parent
                 if rank != self.world.rank() {
                     if key.level() > 1 {
-                        let mut colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
-                        let mut cp_min = colleagues_parent.iter().min();
-                        let mut cp_max = colleagues_parent.iter().max();
+                        let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
+                        let (cp_min, cp_max) = (colleagues_parent.iter().min(), colleagues_parent.iter().max());
 
                         match (cp_min, cp_max) {
                             (Some(cp_min), Some(cp_max)) => {
@@ -433,8 +434,13 @@ impl LocallyEssentialTree for MultiNodeTree {
                                 {
                                     user_tmp.push(rank);
 
-                                    if packet_destinations[rank as usize] == 0 {
-                                        packet_destinations[rank as usize] = 1
+                                    if key_packet_destinations[rank as usize] == 0 {
+                                        key_packet_destinations[rank as usize] = 1
+                                    }
+
+                                    if leaf_packet_destinations[rank as usize] == 0 && self.leaves_set.contains(key) {
+                                        leaf_packet_destinations[rank as usize] = 1;
+                                        point_packet_destinations[rank as usize] = 1;
                                     }
                                 }
                             }
@@ -445,9 +451,13 @@ impl LocallyEssentialTree for MultiNodeTree {
                     // it will always overlap with a range
                     else if key.level() <= 1 {
                         user_tmp.push(rank);
+                        if key_packet_destinations[rank as usize] == 0 {
+                            key_packet_destinations[rank as usize] = 1
+                        }
 
-                        if packet_destinations[rank as usize] == 0 {
-                            packet_destinations[rank as usize] = 1
+                        if leaf_packet_destinations[rank as usize] == 0 && self.leaves_set.contains(key) {
+                            leaf_packet_destinations[rank as usize] = 1;
+                            point_packet_destinations[rank as usize] = 1;
                         }
                     }
                 }
@@ -456,82 +466,116 @@ impl LocallyEssentialTree for MultiNodeTree {
             users.push(user_tmp);
         }
 
+
         let let_set: HashSet<MortonKey> = let_vec.iter().cloned().collect();
 
         // Communicate number of packets being received by each process globally
-        let mut to_receive = vec![0i32; size as usize];
+        let mut keys_to_receive = vec![0i32; size as usize];
         self.world.all_reduce_into(
-            &packet_destinations,
-            &mut to_receive,
+            &key_packet_destinations,
+            &mut keys_to_receive,
             SystemOperation::sum(),
         );
 
-        let recv_count = to_receive[rank as usize];
-        // Communicate only with partners, which are in general a subset of the global communicator
+        let mut leaves_to_receive = vec![0i32; size as usize];
+        self.world.all_reduce_into(
+            &leaf_packet_destinations,
+            &mut leaves_to_receive,
+            SystemOperation::sum(),
+        );
 
-        packet_destinations = packet_destinations
+        let recv_count_keys = keys_to_receive[rank as usize];
+        let recv_count_leaves = leaves_to_receive[rank as usize];
+
+        key_packet_destinations = key_packet_destinations
             .into_iter()
             .enumerate()
             .filter(|(_, x)| x > &0)
             .map(|(i, _)| i as Rank)
-            .collect();        
-        
+            .collect();
+
+        leaf_packet_destinations = leaf_packet_destinations
+            .into_iter()
+            .enumerate()
+            .filter(|(_, x)| x > &0)
+            .map(|(i, _)| i as Rank)
+            .collect();
+
+        point_packet_destinations = point_packet_destinations
+            .into_iter()
+            .enumerate()
+            .filter(|(_, x)| x > &0)
+            .map(|(i, _)| i as Rank)
+            .collect();
+    
         let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
         let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
         let mut point_packets: Vec<Vec<Point>> = Vec::new();
 
-        for rank in packet_destinations.iter() {
+        let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
+        let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
+        let mut point_packet_destinations_filt: Vec<Rank> = Vec::new();
+
+        for &rank in key_packet_destinations.iter() {
             let key_packet: Vec<MortonKey> = let_vec
                 .iter()
                 .zip(users.iter())
                 .filter(|(_, user)| user.contains(&rank))
                 .map(|(k, _)| *k)
                 .collect();
-
             let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
 
-            let leaf_packet: Vec<MortonKey> = key_packet_set
-                .intersection(&self.leaves_set)
-                .cloned()
-                .collect();
+            if key_packet.len() > 0 {
+                    key_packets.push(key_packet);
+                    key_packet_destinations_filt.push(rank);
+                }
 
-            let point_packet: Vec<Point> = leaf_packet
-                .iter()
-                .map(|leaf| self.leaves_to_points.get(leaf).unwrap())
-                .cloned()
-                .flatten()
-                .collect();
+            if leaf_packet_destinations.contains(&rank) {
+                let leaf_packet: Vec<MortonKey> = key_packet_set
+                    .intersection(&self.leaves_set)
+                    .cloned()
+                    .collect();
 
-            key_packets.push(key_packet);
-            leaf_packets.push(leaf_packet);
-            point_packets.push(point_packet);
+                let point_packet: Vec<Point> = leaf_packet
+                    .iter()
+                    .map(|leaf| self.leaves_to_points.get(leaf).unwrap())
+                    .cloned()
+                    .flatten()
+                    .collect();
+
+                    if leaf_packet.len() > 0 {
+                        leaf_packets.push(leaf_packet);
+                        leaf_packet_destinations_filt.push(rank);
+                    }
+        
+                    if point_packet.len() > 0 {
+                        point_packets.push(point_packet);
+                        point_packet_destinations_filt.push(rank);
+                    }
+            }
         }
 
         let received_leaves = all_to_allv_sparse(
             &self.world,
             &leaf_packets,
-            &packet_destinations,
-            &recv_count,
+            &leaf_packet_destinations_filt,
+            &recv_count_leaves,
         );
+ 
         let received_points = all_to_allv_sparse(
             &self.world,
             &point_packets,
-            &packet_destinations,
-            &recv_count,
+            &point_packet_destinations_filt,
+            &recv_count_leaves,
         );
         
         let received_keys = all_to_allv_sparse(
             &self.world,
             &key_packets,
-            &packet_destinations,
-            &recv_count,
+            &key_packet_destinations_filt,
+            &recv_count_keys,
         );
         
-        // println!(
-        //     "rank {:?} received {:?} leaves {:?} keys {:?} points",
-        //     rank, received_leaves.len(), received_keys.len(), received_points.len()
-        // );
-
         // Insert into local tree
         self.keys_set.extend(&received_keys);
         self.leaves_set.extend(&received_leaves);

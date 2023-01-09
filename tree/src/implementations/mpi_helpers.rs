@@ -24,15 +24,22 @@ where
 
     let send_count = packets.len() as Count;
     let nreqs = send_count + recv_count;
+    let mut packet_sizes: Vec<usize> = Vec::new();
+
+    for p in packets.iter() {
+        packet_sizes.push(p.len())
+    }
 
     // Communicate the packet sizes to relevant destinationss
     for (i, packet) in packets.iter().enumerate() {
-        let msg = vec![rank, packet.len() as Count];
-
+        // Tag with destination rank
+        let tag = packet_destinations[i];
+        // Send packet size
+        let msg = packet.len() as Count;
         let partner_process = world.process_at_rank(packet_destinations[i]);
 
         mpi::request::scope(|scope| {
-            let _sreq = WaitGuard::from(partner_process.immediate_send(scope, &msg[..]));
+            let _sreq = WaitGuard::from(partner_process.immediate_send_with_tag(scope, &msg, tag));
         })
     }
 
@@ -40,14 +47,17 @@ where
     let mut received_packet_sources = vec![0 as Rank; recv_count as usize];
 
     for i in (0..recv_count as usize) {
-        let mut msg = vec![0 as Count; 2];
-
+        let mut msg = 0 as Count;
+        let mut source_rank = 0 as Rank;
+        // Look for messages destined for this process
         mpi::request::scope(|scope| {
-            let _rreq = WaitGuard::from(world.any_process().immediate_receive_into(scope, &mut msg));
+            let status = world.any_process().probe_with_tag(rank);
+            source_rank = status.source_rank();
+            let _rreq = WaitGuard::from(world.process_at_rank(source_rank).immediate_receive_into_with_tag(scope, &mut msg, rank));
         });
 
-        received_packet_sources[i] = msg[0];
-        received_packet_sizes[i] = msg[1];
+        received_packet_sources[i] = source_rank;
+        received_packet_sizes[i] = msg;
     }
 
     // Setup send and receives for data
