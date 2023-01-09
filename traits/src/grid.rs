@@ -8,6 +8,8 @@ pub trait Geometry {
     fn map(&self, reference_coords: &[f64], physical_coords: &mut [f64]);
 
     fn dim(&self) -> usize;
+
+    fn midpoint(&self) -> Vec<f64>;
 }
 
 pub enum Locality {

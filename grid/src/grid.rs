@@ -30,6 +30,17 @@ impl Geometry for SerialTriangle3DGeometry<'_> {
     fn dim(&self) -> usize {
         3
     }
+
+    fn midpoint(&self) -> Vec<f64> {
+        let mut mid = vec![0.0, 0.0, 0.0];
+        for i in 0..3 {
+            for j in 0..3 {
+                mid[i] += self.coordinates[self.vertices[j] * 3 + i];
+            }
+            mid[i] /= 3.0;
+        }
+        mid
+    }
 }
 
 pub struct SerialTriangle3DTopology {}
@@ -49,12 +60,12 @@ impl Topology for SerialTriangle3DTopology {
     }
 }
 
-pub struct SerialTriangle3DGrid<'a> {
-    pub coordinates: &'a [f64],
-    pub cells: &'a [usize],
+pub struct SerialTriangle3DGrid {
+    pub coordinates: Vec<f64>,
+    pub cells: Vec<usize>,
 }
 
-impl<'a> Grid for SerialTriangle3DGrid<'a> {
+impl<'a> Grid for SerialTriangle3DGrid {
     type Topology<'b> = SerialTriangle3DTopology where Self: 'b;
     type Geometry<'b> = SerialTriangle3DGeometry<'b> where Self: 'b;
 
@@ -66,6 +77,32 @@ impl<'a> Grid for SerialTriangle3DGrid<'a> {
         SerialTriangle3DGeometry::<'b> {
             coordinates: &self.coordinates,
             vertices: &self.cells[3 * local_index..3 * (local_index + 1)],
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::grid::*;
+    use approx::*;
+
+    #[test]
+    fn test_serial_triangle_grid() {
+        let g = SerialTriangle3DGrid {
+            coordinates: vec![
+                0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
+                0.0, -1.0,
+            ],
+            cells: vec![
+                0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 1, 2, 5, 2, 3, 5, 3, 4, 5, 4, 1,
+            ],
+        };
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.cell_geometry(0).dim(), 3);
+
+        let m = g.cell_geometry(0).midpoint();
+        for i in 0..3 {
+            assert_relative_eq!(m[i], 1.0 / 3.0);
         }
     }
 }

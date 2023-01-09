@@ -19,4 +19,4 @@ crate-type = ["lib", "cdylib"]
 solvers-tools = { path = "../tools"}
 solvers-traits = { path = "../traits"}
 solvers-element = { path = "../element"}
-
+approx = "0.5"
