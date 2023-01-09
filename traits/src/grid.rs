@@ -34,8 +34,11 @@ pub trait Grid {
     type Topology<'a>: Topology
     where
         Self: 'a;
+    type Geometry<'a>: Geometry
+    where
+        Self: 'a;
 
     fn topology<'a>(&'a self) -> Self::Topology<'a>;
 
-    fn cell_geometry<'a>(&'a self, local_index: usize) -> &'a dyn Geometry;
+    fn cell_geometry<'a>(&'a self, local_index: usize) -> Self::Geometry<'a>;
 }
