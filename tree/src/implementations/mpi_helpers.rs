@@ -46,15 +46,17 @@ where
     let mut received_packet_sizes = vec![0 as Count; recv_count as usize];
     let mut received_packet_sources = vec![0 as Rank; recv_count as usize];
 
+    let mut msg = 0 as Count;
+    let mut source_rank = 0 as Rank;
+    
     for i in (0..recv_count as usize) {
-        let mut msg = 0 as Count;
-        let mut source_rank = 0 as Rank;
         // Look for messages destined for this process
         mpi::request::scope(|scope| {
             let status = world.any_process().probe_with_tag(rank);
             source_rank = status.source_rank();
-            let _rreq = WaitGuard::from(world.process_at_rank(source_rank).immediate_receive_into_with_tag(scope, &mut msg, rank));
+            // let _rreq = WaitGuard::from(world.process_at_rank(source_rank).immediate_receive_into_with_tag(scope, &mut msg, rank));
         });
+        let _rreq = world.process_at_rank(source_rank).receive_into_with_tag(&mut msg, rank);
 
         received_packet_sources[i] = source_rank;
         received_packet_sizes[i] = msg;
@@ -67,25 +69,26 @@ where
         buffers.push(vec![T::default(); len as usize])
     }
 
-    mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+    // mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
 
-        for (i, packet) in packets.iter().enumerate() {
-            let sreq = world
-                .process_at_rank(packet_destinations[i])
-                .immediate_send(scope, &packet[..]);
-                coll.add(sreq);
-        }
+    //     for (i, packet) in packets.iter().enumerate() {
+    //         let sreq = world
+    //             .process_at_rank(packet_destinations[i])
+    //             .immediate_send(scope, &packet[..]);
+    //             coll.add(sreq);
+    //     }
 
-        for (i, buffer) in buffers.iter_mut().enumerate() {
-            let rreq = world
-                .process_at_rank(received_packet_sources[i])
-                .immediate_receive_into(scope, &mut buffer[..]);
-            coll.add(rreq);
-        }
-        let mut out = vec![];
-        coll.wait_all(&mut out);
-        assert_eq!(out.len(), nreqs as usize);
-    });
+    //     for (i, buffer) in buffers.iter_mut().enumerate() {
+    //         let rreq = world
+    //             .process_at_rank(received_packet_sources[i])
+    //             .immediate_receive_into(scope, &mut buffer[..]);
+    //         coll.add(rreq);
+    //     }
+
+    //     let mut out = vec![];
+    //     coll.wait_all(&mut out);
+    //     assert_eq!(out.len(), nreqs as usize);
+    // });
 
     buffers.into_iter().flatten().collect()
 }

@@ -484,8 +484,17 @@ impl LocallyEssentialTree for MultiNodeTree {
             SystemOperation::sum(),
         );
 
+
+        let mut points_to_receive = vec![0i32; size as usize];
+        self.world.all_reduce_into(
+            &point_packet_destinations,
+            &mut points_to_receive,
+            SystemOperation::sum(),
+        );
+
         let recv_count_keys = keys_to_receive[rank as usize];
         let recv_count_leaves = leaves_to_receive[rank as usize];
+        let recv_count_points = points_to_receive[rank as usize];
 
         key_packet_destinations = key_packet_destinations
             .into_iter()
@@ -545,15 +554,33 @@ impl LocallyEssentialTree for MultiNodeTree {
 
                     if leaf_packet.len() > 0 {
                         leaf_packets.push(leaf_packet);
-                        leaf_packet_destinations_filt.push(rank);
-                    }
-        
-                    if point_packet.len() > 0 {
                         point_packets.push(point_packet);
+                        leaf_packet_destinations_filt.push(rank);
                         point_packet_destinations_filt.push(rank);
-                    }
+                    } 
             }
         }
+
+        let mut leaf_packet_sizes: Vec<usize> = Vec::new();
+        for p in leaf_packets.iter() {
+            leaf_packet_sizes.push(p.len())
+        }
+
+        let mut key_packet_sizes: Vec<usize> = Vec::new();
+        for p in key_packets.iter() {
+            key_packet_sizes.push(p.len())
+        }
+        
+        let mut point_packet_sizes: Vec<usize> = Vec::new();
+        for p in point_packets.iter() {
+            point_packet_sizes.push(p.len())
+        }
+        println!("SENDER RANK {:?} LEAF PACKETS {:?} DESTS {:?}", rank, leaf_packet_sizes, leaf_packet_destinations_filt);
+        println!("SENDER RANK {:?} POINT PACKETS {:?} DESTS {:?}", rank, point_packet_sizes, leaf_packet_destinations_filt);
+        println!("SENDER RANK {:?} KEY PACKETS {:?} DESTS {:?}", rank, key_packet_sizes, key_packet_destinations_filt);
+        println!("RECEIVER RANK {:?} LEAF RECV COUNT {:?}", rank, recv_count_leaves);
+        println!("RECEIVER RANK {:?} POINT RECV COUNT {:?}", rank, recv_count_points);
+        println!("RECEIVER RANK {:?} KEY RECV COUNT {:?}\n\n", rank, recv_count_keys);
 
         let received_leaves = all_to_allv_sparse(
             &self.world,
@@ -566,7 +593,7 @@ impl LocallyEssentialTree for MultiNodeTree {
             &self.world,
             &point_packets,
             &point_packet_destinations_filt,
-            &recv_count_leaves,
+            &recv_count_points,
         );
         
         let received_keys = all_to_allv_sparse(
@@ -575,7 +602,7 @@ impl LocallyEssentialTree for MultiNodeTree {
             &key_packet_destinations_filt,
             &recv_count_keys,
         );
-        
+        // println!("RANK {:?} RECEIVED {:?} LEAVES FIRST {:?}", rank, received_leaves.len(), received_leaves.first());
         // Insert into local tree
         self.keys_set.extend(&received_keys);
         self.leaves_set.extend(&received_leaves);
