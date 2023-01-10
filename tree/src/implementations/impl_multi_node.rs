@@ -387,7 +387,220 @@ impl Tree for MultiNodeTree {
     }
 }
 
-pub fn let_helper() {}
+fn let_helper(tree: &mut MultiNodeTree) {
+    // Communicate ranges globally using AllGather
+    let rank = tree.world.rank();
+    let size = tree.world.size();
+
+    let mut ranges = vec![0 as KeyType; (size as usize) * 3];
+
+    tree.world.all_gather_into(&tree.range, &mut ranges);
+
+    let mut let_vec: Vec<MortonKey> = tree.keys_set.iter().cloned().collect();
+
+    // Calculate users for each key in LET
+    let mut users: Vec<Vec<Rank>> = Vec::new();
+    let mut key_packet_destinations = vec![0 as Rank; size as usize];
+    let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
+    let mut point_packet_destinations = vec![0 as Rank; size as usize];
+
+    for key in let_vec.iter() {
+        let mut user_tmp: Vec<Rank> = Vec::new();
+
+        // Loop over all ranges, each key may be used by multiple processes
+        for chunk in ranges.chunks_exact(3) {
+            let rank = chunk[0] as Rank;
+            let min = MortonKey::from_morton(chunk[1]);
+            let max = MortonKey::from_morton(chunk[2]);
+
+            // Check if ranges overlap of the neighbors of the key's parent
+            if rank != tree.world.rank() {
+                if key.level() > 1 {
+                    let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
+                    let (cp_min, cp_max) = (
+                        colleagues_parent.iter().min(),
+                        colleagues_parent.iter().max(),
+                    );
+
+                    match (cp_min, cp_max) {
+                        (Some(cp_min), Some(cp_max)) => {
+                            if (cp_min >= &min) && (cp_max <= &max)
+                                || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
+                                || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
+                                || (cp_min <= &min) && (cp_max >= &max)
+                            {
+                                user_tmp.push(rank);
+
+                                if key_packet_destinations[rank as usize] == 0 {
+                                    key_packet_destinations[rank as usize] = 1
+                                }
+
+                                if leaf_packet_destinations[rank as usize] == 0
+                                    && tree.leaves_set.contains(key)
+                                {
+                                    leaf_packet_destinations[rank as usize] = 1;
+                                    point_packet_destinations[rank as usize] = 1;
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                // If the key as at level one its parent is the root node, so by definition
+                // it will always overlap with a range
+                else if key.level() <= 1 {
+                    user_tmp.push(rank);
+                    if key_packet_destinations[rank as usize] == 0 {
+                        key_packet_destinations[rank as usize] = 1
+                    }
+
+                    if leaf_packet_destinations[rank as usize] == 0 && tree.leaves_set.contains(key)
+                    {
+                        leaf_packet_destinations[rank as usize] = 1;
+                        point_packet_destinations[rank as usize] = 1;
+                    }
+                }
+            }
+        }
+        users.push(user_tmp);
+    }
+
+    let let_set: HashSet<MortonKey> = let_vec.iter().cloned().collect();
+
+    // Communicate number of packets being received by each process globally
+    let mut keys_to_receive = vec![0i32; size as usize];
+    tree.world.all_reduce_into(
+        &key_packet_destinations,
+        &mut keys_to_receive,
+        SystemOperation::sum(),
+    );
+
+    let mut leaves_to_receive = vec![0i32; size as usize];
+    tree.world.all_reduce_into(
+        &leaf_packet_destinations,
+        &mut leaves_to_receive,
+        SystemOperation::sum(),
+    );
+
+    let mut points_to_receive = vec![0i32; size as usize];
+    tree.world.all_reduce_into(
+        &point_packet_destinations,
+        &mut points_to_receive,
+        SystemOperation::sum(),
+    );
+
+    let recv_count_keys = keys_to_receive[rank as usize];
+    let recv_count_leaves = leaves_to_receive[rank as usize];
+    let recv_count_points = points_to_receive[rank as usize];
+
+    key_packet_destinations = key_packet_destinations
+        .into_iter()
+        .enumerate()
+        .filter(|(_, x)| x > &0)
+        .map(|(i, _)| i as Rank)
+        .collect();
+
+    leaf_packet_destinations = leaf_packet_destinations
+        .into_iter()
+        .enumerate()
+        .filter(|(_, x)| x > &0)
+        .map(|(i, _)| i as Rank)
+        .collect();
+
+    point_packet_destinations = point_packet_destinations
+        .into_iter()
+        .enumerate()
+        .filter(|(_, x)| x > &0)
+        .map(|(i, _)| i as Rank)
+        .collect();
+
+    let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
+    let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
+    let mut point_packets: Vec<Vec<Point>> = Vec::new();
+
+    let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
+    let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
+    let mut point_packet_destinations_filt: Vec<Rank> = Vec::new();
+
+    for &rank in key_packet_destinations.iter() {
+        let key_packet: Vec<MortonKey> = let_vec
+            .iter()
+            .zip(users.iter())
+            .filter(|(_, user)| user.contains(&rank))
+            .map(|(k, _)| *k)
+            .collect();
+        let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
+
+        if key_packet.len() > 0 {
+            key_packets.push(key_packet);
+            key_packet_destinations_filt.push(rank);
+        }
+
+        if leaf_packet_destinations.contains(&rank) {
+            let leaf_packet: Vec<MortonKey> = key_packet_set
+                .intersection(&tree.leaves_set)
+                .cloned()
+                .collect();
+
+            let point_packet: Vec<Point> = leaf_packet
+                .iter()
+                .map(|leaf| tree.leaves_to_points.get(leaf).unwrap())
+                .cloned()
+                .flatten()
+                .collect();
+
+            if leaf_packet.len() > 0 {
+                leaf_packets.push(leaf_packet);
+                point_packets.push(point_packet);
+                leaf_packet_destinations_filt.push(rank);
+                point_packet_destinations_filt.push(rank);
+            }
+        }
+    }
+
+    let mut leaf_packet_sizes: Vec<usize> = Vec::new();
+    for p in leaf_packets.iter() {
+        leaf_packet_sizes.push(p.len())
+    }
+
+    let mut key_packet_sizes: Vec<usize> = Vec::new();
+    for p in key_packets.iter() {
+        key_packet_sizes.push(p.len())
+    }
+
+    let mut point_packet_sizes: Vec<usize> = Vec::new();
+    for p in point_packets.iter() {
+        point_packet_sizes.push(p.len())
+    }
+
+    let received_leaves = all_to_allv_sparse(
+        &tree.world,
+        &leaf_packets,
+        &leaf_packet_destinations_filt,
+        &recv_count_leaves,
+    );
+
+    let received_points = all_to_allv_sparse(
+        &tree.world,
+        &point_packets,
+        &point_packet_destinations_filt,
+        &recv_count_points,
+    );
+
+    let received_keys = all_to_allv_sparse(
+        &tree.world,
+        &key_packets,
+        &key_packet_destinations_filt,
+        &recv_count_keys,
+    );
+    // Insert into local tree
+    tree.keys_set.extend(&received_keys);
+    tree.leaves_set.extend(&received_leaves);
+    tree.leaves = tree.leaves_set.iter().cloned().collect();
+    tree.points.extend(&received_points);
+    tree.points_to_leaves = assign_points_to_nodes(&tree.points, &tree.leaves);
+    tree.leaves_to_points = assign_nodes_to_points(&tree.leaves, &tree.points);
+}
 
 impl LocallyEssentialTree for MultiNodeTree {
     type RawTree = MultiNodeTree;
@@ -395,220 +608,9 @@ impl LocallyEssentialTree for MultiNodeTree {
     type NodeIndices = MortonKeys;
 
     fn create_let(&mut self) {
-        // Communicate ranges globally using AllGather
-        let rank = self.world.rank();
-        let size = self.world.size();
-
-        let mut ranges = vec![0 as KeyType; (size as usize) * 3];
-
-        self.world.all_gather_into(&self.range, &mut ranges);
-
-        let mut let_vec: Vec<MortonKey> = self.keys_set.iter().cloned().collect();
-
-        // Calculate users for each key in LET
-        let mut users: Vec<Vec<Rank>> = Vec::new();
-        let mut key_packet_destinations = vec![0 as Rank; size as usize];
-        let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
-        let mut point_packet_destinations = vec![0 as Rank; size as usize];
-
-        for key in let_vec.iter() {
-            let mut user_tmp: Vec<Rank> = Vec::new();
-
-            // Loop over all ranges, each key may be used by multiple processes
-            for chunk in ranges.chunks_exact(3) {
-                let rank = chunk[0] as Rank;
-                let min = MortonKey::from_morton(chunk[1]);
-                let max = MortonKey::from_morton(chunk[2]);
-
-                // Check if ranges overlap of the neighbors of the key's parent
-                if rank != self.world.rank() {
-                    if key.level() > 1 {
-                        let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
-                        let (cp_min, cp_max) = (
-                            colleagues_parent.iter().min(),
-                            colleagues_parent.iter().max(),
-                        );
-
-                        match (cp_min, cp_max) {
-                            (Some(cp_min), Some(cp_max)) => {
-                                if (cp_min >= &min) && (cp_max <= &max)
-                                    || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
-                                    || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
-                                    || (cp_min <= &min) && (cp_max >= &max)
-                                {
-                                    user_tmp.push(rank);
-
-                                    if key_packet_destinations[rank as usize] == 0 {
-                                        key_packet_destinations[rank as usize] = 1
-                                    }
-
-                                    if leaf_packet_destinations[rank as usize] == 0
-                                        && self.leaves_set.contains(key)
-                                    {
-                                        leaf_packet_destinations[rank as usize] = 1;
-                                        point_packet_destinations[rank as usize] = 1;
-                                    }
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    // If the key as at level one its parent is the root node, so by definition
-                    // it will always overlap with a range
-                    else if key.level() <= 1 {
-                        user_tmp.push(rank);
-                        if key_packet_destinations[rank as usize] == 0 {
-                            key_packet_destinations[rank as usize] = 1
-                        }
-
-                        if leaf_packet_destinations[rank as usize] == 0
-                            && self.leaves_set.contains(key)
-                        {
-                            leaf_packet_destinations[rank as usize] = 1;
-                            point_packet_destinations[rank as usize] = 1;
-                        }
-                    }
-                }
-            }
-
-            users.push(user_tmp);
-        }
-
-        let let_set: HashSet<MortonKey> = let_vec.iter().cloned().collect();
-
-        // Communicate number of packets being received by each process globally
-        let mut keys_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &key_packet_destinations,
-            &mut keys_to_receive,
-            SystemOperation::sum(),
-        );
-
-        let mut leaves_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &leaf_packet_destinations,
-            &mut leaves_to_receive,
-            SystemOperation::sum(),
-        );
-
-        let mut points_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &point_packet_destinations,
-            &mut points_to_receive,
-            SystemOperation::sum(),
-        );
-
-        let recv_count_keys = keys_to_receive[rank as usize];
-        let recv_count_leaves = leaves_to_receive[rank as usize];
-        let recv_count_points = points_to_receive[rank as usize];
-
-        key_packet_destinations = key_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
-
-        leaf_packet_destinations = leaf_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
-
-        point_packet_destinations = point_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
-
-        let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut point_packets: Vec<Vec<Point>> = Vec::new();
-
-        let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
-        let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
-        let mut point_packet_destinations_filt: Vec<Rank> = Vec::new();
-
-        for &rank in key_packet_destinations.iter() {
-            let key_packet: Vec<MortonKey> = let_vec
-                .iter()
-                .zip(users.iter())
-                .filter(|(_, user)| user.contains(&rank))
-                .map(|(k, _)| *k)
-                .collect();
-            let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
-
-            if key_packet.len() > 0 {
-                key_packets.push(key_packet);
-                key_packet_destinations_filt.push(rank);
-            }
-
-            if leaf_packet_destinations.contains(&rank) {
-                let leaf_packet: Vec<MortonKey> = key_packet_set
-                    .intersection(&self.leaves_set)
-                    .cloned()
-                    .collect();
-
-                let point_packet: Vec<Point> = leaf_packet
-                    .iter()
-                    .map(|leaf| self.leaves_to_points.get(leaf).unwrap())
-                    .cloned()
-                    .flatten()
-                    .collect();
-
-                if leaf_packet.len() > 0 {
-                    leaf_packets.push(leaf_packet);
-                    point_packets.push(point_packet);
-                    leaf_packet_destinations_filt.push(rank);
-                    point_packet_destinations_filt.push(rank);
-                }
-            }
-        }
-
-        let mut leaf_packet_sizes: Vec<usize> = Vec::new();
-        for p in leaf_packets.iter() {
-            leaf_packet_sizes.push(p.len())
-        }
-
-        let mut key_packet_sizes: Vec<usize> = Vec::new();
-        for p in key_packets.iter() {
-            key_packet_sizes.push(p.len())
-        }
-
-        let mut point_packet_sizes: Vec<usize> = Vec::new();
-        for p in point_packets.iter() {
-            point_packet_sizes.push(p.len())
-        }
-
-        let received_leaves = all_to_allv_sparse(
-            &self.world,
-            &leaf_packets,
-            &leaf_packet_destinations_filt,
-            &recv_count_leaves,
-        );
-
-        let received_points = all_to_allv_sparse(
-            &self.world,
-            &point_packets,
-            &point_packet_destinations_filt,
-            &recv_count_points,
-        );
-
-        let received_keys = all_to_allv_sparse(
-            &self.world,
-            &key_packets,
-            &key_packet_destinations_filt,
-            &recv_count_keys,
-        );
-        // Insert into local tree
-        self.keys_set.extend(&received_keys);
-        self.leaves_set.extend(&received_leaves);
-        self.leaves = self.leaves_set.iter().cloned().collect();
-        self.points.extend(&received_points);
-        self.points_to_leaves = assign_points_to_nodes(&self.points, &self.leaves);
-        self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
+        let_helper(self);
+        self.load_balance_let();
+        let_helper(self);
     }
 
     // Repartition based on size of interaction lists for each leaf

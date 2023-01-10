@@ -47,7 +47,4 @@ fn main() {
     let mut tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
 
     tree.create_let();
-    tree.load_balance_let();
-
-    // println!("HERE : {:?}", ROOT.ancestors());
 }
