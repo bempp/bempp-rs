@@ -387,6 +387,7 @@ impl Tree for MultiNodeTree {
     }
 }
 
+// Helper function for creating locally essential trees.
 fn let_helper(tree: &mut MultiNodeTree) {
     // Communicate ranges globally using AllGather
     let rank = tree.world.rank();
@@ -396,7 +397,7 @@ fn let_helper(tree: &mut MultiNodeTree) {
 
     tree.world.all_gather_into(&tree.range, &mut ranges);
 
-    let mut let_vec: Vec<MortonKey> = tree.keys_set.iter().cloned().collect();
+    let let_vec: Vec<MortonKey> = tree.keys_set.iter().cloned().collect();
 
     // Calculate users for each key in LET
     let mut users: Vec<Vec<Rank>> = Vec::new();
@@ -413,7 +414,7 @@ fn let_helper(tree: &mut MultiNodeTree) {
             let min = MortonKey::from_morton(chunk[1]);
             let max = MortonKey::from_morton(chunk[2]);
 
-            // Check if ranges overlap of the neighbors of the key's parent
+            // Check if ranges overlap with the neighbors of the key's parent
             if rank != tree.world.rank() {
                 if key.level() > 1 {
                     let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
@@ -439,7 +440,6 @@ fn let_helper(tree: &mut MultiNodeTree) {
                                     && tree.leaves_set.contains(key)
                                 {
                                     leaf_packet_destinations[rank as usize] = 1;
-                                    point_packet_destinations[rank as usize] = 1;
                                 }
                             }
                         }
@@ -457,7 +457,6 @@ fn let_helper(tree: &mut MultiNodeTree) {
                     if leaf_packet_destinations[rank as usize] == 0 && tree.leaves_set.contains(key)
                     {
                         leaf_packet_destinations[rank as usize] = 1;
-                        point_packet_destinations[rank as usize] = 1;
                     }
                 }
             }
@@ -482,16 +481,8 @@ fn let_helper(tree: &mut MultiNodeTree) {
         SystemOperation::sum(),
     );
 
-    let mut points_to_receive = vec![0i32; size as usize];
-    tree.world.all_reduce_into(
-        &point_packet_destinations,
-        &mut points_to_receive,
-        SystemOperation::sum(),
-    );
-
     let recv_count_keys = keys_to_receive[rank as usize];
     let recv_count_leaves = leaves_to_receive[rank as usize];
-    let recv_count_points = points_to_receive[rank as usize];
 
     key_packet_destinations = key_packet_destinations
         .into_iter()
@@ -507,20 +498,12 @@ fn let_helper(tree: &mut MultiNodeTree) {
         .map(|(i, _)| i as Rank)
         .collect();
 
-    point_packet_destinations = point_packet_destinations
-        .into_iter()
-        .enumerate()
-        .filter(|(_, x)| x > &0)
-        .map(|(i, _)| i as Rank)
-        .collect();
-
     let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
     let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
     let mut point_packets: Vec<Vec<Point>> = Vec::new();
 
     let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
     let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
-    let mut point_packet_destinations_filt: Vec<Rank> = Vec::new();
 
     for &rank in key_packet_destinations.iter() {
         let key_packet: Vec<MortonKey> = let_vec
@@ -553,26 +536,9 @@ fn let_helper(tree: &mut MultiNodeTree) {
                 leaf_packets.push(leaf_packet);
                 point_packets.push(point_packet);
                 leaf_packet_destinations_filt.push(rank);
-                point_packet_destinations_filt.push(rank);
             }
         }
     }
-
-    let mut leaf_packet_sizes: Vec<usize> = Vec::new();
-    for p in leaf_packets.iter() {
-        leaf_packet_sizes.push(p.len())
-    }
-
-    let mut key_packet_sizes: Vec<usize> = Vec::new();
-    for p in key_packets.iter() {
-        key_packet_sizes.push(p.len())
-    }
-
-    let mut point_packet_sizes: Vec<usize> = Vec::new();
-    for p in point_packets.iter() {
-        point_packet_sizes.push(p.len())
-    }
-
     let received_leaves = all_to_allv_sparse(
         &tree.world,
         &leaf_packets,
@@ -583,8 +549,8 @@ fn let_helper(tree: &mut MultiNodeTree) {
     let received_points = all_to_allv_sparse(
         &tree.world,
         &point_packets,
-        &point_packet_destinations_filt,
-        &recv_count_points,
+        &leaf_packet_destinations_filt,
+        &recv_count_leaves,
     );
 
     let received_keys = all_to_allv_sparse(
@@ -608,8 +574,11 @@ impl LocallyEssentialTree for MultiNodeTree {
     type NodeIndices = MortonKeys;
 
     fn create_let(&mut self) {
+        // Create an LET
         let_helper(self);
+        // Load balance the LET
         self.load_balance_let();
+        // Reform LET based, now load balanced.
         let_helper(self);
     }
 

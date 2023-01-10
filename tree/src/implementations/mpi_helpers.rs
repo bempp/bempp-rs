@@ -10,10 +10,18 @@ use mpi::{
 
 /// Sparse MPI_AllToAllV, i.e. each process only communicates
 /// to a subset of the communicator.
+///
+/// For Example, you may have four processes in a communicator
+/// Communicator = [P0, P1, P2, P3]. Each process communicates
+/// with a subset of the Communicator excluding itself,
+/// ie. P0 -> [P0, P2], P1 -> [P0], P2-> [], P3 -> [P0, P1, P2].
+/// This function expects these packets to be separated in a
+/// Vec<Vec<T>>, their destination ranks, as well as the number of
+/// packets this process expects to receive overall `recv_count`.
 pub fn all_to_allv_sparse<T>(
     world: &UserCommunicator,
-    mut packets: &Vec<Vec<T>>,
-    mut packet_destinations: &Vec<Rank>,
+    packets: &Vec<Vec<T>>,
+    packet_destinations: &Vec<Rank>,
     &recv_count: &Count,
 ) -> Vec<T>
 where
@@ -71,26 +79,25 @@ where
         buffers.push(vec![T::default(); len as usize])
     }
 
-    // mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+    mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+        for (i, packet) in packets.iter().enumerate() {
+            let sreq = world
+                .process_at_rank(packet_destinations[i])
+                .immediate_send(scope, &packet[..]);
+            coll.add(sreq);
+        }
 
-    //     for (i, packet) in packets.iter().enumerate() {
-    //         let sreq = world
-    //             .process_at_rank(packet_destinations[i])
-    //             .immediate_send(scope, &packet[..]);
-    //             coll.add(sreq);
-    //     }
+        for (i, buffer) in buffers.iter_mut().enumerate() {
+            let rreq = world
+                .process_at_rank(received_packet_sources[i])
+                .immediate_receive_into(scope, &mut buffer[..]);
+            coll.add(rreq);
+        }
 
-    //     for (i, buffer) in buffers.iter_mut().enumerate() {
-    //         let rreq = world
-    //             .process_at_rank(received_packet_sources[i])
-    //             .immediate_receive_into(scope, &mut buffer[..]);
-    //         coll.add(rreq);
-    //     }
-
-    //     let mut out = vec![];
-    //     coll.wait_all(&mut out);
-    //     assert_eq!(out.len(), nreqs as usize);
-    // });
+        let mut out = vec![];
+        coll.wait_all(&mut out);
+        assert_eq!(out.len(), nreqs as usize);
+    });
 
     buffers.into_iter().flatten().collect()
 }
