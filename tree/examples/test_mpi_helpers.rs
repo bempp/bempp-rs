@@ -2,11 +2,9 @@ use itertools::Itertools;
 use rand::distributions::Uniform;
 use rand::Rng;
 
-use mpi::{collective::SystemOperation, Rank, environment::Universe, traits::*};
+use mpi::{collective::SystemOperation, environment::Universe, traits::*, Rank};
 
-use solvers_tree::{
-    implementations::mpi_helpers::all_to_allv_sparse
-};
+use solvers_tree::implementations::mpi_helpers::all_to_allv_sparse;
 
 fn main() {
     // Setup an MPI environment
@@ -19,18 +17,18 @@ fn main() {
 
     // Send a random number of packets from this process
     let mut rng = rand::thread_rng();
-    let range = Uniform::from(1..size); 
+    let range = Uniform::from(1..size);
     let nsend = rng.sample(range);
 
     // Send packets to 'nsend' other processors in communicator, excluding
     // this process.
     let mut packet_destinations = Vec::new();
     let mut destination: Rank;
-    let range = Uniform::from(0..size); 
+    let range = Uniform::from(0..size);
 
     while packet_destinations.len() < nsend as usize {
         destination = rng.sample(range);
-        if destination != rank  && !packet_destinations.contains(&destination) {
+        if destination != rank && !packet_destinations.contains(&destination) {
             packet_destinations.push(destination)
         }
     }
@@ -39,8 +37,8 @@ fn main() {
     let mut packets: Vec<Vec<i32>> = vec![Vec::new(); nsend as usize];
 
     for packet in packets.iter_mut() {
-        *packet = vec![rank; (rank+1) as usize];
-    } 
+        *packet = vec![rank; (rank + 1) as usize];
+    }
 
     // Communicate the number of packets that this process will receive.
     let mut to_receive = vec![0 as Rank; size as usize];
@@ -50,7 +48,7 @@ fn main() {
     }
 
     world.all_reduce_into(&dest_vec, &mut to_receive, SystemOperation::sum());
-    
+
     let recv_count = to_receive[rank as usize];
 
     let received = all_to_allv_sparse(&comm, &packets, &packet_destinations, &recv_count);
