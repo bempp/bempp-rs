@@ -181,6 +181,7 @@ impl MultiNodeTree {
         locally_balanced.linearize();
 
         // 8. Find new maps between points and locally balanced tree
+
         let points_to_locally_balanced = assign_points_to_nodes(&points, &locally_balanced);
         let mut points: Points = points
             .iter()
@@ -423,7 +424,10 @@ impl LocallyEssentialTree for MultiNodeTree {
                 if rank != self.world.rank() {
                     if key.level() > 1 {
                         let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
-                        let (cp_min, cp_max) = (colleagues_parent.iter().min(), colleagues_parent.iter().max());
+                        let (cp_min, cp_max) = (
+                            colleagues_parent.iter().min(),
+                            colleagues_parent.iter().max(),
+                        );
 
                         match (cp_min, cp_max) {
                             (Some(cp_min), Some(cp_max)) => {
@@ -438,7 +442,9 @@ impl LocallyEssentialTree for MultiNodeTree {
                                         key_packet_destinations[rank as usize] = 1
                                     }
 
-                                    if leaf_packet_destinations[rank as usize] == 0 && self.leaves_set.contains(key) {
+                                    if leaf_packet_destinations[rank as usize] == 0
+                                        && self.leaves_set.contains(key)
+                                    {
                                         leaf_packet_destinations[rank as usize] = 1;
                                         point_packet_destinations[rank as usize] = 1;
                                     }
@@ -455,7 +461,9 @@ impl LocallyEssentialTree for MultiNodeTree {
                             key_packet_destinations[rank as usize] = 1
                         }
 
-                        if leaf_packet_destinations[rank as usize] == 0 && self.leaves_set.contains(key) {
+                        if leaf_packet_destinations[rank as usize] == 0
+                            && self.leaves_set.contains(key)
+                        {
                             leaf_packet_destinations[rank as usize] = 1;
                             point_packet_destinations[rank as usize] = 1;
                         }
@@ -465,7 +473,6 @@ impl LocallyEssentialTree for MultiNodeTree {
 
             users.push(user_tmp);
         }
-
 
         let let_set: HashSet<MortonKey> = let_vec.iter().cloned().collect();
 
@@ -483,7 +490,6 @@ impl LocallyEssentialTree for MultiNodeTree {
             &mut leaves_to_receive,
             SystemOperation::sum(),
         );
-
 
         let mut points_to_receive = vec![0i32; size as usize];
         self.world.all_reduce_into(
@@ -516,7 +522,7 @@ impl LocallyEssentialTree for MultiNodeTree {
             .filter(|(_, x)| x > &0)
             .map(|(i, _)| i as Rank)
             .collect();
-    
+
         let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
         let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
         let mut point_packets: Vec<Vec<Point>> = Vec::new();
@@ -535,9 +541,9 @@ impl LocallyEssentialTree for MultiNodeTree {
             let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
 
             if key_packet.len() > 0 {
-                    key_packets.push(key_packet);
-                    key_packet_destinations_filt.push(rank);
-                }
+                key_packets.push(key_packet);
+                key_packet_destinations_filt.push(rank);
+            }
 
             if leaf_packet_destinations.contains(&rank) {
                 let leaf_packet: Vec<MortonKey> = key_packet_set
@@ -552,12 +558,12 @@ impl LocallyEssentialTree for MultiNodeTree {
                     .flatten()
                     .collect();
 
-                    if leaf_packet.len() > 0 {
-                        leaf_packets.push(leaf_packet);
-                        point_packets.push(point_packet);
-                        leaf_packet_destinations_filt.push(rank);
-                        point_packet_destinations_filt.push(rank);
-                    } 
+                if leaf_packet.len() > 0 {
+                    leaf_packets.push(leaf_packet);
+                    point_packets.push(point_packet);
+                    leaf_packet_destinations_filt.push(rank);
+                    point_packet_destinations_filt.push(rank);
+                }
             }
         }
 
@@ -570,17 +576,11 @@ impl LocallyEssentialTree for MultiNodeTree {
         for p in key_packets.iter() {
             key_packet_sizes.push(p.len())
         }
-        
+
         let mut point_packet_sizes: Vec<usize> = Vec::new();
         for p in point_packets.iter() {
             point_packet_sizes.push(p.len())
         }
-        println!("SENDER RANK {:?} LEAF PACKETS {:?} DESTS {:?}", rank, leaf_packet_sizes, leaf_packet_destinations_filt);
-        println!("SENDER RANK {:?} POINT PACKETS {:?} DESTS {:?}", rank, point_packet_sizes, leaf_packet_destinations_filt);
-        println!("SENDER RANK {:?} KEY PACKETS {:?} DESTS {:?}", rank, key_packet_sizes, key_packet_destinations_filt);
-        println!("RECEIVER RANK {:?} LEAF RECV COUNT {:?}", rank, recv_count_leaves);
-        println!("RECEIVER RANK {:?} POINT RECV COUNT {:?}", rank, recv_count_points);
-        println!("RECEIVER RANK {:?} KEY RECV COUNT {:?}\n\n", rank, recv_count_keys);
 
         let received_leaves = all_to_allv_sparse(
             &self.world,
@@ -588,21 +588,20 @@ impl LocallyEssentialTree for MultiNodeTree {
             &leaf_packet_destinations_filt,
             &recv_count_leaves,
         );
- 
+
         let received_points = all_to_allv_sparse(
             &self.world,
             &point_packets,
             &point_packet_destinations_filt,
             &recv_count_points,
         );
-        
+
         let received_keys = all_to_allv_sparse(
             &self.world,
             &key_packets,
             &key_packet_destinations_filt,
             &recv_count_keys,
         );
-        // println!("RANK {:?} RECEIVED {:?} LEAVES FIRST {:?}", rank, received_leaves.len(), received_leaves.first());
         // Insert into local tree
         self.keys_set.extend(&received_keys);
         self.leaves_set.extend(&received_leaves);
@@ -756,7 +755,7 @@ impl LocallyEssentialTree for MultiNodeTree {
             &recv_count,
         );
 
-        // Insert into local tree 
+        // Insert into local tree
         self.keys_set.extend(&received_leaves);
         self.leaves_set.extend(&received_leaves);
         self.leaves = self.leaves_set.iter().cloned().collect();

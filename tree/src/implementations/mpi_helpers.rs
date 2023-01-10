@@ -2,7 +2,7 @@
 use mpi::{
     collective::SystemOperation,
     datatype::Equivalence,
-    request::{Scope, RequestCollection, WaitGuard},
+    request::{RequestCollection, Scope, WaitGuard},
     topology::{Communicator, UserCommunicator},
     traits::*,
     Count, Rank,
@@ -48,7 +48,7 @@ where
 
     let mut msg = 0 as Count;
     let mut source_rank = 0 as Rank;
-    
+
     for i in (0..recv_count as usize) {
         // Look for messages destined for this process
         mpi::request::scope(|scope| {
@@ -56,7 +56,9 @@ where
             source_rank = status.source_rank();
             // let _rreq = WaitGuard::from(world.process_at_rank(source_rank).immediate_receive_into_with_tag(scope, &mut msg, rank));
         });
-        let _rreq = world.process_at_rank(source_rank).receive_into_with_tag(&mut msg, rank);
+        let _rreq = world
+            .process_at_rank(source_rank)
+            .receive_into_with_tag(&mut msg, rank);
 
         received_packet_sources[i] = source_rank;
         received_packet_sizes[i] = msg;
@@ -92,4 +94,3 @@ where
 
     buffers.into_iter().flatten().collect()
 }
-

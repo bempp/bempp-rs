@@ -96,18 +96,21 @@ pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<Mor
     let mut map: HashMap<MortonKey, Points> = HashMap::new();
 
     for point in points.iter() {
-        if keys.contains(&point.key) {
-            map.entry(point.key).or_default().push(*point);
-        } else {
-            let ancestor = point
-                .key
-                .ancestors()
-                .into_iter()
-                .sorted()
-                .rev()
-                .find(|a| keys.contains(a))
-                .unwrap();
-            map.entry(ancestor).or_default().push(*point);
+        // Ancestor could be the key itself
+        if let Some(ancestor) = point
+            .key
+            .ancestors()
+            .into_iter()
+            .sorted()
+            .rev()
+            .find(|a| keys.contains(a))
+        {
+            map.entry(ancestor).or_default().push(*point)
+        }
+        // Otherwise, if nothing matching is found in keys, just insert
+        // the point on its own.
+        else {
+            map.entry(point.key).or_default().push(*point)
         }
     }
     map

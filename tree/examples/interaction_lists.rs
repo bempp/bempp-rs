@@ -1,4 +1,3 @@
-
 use rand::prelude::*;
 use rand::SeedableRng;
 
@@ -6,8 +5,9 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use solvers_traits::tree::{LocallyEssentialTree, Tree};
 
-use solvers_tree::types::{multi_node::MultiNodeTree, point::PointType,
-    single_node::SingleNodeTree,
+use solvers_tree::constants::ROOT;
+use solvers_tree::types::{
+    multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree,
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
@@ -33,10 +33,13 @@ fn main() {
     let comm = world.duplicate();
 
     // Setup tree parameters
+    // let adaptive = false;
     let adaptive = true;
-    let n_crit = Some(15);
+    let n_crit = Some(50);
+    // let n_crit: Option<_> = None;
     let depth: Option<_> = None;
-    let n_points = 10000;
+    // let depth = Some(3);
+    let n_points = 100000;
     let k: Option<_> = None;
 
     let points = points_fixture(n_points);
@@ -45,4 +48,6 @@ fn main() {
 
     tree.create_let();
     tree.load_balance_let();
+
+    // println!("HERE : {:?}", ROOT.ancestors());
 }
