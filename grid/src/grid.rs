@@ -4,10 +4,12 @@ pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Locality;
 pub use solvers_traits::grid::Topology;
+use std::cmp::max;
+use std::cmp::min;
 
 pub struct SerialTriangle3DGeometry<'a> {
     pub coordinates: &'a [f64],
-    pub vertices: &'a [usize],
+    pub vertex_numbers: &'a [usize],
 }
 
 impl Geometry for SerialTriangle3DGeometry<'_> {
@@ -17,13 +19,13 @@ impl Geometry for SerialTriangle3DGeometry<'_> {
 
     fn map(&self, reference_coords: &[f64], physical_coords: &mut [f64]) {
         for i in 0..3 {
-            physical_coords[i] = self.coordinates[self.vertices[0] * 3 + i]
+            physical_coords[i] = self.coordinates[self.vertex_numbers[0] * 3 + i]
                 + reference_coords[0]
-                    * (self.coordinates[self.vertices[1] * 3 + i]
-                        - self.coordinates[self.vertices[0] * 3 + i])
+                    * (self.coordinates[self.vertex_numbers[1] * 3 + i]
+                        - self.coordinates[self.vertex_numbers[0] * 3 + i])
                 + reference_coords[2]
-                    * (self.coordinates[self.vertices[2] * 3 + i]
-                        - self.coordinates[self.vertices[0] * 3 + i]);
+                    * (self.coordinates[self.vertex_numbers[2] * 3 + i]
+                        - self.coordinates[self.vertex_numbers[0] * 3 + i]);
         }
     }
 
@@ -35,28 +37,75 @@ impl Geometry for SerialTriangle3DGeometry<'_> {
         let mut mid = vec![0.0, 0.0, 0.0];
         for i in 0..3 {
             for j in 0..3 {
-                mid[i] += self.coordinates[self.vertices[j] * 3 + i];
+                mid[i] += self.coordinates[self.vertex_numbers[j] * 3 + i];
             }
             mid[i] /= 3.0;
         }
         mid
     }
+    fn volume(&self) -> f64 {
+        let a = [
+            self.coordinates[self.vertex_numbers[1] * 3]
+                - self.coordinates[self.vertex_numbers[0] * 3],
+            self.coordinates[self.vertex_numbers[1] * 3 + 1]
+                - self.coordinates[self.vertex_numbers[0] * 3 + 1],
+            self.coordinates[self.vertex_numbers[1] * 3 + 2]
+                - self.coordinates[self.vertex_numbers[0] * 3 + 2],
+        ];
+        let b = [
+            self.coordinates[self.vertex_numbers[2] * 3]
+                - self.coordinates[self.vertex_numbers[0] * 3],
+            self.coordinates[self.vertex_numbers[2] * 3 + 1]
+                - self.coordinates[self.vertex_numbers[0] * 3 + 1],
+            self.coordinates[self.vertex_numbers[2] * 3 + 2]
+                - self.coordinates[self.vertex_numbers[0] * 3 + 2],
+        ];
+        ((a[0] * b[1] - a[1] * b[0]).powi(2)
+            + (a[1] * b[2] - a[2] * b[1]).powi(2)
+            + (a[2] * b[0] - a[0] * b[2]).powi(2))
+        .sqrt()
+    }
 }
 
-pub struct SerialTriangle3DTopology {}
+pub struct SerialTriangle3DTopology<'a> {
+    pub cells: &'a [usize],
+    pub connectivity_2_1: Vec<usize>,
+    // pub connectivity_1_2: Vec<usize>,
+    pub connectivity_1_0: Vec<usize>,
+    // pub connectivity_0_2: Vec<usize>,
+    // pub connectivity_0_1: Vec<usize>,
+    // TODO: adjacency lists
+    // TODO: only create this data later when needed
+}
 
-impl Topology for SerialTriangle3DTopology {
-    fn local2global(local_id: usize) -> usize {
+impl Topology for SerialTriangle3DTopology<'_> {
+    fn local2global(&self, local_id: usize) -> usize {
         local_id
     }
-    fn global2local(global_id: usize) -> Option<usize> {
+    fn global2local(&self, global_id: usize) -> Option<usize> {
         Some(global_id)
     }
-    fn locality(global_id: usize) -> Locality {
+    fn locality(&self, global_id: usize) -> Locality {
         Locality::Local
     }
     fn dim(&self) -> usize {
         2
+    }
+    fn entity_count(&self, dim: usize) -> usize {
+        match dim {
+            0 => {
+                let mut nvertices = 0;
+                for v in self.cells {
+                    if *v >= nvertices {
+                        nvertices = *v + 1;
+                    }
+                }
+                nvertices
+            }
+            1 => self.connectivity_1_0.len() / 2,
+            2 => self.cells.len() / 3,
+            _ => 0,
+        }
     }
 }
 
@@ -66,17 +115,48 @@ pub struct SerialTriangle3DGrid {
 }
 
 impl<'a> Grid for SerialTriangle3DGrid {
-    type Topology<'b> = SerialTriangle3DTopology where Self: 'b;
+    type Topology<'b> = SerialTriangle3DTopology<'b> where Self: 'b;
     type Geometry<'b> = SerialTriangle3DGeometry<'b> where Self: 'b;
 
-    fn topology(&self) -> Self::Topology<'a> {
-        SerialTriangle3DTopology {}
+    fn topology<'b>(&'b self) -> Self::Topology<'b> {
+        let mut edges = vec![];
+        let mut triangles_to_edges = vec![];
+        for triangle in 0..&self.cells.len() / 3 {
+            for edge in [(1, 2), (0, 2), (0, 1)] {
+                let start = min(
+                    self.cells[3 * triangle + edge.0],
+                    self.cells[3 * triangle + edge.1],
+                );
+                let end = max(
+                    self.cells[3 * triangle + edge.0],
+                    self.cells[3 * triangle + edge.1],
+                );
+                let mut found = false;
+                for i in 0..edges.len() / 2 {
+                    if edges[2 * i] == start && edges[2 * i + 1] == end {
+                        found = true;
+                        triangles_to_edges.push(i);
+                        break;
+                    }
+                }
+                if !found {
+                    triangles_to_edges.push(edges.len() / 2);
+                    edges.push(start);
+                    edges.push(end);
+                }
+            }
+        }
+        SerialTriangle3DTopology {
+            cells: &self.cells,
+            connectivity_2_1: triangles_to_edges,
+            connectivity_1_0: edges,
+        }
     }
 
     fn cell_geometry<'b>(&'b self, local_index: usize) -> Self::Geometry<'b> {
         SerialTriangle3DGeometry::<'b> {
             coordinates: &self.coordinates,
-            vertices: &self.cells[3 * local_index..3 * (local_index + 1)],
+            vertex_numbers: &self.cells[3 * local_index..3 * (local_index + 1)],
         }
     }
 }

@@ -10,6 +10,8 @@ pub trait Geometry {
     fn dim(&self) -> usize;
 
     fn midpoint(&self) -> Vec<f64>;
+
+    fn volume(&self) -> f64;
 }
 
 pub enum Locality {
@@ -23,13 +25,15 @@ pub trait Topology {
     fn dim(&self) -> usize;
 
     // Check the locality of an element
-    fn locality(global_id: usize) -> Locality;
+    fn locality(&self, global_id: usize) -> Locality;
 
     // Convert local to global id
-    fn local2global(local_id: usize) -> usize;
+    fn local2global(&self, local_id: usize) -> usize;
 
     // Convert global to local id
-    fn global2local(global_id: usize) -> Option<usize>;
+    fn global2local(&self, global_id: usize) -> Option<usize>;
+
+    fn entity_count(&self, dim: usize) -> usize;
 }
 
 pub trait Grid {
