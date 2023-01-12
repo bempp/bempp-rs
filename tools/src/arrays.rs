@@ -1,43 +1,61 @@
+//! Containers to store multi-dimensional data
+
+/// A two-dimensional rectangular array
 pub struct Array2D<T> {
     data: Vec<T>,
     shape: (usize, usize),
 }
 impl<T> Array2D<T> {
+    /// Create an array
     pub fn new(data: Vec<T>, shape: (usize, usize)) -> Self {
         Self {
+            /// The data in the array, in row-major order
             data: data,
+            /// The shape of the array
             shape: shape,
         }
     }
 
+    /// Get an item from the array
     pub fn get(&mut self, index0: usize, index1: usize) -> &T {
         self.data.get(index0 * self.shape.1 + index1).unwrap()
     }
+    /// Get a mutable item from the array
     pub fn get_mut(&mut self, index0: usize, index1: usize) -> &mut T {
         self.data.get_mut(index0 * self.shape.1 + index1).unwrap()
     }
+    /// Get a row of the array
     pub fn row(&mut self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
     }
 }
 
+/// An adjacency list
+///
+/// An adjacency list stores two-dimensional data where each row may have a different number of items
 pub struct AdjacencyList<T> {
     data: Vec<T>,
     offsets: Vec<usize>,
 }
 impl<T> AdjacencyList<T> {
+    /// Create an adjacency list
     pub fn new(data: Vec<T>, offsets: Vec<usize>) -> Self {
         Self {
             data: data,
             offsets: offsets,
         }
     }
+    /// Get an item from the adjacency list
     pub fn get(&mut self, index0: usize, index1: usize) -> &T {
+        // TODO: check that self.offsets[index0] + index1 < self.offsets[index0 + 1]
         self.data.get(self.offsets[index0] + index1).unwrap()
     }
+    /// Get a mutable item from the adjacency list
     pub fn get_mut(&mut self, index0: usize, index1: usize) -> &mut T {
+        // TODO: check that self.offsets[index0] + index1 < self.offsets[index0 + 1]
         self.data.get_mut(self.offsets[index0] + index1).unwrap()
     }
+    /// Get a row from the adjacency list
     pub fn row(&mut self, index: usize) -> &[T] {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
