@@ -21,18 +21,24 @@ impl<T> Array2D<T> {
     }
 }
 
-pub struct AdjacencyList {
-    data: Vec<usize>,
+pub struct AdjacencyList<T> {
+    data: Vec<T>,
     offsets: Vec<usize>,
 }
-impl AdjacencyList {
-    pub fn get(&mut self, index0: usize, index1: usize) -> &usize {
+impl<T> AdjacencyList<T> {
+    pub fn new(data: Vec<T>, offsets: Vec<usize>) -> Self {
+        Self {
+            data: data,
+            offsets: offsets,
+        }
+    }
+    pub fn get(&mut self, index0: usize, index1: usize) -> &T {
         self.data.get(self.offsets[index0] + index1).unwrap()
     }
-    pub fn get_mut(&mut self, index0: usize, index1: usize) -> &mut usize {
+    pub fn get_mut(&mut self, index0: usize, index1: usize) -> &mut T {
         self.data.get_mut(self.offsets[index0] + index1).unwrap()
     }
-    pub fn row(&mut self, index: usize) -> &[usize] {
+    pub fn row(&mut self, index: usize) -> &[T] {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
 }
@@ -80,10 +86,7 @@ mod test {
 
     #[test]
     fn test_adjacency_list() {
-        let mut arr = AdjacencyList {
-            data: vec![1, 2, 3, 4, 5, 6],
-            offsets: vec![0, 2, 3, 6],
-        };
+        let mut arr = AdjacencyList::new(vec![1, 2, 3, 4, 5, 6], vec![0, 2, 3, 6]);
         assert_eq!(*arr.get(0, 0), 1);
         assert_eq!(*arr.get(0, 1), 2);
         assert_eq!(*arr.get(1, 0), 3);
