@@ -3,7 +3,7 @@
 // An indexable data view.
 pub trait IndexableView {
     // The Item type
-    type Item: crate::types::Scalar;
+    type Item;
 
     // Get data at position.
     fn get(&self, index: usize) -> Option<&Self::Item>;
