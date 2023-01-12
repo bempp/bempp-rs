@@ -1,4 +1,3 @@
-
 pub struct Array2D<T> {
     data: Vec<T>,
     shape: (usize, usize),
@@ -21,13 +20,12 @@ impl<T> Array2D<T> {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::arrays::*;
 
     #[test]
-    fn test_array_2d(){
+    fn test_array_2d() {
         let mut arr = Array2D::new(vec![1, 2, 3, 4, 5, 6], (2, 3));
         assert_eq!(*arr.get(0, 0), 1);
         assert_eq!(*arr.get(0, 1), 2);

@@ -1,9 +1,9 @@
 //! Tools for interfacing Rust via CFFI
 
+pub mod arrays;
 pub mod containers;
 pub mod types;
-pub mod arrays;
 
+pub use arrays::*;
 pub use containers::*;
 pub use types::*;
-pub use arrays::*;
