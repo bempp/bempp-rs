@@ -9,6 +9,7 @@ impl<T> Array2D<T> {
             shape: shape,
         }
     }
+
     pub fn get(&mut self, index0: usize, index1: usize) -> &T {
         self.data.get(index0 * self.shape.1 + index1).unwrap()
     }
@@ -17,6 +18,22 @@ impl<T> Array2D<T> {
     }
     pub fn row(&mut self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
+    }
+}
+
+pub struct AdjacencyList {
+    data: Vec<usize>,
+    offsets: Vec<usize>,
+}
+impl AdjacencyList {
+    pub fn get(&mut self, index0: usize, index1: usize) -> &usize {
+        self.data.get(self.offsets[index0] + index1).unwrap()
+    }
+    pub fn get_mut(&mut self, index0: usize, index1: usize) -> &mut usize {
+        self.data.get_mut(self.offsets[index0] + index1).unwrap()
+    }
+    pub fn row(&mut self, index: usize) -> &[usize] {
+        &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
 }
 
@@ -32,6 +49,7 @@ mod test {
         assert_eq!(*arr.get(0, 2), 3);
         assert_eq!(*arr.get(1, 0), 4);
         assert_eq!(*arr.get(1, 1), 5);
+        assert_eq!(*arr.get(1, 2), 6);
 
         let row1 = arr.row(1);
         assert_eq!(row1.len(), 3);
@@ -48,6 +66,7 @@ mod test {
         assert_eq!(*arr2.get(0, 2), 3.0);
         assert_eq!(*arr2.get(1, 0), 4.0);
         assert_eq!(*arr2.get(1, 1), 5.0);
+        assert_eq!(*arr2.get(1, 2), 6.0);
 
         let row1 = arr2.row(1);
         assert_eq!(row1.len(), 3);
@@ -57,5 +76,26 @@ mod test {
 
         *arr2.get_mut(1, 2) = 7.;
         assert_eq!(*arr2.get(1, 2), 7.0);
+    }
+
+    #[test]
+    fn test_adjacency_list() {
+        let mut arr = AdjacencyList {
+            data: vec![1, 2, 3, 4, 5, 6],
+            offsets: vec![0, 2, 3, 6],
+        };
+        assert_eq!(*arr.get(0, 0), 1);
+        assert_eq!(*arr.get(0, 1), 2);
+        assert_eq!(*arr.get(1, 0), 3);
+        assert_eq!(*arr.get(2, 0), 4);
+        assert_eq!(*arr.get(2, 1), 5);
+        assert_eq!(*arr.get(2, 2), 6);
+
+        let row1 = arr.row(1);
+        assert_eq!(row1.len(), 1);
+        assert_eq!(row1[0], 3);
+
+        *arr.get_mut(2, 0) = 7;
+        assert_eq!(*arr.get(2, 0), 7);
     }
 }
