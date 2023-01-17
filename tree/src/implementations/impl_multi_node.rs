@@ -251,7 +251,10 @@ impl MultiNodeTree {
             let min = seeds.iter().min().unwrap();
             let fa = ffc_root.finest_ancestor(min);
             let first_child = fa.children().into_iter().min().unwrap();
-            seeds.push(first_child);
+            // Check for overlap
+            if first_child < *min {
+                seeds.push(first_child)
+            }
             seeds.sort();
         }
 
@@ -260,7 +263,13 @@ impl MultiNodeTree {
             let max = seeds.iter().max().unwrap();
             let fa = flc_root.finest_ancestor(max);
             let last_child = fa.children().into_iter().max().unwrap();
-            seeds.push(last_child);
+            
+            if last_child > *max
+                && !max.ancestors().contains(&last_child)
+                && !last_child.ancestors().contains(max)
+            {
+                seeds.push(last_child);
+            }
         }
 
         let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
@@ -432,6 +441,7 @@ fn let_helper(tree: &mut MultiNodeTree) {
                             {
                                 user_tmp.push(rank);
 
+                                // Mark ranks as users of keys/leaves from this process
                                 if key_packet_destinations[rank as usize] == 0 {
                                     key_packet_destinations[rank as usize] = 1
                                 }
@@ -481,9 +491,11 @@ fn let_helper(tree: &mut MultiNodeTree) {
         SystemOperation::sum(),
     );
 
+    // Calculate the number of receives that this process is expecting
     let recv_count_keys = keys_to_receive[rank as usize];
     let recv_count_leaves = leaves_to_receive[rank as usize];
 
+    // Filter for packet destinations
     key_packet_destinations = key_packet_destinations
         .into_iter()
         .enumerate()
@@ -505,6 +517,7 @@ fn let_helper(tree: &mut MultiNodeTree) {
     let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
     let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
 
+    // Form packets for each send
     for &rank in key_packet_destinations.iter() {
         let key_packet: Vec<MortonKey> = let_vec
             .iter()
@@ -539,6 +552,8 @@ fn let_helper(tree: &mut MultiNodeTree) {
             }
         }
     }
+
+    // Communicate keys, leaves and points
     let received_leaves = all_to_allv_sparse(
         &tree.world,
         &leaf_packets,
@@ -559,7 +574,8 @@ fn let_helper(tree: &mut MultiNodeTree) {
         &key_packet_destinations_filt,
         &recv_count_keys,
     );
-    // Insert into local tree
+
+    // Insert received data into local tree
     tree.keys_set.extend(&received_keys);
     tree.leaves_set.extend(&received_leaves);
     tree.leaves = tree.leaves_set.iter().cloned().collect();
@@ -568,8 +584,8 @@ fn let_helper(tree: &mut MultiNodeTree) {
     tree.leaves_to_points = assign_nodes_to_points(&tree.leaves, &tree.points);
 }
 
-// Repartition based on size of interaction lists for each leaf
-// Use Algorithm 1 in Sundar et. al (2008)
+// Repartition based on size of interaction lists for each leaf Use Algorithm 1
+// in Sundar et. al (2008)
 fn load_balance_let(tree: &mut MultiNodeTree) {
     let size = tree.world.size();
     let rank = tree.world.rank();
@@ -615,6 +631,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
     if rank == size - 1 {
         total_weight = cum_weights.last().unwrap().clone();
     }
+
     tree.world
         .process_at_rank(size - 1)
         .broadcast_into(&mut total_weight);
@@ -668,6 +685,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
 
     let recv_count = to_receive[rank as usize];
 
+    // Filter for packet destinations
     packet_destinations = packet_destinations
         .into_iter()
         .enumerate()
@@ -675,7 +693,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
         .map(|(i, _)| i as Rank)
         .collect();
 
-    // Remove all data being sent
+    // Remove all data being sent from local tree
     tree.leaves_set = tree
         .leaves_set
         .difference(&leaves_packets.iter().flatten().cloned().collect())
@@ -690,7 +708,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
         .cloned()
         .collect();
 
-    // This line works as leaves being sent have already been removed
+    // This line works as the leaves being sent have already been removed
     tree.points = tree
         .leaves
         .iter()
@@ -705,6 +723,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
         &packet_destinations,
         &recv_count,
     );
+
     let received_points = all_to_allv_sparse(
         &tree.world,
         &points_packets,
@@ -712,7 +731,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
         &recv_count,
     );
 
-    // Insert into local tree
+    // Insert received data into local tree
     tree.keys_set.extend(&received_leaves);
     tree.leaves_set.extend(&received_leaves);
     tree.leaves = tree.leaves_set.iter().cloned().collect();
@@ -770,6 +789,7 @@ impl LocallyEssentialTree for MultiNodeTree {
             index: 0,
         }
     }
+
     // Calculate compressible far field interactions of leaf & other keys.
     fn get_interaction_list(&self, key: &MortonKey) -> Option<MortonKeys> {
         if key.level() >= 2 {

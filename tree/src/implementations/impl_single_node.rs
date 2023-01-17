@@ -37,8 +37,7 @@ pub fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -
     loop {
         let mut new_blocktree = MortonKeys::new();
 
-        // Map between blocks and the leaves they contain
-        // Blocks are being removed if they dont contain points, have to find a way to retain empty blocks.
+        // Map between blocks and the leaves they contain, empty blocks are retained
         blocks_to_points = assign_nodes_to_points(&blocktree, points);
 
         // Generate a new blocktree with a block's children if they violate the n_crit parameter
@@ -66,7 +65,8 @@ pub fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -
     split_blocktree
 }
 
-/// Create a mapping between points and octree nodes, assumed to overlap.
+/// Create a mapping between points and octree nodes, assumed to overlap. Note that points
+/// are hashed by their associated Morton key.
 pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
     let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
     let mut map: HashMap<Point, MortonKey> = HashMap::new();
@@ -106,7 +106,7 @@ pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &Points) -> HashMap<Mo
         }
     }
 
-    // Some nodes may be empty, this line retains them
+    // Some nodes may be empty, however we want to retain them
     for node in nodes.iter() {
         if !map.contains_key(node) {
             map.entry(*node).or_default();
@@ -116,7 +116,7 @@ pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &Points) -> HashMap<Mo
 }
 
 impl SingleNodeTree {
-    /// Create a new single-node tree. In non-adaptive (uniform) trees are created, they are specified
+    /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
     /// user defined maximum leaf maximum occupancy n_crit.
     pub fn new(
@@ -285,11 +285,13 @@ impl SingleNodeTree {
 
         let flc_root = ROOT.finest_last_child();
         let max = seeds.iter().max().unwrap();
-        // println!("MAX {:?}", max);
         let fa = flc_root.finest_ancestor(max);
         let last_child = fa.children().into_iter().max().unwrap();
 
-        if last_child > *max {
+        if last_child > *max
+            && !max.ancestors().contains(&last_child)
+            && !last_child.ancestors().contains(max)
+        {
             seeds.push(last_child);
         }
 
@@ -361,6 +363,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
+    // Single node trees are already locally essential trees
     fn create_let(&mut self) {}
 
     // Calculate near field interaction list of leaf keys.
@@ -581,7 +584,7 @@ mod tests {
 
         let map = assign_points_to_nodes(&points, &keys);
 
-        // Assert that all points have been mapped to something
+        // Test that all points have been mapped to something
         for point in points.iter() {
             assert!(map.contains_key(point));
         }
@@ -624,6 +627,7 @@ mod tests {
 
         let map = assign_points_to_nodes(&points, &keys);
 
+        // Test that the map remains empty
         assert!(map.is_empty());
     }
 
@@ -670,7 +674,7 @@ mod tests {
         assert_eq!(map.keys().len(), keys.len());
 
         // Test that a single octant contains all the points
-        for (node, points) in map.iter() {
+        for (_, points) in map.iter() {
             if points.len() > 0 {
                 assert!(points.len() == npoints);
             }

@@ -38,7 +38,7 @@ fn main() {
     // let n_crit: Option<_> = None;
     let depth: Option<_> = None;
     // let depth = Some(3);
-    let n_points = 1000000;
+    let n_points = 10000;
     let k: Option<_> = None;
 
     let points = points_fixture(n_points);

@@ -19,6 +19,7 @@ fn main() {
     let mut rng = rand::thread_rng();
     let range = Uniform::from(1..size);
     let nsend = rng.sample(range);
+    // let nsend = 1;
 
     // Send packets to 'nsend' other processors in communicator, excluding
     // this process.

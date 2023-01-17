@@ -62,8 +62,8 @@ where
         mpi::request::scope(|scope| {
             let status = world.any_process().probe_with_tag(rank);
             source_rank = status.source_rank();
-            // let _rreq = WaitGuard::from(world.process_at_rank(source_rank).immediate_receive_into_with_tag(scope, &mut msg, rank));
         });
+        
         let _rreq = world
             .process_at_rank(source_rank)
             .receive_into_with_tag(&mut msg, rank);
@@ -78,6 +78,12 @@ where
     for &len in received_packet_sizes.iter() {
         buffers.push(vec![T::default(); len as usize])
     }
+    
+    let buffer_lens: Vec<usize> = buffers.iter().map(|b| b.len()).collect();
+    let packet_lens: Vec<usize> = packets.iter().map(|p| p.len()).collect();
+    println!("RANK {:?} SENDING {:?} TO {:?}", rank, packet_lens, packet_destinations);
+    println!("RANK {:?} BUFFER LENS {:?} FROM {:?} \n", rank, buffer_lens, received_packet_sources);
+
 
     mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
         for (i, packet) in packets.iter().enumerate() {

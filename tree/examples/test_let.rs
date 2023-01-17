@@ -38,9 +38,7 @@ fn main() {
     // let adaptive = false;
     let adaptive = true;
     let n_crit = Some(50);
-    // let n_crit: Option<_> = None;
     let depth: Option<_> = None;
-    // let depth = Some(3);
     let n_points = 100000;
     let k: Option<_> = None;
 
