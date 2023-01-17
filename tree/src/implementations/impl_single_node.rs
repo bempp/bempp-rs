@@ -80,9 +80,9 @@ pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Po
             .sorted()
             .rev()
             .find(|a| nodes.contains(a))
-            { 
-                map.insert(*point, ancestor);
-            }
+        {
+            map.insert(*point, ancestor);
+        }
     }
     map
 }
@@ -356,15 +356,12 @@ impl Tree for SingleNodeTree {
     }
 }
 
-
 impl LocallyEssentialTree for SingleNodeTree {
     type RawTree = SingleNodeTree;
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
 
     fn create_let(&mut self) {}
-
-    fn load_balance_let(&mut self) {}
 
     // Calculate near field interaction list of leaf keys.
     fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {
@@ -558,24 +555,29 @@ mod tests {
 
     #[test]
     pub fn test_assign_points_to_nodes() {
-
         // 1. Assume overlap
         let points = points_fixture(100);
-        
-        let domain = Domain {origin: [0.0, 0.0, 0.0], diameter: [1.0, 1.0, 1.0]};
+
+        let domain = Domain {
+            origin: [0.0, 0.0, 0.0],
+            diameter: [1.0, 1.0, 1.0],
+        };
         let depth = 1;
 
         let points: Points = points
-        .iter()
-        .enumerate()
-        .map(|(i, p)| Point {
-            coordinate: *p,
-            key: MortonKey::from_point(p, &domain, depth),
-            global_idx: i,
-        })
-        .collect();
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, depth),
+                global_idx: i,
+            })
+            .collect();
 
-        let keys = MortonKeys { keys: ROOT.children(), index: 0 };
+        let keys = MortonKeys {
+            keys: ROOT.children(),
+            index: 0,
+        };
 
         let map = assign_points_to_nodes(&points, &keys);
 
@@ -599,31 +601,34 @@ mod tests {
             ])
         }
 
-        let domain = Domain {origin: [0.0, 0.0, 0.0], diameter: [1.0, 1.0, 1.0]};
+        let domain = Domain {
+            origin: [0.0, 0.0, 0.0],
+            diameter: [1.0, 1.0, 1.0],
+        };
         let depth = 1;
 
         let points: Points = points
-        .iter()
-        .enumerate()
-        .map(|(i, p)| Point {
-            coordinate: *p,
-            key: MortonKey::from_point(p, &domain, depth),
-            global_idx: i,
-        })
-        .collect();
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, depth),
+                global_idx: i,
+            })
+            .collect();
 
-        let keys = MortonKeys { keys: vec![ROOT.children().last().unwrap().clone()], index: 0 };
+        let keys = MortonKeys {
+            keys: vec![ROOT.children().last().unwrap().clone()],
+            index: 0,
+        };
 
         let map = assign_points_to_nodes(&points, &keys);
 
         assert!(map.is_empty());
-
-
     }
 
     #[test]
     pub fn test_assign_nodes_to_points() {
-
         // Generate points in a single octant of the domain
         let npoints = 10;
         let mut range = StdRng::seed_from_u64(0);
@@ -638,20 +643,26 @@ mod tests {
             ])
         }
 
-        let domain = Domain {origin: [0.0, 0.0, 0.0], diameter: [1.0, 1.0, 1.0]};
+        let domain = Domain {
+            origin: [0.0, 0.0, 0.0],
+            diameter: [1.0, 1.0, 1.0],
+        };
         let depth = 1;
 
         let points: Points = points
-        .iter()
-        .enumerate()
-        .map(|(i, p)| Point {
-            coordinate: *p,
-            key: MortonKey::from_point(p, &domain, depth),
-            global_idx: i,
-        })
-        .collect();
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                key: MortonKey::from_point(p, &domain, depth),
+                global_idx: i,
+            })
+            .collect();
 
-        let keys = MortonKeys { keys: ROOT.children(), index: 0 };
+        let keys = MortonKeys {
+            keys: ROOT.children(),
+            index: 0,
+        };
 
         let map = assign_nodes_to_points(&keys, &points);
 
@@ -664,27 +675,32 @@ mod tests {
                 assert!(points.len() == npoints);
             }
         }
-
     }
 
     #[test]
     pub fn test_split_blocks() {
-
-        let domain = Domain { origin: [0., 0., 0.], diameter: [1.0, 1.0, 1.0] };
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1.0, 1.0, 1.0],
+        };
         let depth = 5;
-        let points : Vec<Point> = points_fixture(10000)
+        let points: Vec<Point> = points_fixture(10000)
             .into_iter()
             .enumerate()
-            .map(|(i, p)| Point{coordinate: p, global_idx: i, key: MortonKey::from_point(&p, &domain, depth)})
+            .map(|(i, p)| Point {
+                coordinate: p,
+                global_idx: i,
+                key: MortonKey::from_point(&p, &domain, depth),
+            })
             // .cloned()
             .collect();
 
         let n_crit = 15;
-        
+
         // Test case where blocks span the entire domain
-        let blocktree = MortonKeys{
+        let blocktree = MortonKeys {
             keys: vec![ROOT],
-            index: 0
+            index: 0,
         };
 
         let split_blocktree = split_blocks(&points, blocktree, n_crit);
@@ -697,11 +713,10 @@ mod tests {
 
         let a = children[0];
         let b = children[6];
-        
 
-        let mut seeds = MortonKeys{
+        let mut seeds = MortonKeys {
             keys: vec![a, b],
-            index: 0
+            index: 0,
         };
 
         let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
@@ -709,18 +724,16 @@ mod tests {
         let split_blocktree = split_blocks(&points, blocktree, 25);
 
         test_no_overlaps_helper(&split_blocktree);
-
     }
 
     #[test]
     fn test_complete_blocktree() {
-
         let a = ROOT.first_child();
         let b = ROOT.children().last().unwrap().clone();
-        
-        let mut seeds = MortonKeys{
+
+        let mut seeds = MortonKeys {
             keys: vec![a, b],
-            index: 0
+            index: 0,
         };
 
         let mut blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
@@ -735,8 +748,5 @@ mod tests {
         for (a, b) in children.iter().zip(blocktree.iter()) {
             assert_eq!(a, b)
         }
-
-
-        
-    } 
+    }
 }

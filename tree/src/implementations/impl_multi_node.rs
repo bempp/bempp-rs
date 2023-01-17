@@ -568,6 +568,159 @@ fn let_helper(tree: &mut MultiNodeTree) {
     tree.leaves_to_points = assign_nodes_to_points(&tree.leaves, &tree.points);
 }
 
+// Repartition based on size of interaction lists for each leaf
+// Use Algorithm 1 in Sundar et. al (2008)
+fn load_balance_let(tree: &mut MultiNodeTree) {
+    let size = tree.world.size();
+    let rank = tree.world.rank();
+
+    let weights: Vec<i32> = tree
+        .leaves
+        .iter()
+        .map(|l| {
+            (tree.get_near_field(l).len() + tree.get_x_list(l).len() + tree.get_w_list(l).len())
+                as i32
+        })
+        .collect();
+
+    let mut cum_weights: Vec<i32> = weights
+        .iter()
+        .scan(0, |acc, &x| {
+            *acc += x;
+            Some(*acc)
+        })
+        .collect();
+
+    let mut total_weight = 0i32;
+    let local_weight = cum_weights.last().unwrap().clone();
+    tree.world
+        .scan_into(&local_weight, &mut total_weight, &SystemOperation::sum());
+
+    let mut prev_local_weight = 0i32;
+
+    if rank < size - 1 {
+        let next_rank = rank + 1;
+        let next_process = tree.world.process_at_rank(next_rank);
+        next_process.send(&total_weight);
+    }
+
+    if rank > 0 {
+        let prev_rank = rank - 1;
+        let prev_process = tree.world.process_at_rank(prev_rank);
+        prev_process.receive_into(&mut prev_local_weight);
+    }
+
+    cum_weights = cum_weights.iter().map(|x| x + prev_local_weight).collect();
+
+    if rank == size - 1 {
+        total_weight = cum_weights.last().unwrap().clone();
+    }
+    tree.world
+        .process_at_rank(size - 1)
+        .broadcast_into(&mut total_weight);
+
+    let mean_weight: f32 = total_weight as f32 / tree.world.size() as f32;
+
+    let k = total_weight % size;
+
+    let mut leaves_packets: Vec<Vec<MortonKey>> = Vec::new();
+    let mut points_packets: Vec<Vec<Point>> = Vec::new();
+    let mut packet_destinations = vec![0 as Rank; size as usize];
+
+    for p in 1..=size {
+        let mut leaves_packet: Vec<MortonKey> = Vec::new();
+        let mut points_packet: Vec<Point> = Vec::new();
+
+        if p <= k {
+            for (i, &cw) in cum_weights.iter().enumerate() {
+                if ((p - 1) as f32) * (mean_weight + 1.0) <= (cw as f32)
+                    && (cw as f32) < (p as f32) * (mean_weight + 1.0)
+                {
+                    leaves_packet.push(tree.leaves[i]);
+                    points_packet.extend(tree.leaves_to_points.get(&tree.leaves[i]).unwrap())
+                }
+            }
+        } else {
+            for (i, &cw) in cum_weights.iter().enumerate() {
+                if ((p - 1) as f32) * (mean_weight) + (k as f32) <= (cw as f32)
+                    && (cw as f32) < ((p) as f32) * (mean_weight) + (k as f32)
+                {
+                    leaves_packet.push(tree.leaves[i]);
+                    points_packet.extend(tree.leaves_to_points.get(&tree.leaves[i]).unwrap())
+                }
+            }
+        }
+
+        if rank != (p - 1) && leaves_packet.len() > 0 {
+            packet_destinations[(p - 1) as usize] = 1;
+            leaves_packets.push(leaves_packet);
+            points_packets.push(points_packet);
+        }
+    }
+
+    // Communicate number of packets being received by each process globally
+    let mut to_receive = vec![0i32; size as usize];
+    tree.world.all_reduce_into(
+        &packet_destinations,
+        &mut to_receive,
+        SystemOperation::sum(),
+    );
+
+    let recv_count = to_receive[rank as usize];
+
+    packet_destinations = packet_destinations
+        .into_iter()
+        .enumerate()
+        .filter(|(_, x)| x > &0)
+        .map(|(i, _)| i as Rank)
+        .collect();
+
+    // Remove all data being sent
+    tree.leaves_set = tree
+        .leaves_set
+        .difference(&leaves_packets.iter().flatten().cloned().collect())
+        .cloned()
+        .collect();
+
+    tree.leaves = tree.leaves_set.iter().cloned().collect();
+
+    tree.keys_set = tree
+        .keys_set
+        .difference(&leaves_packets.iter().flatten().cloned().collect())
+        .cloned()
+        .collect();
+
+    // This line works as leaves being sent have already been removed
+    tree.points = tree
+        .leaves
+        .iter()
+        .map(|leaf| tree.leaves_to_points.get(leaf).unwrap())
+        .cloned()
+        .flatten()
+        .collect();
+
+    let received_leaves = all_to_allv_sparse(
+        &tree.world,
+        &leaves_packets,
+        &packet_destinations,
+        &recv_count,
+    );
+    let received_points = all_to_allv_sparse(
+        &tree.world,
+        &points_packets,
+        &packet_destinations,
+        &recv_count,
+    );
+
+    // Insert into local tree
+    tree.keys_set.extend(&received_leaves);
+    tree.leaves_set.extend(&received_leaves);
+    tree.leaves = tree.leaves_set.iter().cloned().collect();
+    tree.points.extend(&received_points);
+    tree.points_to_leaves = assign_points_to_nodes(&tree.points, &tree.leaves);
+    tree.leaves_to_points = assign_nodes_to_points(&tree.leaves, &tree.points);
+}
+
 impl LocallyEssentialTree for MultiNodeTree {
     type RawTree = MultiNodeTree;
     type NodeIndex = MortonKey;
@@ -577,162 +730,9 @@ impl LocallyEssentialTree for MultiNodeTree {
         // Create an LET
         let_helper(self);
         // Load balance the LET
-        self.load_balance_let();
+        load_balance_let(self);
         // Reform LET based, now load balanced.
         let_helper(self);
-    }
-
-    // Repartition based on size of interaction lists for each leaf
-    // Use Algorithm 1 in Sundar et. al (2008)
-    fn load_balance_let(&mut self) {
-        let size = self.world.size();
-        let rank = self.world.rank();
-
-        let weights: Vec<i32> = self
-            .leaves
-            .iter()
-            .map(|l| {
-                (self.get_near_field(l).len() + self.get_x_list(l).len() + self.get_w_list(l).len())
-                    as i32
-            })
-            .collect();
-
-        let mut cum_weights: Vec<i32> = weights
-            .iter()
-            .scan(0, |acc, &x| {
-                *acc += x;
-                Some(*acc)
-            })
-            .collect();
-
-        let mut total_weight = 0i32;
-        let local_weight = cum_weights.last().unwrap().clone();
-        self.world
-            .scan_into(&local_weight, &mut total_weight, &SystemOperation::sum());
-
-        let mut prev_local_weight = 0i32;
-
-        if rank < size - 1 {
-            let next_rank = rank + 1;
-            let next_process = self.world.process_at_rank(next_rank);
-            next_process.send(&total_weight);
-        }
-
-        if rank > 0 {
-            let prev_rank = rank - 1;
-            let prev_process = self.world.process_at_rank(prev_rank);
-            prev_process.receive_into(&mut prev_local_weight);
-        }
-
-        cum_weights = cum_weights.iter().map(|x| x + prev_local_weight).collect();
-
-        if rank == size - 1 {
-            total_weight = cum_weights.last().unwrap().clone();
-        }
-        self.world
-            .process_at_rank(size - 1)
-            .broadcast_into(&mut total_weight);
-
-        let mean_weight: f32 = total_weight as f32 / self.world.size() as f32;
-
-        let k = total_weight % size;
-
-        let mut leaves_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut points_packets: Vec<Vec<Point>> = Vec::new();
-        let mut packet_destinations = vec![0 as Rank; size as usize];
-
-        for p in 1..=size {
-            let mut leaves_packet: Vec<MortonKey> = Vec::new();
-            let mut points_packet: Vec<Point> = Vec::new();
-
-            if p <= k {
-                for (i, &cw) in cum_weights.iter().enumerate() {
-                    if ((p - 1) as f32) * (mean_weight + 1.0) <= (cw as f32)
-                        && (cw as f32) < (p as f32) * (mean_weight + 1.0)
-                    {
-                        leaves_packet.push(self.leaves[i]);
-                        points_packet.extend(self.leaves_to_points.get(&self.leaves[i]).unwrap())
-                    }
-                }
-            } else {
-                for (i, &cw) in cum_weights.iter().enumerate() {
-                    if ((p - 1) as f32) * (mean_weight) + (k as f32) <= (cw as f32)
-                        && (cw as f32) < ((p) as f32) * (mean_weight) + (k as f32)
-                    {
-                        leaves_packet.push(self.leaves[i]);
-                        points_packet.extend(self.leaves_to_points.get(&self.leaves[i]).unwrap())
-                    }
-                }
-            }
-
-            if rank != (p - 1) && leaves_packet.len() > 0 {
-                packet_destinations[(p - 1) as usize] = 1;
-                leaves_packets.push(leaves_packet);
-                points_packets.push(points_packet);
-            }
-        }
-
-        // Communicate number of packets being received by each process globally
-        let mut to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &packet_destinations,
-            &mut to_receive,
-            SystemOperation::sum(),
-        );
-
-        let recv_count = to_receive[rank as usize];
-
-        packet_destinations = packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
-
-        // Remove all data being sent
-        self.leaves_set = self
-            .leaves_set
-            .difference(&leaves_packets.iter().flatten().cloned().collect())
-            .cloned()
-            .collect();
-
-        self.leaves = self.leaves_set.iter().cloned().collect();
-
-        self.keys_set = self
-            .keys_set
-            .difference(&leaves_packets.iter().flatten().cloned().collect())
-            .cloned()
-            .collect();
-
-        // This line works as leaves being sent have already been removed
-        self.points = self
-            .leaves
-            .iter()
-            .map(|leaf| self.leaves_to_points.get(leaf).unwrap())
-            .cloned()
-            .flatten()
-            .collect();
-
-        let received_leaves = all_to_allv_sparse(
-            &self.world,
-            &leaves_packets,
-            &packet_destinations,
-            &recv_count,
-        );
-        let received_points = all_to_allv_sparse(
-            &self.world,
-            &points_packets,
-            &packet_destinations,
-            &recv_count,
-        );
-
-        // Insert into local tree
-        self.keys_set.extend(&received_leaves);
-        self.leaves_set.extend(&received_leaves);
-        self.leaves = self.leaves_set.iter().cloned().collect();
-        self.points.extend(&received_points);
-        self.points_to_leaves = assign_points_to_nodes(&self.points, &self.leaves);
-        self.leaves_to_points = assign_nodes_to_points(&self.leaves, &self.points);
     }
 
     // Calculate near field interaction list of  keys.
@@ -770,7 +770,6 @@ impl LocallyEssentialTree for MultiNodeTree {
             index: 0,
         }
     }
-
     // Calculate compressible far field interactions of leaf & other keys.
     fn get_interaction_list(&self, key: &MortonKey) -> Option<MortonKeys> {
         if key.level() >= 2 {

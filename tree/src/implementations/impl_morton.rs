@@ -448,7 +448,7 @@ impl MortonKey {
             *other
         } else {
             let my_ancestors = self.ancestors();
-            let mut current = other.parent().clone();
+            let mut current = other.parent();
             while !my_ancestors.contains(&current) {
                 current = current.parent()
             }

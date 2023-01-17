@@ -7,7 +7,7 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 use solvers_traits::tree::{LocallyEssentialTree, Tree};
 
 use solvers_tree::types::{
-    multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree, morton::MortonKey
+    morton::MortonKey, multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree,
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
@@ -51,7 +51,6 @@ fn main() {
     // Create locally essential tree
     tree.create_let();
 
-    // Test that the local leaves have retained Morton ordering.
     let mut local: Vec<MortonKey> = tree.leaves.iter().sorted().cloned().collect();
 
     let min = local.iter().min().unwrap();
@@ -80,5 +79,4 @@ fn main() {
     if rank > 0 {
         assert!(partner_max <= *max)
     }
-
 }

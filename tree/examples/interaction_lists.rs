@@ -38,7 +38,7 @@ fn main() {
     // let n_crit: Option<_> = None;
     let depth: Option<_> = None;
     // let depth = Some(3);
-    let n_points = 100000;
+    let n_points = 1000000;
     let k: Option<_> = None;
 
     let points = points_fixture(n_points);
@@ -46,4 +46,10 @@ fn main() {
     let mut tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
 
     tree.create_let();
+
+    println!(
+        "rank {:?} has {:?} leaves",
+        tree.world.rank(),
+        tree.leaves.len()
+    );
 }
