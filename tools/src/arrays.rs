@@ -17,7 +17,7 @@ impl<T> Array2D<T> {
     }
 
     /// Get an item from the array
-    pub fn get(&mut self, index0: usize, index1: usize) -> &T {
+    pub fn get(&self, index0: usize, index1: usize) -> &T {
         self.data.get(index0 * self.shape.1 + index1).unwrap()
     }
     /// Get a mutable item from the array
@@ -25,7 +25,7 @@ impl<T> Array2D<T> {
         self.data.get_mut(index0 * self.shape.1 + index1).unwrap()
     }
     /// Get a row of the array
-    pub fn row(&mut self, index: usize) -> &[T] {
+    pub fn row(&self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
     }
 }
@@ -46,7 +46,7 @@ impl<T> AdjacencyList<T> {
         }
     }
     /// Get an item from the adjacency list
-    pub fn get(&mut self, index0: usize, index1: usize) -> &T {
+    pub fn get(&self, index0: usize, index1: usize) -> &T {
         // TODO: check that self.offsets[index0] + index1 < self.offsets[index0 + 1]
         self.data.get(self.offsets[index0] + index1).unwrap()
     }
@@ -56,7 +56,7 @@ impl<T> AdjacencyList<T> {
         self.data.get_mut(self.offsets[index0] + index1).unwrap()
     }
     /// Get a row from the adjacency list
-    pub fn row(&mut self, index: usize) -> &[T] {
+    pub fn row(&self, index: usize) -> &[T] {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
 }
