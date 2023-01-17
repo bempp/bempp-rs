@@ -4,24 +4,26 @@ pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Locality;
 pub use solvers_traits::grid::Topology;
+pub use solvers_tools::arrays::Array2D;
+pub use solvers_tools::arrays::AdjacencyList;
 use std::cmp::max;
 use std::cmp::min;
 
 pub struct SerialTriangle3DGeometry<'a> {
-    pub coordinates: &'a [f64],
+    pub coordinates: &'a Array2D<f64>,
 }
 
 impl Geometry for SerialTriangle3DGeometry<'_> {
     fn dim(&self) -> usize {
-        3
+        self.coordinates.shape.1
     }
 
     fn point(&self, i: usize) -> &[f64] {
-        &self.coordinates[i * self.dim()..(i + 1) * self.dim()]
+        &self.coordinates.row(i)
     }
 
     fn point_count(&self) -> usize {
-        self.coordinates.len() / self.dim()
+        self.coordinates.shape.0
     }
 }
 
@@ -68,7 +70,7 @@ impl Topology for SerialTriangle3DTopology<'_> {
 }
 
 pub struct SerialTriangle3DGrid {
-    pub coordinates: Vec<f64>,
+    pub coordinates: Array2D<f64>,
     pub cells: Vec<usize>,
 }
 
@@ -126,15 +128,16 @@ mod test {
     #[test]
     fn test_serial_triangle_grid() {
         let g = SerialTriangle3DGrid {
-            coordinates: vec![
+            coordinates: Array2D::new(vec![
                 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
                 0.0, -1.0,
-            ],
+            ], (6, 3)),
             cells: vec![
                 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 1, 2, 5, 2, 3, 5, 3, 4, 5, 4, 1,
             ],
         };
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
+
     }
 }
