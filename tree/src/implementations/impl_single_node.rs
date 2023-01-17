@@ -69,30 +69,27 @@ pub fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -
 /// Create a mapping between points and octree nodes, assumed to overlap.
 pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
     let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
-
     let mut map: HashMap<Point, MortonKey> = HashMap::new();
 
     for point in points.iter() {
-        if nodes.contains(&point.key) {
-            map.insert(*point, point.key);
-        } else {
-            let ancestor = point
-                .key
-                .ancestors()
-                .into_iter()
-                .sorted()
-                .rev()
-                .find(|a| nodes.contains(a))
-                .unwrap();
-            map.insert(*point, ancestor);
-        };
+        // The ancestor could be the key already assigned to the point
+        if let Some(ancestor) = point
+            .key
+            .ancestors()
+            .into_iter()
+            .sorted()
+            .rev()
+            .find(|a| nodes.contains(a))
+            { 
+                map.insert(*point, ancestor);
+            }
     }
     map
 }
 
 /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
-pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<MortonKey, Points> {
-    let keys: HashSet<MortonKey> = keys.iter().cloned().collect();
+pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &Points) -> HashMap<MortonKey, Points> {
+    let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
     let mut map: HashMap<MortonKey, Points> = HashMap::new();
 
     for point in points.iter() {
@@ -103,14 +100,16 @@ pub fn assign_nodes_to_points(keys: &MortonKeys, points: &Points) -> HashMap<Mor
             .into_iter()
             .sorted()
             .rev()
-            .find(|a| keys.contains(a))
+            .find(|a| nodes.contains(a))
         {
             map.entry(ancestor).or_default().push(*point)
         }
-        // Otherwise, if nothing matching is found in keys, just insert
-        // the point on its own.
-        else {
-            map.entry(point.key).or_default().push(*point)
+    }
+
+    // Some nodes may be empty, this line retains them
+    for node in nodes.iter() {
+        if !map.contains_key(node) {
+            map.entry(*node).or_default();
         }
     }
     map
@@ -274,24 +273,27 @@ impl SingleNodeTree {
     }
 
     pub fn complete_blocktree(seeds: &mut MortonKeys) -> MortonKeys {
-        println!("SEEDS BEFORE {:?}", seeds);
         let ffc_root = ROOT.finest_first_child();
         let min = seeds.iter().min().unwrap();
         let fa = ffc_root.finest_ancestor(min);
-        // println!("Finest Ancestor {:?} FFC ROOT {:?} MIN {:?}", fa, ffc_root, min);
         let first_child = fa.children().into_iter().min().unwrap();
-        seeds.push(first_child);
+
+        // Check for overlap
+        if first_child < *min {
+            seeds.push(first_child)
+        }
 
         let flc_root = ROOT.finest_last_child();
         let max = seeds.iter().max().unwrap();
         // println!("MAX {:?}", max);
         let fa = flc_root.finest_ancestor(max);
         let last_child = fa.children().into_iter().max().unwrap();
-        seeds.push(last_child);
+
+        if last_child > *max {
+            seeds.push(last_child);
+        }
 
         seeds.sort();
-
-        println!("SEEDS {:?}", seeds);
 
         let mut blocktree = MortonKeys::new();
 
@@ -557,58 +559,158 @@ mod tests {
     #[test]
     pub fn test_assign_points_to_nodes() {
 
+        // 1. Assume overlap
+        let points = points_fixture(100);
+        
+        let domain = Domain {origin: [0.0, 0.0, 0.0], diameter: [1.0, 1.0, 1.0]};
+        let depth = 1;
+
+        let points: Points = points
+        .iter()
+        .enumerate()
+        .map(|(i, p)| Point {
+            coordinate: *p,
+            key: MortonKey::from_point(p, &domain, depth),
+            global_idx: i,
+        })
+        .collect();
+
+        let keys = MortonKeys { keys: ROOT.children(), index: 0 };
+
+        let map = assign_points_to_nodes(&points, &keys);
+
+        // Assert that all points have been mapped to something
+        for point in points.iter() {
+            assert!(map.contains_key(point));
+        }
+
+        // 2. No overlap
+        // Generate points in a single octant of the domain
+        let npoints = 10;
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..0.5);
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
+
+        let domain = Domain {origin: [0.0, 0.0, 0.0], diameter: [1.0, 1.0, 1.0]};
+        let depth = 1;
+
+        let points: Points = points
+        .iter()
+        .enumerate()
+        .map(|(i, p)| Point {
+            coordinate: *p,
+            key: MortonKey::from_point(p, &domain, depth),
+            global_idx: i,
+        })
+        .collect();
+
+        let keys = MortonKeys { keys: vec![ROOT.children().last().unwrap().clone()], index: 0 };
+
+        let map = assign_points_to_nodes(&points, &keys);
+
+        assert!(map.is_empty());
+
+
     }
 
     #[test]
     pub fn test_assign_nodes_to_points() {
 
+        // Generate points in a single octant of the domain
+        let npoints = 10;
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..0.5);
+        let mut points: Vec<[PointType; 3]> = Vec::new();
+
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
+
+        let domain = Domain {origin: [0.0, 0.0, 0.0], diameter: [1.0, 1.0, 1.0]};
+        let depth = 1;
+
+        let points: Points = points
+        .iter()
+        .enumerate()
+        .map(|(i, p)| Point {
+            coordinate: *p,
+            key: MortonKey::from_point(p, &domain, depth),
+            global_idx: i,
+        })
+        .collect();
+
+        let keys = MortonKeys { keys: ROOT.children(), index: 0 };
+
+        let map = assign_nodes_to_points(&keys, &points);
+
+        // Test that map retains empty nodes
+        assert_eq!(map.keys().len(), keys.len());
+
+        // Test that a single octant contains all the points
+        for (node, points) in map.iter() {
+            if points.len() > 0 {
+                assert!(points.len() == npoints);
+            }
+        }
+
     }
 
-    // #[test]
-    // pub fn test_split_blocks() {
+    #[test]
+    pub fn test_split_blocks() {
 
-    //     let domain = Domain { origin: [0., 0., 0.], diameter: [1.0, 1.0, 1.0] };
-    //     let depth = 5;
-    //     let points : Vec<Point> = points_fixture(10000)
-    //         .into_iter()
-    //         .enumerate()
-    //         .map(|(i, p)| Point{coordinate: p, global_idx: i, key: MortonKey::from_point(&p, &domain, depth)})
-    //         // .cloned()
-    //         .collect();
+        let domain = Domain { origin: [0., 0., 0.], diameter: [1.0, 1.0, 1.0] };
+        let depth = 5;
+        let points : Vec<Point> = points_fixture(10000)
+            .into_iter()
+            .enumerate()
+            .map(|(i, p)| Point{coordinate: p, global_idx: i, key: MortonKey::from_point(&p, &domain, depth)})
+            // .cloned()
+            .collect();
 
-    //     let n_crit = 15;
+        let n_crit = 15;
         
-    //     // Test case where blocks span the entire domain
-    //     let blocktree = MortonKeys{
-    //         keys: vec![ROOT],
-    //         index: 0
-    //     };
+        // Test case where blocks span the entire domain
+        let blocktree = MortonKeys{
+            keys: vec![ROOT],
+            index: 0
+        };
 
-    //     let split_blocktree = split_blocks(&points, blocktree, n_crit);
+        let split_blocktree = split_blocks(&points, blocktree, n_crit);
 
-    //     test_no_overlaps_helper(&split_blocktree);
+        test_no_overlaps_helper(&split_blocktree);
 
-    //     // Test case where the blocktree only partially covers the area
-    //     let children = ROOT.children();
-    //     // let a = ROOT.first_child().first_child();
-    //     // let b = ROOT.children().last().unwrap().children().last().unwrap().clone();
+        // Test case where the blocktree only partially covers the area
+        let mut children = ROOT.children();
+        children.sort();
+
+        let a = children[0];
+        let b = children[6];
         
-    //     let a = ROOT.first_child();
-    //     let b = ROOT.children().last().unwrap().clone();
 
-    //     let mut seeds = MortonKeys{
-    //         keys: vec![a, b],
-    //         index: 0
-    //     };
+        let mut seeds = MortonKeys{
+            keys: vec![a, b],
+            index: 0
+        };
 
-    //     let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
-    //     let split_blocktree = split_blocks(&points, blocktree, n_crit);
+        let split_blocktree = split_blocks(&points, blocktree, 25);
 
-    //     // println!("Split blocktree {:?}", split_blocktree.len());
-    //     // assert!(false);
+        test_no_overlaps_helper(&split_blocktree);
 
-    // }
+    }
 
     #[test]
     fn test_complete_blocktree() {
@@ -621,10 +723,20 @@ mod tests {
             index: 0
         };
 
-        let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let mut blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
+        blocktree.sort();
+
+        let mut children = ROOT.children();
+        children.sort();
         // Test that the blocktree is completed
-        // println!("blocktree {:?}", blocktree);
-        assert!(false)
-   } 
+        assert_eq!(blocktree.len(), 8);
+
+        for (a, b) in children.iter().zip(blocktree.iter()) {
+            assert_eq!(a, b)
+        }
+
+
+        
+    } 
 }
