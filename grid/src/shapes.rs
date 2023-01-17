@@ -1,15 +1,18 @@
 pub use crate::grid::SerialTriangle3DGrid;
+pub use solvers_tools::arrays::Array2D;
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
-pub use solvers_tools::arrays::Array2D;
 
 pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
     let mut g = SerialTriangle3DGrid {
-        coordinates: Array2D::new(vec![
-            0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0,
-            -1.0,
-        ], (6, 3)),
+        coordinates: Array2D::new(
+            vec![
+                0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
+                0.0, -1.0,
+            ],
+            (6, 3),
+        ),
         cells: vec![
             0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
         ],
@@ -27,7 +30,9 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
             let mut pt = [0.0, 0.0, 0.0];
             for j in 0..3 {
                 for i in 0..2 {
-                    pt[j] += g.coordinates.get(g.topology().connectivity_1_0[2 * edge + i], j);
+                    pt[j] += g
+                        .coordinates
+                        .get(g.topology().connectivity_1_0[2 * edge + i], j);
                 }
                 pt[j] /= 2.0;
             }

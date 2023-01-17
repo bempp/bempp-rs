@@ -1,11 +1,11 @@
 pub use solvers_element::cell::Triangle;
+pub use solvers_tools::arrays::AdjacencyList;
+pub use solvers_tools::arrays::Array2D;
 pub use solvers_traits::cell::ReferenceCell;
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Locality;
 pub use solvers_traits::grid::Topology;
-pub use solvers_tools::arrays::Array2D;
-pub use solvers_tools::arrays::AdjacencyList;
 use std::cmp::max;
 use std::cmp::min;
 
@@ -128,16 +128,18 @@ mod test {
     #[test]
     fn test_serial_triangle_grid() {
         let g = SerialTriangle3DGrid {
-            coordinates: Array2D::new(vec![
-                0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
-                0.0, -1.0,
-            ], (6, 3)),
+            coordinates: Array2D::new(
+                vec![
+                    0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0,
+                    0.0, 0.0, -1.0,
+                ],
+                (6, 3),
+            ),
             cells: vec![
                 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 1, 2, 5, 2, 3, 5, 3, 4, 5, 4, 1,
             ],
         };
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
-
     }
 }
