@@ -3,7 +3,7 @@ pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
 
-fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
+pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
     let mut g = SerialTriangle3DGrid {
         coordinates: vec![
             0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0,
@@ -70,14 +70,10 @@ mod test {
     #[test]
     fn test_regular_sphere_0() {
         let g = regular_sphere(0);
-        let volume = g.cell_geometry(0).volume();
-        for i in 0..g.topology().entity_count(2) {
-            assert_relative_eq!(g.cell_geometry(i).volume(), volume);
-        }
     }
 
     #[test]
-    fn test_regular_sphere2() {
+    fn test_regular_spheres() {
         let g1 = regular_sphere(1);
         let g2 = regular_sphere(2);
         let g3 = regular_sphere(3);

@@ -4,14 +4,11 @@ pub use crate::cell::ReferenceCell;
 pub use crate::element::FiniteElement;
 
 pub trait Geometry {
-    fn reference_cell(&self) -> &dyn ReferenceCell;
-    fn map(&self, reference_coords: &[f64], physical_coords: &mut [f64]);
-
     fn dim(&self) -> usize;
 
-    fn midpoint(&self) -> Vec<f64>;
+    fn point(&self, i: usize) -> &[f64];
 
-    fn volume(&self) -> f64;
+    fn point_count(&self) -> usize;
 }
 
 pub enum Locality {
@@ -46,5 +43,5 @@ pub trait Grid {
 
     fn topology<'a>(&'a self) -> Self::Topology<'a>;
 
-    fn cell_geometry<'a>(&'a self, local_index: usize) -> Self::Geometry<'a>;
+    fn geometry<'a>(&'a self) -> Self::Geometry<'a>;
 }

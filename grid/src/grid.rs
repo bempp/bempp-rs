@@ -9,61 +9,19 @@ use std::cmp::min;
 
 pub struct SerialTriangle3DGeometry<'a> {
     pub coordinates: &'a [f64],
-    pub vertex_numbers: &'a [usize],
 }
 
 impl Geometry for SerialTriangle3DGeometry<'_> {
-    fn reference_cell(&self) -> &dyn ReferenceCell {
-        &Triangle {}
-    }
-
-    fn map(&self, reference_coords: &[f64], physical_coords: &mut [f64]) {
-        for i in 0..3 {
-            physical_coords[i] = self.coordinates[self.vertex_numbers[0] * 3 + i]
-                + reference_coords[0]
-                    * (self.coordinates[self.vertex_numbers[1] * 3 + i]
-                        - self.coordinates[self.vertex_numbers[0] * 3 + i])
-                + reference_coords[2]
-                    * (self.coordinates[self.vertex_numbers[2] * 3 + i]
-                        - self.coordinates[self.vertex_numbers[0] * 3 + i]);
-        }
-    }
-
     fn dim(&self) -> usize {
         3
     }
 
-    fn midpoint(&self) -> Vec<f64> {
-        let mut mid = vec![0.0, 0.0, 0.0];
-        for i in 0..3 {
-            for j in 0..3 {
-                mid[i] += self.coordinates[self.vertex_numbers[j] * 3 + i];
-            }
-            mid[i] /= 3.0;
-        }
-        mid
+    fn point(&self, i: usize) -> &[f64] {
+        &self.coordinates[i * self.dim()..(i + 1) * self.dim()]
     }
-    fn volume(&self) -> f64 {
-        let a = [
-            self.coordinates[self.vertex_numbers[1] * 3]
-                - self.coordinates[self.vertex_numbers[0] * 3],
-            self.coordinates[self.vertex_numbers[1] * 3 + 1]
-                - self.coordinates[self.vertex_numbers[0] * 3 + 1],
-            self.coordinates[self.vertex_numbers[1] * 3 + 2]
-                - self.coordinates[self.vertex_numbers[0] * 3 + 2],
-        ];
-        let b = [
-            self.coordinates[self.vertex_numbers[2] * 3]
-                - self.coordinates[self.vertex_numbers[0] * 3],
-            self.coordinates[self.vertex_numbers[2] * 3 + 1]
-                - self.coordinates[self.vertex_numbers[0] * 3 + 1],
-            self.coordinates[self.vertex_numbers[2] * 3 + 2]
-                - self.coordinates[self.vertex_numbers[0] * 3 + 2],
-        ];
-        ((a[0] * b[1] - a[1] * b[0]).powi(2)
-            + (a[1] * b[2] - a[2] * b[1]).powi(2)
-            + (a[2] * b[0] - a[0] * b[2]).powi(2))
-        .sqrt()
+
+    fn point_count(&self) -> usize {
+        self.coordinates.len() / self.dim()
     }
 }
 
@@ -153,10 +111,9 @@ impl<'a> Grid for SerialTriangle3DGrid {
         }
     }
 
-    fn cell_geometry<'b>(&'b self, local_index: usize) -> Self::Geometry<'b> {
+    fn geometry<'b>(&'b self) -> Self::Geometry<'b> {
         SerialTriangle3DGeometry::<'b> {
             coordinates: &self.coordinates,
-            vertex_numbers: &self.cells[3 * local_index..3 * (local_index + 1)],
         }
     }
 }
@@ -178,11 +135,6 @@ mod test {
             ],
         };
         assert_eq!(g.topology().dim(), 2);
-        assert_eq!(g.cell_geometry(0).dim(), 3);
-
-        let m = g.cell_geometry(0).midpoint();
-        for i in 0..3 {
-            assert_relative_eq!(m[i], 1.0 / 3.0);
-        }
+        assert_eq!(g.geometry().dim(), 3);
     }
 }
