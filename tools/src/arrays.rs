@@ -28,6 +28,10 @@ impl<T> Array2D<T> {
     pub fn row(&self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
     }
+    /// Get the shape of the array
+    pub fn shape(&self) -> &(usize, usize) {
+        &self.shape
+    }
 }
 
 /// An adjacency list
@@ -58,6 +62,10 @@ impl<T> AdjacencyList<T> {
     /// Get a row from the adjacency list
     pub fn row(&self, index: usize) -> &[T] {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
+    }
+    /// Get the vector of offsets
+    pub fn offsets(&self) -> &Vec<usize> {
+        &self.offsets
     }
 }
 
