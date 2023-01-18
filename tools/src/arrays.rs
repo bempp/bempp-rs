@@ -18,11 +18,27 @@ impl<T> Array2D<T> {
 
     /// Get an item from the array
     pub fn get(&self, index0: usize, index1: usize) -> Option<&T> {
-        self.data.get(index0 * self.shape.1 + index1)
+        if index0 >= self.shape.0 || index1 >= self.shape.1 {
+            None
+        } else {
+            self.data.get(index0 * self.shape.1 + index1)
+        }
     }
     /// Get a mutable item from the array
     pub fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
-        self.data.get_mut(index0 * self.shape.1 + index1)
+        if index0 >= self.shape.0 || index1 >= self.shape.1 {
+            None
+        } else {
+            self.data.get_mut(index0 * self.shape.1 + index1)
+        }
+    }
+    /// Get a row of the array
+    pub fn row(&self, index: usize) -> Option<&[T]> {
+        if index >= self.shape.0 {
+            None
+        } else {
+            Some(&self.data[index * self.shape.1..(index + 1) * self.shape.1])
+        }
     }
     /// Get an item from the array without checking bounds
     pub unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
@@ -32,8 +48,8 @@ impl<T> Array2D<T> {
     pub unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
         self.data.get_unchecked_mut(index0 * self.shape.1 + index1)
     }
-    /// Get a row of the array
-    pub fn row(&self, index: usize) -> &[T] {
+    /// Get a row of the array without checking bounds
+    pub unsafe fn row_unchecked(&self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
     }
     /// Get the shape of the array
@@ -59,13 +75,31 @@ impl<T> AdjacencyList<T> {
     }
     /// Get an item from the adjacency list
     pub fn get(&self, index0: usize, index1: usize) -> Option<&T> {
-        // TODO: check that self.offsets[index0] + index1 < self.offsets[index0 + 1]
-        self.data.get(self.offsets[index0] + index1)
+        if index0 >= self.offsets.len() - 1
+            || self.offsets[index0] + index1 >= self.offsets[index0 + 1]
+        {
+            None
+        } else {
+            self.data.get(self.offsets[index0] + index1)
+        }
     }
     /// Get a mutable item from the adjacency list
     pub fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
-        // TODO: check that self.offsets[index0] + index1 < self.offsets[index0 + 1]
-        self.data.get_mut(self.offsets[index0] + index1)
+        if index0 >= self.offsets.len() - 1
+            || self.offsets[index0] + index1 >= self.offsets[index0 + 1]
+        {
+            None
+        } else {
+            self.data.get_mut(self.offsets[index0] + index1)
+        }
+    }
+    /// Get a row from the adjacency list
+    pub fn row(&self, index: usize) -> Option<&[T]> {
+        if index >= self.offsets.len() - 1 {
+            None
+        } else {
+            Some(&self.data[self.offsets[index]..self.offsets[index + 1]])
+        }
     }
     /// Get an item from the adjacency list without checking bounds
     pub unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
@@ -75,8 +109,8 @@ impl<T> AdjacencyList<T> {
     pub unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
         self.data.get_unchecked_mut(self.offsets[index0] + index1)
     }
-    /// Get a row from the adjacency list
-    pub fn row(&self, index: usize) -> &[T] {
+    /// Get a row from the adjacency list without checking bounds
+    pub unsafe fn row_unchecked(&self, index: usize) -> &[T] {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
     /// Get the vector of offsets
@@ -99,7 +133,7 @@ mod test {
         assert_eq!(*arr.get(1, 1).unwrap(), 5);
         assert_eq!(*arr.get(1, 2).unwrap(), 6);
 
-        let row1 = arr.row(1);
+        let row1 = arr.row(1).unwrap();
         assert_eq!(row1.len(), 3);
         assert_eq!(row1[0], 4);
         assert_eq!(row1[1], 5);
@@ -116,7 +150,7 @@ mod test {
         assert_eq!(*arr2.get(1, 1).unwrap(), 5.0);
         assert_eq!(*arr2.get(1, 2).unwrap(), 6.0);
 
-        let row1 = arr2.row(1);
+        let row1 = arr2.row(1).unwrap();
         assert_eq!(row1.len(), 3);
         assert_eq!(row1[0], 4.0);
         assert_eq!(row1[1], 5.0);
@@ -136,7 +170,7 @@ mod test {
         assert_eq!(*arr.get(2, 1).unwrap(), 5);
         assert_eq!(*arr.get(2, 2).unwrap(), 6);
 
-        let row1 = arr.row(1);
+        let row1 = arr.row(1).unwrap();
         assert_eq!(row1.len(), 1);
         assert_eq!(row1[0], 3);
 
