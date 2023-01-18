@@ -24,6 +24,14 @@ impl<T> Array2D<T> {
     pub fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
         self.data.get_mut(index0 * self.shape.1 + index1)
     }
+    /// Get an item from the array without checking bounds
+    pub unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
+        self.data.get_unchecked(index0 * self.shape.1 + index1)
+    }
+    /// Get a mutable item from the array without checking bounds
+    pub unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
+        self.data.get_unchecked_mut(index0 * self.shape.1 + index1)
+    }
     /// Get a row of the array
     pub fn row(&self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
@@ -58,6 +66,14 @@ impl<T> AdjacencyList<T> {
     pub fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
         // TODO: check that self.offsets[index0] + index1 < self.offsets[index0 + 1]
         self.data.get_mut(self.offsets[index0] + index1)
+    }
+    /// Get an item from the adjacency list without checking bounds
+    pub unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
+        self.data.get_unchecked(self.offsets[index0] + index1)
+    }
+    /// Get a mutable item from the adjacency list without checking bounds
+    pub unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
+        self.data.get_unchecked_mut(self.offsets[index0] + index1)
     }
     /// Get a row from the adjacency list
     pub fn row(&self, index: usize) -> &[T] {
