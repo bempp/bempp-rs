@@ -1,21 +1,33 @@
 //! Containers to store multi-dimensional data
+use num::Num;
+use std::clone::Clone;
 
 /// A two-dimensional rectangular array
 pub struct Array2D<T> {
+    /// The data in the array, in row-major order
     data: Vec<T>,
+    /// The shape of the array
     shape: (usize, usize),
 }
-impl<T> Array2D<T> {
-    /// Create an array
-    pub fn from_data(data: Vec<T>, shape: (usize, usize)) -> Self {
+
+impl<T: Num + Clone> Array2D<T> {
+    /// Create an array from a data vector
+    pub fn new(shape: (usize, usize)) -> Self {
         Self {
-            /// The data in the array, in row-major order
-            data: data,
-            /// The shape of the array
+            data: vec![T::zero(); shape.0 * shape.1],
             shape: shape,
         }
     }
+}
 
+impl<T> Array2D<T> {
+    /// Create an array from a data vector
+    pub fn from_data(data: Vec<T>, shape: (usize, usize)) -> Self {
+        Self {
+            data: data,
+            shape: shape,
+        }
+    }
     /// Get an item from the array
     pub fn get(&self, index0: usize, index1: usize) -> Option<&T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
@@ -62,9 +74,32 @@ impl<T> Array2D<T> {
 ///
 /// An adjacency list stores two-dimensional data where each row may have a different number of items
 pub struct AdjacencyList<T> {
+    /// The data in the array, in row-major order
     data: Vec<T>,
+    /// The starting index of each row, plus a final entry that is the length of data
     offsets: Vec<usize>,
 }
+
+impl<T: Num + Clone> AdjacencyList<T> {
+    /// Create an adjacency list
+    pub fn new() -> Self {
+        Self {
+            data: vec![T::zero(); 0],
+            offsets: vec![0],
+        }
+    }
+}
+
+impl<T: Num + Copy> AdjacencyList<T> {
+    /// Add a new row of data to the end
+    pub fn add_row(&mut self, data: Vec<T>) {
+        for i in 0..data.len() {
+            self.data.push(data[i]);
+        }
+        self.offsets.push(self.offsets.last().unwrap() + data.len());
+    }
+}
+
 impl<T> AdjacencyList<T> {
     /// Create an adjacency list
     pub fn from_data(data: Vec<T>, offsets: Vec<usize>) -> Self {
@@ -117,6 +152,10 @@ impl<T> AdjacencyList<T> {
     pub fn offsets(&self) -> &Vec<usize> {
         &self.offsets
     }
+    /// Get the number of rows
+    pub fn num_rows(&self) -> usize {
+        self.offsets.len() - 1
+    }
 }
 
 #[cfg(test)]
@@ -158,6 +197,16 @@ mod test {
 
         *arr2.get_mut(1, 2).unwrap() = 7.;
         assert_eq!(*arr2.get(1, 2).unwrap(), 7.0);
+
+        let mut arr3 = Array2D::<usize>::new((4, 5));
+        assert_eq!(*arr3.get(1, 2).unwrap(), 0);
+        *arr3.get_mut(1, 2).unwrap() = 5;
+        assert_eq!(*arr3.get(1, 2).unwrap(), 5);
+
+        let mut arr4 = Array2D::<f32>::new((4, 5));
+        assert_eq!(*arr4.get(1, 2).unwrap(), 0.0);
+        *arr4.get_mut(1, 2).unwrap() = 5.0;
+        assert_eq!(*arr4.get(1, 2).unwrap(), 5.0);
     }
 
     #[test]
@@ -176,5 +225,14 @@ mod test {
 
         *arr.get_mut(2, 0).unwrap() = 7;
         assert_eq!(*arr.get(2, 0).unwrap(), 7);
+
+        let mut arr2 = AdjacencyList::<f64>::new();
+        assert_eq!(arr2.num_rows(), 0);
+        arr2.add_row(vec![1.0, 2.0, 3.0]);
+        arr2.add_row(vec![4.0]);
+        arr2.add_row(vec![5.0, 6.0, 7.0, 8.0]);
+
+        assert_eq!(arr2.num_rows(), 3);
+        assert_eq!(*arr2.get(0, 0).unwrap(), 1.0)
     }
 }
