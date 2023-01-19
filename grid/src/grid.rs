@@ -15,15 +15,18 @@ pub struct SerialTriangle3DGeometry<'a> {
 
 impl Geometry for SerialTriangle3DGeometry<'_> {
     fn dim(&self) -> usize {
-        self.coordinates.shape.1
+        self.coordinates.shape().1
     }
 
-    fn point(&self, i: usize) -> &[f64] {
-        &self.coordinates.row(i)
+    fn point(&self, i: usize) -> Option<&[f64]> {
+        self.coordinates.row(i)
+    }
+    unsafe fn point_unchecked(&self, i: usize) -> &[f64] {
+        self.coordinates.row_unchecked(i)
     }
 
     fn point_count(&self) -> usize {
-        self.coordinates.shape.0
+        self.coordinates.shape().0
     }
 }
 
@@ -128,7 +131,7 @@ mod test {
     #[test]
     fn test_serial_triangle_grid() {
         let g = SerialTriangle3DGrid {
-            coordinates: Array2D::new(
+            coordinates: Array2D::from_data(
                 vec![
                     0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0,
                     0.0, 0.0, -1.0,

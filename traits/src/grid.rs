@@ -6,7 +6,9 @@ pub use crate::element::FiniteElement;
 pub trait Geometry {
     fn dim(&self) -> usize;
 
-    fn point(&self, i: usize) -> &[f64];
+    fn point(&self, i: usize) -> Option<&[f64]>;
+
+    unsafe fn point_unchecked(&self, i: usize) -> &[f64];
 
     fn point_count(&self) -> usize;
 }

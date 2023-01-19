@@ -6,7 +6,7 @@ pub use solvers_traits::grid::Topology;
 
 pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
     let mut g = SerialTriangle3DGrid {
-        coordinates: Array2D::new(
+        coordinates: Array2D::from_data(
             vec![
                 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
                 0.0, -1.0,
@@ -20,11 +20,13 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
     for level in 0..refinement_level {
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
         let ncells = 4 * g.topology().entity_count(2);
-        let mut coordinates = Array2D::new(vec![0.0; 3 * nvertices], (nvertices, 3));
+        let mut coordinates = Array2D::<f64>::new((nvertices, 3));
         let mut cells = vec![0; 3 * ncells];
 
-        for i in 0..g.coordinates.data.len() {
-            coordinates.data[i] = g.coordinates.data[i];
+        for i in 0..g.coordinates.shape().0 {
+            for j in 0..g.coordinates.shape().1 {
+                *coordinates.get_mut(i, j).unwrap() = *g.coordinates.get(i, j).unwrap();
+            }
         }
         for edge in 0..g.topology().entity_count(1) {
             let mut pt = [0.0, 0.0, 0.0];
@@ -32,14 +34,17 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
                 for i in 0..2 {
                     pt[j] += g
                         .coordinates
-                        .get(g.topology().connectivity_1_0[2 * edge + i], j);
+                        .get(g.topology().connectivity_1_0[2 * edge + i], j)
+                        .unwrap();
                 }
                 pt[j] /= 2.0;
             }
             let norm = (pt[0].powi(2) + pt[1].powi(2) + pt[2].powi(2)).sqrt();
 
             for j in 0..3 {
-                *coordinates.get_mut(g.topology().entity_count(0) + edge, j) = pt[j] / norm;
+                *coordinates
+                    .get_mut(g.topology().entity_count(0) + edge, j)
+                    .unwrap() = pt[j] / norm;
             }
         }
 

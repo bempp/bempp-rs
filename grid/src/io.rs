@@ -16,7 +16,7 @@ pub fn export_as_gmsh(grid: SerialTriangle3DGrid, fname: String) {
     for i in 0..node_count {
         gmsh_s.push_str(&format!("{i}"));
         for j in 0..grid.geometry().dim() {
-            let coord = grid.geometry().point(i)[j];
+            let coord = grid.geometry().point(i).unwrap()[j];
             gmsh_s.push_str(&format!(" {coord}"));
         }
         gmsh_s.push_str("\n");
