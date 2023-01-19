@@ -36,14 +36,10 @@ pub trait Topology {
 }
 
 pub trait Grid {
-    type Topology<'a>: Topology
-    where
-        Self: 'a;
-    type Geometry<'a>: Geometry
-    where
-        Self: 'a;
+    type Topology: Topology;
+    type Geometry: Geometry;
 
-    fn topology<'a>(&'a self) -> Self::Topology<'a>;
+    fn topology(&self) -> &Self::Topology;
 
-    fn geometry<'a>(&'a self) -> Self::Geometry<'a>;
+    fn geometry(&self) -> &Self::Geometry;
 }
