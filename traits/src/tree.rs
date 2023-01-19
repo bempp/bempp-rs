@@ -36,7 +36,6 @@ pub trait LocallyEssentialTree {
     type NodeIndices;
 
     fn create_let(&mut self);
-    // fn load_balance_let(&mut self);
     fn get_near_field(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
     fn get_interaction_list(&self, key: &Self::NodeIndex) -> Option<Self::NodeIndices>;
     fn get_x_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
