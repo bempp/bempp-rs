@@ -1,15 +1,12 @@
-
 use itertools::Itertools;
 use std::collections::HashSet;
 
-use mpi::{
-    collective::SystemOperation, topology::UserCommunicator, traits::*, Rank, Count
-};
+use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Count, Rank};
 
 use hyksort::hyksort;
 use solvers_traits::{
     tree::{LocallyEssentialTree, Tree},
-    types::Locality
+    types::Locality,
 };
 
 use crate::{
@@ -601,8 +598,7 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
             let u = tree.get_near_field(l).unwrap_or(MortonKeys::default());
             let w = tree.get_w_list(l).unwrap_or(MortonKeys::default());
             let x = tree.get_x_list(l).unwrap_or(MortonKeys::default());
-            (u.len()+w.len()+x.len()) as i32
-            
+            (u.len() + w.len() + x.len()) as i32
         })
         .collect();
 

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use solvers_traits::{
     tree::{LocallyEssentialTree, Tree},
-    types::Locality
+    types::Locality,
 };
 
 use crate::{
@@ -365,7 +365,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     type RawTree = SingleNodeTree;
     type NodeIndex = MortonKey;
     type NodeIndices<'a> = MortonKeys;
-    
+
     fn locality<'a>(&'a self, node_index: &Self::NodeIndex) -> Locality {
         Locality::Local
     }
