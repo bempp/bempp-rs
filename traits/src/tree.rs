@@ -1,3 +1,5 @@
+use crate::types::{Locality, Scalar};
+
 pub trait Tree {
     type Domain;
     type Point;
@@ -33,11 +35,53 @@ pub trait Tree {
 pub trait LocallyEssentialTree {
     type RawTree: Tree;
     type NodeIndex;
-    type NodeIndices;
+    type NodeIndices<'a>: std::iter::Iterator<Item = Self::NodeIndex>
+    where
+        Self: 'a;
+    
+    fn create_let<'a>(&'a mut self);
+    fn locality<'a>(&'a self, node_index: &Self::NodeIndex) -> Locality;
+    fn get_near_field<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
+    fn get_interaction_list<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
+    fn get_x_list<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
+    fn get_w_list<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
+}
 
-    fn create_let(&mut self);
-    fn get_near_field(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    fn get_interaction_list(&self, key: &Self::NodeIndex) -> Option<Self::NodeIndices>;
-    fn get_x_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
-    fn get_w_list(&self, key: &Self::NodeIndex) -> Self::NodeIndices;
+// Definition of a tree node for the FMM
+// A node contains
+// - `Data`: Typically an array of numbers associated with a node.
+// - `NodeData`: A type that describes geometric data of a node.
+// - `NodeIndex`: An index associated with the node.
+pub trait FmmNode {
+    // The type of the coefficients associated with the node.
+    type Item: Scalar;
+    // Type of the geometry definition.
+    type Geometry;
+    // Type that describes node indices.
+    type NodeIndex;
+    // Data view with a lifetime that depends on the
+    // lifetime of the tree node.
+    type View<'a>: crate::general::IndexableView
+    where
+        Self: 'a;
+    // Get the node geometry.
+    fn node_geometry(&self) -> Self::Geometry;
+    // Get a view onto the data.
+    fn view<'a>(&'a self) -> Self::View<'a>;
+    // Get a mutable view onto the data.
+    fn view_mut<'a>(&'a mut self) -> Self::View<'a>;
+    // Get the index of the node.
+    fn node_index(&self) -> Self::NodeIndex;
+}
+
+pub trait FmmTree {
+    type RawTree: LocallyEssentialTree;
+    type NodeIndex: FmmNode;
+    type NodeIndices<'a>: std::iter::Iterator<Item = Self::NodeIndex>
+    where
+        Self: 'a;
+    
+    fn upward_pass(&self) {};
+    fn downward_pass(&self) {};
+    fn run(&self) {};
 }

@@ -1,8 +1,6 @@
 /// Helper Routines for MPI functionality
 use mpi::{
-    collective::SystemOperation,
     datatype::Equivalence,
-    request::{LocalScope, Request, RequestCollection, Scope, WaitGuard},
     topology::{Communicator, UserCommunicator},
     traits::*,
     Count, Rank,

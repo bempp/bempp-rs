@@ -1,17 +1,21 @@
+
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use mpi::{
-    collective::SystemOperation, request::WaitGuard, topology::UserCommunicator, traits::*, Rank,
+    collective::SystemOperation, topology::UserCommunicator, traits::*, Rank, Count
 };
 
 use hyksort::hyksort;
-use solvers_traits::tree::{LocallyEssentialTree, Tree};
+use solvers_traits::{
+    tree::{LocallyEssentialTree, Tree},
+    types::Locality
+};
 
 use crate::{
     constants::{DEEPEST_LEVEL, K, LEVEL_SIZE, NCRIT, ROOT},
     implementations::{
-        impl_morton::{complete_region, encode_anchor, point_to_anchor},
+        impl_morton::{complete_region, encode_anchor},
         impl_single_node::{
             assign_nodes_to_points, assign_points_to_nodes, find_seeds, split_blocks,
         },
@@ -590,16 +594,19 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
     let size = tree.world.size();
     let rank = tree.world.rank();
 
-    let weights: Vec<i32> = tree
+    let weights: Vec<Count> = tree
         .leaves
         .iter()
         .map(|l| {
-            (tree.get_near_field(l).len() + tree.get_x_list(l).len() + tree.get_w_list(l).len())
-                as i32
+            let u = tree.get_near_field(l).unwrap_or(MortonKeys::default());
+            let w = tree.get_w_list(l).unwrap_or(MortonKeys::default());
+            let x = tree.get_x_list(l).unwrap_or(MortonKeys::default());
+            (u.len()+w.len()+x.len()) as i32
+            
         })
         .collect();
 
-    let mut cum_weights: Vec<i32> = weights
+    let mut cum_weights: Vec<Count> = weights
         .iter()
         .scan(0, |acc, &x| {
             *acc += x;
@@ -607,12 +614,12 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
         })
         .collect();
 
-    let mut total_weight = 0i32;
+    let mut total_weight = 0 as Count;
     let local_weight = cum_weights.last().unwrap().clone();
     tree.world
         .scan_into(&local_weight, &mut total_weight, &SystemOperation::sum());
 
-    let mut prev_local_weight = 0i32;
+    let mut prev_local_weight = 0 as Count;
 
     if rank < size - 1 {
         let next_rank = rank + 1;
@@ -743,9 +750,13 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
 impl LocallyEssentialTree for MultiNodeTree {
     type RawTree = MultiNodeTree;
     type NodeIndex = MortonKey;
-    type NodeIndices = MortonKeys;
+    type NodeIndices<'a> = MortonKeys;
 
-    fn create_let(&mut self) {
+    fn locality<'a>(&'a self, node_index: &Self::NodeIndex) -> Locality {
+        Locality::Local
+    }
+
+    fn create_let<'a>(&'a mut self) {
         // Create an LET
         let_helper(self);
         // Load balance the LET
@@ -755,8 +766,8 @@ impl LocallyEssentialTree for MultiNodeTree {
     }
 
     // Calculate near field interaction list of  keys.
-    fn get_near_field(&self, leaf: &MortonKey) -> MortonKeys {
-        let mut result = Vec::<MortonKey>::new();
+    fn get_near_field<'a>(&'a self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
+        let mut keys = Vec::<MortonKey>::new();
         let neighbours = leaf.neighbors();
 
         // Child level
@@ -780,29 +791,33 @@ impl LocallyEssentialTree for MultiNodeTree {
             .filter(|np| self.leaves_set.contains(np) && leaf.is_adjacent(np))
             .collect();
 
-        result.append(&mut neighbors_children_adj);
-        result.append(&mut neighbors_adj);
-        result.append(&mut neighbors_parents_adj);
+        keys.append(&mut neighbors_children_adj);
+        keys.append(&mut neighbors_adj);
+        keys.append(&mut neighbors_parents_adj);
 
-        MortonKeys {
-            keys: result,
-            index: 0,
+        if keys.len() > 0 {
+            Some(MortonKeys { keys, index: 0 })
+        } else {
+            None
         }
     }
 
     // Calculate compressible far field interactions of leaf & other keys.
-    fn get_interaction_list(&self, key: &MortonKey) -> Option<MortonKeys> {
+    fn get_interaction_list<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
         if key.level() >= 2 {
-            return Some(MortonKeys {
-                keys: key
-                    .parent()
-                    .neighbors()
-                    .iter()
-                    .flat_map(|pn| pn.children())
-                    .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
-                    .collect_vec(),
-                index: 0,
-            });
+            let keys = key
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
+                .collect_vec();
+
+            if keys.len() > 0 {
+                return Some(MortonKeys { keys, index: 0 });
+            } else {
+                return None;
+            }
         }
         {
             None
@@ -810,29 +825,35 @@ impl LocallyEssentialTree for MultiNodeTree {
     }
 
     // Calculate M2P interactions of leaf key.
-    fn get_w_list(&self, leaf: &MortonKey) -> MortonKeys {
+    fn get_w_list<'a>(&'a self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
         // Child level
-        MortonKeys {
-            keys: leaf
-                .neighbors()
-                .iter()
-                .flat_map(|n| n.children())
-                .filter(|nc| self.keys_set.contains(nc) && !leaf.is_adjacent(nc))
-                .collect_vec(),
-            index: 0,
+        let keys = leaf
+            .neighbors()
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| self.keys_set.contains(nc) && !leaf.is_adjacent(nc))
+            .collect_vec();
+
+        if keys.len() > 0 {
+            Some(MortonKeys { keys, index: 0 })
+        } else {
+            None
         }
     }
 
     // Calculate P2L interactions of leaf key.
-    fn get_x_list(&self, leaf: &MortonKey) -> MortonKeys {
-        MortonKeys {
-            keys: leaf
-                .parent()
-                .neighbors()
-                .into_iter()
-                .filter(|pn| self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
-                .collect_vec(),
-            index: 0,
+    fn get_x_list<'a>(&'a self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
+        let keys = leaf
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
+            .collect_vec();
+
+        if keys.len() > 0 {
+            Some(MortonKeys { keys, index: 0 })
+        } else {
+            None
         }
     }
 }

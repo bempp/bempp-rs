@@ -1,6 +1,6 @@
 // //! Fast Solver FMM library
 
-// use std::collections::HashSet;
+use std::collections::HashSet;
 
 // use solvers_traits::{
 //     fmm::{
