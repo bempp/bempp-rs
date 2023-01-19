@@ -43,7 +43,6 @@ pub fn export_as_gmsh(grid: SerialTriangle3DGrid, fname: String) {
 mod test {
     use crate::io::*;
     pub use crate::shapes::regular_sphere;
-    use approx::*;
 
     #[test]
     fn test_gmsh_output() {

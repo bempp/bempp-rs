@@ -48,7 +48,7 @@ impl Topology for SerialTriangle3DTopology<'_> {
     fn global2local(&self, global_id: usize) -> Option<usize> {
         Some(global_id)
     }
-    fn locality(&self, global_id: usize) -> Locality {
+    fn locality(&self, _global_id: usize) -> Locality {
         Locality::Local
     }
     fn dim(&self) -> usize {
@@ -126,7 +126,6 @@ impl<'a> Grid for SerialTriangle3DGrid {
 #[cfg(test)]
 mod test {
     use crate::grid::*;
-    use approx::*;
 
     #[test]
     fn test_serial_triangle_grid() {

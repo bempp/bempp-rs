@@ -17,7 +17,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
             0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
         ],
     };
-    for level in 0..refinement_level {
+    for _level in 0..refinement_level {
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
         let ncells = 4 * g.topology().entity_count(2);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
@@ -76,17 +76,16 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
 #[cfg(test)]
 mod test {
     use crate::shapes::*;
-    use approx::*;
 
     #[test]
     fn test_regular_sphere_0() {
-        let g = regular_sphere(0);
+        let _g = regular_sphere(0);
     }
 
     #[test]
     fn test_regular_spheres() {
-        let g1 = regular_sphere(1);
-        let g2 = regular_sphere(2);
-        let g3 = regular_sphere(3);
+        let _g1 = regular_sphere(1);
+        let _g2 = regular_sphere(2);
+        let _g3 = regular_sphere(3);
     }
 }
