@@ -2,7 +2,7 @@
 use mpi::{
     collective::SystemOperation,
     datatype::Equivalence,
-    request::{RequestCollection, Scope, WaitGuard, Request, LocalScope},
+    request::{LocalScope, Request, RequestCollection, Scope, WaitGuard},
     topology::{Communicator, UserCommunicator},
     traits::*,
     Count, Rank,
@@ -25,7 +25,7 @@ pub fn all_to_allv_sparse<T>(
     &recv_count: &Count,
 ) -> Vec<T>
 where
-    T: Default + Clone + Equivalence+ std::fmt::Debug,
+    T: Default + Clone + Equivalence + std::fmt::Debug,
 {
     let rank = world.rank();
     let size = world.size();
@@ -34,24 +34,23 @@ where
     let nreqs = send_count + recv_count;
 
     let packet_sizes: Vec<Count> = packets.iter().map(|p| p.len() as Count).collect();
-    
+
     let mut received_packet_sizes = vec![0 as Count; recv_count as usize];
     let mut received_packet_sources = vec![0 as Rank; recv_count as usize];
 
     let mut source_rank = 0 as Count;
 
     mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-
         for (i, &rank) in packet_destinations.iter().enumerate() {
             let tag = rank;
-            let sreq = world
-                .process_at_rank(rank)
-                .immediate_send_with_tag(scope, &packet_sizes[i], tag);
+            let sreq =
+                world
+                    .process_at_rank(rank)
+                    .immediate_send_with_tag(scope, &packet_sizes[i], tag);
             coll.add(sreq);
         }
-        
-        for (i, size) in received_packet_sizes.iter_mut().enumerate() {
 
+        for (i, size) in received_packet_sizes.iter_mut().enumerate() {
             let (msg, status) = loop {
                 // Spin for message availability. There is no guarantee that
                 // immediate sends, even to the same process, will be immediately
@@ -62,28 +61,26 @@ where
                 }
             };
 
-            let rreq =  msg.immediate_matched_receive_into(scope, size);
+            let rreq = msg.immediate_matched_receive_into(scope, size);
             received_packet_sources[i] = status.source_rank();
- 
+
             coll.add(rreq);
         }
 
         let mut complete = vec![];
         coll.wait_all(&mut complete);
+    });
 
-    }); 
-  
     // Setup send and receives for data
     let mut buffers: Vec<Vec<T>> = Vec::new();
 
     for &len in received_packet_sizes.iter() {
         buffers.push(vec![T::default(); len as usize])
     }
-    
+
     world.barrier();
 
     mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-
         for (i, packet) in packets.iter().enumerate() {
             let sreq = world
                 .process_at_rank(packet_destinations[i])
@@ -92,7 +89,6 @@ where
         }
 
         for (i, buffer) in buffers.iter_mut().enumerate() {
-
             let rreq = world
                 .process_at_rank(received_packet_sources[i])
                 .immediate_receive_into(scope, &mut buffer[..]);

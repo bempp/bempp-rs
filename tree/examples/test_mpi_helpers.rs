@@ -57,6 +57,6 @@ fn main() {
     let received = all_to_allv_sparse(&comm, &packets, &packet_destinations, &recv_count);
 
     // Test that the correct number of packets were received.
-    // let unique: Vec<i32> = received.iter().unique().cloned().collect();
-    // assert_eq!(unique.len() as i32, recv_count);
+    let unique: Vec<i32> = received.iter().unique().cloned().collect();
+    assert_eq!(unique.len() as i32, recv_count);
 }

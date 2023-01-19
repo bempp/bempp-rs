@@ -263,7 +263,7 @@ impl MultiNodeTree {
             let max = seeds.iter().max().unwrap();
             let fa = flc_root.finest_ancestor(max);
             let last_child = fa.children().into_iter().max().unwrap();
-            
+
             if last_child > *max
                 && !max.ancestors().contains(&last_child)
                 && !last_child.ancestors().contains(max)
