@@ -6,12 +6,6 @@ use solvers_tree::types::{
     multi_node::MultiNodeTree,
 };
 
-// use solvers_tree::types::{
-//     domain::Domain,
-//     morton::{MortonKey, MortonKeys},
-//     point::{Point, Points},
-// };
-
 pub enum Geometry {
     Square,
     Cube,
