@@ -1,14 +1,10 @@
 // //! Fast Solver FMM library
+use solvers_traits::tree::{FmmNode, FmmTree, LocallyEssentialTree};
 
-use std::collections::HashSet;
-
-// use solvers_traits::{
-//     fmm::{
-//         fmmtree::{FmmTree, Node},
-//         translation::Translation,
-//     },
-//     tree::{LocallyEssentialTree, Tree},
-// };
+use solvers_tree::types::{
+    morton::{MortonKey, MortonKeys},
+    multi_node::MultiNodeTree,
+};
 
 // use solvers_tree::types::{
 //     domain::Domain,
@@ -16,131 +12,87 @@ use std::collections::HashSet;
 //     point::{Point, Points},
 // };
 
-// pub enum Geometry {
-//     Square,
-//     Cube,
-// }
+pub enum Geometry {
+    Square,
+    Cube,
+}
 
-// #[derive(Clone, Copy)]
-// pub struct KiFmmNode3D {
-//     node: MortonKey,
-// }
+#[derive(Clone)]
+pub struct KiFmmNode3D {
+    index: MortonKey,
+    data: Vec<[f64; 5]>,
+}
 
-// pub struct KiFmmNodes3D {
-//     nodes: Vec<KiFmmNode3D>,
-//     index: usize,
-// }
+pub struct KiFmmNodes3D {
+    nodes: Vec<KiFmmNode3D>,
+    index: usize,
+}
 
-// impl KiFmmNodes3D {
-//     fn new() -> KiFmmNodes3D {
-//         KiFmmNodes3D {
-//             nodes: Vec::<KiFmmNode3D>::new(),
-//             index: 0,
-//         }
-//     }
+impl KiFmmNodes3D {
+    fn new() -> KiFmmNodes3D {
+        KiFmmNodes3D {
+            nodes: Vec::<KiFmmNode3D>::new(),
+            index: 0,
+        }
+    }
 
-//     fn add(&mut self, elem: KiFmmNode3D) {
-//         self.nodes.push(elem);
-//     }
-// }
+    fn add(&mut self, elem: KiFmmNode3D) {
+        self.nodes.push(elem);
+    }
+}
 
-// pub struct KiFmmTree {
-//     raw_tree: Box<
-//         dyn Tree<
-//             Point = Point,
-//             Domain = Domain,
-//             Points = Points,
-//             NodeIndex = MortonKey,
-//             NodeIndices = MortonKeys,
-//             NodeIndicesSet = HashSet<MortonKey>,
-//         >,
-//     >,
-// }
+impl Iterator for KiFmmNodes3D {
+    type Item = KiFmmNode3D;
 
-// impl Node for KiFmmNode3D {
-//     type Item = f64;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.nodes.len() {
+            return None;
+        }
 
-//     type Geometry = Geometry;
+        self.index += 1;
+        self.nodes.get(self.index).cloned()
+    }
+}
 
-//     type NodeIndex = MortonKey;
+pub struct KiFmmTree {
+    raw_tree: Box<dyn LocallyEssentialTree<NodeIndex = MortonKey, NodeIndices = MortonKeys>>,
+}
 
-//     // type View =
-//     fn node_geometry(&self) -> Self::Geometry {
-//         Geometry::Cube
-//     }
+impl FmmNode for KiFmmNode3D {
+    type Item = f64;
 
-//     fn node_index(&self) -> Self::NodeIndex {
-//         self.node
-//     }
-// }
+    type Geometry = Geometry;
 
-// impl Iterator for KiFmmNodes3D {
-//     type Item = KiFmmNode3D;
+    type NodeIndex = MortonKey;
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if self.index >= self.nodes.len() {
-//             return None;
-//         }
+    type View<'a> = std::slice::Iter<'a, [f64; 5]>;
 
-//         self.index += 1;
-//         self.nodes.get(self.index).copied()
-//     }
-// }
+    type ViewMut<'a> = std::slice::IterMut<'a, [f64; 5]>;
 
-// impl FromIterator<KiFmmNode3D> for KiFmmNodes3D {
-//     fn from_iter<T: IntoIterator<Item = KiFmmNode3D>>(iter: T) -> Self {
-//         let mut res = KiFmmNodes3D::new();
+    fn node_geometry(&self) -> Self::Geometry {
+        Geometry::Cube
+    }
 
-//         for item in iter {
-//             res.add(item)
-//         }
-//         res
-//     }
-// }
+    fn view<'a>(&'a self) -> Self::View<'a> {
+        self.data.iter()
+    }
 
-// impl FmmTree for KiFmmTree {
-//     type NodeIndex = KiFmmNode3D;
-//     type IndexIter<'a> = KiFmmNodes3D;
+    fn view_mut<'a>(&'a mut self) -> Self::ViewMut<'a> {
+        self.data.iter_mut()
+    }
 
-//     fn locality(&self, node_index: Self::NodeIndex) -> solvers_traits::types::Locality {
-//         match self.raw_tree.map_key_to_points(&node_index.node) {
-//             Some(_) => solvers_traits::types::Locality::Local,
-//             None => solvers_traits::types::Locality::Remote,
-//         }
-//     }
+    fn node_index(&self) -> Self::NodeIndex {
+        self.index
+    }
+}
 
-//     // Composed of adjacent siblings and neighbours,
-//     fn get_near_field<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
+impl FmmTree for KiFmmTree {
+    type FmmNodeIndex = KiFmmNode3D;
+    type FmmNodeIndices<'a> = KiFmmNodes3D;
 
-//     fn get_interaction_list<'a>(
-//         &'a self,
-//         node_index: Self::NodeIndex,
-//     ) -> Option<Self::IndexIter<'a>> {
-//         self.raw_tree.get_interaction_list()
-//     }
+    fn upward_pass(&self) {}
 
-//     fn get_x_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {
-//         self.raw_tree.get_x_list()
-//     }
+    fn downward_pass(&self) {}
 
-//     fn get_w_list<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {}
-
-//     fn get_level(&self, node_index: Self::NodeIndex) -> Option<usize> {
-//         Some(node_index.node.level() as usize)
-//     }
-
-//     fn get_parent(&self, node_index: Self::NodeIndex) -> Option<Self::NodeIndex> {
-//         Some(Self::NodeIndex {
-//             node: node_index.node.parent(),
-//         })
-//     }
-
-//     fn get_children<'a>(&'a self, node_index: Self::NodeIndex) -> Option<Self::IndexIter<'a>> {
-//         let children = node_index.node.children();
-//         let children = children
-//             .iter()
-//             .map(|&c| Self::NodeIndex { node: c })
-//             .collect();
-//         Some(children)
-//     }
-// }
+    fn run(&self) {}
+}

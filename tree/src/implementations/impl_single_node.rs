@@ -362,19 +362,18 @@ impl Tree for SingleNodeTree {
 }
 
 impl LocallyEssentialTree for SingleNodeTree {
-    type RawTree = SingleNodeTree;
     type NodeIndex = MortonKey;
-    type NodeIndices<'a> = MortonKeys;
+    type NodeIndices = MortonKeys;
 
-    fn locality<'a>(&'a self, node_index: &Self::NodeIndex) -> Locality {
+    fn locality(&self, node_index: &Self::NodeIndex) -> Locality {
         Locality::Local
     }
 
     // Single node trees are already locally essential trees
-    fn create_let<'a>(&'a mut self) {}
+    fn create_let(&mut self) {}
 
     // Calculate near field interaction list of leaf keys.
-    fn get_near_field<'a>(&'a self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
+    fn get_near_field(&self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices> {
         let mut keys = Vec::<MortonKey>::new();
         let neighbours = leaf.neighbors();
 
@@ -411,7 +410,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     }
 
     // Calculate compressible far field interactions of leaf & other keys.
-    fn get_interaction_list<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
+    fn get_interaction_list(&self, key: &Self::NodeIndex) -> Option<Self::NodeIndices> {
         if key.level() >= 2 {
             let keys = key
                 .parent()
@@ -433,7 +432,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     }
 
     // Calculate M2P interactions of leaf key.
-    fn get_w_list<'a>(&'a self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
+    fn get_w_list(&self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices> {
         // Child level
         let keys = leaf
             .neighbors()
@@ -450,7 +449,7 @@ impl LocallyEssentialTree for SingleNodeTree {
     }
 
     // Calculate P2L interactions of leaf key.
-    fn get_x_list<'a>(&'a self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>> {
+    fn get_x_list(&self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices> {
         let keys = leaf
             .parent()
             .neighbors()

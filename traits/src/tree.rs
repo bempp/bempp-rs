@@ -33,18 +33,15 @@ pub trait Tree {
 /// Locally Essential Trees take care of ghost nodes on other processors, and have access to all
 /// the information they need to build the interaction lists for a tree.
 pub trait LocallyEssentialTree {
-    type RawTree: Tree;
     type NodeIndex;
-    type NodeIndices<'a>: std::iter::Iterator<Item = Self::NodeIndex>
-    where
-        Self: 'a;
-    
-    fn create_let<'a>(&'a mut self);
-    fn locality<'a>(&'a self, node_index: &Self::NodeIndex) -> Locality;
-    fn get_near_field<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
-    fn get_interaction_list<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
-    fn get_x_list<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
-    fn get_w_list<'a>(&'a self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices<'a>>;
+    type NodeIndices;
+
+    fn create_let(&mut self);
+    fn locality(&self, node_index: &Self::NodeIndex) -> Locality;
+    fn get_near_field(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
+    fn get_interaction_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
+    fn get_x_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
+    fn get_w_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
 }
 
 // Definition of a tree node for the FMM
@@ -54,34 +51,43 @@ pub trait LocallyEssentialTree {
 // - `NodeIndex`: An index associated with the node.
 pub trait FmmNode {
     // The type of the coefficients associated with the node.
-    type Item: Scalar;
+    type Item;
+
     // Type of the geometry definition.
     type Geometry;
+
     // Type that describes node indices.
     type NodeIndex;
-    // Data view with a lifetime that depends on the
-    // lifetime of the tree node.
-    type View<'a>: crate::general::IndexableView
+
+    // Data view
+    type View<'a>
     where
         Self: 'a;
+
+    type ViewMut<'a>
+    where
+        Self: 'a;
+
     // Get the node geometry.
     fn node_geometry(&self) -> Self::Geometry;
+
     // Get a view onto the data.
     fn view<'a>(&'a self) -> Self::View<'a>;
+
     // Get a mutable view onto the data.
-    fn view_mut<'a>(&'a mut self) -> Self::View<'a>;
+    fn view_mut<'a>(&'a mut self) -> Self::ViewMut<'a>;
+
     // Get the index of the node.
     fn node_index(&self) -> Self::NodeIndex;
 }
 
 pub trait FmmTree {
-    type RawTree: LocallyEssentialTree;
-    type NodeIndex: FmmNode;
-    type NodeIndices<'a>: std::iter::Iterator<Item = Self::NodeIndex>
+    type FmmNodeIndex: FmmNode;
+    type FmmNodeIndices<'a>: std::iter::Iterator<Item = Self::FmmNodeIndex>
     where
         Self: 'a;
-    
-    fn upward_pass(&self) {};
-    fn downward_pass(&self) {};
-    fn run(&self) {};
+
+    fn upward_pass(&self);
+    fn downward_pass(&self);
+    fn run(&self);
 }
