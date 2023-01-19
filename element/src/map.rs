@@ -6,16 +6,16 @@ pub use solvers_traits::element::MapType;
 
 pub fn identity_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
-    points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    _points: &[f64],
+    _geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
 pub fn identity_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     data: &mut TabulatedData<'a, F>,
-    points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    _points: &[f64],
+    _geometry: &impl PhysicalCell<'b, F2>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
@@ -40,7 +40,6 @@ pub fn contravariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElem
             .tabulate(&points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -55,7 +54,7 @@ pub fn contravariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElem
                 j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
                 j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = j[0] * j[3] - j[1] * j[2];
+            let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
                 temp_data[0] = *data.get(0, p, i, 0);
@@ -90,7 +89,6 @@ pub fn contravariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement
             .tabulate(&points, 1, &mut derivs);
 
         let mut jinv = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -139,7 +137,6 @@ pub fn covariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement 
             .tabulate(&points, 1, &mut derivs);
 
         let mut jinv_t = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -154,7 +151,7 @@ pub fn covariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement 
                 jinv_t[1] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
                 jinv_t[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = jinv_t[0] * jinv_t[3] - jinv_t[1] * jinv_t[2];
+            let det_j = jinv_t[0] * jinv_t[3] - jinv_t[1] * jinv_t[2];
             jinv_t[0] /= det_j;
             jinv_t[1] /= det_j;
             jinv_t[2] /= det_j;
@@ -193,7 +190,6 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + '
             .tabulate(&points, 1, &mut derivs);
 
         let mut j_t = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -242,9 +238,6 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
             .tabulate(&points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
-
-        let mut temp_data = vec![0.0, 0.0];
 
         for p in 0..npts {
             j[0] = 0.0;
@@ -257,7 +250,7 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
                 j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
                 j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = j[0] * j[3] - j[1] * j[2];
+            let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
                 *data.get_mut(0, p, i, 0) *= det_j;
@@ -288,9 +281,6 @@ pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
             .tabulate(&points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
-
-        let mut temp_data = vec![0.0, 0.0];
 
         for p in 0..npts {
             j[0] = 0.0;
@@ -303,7 +293,7 @@ pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
                 j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
                 j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = j[0] * j[3] - j[1] * j[2];
+            let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
                 *data.get_mut(0, p, i, 0) /= det_j;
@@ -321,8 +311,7 @@ mod test {
     use crate::map::*;
     use approx::*;
 
-    pub struct TestPhysicalCell<'a, F: FiniteElement, C: ReferenceCell> {
-        reference_cell: &'a C,
+    pub struct TestPhysicalCell<'a, F: FiniteElement> {
         vertices: &'a [f64],
         coordinate_element: &'a F,
         gdim: usize,
@@ -330,9 +319,9 @@ mod test {
         npts: usize,
     }
 
-    impl<'a, F: FiniteElement, C: ReferenceCell> TestPhysicalCell<'a, F, C> {
+    impl<'a, F: FiniteElement> TestPhysicalCell<'a, F> {
         pub fn new(
-            reference_cell: &'a C,
+            reference_cell: &'a impl ReferenceCell,
             vertices: &'a [f64],
             coordinate_element: &'a F,
             gdim: usize,
@@ -340,7 +329,6 @@ mod test {
             let tdim = reference_cell.dim();
             let npts = vertices.len() / gdim;
             Self {
-                reference_cell,
                 vertices,
                 coordinate_element,
                 gdim,
@@ -350,7 +338,7 @@ mod test {
         }
     }
 
-    impl<'a, F: FiniteElement, C: ReferenceCell> PhysicalCell<'a, F> for TestPhysicalCell<'a, F, C> {
+    impl<'a, F: FiniteElement> PhysicalCell<'a, F> for TestPhysicalCell<'a, F> {
         fn tdim(&self) -> usize {
             self.tdim
         }
