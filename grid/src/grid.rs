@@ -81,10 +81,29 @@ impl Serial2DTopology {
         }
     }
     fn create_connectivity_01(&mut self) {
-        // TODO
+        self.create_connectivity(0, 0);
+        self.create_connectivity(1, 0);
+        let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
+        for i in 0..self.connectivity[1][0].num_rows() {
+            for v in self.connectivity[1][0].row(i).unwrap() {
+                data[*v].push(i);
+            }
+        }
+        for row in data {
+            self.connectivity[0][1].add_row(row);
+        }
     }
     fn create_connectivity_02(&mut self) {
-        // TODO
+        self.create_connectivity(0, 0);
+        let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
+        for i in 0..self.connectivity[2][0].num_rows() {
+            for v in self.connectivity[2][0].row(i).unwrap() {
+                data[*v].push(i);
+            }
+        }
+        for row in data {
+            self.connectivity[0][2].add_row(row);
+        }
     }
     fn create_connectivity_10(&mut self) {
         let mut data = AdjacencyList::<usize>::new();
@@ -106,12 +125,10 @@ impl Serial2DTopology {
                 for i in 0..data.num_rows() {
                     if *data.get(i, 0).unwrap() == start && *data.get(i, 1).unwrap() == end {
                         found = true;
-                        //triangles_to_edges.push(i);
                         break;
                     }
                 }
                 if !found {
-                    //triangles_to_edges.push(edges.len() / 2);
                     data.add_row(vec![start, end]);
                 }
             }
@@ -119,10 +136,23 @@ impl Serial2DTopology {
         self.connectivity[1][0] = data;
     }
     fn create_connectivity_11(&mut self) {
-        // TODO
+        self.create_connectivity(1, 0);
+        for i in 0..self.connectivity[0][1].num_rows() {
+            self.connectivity[1][1].add_row(vec![i]);
+        }
     }
     fn create_connectivity_12(&mut self) {
-        // TODO
+        self.create_connectivity(1, 0);
+        self.create_connectivity(2, 1);
+        let mut data = vec![vec![]; self.connectivity[1][0].num_rows()];
+        for i in 0..self.connectivity[2][1].num_rows() {
+            for v in self.connectivity[2][1].row(i).unwrap() {
+                data[*v].push(i);
+            }
+        }
+        for row in data {
+            self.connectivity[1][2].add_row(row);
+        }
     }
     fn create_connectivity_21(&mut self) {
         self.create_connectivity(1, 0);
@@ -143,7 +173,6 @@ impl Serial2DTopology {
             for e in cell_edges {
                 let start = min(cell[e.0], cell[e.1]);
                 let end = max(cell[e.0], cell[e.1]);
-                let mut found = false;
                 for i in 0..edges.num_rows() {
                     if *edges.get(i, 0).unwrap() == start && *edges.get(i, 1).unwrap() == end {
                         row.push(i);
@@ -232,35 +261,6 @@ pub struct SerialGrid {
 
 impl SerialGrid {
     pub fn new(coordinates: Array2D<f64>, cells: AdjacencyList<usize>) -> Self {
-        /*
-        let mut edges = vec![];
-        let mut triangles_to_edges = vec![];
-        for triangle in 0..cells.num_rows() {
-            for edge in [(1, 2), (0, 2), (0, 1)] {
-                let start = min(
-                    *cells.get(triangle, edge.0).unwrap(),
-                    *cells.get(triangle, edge.1).unwrap(),
-                );
-                let end = max(
-                    *cells.get(triangle, edge.0).unwrap(),
-                    *cells.get(triangle, edge.1).unwrap(),
-                );
-                let mut found = false;
-                for i in 0..edges.len() / 2 {
-                    if edges[2 * i] == start && edges[2 * i + 1] == end {
-                        found = true;
-                        triangles_to_edges.push(i);
-                        break;
-                    }
-                }
-                if !found {
-                    triangles_to_edges.push(edges.len() / 2);
-                    edges.push(start);
-                    edges.push(end);
-                }
-            }
-        }
-        */
         Self {
             geometry: SerialGeometry::new(coordinates),
             topology: Serial2DTopology::new(cells),
@@ -290,7 +290,7 @@ mod test {
 
     #[test]
     fn test_serial_triangle_grid_octahedron() {
-        let g = SerialGrid::new(
+        let mut g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0,
@@ -307,11 +307,15 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
+        g.topology_mut().create_connectivity_all();
+        assert_eq!(g.topology().entity_count(0), 6);
+        assert_eq!(g.topology().entity_count(1), 12);
+        assert_eq!(g.topology().entity_count(2), 8);
     }
 
     #[test]
     fn test_serial_triangle_grid_screen() {
-        let g = SerialGrid::new(
+        let mut g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
@@ -328,11 +332,15 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
+        g.topology_mut().create_connectivity_all();
+        assert_eq!(g.topology().entity_count(0), 9);
+        assert_eq!(g.topology().entity_count(1), 16);
+        assert_eq!(g.topology().entity_count(2), 8);
     }
 
     #[test]
     fn test_serial_mixed_grid_screen() {
-        let g = SerialGrid::new(
+        let mut g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
@@ -347,5 +355,9 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
+        g.topology_mut().create_connectivity_all();
+        assert_eq!(g.topology().entity_count(0), 9);
+        assert_eq!(g.topology().entity_count(1), 14);
+        assert_eq!(g.topology().entity_count(2), 6);
     }
 }
