@@ -5,3 +5,4 @@ pub mod morton;
 pub mod multi_node;
 pub mod point;
 pub mod single_node;
+pub mod data;

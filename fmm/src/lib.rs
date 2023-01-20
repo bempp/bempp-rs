@@ -1,8 +1,11 @@
 // //! Fast Solver FMM library
+
+use mpi::{traits::*, Address};
+
 use solvers_traits::tree::{FmmNode, FmmTree, LocallyEssentialTree};
 
 use solvers_tree::types::{
-    morton::{MortonKey, MortonKeys},
+    morton::{KeyType, MortonKey, MortonKeys},
     multi_node::MultiNodeTree,
 };
 

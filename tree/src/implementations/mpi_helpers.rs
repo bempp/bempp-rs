@@ -11,7 +11,7 @@ use mpi::{
 ///
 /// For Example, you may have four processes in a communicator
 /// Communicator = [P0, P1, P2, P3]. Each process communicates
-/// with a subset of the Communicator excluding itself,
+/// with a subset of the communicator excluding itself,
 /// ie. P0 -> [P0, P2], P1 -> [P0], P2-> [], P3 -> [P0, P1, P2].
 /// This function expects these packets to be separated in a
 /// Vec<Vec<T>>, their destination ranks, as well as the number of
@@ -23,7 +23,7 @@ pub fn all_to_allv_sparse<T>(
     &recv_count: &Count,
 ) -> Vec<T>
 where
-    T: Default + Clone + Equivalence + std::fmt::Debug,
+    T: Default + Clone + Equivalence,
 {
     let rank = comm.rank();
     let size = comm.size();

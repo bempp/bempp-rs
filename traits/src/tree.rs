@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::types::{Locality, Scalar};
 
 pub trait Tree {
@@ -31,10 +33,12 @@ pub trait Tree {
 }
 
 /// Locally Essential Trees take care of ghost nodes on other processors, and have access to all
-/// the information they need to build the interaction lists for a tree.
+/// the information they need to build the interaction lists for a tree, as well as perform an FMM
+/// loop.
 pub trait LocallyEssentialTree {
     type NodeIndex;
     type NodeIndices;
+    type Data;
 
     fn create_let(&mut self);
     fn locality(&self, node_index: &Self::NodeIndex) -> Locality;
@@ -42,50 +46,25 @@ pub trait LocallyEssentialTree {
     fn get_interaction_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
     fn get_x_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
     fn get_w_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
+    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::Data>;
 }
 
-// Definition of a tree node for the FMM
-// A node contains
-// - `Data`: Typically an array of numbers associated with a node.
-// - `NodeData`: A type that describes geometric data of a node.
-// - `NodeIndex`: An index associated with the node.
-pub trait FmmNode {
-    // The type of the coefficients associated with the node.
-    type Item;
-
-    // Type of the geometry definition.
-    type Geometry;
-
-    // Type that describes node indices.
+pub trait FmmData {
     type NodeIndex;
+    type CoefficientData;
+    type ParticleData;
 
-    // Data view
-    type View<'a>
-    where
-        Self: 'a;
-
-    type ViewMut<'a>
-    where
-        Self: 'a;
-
-    // Get the node geometry.
-    fn node_geometry(&self) -> Self::Geometry;
-
-    // Get a view onto the data.
-    fn view<'a>(&'a self) -> Self::View<'a>;
-
-    // Get a mutable view onto the data.
-    fn view_mut<'a>(&'a mut self) -> Self::ViewMut<'a>;
-
-    // Get the index of the node.
-    fn node_index(&self) -> Self::NodeIndex;
+    fn get_expansion_order(&self) -> usize;
+    fn get_particles(&self, node_index: &Self::NodeIndex) -> Option<&Self::ParticleData>;
+    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<&Self::CoefficientData>;
+    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<&Self::CoefficientData>;
 }
 
 pub trait FmmTree {
-    type FmmNodeIndex: FmmNode;
-    type FmmNodeIndices<'a>: std::iter::Iterator<Item = Self::FmmNodeIndex>
-    where
-        Self: 'a;
+    // type FmmNodeIndex: FmmNode;
+    // type FmmNodeIndices<'a>: std::iter::Iterator<Item = Self::FmmNodeIndex>
+    // where
+    //     Self: 'a;
 
     fn upward_pass(&self);
     fn downward_pass(&self);

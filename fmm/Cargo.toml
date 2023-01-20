@@ -21,3 +21,4 @@ solvers-tree = { path = "../tree" }
 solvers-traits = { path = "../traits" }
 approx = "0.5"
 cauchy = "0.4.*"
+mpi = { version = "0.6.*" }

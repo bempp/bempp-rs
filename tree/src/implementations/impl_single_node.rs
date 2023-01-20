@@ -10,6 +10,7 @@ use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
+        data::NodeData,
         domain::Domain,
         morton::{MortonKey, MortonKeys},
         point::{Point, PointType, Points},
@@ -190,9 +191,12 @@ impl SingleNodeTree {
             keys_set.extend(&ancestors);
         }
 
+        let data = NodeData::default();
+
         SingleNodeTree {
             adaptive,
             points,
+            data,
             keys_set,
             leaves,
             leaves_set,
@@ -263,9 +267,12 @@ impl SingleNodeTree {
             let ancestors = key.ancestors();
             keys_set.extend(&ancestors);
         }
+        let data = NodeData::default();
+
         SingleNodeTree {
             adaptive,
             points,
+            data,
             keys_set,
             leaves,
             leaves_set,
@@ -364,9 +371,14 @@ impl Tree for SingleNodeTree {
 impl LocallyEssentialTree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
+    type Data = NodeData;
 
     fn locality(&self, node_index: &Self::NodeIndex) -> Locality {
         Locality::Local
+    }
+
+    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::Data> {
+        Some(&self.data)
     }
 
     // Single node trees are already locally essential trees
