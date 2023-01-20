@@ -1,12 +1,12 @@
-pub use crate::grid::SerialTriangle3DGrid;
+pub use crate::grid::SerialGrid;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
 
-pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
-    let mut g = SerialTriangle3DGrid::new(
+pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
+    let mut g = SerialGrid::new(
         Array2D::from_data(
             vec![
                 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
@@ -22,6 +22,9 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
         ),
     );
     for _level in 0..refinement_level {
+        g.topology_mut().create_connectivity(2, 1);
+        g.topology_mut().create_connectivity(1, 0);
+        g.topology_mut().create_connectivity(0, 0);
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
         let mut cells = AdjacencyList::<usize>::new();
@@ -37,7 +40,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
                 for i in 0..2 {
                     pt[j] += g
                         .geometry()
-                        .point(g.topology().connectivity_1_0[2 * edge + i])
+                        .point(*g.topology().connectivity(1, 0).get(edge, i).unwrap())
                         .unwrap()[j];
                 }
                 pt[j] /= 2.0;
@@ -53,7 +56,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
 
         for triangle in 0..g.topology().entity_count(2) {
             let vs = g.topology().cell(triangle).unwrap();
-            let es = &g.topology().connectivity_2_1[3 * triangle..3 * (triangle + 1)];
+            let es = g.topology().connectivity(2, 1).row(triangle).unwrap();
             cells.add_row(vec![
                 vs[0],
                 g.topology().entity_count(0) + es[2],
@@ -75,7 +78,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
                 g.topology().entity_count(0) + es[2],
             ]);
         }
-        g = SerialTriangle3DGrid::new(coordinates, cells);
+        g = SerialGrid::new(coordinates, cells);
     }
 
     g

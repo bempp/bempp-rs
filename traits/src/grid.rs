@@ -1,7 +1,8 @@
 //! Geometry and topology definitions
 
-pub use crate::cell::ReferenceCell;
-pub use crate::element::FiniteElement;
+use crate::cell::ReferenceCell;
+use crate::element::FiniteElement;
+use solvers_tools::arrays::AdjacencyList;
 
 pub trait Geometry {
     fn dim(&self) -> usize;
@@ -36,6 +37,16 @@ pub trait Topology {
 
     fn cell(&self, index: usize) -> Option<&[usize]>;
     unsafe fn cell_unchecked(&self, index: usize) -> &[usize];
+
+    fn create_connectivity(&mut self, dim0: usize, dim1: usize);
+    fn create_connectivity_all(&mut self) {
+        for dim0 in 0..self.dim() {
+            for dim1 in 0..self.dim() {
+                self.create_connectivity(dim0, dim1);
+            }
+        }
+    }
+    fn connectivity(&self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
 }
 
 pub trait Grid {
@@ -43,6 +54,7 @@ pub trait Grid {
     type Geometry: Geometry;
 
     fn topology(&self) -> &Self::Topology;
+    fn topology_mut(&mut self) -> &mut Self::Topology;
 
     fn geometry(&self) -> &Self::Geometry;
 }
