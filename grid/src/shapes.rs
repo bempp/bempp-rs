@@ -49,7 +49,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
         }
 
         for triangle in 0..g.topology().entity_count(2) {
-            let vs = &g.topology().cells[3 * triangle..3 * (triangle + 1)];
+            let vs = g.topology().cell(triangle);
             let es = &g.topology().connectivity_2_1[3 * triangle..3 * (triangle + 1)];
             cells[12 * triangle] = vs[0];
             cells[12 * triangle + 1] = g.topology().entity_count(0) + es[2];

@@ -9,11 +9,11 @@ pub use solvers_traits::grid::Topology;
 use std::cmp::max;
 use std::cmp::min;
 
-pub struct SerialTriangle3DGeometry {
+pub struct SerialGeometry {
     pub coordinates: Array2D<f64>,
 }
 
-impl Geometry for SerialTriangle3DGeometry {
+impl Geometry for SerialGeometry {
     fn dim(&self) -> usize {
         self.coordinates.shape().1
     }
@@ -31,7 +31,7 @@ impl Geometry for SerialTriangle3DGeometry {
 }
 
 pub struct SerialTriangle3DTopology {
-    pub cells: Vec<usize>,
+    cells: Vec<usize>,
     pub connectivity_2_1: Vec<usize>,
     // pub connectivity_1_2: Vec<usize>,
     pub connectivity_1_0: Vec<usize>,
@@ -70,10 +70,13 @@ impl Topology for SerialTriangle3DTopology {
             _ => 0,
         }
     }
+    fn cell(&self, index: usize) -> &[usize] {
+        &   self.cells[3*index..3*(index + 1)]
+    }
 }
 
 pub struct SerialTriangle3DGrid {
-    geometry: SerialTriangle3DGeometry,
+    geometry: SerialGeometry,
     topology: SerialTriangle3DTopology,
 }
 
@@ -102,7 +105,7 @@ impl SerialTriangle3DGrid {
         }
 
         Self {
-            geometry: SerialTriangle3DGeometry {
+            geometry: SerialGeometry {
                 coordinates: coordinates,
             },
             topology: SerialTriangle3DTopology {
@@ -115,7 +118,7 @@ impl SerialTriangle3DGrid {
 }
 impl Grid for SerialTriangle3DGrid {
     type Topology = SerialTriangle3DTopology;
-    type Geometry = SerialTriangle3DGeometry;
+    type Geometry = SerialGeometry;
 
     fn topology(&self) -> &Self::Topology {
         &self.topology
@@ -131,7 +134,7 @@ mod test {
     use crate::grid::*;
 
     #[test]
-    fn test_serial_triangle_grid() {
+    fn test_serial_triangle_grid_octahedron() {
         let g = SerialTriangle3DGrid::new(
             Array2D::from_data(
                 vec![
@@ -146,5 +149,28 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
+    }
+    fn test_serial_triangle_grid_screen() {
+        let g = SerialTriangle3DGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0,
+                    0.5, 0.0,
+                    1.0, 0.0,
+                    0.0, 0.5,
+                    0.5, 0.5,
+                    1.0, 0.5,
+                    0.0, 1.0,
+                    0.5, 1.0,
+                    1.0, 1.0,
+                ],
+                (9, 2),
+            ),
+            vec![
+                0, 1, 4, 1, 2, 5, 0, 4, 3, 1, 5, 4, 3, 4, 7, 4, 5, 8, 3, 7, 6, 4, 8, 7,
+            ],
+        );
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.geometry().dim(), 2);
     }
 }

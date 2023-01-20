@@ -33,6 +33,8 @@ pub trait Topology {
     fn global2local(&self, global_id: usize) -> Option<usize>;
 
     fn entity_count(&self, dim: usize) -> usize;
+
+    fn cell(&self, index: usize) -> &[usize];
 }
 
 pub trait Grid {
