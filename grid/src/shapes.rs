@@ -1,5 +1,6 @@
 pub use crate::grid::SerialTriangle3DGrid;
-pub use solvers_tools::arrays::Array2D;
+use solvers_tools::arrays::AdjacencyList;
+use solvers_tools::arrays::Array2D;
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
@@ -13,15 +14,17 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
             ],
             (6, 3),
         ),
-        vec![
-            0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
-        ],
+        AdjacencyList::from_data(
+            vec![
+                0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
+            ],
+            vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
+        ),
     );
     for _level in 0..refinement_level {
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
-        let ncells = 4 * g.topology().entity_count(2);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
-        let mut cells = vec![0; 3 * ncells];
+        let mut cells = AdjacencyList::<usize>::new();
 
         for i in 0..g.geometry().point_count() {
             for j in 0..g.geometry().dim() {
@@ -49,20 +52,28 @@ pub fn regular_sphere(refinement_level: usize) -> SerialTriangle3DGrid {
         }
 
         for triangle in 0..g.topology().entity_count(2) {
-            let vs = g.topology().cell(triangle);
+            let vs = g.topology().cell(triangle).unwrap();
             let es = &g.topology().connectivity_2_1[3 * triangle..3 * (triangle + 1)];
-            cells[12 * triangle] = vs[0];
-            cells[12 * triangle + 1] = g.topology().entity_count(0) + es[2];
-            cells[12 * triangle + 2] = g.topology().entity_count(0) + es[1];
-            cells[12 * triangle + 3] = vs[1];
-            cells[12 * triangle + 4] = g.topology().entity_count(0) + es[0];
-            cells[12 * triangle + 5] = g.topology().entity_count(0) + es[2];
-            cells[12 * triangle + 6] = vs[2];
-            cells[12 * triangle + 7] = g.topology().entity_count(0) + es[1];
-            cells[12 * triangle + 8] = g.topology().entity_count(0) + es[0];
-            cells[12 * triangle + 9] = g.topology().entity_count(0) + es[0];
-            cells[12 * triangle + 10] = g.topology().entity_count(0) + es[1];
-            cells[12 * triangle + 11] = g.topology().entity_count(0) + es[2];
+            cells.add_row(vec![
+                vs[0],
+                g.topology().entity_count(0) + es[2],
+                g.topology().entity_count(0) + es[1],
+            ]);
+            cells.add_row(vec![
+                vs[1],
+                g.topology().entity_count(0) + es[0],
+                g.topology().entity_count(0) + es[2],
+            ]);
+            cells.add_row(vec![
+                vs[2],
+                g.topology().entity_count(0) + es[1],
+                g.topology().entity_count(0) + es[0],
+            ]);
+            cells.add_row(vec![
+                g.topology().entity_count(0) + es[0],
+                g.topology().entity_count(0) + es[1],
+                g.topology().entity_count(0) + es[2],
+            ]);
         }
         g = SerialTriangle3DGrid::new(coordinates, cells);
     }

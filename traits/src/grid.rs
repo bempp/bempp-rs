@@ -34,7 +34,8 @@ pub trait Topology {
 
     fn entity_count(&self, dim: usize) -> usize;
 
-    fn cell(&self, index: usize) -> &[usize];
+    fn cell(&self, index: usize) -> Option<&[usize]>;
+    unsafe fn cell_unchecked(&self, index: usize) -> &[usize];
 }
 
 pub trait Grid {

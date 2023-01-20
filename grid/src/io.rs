@@ -29,7 +29,7 @@ pub fn export_as_gmsh(grid: SerialTriangle3DGrid, fname: String) {
         gmsh_s.push_str(&format!("{i} 2 2 0 0")); // TODO: 2 is hardcoded triangle
         for j in 0..3 {
             // currently assumes that Geometry and Topology use the same order
-            let vertex = grid.topology().cell(i)[j];
+            let vertex = grid.topology().cell(i).unwrap()[j];
             gmsh_s.push_str(&format!(" {vertex}"))
         }
         gmsh_s.push_str("\n");
