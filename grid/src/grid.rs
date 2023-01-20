@@ -186,4 +186,23 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
     }
+
+    #[test]
+    fn test_serial_mixed_grid_screen() {
+        let g = SerialTriangle3DGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
+                    1.0, 1.0,
+                ],
+                (9, 2),
+            ),
+            AdjacencyList::from_data(
+                vec![0, 1, 4, 0, 4, 3, 1, 2, 4, 5, 3, 4, 7, 3, 7, 6, 4, 5, 7, 8],
+                vec![0, 3, 6, 10, 13, 16, 20],
+            ),
+        );
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.geometry().dim(), 2);
+    }
 }
