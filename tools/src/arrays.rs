@@ -33,7 +33,7 @@ impl<T> Array2D<T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
             None
         } else {
-            self.data.get(index0 * self.shape.1 + index1)
+            unsafe { Some(self.get_unchecked(index0, index1)) }
         }
     }
     /// Get a mutable item from the array
@@ -41,7 +41,7 @@ impl<T> Array2D<T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
             None
         } else {
-            self.data.get_mut(index0 * self.shape.1 + index1)
+            unsafe { Some(self.get_unchecked_mut(index0, index1)) }
         }
     }
     /// Get a row of the array
@@ -49,7 +49,7 @@ impl<T> Array2D<T> {
         if index >= self.shape.0 {
             None
         } else {
-            Some(&self.data[index * self.shape.1..(index + 1) * self.shape.1])
+            unsafe { Some(&self.row_unchecked(index)) }
         }
     }
     /// Get an item from the array without checking bounds
@@ -115,7 +115,7 @@ impl<T> AdjacencyList<T> {
         {
             None
         } else {
-            self.data.get(self.offsets[index0] + index1)
+            unsafe { Some(self.get_unchecked(index0, index1)) }
         }
     }
     /// Get a mutable item from the adjacency list
@@ -125,7 +125,7 @@ impl<T> AdjacencyList<T> {
         {
             None
         } else {
-            self.data.get_mut(self.offsets[index0] + index1)
+            unsafe { Some(self.get_unchecked_mut(index0, index1)) }
         }
     }
     /// Get a row from the adjacency list
