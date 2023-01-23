@@ -69,7 +69,7 @@ impl<T> Array2D<T> {
         &self.shape
     }
     /// Iterate through the rows
-    pub fn row_iter(&self) -> Array2DRowIterator<'_, T> {
+    pub fn iter_rows(&self) -> Array2DRowIterator<'_, T> {
         Array2DRowIterator::<T> {
             array: &self,
             index: 0,
@@ -177,7 +177,7 @@ impl<T> AdjacencyList<T> {
         self.offsets.len() - 1
     }
     /// Iterate through the rows
-    pub fn row_iter(&self) -> AdjacencyListRowIterator<'_, T> {
+    pub fn iter_rows(&self) -> AdjacencyListRowIterator<'_, T> {
         AdjacencyListRowIterator::<T> {
             alist: &self,
             index: 0,
@@ -222,7 +222,7 @@ mod test {
         assert_eq!(*arr.get(1, 2).unwrap(), 7);
 
         let mut index = 0;
-        for row in arr.row_iter() {
+        for row in arr.iter_rows() {
             assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
             index += 1;
         }
@@ -273,7 +273,7 @@ mod test {
         assert_eq!(*arr.get(2, 0).unwrap(), 7);
 
         let mut index = 0;
-        for row in arr.row_iter() {
+        for row in arr.iter_rows() {
             assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
             index += 1;
         }
