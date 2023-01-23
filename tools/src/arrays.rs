@@ -68,6 +68,26 @@ impl<T> Array2D<T> {
     pub fn shape(&self) -> &(usize, usize) {
         &self.shape
     }
+    /// Iterate through the rows
+    pub fn row_iter(&self) -> Array2DRowIterator<'_, T> {
+        Array2DRowIterator::<T> {
+            array: &self,
+            index: 0,
+        }
+    }
+}
+
+pub struct Array2DRowIterator<'a, T> {
+    array: &'a Array2D<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for Array2DRowIterator<'a, T> {
+    type Item = &'a [T];
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        self.array.row(self.index - 1)
+    }
 }
 
 /// An adjacency list
