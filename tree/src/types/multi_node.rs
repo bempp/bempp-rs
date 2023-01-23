@@ -4,6 +4,7 @@ use mpi::topology::UserCommunicator;
 use std::collections::{HashMap, HashSet};
 
 use crate::types::{
+    data::NodeData,
     domain::Domain,
     morton::{KeyType, MortonKey, MortonKeys},
     point::{Point, Points},
@@ -37,6 +38,9 @@ pub struct MultiNodeTree {
 
     /// Map between the nodes in the tree and the points they contain.
     pub leaves_to_points: HashMap<MortonKey, Points>,
+
+    // Map between keys and data
+    pub keys_to_data: HashMap<MortonKey, NodeData>,
 
     /// Range of Morton keys at this processor, and their current rank [rank, min, max]
     pub range: [KeyType; 3],

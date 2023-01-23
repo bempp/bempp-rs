@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 use solvers_traits::{
-    tree::{LocallyEssentialTree, Tree},
+    tree::{FmmData, FmmTree, Tree},
     types::Locality,
 };
 
@@ -191,18 +191,18 @@ impl SingleNodeTree {
             keys_set.extend(&ancestors);
         }
 
-        let data = NodeData::default();
+        let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
 
         SingleNodeTree {
             adaptive,
             points,
-            data,
             keys_set,
             leaves,
             leaves_set,
             domain,
             points_to_leaves,
             leaves_to_points,
+            keys_to_data,
         }
     }
 
@@ -267,18 +267,19 @@ impl SingleNodeTree {
             let ancestors = key.ancestors();
             keys_set.extend(&ancestors);
         }
-        let data = NodeData::default();
+
+        let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
 
         SingleNodeTree {
             adaptive,
             points,
-            data,
             keys_set,
             leaves,
             leaves_set,
             domain,
             points_to_leaves,
             leaves_to_points,
+            keys_to_data,
         }
     }
 
@@ -332,6 +333,7 @@ impl Tree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
     type NodeIndicesSet = HashSet<MortonKey>;
+    type NodeDataType = NodeData;
 
     // Get adaptivity information
     fn get_adaptive(&self) -> bool {
@@ -348,7 +350,7 @@ impl Tree for SingleNodeTree {
     }
 
     // Get all points, gets local keys in multi-node setting
-    fn get_points(&self) -> &Points {
+    fn get_all_points(&self) -> &Points {
         &self.points
     }
 
@@ -357,29 +359,30 @@ impl Tree for SingleNodeTree {
         &self.domain
     }
 
-    // Get tree node key associated with a given point
-    fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
+    // Get tree leaf associated with a given point
+    fn get_leaf(&self, point: &Point) -> Option<&MortonKey> {
         self.points_to_leaves.get(point)
     }
 
-    // Get points associated with a tree node key
-    fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
-        self.leaves_to_points.get(key)
+    // Get points associated with a tree leaf.
+    fn get_points(&self, leaf: &MortonKey) -> Option<&Points> {
+        self.leaves_to_points.get(leaf)
+    }
+
+    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::NodeDataType> {
+        self.keys_to_data.get(node_index)
+    }
+
+    fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType) {
+        self.keys_to_data.insert(*node_index, data);
     }
 }
 
-impl LocallyEssentialTree for SingleNodeTree {
+impl FmmTree for SingleNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
-    type Data = NodeData;
-
-    fn locality(&self, node_index: &Self::NodeIndex) -> Locality {
-        Locality::Local
-    }
-
-    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::Data> {
-        Some(&self.data)
-    }
+    type NodeData = NodeData;
+    type NodeDataType = Vec<f64>;
 
     // Single node trees are already locally essential trees
     fn create_let(&mut self) {}
@@ -475,6 +478,46 @@ impl LocallyEssentialTree for SingleNodeTree {
             None
         }
     }
+
+    // Set data associated with a tree node key
+    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
+        if let Some(x) = self.keys_to_data.get_mut(node_index) {
+            x.set_multipole_expansion(data);
+        }
+    }
+
+    // Get data associated with a tree node key
+    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
+        if let Some(x) = self.keys_to_data.get(node_index) {
+            Some(x.get_multipole_expansion())
+        } else {
+            None
+        }
+    }
+
+    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
+        if let Some(x) = self.keys_to_data.get_mut(node_index) {
+            x.set_local_expansion(data);
+        }
+    }
+
+    // Get data associated with a tree node key
+    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
+        if let Some(x) = self.keys_to_data.get(node_index) {
+            Some(x.get_local_expansion())
+        } else {
+            None
+        }
+    }
+
+    // TODO: Not implemented
+    fn downward_pass(&self) {}
+
+    // TODO: Not implemented
+    fn upward_pass(&self) {}
+
+    // TODO: Not implemented
+    fn run(&self, expansion_order: usize) {}
 }
 
 #[cfg(test)]

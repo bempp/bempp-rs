@@ -1,11 +1,12 @@
 use itertools::Itertools;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Count, Rank};
 
 use hyksort::hyksort;
+
 use solvers_traits::{
-    tree::{LocallyEssentialTree, Tree},
+    tree::{FmmData, FmmTree, Tree},
     types::Locality,
 };
 
@@ -19,6 +20,7 @@ use crate::{
         mpi_helpers::all_to_allv_sparse,
     },
     types::{
+        data::NodeData,
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
         multi_node::MultiNodeTree,
@@ -114,6 +116,8 @@ impl MultiNodeTree {
         let max = leaves.iter().max().unwrap();
         let range = [world.rank() as KeyType, min.morton, max.morton];
 
+        let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
+
         MultiNodeTree {
             world: world.duplicate(),
             adaptive: false,
@@ -124,6 +128,7 @@ impl MultiNodeTree {
             domain: *domain,
             points_to_leaves,
             leaves_to_points,
+            keys_to_data,
             range,
         }
     }
@@ -227,6 +232,8 @@ impl MultiNodeTree {
         let max = globally_balanced.iter().max().unwrap();
         let range = [world.rank() as KeyType, min.morton, max.morton];
 
+        let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
+
         MultiNodeTree {
             world: world.duplicate(),
             adaptive: true,
@@ -237,6 +244,7 @@ impl MultiNodeTree {
             domain: *domain,
             points_to_leaves: points_to_globally_balanced,
             leaves_to_points: globally_balanced_to_points,
+            keys_to_data,
             range,
         }
     }
@@ -361,6 +369,7 @@ impl Tree for MultiNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
     type NodeIndicesSet = HashSet<MortonKey>;
+    type NodeDataType = NodeData;
 
     // Get adaptivity information
     fn get_adaptive(&self) -> bool {
@@ -377,7 +386,7 @@ impl Tree for MultiNodeTree {
     }
 
     // Get all points, gets local keys in multi-node setting
-    fn get_points(&self) -> &Points {
+    fn get_all_points(&self) -> &Points {
         &self.points
     }
 
@@ -386,14 +395,24 @@ impl Tree for MultiNodeTree {
         &self.domain
     }
 
-    // Get points associated with a tree node key
-    fn map_point_to_key(&self, point: &Point) -> Option<&MortonKey> {
+    // Get leaf key associated with a point
+    fn get_leaf(&self, point: &Point) -> Option<&MortonKey> {
         self.points_to_leaves.get(point)
     }
 
-    // Get points associated with a tree node key
-    fn map_key_to_points(&self, key: &MortonKey) -> Option<&Points> {
-        self.leaves_to_points.get(key)
+    // Get points associated with a tree leaf
+    fn get_points(&self, leaf: &MortonKey) -> Option<&Points> {
+        self.leaves_to_points.get(leaf)
+    }
+
+    // Set data associated with a tree node key
+    fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType) {
+        self.keys_to_data.insert(*node_index, data);
+    }
+
+    // Get data associated with a tree node key
+    fn get_data(&self, key: &Self::NodeIndex) -> Option<&Self::NodeDataType> {
+        self.keys_to_data.get(key)
     }
 }
 
@@ -743,13 +762,11 @@ fn load_balance_let(tree: &mut MultiNodeTree) {
     tree.leaves_to_points = assign_nodes_to_points(&tree.leaves, &tree.points);
 }
 
-impl LocallyEssentialTree for MultiNodeTree {
+impl FmmTree for MultiNodeTree {
     type NodeIndex = MortonKey;
     type NodeIndices = MortonKeys;
-
-    fn locality(&self, node_index: &Self::NodeIndex) -> Locality {
-        Locality::Local
-    }
+    type NodeData = NodeData;
+    type NodeDataType = Vec<f64>;
 
     fn create_let(&mut self) {
         // Create an LET
@@ -851,4 +868,44 @@ impl LocallyEssentialTree for MultiNodeTree {
             None
         }
     }
+
+    // Set data associated with a tree node key
+    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
+        if let Some(x) = self.keys_to_data.get_mut(node_index) {
+            x.set_multipole_expansion(data);
+        }
+    }
+
+    // Get data associated with a tree node key
+    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
+        if let Some(x) = self.keys_to_data.get(node_index) {
+            Some(x.get_multipole_expansion())
+        } else {
+            None
+        }
+    }
+
+    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
+        if let Some(x) = self.keys_to_data.get_mut(node_index) {
+            x.set_local_expansion(data);
+        }
+    }
+
+    // Get data associated with a tree node key
+    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
+        if let Some(x) = self.keys_to_data.get(node_index) {
+            Some(x.get_local_expansion())
+        } else {
+            None
+        }
+    }
+
+    // TODO: Not implemented
+    fn downward_pass(&self) {}
+
+    // TODO: Not implemented
+    fn upward_pass(&self) {}
+
+    // TODO: Not implemented
+    fn run(&self, expansion_order: usize) {}
 }
