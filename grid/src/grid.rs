@@ -67,8 +67,7 @@ impl Serial2DTopology {
     fn create_connectivity_00(&mut self) {
         let mut nvertices = 0;
         let cells = &self.connectivity[2][0];
-        for i in 0..cells.num_rows() {
-            let cell = cells.row(i).unwrap();
+        for cell in cells.row_iter() {
             for j in cell {
                 if *j >= nvertices {
                     nvertices = *j + 1;
