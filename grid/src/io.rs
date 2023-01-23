@@ -19,7 +19,7 @@ pub fn export_as_gmsh(grid: SerialGrid, fname: String) {
             let coord = grid.geometry().point(i).unwrap()[j];
             gmsh_s.push_str(&format!(" {coord}"));
         }
-        for j in grid.geometry().dim()..3 {
+        for _j in grid.geometry().dim()..3 {
             gmsh_s.push_str(&format!(" 0.0"));
         }
         gmsh_s.push_str("\n");
@@ -31,7 +31,7 @@ pub fn export_as_gmsh(grid: SerialGrid, fname: String) {
     for i in 0..cell_count {
         let cell = grid.topology().cell(i).unwrap();
         gmsh_s.push_str(&format!("{i} "));
-        let mut vertex_order = vec![];
+        let vertex_order: Vec<usize>;
         if cell.len() == 3 {
             gmsh_s.push_str("2");
             vertex_order = vec![0, 1, 2];

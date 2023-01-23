@@ -1,7 +1,5 @@
 //! Geometry and topology definitions
 
-use crate::cell::ReferenceCell;
-use crate::element::FiniteElement;
 use solvers_tools::arrays::AdjacencyList;
 
 pub trait Geometry {

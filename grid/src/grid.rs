@@ -1,7 +1,6 @@
 pub use solvers_element::cell::Triangle;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
-pub use solvers_traits::cell::ReferenceCell;
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Locality;
