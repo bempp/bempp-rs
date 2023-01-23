@@ -221,6 +221,12 @@ mod test {
         *arr.get_mut(1, 2).unwrap() = 7;
         assert_eq!(*arr.get(1, 2).unwrap(), 7);
 
+        let mut index = 0;
+        for row in arr.row_iter() {
+            assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
+            index += 1;
+        }
+
         let mut arr2 = Array2D::from_data(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3));
         assert_eq!(*arr2.get(0, 0).unwrap(), 1.0);
         assert_eq!(*arr2.get(0, 1).unwrap(), 2.0);
