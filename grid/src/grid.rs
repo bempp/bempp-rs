@@ -67,7 +67,7 @@ impl Serial2DTopology {
     fn create_connectivity_00(&mut self) {
         let mut nvertices = 0;
         let cells = &self.connectivity[2][0];
-        for cell in cells.row_iter() {
+        for cell in cells.iter_rows() {
             for j in cell {
                 if *j >= nvertices {
                     nvertices = *j + 1;
@@ -82,8 +82,8 @@ impl Serial2DTopology {
         self.create_connectivity(0, 0);
         self.create_connectivity(1, 0);
         let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
-        for i in 0..self.connectivity[1][0].num_rows() {
-            for v in self.connectivity[1][0].row(i).unwrap() {
+        for (i, row) in self.connectivity[1][0].iter_rows().enumerate() {
+            for v in row {
                 data[*v].push(i);
             }
         }
@@ -94,8 +94,8 @@ impl Serial2DTopology {
     fn create_connectivity_02(&mut self) {
         self.create_connectivity(0, 0);
         let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
-        for i in 0..self.connectivity[2][0].num_rows() {
-            for v in self.connectivity[2][0].row(i).unwrap() {
+        for (i, row) in self.connectivity[2][0].iter_rows().enumerate() {
+            for v in row {
                 data[*v].push(i);
             }
         }
@@ -106,8 +106,7 @@ impl Serial2DTopology {
     fn create_connectivity_10(&mut self) {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
-        for i in 0..cells.num_rows() {
-            let cell = cells.row(i).unwrap();
+        for cell in cells.iter_rows() {
             let cell_edges = match cell.len() {
                 // TODO: remove hard coding here
                 3 => vec![(1, 2), (0, 2), (0, 1)],
@@ -120,8 +119,8 @@ impl Serial2DTopology {
                 let start = min(cell[e.0], cell[e.1]);
                 let end = max(cell[e.0], cell[e.1]);
                 let mut found = false;
-                for i in 0..data.num_rows() {
-                    if *data.get(i, 0).unwrap() == start && *data.get(i, 1).unwrap() == end {
+                for edge in data.iter_rows() {
+                    if edge[0] == start && edge[1] == end {
                         found = true;
                         break;
                     }
@@ -143,8 +142,8 @@ impl Serial2DTopology {
         self.create_connectivity(1, 0);
         self.create_connectivity(2, 1);
         let mut data = vec![vec![]; self.connectivity[1][0].num_rows()];
-        for i in 0..self.connectivity[2][1].num_rows() {
-            for v in self.connectivity[2][1].row(i).unwrap() {
+        for (i, row) in self.connectivity[2][1].iter_rows().enumerate() {
+            for v in row {
                 data[*v].push(i);
             }
         }
@@ -157,9 +156,8 @@ impl Serial2DTopology {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
         let edges = &self.connectivity[1][0];
-        for i in 0..cells.num_rows() {
+        for cell in cells.iter_rows() {
             let mut row = vec![];
-            let cell = cells.row(i).unwrap();
             let cell_edges = match cell.len() {
                 // TODO: remove hard coding here
                 3 => vec![(1, 2), (0, 2), (0, 1)],
@@ -171,8 +169,8 @@ impl Serial2DTopology {
             for e in cell_edges {
                 let start = min(cell[e.0], cell[e.1]);
                 let end = max(cell[e.0], cell[e.1]);
-                for i in 0..edges.num_rows() {
-                    if *edges.get(i, 0).unwrap() == start && *edges.get(i, 1).unwrap() == end {
+                for (i, edge) in edges.iter_rows().enumerate() {
+                    if edge[0] == start && edge[1] == end {
                         row.push(i);
                         break;
                     }

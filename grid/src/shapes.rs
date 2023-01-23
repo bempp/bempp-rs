@@ -30,8 +30,9 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         let mut cells = AdjacencyList::<usize>::new();
 
         for i in 0..g.geometry().point_count() {
-            for j in 0..g.geometry().dim() {
-                *coordinates.get_mut(i, j).unwrap() = g.geometry().point(i).unwrap()[j];
+            let pt = g.geometry().point(i).unwrap();
+            for (j, c) in pt.iter().enumerate() {
+                *coordinates.get_mut(i, j).unwrap() = *c;
             }
         }
         for edge in 0..g.topology().entity_count(1) {

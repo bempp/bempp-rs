@@ -15,11 +15,11 @@ pub fn export_as_gmsh(grid: SerialGrid, fname: String) {
     gmsh_s.push_str(&format!("{node_count}\n"));
     for i in 0..node_count {
         gmsh_s.push_str(&format!("{i}"));
-        for j in 0..grid.geometry().dim() {
-            let coord = grid.geometry().point(i).unwrap()[j];
-            gmsh_s.push_str(&format!(" {coord}"));
+        let pt = grid.geometry().point(i).unwrap();
+        for j in pt {
+            gmsh_s.push_str(&format!(" {j}"));
         }
-        for _j in grid.geometry().dim()..3 {
+        for _ in grid.geometry().dim()..3 {
             gmsh_s.push_str(&format!(" 0.0"));
         }
         gmsh_s.push_str("\n");
@@ -42,10 +42,9 @@ pub fn export_as_gmsh(grid: SerialGrid, fname: String) {
             panic!("Unsupported cell type.");
         }
         gmsh_s.push_str(" 2 0 0");
-        for j in 0..cell.len() {
+        for j in vertex_order {
             // currently assumes that Geometry and Topology use the same order
-            let vertex = cell[vertex_order[j]];
-            gmsh_s.push_str(&format!(" {vertex}"))
+            gmsh_s.push_str(&format!(" {}", cell[j]))
         }
         gmsh_s.push_str("\n");
     }
