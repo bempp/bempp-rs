@@ -33,7 +33,7 @@ impl<T> Array2D<T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
             None
         } else {
-            self.data.get(index0 * self.shape.1 + index1)
+            unsafe { Some(self.get_unchecked(index0, index1)) }
         }
     }
     /// Get a mutable item from the array
@@ -41,7 +41,7 @@ impl<T> Array2D<T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
             None
         } else {
-            self.data.get_mut(index0 * self.shape.1 + index1)
+            unsafe { Some(self.get_unchecked_mut(index0, index1)) }
         }
     }
     /// Get a row of the array
@@ -49,7 +49,7 @@ impl<T> Array2D<T> {
         if index >= self.shape.0 {
             None
         } else {
-            Some(&self.data[index * self.shape.1..(index + 1) * self.shape.1])
+            unsafe { Some(&self.row_unchecked(index)) }
         }
     }
     /// Get an item from the array without checking bounds
@@ -67,6 +67,26 @@ impl<T> Array2D<T> {
     /// Get the shape of the array
     pub fn shape(&self) -> &(usize, usize) {
         &self.shape
+    }
+    /// Iterate through the rows
+    pub fn row_iter(&self) -> Array2DRowIterator<'_, T> {
+        Array2DRowIterator::<T> {
+            array: &self,
+            index: 0,
+        }
+    }
+}
+
+pub struct Array2DRowIterator<'a, T> {
+    array: &'a Array2D<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for Array2DRowIterator<'a, T> {
+    type Item = &'a [T];
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        self.array.row(self.index - 1)
     }
 }
 
@@ -115,7 +135,7 @@ impl<T> AdjacencyList<T> {
         {
             None
         } else {
-            self.data.get(self.offsets[index0] + index1)
+            unsafe { Some(self.get_unchecked(index0, index1)) }
         }
     }
     /// Get a mutable item from the adjacency list
@@ -125,7 +145,7 @@ impl<T> AdjacencyList<T> {
         {
             None
         } else {
-            self.data.get_mut(self.offsets[index0] + index1)
+            unsafe { Some(self.get_unchecked_mut(index0, index1)) }
         }
     }
     /// Get a row from the adjacency list
@@ -133,7 +153,7 @@ impl<T> AdjacencyList<T> {
         if index >= self.offsets.len() - 1 {
             None
         } else {
-            Some(&self.data[self.offsets[index]..self.offsets[index + 1]])
+            unsafe { Some(self.row_unchecked(index)) }
         }
     }
     /// Get an item from the adjacency list without checking bounds
@@ -149,12 +169,32 @@ impl<T> AdjacencyList<T> {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
     /// Get the vector of offsets
-    pub fn offsets(&self) -> &Vec<usize> {
+    pub fn offsets(&self) -> &[usize] {
         &self.offsets
     }
     /// Get the number of rows
     pub fn num_rows(&self) -> usize {
         self.offsets.len() - 1
+    }
+    /// Iterate through the rows
+    pub fn row_iter(&self) -> AdjacencyListRowIterator<'_, T> {
+        AdjacencyListRowIterator::<T> {
+            alist: &self,
+            index: 0,
+        }
+    }
+}
+
+pub struct AdjacencyListRowIterator<'a, T> {
+    alist: &'a AdjacencyList<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for AdjacencyListRowIterator<'a, T> {
+    type Item = &'a [T];
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        self.alist.row(self.index - 1)
     }
 }
 
@@ -180,6 +220,12 @@ mod test {
 
         *arr.get_mut(1, 2).unwrap() = 7;
         assert_eq!(*arr.get(1, 2).unwrap(), 7);
+
+        let mut index = 0;
+        for row in arr.row_iter() {
+            assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
+            index += 1;
+        }
 
         let mut arr2 = Array2D::from_data(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3));
         assert_eq!(*arr2.get(0, 0).unwrap(), 1.0);
@@ -225,6 +271,12 @@ mod test {
 
         *arr.get_mut(2, 0).unwrap() = 7;
         assert_eq!(*arr.get(2, 0).unwrap(), 7);
+
+        let mut index = 0;
+        for row in arr.row_iter() {
+            assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
+            index += 1;
+        }
 
         let mut arr2 = AdjacencyList::<f64>::new();
         assert_eq!(arr2.num_rows(), 0);
