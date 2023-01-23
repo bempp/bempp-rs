@@ -16,13 +16,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust-version: ["stable", "nightly"]
+        rust-version: ["stable", "beta", "nightly"]
+        mpi: [ 'mpich', 'openmpi']
     steps:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }}
       - uses: actions/checkout@v2
       - name: Style checks
         run: |
