@@ -133,7 +133,7 @@ impl<T> AdjacencyList<T> {
         if index >= self.offsets.len() - 1 {
             None
         } else {
-            Some(&self.data[self.offsets[index]..self.offsets[index + 1]])
+            unsafe { Some(self.row_unchecked(index)) }
         }
     }
     /// Get an item from the adjacency list without checking bounds
