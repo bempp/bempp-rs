@@ -156,6 +156,26 @@ impl<T> AdjacencyList<T> {
     pub fn num_rows(&self) -> usize {
         self.offsets.len() - 1
     }
+    /// Iterate through the rows
+    pub fn row_iter(&self) -> AdjacencyListRowIterator<'_, T> {
+        AdjacencyListRowIterator::<T> {
+            alist: &self,
+            index: 0,
+        }
+    }
+}
+
+pub struct AdjacencyListRowIterator<'a, T> {
+    alist: &'a AdjacencyList<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for AdjacencyListRowIterator<'a, T> {
+    type Item = &'a [T];
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        self.alist.row(self.index - 1)
+    }
 }
 
 #[cfg(test)]
@@ -225,6 +245,12 @@ mod test {
 
         *arr.get_mut(2, 0).unwrap() = 7;
         assert_eq!(*arr.get(2, 0).unwrap(), 7);
+
+        let mut index = 0;
+        for row in arr.row_iter() {
+            assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
+            index += 1;
+        }
 
         let mut arr2 = AdjacencyList::<f64>::new();
         assert_eq!(arr2.num_rows(), 0);
