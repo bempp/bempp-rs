@@ -1,10 +1,7 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use solvers_traits::{
-    tree::{FmmData, FmmTree, Tree},
-    types::Locality,
-};
+use solvers_traits::tree::{FmmData, FmmTree, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -417,7 +414,7 @@ impl FmmTree for SingleNodeTree {
         keys.append(&mut neighbors_adj);
         keys.append(&mut neighbors_parents_adj);
 
-        if keys.len() > 0 {
+        if !keys.is_empty() {
             Some(MortonKeys { keys, index: 0 })
         } else {
             None
@@ -435,7 +432,7 @@ impl FmmTree for SingleNodeTree {
                 .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
                 .collect_vec();
 
-            if keys.len() > 0 {
+            if !keys.is_empty() {
                 return Some(MortonKeys { keys, index: 0 });
             } else {
                 return None;
@@ -456,7 +453,7 @@ impl FmmTree for SingleNodeTree {
             .filter(|nc| self.keys_set.contains(nc) && !leaf.is_adjacent(nc))
             .collect_vec();
 
-        if keys.len() > 0 {
+        if !keys.is_empty() {
             Some(MortonKeys { keys, index: 0 })
         } else {
             None
@@ -472,7 +469,7 @@ impl FmmTree for SingleNodeTree {
             .filter(|pn| self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
             .collect_vec();
 
-        if keys.len() > 0 {
+        if !keys.is_empty() {
             Some(MortonKeys { keys, index: 0 })
         } else {
             None
@@ -488,11 +485,9 @@ impl FmmTree for SingleNodeTree {
 
     // Get data associated with a tree node key
     fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
-        if let Some(x) = self.keys_to_data.get(node_index) {
-            Some(x.get_multipole_expansion())
-        } else {
-            None
-        }
+        self.keys_to_data
+            .get(node_index)
+            .map(|x| x.get_multipole_expansion())
     }
 
     fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
@@ -503,11 +498,9 @@ impl FmmTree for SingleNodeTree {
 
     // Get data associated with a tree node key
     fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
-        if let Some(x) = self.keys_to_data.get(node_index) {
-            Some(x.get_local_expansion())
-        } else {
-            None
-        }
+        self.keys_to_data
+            .get(node_index)
+            .map(|x| x.get_local_expansion())
     }
 
     // TODO: Not implemented

@@ -11,8 +11,6 @@ pub enum NodeType {
 
 #[derive(Debug, Clone)]
 pub struct NodeData {
-    // Number of data fields in vec
-    nfields: usize,
     field_size: Vec<usize>,
     data: Vec<f64>,
     displacement: Vec<usize>,
@@ -29,7 +27,6 @@ impl NodeData {
     fn default_data() -> NodeData {
         // Stub
         NodeData {
-            nfields: 1,
             data: Vec::<f64>::new(),
             field_size: vec![1],
             displacement: vec![0],
@@ -38,7 +35,6 @@ impl NodeData {
 
     fn fmm_data() -> NodeData {
         NodeData {
-            nfields: 2,
             data: Vec::<f64>::new(),
             field_size: vec![1, 1],
             displacement: vec![0, 1],

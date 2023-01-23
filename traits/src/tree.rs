@@ -1,29 +1,23 @@
-use std::fmt::Debug;
-
-use crate::types::{Locality, Scalar};
-
-/// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers. 
+/// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 pub trait Tree {
-    
     // The computational domain defined by the tree
     type Domain;
-    
+
     // The type of points that define a tree
     type Point;
 
     // A container for multiple Points
     type Points;
 
-
     // Unique index for tree nodes
     type NodeIndex;
 
-    // Container for multiple tree nodes 
+    // Container for multiple tree nodes
     type NodeIndices;
 
     // A set of NodeIndices
     type NodeIndicesSet;
-    
+
     // Type of element in a node's data container
     type NodeDataType;
 
@@ -46,21 +40,19 @@ pub trait Tree {
     fn get_leaf(&self, point: &Self::Point) -> Option<&Self::NodeIndex>;
 
     // Get points associated with a tree leaf
-    fn get_points(&self, leaf: &Self::NodeIndex) -> Option<&Self::Points>;   
+    fn get_points(&self, leaf: &Self::NodeIndex) -> Option<&Self::Points>;
 
     // Set data associated with a given leaf node.
     fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType);
 
     // Get data associated with a given leaf node.
     fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::NodeDataType>;
-
 }
 
 /// FmmTree take care of ghost nodes on other processors, and have access to all
-/// the information they need to build the interaction lists for a tree, as well as 
+/// the information they need to build the interaction lists for a tree, as well as
 /// perform an FMM loop.
 pub trait FmmTree {
-    
     // Unique index for tree nodes
     type NodeIndex;
 
@@ -81,7 +73,7 @@ pub trait FmmTree {
     fn get_interaction_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
     fn get_x_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
     fn get_w_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
-    
+
     // Getters/setters for expansion coefficients.
     fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType);
     fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType>;
@@ -99,7 +91,7 @@ pub trait FmmTree {
 pub trait FmmData {
     type NodeIndex;
     type CoefficientDataType;
-    
+
     fn set_expansion_order(&mut self, order: usize);
     fn get_expansion_order(&self) -> usize;
     fn set_multipole_expansion(&mut self, data: &Self::CoefficientDataType);
