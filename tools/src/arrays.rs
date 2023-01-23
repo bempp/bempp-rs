@@ -149,7 +149,7 @@ impl<T> AdjacencyList<T> {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
     /// Get the vector of offsets
-    pub fn offsets(&self) -> &Vec<usize> {
+    pub fn offsets(&self) -> &[usize] {
         &self.offsets
     }
     /// Get the number of rows
