@@ -1,12 +1,8 @@
-
-use solvers_traits::{
-    tree::FmmData,
-    fmm::Translation
-};
+use solvers_traits::{fmm::Translation, tree::FmmData};
 
 use crate::types::{
+    data::{NodeData, NodeType},
     morton::MortonKey,
-    data::{NodeData, NodeType}
 };
 
 impl NodeData {
@@ -37,7 +33,6 @@ impl NodeData {
 
 impl FmmData for NodeData {
     type CoefficientDataType = Vec<f64>;
-    type NodeIndex = MortonKey;
 
     fn set_expansion_order(&mut self, order: usize) {
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
@@ -81,7 +76,6 @@ impl FmmData for NodeData {
         _multipole = data;
     }
 }
-
 
 mod test {
     use solvers_traits::tree::FmmData;

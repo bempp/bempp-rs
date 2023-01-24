@@ -7,7 +7,7 @@ use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
-        data::{NodeType, NodeData},
+        data::{NodeData, NodeType},
         domain::Domain,
         morton::{MortonKey, MortonKeys},
         point::{Point, PointType, Points},
@@ -337,13 +337,17 @@ impl Tree for SingleNodeTree {
         self.adaptive
     }
 
-    // Get all keys, gets local keys in multi-node setting
-    fn get_keys(&self) -> &MortonKeys {
+    // Get all leaves, gets local keys in multi-node setting
+    fn get_leaves(&self) -> &MortonKeys {
         &self.leaves
     }
 
-    fn get_keys_set(&self) -> &HashSet<MortonKey> {
+    fn get_leaves_set(&self) -> &HashSet<MortonKey> {
         &self.leaves_set
+    }
+    
+    fn get_keys_set(&self) -> &HashSet<MortonKey> {
+        &self.keys_set
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -376,10 +380,9 @@ impl Tree for SingleNodeTree {
 }
 
 impl FmmTree for SingleNodeTree {
-    type NodeIndex = MortonKey;
-    type NodeIndices = MortonKeys;
     type NodeData = NodeData;
-    type NodeDataType = Vec<f64>;
+    type NodeDataContainer = Vec<f64>;
+    // type ParticleData = Vec<f64>;
 
     // Single node trees are already locally essential trees
     fn create_let(&mut self) {}
@@ -477,27 +480,27 @@ impl FmmTree for SingleNodeTree {
     }
 
     // Set data associated with a tree node key
-    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
+    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataContainer) {
         if let Some(x) = self.keys_to_data.get_mut(node_index) {
             x.set_multipole_expansion(data);
         }
     }
 
     // Get data associated with a tree node key
-    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
+    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataContainer> {
         self.keys_to_data
             .get(node_index)
             .map(|x| x.get_multipole_expansion())
     }
 
-    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
+    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataContainer) {
         if let Some(x) = self.keys_to_data.get_mut(node_index) {
             x.set_local_expansion(data);
         }
     }
 
     // Get data associated with a tree node key
-    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
+    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataContainer> {
         self.keys_to_data
             .get(node_index)
             .map(|x| x.get_local_expansion())
@@ -505,11 +508,10 @@ impl FmmTree for SingleNodeTree {
 
     // TODO: Not implemented
     fn upward_pass(&mut self) {
-
         // 1. P2M: Loop over leaves
         for (leaf, points) in self.leaves_to_points.iter() {
             // calculate P2M operator and update multipole expansion at leaves
-            let mut data =  NodeData::new(NodeType::Fmm);
+            let mut data = NodeData::new(NodeType::Fmm);
             // this is where operator would go
             let tmp: Vec<f64> = vec![1.0];
             data.set_multipole_expansion(&tmp);
@@ -518,10 +520,8 @@ impl FmmTree for SingleNodeTree {
 
         // 2. M2M: Loop over keys, level by level.
         // let working_set: Vec<MortonKey> = self.leaves.cloned().collect();
-
-
     }
-    
+
     // TODO: Not implemented
     fn downward_pass(&mut self) {}
 
@@ -565,7 +565,7 @@ mod tests {
         }
 
         // Test that the tree really is uniform
-        let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
+        let levels: Vec<u64> = tree.get_leaves().iter().map(|key| key.level()).collect();
         let first = levels[0];
         assert!(levels.iter().all(|key| *key == first));
 
@@ -586,7 +586,7 @@ mod tests {
         }
 
         // Test that tree is not uniform
-        let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
+        let levels: Vec<u64> = tree.get_leaves().iter().map(|key| key.level()).collect();
         let first = levels[0];
         assert_eq!(false, levels.iter().all(|level| *level == first));
 
@@ -632,8 +632,8 @@ mod tests {
         let points = points_fixture(10000);
         let uniform = SingleNodeTree::new(&points, false, Some(150), Some(4));
         let adaptive = SingleNodeTree::new(&points, true, Some(150), None);
-        test_no_overlaps_helper(&uniform.get_keys());
-        test_no_overlaps_helper(&adaptive.get_keys());
+        test_no_overlaps_helper(&uniform.get_leaves());
+        test_no_overlaps_helper(&adaptive.get_leaves());
     }
 
     #[test]

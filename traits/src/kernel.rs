@@ -1,5 +1,5 @@
 // Definition of kernel functions.
-use crate::types::{Result, EvalType};
+use crate::types::{EvalType, Result};
 
 pub trait Kernel {
     // Evaluation data;
@@ -19,6 +19,7 @@ pub trait Kernel {
 
     // Evaluate the kernel.
     fn evaluate(
+        &self,
         sources: &[f64],
         charges: &[f64],
         targets: &[f64],
