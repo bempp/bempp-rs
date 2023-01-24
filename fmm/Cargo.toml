@@ -1,3 +1,7 @@
+[features]
+# Treat warnings as a build error.
+strict = []
+
 [package]
 name = "solvers-fmm"
 version = "0.1.0"

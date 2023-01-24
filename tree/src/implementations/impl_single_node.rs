@@ -510,12 +510,11 @@ impl FmmTree for SingleNodeTree {
     fn upward_pass(&self) {}
 
     // TODO: Not implemented
-    fn run(&self, expansion_order: usize) {}
+    fn run(&self, _expansion_order: usize) {}
 }
 
 #[cfg(test)]
-mod tests {
-
+mod test {
     use super::*;
     use rand::prelude::*;
     use rand::SeedableRng;
