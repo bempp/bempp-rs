@@ -2,6 +2,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::types::{
+    data::NodeData,
     domain::Domain,
     morton::{MortonKey, MortonKeys},
     point::{Point, Points},
@@ -16,6 +17,9 @@ pub struct SingleNodeTree {
     ///  A vector of Cartesian points.
     pub points: Points,
 
+    /// All ancestors of leaves in tree, as a set.
+    pub keys_set: HashSet<MortonKey>,
+
     /// The leaves that span the tree, defined by its leaf nodes.
     pub leaves: MortonKeys,
 
@@ -27,6 +31,9 @@ pub struct SingleNodeTree {
 
     /// Map between the points and the nodes in the SingleNodeTree.
     pub points_to_leaves: HashMap<Point, MortonKey>,
+
+    // Map between keys and data
+    pub keys_to_data: HashMap<MortonKey, NodeData>,
 
     /// Map between the nodes in the SingleNodetree and the points they contain.
     pub leaves_to_points: HashMap<MortonKey, Points>,
