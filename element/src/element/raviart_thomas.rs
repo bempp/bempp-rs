@@ -1,6 +1,9 @@
 //! Lagrange elements
 
+use crate::cell::*;
 use crate::element::*;
+use crate::map::*;
+use solvers_traits::element::ElementFamily;
 
 /// Degree 1 Raviart-Thomas element on a triangle
 pub struct RaviartThomasElementTriangleDegree1 {}
@@ -29,7 +32,7 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
     }
     fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are 1-x-y, x, y
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) = -points[2 * pt];
@@ -71,6 +74,7 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
 
 #[cfg(test)]
 mod test {
+    use crate::cell::*;
     use crate::element::*;
     use approx::*;
 

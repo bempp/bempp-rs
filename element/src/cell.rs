@@ -1,6 +1,5 @@
 //! Cell definitions
 
-use crate::element::*;
 pub mod cells_1d;
 pub use cells_1d::*;
 pub mod cells_2d;

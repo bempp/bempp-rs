@@ -1,19 +1,17 @@
 //! Finite Element definitions
 
-use crate::cell::*;
-use crate::map::*;
+pub use solvers_traits::element::ElementFamily;
+pub use solvers_traits::element::FiniteElement;
+pub use solvers_traits::element::TabulatedData;
 pub mod lagrange;
 pub use lagrange::*;
 pub mod raviart_thomas;
 pub use raviart_thomas::*;
-pub use solvers_traits::cell::ReferenceCellType;
-pub use solvers_traits::element::ElementFamily;
-pub use solvers_traits::element::FiniteElement;
-pub use solvers_traits::element::TabulatedData;
 
 #[cfg(test)]
 mod test {
     use crate::element::*;
+    use solvers_traits::cell::ReferenceCellType;
 
     #[test]
     fn test_lagrange_1() {
