@@ -46,6 +46,17 @@ pub struct Serial2DTopology {
     quad_start: usize,
 }
 
+fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
+    match cell_type {
+        ReferenceCellType::Interval => Box::new(cell::Interval),
+        ReferenceCellType::Triangle => Box::new(cell::Triangle),
+        ReferenceCellType::Quadrilateral => Box::new(cell::Quadrilateral),
+        _ => {
+            panic!("Unsupported cell type (for now)");
+        }
+    }
+}
+
 impl Serial2DTopology {
     pub fn new(cells: AdjacencyList<usize>) -> Self {
         let mut c20 = AdjacencyList::<usize>::new();
@@ -203,66 +214,11 @@ impl Serial2DTopology {
                 data.add_row(&row);
             }
         }
-        /*
-        let triangle_connectivity = [
-            cell::Triangle.connectivity(1, 0, 0).unwrap(),
-            cell::Triangle.connectivity(1, 1, 0).unwrap(),
-            cell::Triangle.connectivity(1, 2, 0).unwrap(),
-        ];
-
-        for triangle in self.get_cells_range(ReferenceCellType::Triangle).unwrap() {
-            let cell = unsafe { cells.row_unchecked(triangle) };
-            let mut row = vec![];
-            for e in &triangle_connectivity {
-                let start = min(cell[e[0]], cell[e[1]]);
-                let end = max(cell[e[0]], cell[e[1]]);
-                for (i, edge) in edges.iter_rows().enumerate() {
-                    if edge[0] == start && edge[1] == end {
-                        row.push(i);
-                        break;
-                    }
-                }
-            }
-            data.add_row(&row);
-        }
-        let quad_connectivity = [
-            cell::Quadrilateral.connectivity(1, 0, 0).unwrap(),
-            cell::Quadrilateral.connectivity(1, 1, 0).unwrap(),
-            cell::Quadrilateral.connectivity(1, 2, 0).unwrap(),
-            cell::Quadrilateral.connectivity(1, 3, 0).unwrap(),
-        ];
-        for quadrilateral in self.get_cells_range(ReferenceCellType::Quadrilateral).unwrap() {
-            let cell = unsafe { cells.row_unchecked(quadrilateral) };
-            let mut row = vec![];
-            for e in &quad_connectivity {
-                let start = min(cell[e[0]], cell[e[1]]);
-                let end = max(cell[e[0]], cell[e[1]]);
-                for (i, edge) in edges.iter_rows().enumerate() {
-                    if edge[0] == start && edge[1] == end {
-                        row.push(i);
-                        break;
-                    }
-                }
-            }
-            data.add_row(&row);
-        }
-        */
         self.connectivity[2][1] = data;
     }
     fn create_connectivity_22(&mut self) {
         for i in 0..self.connectivity[2][0].num_rows() {
             self.connectivity[2][2].add_row(&[i]);
-        }
-    }
-}
-
-fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
-    match cell_type {
-        ReferenceCellType::Interval => Box::new(cell::Interval),
-        ReferenceCellType::Triangle => Box::new(cell::Triangle),
-        ReferenceCellType::Quadrilateral => Box::new(cell::Quadrilateral),
-        _ => {
-            panic!("Unsupported cell type (for now)");
         }
     }
 }
