@@ -39,10 +39,27 @@ impl Geometry for SerialGeometry {
 
 pub struct Serial2DTopology {
     connectivity: [[AdjacencyList<usize>; 3]; 3],
+    index_map: Vec<usize>,
+    quad_start: usize,
 }
 
 impl Serial2DTopology {
     pub fn new(cells: AdjacencyList<usize>) -> Self {
+        let mut c20 = AdjacencyList::<usize>::new();
+        let mut index_map = vec![];
+        for (i, cell) in cells.iter_rows().enumerate() {
+            if cell.len() == 3 {
+                index_map.push(i);
+                c20.add_row(cell);
+            }
+        }
+        let quad_start = index_map.len();
+        for (i, cell) in cells.iter_rows().enumerate() {
+            if cell.len() == 4 {
+                index_map.push(i);
+                c20.add_row(cell);
+            }
+        }
         Self {
             connectivity: [
                 [
@@ -56,11 +73,13 @@ impl Serial2DTopology {
                     AdjacencyList::<usize>::new(),
                 ],
                 [
-                    cells,
+                    c20,
                     AdjacencyList::<usize>::new(),
                     AdjacencyList::<usize>::new(),
                 ],
             ],
+            index_map: index_map,
+            quad_start: quad_start,
         }
     }
 
@@ -75,7 +94,7 @@ impl Serial2DTopology {
             }
         }
         for i in 0..nvertices {
-            self.connectivity[0][0].add_row(vec![i]);
+            self.connectivity[0][0].add_row(&[i]);
         }
     }
     fn create_connectivity_01(&mut self) {
@@ -88,7 +107,7 @@ impl Serial2DTopology {
             }
         }
         for row in data {
-            self.connectivity[0][1].add_row(row);
+            self.connectivity[0][1].add_row(&row);
         }
     }
     fn create_connectivity_02(&mut self) {
@@ -100,7 +119,7 @@ impl Serial2DTopology {
             }
         }
         for row in data {
-            self.connectivity[0][2].add_row(row);
+            self.connectivity[0][2].add_row(&row);
         }
     }
     fn create_connectivity_10(&mut self) {
@@ -126,7 +145,7 @@ impl Serial2DTopology {
                     }
                 }
                 if !found {
-                    data.add_row(vec![start, end]);
+                    data.add_row(&[start, end]);
                 }
             }
         }
@@ -135,7 +154,7 @@ impl Serial2DTopology {
     fn create_connectivity_11(&mut self) {
         self.create_connectivity(1, 0);
         for i in 0..self.connectivity[0][1].num_rows() {
-            self.connectivity[1][1].add_row(vec![i]);
+            self.connectivity[1][1].add_row(&[i]);
         }
     }
     fn create_connectivity_12(&mut self) {
@@ -148,7 +167,7 @@ impl Serial2DTopology {
             }
         }
         for row in data {
-            self.connectivity[1][2].add_row(row);
+            self.connectivity[1][2].add_row(&row);
         }
     }
     fn create_connectivity_21(&mut self) {
@@ -176,18 +195,22 @@ impl Serial2DTopology {
                     }
                 }
             }
-            data.add_row(row);
+            data.add_row(&row);
         }
         self.connectivity[2][1] = data;
     }
     fn create_connectivity_22(&mut self) {
         for i in 0..self.connectivity[2][0].num_rows() {
-            self.connectivity[2][2].add_row(vec![i]);
+            self.connectivity[2][2].add_row(&[i]);
         }
     }
 }
 
 impl Topology for Serial2DTopology {
+    fn index_map(&self) -> &[usize] {
+        &self.index_map
+    }
+
     fn local2global(&self, local_id: usize) -> usize {
         local_id
     }

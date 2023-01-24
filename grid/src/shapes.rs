@@ -58,22 +58,22 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         for triangle in 0..g.topology().entity_count(2) {
             let vs = g.topology().cell(triangle).unwrap();
             let es = g.topology().connectivity(2, 1).row(triangle).unwrap();
-            cells.add_row(vec![
+            cells.add_row(&[
                 vs[0],
                 g.topology().entity_count(0) + es[2],
                 g.topology().entity_count(0) + es[1],
             ]);
-            cells.add_row(vec![
+            cells.add_row(&[
                 vs[1],
                 g.topology().entity_count(0) + es[0],
                 g.topology().entity_count(0) + es[2],
             ]);
-            cells.add_row(vec![
+            cells.add_row(&[
                 vs[2],
                 g.topology().entity_count(0) + es[1],
                 g.topology().entity_count(0) + es[0],
             ]);
-            cells.add_row(vec![
+            cells.add_row(&[
                 g.topology().entity_count(0) + es[0],
                 g.topology().entity_count(0) + es[1],
                 g.topology().entity_count(0) + es[2],

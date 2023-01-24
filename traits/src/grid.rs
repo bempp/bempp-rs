@@ -22,6 +22,9 @@ pub trait Topology {
     // The dimension of the grid
     fn dim(&self) -> usize;
 
+    // Return the index map from the input order to the storage order
+    fn index_map(&self) -> &[usize];
+
     // Check the locality of an element
     fn locality(&self, global_id: usize) -> Locality;
 
