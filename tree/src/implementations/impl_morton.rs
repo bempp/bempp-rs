@@ -73,7 +73,7 @@ fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     balanced
 }
 
-/// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in [1].
+/// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in \[1\].
 pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
     let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
     let mut b_ancestors: HashSet<MortonKey> = b.ancestors();

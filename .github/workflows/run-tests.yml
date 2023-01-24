@@ -34,6 +34,9 @@ jobs:
       - name: Run tests
         run: |
           cargo test --lib --features "strict"
+      - name: Run tests
+        run: |
+          cargo doc --features "strict"
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest
