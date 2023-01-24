@@ -20,6 +20,9 @@ name = "solvers_fmm"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../tools"}
+solvers-tools = { path = "../tools" }
+solvers-tree = { path = "../tree" }
+solvers-traits = { path = "../traits" }
 approx = "0.5"
 cauchy = "0.4.*"
+mpi = { version = "0.6.*" }
