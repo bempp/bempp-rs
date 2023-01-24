@@ -42,7 +42,7 @@ jobs:
       - name: Build docs
         run: |
           cargo doc --features "strict"
-          - name: Run examples
+      - name: Run examples
         run: |
           cargo test --examples  --features "strict"
   run-tests-python:
