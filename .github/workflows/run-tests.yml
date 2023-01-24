@@ -44,6 +44,7 @@ jobs:
           cargo doc --features "strict"
       - name: Run examples
         run: |
+          cd tools
           cargo test --examples  --features "strict"
   run-tests-python:
     name: Run tests (Python)
