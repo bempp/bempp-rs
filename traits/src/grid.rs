@@ -1,6 +1,8 @@
 //! Geometry and topology definitions
 
+use std::ops::Range;
 use solvers_tools::arrays::AdjacencyList;
+use crate::cell::ReferenceCellType;
 
 pub trait Geometry {
     fn dim(&self) -> usize;
@@ -25,6 +27,12 @@ pub trait Topology {
     // Return the index map from the input order to the storage order
     fn index_map(&self) -> &[usize];
 
+    // Get the indices of cells with the given cell type
+    fn get_cells(&self, cell_type: ReferenceCellType) -> Vec<usize>;
+
+    // Get the indices of cells with the given cell type as a range (if they are contiguous
+    fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
+
     // Check the locality of an element
     fn locality(&self, global_id: usize) -> Locality;
 
@@ -40,6 +48,7 @@ pub trait Topology {
     unsafe fn cell_unchecked(&self, index: usize) -> &[usize];
 
     fn create_connectivity(&mut self, dim0: usize, dim1: usize);
+
     fn create_connectivity_all(&mut self) {
         for dim0 in 0..self.dim() {
             for dim1 in 0..self.dim() {
@@ -47,6 +56,7 @@ pub trait Topology {
             }
         }
     }
+
     fn connectivity(&self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
 }
 

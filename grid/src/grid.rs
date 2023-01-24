@@ -1,12 +1,15 @@
+use solvers_element::cell;
 pub use solvers_element::cell::Triangle;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
+use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Locality;
 pub use solvers_traits::grid::Topology;
 use std::cmp::max;
 use std::cmp::min;
+use std::ops::Range;
 
 pub struct SerialGeometry {
     pub coordinates: Array2D<f64>,
@@ -175,19 +178,44 @@ impl Serial2DTopology {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
         let edges = &self.connectivity[1][0];
-        for cell in cells.iter_rows() {
-            let mut row = vec![];
-            let cell_edges = match cell.len() {
-                // TODO: remove hard coding here
-                3 => vec![(1, 2), (0, 2), (0, 1)],
-                4 => vec![(0, 1), (0, 2), (1, 3), (2, 3)],
-                _ => {
-                    panic!("Unsupported cell type.")
+
+        for cell_type in [
+            ReferenceCellType::Triangle,
+            ReferenceCellType::Quadrilateral,
+        ] {
+            let ref_cell = get_reference_cell(cell_type);
+            let connectivity = (0..ref_cell.edge_count())
+                .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
+                .collect::<Vec<Vec<usize>>>();
+            for i in self.get_cells_range(cell_type).unwrap() {
+                let cell = unsafe { cells.row_unchecked(i) };
+                let mut row = vec![];
+                for e in &connectivity {
+                    let start = min(cell[e[0]], cell[e[1]]);
+                    let end = max(cell[e[0]], cell[e[1]]);
+                    for (i, edge) in edges.iter_rows().enumerate() {
+                        if edge[0] == start && edge[1] == end {
+                            row.push(i);
+                            break;
+                        }
+                    }
                 }
-            };
-            for e in cell_edges {
-                let start = min(cell[e.0], cell[e.1]);
-                let end = max(cell[e.0], cell[e.1]);
+                data.add_row(&row);
+            }
+        }
+        /*
+        let triangle_connectivity = [
+            cell::Triangle.connectivity(1, 0, 0).unwrap(),
+            cell::Triangle.connectivity(1, 1, 0).unwrap(),
+            cell::Triangle.connectivity(1, 2, 0).unwrap(),
+        ];
+
+        for triangle in self.get_cells_range(ReferenceCellType::Triangle).unwrap() {
+            let cell = unsafe { cells.row_unchecked(triangle) };
+            let mut row = vec![];
+            for e in &triangle_connectivity {
+                let start = min(cell[e[0]], cell[e[1]]);
+                let end = max(cell[e[0]], cell[e[1]]);
                 for (i, edge) in edges.iter_rows().enumerate() {
                     if edge[0] == start && edge[1] == end {
                         row.push(i);
@@ -197,6 +225,28 @@ impl Serial2DTopology {
             }
             data.add_row(&row);
         }
+        let quad_connectivity = [
+            cell::Quadrilateral.connectivity(1, 0, 0).unwrap(),
+            cell::Quadrilateral.connectivity(1, 1, 0).unwrap(),
+            cell::Quadrilateral.connectivity(1, 2, 0).unwrap(),
+            cell::Quadrilateral.connectivity(1, 3, 0).unwrap(),
+        ];
+        for quadrilateral in self.get_cells_range(ReferenceCellType::Quadrilateral).unwrap() {
+            let cell = unsafe { cells.row_unchecked(quadrilateral) };
+            let mut row = vec![];
+            for e in &quad_connectivity {
+                let start = min(cell[e[0]], cell[e[1]]);
+                let end = max(cell[e[0]], cell[e[1]]);
+                for (i, edge) in edges.iter_rows().enumerate() {
+                    if edge[0] == start && edge[1] == end {
+                        row.push(i);
+                        break;
+                    }
+                }
+            }
+            data.add_row(&row);
+        }
+        */
         self.connectivity[2][1] = data;
     }
     fn create_connectivity_22(&mut self) {
@@ -206,11 +256,51 @@ impl Serial2DTopology {
     }
 }
 
+fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
+    match cell_type {
+        ReferenceCellType::Interval => Box::new(cell::Interval),
+        ReferenceCellType::Triangle => Box::new(cell::Triangle),
+        ReferenceCellType::Quadrilateral => Box::new(cell::Quadrilateral),
+        _ => {
+            panic!("Unsupported cell type (for now)");
+        }
+    }
+}
+
 impl Topology for Serial2DTopology {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
-
+    fn get_cells(&self, cell_type: ReferenceCellType) -> Vec<usize> {
+        match cell_type {
+            ReferenceCellType::Triangle => {
+                let mut cells = vec![];
+                for (i, cell) in self.connectivity[2][0].iter_rows().enumerate() {
+                    if cell.len() == 3 {
+                        cells.push(i);
+                    }
+                }
+                cells
+            }
+            ReferenceCellType::Quadrilateral => {
+                let mut cells = vec![];
+                for (i, cell) in self.connectivity[2][0].iter_rows().enumerate() {
+                    if cell.len() == 4 {
+                        cells.push(i);
+                    }
+                }
+                cells
+            }
+            _ => vec![],
+        }
+    }
+    fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>> {
+        match cell_type {
+            ReferenceCellType::Triangle => Some(0..self.quad_start),
+            ReferenceCellType::Quadrilateral => Some(self.quad_start..self.index_map.len()),
+            _ => Some(0..0),
+        }
+    }
     fn local2global(&self, local_id: usize) -> usize {
         local_id
     }
