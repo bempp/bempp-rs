@@ -2,6 +2,7 @@ use solvers_tools::arrays::AdjacencyList;
 
 fn main() {
     // Create an empty adjacency list
+    // An adjacency list is a storage format that stores data in rows with a different number of items allowed in each row
     let mut a = AdjacencyList::<usize>::new();
 
     // Add rows to an adjacency list

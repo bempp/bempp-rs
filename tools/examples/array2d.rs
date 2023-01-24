@@ -2,6 +2,7 @@ use solvers_tools::arrays::Array2D;
 
 fn main() {
     // Create an 2D array of zero integers of a given size
+    // A 2D array is a two-dimensional storage format that allows items to be accessed using two indices (a row and a column)
     let mut a = Array2D::<usize>::new((5, 3));
 
     // Set values in the first row of the array
