@@ -37,10 +37,7 @@ jobs:
       - name: Run examples
         run: |
           cd tools
-          for example in examples/*.rs
-          do
-            cargo run --example "$(basename "${example%.rs}")"
-          done
+          cargo test --examples
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest
