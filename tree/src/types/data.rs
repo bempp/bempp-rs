@@ -90,10 +90,6 @@ impl FmmData for NodeData {
 }
 
 mod test {
-    use solvers_traits::tree::FmmData;
-
-    use super::NodeData;
-
     #[test]
     fn test_fmm_node_data() {
         let mut data = NodeData::fmm_data();

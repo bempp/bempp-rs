@@ -39,7 +39,7 @@ jobs:
       - name: Run tests
         run: |
           cargo test --lib --features "strict"
-      - name: Run tests
+      - name: Build docs
         run: |
           cargo doc --features "strict"
   run-tests-python:
