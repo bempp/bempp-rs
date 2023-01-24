@@ -34,7 +34,6 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Res
         ReferenceCellType::Hexahedron => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
         ReferenceCellType::Prism => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
         ReferenceCellType::Pyramid => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        _ => Err(()),
     }
 }
 
@@ -88,6 +87,9 @@ impl<'a, F: FiniteElement> TabulatedData<'a, F> {
     }
     pub fn value_size(&self) -> usize {
         self.value_size
+    }
+    pub fn element(&self) -> &'a F {
+        self.element
     }
 }
 
