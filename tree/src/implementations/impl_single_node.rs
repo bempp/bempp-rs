@@ -7,7 +7,7 @@ use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
-        data::NodeData,
+        data::{NodeType, NodeData},
         domain::Domain,
         morton::{MortonKey, MortonKeys},
         point::{Point, PointType, Points},
@@ -504,13 +504,29 @@ impl FmmTree for SingleNodeTree {
     }
 
     // TODO: Not implemented
-    fn downward_pass(&self) {}
+    fn upward_pass(&mut self) {
+
+        // 1. P2M: Loop over leaves
+        for (leaf, points) in self.leaves_to_points.iter() {
+            // calculate P2M operator and update multipole expansion at leaves
+            let mut data =  NodeData::new(NodeType::Fmm);
+            // this is where operator would go
+            let tmp: Vec<f64> = vec![1.0];
+            data.set_multipole_expansion(&tmp);
+            self.keys_to_data.insert(*leaf, data);
+        }
+
+        // 2. M2M: Loop over keys, level by level.
+        // let working_set: Vec<MortonKey> = self.leaves.cloned().collect();
+
+
+    }
+    
+    // TODO: Not implemented
+    fn downward_pass(&mut self) {}
 
     // TODO: Not implemented
-    fn upward_pass(&self) {}
-
-    // TODO: Not implemented
-    fn run(&self, expansion_order: usize) {}
+    fn run(&mut self, expansion_order: usize) {}
 }
 
 #[cfg(test)]

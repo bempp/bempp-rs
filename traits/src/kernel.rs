@@ -1,9 +1,9 @@
 // Definition of kernel functions.
-use crate::types::Result;
+use crate::types::{Result, EvalType};
 
 pub trait Kernel {
     // Evaluation data;
-    type Data: KernelEvaluationData;
+    type Data;
 
     // Space dimensions for the input of the kernel
     fn dim(&self) -> usize;
@@ -19,12 +19,11 @@ pub trait Kernel {
 
     // Evaluate the kernel.
     fn evaluate(
-        &self,
         sources: &[f64],
         charges: &[f64],
         targets: &[f64],
         eval_type: &EvalType,
-    ) -> Result<Data>;
+    ) -> Result<Self::Data>;
 }
 
 // A trait that describes evaluation data for a kernel.
@@ -38,5 +37,5 @@ pub trait KernelEvaluationData {
     fn value_dimension(&self) -> usize;
 
     // Return the data at a given target index.
-    fn data_at_target(&self, index: usize) -> &[Item];
+    fn data_at_target(&self, index: usize) -> &[&Self::Item];
 }

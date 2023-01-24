@@ -81,9 +81,9 @@ pub trait FmmTree {
     fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType>;
 
     // FMM core loop
-    fn upward_pass(&self);
-    fn downward_pass(&self);
-    fn run(&self, expansion_order: usize);
+    fn upward_pass(&mut self);
+    fn downward_pass(&mut self);
+    fn run(&mut self, expansion_order: usize);
 }
 
 /// FmmData containers extend a data container with specialised methods for FMM data,

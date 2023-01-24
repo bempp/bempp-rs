@@ -1,6 +1,9 @@
 //! FMM traits
+
+use crate::tree::FmmData;
+
 pub trait Translation {
-    type Node;
+    type Node: FmmData;
 
     // Particle to Multipole
     fn p2m(node: &mut Self::Node);

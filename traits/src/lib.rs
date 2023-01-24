@@ -7,3 +7,4 @@ pub mod general;
 pub mod grid;
 pub mod tree;
 pub mod types;
+pub mod kernel;
