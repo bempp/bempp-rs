@@ -42,6 +42,9 @@ jobs:
       - name: Build docs
         run: |
           cargo doc --features "strict"
+          - name: Run examples
+        run: |
+          cargo test --examples  --features "strict"
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest
