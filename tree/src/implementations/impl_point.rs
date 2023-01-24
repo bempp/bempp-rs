@@ -31,7 +31,7 @@ impl Hash for Point {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use rand::prelude::*;
     use rand::SeedableRng;
 

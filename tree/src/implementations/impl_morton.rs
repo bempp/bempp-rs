@@ -640,7 +640,7 @@ impl Hash for MortonKey {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use itertools::Itertools;
     use std::vec;
 
