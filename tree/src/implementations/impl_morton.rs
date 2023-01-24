@@ -1372,7 +1372,7 @@ mod tests {
 
         // Test keys on different levels
         let anchor_a = [0, 0, 0];
-        let mut a = MortonKey::from_anchor(&anchor_a, DEEPEST_LEVEL - 1);
+        let a = MortonKey::from_anchor(&anchor_a, DEEPEST_LEVEL - 1);
         let anchor_b = [2, 2, 2];
         let b = MortonKey::from_anchor(&anchor_b, DEEPEST_LEVEL);
         assert!(a.is_adjacent(&b));
