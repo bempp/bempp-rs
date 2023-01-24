@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "strict", deny(warnings))]
-
 use solvers_tools::arrays::AdjacencyList;
 
 fn main() {
