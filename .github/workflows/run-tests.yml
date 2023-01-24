@@ -17,12 +17,17 @@ jobs:
     strategy:
       matrix:
         rust-version: ["stable", "beta", "nightly"]
+        mpi: [ 'mpich', 'openmpi']
     steps:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }}
       - uses: actions/checkout@v2
       - name: Style checks
         run: |
@@ -34,10 +39,13 @@ jobs:
       - name: Run tests
         run: |
           cargo test --lib --features "strict"
+      - name: Build docs
+        run: |
+          cargo doc --features "strict"
       - name: Run examples
         run: |
           cd tools
-          cargo test --examples --features "strict"
+          cargo test --examples  --features "strict"
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest

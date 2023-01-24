@@ -98,7 +98,7 @@ fn main() {
     let adaptive = true;
     let n_crit = Some(50);
     let depth: Option<_> = None;
-    let n_points = 1000;
+    let n_points = 10000;
     let k: Option<_> = None;
 
     let points = points_fixture(n_points);

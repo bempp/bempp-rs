@@ -1,4 +1,5 @@
 //! # Type declaration
+pub mod data;
 pub mod domain;
 pub mod morton;
 #[cfg(feature = "mpi")]

@@ -11,5 +11,6 @@ edition = "2021"
 
 [dependencies]
 mpi = "0.6.*"
+
 rand = "0.8.*"
 superslice = "1"

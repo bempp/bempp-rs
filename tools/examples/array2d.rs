@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "strict", deny(warnings))]
+
 use solvers_tools::arrays::Array2D;
 
 fn main() {
@@ -48,4 +50,6 @@ fn main() {
             row.iter().sum::<usize>()
         );
     }
+
+    let a = 0;
 }
