@@ -73,11 +73,6 @@ pub trait FmmTree: Tree {
 
     // Getters for particle data
     // fn get_particles(&self, node_index: &Self::NodeIndex) -> Option<Self::ParticleData>;
-
-    // FMM core loop
-    fn upward_pass(&mut self);
-    fn downward_pass(&mut self);
-    fn run(&mut self, expansion_order: usize);
 }
 
 /// FmmData containers extend a data container with specialised methods for FMM data,
@@ -91,6 +86,13 @@ pub trait FmmData {
     fn get_multipole_expansion(&self) -> Self::CoefficientDataType;
     fn set_local_expansion(&mut self, data: &Self::CoefficientDataType);
     fn get_local_expansion(&self) -> Self::CoefficientDataType;
+}
+
+pub trait Fmm {
+    // // FMM core loop
+    fn upward_pass(&mut self);
+    fn downward_pass(&mut self);
+    fn run(&mut self, expansion_order: usize);
 }
 
 

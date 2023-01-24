@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use solvers_traits::types::{Error, EvalType};
-use solvers_traits::{fmm::Translation, kernel::Kernel, tree::FmmTree};
+use solvers_traits::{fmm::{Translation, FmmTree, Fmm}, kernel::Kernel};
 use solvers_tree::types::data::NodeData;
 
 use solvers_tree::types::{
@@ -118,4 +118,18 @@ impl Translation for KiFmm {
     fn l2p(&self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
 
     fn m2p(&self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+}
+
+
+impl Fmm for KiFmm {
+    
+    fn upward_pass(&mut self) {
+        
+    }
+    fn downward_pass(&mut self) {
+        
+    } 
+    fn run(&mut self, expansion_order: usize) {
+        
+    }
 }

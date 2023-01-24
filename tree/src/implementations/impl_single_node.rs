@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use solvers_traits::tree::{FmmData, FmmTree, Tree};
+use solvers_traits::{tree::Tree, fmm::{FmmTree, FmmData}};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -505,28 +505,6 @@ impl FmmTree for SingleNodeTree {
             .get(node_index)
             .map(|x| x.get_local_expansion())
     }
-
-    // TODO: Not implemented
-    fn upward_pass(&mut self) {
-        // 1. P2M: Loop over leaves
-        for (leaf, points) in self.leaves_to_points.iter() {
-            // calculate P2M operator and update multipole expansion at leaves
-            let mut data = NodeData::new(NodeType::Fmm);
-            // this is where operator would go
-            let tmp: Vec<f64> = vec![1.0];
-            data.set_multipole_expansion(&tmp);
-            self.keys_to_data.insert(*leaf, data);
-        }
-
-        // 2. M2M: Loop over keys, level by level.
-        // let working_set: Vec<MortonKey> = self.leaves.cloned().collect();
-    }
-
-    // TODO: Not implemented
-    fn downward_pass(&mut self) {}
-
-    // TODO: Not implemented
-    fn run(&mut self, expansion_order: usize) {}
 }
 
 #[cfg(test)]

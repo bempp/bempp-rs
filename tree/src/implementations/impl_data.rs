@@ -1,4 +1,4 @@
-use solvers_traits::{fmm::Translation, tree::FmmData};
+use solvers_traits::{fmm::FmmData};
 
 use crate::types::{
     data::{NodeData, NodeType},
@@ -78,7 +78,7 @@ impl FmmData for NodeData {
 }
 
 mod test {
-    use solvers_traits::tree::FmmData;
+    use solvers_traits::fmm::FmmData;
 
     use super::NodeData;
 
