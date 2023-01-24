@@ -1,8 +1,8 @@
 //! Geometry and topology definitions
 
-use std::ops::Range;
-use solvers_tools::arrays::AdjacencyList;
 use crate::cell::ReferenceCellType;
+use solvers_tools::arrays::AdjacencyList;
+use std::ops::Range;
 
 pub trait Geometry {
     fn dim(&self) -> usize;
