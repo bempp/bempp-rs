@@ -17,6 +17,7 @@
 //!
 //! [4] Chan, T. "Closest-point problems simplified on the RAM", ACM-SIAM Symposium on Discrete
 //! Algorithms (2002)
+#![cfg_attr(feature = "strict", deny(warnings))]
 
 pub mod constants;
 pub mod implementations;

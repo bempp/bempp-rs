@@ -29,11 +29,11 @@ jobs:
           cargo fmt -- --check
       - name: Build rust library
         run: |
-          cargo build
-          cargo build --release
+          cargo build --features "strict"
+          cargo build --release --features "strict"
       - name: Run tests
         run: |
-          cargo test --lib
+          cargo test --lib --features "strict"
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest

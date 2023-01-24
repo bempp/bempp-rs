@@ -1,4 +1,5 @@
 //! Trait definitions for the solvers library
+#![cfg_attr(feature = "strict", deny(warnings))]
 
 pub mod cell;
 pub mod element;
