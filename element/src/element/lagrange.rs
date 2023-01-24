@@ -1,6 +1,8 @@
 //! Lagrange elements
 
+use crate::cell::*;
 use crate::element::*;
+use crate::map::*;
 
 /// Lagrange element
 pub struct LagrangeElement {
@@ -30,10 +32,10 @@ impl FiniteElement for LagrangeElement {
     fn dim(&self) -> usize {
         unimplemented!("dim not yet implemented for this element");
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], _nderivs: usize, _data: &mut TabulatedData<Self>) {
         unimplemented!("tabulate not yet implemented for this element");
     }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
+    fn entity_dofs(&self, _entity_dim: usize, _entity_number: usize) -> Vec<usize> {
         unimplemented!("entity_dofs not yet implemented for this element");
     }
 }
@@ -63,9 +65,9 @@ impl FiniteElement for LagrangeElementIntervalDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are 1-x-y, x, y
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..nderivs + 1 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) = 1.0;
@@ -111,7 +113,7 @@ impl FiniteElement for LagrangeElementIntervalDegree1 {
     }
     fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are 1-x-y, x, y
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) = 1.0 - points[pt];
@@ -161,9 +163,9 @@ impl FiniteElement for LagrangeElementTriangleDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are 1-x-y, x, y
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) = 1.0;
@@ -209,7 +211,7 @@ impl FiniteElement for LagrangeElementTriangleDegree1 {
     }
     fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are 1-x-y, x, y
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) = 1.0 - points[2 * pt] - points[2 * pt + 1];
@@ -265,9 +267,9 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) = 1.0;
@@ -313,7 +315,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
     }
     fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
-        for deriv in 0..data.deriv_count() {
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
                 if deriv == 0 {
                     *data.get_mut(deriv, pt, 0, 0) =
@@ -358,6 +360,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
 
 #[cfg(test)]
 mod test {
+    use crate::cell::*;
     use crate::element::*;
     use approx::*;
 
