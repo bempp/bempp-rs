@@ -89,8 +89,9 @@ impl FmmData for NodeData {
     }
 }
 
+#[cfg(test)]
 mod test {
-    use solvers_tree::types::data::NodeData;
+    use super::NodeData;
 
     #[test]
     fn test_fmm_node_data() {
