@@ -112,11 +112,11 @@ impl<T: Num + Clone> AdjacencyList<T> {
 
 impl<T: Num + Copy> AdjacencyList<T> {
     /// Add a new row of data to the end
-    pub fn add_row(&mut self, data: Vec<T>) {
-        for i in 0..data.len() {
-            self.data.push(data[i]);
+    pub fn add_row(&mut self, row: &[T]) {
+        for i in row {
+            self.data.push(*i);
         }
-        self.offsets.push(self.offsets.last().unwrap() + data.len());
+        self.offsets.push(self.offsets.last().unwrap() + row.len());
     }
 }
 
@@ -280,9 +280,9 @@ mod test {
 
         let mut arr2 = AdjacencyList::<f64>::new();
         assert_eq!(arr2.num_rows(), 0);
-        arr2.add_row(vec![1.0, 2.0, 3.0]);
-        arr2.add_row(vec![4.0]);
-        arr2.add_row(vec![5.0, 6.0, 7.0, 8.0]);
+        arr2.add_row(&[1.0, 2.0, 3.0]);
+        arr2.add_row(&[4.0]);
+        arr2.add_row(&[5.0, 6.0, 7.0, 8.0]);
 
         assert_eq!(arr2.num_rows(), 3);
         assert_eq!(*arr2.get(0, 0).unwrap(), 1.0)
