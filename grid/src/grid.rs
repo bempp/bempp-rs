@@ -139,27 +139,29 @@ impl Serial2DTopology {
     fn create_connectivity_10(&mut self) {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
-        for cell in cells.iter_rows() {
-            let cell_edges = match cell.len() {
-                // TODO: remove hard coding here
-                3 => vec![(1, 2), (0, 2), (0, 1)],
-                4 => vec![(0, 1), (0, 2), (1, 3), (2, 3)],
-                _ => {
-                    panic!("Unsupported cell type.")
-                }
-            };
-            for e in cell_edges {
-                let start = min(cell[e.0], cell[e.1]);
-                let end = max(cell[e.0], cell[e.1]);
-                let mut found = false;
-                for edge in data.iter_rows() {
-                    if edge[0] == start && edge[1] == end {
-                        found = true;
-                        break;
+        for cell_type in [
+            ReferenceCellType::Triangle,
+            ReferenceCellType::Quadrilateral,
+        ] {
+            let ref_cell = get_reference_cell(cell_type);
+            let ref_edges = (0..ref_cell.edge_count())
+                .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
+                .collect::<Vec<Vec<usize>>>();
+            for i in self.get_cells_range(cell_type).unwrap() {
+                let cell = unsafe { cells.row_unchecked(i) };
+                for e in &ref_edges {
+                    let mut found = false;
+                    let start = min(cell[e[0]], cell[e[1]]);
+                    let end = max(cell[e[0]], cell[e[1]]);
+                    for edge in data.iter_rows() {
+                        if edge[0] == start && edge[1] == end {
+                            found = true;
+                            break;
+                        }
                     }
-                }
-                if !found {
-                    data.add_row(&[start, end]);
+                    if !found {
+                        data.add_row(&[start, end]);
+                    }
                 }
             }
         }
@@ -189,19 +191,18 @@ impl Serial2DTopology {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
         let edges = &self.connectivity[1][0];
-
         for cell_type in [
             ReferenceCellType::Triangle,
             ReferenceCellType::Quadrilateral,
         ] {
             let ref_cell = get_reference_cell(cell_type);
-            let connectivity = (0..ref_cell.edge_count())
+            let ref_edges = (0..ref_cell.edge_count())
                 .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
                 .collect::<Vec<Vec<usize>>>();
             for i in self.get_cells_range(cell_type).unwrap() {
                 let cell = unsafe { cells.row_unchecked(i) };
                 let mut row = vec![];
-                for e in &connectivity {
+                for e in &ref_edges {
                     let start = min(cell[e[0]], cell[e[1]]);
                     let end = max(cell[e[0]], cell[e[1]]);
                     for (i, edge) in edges.iter_rows().enumerate() {
