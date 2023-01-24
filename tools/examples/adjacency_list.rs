@@ -40,8 +40,4 @@ fn main() {
             row.iter().sum::<usize>()
         );
     }
-
-    // TODO: REMOVE
-    // TESTING CI WILL FAIL
-    println!("{}", a.len());
 }
