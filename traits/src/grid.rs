@@ -17,6 +17,9 @@ pub trait Geometry {
 
     /// The number of points stored in the geometry
     fn point_count(&self) -> usize;
+
+    /// Get the vertex numbers of a cell
+    fn cell_vertices(&self, index: usize) -> Option<&[usize]>;
 }
 
 pub trait Topology {
@@ -36,10 +39,10 @@ pub trait Topology {
     /// Get the indices of cells with the given cell type as a range (if they are contiguous
     fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
 
-    /// Convert local to global id
+    /// Convert local id of a cell to global id of the cell
     fn local2global(&self, local_id: usize) -> usize;
 
-    /// Convert global to local id
+    /// Convert global id of a cell to local id of the cell
     fn global2local(&self, global_id: usize) -> Option<usize>;
 
     /// The number of entities of dimension `dim`

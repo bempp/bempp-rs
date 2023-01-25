@@ -13,12 +13,14 @@ use std::ops::Range;
 /// Geometry of a serial grid
 pub struct SerialGeometry {
     pub coordinates: Array2D<f64>,
+    pub cells: AdjacencyList<usize>,
 }
 
 impl SerialGeometry {
-    pub fn new(coordinates: Array2D<f64>) -> Self {
+    pub fn new(coordinates: Array2D<f64>, cells: AdjacencyList<usize>) -> Self {
         Self {
             coordinates: coordinates,
+            cells: cells,
         }
     }
 }
@@ -34,6 +36,10 @@ impl Geometry for SerialGeometry {
 
     fn point_count(&self) -> usize {
         self.coordinates.shape().0
+    }
+
+    fn cell_vertices(&self, index: usize) -> Option<&[usize]> {
+        self.cells.row(index)
     }
 }
 
@@ -56,7 +62,7 @@ fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
 }
 
 impl Serial2DTopology {
-    pub fn new(cells: AdjacencyList<usize>) -> Self {
+    pub fn new(cells: &AdjacencyList<usize>) -> Self {
         let mut c20 = AdjacencyList::<usize>::new();
         let mut index_map = vec![];
         for (i, cell) in cells.iter_rows().enumerate() {
@@ -318,15 +324,15 @@ impl Topology for Serial2DTopology {
 
 /// Serial grid
 pub struct SerialGrid {
-    geometry: SerialGeometry,
     topology: Serial2DTopology,
+    geometry: SerialGeometry,
 }
 
 impl SerialGrid {
     pub fn new(coordinates: Array2D<f64>, cells: AdjacencyList<usize>) -> Self {
         Self {
-            geometry: SerialGeometry::new(coordinates),
-            topology: Serial2DTopology::new(cells),
+            topology: Serial2DTopology::new(&cells),
+            geometry: SerialGeometry::new(coordinates, cells),
         }
     }
 }
