@@ -1,15 +1,17 @@
+//! A serial implementation of a grid
 use solvers_element::cell;
-pub use solvers_element::cell::Triangle;
+use solvers_element::cell::Triangle;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
-pub use solvers_traits::grid::Geometry;
-pub use solvers_traits::grid::Grid;
-pub use solvers_traits::grid::Topology;
+use solvers_traits::grid::Geometry;
+use solvers_traits::grid::Grid;
+use solvers_traits::grid::Topology;
 use std::cmp::max;
 use std::cmp::min;
 use std::ops::Range;
 
+/// Geometry of a serial grid
 pub struct SerialGeometry {
     pub coordinates: Array2D<f64>,
 }
@@ -36,6 +38,7 @@ impl Geometry for SerialGeometry {
     }
 }
 
+/// Topology of a serial grid
 pub struct Serial2DTopology {
     connectivity: [[AdjacencyList<usize>; 3]; 3],
     index_map: Vec<usize>,
@@ -314,6 +317,7 @@ impl Topology for Serial2DTopology {
     }
 }
 
+/// Serial grid
 pub struct SerialGrid {
     geometry: SerialGeometry,
     topology: Serial2DTopology,

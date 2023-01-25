@@ -1,9 +1,11 @@
+//! Functions for inputting and outputting grids to/from file
 use crate::grid::SerialGrid;
-pub use solvers_traits::grid::Geometry;
-pub use solvers_traits::grid::Grid;
-pub use solvers_traits::grid::Topology;
+use solvers_traits::grid::Geometry;
+use solvers_traits::grid::Grid;
+use solvers_traits::grid::Topology;
 use std::fs;
 
+/// Export a grid as a gmsh file
 pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");

@@ -1,3 +1,5 @@
+//! Functions to create simple example grids
+
 pub use crate::grid::SerialGrid;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
@@ -5,6 +7,11 @@ pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
 
+/// Create a regular sphere
+///
+/// A regular sphere is created by starting with a regular octahedron. The shape is then refined `refinement_level` times.
+/// Each time the grid is refined, each triangle is split into four triangles (by adding lines connecting the midpoints of
+/// each edge). The new points are then scaled so that they are a distance of 1 from the origin.
 pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
     let mut g = SerialGrid::new(
         Array2D::from_data(
