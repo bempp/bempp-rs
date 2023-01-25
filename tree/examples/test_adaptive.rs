@@ -1,3 +1,5 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 use std::collections::HashSet;
 
 use rand::prelude::*;

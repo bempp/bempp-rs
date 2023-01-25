@@ -1,9 +1,11 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 use rand::prelude::*;
 use rand::SeedableRng;
 
 use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
-use solvers_traits::tree::{LocallyEssentialTree, Tree};
+use solvers_traits::tree::{FmmTree, Tree};
 
 use solvers_tree::types::{
     multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree,
