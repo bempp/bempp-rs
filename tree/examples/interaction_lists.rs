@@ -5,7 +5,7 @@ use rand::SeedableRng;
 
 use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
-use solvers_traits::tree::{Tree, FmmTree};
+use solvers_traits::tree::{FmmTree, Tree};
 
 use solvers_tree::types::{
     multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree,
