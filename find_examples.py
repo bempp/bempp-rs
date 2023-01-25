@@ -1,8 +1,8 @@
 """
 Script to make .sh file to run all examples.
 
-Type of run can be controlled by including a comment starting with `//?` in a file.
-For example, including:
+Type of run can be controlled by including a comment starting with `//?` in
+a file. For example, including:
 
 ```rust
 //? mpirun -n {{NPROCESSES}} --features "mpi"
@@ -42,17 +42,22 @@ for file, example_name in files:
                 line = line[3:].strip()
                 if " " in line:
                     cmd, options = line.split(" ", 1)
-                    command = f"cargo {cmd} --example {example_name} {options}"
                 else:
-                    command = f"cargo {line} --example {example_name}"
-                if "{{NPROCESSES}}" in "":
-                    for n in range(2, 5):
-                        lines.append(command.replace("{{NPROCESSES}}", n))
-                else:
-                    lines.append(command)
+                    cmd = line
+                    options = None
                 break
         else:
-            lines.append(f"cargo run --example {example_name}\n")
+            cmd = "run"
+            options = None
+
+    command = f"cargo {cmd} --example {example_name} --release"
+    if options is not None:
+        command += f" {options}"
+    if "{{NPROCESSES}}" in "":
+        for n in range(2, 5):
+            lines.append(command.replace("{{NPROCESSES}}", n))
+    else:
+        lines.append(command)
 
 with open("examples.sh", "w") as f:
     f.write("\n".join(lines))
