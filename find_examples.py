@@ -40,8 +40,11 @@ for file, example_name in files:
         for line in f:
             if line.startswith("//?"):
                 line = line[3:].strip()
-                cmd, options = line.split(" ", 1)
-                command = f"cargo {cmd} --example {example_name} {options}"
+                if " " in line:
+                    cmd, options = line.split(" ", 1)
+                    command = f"cargo {cmd} --example {example_name} {options}"
+                else:
+                    command = f"cargo {line} --example {example_name}"
                 if "{{NPROCESSES}}" in "":
                     for n in range(2, 5):
                         lines.append(command.replace("{{NPROCESSES}}", n))
