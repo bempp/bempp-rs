@@ -3,13 +3,11 @@
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
+use mpi::{environment::Universe, traits::*};
 
-use solvers_traits::tree::{FmmTree, Tree};
+use solvers_traits::tree::FmmTree;
 
-use solvers_tree::types::{
-    multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree,
-};
+use solvers_tree::types::{multi_node::MultiNodeTree, point::PointType};
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
     let mut range = StdRng::seed_from_u64(0);
