@@ -12,8 +12,8 @@ use std::ops::Range;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
-    pub coordinates: Array2D<f64>,
-    pub cells: AdjacencyList<usize>,
+    coordinates: Array2D<f64>,
+    cells: AdjacencyList<usize>,
 }
 
 impl SerialGeometry {
