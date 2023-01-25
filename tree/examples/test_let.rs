@@ -2,13 +2,11 @@ use itertools::Itertools;
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
+use mpi::{environment::Universe, traits::*};
 
-use solvers_traits::tree::{FmmTree, Tree};
+use solvers_traits::tree::FmmTree;
 
-use solvers_tree::types::{
-    morton::MortonKey, multi_node::MultiNodeTree, point::PointType, single_node::SingleNodeTree,
-};
+use solvers_tree::types::{morton::MortonKey, multi_node::MultiNodeTree, point::PointType};
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
     let mut range = StdRng::seed_from_u64(0);
@@ -49,9 +47,9 @@ fn main() {
     // Create locally essential tree
     tree.create_let();
 
-    let mut local: Vec<MortonKey> = tree.leaves.iter().sorted().cloned().collect();
+    let local: Vec<MortonKey> = tree.leaves.iter().sorted().cloned().collect();
 
-    let min = local.iter().min().unwrap();
+    let _min = local.iter().min().unwrap();
     let max = local.iter().max().unwrap();
 
     // Communicate with nearest neighbours.

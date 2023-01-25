@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use rand::prelude::*;
 use rand::SeedableRng;
 
@@ -7,14 +5,8 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use solvers_traits::tree::Tree;
 
-use solvers_tree::constants::{DEEPEST_LEVEL, LEVEL_SIZE};
-use solvers_tree::implementations::impl_morton::encode_anchor;
 use solvers_tree::types::{
-    domain::Domain,
-    morton::{MortonKey, MortonKeys},
-    multi_node::MultiNodeTree,
-    point::PointType,
-    single_node::SingleNodeTree,
+    domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
 };
 
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {

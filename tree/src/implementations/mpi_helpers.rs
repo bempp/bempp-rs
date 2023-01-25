@@ -26,7 +26,6 @@ where
     T: Default + Clone + Equivalence,
 {
     let rank = comm.rank();
-    let size = comm.size();
 
     let send_count = packets.len() as Count;
     let nreqs = send_count + recv_count;
@@ -35,8 +34,6 @@ where
 
     let mut received_packet_sizes = vec![0 as Count; recv_count as usize];
     let mut received_packet_sources = vec![0 as Rank; recv_count as usize];
-
-    let mut source_rank = 0 as Count;
 
     mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
         for (i, &rank) in packet_destinations.iter().enumerate() {

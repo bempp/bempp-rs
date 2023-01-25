@@ -5,10 +5,7 @@ use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Co
 
 use hyksort::hyksort;
 
-use solvers_traits::{
-    tree::{FmmData, FmmTree, Tree},
-    types::Locality,
-};
+use solvers_traits::tree::{FmmData, FmmTree, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, K, LEVEL_SIZE, NCRIT, ROOT},
@@ -432,7 +429,6 @@ fn let_helper(tree: &mut MultiNodeTree) {
     let mut users: Vec<Vec<Rank>> = Vec::new();
     let mut key_packet_destinations = vec![0 as Rank; size as usize];
     let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
-    let mut point_packet_destinations = vec![0 as Rank; size as usize];
 
     for key in let_vec.iter() {
         let mut user_tmp: Vec<Rank> = Vec::new();
@@ -493,8 +489,6 @@ fn let_helper(tree: &mut MultiNodeTree) {
         }
         users.push(user_tmp);
     }
-
-    let let_set: HashSet<MortonKey> = let_vec.iter().cloned().collect();
 
     // Communicate number of packets being received by each process globally
     let mut keys_to_receive = vec![0i32; size as usize];
@@ -907,5 +901,5 @@ impl FmmTree for MultiNodeTree {
     fn upward_pass(&self) {}
 
     // TODO: Not implemented
-    fn run(&self, expansion_order: usize) {}
+    fn run(&self, _expansion_order: usize) {}
 }
