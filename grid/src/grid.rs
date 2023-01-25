@@ -1,6 +1,5 @@
 //! A serial implementation of a grid
 use solvers_element::cell;
-use solvers_element::cell::Triangle;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};

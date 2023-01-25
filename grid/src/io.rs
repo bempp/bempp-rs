@@ -1,5 +1,4 @@
 //! Functions for inputting and outputting grids to/from file
-use crate::grid::SerialGrid;
 use solvers_traits::grid::Geometry;
 use solvers_traits::grid::Grid;
 use solvers_traits::grid::Topology;
