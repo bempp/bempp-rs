@@ -242,6 +242,109 @@ impl FiniteElement for LagrangeElementTriangleDegree1 {
     }
 }
 
+/// Degree 2 Lagrange element on a triangle
+pub struct LagrangeElementTriangleDegree2 {}
+
+impl FiniteElement for LagrangeElementTriangleDegree2 {
+    const VALUE_SIZE: usize = 1;
+    const MAP_TYPE: MapType = MapType::Identity;
+
+    fn cell_type(&self) -> ReferenceCellType {
+        ReferenceCellType::Triangle
+    }
+    fn degree(&self) -> usize {
+        2
+    }
+    fn highest_degree(&self) -> usize {
+        2
+    }
+    fn family(&self) -> ElementFamily {
+        ElementFamily::Lagrange
+    }
+    fn discontinuous(&self) -> bool {
+        false
+    }
+    fn dim(&self) -> usize {
+        3
+    }
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+        // Basis functions are:
+        // * (1-x-y)(1-2x-2y)
+        // * x(2x-1)
+        // * y(2y - 1)
+        // * 4xy
+        // * 4y(1-x-y)
+        // * 4x(1-x-y)
+        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
+            for pt in 0..data.point_count() {
+                let x = points[2 * pt];
+                let y = points[2 * pt + 1];
+                if deriv == 0 {
+                    *data.get_mut(deriv, pt, 0, 0) = 2.0 * (1.0 - x - y) * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 1, 0) = x * (2.0 * x - 1.0);
+                    *data.get_mut(deriv, pt, 2, 0) = y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * x * y;
+                    *data.get_mut(deriv, pt, 4, 0) = 4.0 * y * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 5, 0) = 4.0 * x * (1.0 - x - y);
+                } else if deriv == 1 {
+                    // d/dx
+                    *data.get_mut(deriv, pt, 0, 0) = -4.0 * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 1, 0) = 4.0 * x - 1.0;
+                    *data.get_mut(deriv, pt, 2, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * y;
+                    *data.get_mut(deriv, pt, 4, 0) = -4.0 * y;
+                    *data.get_mut(deriv, pt, 5, 0) = 4.0 - 8.0 * x - 4.0 * y;
+                } else if deriv == 2 {
+                    // d/dx
+                    *data.get_mut(deriv, pt, 0, 0) = -4.0 * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0) = 4.0 * y - 1.0;
+                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * x;
+                    *data.get_mut(deriv, pt, 4, 0) = 4.0 - 4.0 * x - 8.0 * y;
+                    *data.get_mut(deriv, pt, 5, 0) = -4.0 * x;
+                } else if deriv == 3 {
+                    // d2/dx2
+                    *data.get_mut(deriv, pt, 0, 0) = 4.0;
+                    *data.get_mut(deriv, pt, 1, 0) = 4.0;
+                    *data.get_mut(deriv, pt, 2, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 3, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 4, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 5, 0) = -8.0;
+                } else if deriv == 4 {
+                    // d2/dxy
+                    *data.get_mut(deriv, pt, 0, 0) = 4.0;
+                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0) = 4.0;
+                    *data.get_mut(deriv, pt, 3, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 4, 0) = -8.0;
+                    *data.get_mut(deriv, pt, 5, 0) = 0.0;
+                } else if deriv == 5 {
+                    // d2/dy2
+                    *data.get_mut(deriv, pt, 0, 0) = 4.0;
+                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0) = 4.0;
+                    *data.get_mut(deriv, pt, 3, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 4, 0) = -8.0;
+                    *data.get_mut(deriv, pt, 5, 0) = 0.0;
+                } else {
+                    for fun in 0..6 {
+                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                    }
+                }
+            }
+        }
+    }
+    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
+        if entity_dim == 0 {
+            vec![entity_number]
+        } else if entity_dim == 1 {
+            vec![3 + entity_number]
+        } else {
+            vec![]
+        }
+    }
+}
+
 /// Degree 0 Lagrange element on a quadrilateral
 pub struct LagrangeElementQuadrilateralDegree0 {}
 
