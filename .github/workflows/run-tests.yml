@@ -23,7 +23,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
-          components: rustfmt
+          components: rustfmt, cargo-mpirun
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
         with:
@@ -42,9 +42,14 @@ jobs:
       - name: Build docs
         run: |
           cargo doc --features "strict"
-      - name: Run examples
+      - name: Run examples in tools
         run: |
+          cd tools
           cargo test --examples  --features "strict"
+      - name: Run examples in tree
+        run: |
+          cd tree
+          ./examples/run-examples.sh
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest
