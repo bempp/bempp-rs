@@ -55,6 +55,7 @@ pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
 
 #[cfg(test)]
 mod test {
+    use crate::grid::SerialGrid;
     use crate::io::*;
     use crate::shapes::regular_sphere;
     use solvers_tools::arrays::AdjacencyList;
