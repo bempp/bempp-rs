@@ -1,17 +1,18 @@
 //! A serial implementation of a grid
 use solvers_element::cell;
+use solvers_element::element::LagrangeElementTriangleDegree1;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
-use solvers_traits::grid::Geometry;
-use solvers_traits::grid::Grid;
-use solvers_traits::grid::Topology;
+use solvers_traits::element::FiniteElement;
+use solvers_traits::grid::{Geometry, Grid, Topology};
 use std::cmp::max;
 use std::cmp::min;
 use std::ops::Range;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
+    coordinate_element: Box<dyn FiniteElement>,
     coordinates: Array2D<f64>,
     cells: AdjacencyList<usize>,
 }
@@ -19,9 +20,14 @@ pub struct SerialGeometry {
 impl SerialGeometry {
     pub fn new(coordinates: Array2D<f64>, cells: AdjacencyList<usize>) -> Self {
         Self {
+            coordinate_element: Box::new(LagrangeElementTriangleDegree1 {}),
             coordinates: coordinates,
             cells: cells,
         }
+    }
+
+    pub fn coordinate_element(&self) -> &Box<dyn FiniteElement> {
+        &self.coordinate_element
     }
 }
 

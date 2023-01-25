@@ -9,8 +9,12 @@ use solvers_traits::element::ElementFamily;
 pub struct RaviartThomasElementTriangleDegree1 {}
 
 impl FiniteElement for RaviartThomasElementTriangleDegree1 {
-    const VALUE_SIZE: usize = 2;
-    const MAP_TYPE: MapType = MapType::ContravariantPiola;
+    fn value_size(&self) -> usize {
+        2
+    }
+    fn map_type(&self) -> MapType {
+        MapType::ContravariantPiola
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Triangle

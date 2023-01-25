@@ -93,10 +93,7 @@ impl<'a, F: FiniteElement> TabulatedData<'a, F> {
     }
 }
 
-pub trait FiniteElement: Sized {
-    const VALUE_SIZE: usize;
-    const MAP_TYPE: MapType;
-
+pub trait FiniteElement {
     fn cell_type(&self) -> ReferenceCellType;
     fn degree(&self) -> usize;
     fn highest_degree(&self) -> usize;
@@ -104,15 +101,13 @@ pub trait FiniteElement: Sized {
     fn dim(&self) -> usize;
     fn discontinuous(&self) -> bool;
 
-    fn value_size(&self) -> usize {
-        Self::VALUE_SIZE
-    }
+    fn value_size(&self) -> usize;
 
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>);
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>)
+    where
+        Self: Sized;
 
     fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize>;
 
-    fn map_type(&self) -> MapType {
-        Self::MAP_TYPE
-    }
+    fn map_type(&self) -> MapType;
 }
