@@ -9,15 +9,7 @@ pub trait Geometry {
 
     fn point(&self, i: usize) -> Option<&[f64]>;
 
-    unsafe fn point_unchecked(&self, i: usize) -> &[f64];
-
     fn point_count(&self) -> usize;
-}
-
-pub enum Locality {
-    Local,
-    Ghost(usize),
-    Remote,
 }
 
 pub trait Topology {
@@ -33,9 +25,6 @@ pub trait Topology {
     // Get the indices of cells with the given cell type as a range (if they are contiguous
     fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
 
-    // Check the locality of an element
-    fn locality(&self, global_id: usize) -> Locality;
-
     // Convert local to global id
     fn local2global(&self, local_id: usize) -> usize;
 
@@ -45,7 +34,6 @@ pub trait Topology {
     fn entity_count(&self, dim: usize) -> usize;
 
     fn cell(&self, index: usize) -> Option<&[usize]>;
-    unsafe fn cell_unchecked(&self, index: usize) -> &[usize];
 
     fn create_connectivity(&mut self, dim0: usize, dim1: usize);
 

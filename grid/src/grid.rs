@@ -5,7 +5,6 @@ use solvers_tools::arrays::Array2D;
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
-pub use solvers_traits::grid::Locality;
 pub use solvers_traits::grid::Topology;
 use std::cmp::max;
 use std::cmp::min;
@@ -30,9 +29,6 @@ impl Geometry for SerialGeometry {
 
     fn point(&self, i: usize) -> Option<&[f64]> {
         self.coordinates.row(i)
-    }
-    unsafe fn point_unchecked(&self, i: usize) -> &[f64] {
-        self.coordinates.row_unchecked(i)
     }
 
     fn point_count(&self) -> usize {
@@ -259,13 +255,15 @@ impl Topology for Serial2DTopology {
         }
     }
     fn local2global(&self, local_id: usize) -> usize {
-        local_id
+        self.index_map[local_id]
     }
     fn global2local(&self, global_id: usize) -> Option<usize> {
-        Some(global_id)
-    }
-    fn locality(&self, _global_id: usize) -> Locality {
-        Locality::Local
+        for (i, j) in self.index_map.iter().enumerate() {
+            if *j == global_id {
+                return Some(i);
+            }
+        }
+        None
     }
     fn dim(&self) -> usize {
         2
@@ -281,10 +279,6 @@ impl Topology for Serial2DTopology {
     fn cell(&self, index: usize) -> Option<&[usize]> {
         self.connectivity[2][0].row(index)
     }
-    unsafe fn cell_unchecked(&self, index: usize) -> &[usize] {
-        self.connectivity[2][0].row_unchecked(index)
-    }
-
     fn create_connectivity(&mut self, dim0: usize, dim1: usize) {
         if self.connectivity[dim0][dim1].num_rows() > 0 {
             return;

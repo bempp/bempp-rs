@@ -4,8 +4,7 @@ pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
 use std::fs;
 
-// pub fn export_as_gmsh(grid: impl Grid, fname: String) {
-pub fn export_as_gmsh(grid: SerialGrid, fname: String) {
+pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");
     gmsh_s.push_str("2.2 0 8\n");
@@ -63,7 +62,7 @@ mod test {
     #[test]
     fn test_gmsh_output_regular_sphere() {
         let g = regular_sphere(2);
-        export_as_gmsh(g, String::from("test_io_sphere.msh"));
+        export_as_gmsh(&g, String::from("test_io_sphere.msh"));
     }
 
     #[test]
@@ -81,7 +80,7 @@ mod test {
                 vec![0, 4, 8, 12, 16],
             ),
         );
-        export_as_gmsh(g, String::from("test_io_screen.msh"));
+        export_as_gmsh(&g, String::from("test_io_screen.msh"));
     }
 
     #[test]
@@ -99,6 +98,6 @@ mod test {
                 vec![0, 3, 6, 10, 13, 16, 20],
             ),
         );
-        export_as_gmsh(g, String::from("test_io_screen_mixed.msh"));
+        export_as_gmsh(&g, String::from("test_io_screen_mixed.msh"));
     }
 }
