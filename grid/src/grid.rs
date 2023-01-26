@@ -1,6 +1,6 @@
 //! A serial implementation of a grid
 use solvers_element::cell;
-use solvers_element::element::LagrangeElementTriangleDegree1;
+use solvers_element::element::*;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
@@ -12,22 +12,79 @@ use std::ops::Range;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
-    coordinate_element: Box<dyn FiniteElement>,
+    coordinate_elements: Vec<Box<dyn FiniteElement>>,
     coordinates: Array2D<f64>,
     cells: AdjacencyList<usize>,
+    element_changes: Vec<usize>,
+    index_map: Vec<usize>,
+}
+
+fn create_element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dyn FiniteElement> {
+    match cell_type {
+        ReferenceCellType::Triangle => {
+            let degree = (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1;
+            match degree {
+                1 => Box::new(LagrangeElementTriangleDegree1 {}),
+                2 => Box::new(LagrangeElementTriangleDegree2 {}),
+                _ => {
+                    panic!("Unsupported degree (for now)");
+                }
+            }
+        }
+        ReferenceCellType::Quadrilateral => {
+            let degree = (npts as f64).sqrt() as usize - 1;
+            match degree {
+                1 => Box::new(LagrangeElementQuadrilateralDegree1 {}),
+                _ => {
+                    panic!("Unsupported degree (for now)");
+                }
+            }
+        }
+        _ => {
+            panic!("Unsupported cell type (for now)");
+        }
+    }
 }
 
 impl SerialGeometry {
-    pub fn new(coordinates: Array2D<f64>, cells: AdjacencyList<usize>) -> Self {
+    pub fn new(
+        coordinates: Array2D<f64>,
+        cells: AdjacencyList<usize>,
+        cell_types: &Vec<ReferenceCellType>,
+    ) -> Self {
+        let mut index_map = vec![];
+        let mut element_changes = vec![];
+        let mut coordinate_elements = vec![];
+        for (i, cell) in cells.iter_rows().enumerate() {
+            if !index_map.contains(&i) {
+                let cell_type = cell_types[i];
+                let npts = cell.len();
+
+                element_changes.push(index_map.len());
+                coordinate_elements.push(create_element_from_npts(cell_type, npts));
+                for (j, cell_j) in cells.iter_rows().enumerate() {
+                    if cell_type == cell_types[j] && npts == cell_j.len() {
+                        index_map.push(j);
+                    }
+                }
+            }
+        }
+
         Self {
-            coordinate_element: Box::new(LagrangeElementTriangleDegree1 {}),
+            coordinate_elements: coordinate_elements,
             coordinates: coordinates,
             cells: cells,
+            element_changes: element_changes,
+            index_map: index_map,
         }
     }
 
-    pub fn coordinate_element(&self) -> &Box<dyn FiniteElement> {
-        &self.coordinate_element
+    pub fn coordinate_elements(&self) -> &Vec<Box<dyn FiniteElement>> {
+        &self.coordinate_elements
+    }
+
+    pub fn element_changes(&self) -> &Vec<usize> {
+        &self.element_changes
     }
 }
 
@@ -46,6 +103,20 @@ impl Geometry for SerialGeometry {
 
     fn cell_vertices(&self, index: usize) -> Option<&[usize]> {
         self.cells.row(index)
+    }
+    fn local2global(&self, local_id: usize) -> usize {
+        self.index_map[local_id]
+    }
+    fn global2local(&self, global_id: usize) -> Option<usize> {
+        for (i, j) in self.index_map.iter().enumerate() {
+            if *j == global_id {
+                return Some(i);
+            }
+        }
+        None
+    }
+    fn cell_count(&self) -> usize {
+        self.index_map.len()
     }
 }
 
@@ -68,20 +139,20 @@ fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
 }
 
 impl Serial2DTopology {
-    pub fn new(cells: &AdjacencyList<usize>) -> Self {
+    pub fn new(cells: &AdjacencyList<usize>, cell_types: &Vec<ReferenceCellType>) -> Self {
         let mut c20 = AdjacencyList::<usize>::new();
         let mut index_map = vec![];
         for (i, cell) in cells.iter_rows().enumerate() {
-            if cell.len() == 3 {
+            if cell_types[i] == ReferenceCellType::Triangle {
                 index_map.push(i);
-                c20.add_row(cell);
+                c20.add_row(&cell[..3]);
             }
         }
         let quad_start = index_map.len();
         for (i, cell) in cells.iter_rows().enumerate() {
-            if cell.len() == 4 {
+            if cell_types[i] == ReferenceCellType::Quadrilateral {
                 index_map.push(i);
-                c20.add_row(cell);
+                c20.add_row(&cell[..4]);
             }
         }
         Self {
@@ -335,10 +406,14 @@ pub struct SerialGrid {
 }
 
 impl SerialGrid {
-    pub fn new(coordinates: Array2D<f64>, cells: AdjacencyList<usize>) -> Self {
+    pub fn new(
+        coordinates: Array2D<f64>,
+        cells: AdjacencyList<usize>,
+        cell_types: Vec<ReferenceCellType>,
+    ) -> Self {
         Self {
-            topology: Serial2DTopology::new(&cells),
-            geometry: SerialGeometry::new(coordinates, cells),
+            topology: Serial2DTopology::new(&cells, &cell_types),
+            geometry: SerialGeometry::new(coordinates, cells, &cell_types),
         }
     }
 }
@@ -379,6 +454,7 @@ mod test {
                 ],
                 vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
             ),
+            vec![ReferenceCellType::Triangle; 8],
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
@@ -404,6 +480,7 @@ mod test {
                 ],
                 vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
             ),
+            vec![ReferenceCellType::Triangle; 8],
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
@@ -427,6 +504,14 @@ mod test {
                 vec![0, 1, 4, 0, 4, 3, 1, 2, 4, 5, 3, 4, 7, 3, 7, 6, 4, 5, 7, 8],
                 vec![0, 3, 6, 10, 13, 16, 20],
             ),
+            vec![
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+            ],
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);

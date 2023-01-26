@@ -20,6 +20,15 @@ pub trait Geometry {
 
     /// Get the vertex numbers of a cell
     fn cell_vertices(&self, index: usize) -> Option<&[usize]>;
+
+    /// Convert local id of a cell to global id of the cell
+    fn local2global(&self, local_id: usize) -> usize;
+
+    /// Convert global id of a cell to local id of the cell
+    fn global2local(&self, global_id: usize) -> Option<usize>;
+
+    /// The number of cells
+    fn cell_count(&self) -> usize;
 }
 
 pub trait Topology {

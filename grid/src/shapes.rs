@@ -3,6 +3,7 @@
 pub use crate::grid::SerialGrid;
 use solvers_tools::arrays::AdjacencyList;
 use solvers_tools::arrays::Array2D;
+use solvers_traits::cell::ReferenceCellType;
 pub use solvers_traits::grid::Geometry;
 pub use solvers_traits::grid::Grid;
 pub use solvers_traits::grid::Topology;
@@ -27,6 +28,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
             ],
             vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
         ),
+        vec![ReferenceCellType::Triangle; 8],
     );
     for _level in 0..refinement_level {
         g.topology_mut().create_connectivity(2, 1);
@@ -86,7 +88,12 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
                 g.topology().entity_count(0) + es[2],
             ]);
         }
-        g = SerialGrid::new(coordinates, cells);
+        let ncells = cells.num_rows();
+        g = SerialGrid::new(
+            coordinates,
+            cells,
+            vec![ReferenceCellType::Triangle; ncells],
+        );
     }
 
     g
