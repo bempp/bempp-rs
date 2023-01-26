@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "0 7 * * 1"
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   run-tests-rust:
     name: Run tests (Rust)
@@ -32,21 +37,30 @@ jobs:
         with:
           mpi: ${{ matrix.mpi }}
       - uses: actions/checkout@v2
+
       - name: Style checks
         run: |
           cargo fmt -- --check
-      - name: Build rust library
+
+      - name: Build rust library (debug)
+        run: cargo build --features "strict"
+      - name: Build rust library (release)
+        run: cargo build --release --features "strict"
+      - name: Build rust library (release with mpi)
+        run: cargo build --release --features "strict,mpi"
+
+      - name: Run unit tests
+        run: cargo test --lib --features "strict"
+      - name: Run unit tests (with mpi enabled)
+        run: cargo test --lib --features "mpi,strict"
+      - name: Run examples
         run: |
-          cargo build --features "strict"
-          cargo build --release --features "strict"
-      - name: Run tests
-        run: |
-          cargo test --lib --features "strict"
-          cargo test --lib --features "mpi,strict"
+          cd tools
+          cargo test --examples  --features "strict"
+
       - name: Build docs
         run: |
           cargo doc --features "strict"
-
       - name: Setup Pages
         uses: actions/configure-pages@v3
         #if: ${{ github.ref == 'refs/heads/main' }}
@@ -63,10 +77,6 @@ jobs:
         #if: ${{ github.ref == 'refs/heads/main' }}
         if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' }}
 
-      - name: Run examples
-        run: |
-          cd tools
-          cargo test --examples  --features "strict"
 
   run-tests-python:
     name: Run tests (Python)
