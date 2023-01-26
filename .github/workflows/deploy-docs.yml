@@ -1,0 +1,59 @@
+name: ℹ️ Deploy docs
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy-docs:
+    name: Build and deploy docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: "stable"
+          components: rustfmt
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: "mpich"
+      - uses: actions/checkout@v2
+
+      - name: Build docs
+        run: cargo doc
+
+      - name: make index.html
+        run: |
+          for f in target/doc/solvers_*
+          do
+          if [ -d "$f" ]
+          then
+          echo "<li><a href='${f##*/}'>${f##*/}</a></li>" >> target/doc/index.html
+          fi
+          done
+          echo "</ul></body></html>" >> target/doc/index.html
+
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact for docs
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: 'target/doc'
+      - name: Deploy docs to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
