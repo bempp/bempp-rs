@@ -1,4 +1,5 @@
-use itertools::izip;
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 use rand::prelude::*;
 use rand::SeedableRng;
 
@@ -6,7 +7,6 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use solvers_traits::tree::Tree;
 
-use solvers_tree::types::single_node::SingleNodeTree;
 use solvers_tree::types::{
     domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
 };

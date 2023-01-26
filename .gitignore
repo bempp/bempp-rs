@@ -13,3 +13,5 @@ Cargo.lock
 .*.swp
 
 *.pyc
+
+examples.sh

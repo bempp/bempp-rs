@@ -1,6 +1,6 @@
 //! Container to make working with arrays easier.
 //!
-//! This module defines a type [DataContainer], which
+//! This module defines a type [RustyDataContainer], which
 //! is a simple C data structure that can be flexibly converted to
 //! various Rust types.
 
@@ -26,7 +26,7 @@ pub struct RustyDataContainer {
     /// The ownership of the data. It is either
     /// [OWNERSHIP::Owner] or [OWNERSHIP::NotOwner].
     /// The underlying data can only be destroyed if
-    /// [DataContainer] is owner.
+    /// [RustyDataContainer] is owner.
     is_owner: OWNERSHIP,
     /// Mutability of the underlying data. It is either
     /// [MUTABILITY::Mutable] or [MUTABILITY::NotMutable].

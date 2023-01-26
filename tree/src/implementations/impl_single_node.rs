@@ -508,8 +508,7 @@ impl FmmTree for SingleNodeTree {
 }
 
 #[cfg(test)]
-mod tests {
-
+mod test {
     use super::*;
     use rand::prelude::*;
     use rand::SeedableRng;

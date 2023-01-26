@@ -16,6 +16,7 @@ default-members = [
     "quadrature",
     "tools",
     "tree",
+    "hyksort",
     "fmm",
     "traits",
     "grid"

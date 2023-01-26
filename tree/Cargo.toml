@@ -24,3 +24,4 @@ solvers-traits = { path = "../traits" }
 
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]
+strict = []

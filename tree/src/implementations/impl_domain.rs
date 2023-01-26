@@ -45,7 +45,7 @@ impl Domain {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 
     use rand::prelude::*;
     use rand::SeedableRng;
