@@ -40,7 +40,7 @@ pub trait Topology {
     fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
 
     /// The number of entities of dimension `dim`
-    fn entity_count(&self, dim: usize) -> usize;
+    fn entity_count(&mut self, dim: usize) -> usize;
 
     /// The indices of the vertices that from cell with index `index`
     fn cell(&self, index: usize) -> Option<&[usize]>;
@@ -60,7 +60,7 @@ pub trait Topology {
     }
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
+    fn connectivity(&mut self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
 }
 
 pub trait Grid {

@@ -5,7 +5,7 @@ use solvers_traits::grid::Topology;
 use std::fs;
 
 /// Export a grid as a gmsh file
-pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
+pub fn export_as_gmsh(grid: &mut impl Grid, fname: String) {
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");
     gmsh_s.push_str("4.1 0 8\n");
@@ -32,7 +32,8 @@ pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
     }
     gmsh_s.push_str("$EndNodes\n");
     gmsh_s.push_str("$Elements\n");
-    let cell_count = grid.topology().entity_count(grid.topology().dim());
+    let tdim = grid.topology().dim();
+    let cell_count = grid.topology_mut().entity_count(tdim);
 
     // Note: This can and will be tidied up once higher order geometry is supported
     let mut ntriangles = 0;
@@ -113,13 +114,13 @@ mod test {
 
     #[test]
     fn test_gmsh_output_regular_sphere() {
-        let g = regular_sphere(2);
-        export_as_gmsh(&g, String::from("test_io_sphere.msh"));
+        let mut g = regular_sphere(2);
+        export_as_gmsh(&mut g, String::from("test_io_sphere.msh"));
     }
 
     #[test]
     fn test_gmsh_output_quads() {
-        let g = SerialGrid::new(
+        let mut g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
@@ -132,12 +133,12 @@ mod test {
                 vec![0, 4, 8, 12, 16],
             ),
         );
-        export_as_gmsh(&g, String::from("test_io_screen.msh"));
+        export_as_gmsh(&mut g, String::from("test_io_screen.msh"));
     }
 
     #[test]
     fn test_gmsh_output_mixed_cell_type() {
-        let g = SerialGrid::new(
+        let mut g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
@@ -150,6 +151,6 @@ mod test {
                 vec![0, 3, 6, 10, 13, 16, 20],
             ),
         );
-        export_as_gmsh(&g, String::from("test_io_screen_mixed.msh"));
+        export_as_gmsh(&mut g, String::from("test_io_screen_mixed.msh"));
     }
 }

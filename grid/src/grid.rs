@@ -265,13 +265,9 @@ impl Topology for Serial2DTopology {
     fn dim(&self) -> usize {
         2
     }
-    fn entity_count(&self, dim: usize) -> usize {
-        for c in &self.connectivity[dim] {
-            if c.num_rows() > 0 {
-                return c.num_rows();
-            }
-        }
-        panic!("Some connectivity including the relevant entities must be created first.");
+    fn entity_count(&mut self, dim: usize) -> usize {
+        self.create_connectivity(dim, 0);
+        self.connectivity[dim][0].num_rows()
     }
     fn cell(&self, index: usize) -> Option<&[usize]> {
         self.connectivity[2][0].row(index)
@@ -303,10 +299,8 @@ impl Topology for Serial2DTopology {
         }
     }
 
-    fn connectivity(&self, dim0: usize, dim1: usize) -> &AdjacencyList<usize> {
-        if self.connectivity[dim0][dim1].num_rows() == 0 {
-            panic!("Connectivity must be created first");
-        }
+    fn connectivity(&mut self, dim0: usize, dim1: usize) -> &AdjacencyList<usize> {
+        self.create_connectivity(dim0, dim1);
         &self.connectivity[dim0][dim1]
     }
 }
@@ -366,9 +360,9 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
         g.topology_mut().create_connectivity_all();
-        assert_eq!(g.topology().entity_count(0), 6);
-        assert_eq!(g.topology().entity_count(1), 12);
-        assert_eq!(g.topology().entity_count(2), 8);
+        assert_eq!(g.topology_mut().entity_count(0), 6);
+        assert_eq!(g.topology_mut().entity_count(1), 12);
+        assert_eq!(g.topology_mut().entity_count(2), 8);
     }
 
     #[test]
@@ -391,9 +385,9 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
         g.topology_mut().create_connectivity_all();
-        assert_eq!(g.topology().entity_count(0), 9);
-        assert_eq!(g.topology().entity_count(1), 16);
-        assert_eq!(g.topology().entity_count(2), 8);
+        assert_eq!(g.topology_mut().entity_count(0), 9);
+        assert_eq!(g.topology_mut().entity_count(1), 16);
+        assert_eq!(g.topology_mut().entity_count(2), 8);
     }
 
     #[test]
@@ -414,8 +408,8 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
         g.topology_mut().create_connectivity_all();
-        assert_eq!(g.topology().entity_count(0), 9);
-        assert_eq!(g.topology().entity_count(1), 14);
-        assert_eq!(g.topology().entity_count(2), 6);
+        assert_eq!(g.topology_mut().entity_count(0), 9);
+        assert_eq!(g.topology_mut().entity_count(1), 14);
+        assert_eq!(g.topology_mut().entity_count(2), 6);
     }
 }

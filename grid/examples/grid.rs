@@ -13,25 +13,19 @@ fn main() {
     );
 
     // Print the number of points and cells in the topology
-    grid.topology_mut().create_connectivity(0, 0);
     println!(
         "The grid has {} points in its topology",
-        grid.topology().entity_count(0)
+        grid.topology_mut().entity_count(0)
     );
-    println!("The grid has {} cells", grid.topology().entity_count(2));
-
-    grid.topology_mut().create_connectivity(2, 0);
+    println!("The grid has {} cells", grid.topology_mut().entity_count(2));
 
     // Print information about the first four cells
     for i in 0..4 {
         println!("");
 
         // Print the topological vertices of a cell
-        let t_vertices = grid
-            .topology()
-            .connectivity(2, 0)
-            .row(grid.topology().index_map()[i])
-            .unwrap();
+        let tcell = grid.topology().index_map()[i];
+        let t_vertices = grid.topology_mut().connectivity(2, 0).row(tcell).unwrap();
         println!(
             "Triangle {} has vertices with topological numbers {}, {}, and {}",
             i, t_vertices[0], t_vertices[1], t_vertices[2]
@@ -52,5 +46,5 @@ fn main() {
     }
 
     // Save the mesh in gmsh format
-    export_as_gmsh(&grid, String::from("examples_grid.msh"));
+    export_as_gmsh(&mut grid, String::from("examples_grid.msh"));
 }
