@@ -29,24 +29,29 @@ jobs:
         with:
           mpi: ${{ matrix.mpi }}
       - uses: actions/checkout@v2
+
       - name: Style checks
-        run: |
-          cargo fmt -- --check
-      - name: Build rust library
-        run: |
-          cargo build --features "strict"
-          cargo build --release --features "strict"
-      - name: Run tests
-        run: |
-          cargo test --lib --features "strict"
-          cargo test --lib --features "mpi,strict"
-      - name: Build docs
-        run: |
-          cargo doc --features "strict"
+        run: cargo fmt -- --check
+
+      - name: Build rust library (debug)
+        run: cargo build --features "strict"
+      - name: Build rust library (release)
+        run: cargo build --release --features "strict"
+      - name: Build rust library (release with mpi)
+        run: cargo build --release --features "strict,mpi"
+
+      - name: Run unit tests
+        run: cargo test --lib --features "strict"
+      - name: Run unit tests (with mpi enabled)
+        run: cargo test --lib --features "mpi,strict"
       - name: Run examples
         run: |
           cd tools
           cargo test --examples  --features "strict"
+
+      - name: Build docs
+        run: cargo doc --features "strict"
+
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest
