@@ -1,3 +1,5 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 use itertools::Itertools;
 use rand::prelude::*;
 use rand::SeedableRng;

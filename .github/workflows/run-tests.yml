@@ -28,6 +28,8 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
+      - name: Install cargo-mpirun
+        run: cargo install cargo-mpirun
       - uses: actions/checkout@v2
 
       - name: Style checks
@@ -46,8 +48,9 @@ jobs:
         run: cargo test --lib --features "mpi,strict"
       - name: Run examples
         run: |
-          cd tools
-          cargo test --examples  --features "strict"
+          python3 find_examples.py
+          chmod +x examples.sh
+          ./examples.sh
 
       - name: Build docs
         run: cargo doc --features "strict"
