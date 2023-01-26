@@ -10,11 +10,6 @@ on:
   schedule:
     - cron: "0 7 * * 1"
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   run-tests-rust:
     name: Run tests (Rust)
