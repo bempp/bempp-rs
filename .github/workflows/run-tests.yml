@@ -60,11 +60,6 @@ jobs:
         uses: actions/deploy-pages@v1
         if: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
-        run: |
-          ls
       - name: Run examples
         run: |
           cd tools
