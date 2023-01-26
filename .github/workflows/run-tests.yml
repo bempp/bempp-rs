@@ -18,6 +18,9 @@ jobs:
       matrix:
         rust-version: ["stable", "beta", "nightly"]
         mpi: [ 'mpich', 'openmpi']
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -43,7 +46,20 @@ jobs:
       - name: Build docs
         run: |
           cargo doc --features "strict"
-      - name: Push docs to GitHub pages
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+        if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Upload artifact for docs
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: 'target/doc'
+        if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Deploy docs to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+        if: ${{ github.ref == 'refs/heads/main' }}
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
@@ -53,26 +69,6 @@ jobs:
         run: |
           cd tools
           cargo test --examples  --features "strict"
-  deploy-docs:
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs: [run-tests-rust]
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          # Upload entire repository
-          path: 'target/doc'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
 
   run-tests-python:
     name: Run tests (Python)
