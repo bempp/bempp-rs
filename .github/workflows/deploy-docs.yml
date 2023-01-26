@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Build docs
-        run: cargo doc --features
+        run: cargo doc
 
       - name: make index.html
         run: |
