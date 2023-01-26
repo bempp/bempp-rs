@@ -27,20 +27,20 @@ fn main() {
         println!("");
 
         // Print the topological vertices of a cell
-        let t_vertices = grid.topology().connectivity(2, 0).row(i).unwrap();
+        let t_vertices = grid
+            .topology()
+            .connectivity(2, 0)
+            .row(grid.topology().index_map()[i])
+            .unwrap();
         println!(
             "Triangle {} has vertices with topological numbers {}, {}, and {}",
             i, t_vertices[0], t_vertices[1], t_vertices[2]
         );
 
-        // Use local2global to get the global number of the given cell
-        let cell_n = grid.topology().local2global(i);
-        println!("Triangle {}'s global id is {}", i, cell_n);
-        let g_vertices = grid.geometry().cell_vertices(cell_n).unwrap();
-
         // Print the geometric vertices of a cell
         // NOTE: for curved cells, there will be more geometric vertices than topological vertices, and the numbering
         // will not necessarily match the numbering of the topological vertices.
+        let g_vertices = grid.geometry().cell_vertices(i).unwrap();
         println!("The geometric vertices of triangle {} are:", i);
         for v in g_vertices {
             let coords = grid.geometry().point(*v).unwrap();

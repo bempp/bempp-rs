@@ -262,17 +262,6 @@ impl Topology for Serial2DTopology {
             _ => Some(0..0),
         }
     }
-    fn local2global(&self, local_id: usize) -> usize {
-        self.index_map[local_id]
-    }
-    fn global2local(&self, global_id: usize) -> Option<usize> {
-        for (i, j) in self.index_map.iter().enumerate() {
-            if *j == global_id {
-                return Some(i);
-            }
-        }
-        None
-    }
     fn dim(&self) -> usize {
         2
     }

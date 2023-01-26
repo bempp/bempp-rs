@@ -39,12 +39,6 @@ pub trait Topology {
     /// Get the indices of cells with the given cell type as a range (if they are contiguous
     fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
 
-    /// Convert local id of a cell to global id of the cell
-    fn local2global(&self, local_id: usize) -> usize;
-
-    /// Convert global id of a cell to local id of the cell
-    fn global2local(&self, global_id: usize) -> Option<usize>;
-
     /// The number of entities of dimension `dim`
     fn entity_count(&self, dim: usize) -> usize;
 
