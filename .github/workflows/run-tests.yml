@@ -63,19 +63,16 @@ jobs:
           cargo doc --features "strict"
       - name: Setup Pages
         uses: actions/configure-pages@v3
-        #if: ${{ github.ref == 'refs/heads/main' }}
-        if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' }}
+        if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' && github.ref == 'refs/heads/main' }}
       - name: Upload artifact for docs
         uses: actions/upload-pages-artifact@v1
         with:
           path: 'target/doc'
-        #if: ${{ github.ref == 'refs/heads/main' }}
-        if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' }}
+        if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' && github.ref == 'refs/heads/main' }}
       - name: Deploy docs to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
-        #if: ${{ github.ref == 'refs/heads/main' }}
-        if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' }}
+        if: ${{ matrix.rust-version == 'stable' && matrix.mpi == 'mpich' && github.ref == 'refs/heads/main' }}
 
 
   run-tests-python:
