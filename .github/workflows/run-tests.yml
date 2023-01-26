@@ -50,8 +50,7 @@ jobs:
           cargo test --examples  --features "strict"
 
       - name: Build docs
-        run: |
-          cargo doc --features "strict"
+        run: cargo doc --features "strict"
 
   run-tests-python:
     name: Run tests (Python)
