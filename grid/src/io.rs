@@ -8,7 +8,7 @@ use std::fs;
 pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");
-    gmsh_s.push_str("2.2 0 8\n");
+    gmsh_s.push_str("4.1 0 8\n");
     gmsh_s.push_str("$EndMeshFormat\n");
     gmsh_s.push_str("$Nodes\n");
     let node_count = grid.geometry().point_count();
