@@ -36,6 +36,18 @@ jobs:
       - name: Build docs
         run: cargo doc --features
 
+      - name: make index.html
+        run: |
+          for f in target/doc/solvers_*
+          do
+          if [ -d "$f" ]
+          then
+          echo "<li><a href='${f##*/}'>${f##*/}</a></li>" >> target/doc/index.html
+          fi
+          done
+          echo "</ul></body></html>" >> target/doc/index.html
+
+
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact for docs
