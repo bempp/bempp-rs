@@ -12,12 +12,18 @@ pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
     gmsh_s.push_str("$EndMeshFormat\n");
     gmsh_s.push_str("$Nodes\n");
     let node_count = grid.geometry().point_count();
-    gmsh_s.push_str(&format!("{node_count}\n"));
+    gmsh_s.push_str(&format!("1 {node_count} 1 {node_count}\n"));
+    gmsh_s.push_str(&format!("2 1 0 {node_count}\n"));
     for i in 0..node_count {
-        gmsh_s.push_str(&format!("{i}"));
+        gmsh_s.push_str(&format!("{}\n", i + 1));
+    }
+    for i in 0..node_count {
         let pt = grid.geometry().point(i).unwrap();
-        for j in pt {
-            gmsh_s.push_str(&format!(" {j}"));
+        for (n, j) in pt.iter().enumerate() {
+            if n != 0 {
+                gmsh_s.push_str(&format!(" "));
+            }
+            gmsh_s.push_str(&format!("{j}"));
         }
         for _ in grid.geometry().dim()..3 {
             gmsh_s.push_str(&format!(" 0.0"));
@@ -27,26 +33,70 @@ pub fn export_as_gmsh(grid: &impl Grid, fname: String) {
     gmsh_s.push_str("$EndNodes\n");
     gmsh_s.push_str("$Elements\n");
     let cell_count = grid.topology().entity_count(grid.topology().dim());
-    gmsh_s.push_str(&format!("{cell_count}\n"));
+
+    // Note: This can and will be tidied up once higher order geometry is supported
+    let mut ntriangles = 0;
+    let mut nquads = 0;
     for i in 0..cell_count {
         let cell = grid.topology().cell(i).unwrap();
-        gmsh_s.push_str(&format!("{i} "));
-        let vertex_order: Vec<usize>;
         if cell.len() == 3 {
-            gmsh_s.push_str("2");
-            vertex_order = vec![0, 1, 2];
+            ntriangles += 1;
         } else if cell.len() == 4 {
-            gmsh_s.push_str("3");
-            vertex_order = vec![0, 1, 3, 2];
+            nquads += 1;
         } else {
             panic!("Unsupported cell type.");
         }
-        gmsh_s.push_str(" 2 0 0");
-        for j in vertex_order {
-            // currently assumes that Geometry and Topology use the same order
-            gmsh_s.push_str(&format!(" {}", cell[j]))
+    }
+
+    let nblocks = {
+        if ntriangles > 0 {
+            1
+        } else {
+            0
         }
-        gmsh_s.push_str("\n");
+    } + {
+        if nquads > 0 {
+            1
+        } else {
+            0
+        }
+    };
+
+    gmsh_s.push_str(&format!("{nblocks} {cell_count} 1 {cell_count}\n"));
+
+    let mut cell_i = 1;
+
+    if ntriangles > 0 {
+        gmsh_s.push_str(&format!("2 1 2 {ntriangles}\n"));
+
+        for i in 0..cell_count {
+            let cell = grid.topology().cell(i).unwrap();
+            if cell.len() == 3 {
+                gmsh_s.push_str(&format!("{cell_i}"));
+                for j in [0, 1, 2] {
+                    // currently assumes that Geometry and Topology use the same order
+                    gmsh_s.push_str(&format!(" {}", cell[j] + 1))
+                }
+                gmsh_s.push_str("\n");
+                cell_i += 1;
+            }
+        }
+    }
+    if nquads > 0 {
+        gmsh_s.push_str(&format!("2 1 3 {nquads}\n"));
+
+        for i in 0..cell_count {
+            let cell = grid.topology().cell(i).unwrap();
+            if cell.len() == 4 {
+                gmsh_s.push_str(&format!("{cell_i}"));
+                for j in [0, 1, 3, 2] {
+                    // currently assumes that Geometry and Topology use the same order
+                    gmsh_s.push_str(&format!(" {}", cell[j] + 1))
+                }
+                gmsh_s.push_str("\n");
+                cell_i += 1;
+            }
+        }
     }
     gmsh_s.push_str("$EndElements\n");
 

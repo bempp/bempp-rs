@@ -52,5 +52,5 @@ fn main() {
     }
 
     // Save the mesh in gmsh format
-    export_as_gmsh(&grid, String::from("examples_grid_mesh.msh"));
+    export_as_gmsh(&grid, String::from("examples_grid.msh"));
 }
