@@ -1,12 +1,10 @@
 //! Functions to create simple example grids
 
-pub use crate::grid::SerialGrid;
-use solvers_tools::arrays::AdjacencyList;
-use solvers_tools::arrays::Array2D;
-use solvers_traits::cell::ReferenceCellType;
-pub use solvers_traits::grid::Geometry;
-pub use solvers_traits::grid::Grid;
-pub use solvers_traits::grid::Topology;
+use crate::grid::SerialGrid;
+use solvers_element::cell::Triangle;
+use solvers_tools::arrays::{AdjacencyList, Array2D};
+use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
+use solvers_traits::grid::{Geometry, Grid, Topology};
 
 /// Create a regular sphere
 ///
@@ -30,94 +28,53 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         ),
         vec![ReferenceCellType::Triangle; 8],
     );
+    let ref_e = Triangle {};
     for _level in 0..refinement_level {
-        println!("---------------");
+        let nvertices_old = g.topology_mut().entity_count(0);
+        let ncells_old = g.topology_mut().entity_count(2);
         let nvertices = g.topology_mut().entity_count(0) + g.topology_mut().entity_count(1);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
         let mut cells = AdjacencyList::<usize>::new();
 
-        for i in 0..g.geometry().point_count() {
-            let pt = g.geometry().point(i).unwrap();
-            for (j, c) in pt.iter().enumerate() {
-                *coordinates.get_mut(i, j).unwrap() = *c;
-            }
-        }
-        for edge in 0..g.topology_mut().entity_count(1) {
-            let mut pt = [0.0, 0.0, 0.0];
+        for i in 0..ncells_old {
+            let ti = g.topology().index_map()[i];
+            let tedges = (0..3)
+                .map(|x| unsafe { g.topology_mut().connectivity(2, 1).row_unchecked(ti)[x] })
+                .collect::<Vec<usize>>();
+            let gi = g.geometry().index_map()[i];
+            let tv = g.topology().cell(ti).unwrap();
+            let gv = g.geometry().cell_vertices(gi).unwrap();
             for j in 0..3 {
-                for i in 0..2 {
-                    let n = *g.topology_mut().connectivity(1, 0).get(edge, i).unwrap();
-                    pt[j] += g.geometry().point(n).unwrap()[j];
+                let pt = g.geometry().point(gv[j]).unwrap();
+                for k in 0..3 {
+                    *coordinates.get_mut(tv[j], k).unwrap() = pt[k];
                 }
-                pt[j] /= 2.0;
             }
-            let norm = (pt[0].powi(2) + pt[1].powi(2) + pt[2].powi(2)).sqrt();
 
             for j in 0..3 {
-                *coordinates
-                    .get_mut(g.topology_mut().entity_count(0) + edge, j)
-                    .unwrap() = pt[j] / norm;
+                let vs = ref_e.connectivity(1, j, 0).unwrap();
+                let pt = (0..3)
+                    .map(|k| {
+                        (*coordinates.get(tv[vs[0]], k).unwrap()
+                            + *coordinates.get(tv[vs[1]], k).unwrap())
+                            / 2.0
+                    })
+                    .collect::<Vec<f64>>();
+
+                let norm = (pt[0].powi(2) + pt[1].powi(2) + pt[2].powi(2)).sqrt();
+                for k in 0..3 {
+                    *coordinates.get_mut(nvertices_old + tedges[j], k).unwrap() = pt[k] / norm;
+                }
             }
-        }
 
-        let nvertices = g.topology_mut().entity_count(0);
-        for triangle in 0..g.topology_mut().entity_count(2) {
-            let vs = [
-                g.topology().cell(triangle).unwrap()[0],
-                g.topology().cell(triangle).unwrap()[1],
-                g.topology().cell(triangle).unwrap()[2],
-            ];
-            let es = g.topology_mut().connectivity(2, 1).row(triangle).unwrap();
-            cells.add_row(&[vs[0], nvertices + es[2], nvertices + es[1]]);
-            println!(
-                "{} {} {} {}",
-                vs[0],
-                coordinates.row(vs[0]).unwrap()[0],
-                coordinates.row(vs[0]).unwrap()[1],
-                coordinates.row(vs[0]).unwrap()[2]
-            );
-            println!(
-                "{} {} {} {}",
-                vs[1],
-                coordinates.row(vs[1]).unwrap()[0],
-                coordinates.row(vs[1]).unwrap()[1],
-                coordinates.row(vs[1]).unwrap()[2]
-            );
-            println!(
-                "{} {} {} {}",
-                vs[2],
-                coordinates.row(vs[2]).unwrap()[0],
-                coordinates.row(vs[2]).unwrap()[1],
-                coordinates.row(vs[2]).unwrap()[2]
-            );
-            println!("");
-
-            println!(
-                "{} {} {} {}",
-                vs[0],
-                coordinates.row(vs[0]).unwrap()[0],
-                coordinates.row(vs[0]).unwrap()[1],
-                coordinates.row(vs[0]).unwrap()[2]
-            );
-            println!(
-                "{} {} {} {}",
-                nvertices + es[2],
-                coordinates.row(nvertices + es[2]).unwrap()[0],
-                coordinates.row(nvertices + es[2]).unwrap()[1],
-                coordinates.row(nvertices + es[2]).unwrap()[2]
-            );
-            println!(
-                "{} {} {} {}",
-                nvertices + es[1],
-                coordinates.row(nvertices + es[1]).unwrap()[0],
-                coordinates.row(nvertices + es[1]).unwrap()[1],
-                coordinates.row(nvertices + es[1]).unwrap()[2]
-            );
-            println!("");
-            println!("");
-            cells.add_row(&[vs[1], nvertices + es[0], nvertices + es[2]]);
-            cells.add_row(&[vs[2], nvertices + es[1], nvertices + es[0]]);
-            cells.add_row(&[nvertices + es[0], nvertices + es[1], nvertices + es[2]]);
+            cells.add_row(&[tv[0], nvertices_old + tedges[2], nvertices_old + tedges[1]]);
+            cells.add_row(&[tv[1], nvertices_old + tedges[0], nvertices_old + tedges[2]]);
+            cells.add_row(&[tv[2], nvertices_old + tedges[1], nvertices_old + tedges[0]]);
+            cells.add_row(&[
+                nvertices_old + tedges[0],
+                nvertices_old + tedges[1],
+                nvertices_old + tedges[2],
+            ]);
         }
         let ncells = cells.num_rows();
         g = SerialGrid::new(
