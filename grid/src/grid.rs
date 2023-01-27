@@ -1,13 +1,11 @@
 //! A serial implementation of a grid
+use itertools::izip;
 use solvers_element::cell;
-use solvers_element::element::*;
-use solvers_tools::arrays::AdjacencyList;
-use solvers_tools::arrays::Array2D;
+use solvers_element::element;
+use solvers_tools::arrays::{AdjacencyList, Array2D};
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
 use solvers_traits::element::FiniteElement;
 use solvers_traits::grid::{Geometry, Grid, Topology};
-use std::cmp::max;
-use std::cmp::min;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -23,8 +21,8 @@ fn create_element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dy
         ReferenceCellType::Triangle => {
             let degree = (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1;
             match degree {
-                1 => Box::new(LagrangeElementTriangleDegree1 {}),
-                2 => Box::new(LagrangeElementTriangleDegree2 {}),
+                1 => Box::new(element::LagrangeElementTriangleDegree1 {}),
+                2 => Box::new(element::LagrangeElementTriangleDegree2 {}),
                 _ => {
                     panic!("Unsupported degree (for now)");
                 }
@@ -33,8 +31,8 @@ fn create_element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dy
         ReferenceCellType::Quadrilateral => {
             let degree = (npts as f64).sqrt() as usize - 1;
             match degree {
-                1 => Box::new(LagrangeElementQuadrilateralDegree1 {}),
-                2 => Box::new(LagrangeElementQuadrilateralDegree2 {}),
+                1 => Box::new(element::LagrangeElementQuadrilateralDegree1 {}),
+                2 => Box::new(element::LagrangeElementQuadrilateralDegree2 {}),
                 _ => {
                     panic!("Unsupported degree (for now)");
                 }
@@ -195,90 +193,23 @@ impl SerialTopology {
             cell_types: cell_types_new,
         }
     }
+}
 
-    fn create_connectivity_10(&mut self) {
-        let mut data = AdjacencyList::<usize>::new();
-        let cells = &self.connectivity[2][0];
-        for (i, cell_type) in self.cell_types.iter().enumerate() {
-            let ref_cell = get_reference_cell(*cell_type);
-            let ref_edges = (0..ref_cell.edge_count())
-                .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
-                .collect::<Vec<Vec<usize>>>();
+fn all_equal(a: &[usize], b: &[usize]) -> bool {
+    if a.len() != b.len() {
+        false
+    } else {
+        all_in(a, b)
+    }
+}
 
-            let cstart = self.starts[i];
-            let cend = if i == self.starts.len() - 1 {
-                self.connectivity[2][0].num_rows()
-            } else {
-                self.starts[i + 1]
-            };
-            for c in cstart..cend {
-                let cell = unsafe { cells.row_unchecked(c) };
-                for e in &ref_edges {
-                    let mut found = false;
-                    let start = min(cell[e[0]], cell[e[1]]);
-                    let end = max(cell[e[0]], cell[e[1]]);
-                    for edge in data.iter_rows() {
-                        if edge[0] == start && edge[1] == end {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if !found {
-                        data.add_row(&[start, end]);
-                    }
-                }
-            }
+fn all_in(a: &[usize], b: &[usize]) -> bool {
+    for i in a {
+        if !b.contains(i) {
+            return false;
         }
-        self.connectivity[1][0] = data;
     }
-    fn create_connectivity_20(&mut self) {
-        panic!("Not implemented");
-    }
-    fn create_connectivity_21(&mut self) {
-        self.create_connectivity(1, 0);
-        self.create_connectivity(2, 0);
-        let mut data = AdjacencyList::<usize>::new();
-        let cells = &self.connectivity[2][0];
-        let edges = &self.connectivity[1][0];
-        for (i, cell_type) in self.cell_types.iter().enumerate() {
-            let ref_cell = get_reference_cell(*cell_type);
-            let ref_edges = (0..ref_cell.edge_count())
-                .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
-                .collect::<Vec<Vec<usize>>>();
-
-            let cstart = self.starts[i];
-            let cend = if i == self.starts.len() - 1 {
-                self.connectivity[2][0].num_rows()
-            } else {
-                self.starts[i + 1]
-            };
-            for c in cstart..cend {
-                let cell = unsafe { cells.row_unchecked(c) };
-                let mut row = vec![];
-                for e in &ref_edges {
-                    let start = min(cell[e[0]], cell[e[1]]);
-                    let end = max(cell[e[0]], cell[e[1]]);
-                    for (ei, edge) in edges.iter_rows().enumerate() {
-                        if edge[0] == start && edge[1] == end {
-                            row.push(ei);
-                            break;
-                        }
-                    }
-                }
-                data.add_row(&row);
-            }
-        }
-        self.connectivity[2][1] = data;
-    }
-    fn create_connectivity_30(&mut self) {
-        panic!("Not implemented");
-    }
-    fn create_connectivity_31(&mut self) {
-        panic!("Not implemented");
-    }
-    fn create_connectivity_32(&mut self) {
-        panic!("Not implemented");
-    }
+    true
 }
 
 impl Topology for SerialTopology {
@@ -348,25 +279,85 @@ impl Topology for SerialTopology {
                     self.connectivity[dim0][dim0].add_row(&[i]);
                 }
             }
-        } else {
-            match dim0 {
-                1 => match dim1 {
-                    0 => self.create_connectivity_10(),
-                    _ => {}
-                },
-                2 => match dim1 {
-                    0 => self.create_connectivity_20(),
-                    1 => self.create_connectivity_21(),
-                    _ => {}
-                },
-                3 => match dim1 {
-                    0 => self.create_connectivity_30(),
-                    1 => self.create_connectivity_31(),
-                    2 => self.create_connectivity_32(),
-                    _ => {}
-                },
-                _ => {}
+        } else if dim1 == 0 {
+            let cells = &self.connectivity[self.dim()][0];
+            let mut data = AdjacencyList::<usize>::new();
+            for (i, cell_type) in self.cell_types.iter().enumerate() {
+                let ref_cell = get_reference_cell(*cell_type);
+                let ref_entities = (0..ref_cell.entity_count(dim0).unwrap())
+                    .map(|x| ref_cell.connectivity(dim0, x, 0).unwrap())
+                    .collect::<Vec<Vec<usize>>>();
+
+                let cstart = self.starts[i];
+                let cend = if i == self.starts.len() - 1 {
+                    self.connectivity[2][0].num_rows()
+                } else {
+                    self.starts[i + 1]
+                };
+                for c in cstart..cend {
+                    let cell = unsafe { cells.row_unchecked(c) };
+                    for e in &ref_entities {
+                        let vertices = e.iter().map(|x| cell[*x]).collect::<Vec<usize>>();
+                        let mut found = false;
+                        for entity in data.iter_rows() {
+                            if all_equal(entity, &vertices) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            data.add_row(&vertices);
+                        }
+                    }
+                }
             }
+            self.connectivity[dim0][0] = data;
+        } else {
+            self.create_connectivity(dim0, 0);
+            self.create_connectivity(dim1, 0);
+            self.create_connectivity(self.dim(), dim0);
+            let mut data = AdjacencyList::<usize>::new();
+            let entities0 = &self.connectivity[dim0][0];
+            let entities1 = &self.connectivity[dim1][0];
+            let cell_to_entities0 = &self.connectivity[self.dim()][dim0];
+
+            let mut cell_types = vec![ReferenceCellType::Point; entities0.num_rows()];
+            for (i, cell_type) in self.cell_types.iter().enumerate() {
+                let ref_cell = get_reference_cell(*cell_type);
+                let etypes = ref_cell.entity_types(dim0).unwrap();
+
+                let cstart = self.starts[i];
+                let cend = if i == self.starts.len() - 1 {
+                    self.connectivity[2][0].num_rows()
+                } else {
+                    self.starts[i + 1]
+                };
+                for c in cstart..cend {
+                    for (e, t) in izip!(unsafe { cell_to_entities0.row_unchecked(c) }, &etypes) {
+                        cell_types[*e] = *t;
+                    }
+                }
+            }
+            for (ei, entity0) in entities0.iter_rows().enumerate() {
+                let entity = get_reference_cell(cell_types[ei]);
+                let mut row = vec![];
+                for i in 0..entity.entity_count(dim1).unwrap() {
+                    let vertices = entity
+                        .connectivity(dim1, i, 0)
+                        .unwrap()
+                        .iter()
+                        .map(|x| entity0[*x])
+                        .collect::<Vec<usize>>();
+                    for (j, entity1) in entities1.iter_rows().enumerate() {
+                        if all_equal(&vertices, entity1) {
+                            row.push(j);
+                            break;
+                        }
+                    }
+                }
+                data.add_row(&row);
+            }
+            self.connectivity[dim0][dim1] = data;
         }
     }
 
@@ -414,6 +405,107 @@ impl Grid for SerialGrid {
 #[cfg(test)]
 mod test {
     use crate::grid::*;
+
+    #[test]
+    fn test_connectivity() {
+        let mut g = SerialGrid::new(
+            Array2D::from_data(vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0], (4, 2)),
+            AdjacencyList::from_data(vec![0, 1, 2, 2, 1, 3], vec![0, 3, 6]),
+            vec![ReferenceCellType::Triangle; 2],
+        );
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.geometry().dim(), 2);
+        assert_eq!(g.topology_mut().entity_count(0), 4);
+        assert_eq!(g.topology_mut().entity_count(1), 5);
+        assert_eq!(g.topology_mut().entity_count(2), 2);
+        assert_eq!(g.geometry().point_count(), 4);
+
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(0).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(0).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(1).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(1).unwrap()[0], 1);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(2).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(2).unwrap()[0], 2);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(3).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(0, 0).row(3).unwrap()[0], 3);
+
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(0).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(0).unwrap()[0], 1);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(0).unwrap()[1], 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(1).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(1).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(1).unwrap()[1], 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(2).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(2).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(2).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(3).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(3).unwrap()[0], 1);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(3).unwrap()[1], 3);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(4).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(4).unwrap()[0], 2);
+        assert_eq!(g.topology_mut().connectivity(1, 0).row(4).unwrap()[1], 3);
+
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(0).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(0).unwrap()[0], 1);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(0).unwrap()[1], 2);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(1).unwrap().len(), 3);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(1).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(1).unwrap()[1], 2);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(1).unwrap()[2], 3);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(2).unwrap().len(), 3);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(2).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(2).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(2).unwrap()[2], 4);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(3).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(3).unwrap()[0], 3);
+        assert_eq!(g.topology_mut().connectivity(0, 1).row(3).unwrap()[1], 4);
+
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(0).unwrap().len(), 3);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(0).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(0).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(0).unwrap()[2], 2);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(1).unwrap().len(), 3);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(1).unwrap()[0], 2);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(1).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(2, 0).row(1).unwrap()[2], 3);
+
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(0).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(0).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(1).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(1).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(1).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(2).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(2).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(2).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(3).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(0, 2).row(3).unwrap()[0], 1);
+
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(0).unwrap().len(), 3);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(0).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(0).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(0).unwrap()[2], 2);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(1).unwrap().len(), 3);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(1).unwrap()[0], 3);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(1).unwrap()[1], 4);
+        assert_eq!(g.topology_mut().connectivity(2, 1).row(1).unwrap()[2], 0);
+
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(0).unwrap().len(), 2);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(0).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(0).unwrap()[1], 1);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(1).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(1).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(2).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(2).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(3).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(3).unwrap()[0], 1);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(4).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(1, 2).row(4).unwrap()[0], 1);
+
+        assert_eq!(g.topology_mut().connectivity(2, 2).row(0).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(2, 2).row(0).unwrap()[0], 0);
+        assert_eq!(g.topology_mut().connectivity(2, 2).row(1).unwrap().len(), 1);
+        assert_eq!(g.topology_mut().connectivity(2, 2).row(1).unwrap()[0], 1);
+    }
 
     #[test]
     fn test_serial_triangle_grid_octahedron() {

@@ -4,7 +4,7 @@ use solvers_traits::grid::{Geometry, Grid, Topology};
 
 fn main() {
     // Create a regular sphere
-    let mut grid = regular_sphere(6);
+    let mut grid = regular_sphere(2);
 
     // Get the number of points in the geometry
     println!(

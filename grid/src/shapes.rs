@@ -31,6 +31,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         vec![ReferenceCellType::Triangle; 8],
     );
     for _level in 0..refinement_level {
+        println!("---------------");
         let nvertices = g.topology_mut().entity_count(0) + g.topology_mut().entity_count(1);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
         let mut cells = AdjacencyList::<usize>::new();
@@ -68,6 +69,52 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
             ];
             let es = g.topology_mut().connectivity(2, 1).row(triangle).unwrap();
             cells.add_row(&[vs[0], nvertices + es[2], nvertices + es[1]]);
+            println!(
+                "{} {} {} {}",
+                vs[0],
+                coordinates.row(vs[0]).unwrap()[0],
+                coordinates.row(vs[0]).unwrap()[1],
+                coordinates.row(vs[0]).unwrap()[2]
+            );
+            println!(
+                "{} {} {} {}",
+                vs[1],
+                coordinates.row(vs[1]).unwrap()[0],
+                coordinates.row(vs[1]).unwrap()[1],
+                coordinates.row(vs[1]).unwrap()[2]
+            );
+            println!(
+                "{} {} {} {}",
+                vs[2],
+                coordinates.row(vs[2]).unwrap()[0],
+                coordinates.row(vs[2]).unwrap()[1],
+                coordinates.row(vs[2]).unwrap()[2]
+            );
+            println!("");
+
+            println!(
+                "{} {} {} {}",
+                vs[0],
+                coordinates.row(vs[0]).unwrap()[0],
+                coordinates.row(vs[0]).unwrap()[1],
+                coordinates.row(vs[0]).unwrap()[2]
+            );
+            println!(
+                "{} {} {} {}",
+                nvertices + es[2],
+                coordinates.row(nvertices + es[2]).unwrap()[0],
+                coordinates.row(nvertices + es[2]).unwrap()[1],
+                coordinates.row(nvertices + es[2]).unwrap()[2]
+            );
+            println!(
+                "{} {} {} {}",
+                nvertices + es[1],
+                coordinates.row(nvertices + es[1]).unwrap()[0],
+                coordinates.row(nvertices + es[1]).unwrap()[1],
+                coordinates.row(nvertices + es[1]).unwrap()[2]
+            );
+            println!("");
+            println!("");
             cells.add_row(&[vs[1], nvertices + es[0], nvertices + es[2]]);
             cells.add_row(&[vs[2], nvertices + es[1], nvertices + es[0]]);
             cells.add_row(&[nvertices + es[0], nvertices + es[1], nvertices + es[2]]);
