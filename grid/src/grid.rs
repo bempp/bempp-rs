@@ -49,12 +49,13 @@ fn create_element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dy
 impl SerialGeometry {
     pub fn new(
         coordinates: Array2D<f64>,
-        cells: AdjacencyList<usize>,
+        cells: &AdjacencyList<usize>,
         cell_types: &Vec<ReferenceCellType>,
     ) -> Self {
         let mut index_map = vec![];
         let mut element_changes = vec![];
         let mut coordinate_elements = vec![];
+        let mut new_cells = AdjacencyList::<usize>::new();
         for (i, cell) in cells.iter_rows().enumerate() {
             if !index_map.contains(&i) {
                 let cell_type = cell_types[i];
@@ -64,6 +65,7 @@ impl SerialGeometry {
                 coordinate_elements.push(create_element_from_npts(cell_type, npts));
                 for (j, cell_j) in cells.iter_rows().enumerate() {
                     if cell_type == cell_types[j] && npts == cell_j.len() {
+                        new_cells.add_row(cells.row(j).unwrap());
                         index_map.push(j);
                     }
                 }
@@ -73,7 +75,7 @@ impl SerialGeometry {
         Self {
             coordinate_elements: coordinate_elements,
             coordinates: coordinates,
-            cells: cells,
+            cells: new_cells,
             element_changes: element_changes,
             index_map: index_map,
         }
@@ -339,27 +341,12 @@ impl Topology for Serial2DTopology {
             _ => Some(0..0),
         }
     }
-    fn local2global(&self, local_id: usize) -> usize {
-        self.index_map[local_id]
-    }
-    fn global2local(&self, global_id: usize) -> Option<usize> {
-        for (i, j) in self.index_map.iter().enumerate() {
-            if *j == global_id {
-                return Some(i);
-            }
-        }
-        None
-    }
     fn dim(&self) -> usize {
         2
     }
-    fn entity_count(&self, dim: usize) -> usize {
-        for c in &self.connectivity[dim] {
-            if c.num_rows() > 0 {
-                return c.num_rows();
-            }
-        }
-        panic!("Some connectivity including the relevant entities must be created first.");
+    fn entity_count(&mut self, dim: usize) -> usize {
+        self.create_connectivity(dim, 0);
+        self.connectivity[dim][0].num_rows()
     }
     fn cell(&self, index: usize) -> Option<&[usize]> {
         self.connectivity[2][0].row(index)
@@ -391,10 +378,8 @@ impl Topology for Serial2DTopology {
         }
     }
 
-    fn connectivity(&self, dim0: usize, dim1: usize) -> &AdjacencyList<usize> {
-        if self.connectivity[dim0][dim1].num_rows() == 0 {
-            panic!("Connectivity must be created first");
-        }
+    fn connectivity(&mut self, dim0: usize, dim1: usize) -> &AdjacencyList<usize> {
+        self.create_connectivity(dim0, dim1);
         &self.connectivity[dim0][dim1]
     }
 }
@@ -413,7 +398,7 @@ impl SerialGrid {
     ) -> Self {
         Self {
             topology: Serial2DTopology::new(&cells, &cell_types),
-            geometry: SerialGeometry::new(coordinates, cells, &cell_types),
+            geometry: SerialGeometry::new(coordinates, &cells, &cell_types),
         }
     }
 }
@@ -459,9 +444,9 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
         g.topology_mut().create_connectivity_all();
-        assert_eq!(g.topology().entity_count(0), 6);
-        assert_eq!(g.topology().entity_count(1), 12);
-        assert_eq!(g.topology().entity_count(2), 8);
+        assert_eq!(g.topology_mut().entity_count(0), 6);
+        assert_eq!(g.topology_mut().entity_count(1), 12);
+        assert_eq!(g.topology_mut().entity_count(2), 8);
     }
 
     #[test]
@@ -485,9 +470,9 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
         g.topology_mut().create_connectivity_all();
-        assert_eq!(g.topology().entity_count(0), 9);
-        assert_eq!(g.topology().entity_count(1), 16);
-        assert_eq!(g.topology().entity_count(2), 8);
+        assert_eq!(g.topology_mut().entity_count(0), 9);
+        assert_eq!(g.topology_mut().entity_count(1), 16);
+        assert_eq!(g.topology_mut().entity_count(2), 8);
     }
 
     #[test]
@@ -516,8 +501,8 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
         g.topology_mut().create_connectivity_all();
-        assert_eq!(g.topology().entity_count(0), 9);
-        assert_eq!(g.topology().entity_count(1), 14);
-        assert_eq!(g.topology().entity_count(2), 6);
+        assert_eq!(g.topology_mut().entity_count(0), 9);
+        assert_eq!(g.topology_mut().entity_count(1), 14);
+        assert_eq!(g.topology_mut().entity_count(2), 6);
     }
 }

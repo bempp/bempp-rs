@@ -31,10 +31,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         vec![ReferenceCellType::Triangle; 8],
     );
     for _level in 0..refinement_level {
-        g.topology_mut().create_connectivity(2, 1);
-        g.topology_mut().create_connectivity(1, 0);
-        g.topology_mut().create_connectivity(0, 0);
-        let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
+        let nvertices = g.topology_mut().entity_count(0) + g.topology_mut().entity_count(1);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
         let mut cells = AdjacencyList::<usize>::new();
 
@@ -44,14 +41,12 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
                 *coordinates.get_mut(i, j).unwrap() = *c;
             }
         }
-        for edge in 0..g.topology().entity_count(1) {
+        for edge in 0..g.topology_mut().entity_count(1) {
             let mut pt = [0.0, 0.0, 0.0];
             for j in 0..3 {
                 for i in 0..2 {
-                    pt[j] += g
-                        .geometry()
-                        .point(*g.topology().connectivity(1, 0).get(edge, i).unwrap())
-                        .unwrap()[j];
+                    let n = *g.topology_mut().connectivity(1, 0).get(edge, i).unwrap();
+                    pt[j] += g.geometry().point(n).unwrap()[j];
                 }
                 pt[j] /= 2.0;
             }
@@ -59,34 +54,23 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
 
             for j in 0..3 {
                 *coordinates
-                    .get_mut(g.topology().entity_count(0) + edge, j)
+                    .get_mut(g.topology_mut().entity_count(0) + edge, j)
                     .unwrap() = pt[j] / norm;
             }
         }
 
-        for triangle in 0..g.topology().entity_count(2) {
-            let vs = g.topology().cell(triangle).unwrap();
-            let es = g.topology().connectivity(2, 1).row(triangle).unwrap();
-            cells.add_row(&[
-                vs[0],
-                g.topology().entity_count(0) + es[2],
-                g.topology().entity_count(0) + es[1],
-            ]);
-            cells.add_row(&[
-                vs[1],
-                g.topology().entity_count(0) + es[0],
-                g.topology().entity_count(0) + es[2],
-            ]);
-            cells.add_row(&[
-                vs[2],
-                g.topology().entity_count(0) + es[1],
-                g.topology().entity_count(0) + es[0],
-            ]);
-            cells.add_row(&[
-                g.topology().entity_count(0) + es[0],
-                g.topology().entity_count(0) + es[1],
-                g.topology().entity_count(0) + es[2],
-            ]);
+        let nvertices = g.topology_mut().entity_count(0);
+        for triangle in 0..g.topology_mut().entity_count(2) {
+            let vs = [
+                g.topology().cell(triangle).unwrap()[0],
+                g.topology().cell(triangle).unwrap()[1],
+                g.topology().cell(triangle).unwrap()[2],
+            ];
+            let es = g.topology_mut().connectivity(2, 1).row(triangle).unwrap();
+            cells.add_row(&[vs[0], nvertices + es[2], nvertices + es[1]]);
+            cells.add_row(&[vs[1], nvertices + es[0], nvertices + es[2]]);
+            cells.add_row(&[vs[2], nvertices + es[1], nvertices + es[0]]);
+            cells.add_row(&[nvertices + es[0], nvertices + es[1], nvertices + es[2]]);
         }
         let ncells = cells.num_rows();
         g = SerialGrid::new(

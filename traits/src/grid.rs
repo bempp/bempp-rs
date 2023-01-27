@@ -48,14 +48,8 @@ pub trait Topology {
     /// Get the indices of cells with the given cell type as a range (if they are contiguous
     fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
 
-    /// Convert local id of a cell to global id of the cell
-    fn local2global(&self, local_id: usize) -> usize;
-
-    /// Convert global id of a cell to local id of the cell
-    fn global2local(&self, global_id: usize) -> Option<usize>;
-
     /// The number of entities of dimension `dim`
-    fn entity_count(&self, dim: usize) -> usize;
+    fn entity_count(&mut self, dim: usize) -> usize;
 
     /// The indices of the vertices that from cell with index `index`
     fn cell(&self, index: usize) -> Option<&[usize]>;
@@ -75,7 +69,7 @@ pub trait Topology {
     }
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
+    fn connectivity(&mut self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
 }
 
 pub trait Grid {
