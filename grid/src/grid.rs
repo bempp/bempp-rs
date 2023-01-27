@@ -8,7 +8,6 @@ use solvers_traits::element::FiniteElement;
 use solvers_traits::grid::{Geometry, Grid, Topology};
 use std::cmp::max;
 use std::cmp::min;
-use std::ops::Range;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -253,16 +252,20 @@ impl SerialTopology {
     fn create_connectivity_10(&mut self) {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
-        for cell_type in [
-            ReferenceCellType::Triangle,
-            ReferenceCellType::Quadrilateral,
-        ] {
-            let ref_cell = get_reference_cell(cell_type);
+        for (i, cell_type) in self.cell_types.iter().enumerate() {
+            let ref_cell = get_reference_cell(*cell_type);
             let ref_edges = (0..ref_cell.edge_count())
                 .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
                 .collect::<Vec<Vec<usize>>>();
-            for i in self.get_cells_range(cell_type).unwrap() {
-                let cell = unsafe { cells.row_unchecked(i) };
+
+            let cstart = self.starts[i];
+            let cend = if i == self.starts.len() - 1 {
+                self.connectivity[2][0].num_rows()
+            } else {
+                self.starts[i + 1]
+            };
+            for c in cstart..cend {
+                let cell = unsafe { cells.row_unchecked(c) };
                 for e in &ref_edges {
                     let mut found = false;
                     let start = min(cell[e[0]], cell[e[1]]);
@@ -312,23 +315,27 @@ impl SerialTopology {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
         let edges = &self.connectivity[1][0];
-        for cell_type in [
-            ReferenceCellType::Triangle,
-            ReferenceCellType::Quadrilateral,
-        ] {
-            let ref_cell = get_reference_cell(cell_type);
+        for (i, cell_type) in self.cell_types.iter().enumerate() {
+            let ref_cell = get_reference_cell(*cell_type);
             let ref_edges = (0..ref_cell.edge_count())
                 .map(|x| ref_cell.connectivity(1, x, 0).unwrap())
                 .collect::<Vec<Vec<usize>>>();
-            for i in self.get_cells_range(cell_type).unwrap() {
-                let cell = unsafe { cells.row_unchecked(i) };
+
+            let cstart = self.starts[i];
+            let cend = if i == self.starts.len() - 1 {
+                self.connectivity[2][0].num_rows()
+            } else {
+                self.starts[i + 1]
+            };
+            for c in cstart..cend {
+                let cell = unsafe { cells.row_unchecked(c) };
                 let mut row = vec![];
                 for e in &ref_edges {
                     let start = min(cell[e[0]], cell[e[1]]);
                     let end = max(cell[e[0]], cell[e[1]]);
-                    for (i, edge) in edges.iter_rows().enumerate() {
+                    for (ei, edge) in edges.iter_rows().enumerate() {
                         if edge[0] == start && edge[1] == end {
-                            row.push(i);
+                            row.push(ei);
                             break;
                         }
                     }
@@ -367,33 +374,6 @@ impl SerialTopology {
 impl Topology for SerialTopology {
     fn index_map(&self) -> &[usize] {
         &self.index_map
-    }
-    fn get_cells(&self, cell_type: ReferenceCellType) -> Vec<usize> {
-        for (i, start) in self.starts.iter().enumerate() {
-            if cell_type == self.cell_types[i] {
-                let end = if i == self.starts.len() - 1 {
-                    self.connectivity[2][0].num_rows()
-                } else {
-                    self.starts[i + 1]
-                };
-                return (*start..end).collect();
-            }
-        }
-        vec![]
-    }
-    fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>> {
-        println!("{} {}", self.starts.len(), self.cell_types.len());
-        for (i, start) in self.starts.iter().enumerate() {
-            if cell_type == self.cell_types[i] {
-                let end = if i == self.starts.len() - 1 {
-                    self.connectivity[2][0].num_rows()
-                } else {
-                    self.starts[i + 1]
-                };
-                return Some(*start..end);
-            }
-        }
-        Some(0..0)
     }
     fn dim(&self) -> usize {
         self.dim

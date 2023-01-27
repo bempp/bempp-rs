@@ -45,12 +45,6 @@ pub trait Topology {
     /// Return the index map from the input order to the storage order
     fn index_map(&self) -> &[usize];
 
-    /// Get the indices of cells with the given cell type
-    fn get_cells(&self, cell_type: ReferenceCellType) -> Vec<usize>;
-
-    /// Get the indices of cells with the given cell type as a range (if they are contiguous
-    fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
-
     /// The number of entities of dimension `dim`
     fn entity_count(&mut self, dim: usize) -> usize;
 
