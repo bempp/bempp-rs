@@ -7,22 +7,22 @@ use std::fs;
 fn get_permutation_to_gmsh(cell_type: ReferenceCellType, degree: usize) -> Vec<usize> {
     match cell_type {
         ReferenceCellType::Triangle => match degree {
-                1 => vec![0, 1, 2],
-                2 => vec![0, 1, 2, 5, 3, 4],
-                3 => vec![0, 1, 2, 7, 8, 3, 4, 6, 5, 9],
-                4 => vec![/* TODO */],
-                5 => vec![/* TODO */],
-                _ => {
-                    panic!("Unsupported degree");
-                }
-            },
+            1 => vec![0, 1, 2],
+            2 => vec![0, 1, 2, 5, 3, 4],
+            3 => vec![0, 1, 2, 7, 8, 3, 4, 6, 5, 9],
+            4 => vec![/* TODO */],
+            5 => vec![/* TODO */],
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
         ReferenceCellType::Quadrilateral => match degree {
-                1 => vec![0, 1, 3, 2],
-                2 => vec![0, 1, 3, 2, 4, 6, 7, 5, 8],
-                _ => {
-                    panic!("Unsupported degree");
-                }
-            },
+            1 => vec![0, 1, 3, 2],
+            2 => vec![0, 1, 3, 2, 4, 6, 7, 5, 8],
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
         _ => {
             panic!("Unsupported cell type.");
         }
@@ -32,22 +32,22 @@ fn get_permutation_to_gmsh(cell_type: ReferenceCellType, degree: usize) -> Vec<u
 fn get_gmsh_cell(cell_type: ReferenceCellType, degree: usize) -> usize {
     match cell_type {
         ReferenceCellType::Triangle => match degree {
-                1 => 2,
-                2 => 9,
-                3 => 21,
-                4 => 23,
-                5 => 25,
-                _ => {
-                    panic!("Unsupported degree");
-                }
-            },
+            1 => 2,
+            2 => 9,
+            3 => 21,
+            4 => 23,
+            5 => 25,
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
         ReferenceCellType::Quadrilateral => match degree {
-                1 => 3,
-                2 => 10,
-                _ => {
-                    panic!("Unsupported degree");
-                }
-            },
+            1 => 3,
+            2 => 10,
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
         _ => {
             panic!("Unsupported cell type.");
         }
@@ -89,17 +89,24 @@ pub fn export_as_gmsh(grid: &mut SerialGrid, fname: String) {
     gmsh_s.push_str(&format!("{ncoordelements} {cell_count} 1 {cell_count}\n"));
     for (i, element) in grid.geometry().coordinate_elements().iter().enumerate() {
         let start = grid.geometry().element_changes()[i];
-        let end = { if i == ncoordelements - 1 { cell_count } else { grid.geometry().element_changes()[i+1] }};
-        gmsh_s.push_str(&format!("2 1 {} {}\n", get_gmsh_cell(element.cell_type(), element.degree()), end - start));
+        let end = {
+            if i == ncoordelements - 1 {
+                cell_count
+            } else {
+                grid.geometry().element_changes()[i + 1]
+            }
+        };
+        gmsh_s.push_str(&format!(
+            "2 1 {} {}\n",
+            get_gmsh_cell(element.cell_type(), element.degree()),
+            end - start
+        ));
         for i in start..end {
             let cell = grid.geometry().cell_vertices(i).unwrap();
             gmsh_s.push_str(&format!("{i}"));
-            println!("<--");
             for j in get_permutation_to_gmsh(element.cell_type(), element.degree()) {
-                println!("{} {}", j, cell.len());
                 gmsh_s.push_str(&format!(" {}", cell[j] + 1))
             }
-            println!("-->");
             gmsh_s.push_str("\n");
         }
     }
