@@ -46,5 +46,35 @@ fn main() {
     }
 
     // Save the mesh in gmsh format
-    export_as_gmsh(&mut grid, String::from("examples_grid.msh"));
+    export_as_gmsh(&mut grid, String::from("_examples_grid.msh"));
+}
+
+#[test]
+fn test_surface_area() {
+    for levels in 1..7 {
+        let mut grid = regular_sphere(levels);
+
+        let mut area = 0.0;
+        for i in 0..grid.topology_mut().entity_count(2) {
+            let v = grid.geometry().cell_vertices(i).unwrap();
+            let e1 = [
+                grid.geometry().point(v[1]).unwrap()[0] - grid.geometry().point(v[0]).unwrap()[0],
+                grid.geometry().point(v[1]).unwrap()[1] - grid.geometry().point(v[0]).unwrap()[1],
+                grid.geometry().point(v[1]).unwrap()[2] - grid.geometry().point(v[0]).unwrap()[2],
+            ];
+            let e2 = [
+                grid.geometry().point(v[2]).unwrap()[0] - grid.geometry().point(v[0]).unwrap()[0],
+                grid.geometry().point(v[2]).unwrap()[1] - grid.geometry().point(v[0]).unwrap()[1],
+                grid.geometry().point(v[2]).unwrap()[2] - grid.geometry().point(v[0]).unwrap()[2],
+            ];
+            let c = [
+                e1[1] * e2[2] - e1[2] * e2[1],
+                e1[2] * e2[0] - e1[0] * e2[2],
+                e1[0] * e2[1] - e1[1] * e2[0],
+            ];
+            area += (c[0].powi(2) + c[1].powi(2) + c[2].powi(2)).sqrt() / 2.0;
+        }
+        // Surface area should be lower than surface area of the sphere
+        assert!(area <= 12.5663706144);
+    }
 }

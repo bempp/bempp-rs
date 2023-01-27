@@ -16,5 +16,4 @@ Cargo.lock
 
 examples.sh
 
-test_*.msh
-examples_*.msh
+_*.msh

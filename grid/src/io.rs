@@ -115,7 +115,7 @@ mod test {
     #[test]
     fn test_gmsh_output_regular_sphere() {
         let mut g = regular_sphere(2);
-        export_as_gmsh(&mut g, String::from("test_io_sphere.msh"));
+        export_as_gmsh(&mut g, String::from("_test_io_sphere.msh"));
     }
 
     #[test]
@@ -133,7 +133,7 @@ mod test {
                 vec![0, 4, 8, 12, 16],
             ),
         );
-        export_as_gmsh(&mut g, String::from("test_io_screen.msh"));
+        export_as_gmsh(&mut g, String::from("_test_io_screen.msh"));
     }
 
     #[test]
@@ -151,6 +151,6 @@ mod test {
                 vec![0, 3, 6, 10, 13, 16, 20],
             ),
         );
-        export_as_gmsh(&mut g, String::from("test_io_screen_mixed.msh"));
+        export_as_gmsh(&mut g, String::from("_test_io_screen_mixed.msh"));
     }
 }
