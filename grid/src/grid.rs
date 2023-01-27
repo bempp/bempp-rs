@@ -196,59 +196,6 @@ impl SerialTopology {
         }
     }
 
-    fn create_connectivity_00(&mut self) {
-        let mut nvertices = 0;
-        let cells = &self.connectivity[self.dim()][0];
-        for cell in cells.iter_rows() {
-            for j in cell {
-                if *j >= nvertices {
-                    nvertices = *j + 1;
-                }
-            }
-        }
-        for i in 0..nvertices {
-            self.connectivity[0][0].add_row(&[i]);
-        }
-    }
-    fn create_connectivity_01(&mut self) {
-        self.create_connectivity(0, 0);
-        self.create_connectivity(1, 0);
-        let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
-        for (i, row) in self.connectivity[1][0].iter_rows().enumerate() {
-            for v in row {
-                data[*v].push(i);
-            }
-        }
-        for row in data {
-            self.connectivity[0][1].add_row(&row);
-        }
-    }
-    fn create_connectivity_02(&mut self) {
-        self.create_connectivity(0, 0);
-        self.create_connectivity(2, 0);
-        let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
-        for (i, row) in self.connectivity[2][0].iter_rows().enumerate() {
-            for v in row {
-                data[*v].push(i);
-            }
-        }
-        for row in data {
-            self.connectivity[0][2].add_row(&row);
-        }
-    }
-    fn create_connectivity_03(&mut self) {
-        self.create_connectivity(0, 0);
-        self.create_connectivity(3, 0);
-        let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
-        for (i, row) in self.connectivity[3][0].iter_rows().enumerate() {
-            for v in row {
-                data[*v].push(i);
-            }
-        }
-        for row in data {
-            self.connectivity[0][3].add_row(&row);
-        }
-    }
     fn create_connectivity_10(&mut self) {
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
@@ -283,28 +230,6 @@ impl SerialTopology {
             }
         }
         self.connectivity[1][0] = data;
-    }
-    fn create_connectivity_11(&mut self) {
-        self.create_connectivity(1, 0);
-        for i in 0..self.connectivity[0][1].num_rows() {
-            self.connectivity[1][1].add_row(&[i]);
-        }
-    }
-    fn create_connectivity_12(&mut self) {
-        self.create_connectivity(1, 0);
-        self.create_connectivity(2, 1);
-        let mut data = vec![vec![]; self.connectivity[1][0].num_rows()];
-        for (i, row) in self.connectivity[2][1].iter_rows().enumerate() {
-            for v in row {
-                data[*v].push(i);
-            }
-        }
-        for row in data {
-            self.connectivity[1][2].add_row(&row);
-        }
-    }
-    fn create_connectivity_13(&mut self) {
-        panic!("Not implemented");
     }
     fn create_connectivity_20(&mut self) {
         panic!("Not implemented");
@@ -345,15 +270,6 @@ impl SerialTopology {
         }
         self.connectivity[2][1] = data;
     }
-    fn create_connectivity_22(&mut self) {
-        self.create_connectivity(2, 0);
-        for i in 0..self.connectivity[2][0].num_rows() {
-            self.connectivity[2][2].add_row(&[i]);
-        }
-    }
-    fn create_connectivity_23(&mut self) {
-        panic!("Not implemented");
-    }
     fn create_connectivity_30(&mut self) {
         panic!("Not implemented");
     }
@@ -362,12 +278,6 @@ impl SerialTopology {
     }
     fn create_connectivity_32(&mut self) {
         panic!("Not implemented");
-    }
-    fn create_connectivity_33(&mut self) {
-        self.create_connectivity(3, 0);
-        for i in 0..self.connectivity[3][0].num_rows() {
-            self.connectivity[3][3].add_row(&[i]);
-        }
     }
 }
 
@@ -406,36 +316,57 @@ impl Topology for SerialTopology {
             return;
         }
 
-        match dim0 {
-            0 => match dim1 {
-                0 => self.create_connectivity_00(),
-                1 => self.create_connectivity_01(),
-                2 => self.create_connectivity_02(),
-                3 => self.create_connectivity_03(),
+        if dim0 < dim1 {
+            self.create_connectivity(dim0, 0);
+            self.create_connectivity(dim1, dim0);
+            let mut data = vec![vec![]; self.connectivity[dim0][0].num_rows()];
+            for (i, row) in self.connectivity[dim1][dim0].iter_rows().enumerate() {
+                for v in row {
+                    data[*v].push(i);
+                }
+            }
+            for row in data {
+                self.connectivity[dim0][dim1].add_row(&row);
+            }
+        } else if dim0 == dim1 {
+            if dim0 == 0 {
+                let mut nvertices = 0;
+                let cells = &self.connectivity[self.dim()][0];
+                for cell in cells.iter_rows() {
+                    for j in cell {
+                        if *j >= nvertices {
+                            nvertices = *j + 1;
+                        }
+                    }
+                }
+                for i in 0..nvertices {
+                    self.connectivity[0][0].add_row(&[i]);
+                }
+            } else {
+                self.create_connectivity(dim0, 0);
+                for i in 0..self.connectivity[dim0][0].num_rows() {
+                    self.connectivity[dim0][dim0].add_row(&[i]);
+                }
+            }
+        } else {
+            match dim0 {
+                1 => match dim1 {
+                    0 => self.create_connectivity_10(),
+                    _ => {}
+                },
+                2 => match dim1 {
+                    0 => self.create_connectivity_20(),
+                    1 => self.create_connectivity_21(),
+                    _ => {}
+                },
+                3 => match dim1 {
+                    0 => self.create_connectivity_30(),
+                    1 => self.create_connectivity_31(),
+                    2 => self.create_connectivity_32(),
+                    _ => {}
+                },
                 _ => {}
-            },
-            1 => match dim1 {
-                0 => self.create_connectivity_10(),
-                1 => self.create_connectivity_11(),
-                2 => self.create_connectivity_12(),
-                3 => self.create_connectivity_13(),
-                _ => {}
-            },
-            2 => match dim1 {
-                0 => self.create_connectivity_20(),
-                1 => self.create_connectivity_21(),
-                2 => self.create_connectivity_22(),
-                3 => self.create_connectivity_23(),
-                _ => {}
-            },
-            3 => match dim1 {
-                0 => self.create_connectivity_30(),
-                1 => self.create_connectivity_31(),
-                2 => self.create_connectivity_32(),
-                3 => self.create_connectivity_33(),
-                _ => {}
-            },
-            _ => {}
+            }
         }
     }
 
