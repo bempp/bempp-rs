@@ -2,7 +2,6 @@
 
 use crate::cell::ReferenceCellType;
 use solvers_tools::arrays::AdjacencyList;
-use std::ops::Range;
 
 pub trait Geometry {
     //! Grid geometry
