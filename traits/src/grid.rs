@@ -29,6 +29,9 @@ pub trait Geometry {
 
     /// The number of cells
     fn cell_count(&self) -> usize;
+
+    /// Return the index map from the input order to the storage order
+    fn index_map(&self) -> &[usize];
 }
 
 pub trait Topology {
@@ -53,6 +56,9 @@ pub trait Topology {
 
     /// The indices of the vertices that from cell with index `index`
     fn cell(&self, index: usize) -> Option<&[usize]>;
+
+    /// The indices of the vertices that from cell with index `index`
+    fn cell_type(&self, index: usize) -> Option<ReferenceCellType>;
 
     /// Create the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
     ///

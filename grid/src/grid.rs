@@ -35,6 +35,7 @@ fn create_element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dy
             let degree = (npts as f64).sqrt() as usize - 1;
             match degree {
                 1 => Box::new(LagrangeElementQuadrilateralDegree1 {}),
+                2 => Box::new(LagrangeElementQuadrilateralDegree2 {}),
                 _ => {
                     panic!("Unsupported degree (for now)");
                 }
@@ -120,13 +121,18 @@ impl Geometry for SerialGeometry {
     fn cell_count(&self) -> usize {
         self.index_map.len()
     }
+    fn index_map(&self) -> &[usize] {
+        &self.index_map
+    }
 }
 
 /// Topology of a serial grid
-pub struct Serial2DTopology {
-    connectivity: [[AdjacencyList<usize>; 3]; 3],
+pub struct SerialTopology {
+    dim: usize,
+    connectivity: Vec<Vec<AdjacencyList<usize>>>,
     index_map: Vec<usize>,
-    quad_start: usize,
+    starts: Vec<usize>,
+    cell_types: Vec<ReferenceCellType>,
 }
 
 fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
@@ -140,49 +146,60 @@ fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
     }
 }
 
-impl Serial2DTopology {
+impl SerialTopology {
     pub fn new(cells: &AdjacencyList<usize>, cell_types: &Vec<ReferenceCellType>) -> Self {
-        let mut c20 = AdjacencyList::<usize>::new();
+        let mut c_dim0 = AdjacencyList::<usize>::new();
         let mut index_map = vec![];
-        for (i, cell) in cells.iter_rows().enumerate() {
-            if cell_types[i] == ReferenceCellType::Triangle {
-                index_map.push(i);
-                c20.add_row(&cell[..3]);
+        let mut vertices = vec![];
+        let mut starts = vec![];
+        let mut cell_types_new = vec![];
+        let dim = get_reference_cell(cell_types[0]).dim();
+        for c in cell_types {
+            if dim != get_reference_cell(*c).dim() {
+                panic!("Grids with cells of mixed topological dimension not supported.");
+            }
+            if !cell_types_new.contains(c) {
+                starts.push(c_dim0.num_rows());
+                cell_types_new.push(*c);
+                let n = get_reference_cell(*c).vertex_count();
+                for (i, cell) in cells.iter_rows().enumerate() {
+                    if cell_types[i] == *c {
+                        index_map.push(i);
+                        // Note: this hard codes that the first n points are at the vertices
+                        let mut row = vec![];
+                        for v in &cell[..n] {
+                            if !vertices.contains(v) {
+                                vertices.push(*v);
+                            }
+                            row.push(vertices.iter().position(|&r| r == *v).unwrap());
+                        }
+                        c_dim0.add_row(&row);
+                    }
+                }
             }
         }
-        let quad_start = index_map.len();
-        for (i, cell) in cells.iter_rows().enumerate() {
-            if cell_types[i] == ReferenceCellType::Quadrilateral {
-                index_map.push(i);
-                c20.add_row(&cell[..4]);
+
+        let mut connectivity = vec![];
+        for i in 0..dim + 1 {
+            connectivity.push(vec![]);
+            for _j in 0..dim + 1 {
+                connectivity[i].push(AdjacencyList::<usize>::new());
             }
         }
+        connectivity[dim][0] = c_dim0;
+
         Self {
-            connectivity: [
-                [
-                    AdjacencyList::<usize>::new(),
-                    AdjacencyList::<usize>::new(),
-                    AdjacencyList::<usize>::new(),
-                ],
-                [
-                    AdjacencyList::<usize>::new(),
-                    AdjacencyList::<usize>::new(),
-                    AdjacencyList::<usize>::new(),
-                ],
-                [
-                    c20,
-                    AdjacencyList::<usize>::new(),
-                    AdjacencyList::<usize>::new(),
-                ],
-            ],
+            dim: dim,
+            connectivity: connectivity,
             index_map: index_map,
-            quad_start: quad_start,
+            starts: starts,
+            cell_types: cell_types_new,
         }
     }
 
     fn create_connectivity_00(&mut self) {
         let mut nvertices = 0;
-        let cells = &self.connectivity[2][0];
+        let cells = &self.connectivity[self.dim()][0];
         for cell in cells.iter_rows() {
             for j in cell {
                 if *j >= nvertices {
@@ -209,6 +226,7 @@ impl Serial2DTopology {
     }
     fn create_connectivity_02(&mut self) {
         self.create_connectivity(0, 0);
+        self.create_connectivity(2, 0);
         let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
         for (i, row) in self.connectivity[2][0].iter_rows().enumerate() {
             for v in row {
@@ -217,6 +235,19 @@ impl Serial2DTopology {
         }
         for row in data {
             self.connectivity[0][2].add_row(&row);
+        }
+    }
+    fn create_connectivity_03(&mut self) {
+        self.create_connectivity(0, 0);
+        self.create_connectivity(3, 0);
+        let mut data = vec![vec![]; self.connectivity[0][0].num_rows()];
+        for (i, row) in self.connectivity[3][0].iter_rows().enumerate() {
+            for v in row {
+                data[*v].push(i);
+            }
+        }
+        for row in data {
+            self.connectivity[0][3].add_row(&row);
         }
     }
     fn create_connectivity_10(&mut self) {
@@ -269,8 +300,15 @@ impl Serial2DTopology {
             self.connectivity[1][2].add_row(&row);
         }
     }
+    fn create_connectivity_13(&mut self) {
+        panic!("Not implemented");
+    }
+    fn create_connectivity_20(&mut self) {
+        panic!("Not implemented");
+    }
     fn create_connectivity_21(&mut self) {
         self.create_connectivity(1, 0);
+        self.create_connectivity(2, 0);
         let mut data = AdjacencyList::<usize>::new();
         let cells = &self.connectivity[2][0];
         let edges = &self.connectivity[1][0];
@@ -301,48 +339,64 @@ impl Serial2DTopology {
         self.connectivity[2][1] = data;
     }
     fn create_connectivity_22(&mut self) {
+        self.create_connectivity(2, 0);
         for i in 0..self.connectivity[2][0].num_rows() {
             self.connectivity[2][2].add_row(&[i]);
         }
     }
+    fn create_connectivity_23(&mut self) {
+        panic!("Not implemented");
+    }
+    fn create_connectivity_30(&mut self) {
+        panic!("Not implemented");
+    }
+    fn create_connectivity_31(&mut self) {
+        panic!("Not implemented");
+    }
+    fn create_connectivity_32(&mut self) {
+        panic!("Not implemented");
+    }
+    fn create_connectivity_33(&mut self) {
+        self.create_connectivity(3, 0);
+        for i in 0..self.connectivity[3][0].num_rows() {
+            self.connectivity[3][3].add_row(&[i]);
+        }
+    }
 }
 
-impl Topology for Serial2DTopology {
+impl Topology for SerialTopology {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
     fn get_cells(&self, cell_type: ReferenceCellType) -> Vec<usize> {
-        match cell_type {
-            ReferenceCellType::Triangle => {
-                let mut cells = vec![];
-                for (i, cell) in self.connectivity[2][0].iter_rows().enumerate() {
-                    if cell.len() == 3 {
-                        cells.push(i);
-                    }
-                }
-                cells
+        for (i, start) in self.starts.iter().enumerate() {
+            if cell_type == self.cell_types[i] {
+                let end = if i == self.starts.len() - 1 {
+                    self.connectivity[2][0].num_rows()
+                } else {
+                    self.starts[i + 1]
+                };
+                return (*start..end).collect();
             }
-            ReferenceCellType::Quadrilateral => {
-                let mut cells = vec![];
-                for (i, cell) in self.connectivity[2][0].iter_rows().enumerate() {
-                    if cell.len() == 4 {
-                        cells.push(i);
-                    }
-                }
-                cells
-            }
-            _ => vec![],
         }
+        vec![]
     }
     fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>> {
-        match cell_type {
-            ReferenceCellType::Triangle => Some(0..self.quad_start),
-            ReferenceCellType::Quadrilateral => Some(self.quad_start..self.index_map.len()),
-            _ => Some(0..0),
+        println!("{} {}", self.starts.len(), self.cell_types.len());
+        for (i, start) in self.starts.iter().enumerate() {
+            if cell_type == self.cell_types[i] {
+                let end = if i == self.starts.len() - 1 {
+                    self.connectivity[2][0].num_rows()
+                } else {
+                    self.starts[i + 1]
+                };
+                return Some(*start..end);
+            }
         }
+        Some(0..0)
     }
     fn dim(&self) -> usize {
-        2
+        self.dim
     }
     fn entity_count(&mut self, dim: usize) -> usize {
         self.create_connectivity(dim, 0);
@@ -351,7 +405,23 @@ impl Topology for Serial2DTopology {
     fn cell(&self, index: usize) -> Option<&[usize]> {
         self.connectivity[2][0].row(index)
     }
+    fn cell_type(&self, index: usize) -> Option<ReferenceCellType> {
+        for (i, start) in self.starts.iter().enumerate() {
+            let end = if i == self.starts.len() - 1 {
+                self.connectivity[2][0].num_rows()
+            } else {
+                self.starts[i + 1]
+            };
+            if *start <= index && index < end {
+                return Some(self.cell_types[i]);
+            }
+        }
+        None
+    }
     fn create_connectivity(&mut self, dim0: usize, dim1: usize) {
+        if dim0 > self.dim() || dim1 > self.dim() {
+            panic!("Dimension of connectivity should be higher than the topological dimension");
+        }
         if self.connectivity[dim0][dim1].num_rows() > 0 {
             return;
         }
@@ -361,17 +431,28 @@ impl Topology for Serial2DTopology {
                 0 => self.create_connectivity_00(),
                 1 => self.create_connectivity_01(),
                 2 => self.create_connectivity_02(),
+                3 => self.create_connectivity_03(),
                 _ => {}
             },
             1 => match dim1 {
                 0 => self.create_connectivity_10(),
                 1 => self.create_connectivity_11(),
                 2 => self.create_connectivity_12(),
+                3 => self.create_connectivity_13(),
                 _ => {}
             },
             2 => match dim1 {
+                0 => self.create_connectivity_20(),
                 1 => self.create_connectivity_21(),
                 2 => self.create_connectivity_22(),
+                3 => self.create_connectivity_23(),
+                _ => {}
+            },
+            3 => match dim1 {
+                0 => self.create_connectivity_30(),
+                1 => self.create_connectivity_31(),
+                2 => self.create_connectivity_32(),
+                3 => self.create_connectivity_33(),
                 _ => {}
             },
             _ => {}
@@ -386,7 +467,7 @@ impl Topology for Serial2DTopology {
 
 /// Serial grid
 pub struct SerialGrid {
-    topology: Serial2DTopology,
+    topology: SerialTopology,
     geometry: SerialGeometry,
 }
 
@@ -397,13 +478,13 @@ impl SerialGrid {
         cell_types: Vec<ReferenceCellType>,
     ) -> Self {
         Self {
-            topology: Serial2DTopology::new(&cells, &cell_types),
+            topology: SerialTopology::new(&cells, &cell_types),
             geometry: SerialGeometry::new(coordinates, &cells, &cell_types),
         }
     }
 }
 impl Grid for SerialGrid {
-    type Topology = Serial2DTopology;
+    type Topology = SerialTopology;
     type Geometry = SerialGeometry;
 
     fn topology(&self) -> &Self::Topology {
@@ -443,10 +524,10 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
-        g.topology_mut().create_connectivity_all();
         assert_eq!(g.topology_mut().entity_count(0), 6);
         assert_eq!(g.topology_mut().entity_count(1), 12);
         assert_eq!(g.topology_mut().entity_count(2), 8);
+        assert_eq!(g.geometry().point_count(), 6);
     }
 
     #[test]
@@ -469,10 +550,10 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
-        g.topology_mut().create_connectivity_all();
         assert_eq!(g.topology_mut().entity_count(0), 9);
         assert_eq!(g.topology_mut().entity_count(1), 16);
         assert_eq!(g.topology_mut().entity_count(2), 8);
+        assert_eq!(g.geometry().point_count(), 9);
     }
 
     #[test]
@@ -500,9 +581,59 @@ mod test {
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 2);
-        g.topology_mut().create_connectivity_all();
         assert_eq!(g.topology_mut().entity_count(0), 9);
         assert_eq!(g.topology_mut().entity_count(1), 14);
         assert_eq!(g.topology_mut().entity_count(2), 6);
+        assert_eq!(g.geometry().point_count(), 9);
+    }
+
+    #[test]
+    fn test_higher_order_grid() {
+        let s = 1.0 / (2.0 as f64).sqrt();
+        let mut g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0, 1.0, 0.0, s, s, 0.0, 1.0, -s, s, -1.0, 0.0, -s, -s, 0.0, -1.0, s, -s,
+                ],
+                (9, 2),
+            ),
+            AdjacencyList::from_data(vec![4, 8, 2, 1, 3, 0, 4, 6, 8, 7, 0, 5], vec![0, 6, 12]),
+            vec![ReferenceCellType::Triangle, ReferenceCellType::Triangle],
+        );
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.geometry().dim(), 2);
+        assert_eq!(g.topology_mut().entity_count(0), 4);
+        assert_eq!(g.topology_mut().entity_count(1), 5);
+        assert_eq!(g.topology_mut().entity_count(2), 2);
+        assert_eq!(g.geometry().point_count(), 9);
+    }
+
+    #[test]
+    fn test_higher_order_mixed_grid() {
+        let mut g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.5, 0.25, 0.0, 0.0, 0.5, 0.5,
+                    0.5, 0.5, 0.5, 1.0, 0.5, 0.5, 2.0, 0.5, 0.0, 1.5, 0.75, 0.0, 0.0, 1.0, 0.0,
+                    0.5, 1.0, 0.0, 1.0, 1.0, 0.0, 2.0, -0.5, 0.0,
+                ],
+                (13, 3),
+            ),
+            AdjacencyList::from_data(
+                vec![2, 7, 12, 0, 2, 9, 11, 1, 4, 6, 10, 5, 2, 7, 11, 8, 6, 3],
+                vec![0, 3, 12, 18],
+            ),
+            vec![
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Triangle,
+            ],
+        );
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.geometry().dim(), 3);
+        assert_eq!(g.topology_mut().entity_count(0), 6);
+        assert_eq!(g.topology_mut().entity_count(1), 8);
+        assert_eq!(g.topology_mut().entity_count(2), 3);
+        assert_eq!(g.geometry().point_count(), 13);
     }
 }
