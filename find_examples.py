@@ -53,9 +53,9 @@ for file, example_name in files:
     command = f"cargo {cmd} --example {example_name} --release"
     if options is not None:
         command += f" {options}"
-    if "{{NPROCESSES}}" in "":
+    if "{{NPROCESSES}}" in command:
         for n in range(2, 5):
-            lines.append(command.replace("{{NPROCESSES}}", n))
+            lines.append(command.replace("{{NPROCESSES}}", f"{n}"))
     else:
         lines.append(command)
 
