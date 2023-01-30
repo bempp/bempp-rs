@@ -21,9 +21,8 @@ pub enum MapType {
 }
 
 /// Tabulated data
-pub struct TabulatedData<'a, F: FiniteElement> {
+pub struct TabulatedData {
     data: Vec<f64>,
-    element: &'a F,
     deriv_count: usize,
     point_count: usize,
     basis_count: usize,
@@ -43,9 +42,9 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Res
     }
 }
 
-impl<'a, F: FiniteElement> TabulatedData<'a, F> {
+impl TabulatedData {
     /// Create a data array full of zeros
-    pub fn new(element: &'a F, nderivs: usize, npoints: usize) -> Self {
+    pub fn new(element: &impl FiniteElement, nderivs: usize, npoints: usize) -> Self {
         let deriv_count = compute_derivative_count(nderivs, element.cell_type()).unwrap();
         let point_count = npoints;
         let basis_count = element.dim();
@@ -53,7 +52,6 @@ impl<'a, F: FiniteElement> TabulatedData<'a, F> {
         let data = vec![0.0; deriv_count * point_count * basis_count * value_size];
         Self {
             data,
-            element,
             deriv_count,
             point_count,
             basis_count,
@@ -101,13 +99,9 @@ impl<'a, F: FiniteElement> TabulatedData<'a, F> {
     pub fn value_size(&self) -> usize {
         self.value_size
     }
-    /// The element that data is being tabulated for
-    pub fn element(&self) -> &'a F {
-        self.element
-    }
 }
 
-pub trait FiniteElement: Sized {
+pub trait FiniteElement {
     //! A finite element defined on a reference cell
 
     /// The reference cell type
@@ -132,7 +126,7 @@ pub trait FiniteElement: Sized {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>);
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData);
 
     /// The DOFs that are associated with a subentity of the reference cell
     fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize>;

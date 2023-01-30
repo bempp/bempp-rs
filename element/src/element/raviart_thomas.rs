@@ -34,7 +34,7 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
