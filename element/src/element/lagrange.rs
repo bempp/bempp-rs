@@ -11,8 +11,12 @@ pub struct LagrangeElement {
 }
 
 impl FiniteElement for LagrangeElement {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         self.celltype
@@ -44,8 +48,12 @@ impl FiniteElement for LagrangeElement {
 pub struct LagrangeElementIntervalDegree0 {}
 
 impl FiniteElement for LagrangeElementIntervalDegree0 {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Interval
@@ -90,8 +98,12 @@ impl FiniteElement for LagrangeElementIntervalDegree0 {
 pub struct LagrangeElementIntervalDegree1 {}
 
 impl FiniteElement for LagrangeElementIntervalDegree1 {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Interval
@@ -142,8 +154,12 @@ impl FiniteElement for LagrangeElementIntervalDegree1 {
 pub struct LagrangeElementTriangleDegree0 {}
 
 impl FiniteElement for LagrangeElementTriangleDegree0 {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Triangle
@@ -188,8 +204,12 @@ impl FiniteElement for LagrangeElementTriangleDegree0 {
 pub struct LagrangeElementTriangleDegree1 {}
 
 impl FiniteElement for LagrangeElementTriangleDegree1 {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Triangle
@@ -246,8 +266,12 @@ impl FiniteElement for LagrangeElementTriangleDegree1 {
 pub struct LagrangeElementQuadrilateralDegree0 {}
 
 impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Quadrilateral
@@ -292,8 +316,12 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
 pub struct LagrangeElementQuadrilateralDegree1 {}
 
 impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
-    const VALUE_SIZE: usize = 1;
-    const MAP_TYPE: MapType = MapType::Identity;
+    fn value_size(&self) -> usize {
+        1
+    }
+    fn map_type(&self) -> MapType {
+        MapType::Identity
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Quadrilateral
