@@ -662,6 +662,7 @@ mod test {
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
+            ReferenceCellType::Point => Point {}.dim(),
             ReferenceCellType::Interval => Interval {}.dim(),
             ReferenceCellType::Triangle => Triangle {}.dim(),
             ReferenceCellType::Quadrilateral => Quadrilateral {}.dim(),
@@ -673,6 +674,7 @@ mod test {
         let mut ndofs = 0;
         for dim in 0..cell_dim + 1 {
             let entity_count = match e.cell_type() {
+                ReferenceCellType::Point => Point {}.entity_count(dim).unwrap(),
                 ReferenceCellType::Interval => Interval {}.entity_count(dim).unwrap(),
                 ReferenceCellType::Triangle => Triangle {}.entity_count(dim).unwrap(),
                 ReferenceCellType::Quadrilateral => Quadrilateral {}.entity_count(dim).unwrap(),

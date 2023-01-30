@@ -14,6 +14,7 @@ pub fn simplex_rule(
     npoints: usize,
 ) -> Result<NumericalQuadratureDefinition, QuadratureError> {
     let dim: usize = match cell_type {
+        ReferenceCellType::Point => 0,
         ReferenceCellType::Interval => 1,
         ReferenceCellType::Triangle => 2,
         ReferenceCellType::Quadrilateral => 2,
@@ -60,6 +61,7 @@ mod test {
 
     fn get_volume(cell_type: ReferenceCellType) -> f64 {
         match cell_type {
+            ReferenceCellType::Point => 0.0,
             ReferenceCellType::Interval => 1.0,
             ReferenceCellType::Triangle => 0.5,
             ReferenceCellType::Quadrilateral => 1.0,

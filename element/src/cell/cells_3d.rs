@@ -46,6 +46,16 @@ impl ReferenceCell for Tetrahedron {
         &FACES_NV
     }
 
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+        match dim {
+            0 => Ok(vec![ReferenceCellType::Point; 4]),
+            1 => Ok(vec![ReferenceCellType::Interval; 6]),
+            2 => Ok(vec![ReferenceCellType::Triangle; 4]),
+            3 => Ok(vec![ReferenceCellType::Tetrahedron]),
+            _ => Err(()),
+        }
+    }
+
     fn vertex_count(&self) -> usize {
         4
     }
@@ -187,6 +197,16 @@ impl ReferenceCell for Hexahedron {
     fn faces_nvertices(&self) -> &[usize] {
         static FACES_NV: [usize; 6] = [4, 4, 4, 4, 4, 4];
         &FACES_NV
+    }
+
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+        match dim {
+            0 => Ok(vec![ReferenceCellType::Point; 8]),
+            1 => Ok(vec![ReferenceCellType::Interval; 12]),
+            2 => Ok(vec![ReferenceCellType::Quadrilateral; 6]),
+            3 => Ok(vec![ReferenceCellType::Hexahedron]),
+            _ => Err(()),
+        }
     }
 
     fn vertex_count(&self) -> usize {
@@ -350,6 +370,22 @@ impl ReferenceCell for Prism {
         static FACES_NV: [usize; 5] = [3, 4, 4, 4, 3];
         &FACES_NV
     }
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+        match dim {
+            0 => Ok(vec![ReferenceCellType::Point; 6]),
+            1 => Ok(vec![ReferenceCellType::Interval; 9]),
+            2 => Ok(vec![
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Triangle,
+            ]),
+            3 => Ok(vec![ReferenceCellType::Prism]),
+            _ => Err(()),
+        }
+    }
+
     fn vertex_count(&self) -> usize {
         6
     }
@@ -497,6 +533,21 @@ impl ReferenceCell for Pyramid {
     fn faces_nvertices(&self) -> &[usize] {
         static FACES_NV: [usize; 5] = [4, 3, 3, 3, 3];
         &FACES_NV
+    }
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+        match dim {
+            0 => Ok(vec![ReferenceCellType::Point; 5]),
+            1 => Ok(vec![ReferenceCellType::Interval; 8]),
+            2 => Ok(vec![
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+            ]),
+            3 => Ok(vec![ReferenceCellType::Pyramid]),
+            _ => Err(()),
+        }
     }
     fn vertex_count(&self) -> usize {
         5

@@ -53,7 +53,6 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
 
             for j in 0..3 {
                 let vs = ref_e.connectivity(1, j, 0).unwrap();
-
                 let pt = (0..3)
                     .map(|k| {
                         (*coordinates.get(tv[vs[0]], k).unwrap()
