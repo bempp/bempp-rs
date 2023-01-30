@@ -58,6 +58,7 @@ fn get_gmsh_cell(cell_type: ReferenceCellType, degree: usize) -> usize {
 
 /// Export a grid as a gmsh file
 pub fn export_as_gmsh(grid: &mut SerialGrid, fname: String) {
+
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");
     gmsh_s.push_str("4.1 0 8\n");

@@ -175,7 +175,6 @@ impl SerialTopology {
                 }
             }
         }
-
         let mut connectivity = vec![];
         for i in 0..dim + 1 {
             connectivity.push(vec![]);
@@ -218,6 +217,7 @@ impl Topology for SerialTopology {
     }
     fn dim(&self) -> usize {
         self.dim
+
     }
     fn entity_count(&mut self, dim: usize) -> usize {
         self.create_connectivity(dim, 0);
@@ -243,6 +243,7 @@ impl Topology for SerialTopology {
         if dim0 > self.dim() || dim1 > self.dim() {
             panic!("Dimension of connectivity should be higher than the topological dimension");
         }
+
         if self.connectivity[dim0][dim1].num_rows() > 0 {
             return;
         }
@@ -358,6 +359,7 @@ impl Topology for SerialTopology {
                 data.add_row(&row);
             }
             self.connectivity[dim0][dim1] = data;
+
         }
     }
 
@@ -387,6 +389,7 @@ impl SerialGrid {
 }
 impl Grid for SerialGrid {
     type Topology = SerialTopology;
+
     type Geometry = SerialGeometry;
 
     fn topology(&self) -> &Self::Topology {
