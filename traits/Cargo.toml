@@ -22,3 +22,4 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 cauchy="0.4.*"
 thiserror="1.*"
+solvers-tools = { path = "../tools"}
