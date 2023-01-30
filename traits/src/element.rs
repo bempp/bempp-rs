@@ -1,5 +1,8 @@
+//! Finite element definitions
+
 use crate::cell::ReferenceCellType;
 
+/// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum ElementFamily {
@@ -7,6 +10,7 @@ pub enum ElementFamily {
     RaviartThomas = 1,
 }
 
+/// The map type used by an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum MapType {
@@ -16,6 +20,7 @@ pub enum MapType {
     L2Piola = 3,
 }
 
+/// Tabulated data
 pub struct TabulatedData<'a, F: FiniteElement> {
     data: Vec<f64>,
     element: &'a F,
@@ -25,6 +30,7 @@ pub struct TabulatedData<'a, F: FiniteElement> {
     value_size: usize,
 }
 
+/// Compute the number of derivatives for a cell
 fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Result<usize, ()> {
     match cell_type {
         ReferenceCellType::Interval => Ok(nderivs + 1),
@@ -38,6 +44,7 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Res
 }
 
 impl<'a, F: FiniteElement> TabulatedData<'a, F> {
+    /// Create a data array full of zeros
     pub fn new(element: &'a F, nderivs: usize, npoints: usize) -> Self {
         let deriv_count = compute_derivative_count(nderivs, element.cell_type()).unwrap();
         let point_count = npoints;
@@ -54,6 +61,7 @@ impl<'a, F: FiniteElement> TabulatedData<'a, F> {
         }
     }
 
+    /// Get a mutable item from the tabulated data
     pub fn get_mut(
         &mut self,
         deriv: usize,
@@ -61,47 +69,74 @@ impl<'a, F: FiniteElement> TabulatedData<'a, F> {
         basis: usize,
         component: usize,
     ) -> &mut f64 {
-        // Debug here
+        // TODO: Debug here
         let index = ((deriv * self.point_count + point) * self.basis_count + basis)
             * self.value_size
             + component;
         self.data.get_mut(index).unwrap()
     }
 
+    /// Get an item from the tabulated data
     pub fn get(&mut self, deriv: usize, point: usize, basis: usize, component: usize) -> &f64 {
-        // Debug here
+        // TODO: Debug here
         let index = ((deriv * self.point_count + point) * self.basis_count + basis)
             * self.value_size
             + component;
         self.data.get(index).unwrap()
     }
 
+    /// The number of derivatives (first dimension of the data)
     pub fn deriv_count(&self) -> usize {
         self.deriv_count
     }
+    /// The number of points (second dimension of the data)
     pub fn point_count(&self) -> usize {
         self.point_count
     }
+    /// The number of basis functions (third dimension of the data)
     pub fn basis_count(&self) -> usize {
         self.basis_count
     }
+    /// The value size (fourth dimension of the data)
     pub fn value_size(&self) -> usize {
         self.value_size
     }
+    /// The element that data is being tabulated for
     pub fn element(&self) -> &'a F {
         self.element
     }
 }
 
 pub trait FiniteElement: Sized {
+    //! A finite element defined on a reference cell
+
+    /// The reference cell type
     fn cell_type(&self) -> ReferenceCellType;
+
+    /// The polynomial degree
     fn degree(&self) -> usize;
+
+    /// The highest degree polynomial in the element's polynomial set
     fn highest_degree(&self) -> usize;
+
+    // The element family
     fn family(&self) -> ElementFamily;
+
+    /// The number of basis functions
     fn dim(&self) -> usize;
+
+    /// Is the element discontinuous between cells?
     fn discontinuous(&self) -> bool;
+
+    /// The value size
     fn value_size(&self) -> usize;
+
+    /// Tabulate the values of the basis functions and their derivatives at a set of points
     fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>);
+
+    /// The DOFs that are associated with a subentity of the reference cell
     fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize>;
+
+    /// The push forward / pull back map to use for this element
     fn map_type(&self) -> MapType;
 }

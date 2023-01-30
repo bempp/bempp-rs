@@ -1,4 +1,4 @@
-//! Lagrange elements
+//! Raviart-Thomas elements
 
 use crate::cell::*;
 use crate::element::*;

@@ -6,8 +6,8 @@ use crate::map::*;
 
 /// Lagrange element
 pub struct LagrangeElement {
-    pub celltype: ReferenceCellType,
-    pub degree: usize,
+    celltype: ReferenceCellType,
+    degree: usize,
 }
 
 impl FiniteElement for LagrangeElement {
