@@ -217,7 +217,6 @@ impl Topology for SerialTopology {
     }
     fn dim(&self) -> usize {
         self.dim
-
     }
     fn entity_count(&mut self, dim: usize) -> usize {
         self.create_connectivity(dim, 0);
@@ -359,7 +358,6 @@ impl Topology for SerialTopology {
                 data.add_row(&row);
             }
             self.connectivity[dim0][dim1] = data;
-
         }
     }
 
