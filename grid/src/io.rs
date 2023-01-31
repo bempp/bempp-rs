@@ -1,11 +1,63 @@
 //! Functions for inputting and outputting grids to/from file
-use solvers_traits::grid::Geometry;
-use solvers_traits::grid::Grid;
-use solvers_traits::grid::Topology;
+use crate::grid::SerialGrid;
+use solvers_traits::cell::ReferenceCellType;
+use solvers_traits::grid::{Geometry, Grid, Topology};
 use std::fs;
 
+fn get_permutation_to_gmsh(cell_type: ReferenceCellType, degree: usize) -> Vec<usize> {
+    match cell_type {
+        ReferenceCellType::Triangle => match degree {
+            1 => vec![0, 1, 2],
+            2 => vec![0, 1, 2, 5, 3, 4],
+            3 => vec![0, 1, 2, 7, 8, 3, 4, 6, 5, 9],
+            4 => vec![0, 1, 2, 9, 10, 11, 3, 4, 5, 8, 7, 6, 12, 13, 14],
+            5 => vec![
+                0, 1, 2, 11, 12, 13, 14, 3, 4, 5, 6, 10, 9, 8, 7, 15, 16, 17, 18, 19, 20,
+            ],
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
+        ReferenceCellType::Quadrilateral => match degree {
+            1 => vec![0, 1, 3, 2],
+            2 => vec![0, 1, 3, 2, 4, 6, 7, 5, 8],
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
+        _ => {
+            panic!("Unsupported cell type.");
+        }
+    }
+}
+
+fn get_gmsh_cell(cell_type: ReferenceCellType, degree: usize) -> usize {
+    match cell_type {
+        ReferenceCellType::Triangle => match degree {
+            1 => 2,
+            2 => 9,
+            3 => 21,
+            4 => 23,
+            5 => 25,
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
+        ReferenceCellType::Quadrilateral => match degree {
+            1 => 3,
+            2 => 10,
+            _ => {
+                panic!("Unsupported degree");
+            }
+        },
+        _ => {
+            panic!("Unsupported cell type.");
+        }
+    }
+}
+
 /// Export a grid as a gmsh file
-pub fn export_as_gmsh(grid: &mut impl Grid, fname: String) {
+pub fn export_as_gmsh(grid: &mut SerialGrid, fname: String) {
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");
     gmsh_s.push_str("4.1 0 8\n");
@@ -32,71 +84,32 @@ pub fn export_as_gmsh(grid: &mut impl Grid, fname: String) {
     }
     gmsh_s.push_str("$EndNodes\n");
     gmsh_s.push_str("$Elements\n");
+
     let tdim = grid.topology().dim();
     let cell_count = grid.topology_mut().entity_count(tdim);
-
-    // Note: This can and will be tidied up once higher order geometry is supported
-    let mut ntriangles = 0;
-    let mut nquads = 0;
-    for i in 0..cell_count {
-        let cell = grid.topology().cell(i).unwrap();
-        if cell.len() == 3 {
-            ntriangles += 1;
-        } else if cell.len() == 4 {
-            nquads += 1;
-        } else {
-            panic!("Unsupported cell type.");
-        }
-    }
-
-    let nblocks = {
-        if ntriangles > 0 {
-            1
-        } else {
-            0
-        }
-    } + {
-        if nquads > 0 {
-            1
-        } else {
-            0
-        }
-    };
-
-    gmsh_s.push_str(&format!("{nblocks} {cell_count} 1 {cell_count}\n"));
-
-    let mut cell_i = 1;
-
-    if ntriangles > 0 {
-        gmsh_s.push_str(&format!("2 1 2 {ntriangles}\n"));
-
-        for i in 0..cell_count {
-            let cell = grid.topology().cell(i).unwrap();
-            if cell.len() == 3 {
-                gmsh_s.push_str(&format!("{cell_i}"));
-                for j in [0, 1, 2] {
-                    // currently assumes that Geometry and Topology use the same order
-                    gmsh_s.push_str(&format!(" {}", cell[j] + 1))
-                }
-                gmsh_s.push_str("\n");
-                cell_i += 1;
+    let ncoordelements = grid.geometry().coordinate_elements().len();
+    gmsh_s.push_str(&format!("{ncoordelements} {cell_count} 1 {cell_count}\n"));
+    for (i, element) in grid.geometry().coordinate_elements().iter().enumerate() {
+        let start = grid.geometry().element_changes()[i];
+        let end = {
+            if i == ncoordelements - 1 {
+                cell_count
+            } else {
+                grid.geometry().element_changes()[i + 1]
             }
-        }
-    }
-    if nquads > 0 {
-        gmsh_s.push_str(&format!("2 1 3 {nquads}\n"));
-
-        for i in 0..cell_count {
-            let cell = grid.topology().cell(i).unwrap();
-            if cell.len() == 4 {
-                gmsh_s.push_str(&format!("{cell_i}"));
-                for j in [0, 1, 3, 2] {
-                    // currently assumes that Geometry and Topology use the same order
-                    gmsh_s.push_str(&format!(" {}", cell[j] + 1))
-                }
-                gmsh_s.push_str("\n");
-                cell_i += 1;
+        };
+        gmsh_s.push_str(&format!(
+            "2 1 {} {}\n",
+            get_gmsh_cell(element.cell_type(), element.degree()),
+            end - start
+        ));
+        for i in start..end {
+            let cell = grid.geometry().cell_vertices(i).unwrap();
+            gmsh_s.push_str(&format!("{i}"));
+            for j in get_permutation_to_gmsh(element.cell_type(), element.degree()) {
+                gmsh_s.push_str(&format!(" {}", cell[j] + 1))
             }
+            gmsh_s.push_str("\n");
         }
     }
     gmsh_s.push_str("$EndElements\n");
@@ -111,6 +124,7 @@ mod test {
     use crate::shapes::regular_sphere;
     use solvers_tools::arrays::AdjacencyList;
     use solvers_tools::arrays::Array2D;
+    use solvers_traits::cell::ReferenceCellType;
 
     #[test]
     fn test_gmsh_output_regular_sphere() {
@@ -132,6 +146,7 @@ mod test {
                 vec![0, 1, 3, 4, 3, 4, 6, 7, 1, 2, 4, 5, 4, 5, 7, 8],
                 vec![0, 4, 8, 12, 16],
             ),
+            vec![ReferenceCellType::Quadrilateral; 4],
         );
         export_as_gmsh(&mut g, String::from("_test_io_screen.msh"));
     }
@@ -150,6 +165,14 @@ mod test {
                 vec![0, 1, 4, 0, 4, 3, 1, 2, 4, 5, 3, 4, 7, 3, 7, 6, 4, 5, 7, 8],
                 vec![0, 3, 6, 10, 13, 16, 20],
             ),
+            vec![
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+            ],
         );
         export_as_gmsh(&mut g, String::from("_test_io_screen_mixed.msh"));
     }

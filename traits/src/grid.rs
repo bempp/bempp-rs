@@ -2,7 +2,6 @@
 
 use crate::cell::ReferenceCellType;
 use solvers_tools::arrays::AdjacencyList;
-use std::ops::Range;
 
 pub trait Geometry {
     //! Grid geometry
@@ -20,6 +19,12 @@ pub trait Geometry {
 
     /// Get the vertex numbers of a cell
     fn cell_vertices(&self, index: usize) -> Option<&[usize]>;
+
+    /// The number of cells
+    fn cell_count(&self) -> usize;
+
+    /// Return the index map from the input order to the storage order
+    fn index_map(&self) -> &[usize];
 }
 
 pub trait Topology {
@@ -33,17 +38,14 @@ pub trait Topology {
     /// Return the index map from the input order to the storage order
     fn index_map(&self) -> &[usize];
 
-    /// Get the indices of cells with the given cell type
-    fn get_cells(&self, cell_type: ReferenceCellType) -> Vec<usize>;
-
-    /// Get the indices of cells with the given cell type as a range (if they are contiguous
-    fn get_cells_range(&self, cell_type: ReferenceCellType) -> Option<Range<usize>>;
-
     /// The number of entities of dimension `dim`
     fn entity_count(&mut self, dim: usize) -> usize;
 
     /// The indices of the vertices that from cell with index `index`
     fn cell(&self, index: usize) -> Option<&[usize]>;
+
+    /// The indices of the vertices that from cell with index `index`
+    fn cell_type(&self, index: usize) -> Option<ReferenceCellType>;
 
     /// Create the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
     ///

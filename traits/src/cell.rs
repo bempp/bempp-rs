@@ -3,13 +3,14 @@ use crate::element::FiniteElement;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum ReferenceCellType {
-    Interval = 0,
-    Triangle = 1,
-    Quadrilateral = 2,
-    Tetrahedron = 3,
-    Hexahedron = 4,
-    Prism = 5,
-    Pyramid = 6,
+    Point = 0,
+    Interval = 1,
+    Triangle = 2,
+    Quadrilateral = 3,
+    Tetrahedron = 4,
+    Hexahedron = 5,
+    Prism = 6,
+    Pyramid = 7,
 }
 
 /// A 0- to 3- dimensional reference cell
@@ -45,6 +46,9 @@ pub trait ReferenceCell {
             _ => Err(()),
         }
     }
+
+    /// The cell types of entities of dimension `dim`
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()>;
 
     /// The number of vertices
     fn vertex_count(&self) -> usize;

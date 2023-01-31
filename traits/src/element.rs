@@ -32,6 +32,7 @@ pub struct TabulatedData {
 /// Compute the number of derivatives for a cell
 fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Result<usize, ()> {
     match cell_type {
+        ReferenceCellType::Point => Ok(0),
         ReferenceCellType::Interval => Ok(nderivs + 1),
         ReferenceCellType::Triangle => Ok((nderivs + 1) * (nderivs + 2) / 2),
         ReferenceCellType::Quadrilateral => Ok((nderivs + 1) * (nderivs + 2) / 2),
