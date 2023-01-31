@@ -15,10 +15,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1() {
-        let e = LagrangeElement {
-            celltype: ReferenceCellType::Triangle,
-            degree: 1,
-        };
+        let e = LagrangeElement::new(ReferenceCellType::Triangle, 1);
         assert_eq!(e.value_size(), 1);
     }
 }

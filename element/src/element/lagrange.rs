@@ -6,8 +6,17 @@ use crate::map::*;
 
 /// Lagrange element
 pub struct LagrangeElement {
-    pub celltype: ReferenceCellType,
-    pub degree: usize,
+    celltype: ReferenceCellType,
+    degree: usize,
+}
+
+impl LagrangeElement {
+    pub fn new(celltype: ReferenceCellType, degree: usize) -> Self {
+        Self {
+            celltype: celltype,
+            degree: degree,
+        }
+    }
 }
 
 impl FiniteElement for LagrangeElement {
@@ -36,7 +45,7 @@ impl FiniteElement for LagrangeElement {
     fn dim(&self) -> usize {
         unimplemented!("dim not yet implemented for this element");
     }
-    fn tabulate(&self, _points: &[f64], _nderivs: usize, _data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], _nderivs: usize, _data: &mut TabulatedData) {
         unimplemented!("tabulate not yet implemented for this element");
     }
     fn entity_dofs(&self, _entity_dim: usize, _entity_number: usize) -> Vec<usize> {
@@ -73,7 +82,7 @@ impl FiniteElement for LagrangeElementIntervalDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..nderivs + 1 {
             for pt in 0..data.point_count() {
@@ -123,7 +132,7 @@ impl FiniteElement for LagrangeElementIntervalDegree1 {
     fn dim(&self) -> usize {
         2
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
@@ -179,7 +188,7 @@ impl FiniteElement for LagrangeElementTriangleDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
@@ -229,7 +238,7 @@ impl FiniteElement for LagrangeElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
@@ -398,7 +407,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
@@ -448,7 +457,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
     fn dim(&self) -> usize {
         4
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
