@@ -26,3 +26,6 @@ solvers-traits = { path = "../traits" }
 approx = "0.5"
 cauchy = "0.4.*"
 mpi = { version = "0.6.*" }
+rand = "0.8.*"
+nalgebra = "*"
+float-cmp = "0.9.0"
