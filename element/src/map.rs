@@ -1,29 +1,29 @@
 //! Push forward and pull back maps
 
-use crate::cell::*;
-use crate::element::*;
+use crate::cell::PhysicalCell;
+use crate::element::{FiniteElement, TabulatedData};
 pub use solvers_traits::element::MapType;
 
-pub fn identity_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     _points: &[f64],
-    _geometry: &impl PhysicalCell<'b, F2>,
+    _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
-pub fn identity_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn identity_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     _points: &[f64],
-    _geometry: &impl PhysicalCell<'b, F2>,
+    _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
-pub fn contravariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -69,10 +69,10 @@ pub fn contravariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElem
     }
 }
 
-pub fn contravariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -117,10 +117,10 @@ pub fn contravariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement
     }
 }
 
-pub fn covariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -170,10 +170,10 @@ pub fn covariant_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement 
     }
 }
 
-pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -218,10 +218,10 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + '
     }
 }
 
-pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -261,10 +261,10 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
     }
 }
 
-pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement + 'b>(
-    data: &mut TabulatedData<'a, F>,
+pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &impl PhysicalCell<'b, F2>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
