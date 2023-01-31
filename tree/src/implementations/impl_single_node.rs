@@ -1,7 +1,10 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use solvers_traits::{tree::Tree, fmm::{FmmTree, FmmData}};
+use solvers_traits::{
+    fmm::{FmmData, FmmTree},
+    tree::Tree,
+};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -122,6 +125,7 @@ impl SingleNodeTree {
     /// user defined maximum leaf maximum occupancy n_crit.
     pub fn new(
         points: &[[PointType; 3]],
+        point_data: &[PointType],
         adaptive: bool,
         n_crit: Option<usize>,
         depth: Option<u64>,
@@ -132,9 +136,9 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
         if adaptive {
-            SingleNodeTree::adaptive_tree(adaptive, points, &domain, n_crit)
+            SingleNodeTree::adaptive_tree(adaptive, points, point_data, &domain, n_crit)
         } else {
-            SingleNodeTree::uniform_tree(adaptive, points, &domain, depth)
+            SingleNodeTree::uniform_tree(adaptive, points, point_data, &domain, depth)
         }
     }
 
@@ -142,17 +146,20 @@ impl SingleNodeTree {
     pub fn uniform_tree(
         adaptive: bool,
         points: &[[PointType; 3]],
+        point_data: &[PointType],
         &domain: &Domain,
         depth: u64,
     ) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
         let points: Points = points
             .iter()
+            .zip(point_data)
             .enumerate()
-            .map(|(i, p)| Point {
+            .map(|(i, (p, d))| Point {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
+                data: *d,
             })
             .collect();
 
@@ -207,17 +214,20 @@ impl SingleNodeTree {
     pub fn adaptive_tree(
         adaptive: bool,
         points: &[[PointType; 3]],
+        point_data: &[PointType],
         &domain: &Domain,
         n_crit: usize,
     ) -> SingleNodeTree {
         // Encode points at deepest level
         let mut points: Points = points
             .iter()
+            .zip(point_data)
             .enumerate()
-            .map(|(i, p)| Point {
+            .map(|(i, (p, d))| Point {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
+                data: *d,
             })
             .collect();
 
@@ -253,6 +263,7 @@ impl SingleNodeTree {
                 coordinate: p.coordinate,
                 global_idx: p.global_idx,
                 key: *points_to_leaves.get(p).unwrap(),
+                data: p.data,
             })
             .collect();
 
@@ -345,7 +356,7 @@ impl Tree for SingleNodeTree {
     fn get_leaves_set(&self) -> &HashSet<MortonKey> {
         &self.leaves_set
     }
-    
+
     fn get_keys_set(&self) -> &HashSet<MortonKey> {
         &self.keys_set
     }
@@ -380,7 +391,7 @@ impl Tree for SingleNodeTree {
 }
 
 impl FmmTree for SingleNodeTree {
-    type NodeData = NodeData;
+    type FmmNodeDataType = NodeData;
     type NodeDataContainer = Vec<f64>;
     // type ParticleData = Vec<f64>;
 
@@ -480,20 +491,37 @@ impl FmmTree for SingleNodeTree {
     }
 
     // Set data associated with a tree node key
-    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataContainer) {
+    fn set_multipole_expansion(
+        &mut self,
+        node_index: &Self::NodeIndex,
+        data: &Self::NodeDataContainer,
+        order: usize,
+    ) {
         if let Some(x) = self.keys_to_data.get_mut(node_index) {
             x.set_multipole_expansion(data);
+        } else {
+            let mut node_data = NodeData::new(NodeType::Fmm);
+            node_data.set_expansion_order(order);
+            node_data.set_multipole_expansion(data);
+            self.keys_to_data.insert(*node_index, node_data);
         }
     }
 
     // Get data associated with a tree node key
-    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataContainer> {
+    fn get_multipole_expansion(
+        &self,
+        node_index: &Self::NodeIndex,
+    ) -> Option<Self::NodeDataContainer> {
         self.keys_to_data
             .get(node_index)
             .map(|x| x.get_multipole_expansion())
     }
 
-    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataContainer) {
+    fn set_local_expansion(
+        &mut self,
+        node_index: &Self::NodeIndex,
+        data: &Self::NodeDataContainer,
+    ) {
         if let Some(x) = self.keys_to_data.get_mut(node_index) {
             x.set_local_expansion(data);
         }
@@ -532,9 +560,10 @@ mod test {
     #[test]
     pub fn test_uniform_tree() {
         let points = points_fixture(10000);
+        let point_data = vec![1.0; 10000];
         let depth = 4;
         let n_crit = 15;
-        let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
+        let tree = SingleNodeTree::new(&points, &point_data, false, Some(n_crit), Some(depth));
 
         // Test that particle constraint is met at this level
         for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
@@ -553,9 +582,10 @@ mod test {
     #[test]
     pub fn test_adaptive_tree() {
         let points = points_fixture(1000);
+        let point_data = vec![1.0; 1000];
         let adaptive = true;
         let n_crit = 15;
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
+        let tree = SingleNodeTree::new(&points, &point_data, adaptive, Some(n_crit), None);
 
         // Test that particle constraint is met
         for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
@@ -607,8 +637,9 @@ mod test {
     #[test]
     pub fn test_no_overlaps() {
         let points = points_fixture(10000);
-        let uniform = SingleNodeTree::new(&points, false, Some(150), Some(4));
-        let adaptive = SingleNodeTree::new(&points, true, Some(150), None);
+        let point_data = vec![1.0; 10000];
+        let uniform = SingleNodeTree::new(&points, &point_data, false, Some(150), Some(4));
+        let adaptive = SingleNodeTree::new(&points, &point_data, true, Some(150), None);
         test_no_overlaps_helper(&uniform.get_leaves());
         test_no_overlaps_helper(&adaptive.get_leaves());
     }
@@ -631,6 +662,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
+                data: 1.0,
             })
             .collect();
 
@@ -674,6 +706,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
+                data: 1.0,
             })
             .collect();
 
@@ -717,6 +750,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
+                data: 1.0,
             })
             .collect();
 
@@ -752,6 +786,7 @@ mod test {
                 coordinate: p,
                 global_idx: i,
                 key: MortonKey::from_point(&p, &domain, depth),
+                data: 1.0,
             })
             // .cloned()
             .collect();

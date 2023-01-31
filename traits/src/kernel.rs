@@ -20,11 +20,21 @@ pub trait Kernel {
     // Evaluate the kernel.
     fn evaluate(
         &self,
-        sources: &[f64],
+        sources: &[[f64; 3]],
         charges: &[f64],
-        targets: &[f64],
+        targets: &[[f64; 3]],
         eval_type: &EvalType,
     ) -> Result<Self::Data>;
+
+    fn gram(
+        &self,
+        sources: &[[f64; 3]],
+        targets: &[[f64; 3]],
+    ) -> Result<Self::Data>;
+
+    fn scale(&self, level: u64) -> f64 {
+        1./2f64.powf((level as f64))
+    }
 }
 
 // A trait that describes evaluation data for a kernel.

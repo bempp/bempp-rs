@@ -2,7 +2,6 @@ use std::ops::Mul;
 
 use nalgebra as na;
 
-
 // Moore-Penrose pseudoinverse
 pub fn pinv(
     matrix: na::DMatrix<f64>,
@@ -27,7 +26,8 @@ pub fn pinv(
     let v = svd.v_t.unwrap().transpose();
     let ut = svd.u.unwrap().transpose();
 
-    let mut s_inv_mat = na::DMatrix::<f64>::zeros(svd.singular_values.len(), svd.singular_values.len());
+    let mut s_inv_mat =
+        na::DMatrix::<f64>::zeros(svd.singular_values.len(), svd.singular_values.len());
 
     // Return as components
     s_inv_mat.set_diagonal(&svd.singular_values);
@@ -56,7 +56,7 @@ mod test {
             data.push(between.sample(&mut range))
         }
         let data = na::DMatrix::from_vec(dim, dim, data);
-    
+
         let data2 = data.clone();
         let (a, b, c) = pinv(data);
 

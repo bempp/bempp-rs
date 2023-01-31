@@ -72,6 +72,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
+                data: 1.0,
             })
             .collect();
 

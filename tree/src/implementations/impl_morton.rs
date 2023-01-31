@@ -8,6 +8,8 @@ use std::{
     vec,
 };
 
+use solvers_traits::fmm::KiFmmNode;
+
 use crate::{
     constants::{
         BYTE_DISPLACEMENT, BYTE_MASK, DEEPEST_LEVEL, DIRECTIONS, LEVEL_DISPLACEMENT, LEVEL_MASK,
@@ -278,6 +280,25 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
 }
 
 impl MortonKey {
+    pub fn diameter(&self, domain: &Domain) -> [f64; 3] {
+        domain
+            .diameter
+            .map(|x| 0.5f64.powf(self.level() as f64) * x)
+    }
+
+    pub fn centre(&self, domain: &Domain) -> [f64; 3] {
+        let mut result = [0f64; 3];
+
+        let anchor_coordinate = self.to_coordinates(domain);
+        let diameter = self.diameter(domain);
+
+        for (i, (c, d)) in anchor_coordinate.iter().zip(diameter).enumerate() {
+            result[i] = c + d / 2.0;
+        }
+
+        result
+    }
+
     /// Return the anchor
     pub fn anchor(&self) -> &[KeyType; 3] {
         &self.anchor
@@ -636,6 +657,86 @@ impl PartialOrd for MortonKey {
 impl Hash for MortonKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
+    }
+}
+
+impl KiFmmNode for MortonKey {
+    type Surface = Vec<[f64; 3]>;
+    type Domain = Domain;
+
+    fn compute_surface(&self, order: usize, alpha: f64, domain: &Self::Domain) -> Self::Surface {
+        let n_coeffs = 6 * (order - 1).pow(2) + 2;
+
+        let mut surface = vec![[0f64; 3]; n_coeffs];
+
+        surface[0] = [-1.0, -1.0, -1.0];
+
+        let mut count = 1;
+
+        // Hold x fixed
+        for i in 0..(order - 1) {
+            for j in 0..(order - 1) {
+                let i = i as f64;
+                let j = j as f64;
+                let order = order as f64;
+
+                surface[count][0] = -1.0;
+                surface[count][1] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
+                surface[count][2] = (2.0 * j - (order - 1.0)) / (order - 1.0);
+                count += 1;
+            }
+        }
+
+        // Hold y fixed
+        for i in 0..(order - 1) {
+            for j in 0..(order - 1) {
+                let i = i as f64;
+                let j = j as f64;
+                let order = order as f64;
+
+                surface[count][0] = (2.0 * j - (order - 1.0)) / (order - 1.0);
+                surface[count][1] = -1.0;
+                surface[count][2] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
+                count += 1;
+            }
+        }
+
+        // Hold z fixed
+        for i in 0..(order - 1) {
+            for j in 0..(order - 1) {
+                let i = i as f64;
+                let j = j as f64;
+                let order = order as f64;
+                surface[count][0] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
+                surface[count][1] = (2.0 * j - (order - 1.0)) / (order - 1.0);
+                surface[count][2] = -1.0;
+                count += 1
+            }
+        }
+
+        // Reflect about origin, for remaining faces
+        for i in 0..n_coeffs / 2 {
+            surface[count + i][0] = -1.0 * surface[i][0];
+            surface[count + i][1] = -1.0 * surface[i][1];
+            surface[count + i][2] = -1.0 * surface[i][2];
+        }
+
+        // Translate box to specified centre, and scale
+        let scaled_diameter = self
+            .diameter(&domain)
+            .map(|d| 0.5f64.powf(self.level() as f64) * d);
+        let dilated_diameter = scaled_diameter.map(|d| d * alpha);
+
+        let mut scaled_surface = vec![[0f64; 3]; n_coeffs];
+
+        let centre = self.centre(domain);
+        for i in 0..n_coeffs {
+            scaled_surface[i][0] = surface[i][0] * dilated_diameter[0] / 2.0 + centre[0];
+            scaled_surface[i][1] = surface[i][1] * dilated_diameter[1] / 2.0 + centre[1];
+            scaled_surface[i][2] = surface[i][2] * dilated_diameter[2] / 2.0 + centre[2];
+        }
+
+        scaled_surface
     }
 }
 

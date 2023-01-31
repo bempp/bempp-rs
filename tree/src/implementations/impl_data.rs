@@ -1,9 +1,6 @@
-use solvers_traits::{fmm::FmmData};
+use solvers_traits::fmm::FmmData;
 
-use crate::types::{
-    data::{NodeData, NodeType},
-    morton::MortonKey,
-};
+use crate::types::data::{NodeData, NodeType};
 
 impl NodeData {
     pub fn new(node_type: NodeType) -> NodeData {
@@ -47,6 +44,8 @@ impl FmmData for NodeData {
                 Some(tmp)
             })
             .collect();
+
+        self.data = vec![0f64; ncoeffs * 2];
     }
 
     fn get_expansion_order(&self) -> usize {
@@ -63,17 +62,22 @@ impl FmmData for NodeData {
     }
 
     fn get_multipole_expansion(&self) -> Self::CoefficientDataType {
-        self.data[self.displacement[0]..self.displacement[1]].to_vec()
+        self.data[self.displacement[1]..].to_vec()
     }
 
     fn set_local_expansion(&mut self, data: &Self::CoefficientDataType) {
-        let (_, mut _local) = data.split_at(self.displacement[1]);
-        _local = data;
+        for (i, elem) in self.data[self.displacement[0]..self.displacement[1]]
+            .iter_mut()
+            .enumerate()
+        {
+            *elem = data[i]
+        }
     }
 
     fn set_multipole_expansion(&mut self, data: &Self::CoefficientDataType) {
-        let (mut _multipole, _) = data.split_at(self.displacement[1]);
-        _multipole = data;
+        for (i, elem) in self.data[self.displacement[1]..].iter_mut().enumerate() {
+            *elem = data[i]
+        }
     }
 }
 
