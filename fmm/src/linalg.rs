@@ -2,6 +2,7 @@ use std::ops::Mul;
 
 use nalgebra as na;
 
+
 // Moore-Penrose pseudoinverse
 pub fn pinv(
     matrix: na::DMatrix<f64>,
@@ -10,28 +11,27 @@ pub fn pinv(
     na::Matrix<f64, na::Dyn, na::Dyn, na::VecStorage<f64, na::Dyn, na::Dyn>>,
     na::Matrix<f64, na::Dyn, na::Dyn, na::VecStorage<f64, na::Dyn, na::Dyn>>,
 ) {
-    let svd = na::linalg::SVD::new(matrix, true, true);
+    let mut svd = na::linalg::SVD::new(matrix, true, true);
 
     let max_s = svd.singular_values.max();
-    // svd.singular_values;
-    let mut s_inv = na::Matrix::from(svd.singular_values.clone_owned());
 
-    for (i, &s) in svd.singular_values.iter().enumerate() {
+    for s in svd.singular_values.iter_mut() {
         // Heuristic
-        if s > 4. * max_s * f64::EPSILON {
-            s_inv[i] = 1. / s;
+        if *s > 4. * max_s * f64::EPSILON {
+            *s = 1. / *s;
         } else {
-            s_inv[i] = 0.;
+            *s = 0.;
         }
     }
 
     let v = svd.v_t.unwrap().transpose();
     let ut = svd.u.unwrap().transpose();
 
-    let mut s_inv_mat = na::DMatrix::<f64>::zeros(s_inv.len(), s_inv.len());
+    let mut s_inv_mat = na::DMatrix::<f64>::zeros(svd.singular_values.len(), svd.singular_values.len());
 
-    s_inv_mat.set_diagonal(&s_inv);
-    return (v, s_inv_mat, ut);
+    // Return as components
+    s_inv_mat.set_diagonal(&svd.singular_values);
+    (v, s_inv_mat, ut)
 }
 
 mod test {
@@ -51,12 +51,12 @@ mod test {
         // Setup a random square matrix, of dimension 'dim'
         let mut data: Vec<f64> = Vec::new();
         let dim = 5;
-        let npoints = (dim as usize).pow(2);
-        for _ in 0..npoints {
+        let nvals = (dim as usize).pow(2);
+        for _ in 0..nvals {
             data.push(between.sample(&mut range))
         }
-
         let data = na::DMatrix::from_vec(dim, dim, data);
+    
         let data2 = data.clone();
         let (a, b, c) = pinv(data);
 
@@ -71,9 +71,7 @@ mod test {
         let id = na::DMatrix::<f64>::identity(dim, dim);
         for (a, b) in res.row_iter().zip(id.row_iter()) {
             for (c, d) in a.column_iter().zip(b.column_iter()) {
-                let c = c[0];
-                let d = d[0];
-                assert_approx_eq!(f64, c, d, epsilon = 1e-14);
+                assert_approx_eq!(f64, c[0], d[0], epsilon = 1e-14);
             }
         }
     }
