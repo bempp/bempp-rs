@@ -1,13 +1,19 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
+#[cfg(feature = "mpi")]
 use itertools::Itertools;
+#[cfg(feature = "mpi")]
 use rand::distributions::Uniform;
+#[cfg(feature = "mpi")]
 use rand::Rng;
 
+#[cfg(feature = "mpi")]
 use mpi::{collective::SystemOperation, environment::Universe, traits::*, Rank};
 
+#[cfg(feature = "mpi")]
 use solvers_tree::implementations::mpi_helpers::all_to_allv_sparse;
 
+#[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
     let universe: Universe = mpi::initialize().unwrap();
@@ -62,3 +68,6 @@ fn main() {
     let unique: Vec<i32> = received.iter().unique().cloned().collect();
     assert_eq!(unique.len() as i32, recv_count);
 }
+
+#[cfg(not(feature = "mpi"))]
+fn main() {}

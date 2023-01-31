@@ -1,14 +1,20 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
+#[cfg(feature = "mpi")]
 use rand::prelude::*;
+#[cfg(feature = "mpi")]
 use rand::SeedableRng;
 
+#[cfg(feature = "mpi")]
 use mpi::{environment::Universe, traits::*};
 
+#[cfg(feature = "mpi")]
 use solvers_traits::tree::FmmTree;
 
+#[cfg(feature = "mpi")]
 use solvers_tree::types::{multi_node::MultiNodeTree, point::PointType};
 
+#[cfg(feature = "mpi")]
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
@@ -25,6 +31,7 @@ pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
     points
 }
 
+#[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
     let universe: Universe = mpi::initialize().unwrap();
@@ -53,3 +60,6 @@ fn main() {
         tree.leaves.len()
     );
 }
+
+#[cfg(not(feature = "mpi"))]
+fn main() {}

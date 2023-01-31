@@ -1,16 +1,22 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
+#[cfg(feature = "mpi")]
 use rand::prelude::*;
+#[cfg(feature = "mpi")]
 use rand::SeedableRng;
 
+#[cfg(feature = "mpi")]
 use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
+#[cfg(feature = "mpi")]
 use solvers_traits::tree::Tree;
 
+#[cfg(feature = "mpi")]
 use solvers_tree::types::{
     domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
 };
 
+#[cfg(feature = "mpi")]
 pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
     let mut range = StdRng::seed_from_u64(0);
     let between = rand::distributions::Uniform::from(0.0..1.0);
@@ -28,6 +34,7 @@ pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
 }
 
 /// Test that the leaves on separate nodes do not overlap.
+#[cfg(feature = "mpi")]
 fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     // Communicate bounds from each process
     let max = tree.get_keys().iter().max().unwrap();
@@ -60,6 +67,7 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     }
 }
 
+#[cfg(feature = "mpi")]
 fn test_uniform(tree: &MultiNodeTree) {
     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
     let first = levels[0];
@@ -67,6 +75,7 @@ fn test_uniform(tree: &MultiNodeTree) {
 }
 
 /// Test that the globally defined domain contains all the points at a given node.
+#[cfg(feature = "mpi")]
 fn test_global_bounds(world: &UserCommunicator) {
     let points = points_fixture(10000);
 
@@ -82,6 +91,7 @@ fn test_global_bounds(world: &UserCommunicator) {
     }
 }
 
+#[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
     let universe: Universe = mpi::initialize().unwrap();
@@ -112,3 +122,6 @@ fn main() {
         println!("\t ... test_no_overlaps passed on uniform tree");
     }
 }
+
+#[cfg(not(feature = "mpi"))]
+fn main() {}
