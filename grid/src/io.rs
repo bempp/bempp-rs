@@ -57,7 +57,7 @@ fn get_gmsh_cell(cell_type: ReferenceCellType, degree: usize) -> usize {
 }
 
 /// Export a grid as a gmsh file
-pub fn export_as_gmsh(grid: &mut SerialGrid, fname: String) {
+pub fn export_as_gmsh(grid: &SerialGrid, fname: String) {
     let mut gmsh_s = String::from("");
     gmsh_s.push_str("$MeshFormat\n");
     gmsh_s.push_str("4.1 0 8\n");
@@ -86,7 +86,7 @@ pub fn export_as_gmsh(grid: &mut SerialGrid, fname: String) {
     gmsh_s.push_str("$Elements\n");
 
     let tdim = grid.topology().dim();
-    let cell_count = grid.topology_mut().entity_count(tdim);
+    let cell_count = grid.topology().entity_count(tdim);
     let ncoordelements = grid.geometry().coordinate_elements().len();
     gmsh_s.push_str(&format!("{ncoordelements} {cell_count} 1 {cell_count}\n"));
     for (i, element) in grid.geometry().coordinate_elements().iter().enumerate() {
@@ -128,13 +128,13 @@ mod test {
 
     #[test]
     fn test_gmsh_output_regular_sphere() {
-        let mut g = regular_sphere(2);
-        export_as_gmsh(&mut g, String::from("_test_io_sphere.msh"));
+        let g = regular_sphere(2);
+        export_as_gmsh(&g, String::from("_test_io_sphere.msh"));
     }
 
     #[test]
     fn test_gmsh_output_quads() {
-        let mut g = SerialGrid::new(
+        let g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
@@ -148,12 +148,12 @@ mod test {
             ),
             vec![ReferenceCellType::Quadrilateral; 4],
         );
-        export_as_gmsh(&mut g, String::from("_test_io_screen.msh"));
+        export_as_gmsh(&g, String::from("_test_io_screen.msh"));
     }
 
     #[test]
     fn test_gmsh_output_mixed_cell_type() {
-        let mut g = SerialGrid::new(
+        let g = SerialGrid::new(
             Array2D::from_data(
                 vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
@@ -174,6 +174,6 @@ mod test {
                 ReferenceCellType::Quadrilateral,
             ],
         );
-        export_as_gmsh(&mut g, String::from("_test_io_screen_mixed.msh"));
+        export_as_gmsh(&g, String::from("_test_io_screen_mixed.msh"));
     }
 }
