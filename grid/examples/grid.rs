@@ -76,5 +76,12 @@ fn test_surface_area() {
         }
         // Surface area should be lower than surface area of the sphere
         assert!(area <= 12.5663706144);
+        if levels >= 4 {
+            assert!(area > 12.52);
+        } else if levels >= 2 {
+            assert!(area > 11.9);
+        } else {
+            assert!(area > 10.4);
+        }
     }
 }
