@@ -300,7 +300,7 @@ impl FiniteElement for LagrangeElementTriangleDegree2 {
     fn dim(&self) -> usize {
         6
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are:
         // * (1-x-y)(1-2x-2y)
         // * x(2x-1)
@@ -531,7 +531,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree2 {
     fn dim(&self) -> usize {
         9
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
