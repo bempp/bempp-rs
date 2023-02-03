@@ -110,16 +110,6 @@ impl KiFmm {
 
         let (a, b, c) = pinv(&uc2e);
 
-        println!(
-            "a r={:?} c={:?} b r={:?} c={:?} c r={:?} c={:?}",
-            a.nrows(),
-            a.ncols(),
-            b.nrows(),
-            b.ncols(),
-            c.nrows(),
-            c.ncols()
-        );
-
         let uc2e_inv = (a.to_owned(), b.dot(&c).to_owned());
 
         let (a, b, c) = pinv(&dc2e);
@@ -261,10 +251,8 @@ impl Translation for KiFmm {
 
         let check_potential = Array1::from_vec(check_potential);
 
-        let tmp = &self.uc2e_inv.1.dot(&check_potential);
-        let multipole_expansion = self.kernel.scale(leaf.level()) * self.uc2e_inv.0.dot(tmp);
-
-        let multipole_expansion = multipole_expansion.to_vec();
+        let multipole_expansion = (self.kernel.scale(leaf.level())
+            * self.uc2e_inv.0.dot(&self.uc2e_inv.1.dot(&check_potential))).to_vec();
 
         self.tree
             .set_multipole_expansion(&leaf, &multipole_expansion, self.order_equivalent);
@@ -337,7 +325,8 @@ mod test {
 
     #[test]
     fn test_p2m() {
-        // Create kernel
+
+        // Create Kernel
         let kernel = Box::new(LaplaceKernel {
             dim: 3,
             is_singular: true,
@@ -373,8 +362,10 @@ mod test {
             }
         }
 
+        // Run P2M on some node containing points
         kifmm.p2m(&node);
 
+        // Evaluate multipole expansion vs direct computation at some distant points
         let multipole = kifmm.tree.get_multipole_expansion(&node).unwrap();
         let upward_equivalent_surface = node.compute_surface(
             kifmm.order_equivalent,
@@ -382,7 +373,7 @@ mod test {
             kifmm.tree.get_domain(),
         );
 
-        let distant_point = [[100.0, 0., 0.], [0., 0., 23.]];
+        let distant_point = [[42.0, 0., 0.], [0., 0., 24.]];
 
         let node_points = kifmm.tree.get_points(&node).unwrap();
         let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data).collect();
@@ -412,5 +403,6 @@ mod test {
         for (a, b) in result.iter().zip(direct.iter()) {
             assert_approx_eq!(f64, *a, *b, epsilon = 1e-6);
         }
+
     }
 }

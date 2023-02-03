@@ -19,8 +19,6 @@ pub fn pinv<T: Scalar + Lapack>(
 
     let max_s = s[0];
 
-    println!("N SING VALS {:?}", s.len());
-
     // Hacky, should really work with type check at runtime.
     for s in s.iter_mut() {
         if *s > T::real(4.) * max_s * T::real(F64_EPSILON) {
