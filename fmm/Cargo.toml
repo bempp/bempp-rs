@@ -27,7 +27,6 @@ approx = "0.5"
 cauchy = "0.4.*"
 mpi = { version = "0.6.*" }
 rand = "0.8.*"
-# nalgebra = "*"
 ndarray = { version = "*", features = ["rayon", "blas"]}
 blas-src = { version = "*", features = ["openblas"] }
 openblas-src = { version = "*", features = ["cblas", "system"] }

@@ -75,17 +75,14 @@ impl KiFmm {
         >,
         kernel: Box<dyn Kernel<Data = Vec<f64>>>,
     ) -> KiFmm {
-        let upward_equivalent_surface =
-            ROOT.compute_surface(order, alpha_inner, tree.get_domain());
+        let upward_equivalent_surface = ROOT.compute_surface(order, alpha_inner, tree.get_domain());
 
-        let upward_check_surface =
-            ROOT.compute_surface(order, alpha_outer, tree.get_domain());
+        let upward_check_surface = ROOT.compute_surface(order, alpha_outer, tree.get_domain());
 
         let downward_equivalent_surface =
             ROOT.compute_surface(order, alpha_outer, tree.get_domain());
 
-        let downward_check_surface =
-            ROOT.compute_surface(order, alpha_inner, tree.get_domain());
+        let downward_check_surface = ROOT.compute_surface(order, alpha_inner, tree.get_domain());
 
         let uc2e = kernel
             .gram(&upward_equivalent_surface, &upward_check_surface)
@@ -250,10 +247,11 @@ impl Translation for KiFmm {
         let check_potential = Array1::from_vec(check_potential);
 
         let multipole_expansion = (self.kernel.scale(leaf.level())
-            * self.uc2e_inv.0.dot(&self.uc2e_inv.1.dot(&check_potential))).to_vec();
+            * self.uc2e_inv.0.dot(&self.uc2e_inv.1.dot(&check_potential)))
+        .to_vec();
 
         self.tree
-            .set_multipole_expansion(&leaf, &multipole_expansion, self.order);
+            .set_multipole_expansion(leaf, &multipole_expansion, self.order);
     }
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
@@ -297,14 +295,6 @@ mod test {
 
     use float_cmp::assert_approx_eq;
 
-    macro_rules! assert_delta {
-        ($x:expr, $y:expr, $d:expr) => {
-            if !(($x - $y) / ($x) < $d || ($y - $x) / ($x) < $d) {
-                panic!();
-            }
-        };
-    }
-
     pub fn points_fixture(npoints: usize) -> Vec<[f64; 3]> {
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
@@ -323,7 +313,6 @@ mod test {
 
     #[test]
     fn test_p2m() {
-
         // Create Kernel
         let kernel = Box::new(LaplaceKernel {
             dim: 3,
@@ -365,11 +354,8 @@ mod test {
 
         // Evaluate multipole expansion vs direct computation at some distant points
         let multipole = kifmm.tree.get_multipole_expansion(&node).unwrap();
-        let upward_equivalent_surface = node.compute_surface(
-            kifmm.order,
-            kifmm.alpha_inner,
-            kifmm.tree.get_domain(),
-        );
+        let upward_equivalent_surface =
+            node.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
 
         let distant_point = [[42.0, 0., 0.], [0., 0., 24.]];
 
@@ -401,6 +387,5 @@ mod test {
         for (a, b) in result.iter().zip(direct.iter()) {
             assert_approx_eq!(f64, *a, *b, epsilon = 1e-6);
         }
-
     }
 }
