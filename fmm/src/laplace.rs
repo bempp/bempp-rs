@@ -129,6 +129,96 @@ pub struct LaplaceKernel {
     pub value_dimension: usize,
 }
 
+impl LaplaceKernel {
+
+    fn potential(
+        &self,
+        sources: &[[f64; 3]],
+        charges: &[f64],
+        targets: &[[f64; 3]],
+    ) -> Vec<f64> {
+
+        let mut potentials: Vec<f64> = vec![0.; targets.len()];
+
+        for (i, target) in targets.iter().enumerate() {
+            let mut potential = 0.0;
+
+            for (source, charge) in sources.iter().zip(charges) {
+                let mut tmp = source
+                    .iter()
+                    .zip(target.iter())
+                    .map(|(s, t)| (s - t).powf(2.0))
+                    .sum::<f64>()
+                    .powf(0.5)
+                    * std::f64::consts::PI
+                    * 4.0;
+
+                tmp = tmp.recip();
+
+                if tmp.is_infinite() {
+                    continue;
+                } else {
+                    potential += tmp * charge;
+                }
+            }
+            potentials[i] = potential
+        }
+        potentials
+    }
+
+    fn gradient_kernel (
+        &self,
+        source: &[f64; 3],
+        target: &[f64; 3],
+        c: usize
+    ) -> f64 {
+        let num = source[c] - target[c];
+        let invdiff: f64 = source
+            .iter()
+            .zip(target.iter())
+            .map(|(s,t)| (s-t).powf(2.0))
+            .sum::<f64>()
+            .sqrt()
+            * std::f64::consts::PI
+            * 4.0;
+
+        let mut tmp = invdiff.recip();
+        tmp *= invdiff;
+        tmp *= invdiff;
+        tmp *= num;
+
+        if tmp.is_finite() {
+            tmp
+        } else {
+            0.
+        }
+            
+    }
+
+    fn gradient(
+        &self,
+        sources: &[[f64; 3]],
+        charges: &[f64],
+        targets: &[[f64; 3]],
+    ) -> Vec<[f64; 3]> {
+
+        let mut gradients: Vec<[f64; 3]> = vec![[0., 0., 0.]; targets.len()];
+
+        for (i, target) in targets.iter().enumerate() {
+
+            for (source, charge) in sources.iter().zip(charges) {
+                gradients[i][0] -= charge*self.gradient_kernel(source, target, 0);
+                gradients[i][1] -= charge*self.gradient_kernel(source, target, 1);
+                gradients[i][2] -= charge*self.gradient_kernel(source, target, 2);
+            }
+        }
+
+    gradients
+
+    }
+}
+
+
 impl Kernel for LaplaceKernel {
     type Data = Vec<f64>;
 
@@ -151,34 +241,10 @@ impl Kernel for LaplaceKernel {
         targets: &[[f64; 3]],
         eval_type: &solvers_traits::types::EvalType,
     ) -> solvers_traits::types::Result<Self::Data> {
-        let mut result: Vec<f64> = vec![0.; targets.len()];
 
         match eval_type {
             EvalType::Value => {
-                for (i, target) in targets.iter().enumerate() {
-                    let mut potential = 0.0;
-
-                    for (source, charge) in sources.iter().zip(charges) {
-                        let mut tmp = source
-                            .iter()
-                            .zip(target.iter())
-                            .map(|(s, t)| (s - t).powf(2.0))
-                            .sum::<f64>()
-                            .powf(0.5)
-                            * std::f64::consts::PI
-                            * 4.0;
-
-                        tmp = tmp.recip();
-
-                        if tmp.is_infinite() {
-                            continue;
-                        } else {
-                            potential += tmp * charge;
-                        }
-                    }
-                    result[i] = potential
-                }
-                solvers_traits::types::Result::Ok(result)
+                solvers_traits::types::Result::Ok(self.potential(sources, charges, targets))
             }
             _ => solvers_traits::types::Result::Err(Error::Generic("foo".to_string())),
         }
@@ -254,20 +320,41 @@ impl Translation for KiFmm {
             .set_multipole_expansion(leaf, &multipole_expansion, self.order);
     }
 
-    fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        
+        
+    }
 
-    fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
 
-    fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    }
 
-    fn l2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
 
-    fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    }
+
+    fn l2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+
+    }
+
+    fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+
+    }
 }
 
 impl Fmm for KiFmm {
     fn upward_pass(&mut self) {
         println!("Running upward pass");
+
+        // P2M over leaves
+        // for leaf in self.tree.leaves {
+        //     self.p2m(leaf)
+        // }
+
+        // M2M
+
+            
+    
     }
     fn downward_pass(&mut self) {
         println!("Running downward pass");
@@ -321,7 +408,7 @@ mod test {
         });
 
         // Create FmmTree
-        let npoints: usize = 1000;
+        let npoints: usize = 10000;
         let points = points_fixture(npoints);
         let point_data = vec![1.0; npoints];
         let depth = 1;
@@ -338,18 +425,8 @@ mod test {
         // New FMM
         let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
 
-        let mut node = kifmm.tree.get_leaves()[0];
-
-        for leaf in kifmm.tree.get_leaves().iter() {
-            if kifmm.tree.get_points(leaf).iter().len() == 0 {
-                continue;
-            } else {
-                node = *leaf;
-                break;
-            }
-        }
-
         // Run P2M on some node containing points
+        let mut node = kifmm.tree.get_leaves()[0];
         kifmm.p2m(&node);
 
         // Evaluate multipole expansion vs direct computation at some distant points
