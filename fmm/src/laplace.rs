@@ -38,8 +38,7 @@ pub struct KiFmm {
             NodeDataContainer = Vec<f64>,
         >,
     >,
-    pub order_equivalent: usize,
-    pub order_check: usize,
+    pub order: usize,
     pub alpha_inner: f64,
     pub alpha_outer: f64,
     pub uc2e_inv: (
@@ -58,8 +57,7 @@ impl KiFmm {
     }
 
     fn new(
-        order_equivalent: usize,
-        order_check: usize,
+        order: usize,
         alpha_inner: f64,
         alpha_outer: f64,
         tree: Box<
@@ -78,16 +76,16 @@ impl KiFmm {
         kernel: Box<dyn Kernel<Data = Vec<f64>>>,
     ) -> KiFmm {
         let upward_equivalent_surface =
-            ROOT.compute_surface(order_equivalent, alpha_inner, tree.get_domain());
+            ROOT.compute_surface(order, alpha_inner, tree.get_domain());
 
         let upward_check_surface =
-            ROOT.compute_surface(order_check, alpha_outer, tree.get_domain());
+            ROOT.compute_surface(order, alpha_outer, tree.get_domain());
 
         let downward_equivalent_surface =
-            ROOT.compute_surface(order_equivalent, alpha_outer, tree.get_domain());
+            ROOT.compute_surface(order, alpha_outer, tree.get_domain());
 
         let downward_check_surface =
-            ROOT.compute_surface(order_check, alpha_inner, tree.get_domain());
+            ROOT.compute_surface(order, alpha_inner, tree.get_domain());
 
         let uc2e = kernel
             .gram(&upward_equivalent_surface, &upward_check_surface)
@@ -96,13 +94,14 @@ impl KiFmm {
             .gram(&downward_equivalent_surface, &downward_check_surface)
             .unwrap();
 
-        let nrows = KiFmm::ncoeffs(order_check);
-        let ncols = KiFmm::ncoeffs(order_equivalent);
+        let nrows = KiFmm::ncoeffs(order);
+        let ncols = nrows;
 
         let uc2e = Array1::from(uc2e)
             .to_shape((nrows, ncols))
             .unwrap()
             .to_owned();
+
         let dc2e = Array1::from(dc2e)
             .to_shape((nrows, ncols))
             .unwrap()
@@ -118,8 +117,7 @@ impl KiFmm {
         KiFmm {
             kernel,
             tree,
-            order_equivalent,
-            order_check,
+            order,
             alpha_inner,
             alpha_outer,
             uc2e_inv,
@@ -232,7 +230,7 @@ impl Translation for KiFmm {
 
     fn p2m(&mut self, leaf: &Self::NodeIndex) {
         let upward_check_surface =
-            leaf.compute_surface(self.order_check, self.alpha_outer, self.tree.get_domain());
+            leaf.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
 
         let sources = self.tree.get_points(leaf).unwrap();
         let charges: Vec<f64> = sources.iter().map(|s| s.data).collect();
@@ -255,7 +253,7 @@ impl Translation for KiFmm {
             * self.uc2e_inv.0.dot(&self.uc2e_inv.1.dot(&check_potential))).to_vec();
 
         self.tree
-            .set_multipole_expansion(&leaf, &multipole_expansion, self.order_equivalent);
+            .set_multipole_expansion(&leaf, &multipole_expansion, self.order);
     }
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
@@ -276,7 +274,7 @@ impl Fmm for KiFmm {
     fn downward_pass(&mut self) {
         println!("Running downward pass");
     }
-    fn run(&mut self, expansion_order: usize) {
+    fn run(&mut self) {
         println!("Running FMM");
         self.upward_pass();
         self.downward_pass();
@@ -349,7 +347,7 @@ mod test {
         ));
 
         // New FMM
-        let mut kifmm = KiFmm::new(6, 6, 1.05, 1.95, tree, kernel);
+        let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
 
         let mut node = kifmm.tree.get_leaves()[0];
 
@@ -368,7 +366,7 @@ mod test {
         // Evaluate multipole expansion vs direct computation at some distant points
         let multipole = kifmm.tree.get_multipole_expansion(&node).unwrap();
         let upward_equivalent_surface = node.compute_surface(
-            kifmm.order_equivalent,
+            kifmm.order,
             kifmm.alpha_inner,
             kifmm.tree.get_domain(),
         );

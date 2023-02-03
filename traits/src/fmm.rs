@@ -79,7 +79,7 @@ pub trait Fmm {
     // FMM core loop
     fn upward_pass(&mut self);
     fn downward_pass(&mut self);
-    fn run(&mut self, expansion_order: usize);
+    fn run(&mut self);
 }
 
 // Special interface for NodeIndices in the KIFMM
