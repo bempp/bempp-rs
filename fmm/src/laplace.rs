@@ -1,6 +1,6 @@
 // Laplace kernel
-use std::ops::Mul;
 use std::collections::HashSet;
+use std::ops::Mul;
 use std::vec;
 
 use nalgebra as na;
@@ -43,12 +43,11 @@ pub struct KiFmm {
     pub order_check: usize,
     pub alpha_inner: f64,
     pub alpha_outer: f64,
-    pub uc2e_inv: na::DMatrix<f64>,
-    pub dc2e_inv: na::DMatrix<f64>,
+    pub uc2e_inv: (na::DMatrix<f64>, na::DMatrix<f64>),
+    pub dc2e_inv: (na::DMatrix<f64>, na::DMatrix<f64>),
 }
 
 impl KiFmm {
-
     fn ncoeffs(order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
     }
@@ -73,39 +72,32 @@ impl KiFmm {
         >,
         kernel: Box<dyn Kernel<Data = Vec<f64>>>,
     ) -> KiFmm {
-        
         let upward_equivalent_surface =
             ROOT.compute_surface(order_equivalent, alpha_inner, tree.get_domain());
-    
+
         let upward_check_surface =
             ROOT.compute_surface(order_check, alpha_outer, tree.get_domain());
-        
+
         let downward_equivalent_surface =
             ROOT.compute_surface(order_equivalent, alpha_outer, tree.get_domain());
-    
+
         let downward_check_surface =
             ROOT.compute_surface(order_check, alpha_inner, tree.get_domain());
 
-        let uc2e = kernel.gram(
-            &upward_equivalent_surface,
-            &upward_check_surface
-        );
-
-        let dc2e = kernel.gram(
-            &downward_equivalent_surface,
-            &downward_check_surface
-        );
-
+        let uc2e = kernel.gram(&upward_equivalent_surface, &upward_check_surface);
+        let dc2e = kernel.gram(&downward_equivalent_surface, &downward_check_surface);
         let nrows = KiFmm::ncoeffs(order_check);
-        let ncols = KiFmm::ncoeffs(order_equivalent);
-    
-        let uc2e = na::DMatrix::from_vec(nrows, ncols, uc2e.unwrap());
-        let dc2e = na::DMatrix::from_vec(ncols, nrows, dc2e.unwrap());
 
-        let (a, b, c) = pinv(uc2e);
-        let uc2e_inv = a.mul(b).mul(c);
-        let (a, b, c) = pinv(dc2e);
-        let dc2e_inv = a.mul(b).mul(c);
+        let ncols = KiFmm::ncoeffs(order_equivalent);
+
+        let uc2e = na::DMatrix::from_vec(nrows, ncols, uc2e.unwrap());
+        let dc2e = na::DMatrix::from_vec(nrows, ncols, dc2e.unwrap());
+        
+        let (a, b, c) = pinv(uc2e.clone());
+        let uc2e_inv = (a, b.mul(c));
+        
+         let (a, b, c) = pinv(dc2e);
+        let dc2e_inv = (a, b.mul(c));
 
         KiFmm {
             kernel,
@@ -115,7 +107,7 @@ impl KiFmm {
             alpha_inner,
             alpha_outer,
             uc2e_inv,
-            dc2e_inv
+            dc2e_inv,
         }
     }
 }
@@ -156,6 +148,7 @@ impl Kernel for LaplaceKernel {
                     let mut potential = 0.0;
 
                     for (source, charge) in sources.iter().zip(charges) {
+                        
                         let mut tmp = source
                             .iter()
                             .zip(target.iter())
@@ -165,15 +158,15 @@ impl Kernel for LaplaceKernel {
                             * std::f64::consts::PI
                             * 4.0;
 
+                        tmp = tmp.recip();
+        
                         if tmp.is_infinite() {
-                            tmp = 0.0;
-                            potential += tmp;
+                            continue;
                         } else {
-                            tmp = charge * tmp.recip();
-                            potential += tmp;
+                            potential += tmp*charge;
                         }
                     }
-                    result[i] = (potential)
+                    result[i] = potential
                 }
                 solvers_traits::types::Result::Ok(result)
             }
@@ -182,42 +175,42 @@ impl Kernel for LaplaceKernel {
     }
 
     fn gram(
-            &self,
-            sources: &[[f64; 3]],
-            targets: &[[f64; 3]],
-        ) -> solvers_traits::types::Result<Self::Data> {
-            let n = sources.len();
-            let m = targets.len();
-        
-            let mut result: Vec<f64> = Vec::new();
-        
-            for (i, target) in targets.iter().enumerate() {
-                let mut row: Vec<f64> = Vec::new();
-                for source in sources.iter() {
-                    
-                    let mut tmp = source
-                        .iter()
-                        .zip(target.iter())
-                        .map(|(s, t)| (s - t).powf(2.0))
-                        .sum::<f64>()
-                        .powf(0.5)
-                        * std::f64::consts::PI
-                        * 4.0;
-        
-                    if tmp.is_infinite() {
-                        row.push(0.0);
-                    } else {
-                        row.push(tmp.recip());
-                    }
+        &self,
+        sources: &[[f64; 3]],
+        targets: &[[f64; 3]],
+    ) -> solvers_traits::types::Result<Self::Data> {
+
+        let mut result: Vec<f64> = Vec::new();
+
+        for target in targets.iter() {
+            let mut row: Vec<f64> = Vec::new();
+            for source in sources.iter() {
+                
+                let mut tmp = source
+                    .iter()
+                    .zip(target.iter())
+                    .map(|(s, t)| (s - t).powf(2.0))
+                    .sum::<f64>()
+                    .powf(0.5)
+                    * std::f64::consts::PI
+                    * 4.0;
+
+                tmp = tmp.recip();
+
+                if tmp.is_infinite() {
+                    row.push(0.0);
+                } else {
+                    row.push(tmp);
                 }
-                result.append(&mut row); 
             }
+            result.append(&mut row);
+        }
 
         Result::Ok(result)
     }
 
     fn scale(&self, level: u64) -> f64 {
-        1./2f64.powf(level as f64)
+        1. / (2f64.powf(level as f64))
     }
 }
 
@@ -225,9 +218,10 @@ impl Translation for KiFmm {
     type NodeIndex = MortonKey;
 
     fn p2m(&mut self, leaf: &Self::NodeIndex) {
-        let upward_equivalent_surface = leaf.compute_surface(
-            self.order_equivalent,
-            self.alpha_inner,
+
+        let upward_check_surface = leaf.compute_surface(
+            self.order_check,
+            self.alpha_outer,
             self.tree.get_domain(),
         );
 
@@ -241,15 +235,24 @@ impl Translation for KiFmm {
             .evaluate(
                 &sources[..],
                 &charges[..],
-                &upward_equivalent_surface[..],
+                &upward_check_surface[..],
                 &EvalType::Value,
             )
             .unwrap();
+    
 
-        let multipole_expansion = self.kernel.scale(leaf.level());
+        let check_potential = na::DMatrix::from_vec(check_potential.len(), 1, check_potential);
+
+        let multipole_expansion = 
+            self.kernel.scale(leaf.level())
+            .mul(self.uc2e_inv.0.clone())
+            .mul(self.uc2e_inv.1.clone())
+            .mul(check_potential);
+ 
+        let multipole_expansion = multipole_expansion.data.as_vec();
 
         self.tree
-            .set_multipole_expansion(&leaf, &multipole_expansion, self.order_equivalent);
+            .set_multipole_expansion(&leaf, multipole_expansion, self.order_equivalent);
     }
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
@@ -284,6 +287,7 @@ mod test {
     use solvers_traits::fmm::KiFmmNode;
     use solvers_traits::fmm::Translation;
     use solvers_traits::types::EvalType;
+    use solvers_tree::types::morton::MortonKey;
     use solvers_tree::types::point::PointType;
     use solvers_tree::types::single_node::SingleNodeTree;
 
@@ -325,12 +329,12 @@ mod test {
         });
 
         // Create FmmTree
-        let npoints: usize = 10000;
+        let npoints: usize = 1000;
         let points = points_fixture(npoints);
         let point_data = vec![1.0; npoints];
-        let depth = 4;
-        let n_crit = 15;
-        
+        let depth = 1;
+        let n_crit = 150;
+
         let tree = Box::new(SingleNodeTree::new(
             &points,
             &point_data,
@@ -338,42 +342,58 @@ mod test {
             Some(n_crit),
             Some(depth),
         ));
-
+        
         // New FMM
         let mut kifmm = KiFmm::new(
-            5, 4, 1.05, 1.95, tree, kernel
+        4, 
+            5,
+            1.05,
+            1.95,
+            tree, 
+            kernel
         );
+
+        let mut node = kifmm.tree.get_leaves()[0];
+
+        for leaf in kifmm.tree.get_leaves().iter() {
+            if kifmm.tree.get_points(leaf).iter().len() == 0 {
+                continue
+            } else {
+                node = *leaf;
+                break;
+            }
+        }
+
+        kifmm.p2m(&node);
+
+        let multipole = kifmm.tree.get_multipole_expansion(&node).unwrap();
+        let upward_equivalent_surface = node.compute_surface(
+            kifmm.order_equivalent,
+            kifmm.alpha_inner,
+            kifmm.tree.get_domain(),
+        );
+
+        let distant_point = [[100.0, 0., 0.], [0., 0., 23.]];
+
+        let node_points = kifmm.tree.get_points(&node).unwrap();
+        let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data).collect();
+        let node_points: Vec<[f64; 3]> = node_points.iter().map(|p| p.coordinate).collect();
         
+        let direct = kifmm
+            .kernel
+            .evaluate(&node_points, &node_point_data, &distant_point, &EvalType::Value)
+            .unwrap();
+        
+        let result = kifmm
+            .kernel
+            .evaluate(
+                &upward_equivalent_surface,
+                &multipole,
+                &distant_point,
+                &EvalType::Value,
+            )
+            .unwrap();
 
-        // let node = kifmm.tree.get_leaves()[0];
-
-        // kifmm.p2m(&node);
-
-        // let multipole = kifmm.tree.get_multipole_expansion(&node).unwrap();
-        // let upward_equivalent_surface = node.compute_surface(
-        //     kifmm.order_equivalent,
-        //     kifmm.alpha_inner,
-        //     kifmm.tree.get_domain(),
-        // );
-
-        // let distant_point = [[10000.0, 0., 0.]];
-
-        // let direct = kifmm
-        //     .kernel
-        //     .evaluate(&points, &point_data, &distant_point, &EvalType::Value)
-        //     .unwrap()[0];
-        // let result = kifmm
-        //     .kernel
-        //     .evaluate(
-        //         &upward_equivalent_surface,
-        //         &multipole,
-        //         &distant_point,
-        //         &EvalType::Value,
-        //     )
-        //     .unwrap()[0];
-        // println!("direct {:?} inferred {:?}", direct, result);
-        // assert_delta!(direct, result, 1e-3);
-        // let distant_point =
-        // Compare to direct calculation at a set of distant points in exterior
+        println!("direct {:?} inferred {:?}", direct, result);
     }
 }

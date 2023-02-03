@@ -32,9 +32,7 @@ pub trait Kernel {
         targets: &[[f64; 3]],
     ) -> Result<Self::Data>;
 
-    fn scale(&self, level: u64) -> f64 {
-        1./2f64.powf((level as f64))
-    }
+    fn scale(&self, level: u64) -> f64;
 }
 
 // A trait that describes evaluation data for a kernel.
