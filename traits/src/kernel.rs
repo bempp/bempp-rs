@@ -26,11 +26,7 @@ pub trait Kernel {
         eval_type: &EvalType,
     ) -> Result<Self::Data>;
 
-    fn gram(
-        &self,
-        sources: &[[f64; 3]],
-        targets: &[[f64; 3]],
-    ) -> Result<Self::Data>;
+    fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::Data>;
 
     fn scale(&self, level: u64) -> f64;
 }

@@ -724,11 +724,10 @@ impl KiFmmNode for MortonKey {
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(&domain);
         let dilated_diameter = scaled_diameter.map(|d| d * alpha);
-  
+
         let mut scaled_surface = vec![[0f64; 3]; n_coeffs];
 
         let centre = self.centre(domain);
-
 
         for i in 0..n_coeffs {
             scaled_surface[i][0] = (surface[i][0] * (dilated_diameter[0] / 2.0)) + centre[0];

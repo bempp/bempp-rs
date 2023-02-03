@@ -1,9 +1,9 @@
 // Laplace kernel
 use std::collections::HashSet;
-use std::ops::Mul;
 use std::vec;
 
-use nalgebra as na;
+use ndarray::*;
+use ndarray_linalg::*;
 
 use solvers_traits::fmm::KiFmmNode;
 use solvers_traits::types::{Error, EvalType};
@@ -13,7 +13,6 @@ use solvers_traits::{
 };
 use solvers_tree::constants::ROOT;
 use solvers_tree::types::data::NodeData;
-use solvers_tree::types::single_node::SingleNodeTree;
 
 use solvers_tree::types::{
     domain::Domain,
@@ -43,8 +42,14 @@ pub struct KiFmm {
     pub order_check: usize,
     pub alpha_inner: f64,
     pub alpha_outer: f64,
-    pub uc2e_inv: (na::DMatrix<f64>, na::DMatrix<f64>),
-    pub dc2e_inv: (na::DMatrix<f64>, na::DMatrix<f64>),
+    pub uc2e_inv: (
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+    ),
+    pub dc2e_inv: (
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+    ),
 }
 
 impl KiFmm {
@@ -84,20 +89,41 @@ impl KiFmm {
         let downward_check_surface =
             ROOT.compute_surface(order_check, alpha_inner, tree.get_domain());
 
-        let uc2e = kernel.gram(&upward_equivalent_surface, &upward_check_surface);
-        let dc2e = kernel.gram(&downward_equivalent_surface, &downward_check_surface);
-        let nrows = KiFmm::ncoeffs(order_check);
+        let uc2e = kernel
+            .gram(&upward_equivalent_surface, &upward_check_surface)
+            .unwrap();
+        let dc2e = kernel
+            .gram(&downward_equivalent_surface, &downward_check_surface)
+            .unwrap();
 
+        let nrows = KiFmm::ncoeffs(order_check);
         let ncols = KiFmm::ncoeffs(order_equivalent);
 
-        let uc2e = na::DMatrix::from_vec(nrows, ncols, uc2e.unwrap());
-        let dc2e = na::DMatrix::from_vec(nrows, ncols, dc2e.unwrap());
-        
-        let (a, b, c) = pinv(uc2e.clone());
-        let uc2e_inv = (a, b.mul(c));
-        
-         let (a, b, c) = pinv(dc2e);
-        let dc2e_inv = (a, b.mul(c));
+        let uc2e = Array1::from(uc2e)
+            .to_shape((nrows, ncols))
+            .unwrap()
+            .to_owned();
+        let dc2e = Array1::from(dc2e)
+            .to_shape((nrows, ncols))
+            .unwrap()
+            .to_owned();
+
+        let (a, b, c) = pinv(&uc2e);
+
+        println!(
+            "a r={:?} c={:?} b r={:?} c={:?} c r={:?} c={:?}",
+            a.nrows(),
+            a.ncols(),
+            b.nrows(),
+            b.ncols(),
+            c.nrows(),
+            c.ncols()
+        );
+
+        let uc2e_inv = (a.to_owned(), b.dot(&c).to_owned());
+
+        let (a, b, c) = pinv(&dc2e);
+        let dc2e_inv = (a.to_owned(), b.dot(&c).to_owned());
 
         KiFmm {
             kernel,
@@ -148,7 +174,6 @@ impl Kernel for LaplaceKernel {
                     let mut potential = 0.0;
 
                     for (source, charge) in sources.iter().zip(charges) {
-                        
                         let mut tmp = source
                             .iter()
                             .zip(target.iter())
@@ -159,11 +184,11 @@ impl Kernel for LaplaceKernel {
                             * 4.0;
 
                         tmp = tmp.recip();
-        
+
                         if tmp.is_infinite() {
                             continue;
                         } else {
-                            potential += tmp*charge;
+                            potential += tmp * charge;
                         }
                     }
                     result[i] = potential
@@ -179,13 +204,11 @@ impl Kernel for LaplaceKernel {
         sources: &[[f64; 3]],
         targets: &[[f64; 3]],
     ) -> solvers_traits::types::Result<Self::Data> {
-
         let mut result: Vec<f64> = Vec::new();
 
         for target in targets.iter() {
             let mut row: Vec<f64> = Vec::new();
             for source in sources.iter() {
-                
                 let mut tmp = source
                     .iter()
                     .zip(target.iter())
@@ -218,12 +241,8 @@ impl Translation for KiFmm {
     type NodeIndex = MortonKey;
 
     fn p2m(&mut self, leaf: &Self::NodeIndex) {
-
-        let upward_check_surface = leaf.compute_surface(
-            self.order_check,
-            self.alpha_outer,
-            self.tree.get_domain(),
-        );
+        let upward_check_surface =
+            leaf.compute_surface(self.order_check, self.alpha_outer, self.tree.get_domain());
 
         let sources = self.tree.get_points(leaf).unwrap();
         let charges: Vec<f64> = sources.iter().map(|s| s.data).collect();
@@ -239,20 +258,16 @@ impl Translation for KiFmm {
                 &EvalType::Value,
             )
             .unwrap();
-    
 
-        let check_potential = na::DMatrix::from_vec(check_potential.len(), 1, check_potential);
+        let check_potential = Array1::from_vec(check_potential);
 
-        let multipole_expansion = 
-            self.kernel.scale(leaf.level())
-            .mul(self.uc2e_inv.0.clone())
-            .mul(self.uc2e_inv.1.clone())
-            .mul(check_potential);
- 
-        let multipole_expansion = multipole_expansion.data.as_vec();
+        let tmp = &self.uc2e_inv.1.dot(&check_potential);
+        let multipole_expansion = self.kernel.scale(leaf.level()) * self.uc2e_inv.0.dot(tmp);
+
+        let multipole_expansion = multipole_expansion.to_vec();
 
         self.tree
-            .set_multipole_expansion(&leaf, multipole_expansion, self.order_equivalent);
+            .set_multipole_expansion(&leaf, &multipole_expansion, self.order_equivalent);
     }
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
@@ -281,7 +296,6 @@ impl Fmm for KiFmm {
 }
 
 mod test {
-    use std::f32::consts::E;
     use std::vec;
 
     use solvers_traits::fmm::KiFmmNode;
@@ -294,6 +308,8 @@ mod test {
     use super::{KiFmm, LaplaceKernel};
     use rand::prelude::*;
     use rand::SeedableRng;
+
+    use float_cmp::assert_approx_eq;
 
     macro_rules! assert_delta {
         ($x:expr, $y:expr, $d:expr) => {
@@ -342,22 +358,15 @@ mod test {
             Some(n_crit),
             Some(depth),
         ));
-        
+
         // New FMM
-        let mut kifmm = KiFmm::new(
-        4, 
-            5,
-            1.05,
-            1.95,
-            tree, 
-            kernel
-        );
+        let mut kifmm = KiFmm::new(6, 6, 1.05, 1.95, tree, kernel);
 
         let mut node = kifmm.tree.get_leaves()[0];
 
         for leaf in kifmm.tree.get_leaves().iter() {
             if kifmm.tree.get_points(leaf).iter().len() == 0 {
-                continue
+                continue;
             } else {
                 node = *leaf;
                 break;
@@ -378,12 +387,17 @@ mod test {
         let node_points = kifmm.tree.get_points(&node).unwrap();
         let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data).collect();
         let node_points: Vec<[f64; 3]> = node_points.iter().map(|p| p.coordinate).collect();
-        
+
         let direct = kifmm
             .kernel
-            .evaluate(&node_points, &node_point_data, &distant_point, &EvalType::Value)
+            .evaluate(
+                &node_points,
+                &node_point_data,
+                &distant_point,
+                &EvalType::Value,
+            )
             .unwrap();
-        
+
         let result = kifmm
             .kernel
             .evaluate(
@@ -394,6 +408,9 @@ mod test {
             )
             .unwrap();
 
-        println!("direct {:?} inferred {:?}", direct, result);
+        // Test that correct digits match the expansion order
+        for (a, b) in result.iter().zip(direct.iter()) {
+            assert_approx_eq!(f64, *a, *b, epsilon = 1e-6);
+        }
     }
 }

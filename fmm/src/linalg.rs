@@ -1,44 +1,48 @@
-use std::ops::Mul;
+// use nalgebra as na;
+use ndarray::*;
+use ndarray_linalg::*;
 
-use nalgebra as na;
+const F64_EPSILON: f64 = 2.2204460492503131E-16f64;
 
 // Moore-Penrose pseudoinverse
-pub fn pinv(
-    matrix: na::DMatrix<f64>,
+pub fn pinv<T: Scalar + Lapack>(
+    array: &Array2<T>,
 ) -> (
-    na::Matrix<f64, na::Dyn, na::Dyn, na::VecStorage<f64, na::Dyn, na::Dyn>>,
-    na::Matrix<f64, na::Dyn, na::Dyn, na::VecStorage<f64, na::Dyn, na::Dyn>>,
-    na::Matrix<f64, na::Dyn, na::Dyn, na::VecStorage<f64, na::Dyn, na::Dyn>>,
+    ArrayBase<OwnedRepr<T>, Dim<[usize; 2]>>,
+    ArrayBase<OwnedRepr<<T as Scalar>::Real>, Dim<[usize; 2]>>,
+    ArrayBase<OwnedRepr<T>, Dim<[usize; 2]>>,
 ) {
-    let mut svd = na::linalg::SVD::new(matrix, true, true);
+    let (u, mut s, vt): (_, Array1<_>, _) = array.svd(true, true).unwrap();
 
-    let max_s = svd.singular_values.max();
+    let u = u.unwrap();
+    let vt = vt.unwrap();
 
-    for s in svd.singular_values.iter_mut() {
-        // Heuristic
-        if *s > 4. * max_s * f64::EPSILON {
-            *s = 1. / *s;
+    let max_s = s[0];
+
+    println!("N SING VALS {:?}", s.len());
+
+    // Hacky, should really work with type check at runtime.
+    for s in s.iter_mut() {
+        if *s > T::real(4.) * max_s * T::real(F64_EPSILON) {
+            *s = T::real(1.) / *s;
         } else {
-            *s = 0.;
+            *s = T::real(0);
         }
     }
 
-    let v = svd.v_t.unwrap().transpose();
-    let ut = svd.u.unwrap().transpose();
+    let v = vt.t();
+    let ut = u.t();
 
-    let mut s_inv_mat =
-        na::DMatrix::<f64>::zeros(svd.singular_values.len(), svd.singular_values.len());
+    let s_inv_mat = Array2::from_diag(&s);
 
-    // Return as components
-    s_inv_mat.set_diagonal(&svd.singular_values);
-    (v, s_inv_mat, ut)
+    // Return components
+    (v.to_owned(), s_inv_mat.to_owned(), ut.to_owned())
 }
 
 mod test {
 
     use super::*;
 
-    use float_cmp::approx_eq;
     use float_cmp::assert_approx_eq;
     use rand::prelude::*;
     use rand::SeedableRng;
@@ -55,24 +59,25 @@ mod test {
         for _ in 0..nvals {
             data.push(between.sample(&mut range))
         }
-        let data = na::DMatrix::from_vec(dim, dim, data);
 
+        let data = Array1::from_vec(data).into_shape((dim, dim)).unwrap();
         let data2 = data.clone();
-        let (a, b, c) = pinv(data);
+
+        let (a, b, c) = pinv(&data);
 
         // Test dimensions of computed inverse are correct
-        let inv = a.mul(b).mul(c);
+        let inv = a.dot(&b).dot(&c);
         assert_eq!(inv.ncols(), dim);
         assert_eq!(inv.nrows(), dim);
 
         // Test that the inverse is approximately correct
-        let res = inv.mul(data2);
+        let res = inv.dot(&data2);
 
-        let id = na::DMatrix::<f64>::identity(dim, dim);
-        for (a, b) in res.row_iter().zip(id.row_iter()) {
-            for (c, d) in a.column_iter().zip(b.column_iter()) {
-                assert_approx_eq!(f64, c[0], d[0], epsilon = 1e-14);
-            }
+        let ones = Array1::from_vec(vec![1.; dim]);
+        let id = Array2::from_diag(&ones);
+
+        for (a, b) in id.iter().zip(res.iter()) {
+            assert_approx_eq!(f64, *a, *b, epsilon = 1e-14);
         }
     }
 }
