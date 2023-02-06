@@ -196,9 +196,9 @@ impl SingleNodeTree {
         }
 
         let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
-        
+
         let depth = depth as usize;
-        
+
         SingleNodeTree {
             depth,
             adaptive,
@@ -281,7 +281,7 @@ impl SingleNodeTree {
 
         let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
         let depth = keys_set.iter().map(|&k| k.level()).max().unwrap() as usize;
-        
+
         SingleNodeTree {
             depth,
             adaptive,
@@ -371,7 +371,11 @@ impl Tree for SingleNodeTree {
     }
 
     fn get_keys(&self, level: usize) -> MortonKeys {
-        self.keys_set.iter().filter(|&k| k.level() == level as u64).cloned().collect()
+        self.keys_set
+            .iter()
+            .filter(|&k| k.level() == level as u64)
+            .cloned()
+            .collect()
     }
 
     // Get all points, gets local keys in multi-node setting
@@ -456,7 +460,7 @@ impl FmmTree for SingleNodeTree {
                 .neighbors()
                 .iter()
                 .flat_map(|pn| pn.children())
-                .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
+                .filter(|pnc| self.keys_set.contains(pnc) && !key.is_adjacent(pnc))
                 .collect_vec();
 
             if !keys.is_empty() {

@@ -11,7 +11,6 @@ use crate::types::{
 /// Concrete local (non-distributed) Tree.
 #[derive(Debug)]
 pub struct SingleNodeTree {
-
     // Depth of a tree
     pub depth: usize,
 

@@ -35,7 +35,7 @@ pub trait Tree {
 
     // Get all keys as a set, gets local keys in a multi-node setting
     fn get_keys_set(&self) -> &Self::NodeIndicesSet;
-    
+
     // Get all keys at a given level, gets matching local keys in a multi-node setting
     fn get_keys(&self, level: usize) -> Self::NodeIndices;
 

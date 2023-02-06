@@ -188,7 +188,6 @@ impl FromIterator<MortonKey> for MortonKeys {
     }
 }
 
-
 /// Helper function for decoding keys.
 fn decode_key_helper(key: KeyType, lookup_table: &[KeyType; 512]) -> KeyType {
     const N_LOOPS: KeyType = 7; // 8 bytes in 64 bit key
@@ -280,16 +279,13 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
     key | level
 }
 
-
 impl MortonKey {
-
     // Checksum encoding unique transfer vector between this key, and another
     pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
-
         // Only valid for keys at level 2 and below
-       if self.level() < 2 || other.level() < 2 {
+        if self.level() < 2 || other.level() < 2 {
             panic!("Transfer vectors only computed for keys at levels deeper than 2")
-       }
+        }
 
         let level_diff = DEEPEST_LEVEL - self.level();
 
@@ -308,9 +304,9 @@ impl MortonKey {
 
         fn positive_map(num: &mut i64) {
             if *num < 0 {
-                *num = 2*(-1**num)+1;
+                *num = 2 * (-1 * *num) + 1;
             } else {
-                *num = 2**num;
+                *num = 2 * *num;
             }
         }
 
@@ -1537,7 +1533,6 @@ mod test {
         assert_ne!(a, b);
         assert_eq!(a.anchor, b.anchor);
     }
-
 
     #[test]
     fn test_transfer_vector() {
