@@ -21,6 +21,9 @@ pub trait Tree {
     // Type of element in a node's data container
     type NodeDataType;
 
+    // Get depth of tree
+    fn get_depth(&self) -> usize;
+
     // Get adaptivity information
     fn get_adaptive(&self) -> bool;
 
@@ -32,6 +35,9 @@ pub trait Tree {
 
     // Get all keys as a set, gets local keys in a multi-node setting
     fn get_keys_set(&self) -> &Self::NodeIndicesSet;
+    
+    // Get all keys at a given level, gets matching local keys in a multi-node setting
+    fn get_keys(&self, level: usize) -> Self::NodeIndices;
 
     // Get all points, gets local keys in multi-node setting
     fn get_all_points(&self) -> &Self::Points;

@@ -188,6 +188,7 @@ impl FromIterator<MortonKey> for MortonKeys {
     }
 }
 
+
 /// Helper function for decoding keys.
 fn decode_key_helper(key: KeyType, lookup_table: &[KeyType; 512]) -> KeyType {
     const N_LOOPS: KeyType = 7; // 8 bytes in 64 bit key

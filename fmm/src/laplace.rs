@@ -361,7 +361,16 @@ impl Translation for KiFmm {
 
         let out_multipole = self.m2m[operator_index].dot(&in_multipole).to_vec();
 
-        self.tree.set_multipole_expansion(&out_node, &out_multipole, self.order);
+        if let Some(curr) = self.tree.get_multipole_expansion(&out_node) {
+
+            let curr: Vec<f64> = curr.iter().zip(out_multipole.iter())
+                .map(|(&a, &b)| a+b)
+                .collect();
+
+            self.tree.set_multipole_expansion(&out_node, &curr, self.order)
+        } else {
+            self.tree.set_multipole_expansion(&out_node, &out_multipole, self.order)
+        }
 
     }
 
@@ -384,18 +393,25 @@ impl Translation for KiFmm {
 
 impl Fmm for KiFmm {
     fn upward_pass(&mut self) {
-        println!("Running upward pass");
+        
+        // P2M over leaves. TODO: multithreading over all leaves
+        let nleaves = self.tree.get_leaves().len();
+        for i in 0..nleaves {
+            self.p2m(&self.tree.get_leaves()[i].clone());
+        }
 
-        // P2M over leaves
-        // for leaf in self.tree.leaves {
-        //     self.p2m(leaf)
-        // }
+        // M2M over each key in a given level. 
+        for level in (1..=self.tree.get_depth()).rev() {
 
-        // M2M
+            let keys = self.tree.get_keys(level);
 
-            
-    
+            // TODO: multithreading over keys at each level
+            for key in keys.iter() {
+                self.m2m(&key, &key.parent())
+            }
+        }
     }
+
     fn downward_pass(&mut self) {
         println!("Running downward pass");
     }
@@ -409,9 +425,12 @@ impl Fmm for KiFmm {
 mod test {
     use std::vec;
 
+    use ndarray_linalg::assert;
+    use solvers_traits::fmm::Fmm;
     use solvers_traits::fmm::KiFmmNode;
     use solvers_traits::fmm::Translation;
     use solvers_traits::types::EvalType;
+    use solvers_tree::constants::ROOT;
     use solvers_tree::types::morton::MortonKey;
     use solvers_tree::types::point::PointType;
     use solvers_tree::types::single_node::SingleNodeTree;
@@ -466,7 +485,7 @@ mod test {
         let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
 
         // Run P2M on some node containing points
-        let mut node = kifmm.tree.get_leaves()[0];
+        let node = kifmm.tree.get_leaves()[0];
         kifmm.p2m(&node);
 
         // Evaluate multipole expansion vs direct computation at some distant points
@@ -502,7 +521,72 @@ mod test {
 
         // Test that correct digits match the expansion order
         for (a, b) in result.iter().zip(direct.iter()) {
-            assert_approx_eq!(f64, *a, *b, epsilon = 1e-6);
+            assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
         }
+    }
+
+    #[test]
+    fn test_m2m() {
+        // Create Kernel
+        let kernel = Box::new(LaplaceKernel {
+            dim: 3,
+            is_singular: true,
+            value_dimension: 3,
+        });
+
+        // Create FmmTree
+        let npoints: usize = 10000;
+        let points = points_fixture(npoints);
+        let point_data = vec![1.0; npoints];
+        let depth = 2;
+        let n_crit = 150;
+
+        let tree = Box::new(SingleNodeTree::new(
+            &points,
+            &point_data,
+            false,
+            Some(n_crit),
+            Some(depth),
+        ));
+
+        // New FMM
+        let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
+
+        kifmm.upward_pass();
+       
+        let root_multipole = kifmm.tree.get_multipole_expansion(&ROOT).unwrap();
+        let upward_equivalent_surface =
+            ROOT.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
+
+        let distant_point = [[40.0, 0., 0.]];
+        let node_points = kifmm.tree.get_all_points();
+        let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data).collect();
+        let node_points: Vec<[f64; 3]> = node_points.iter().map(|p| p.coordinate).collect();
+
+        let direct = kifmm
+            .kernel
+            .evaluate(
+                &node_points,
+                &node_point_data,
+                &distant_point,
+                &EvalType::Value,
+            )
+            .unwrap();
+
+
+        let result = kifmm
+            .kernel
+            .evaluate(
+                &upward_equivalent_surface,
+                &root_multipole,
+                &distant_point,
+                &EvalType::Value,
+            )
+            .unwrap();
+
+        for (a, b) in result.iter().zip(direct.iter()) {
+            assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
+        } 
+
     }
 }

@@ -196,8 +196,11 @@ impl SingleNodeTree {
         }
 
         let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
-
+        
+        let depth = depth as usize;
+        
         SingleNodeTree {
+            depth,
             adaptive,
             points,
             keys_set,
@@ -277,8 +280,10 @@ impl SingleNodeTree {
         }
 
         let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
-
+        let depth = keys_set.iter().map(|&k| k.level()).max().unwrap() as usize;
+        
         SingleNodeTree {
+            depth,
             adaptive,
             points,
             keys_set,
@@ -343,6 +348,10 @@ impl Tree for SingleNodeTree {
     type NodeIndicesSet = HashSet<MortonKey>;
     type NodeDataType = NodeData;
 
+    fn get_depth(&self) -> usize {
+        self.depth
+    }
+
     // Get adaptivity information
     fn get_adaptive(&self) -> bool {
         self.adaptive
@@ -359,6 +368,10 @@ impl Tree for SingleNodeTree {
 
     fn get_keys_set(&self) -> &HashSet<MortonKey> {
         &self.keys_set
+    }
+
+    fn get_keys(&self, level: usize) -> MortonKeys {
+        self.keys_set.iter().filter(|&k| k.level() == level as u64).cloned().collect()
     }
 
     // Get all points, gets local keys in multi-node setting
