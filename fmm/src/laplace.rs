@@ -414,6 +414,13 @@ impl Fmm for KiFmm {
 
     fn downward_pass(&mut self) {
         println!("Running downward pass");
+
+        for level in (2..=self.tree.get_depth()) {
+
+            let keys = self.tree.get_keys(level);
+
+        }
+
     }
     fn run(&mut self) {
         println!("Running FMM");
@@ -457,76 +464,9 @@ mod test {
         points
     }
 
-    #[test]
-    fn test_p2m() {
-        // Create Kernel
-        let kernel = Box::new(LaplaceKernel {
-            dim: 3,
-            is_singular: true,
-            value_dimension: 3,
-        });
-
-        // Create FmmTree
-        let npoints: usize = 10000;
-        let points = points_fixture(npoints);
-        let point_data = vec![1.0; npoints];
-        let depth = 1;
-        let n_crit = 150;
-
-        let tree = Box::new(SingleNodeTree::new(
-            &points,
-            &point_data,
-            false,
-            Some(n_crit),
-            Some(depth),
-        ));
-
-        // New FMM
-        let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
-
-        // Run P2M on some node containing points
-        let node = kifmm.tree.get_leaves()[0];
-        kifmm.p2m(&node);
-
-        // Evaluate multipole expansion vs direct computation at some distant points
-        let multipole = kifmm.tree.get_multipole_expansion(&node).unwrap();
-        let upward_equivalent_surface =
-            node.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
-
-        let distant_point = [[42.0, 0., 0.], [0., 0., 24.]];
-
-        let node_points = kifmm.tree.get_points(&node).unwrap();
-        let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data).collect();
-        let node_points: Vec<[f64; 3]> = node_points.iter().map(|p| p.coordinate).collect();
-
-        let direct = kifmm
-            .kernel
-            .evaluate(
-                &node_points,
-                &node_point_data,
-                &distant_point,
-                &EvalType::Value,
-            )
-            .unwrap();
-
-        let result = kifmm
-            .kernel
-            .evaluate(
-                &upward_equivalent_surface,
-                &multipole,
-                &distant_point,
-                &EvalType::Value,
-            )
-            .unwrap();
-
-        // Test that correct digits match the expansion order
-        for (a, b) in result.iter().zip(direct.iter()) {
-            assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
-        }
-    }
 
     #[test]
-    fn test_m2m() {
+    fn test_upward_pass() {
         // Create Kernel
         let kernel = Box::new(LaplaceKernel {
             dim: 3,

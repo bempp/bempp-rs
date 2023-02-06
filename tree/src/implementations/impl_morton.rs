@@ -280,7 +280,52 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
     key | level
 }
 
+
 impl MortonKey {
+
+    // Checksum encoding unique transfer vector between this key, and another
+    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+
+        // Only valid for keys at level 2 and below
+       if self.level() < 2 || other.level() < 2 {
+            panic!("Transfer vectors only computed for keys at levels deeper than 2")
+       }
+
+        let level_diff = DEEPEST_LEVEL - self.level();
+
+        let a = decode_key(self.morton);
+        let b = decode_key(other.morton);
+
+        // Compute transfer vector
+        let mut x = a[0] as i64 - b[0] as i64;
+        let mut y = a[1] as i64 - b[1] as i64;
+        let mut z = a[2] as i64 - b[2] as i64;
+
+        // Convert to an absolute transfer vector, wrt to key level.
+        x = x / 2_i64.pow(level_diff as u32);
+        y = y / 2_i64.pow(level_diff as u32);
+        z = z / 2_i64.pow(level_diff as u32);
+
+        fn positive_map(num: &mut i64) {
+            if *num < 0 {
+                *num = 2*(-1**num)+1;
+            } else {
+                *num = 2**num;
+            }
+        }
+
+        // Compute checksum via mapping to positive integers.
+        positive_map(&mut x);
+        positive_map(&mut y);
+        positive_map(&mut z);
+
+        let mut checksum = x;
+        checksum = (checksum << 16) | y;
+        checksum = (checksum << 16) | z;
+
+        checksum as usize
+    }
+
     pub fn diameter(&self, domain: &Domain) -> [f64; 3] {
         domain
             .diameter
@@ -1491,5 +1536,38 @@ mod test {
         let b = MortonKey::from_point(&point, &domain, 16);
         assert_ne!(a, b);
         assert_eq!(a.anchor, b.anchor);
+    }
+
+
+    #[test]
+    fn test_transfer_vector() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let a = MortonKey::from_point(&point, &domain, 2);
+        let other = a.siblings()[2];
+        let res_a = a.find_transfer_vector(&other);
+
+        let b = MortonKey::from_point(&point, &domain, 16);
+        let other = b.siblings()[2];
+        let res_b = b.find_transfer_vector(&other);
+
+        assert_eq!(res_a, res_b);
+    }
+
+    #[test]
+    #[should_panic(expected = "Transfer vectors only computed for keys at levels deeper than 2")]
+    fn test_transfer_vector_panic() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let key = MortonKey::from_point(&point, &domain, 1);
+        let sibling = key.siblings()[0];
+        key.find_transfer_vector(&sibling);
     }
 }
