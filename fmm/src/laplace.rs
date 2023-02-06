@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use std::vec;
 
 use ndarray::*;
-use ndarray_linalg::*;
 
 use solvers_traits::fmm::KiFmmNode;
 use solvers_traits::types::{Error, EvalType};
@@ -49,6 +48,8 @@ pub struct KiFmm {
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
     ),
+    pub m2m: Vec<ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>>>,
+    pub l2l: Vec<ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>>>
 }
 
 impl KiFmm {
@@ -75,6 +76,8 @@ impl KiFmm {
         >,
         kernel: Box<dyn Kernel<Data = Vec<f64>>>,
     ) -> KiFmm {
+
+        // Compute equivalent and check surfaces at root level
         let upward_equivalent_surface = ROOT.compute_surface(order, alpha_inner, tree.get_domain());
 
         let upward_check_surface = ROOT.compute_surface(order, alpha_outer, tree.get_domain());
@@ -84,6 +87,8 @@ impl KiFmm {
 
         let downward_check_surface = ROOT.compute_surface(order, alpha_inner, tree.get_domain());
 
+        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
+        // as well as their inverses using DGESVD.
         let uc2e = kernel
             .gram(&upward_equivalent_surface, &upward_check_surface)
             .unwrap();
@@ -99,17 +104,43 @@ impl KiFmm {
             .unwrap()
             .to_owned();
 
+        // Store in two component format for stability, See Malhotra et. al (2015)
         let dc2e = Array1::from(dc2e)
             .to_shape((nrows, ncols))
             .unwrap()
             .to_owned();
-
         let (a, b, c) = pinv(&uc2e);
 
         let uc2e_inv = (a.to_owned(), b.dot(&c).to_owned());
 
         let (a, b, c) = pinv(&dc2e);
         let dc2e_inv = (a.to_owned(), b.dot(&c).to_owned());
+
+        // Compute M2M and L2L oeprators
+        let children = ROOT.children();
+        let mut m2m: Vec<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>> = Vec::new();
+        let mut l2l: Vec<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>> = Vec::new();
+
+        for child in children.iter() {
+
+            let child_upward_equivalent_surface = child.compute_surface(order, alpha_inner, tree.get_domain());
+            let child_downward_check_surface = child.compute_surface(order, alpha_inner, tree.get_domain());
+
+            let pc2ce = kernel.gram(&child_upward_equivalent_surface, &upward_check_surface).unwrap();
+          
+            let pc2e = Array::from_shape_vec((nrows, ncols), pc2ce).unwrap();
+
+            m2m.push(
+                uc2e_inv.0.dot(&uc2e_inv.1.dot(&pc2e))
+            );
+
+            let cc2pe = kernel.gram(&downward_equivalent_surface, &child_downward_check_surface).unwrap();
+            let cc2pe = Array::from_shape_vec((nrows, ncols), cc2pe).unwrap();
+
+            l2l.push(
+                kernel.scale(child.level()) * dc2e_inv.0.dot(&dc2e_inv.1.dot(&cc2pe))
+            )
+        }   
 
         KiFmm {
             kernel,
@@ -119,6 +150,8 @@ impl KiFmm {
             alpha_outer,
             uc2e_inv,
             dc2e_inv,
+            m2m,
+            l2l
         }
     }
 }
@@ -321,8 +354,15 @@ impl Translation for KiFmm {
     }
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        
-        
+       
+        let in_multipole = Array::from(self.tree.get_multipole_expansion(in_node).unwrap());
+
+        let operator_index = in_node.siblings().iter().position(|&x| x == *in_node).unwrap();
+
+        let out_multipole = self.m2m[operator_index].dot(&in_multipole).to_vec();
+
+        self.tree.set_multipole_expansion(&out_node, &out_multipole, self.order);
+
     }
 
     fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
