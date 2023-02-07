@@ -21,7 +21,13 @@ pub trait Translation {
     fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
     // Local to Particle
-    fn l2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    fn l2p(&mut self, node: &Self::NodeIndex);
+    
+    // Particle to Local
+    fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+
+    // Particle to Particle
+    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 }
 
 /// FmmTree take care of ghost nodes on other processors, and have access to all

@@ -4,7 +4,7 @@ use std::vec;
 
 use itertools::Itertools;
 use ndarray::*;
-use ndarray_linalg::{SVDDC};
+use ndarray_linalg::SVDDC;
 
 use solvers_traits::fmm::KiFmmNode;
 use solvers_traits::types::{Error, EvalType, Result};
@@ -57,7 +57,7 @@ pub struct KiFmm {
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    )
+    ),
 }
 
 impl KiFmm {
@@ -152,20 +152,27 @@ impl KiFmm {
 
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         let (sources, transfer_vectors, targets) = find_unique_v_list_interactions(3);
-        
+
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
-        let mut se2tc: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> = Array2::zeros((nrows, ncols*sources.len()));
+        let mut se2tc: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
+            Array2::zeros((nrows, ncols * sources.len()));
 
         for (source, (i, target)) in sources.iter().zip(targets.iter().enumerate()) {
-            let target_check_surface = target.compute_surface(order, alpha_inner, tree.get_domain());
-            let source_equivalent_surface = source.compute_surface(order, alpha_outer, tree.get_domain());
+            let target_check_surface =
+                target.compute_surface(order, alpha_inner, tree.get_domain());
+            let source_equivalent_surface =
+                source.compute_surface(order, alpha_outer, tree.get_domain());
 
-            let tmp_gram = kernel.gram(&source_equivalent_surface, &target_check_surface).unwrap();
+            let tmp_gram = kernel
+                .gram(&source_equivalent_surface, &target_check_surface)
+                .unwrap();
             let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
-            let lidx_sources = i*ncols;
+            let lidx_sources = i * ncols;
             let ridx_sources = lidx_sources + ncols;
 
-            se2tc.slice_mut(s![..,lidx_sources..ridx_sources]).assign(&tmp_gram);
+            se2tc
+                .slice_mut(s![.., lidx_sources..ridx_sources])
+                .assign(&tmp_gram);
         }
 
         // TODO: replace with randomised SVD
@@ -173,7 +180,7 @@ impl KiFmm {
         let s = Array2::from_diag(&s);
         let u = u.unwrap();
         let mut vt = vt.unwrap();
-        vt = vt.slice(s![0..nrows,..]).to_owned();
+        vt = vt.slice(s![0..nrows, ..]).to_owned();
         let m2l = (u, s, vt);
 
         KiFmm {
@@ -187,7 +194,7 @@ impl KiFmm {
             m2m,
             l2l,
             m2l,
-            transfer_vectors
+            transfer_vectors,
         }
     }
 }
@@ -389,21 +396,23 @@ impl Translation for KiFmm {
                 .map(|(&a, &b)| a + b)
                 .collect();
 
-            self.tree.set_multipole_expansion(&out_node, &curr, self.order)
+            self.tree
+                .set_multipole_expansion(&out_node, &curr, self.order)
         } else {
-            self.tree.set_multipole_expansion(&out_node, &out_multipole, self.order)
+            self.tree
+                .set_multipole_expansion(&out_node, &out_multipole, self.order)
         }
     }
 
     fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         let in_local = Array::from(self.tree.get_local_expansion(in_node).unwrap());
-        
+
         let operator_index = out_node
             .siblings()
             .iter()
             .position(|&x| x == *out_node)
             .unwrap();
-        
+
         let out_local = self.l2l[operator_index].dot(&in_local).to_vec();
 
         if let Some(curr) = self.tree.get_local_expansion(&out_node) {
@@ -414,17 +423,60 @@ impl Translation for KiFmm {
                 .collect();
 
             self.tree.set_local_expansion(&out_node, &curr);
-        }  else {
+        } else {
             self.tree.set_local_expansion(&out_node, &out_local);
         }
-        
     }
 
-    fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let v_list = self.tree.get_interaction_list(&in_node).unwrap();
 
-    fn l2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+        let ncoeffs = KiFmm::ncoeffs(self.order);
+
+        // Locate correct components of compressed M2L matrix.
+        let transfer_vector = in_node.find_transfer_vector(out_node);
+        let v_idx = self
+            .transfer_vectors
+            .iter()
+            .position(|&x| x == transfer_vector)
+            .unwrap();
+        let v_lidx = v_idx * ncoeffs;
+        let v_ridx = v_lidx + ncoeffs;
+        let vt_sub = self.m2l.2.slice(s![.., v_lidx..v_ridx]);
+        let scale = 1.0;
+
+        let in_multipole = Array::from(self.tree.get_multipole_expansion(&in_node).unwrap());
+
+        let out_local = self.dc2e_inv.0.dot(
+            &self
+                .dc2e_inv
+                .1
+                .dot(&self.m2l.0.dot(&self.m2l.1.dot(&vt_sub.dot(&in_multipole)))),
+        );
+        let out_local = out_local.map(|&x| x * scale).to_vec();
+
+        if let Some(curr) = self.tree.get_local_expansion(&out_node) {
+            let curr: Vec<f64> = curr
+                .iter()
+                .zip(out_local.iter())
+                .map(|(&a, &b)| a + b)
+                .collect();
+
+            self.tree.set_local_expansion(&out_node, &curr);
+        } else {
+            self.tree.set_local_expansion(&out_node, &out_local);
+        }
+    }
+
+    fn l2p(&mut self, node: &Self::NodeIndex) {}
 
     fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+
+    fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+
+    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        
+    }
 }
 
 /// Algebraically defined list of transfer vectors in an octree
@@ -474,8 +526,8 @@ fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, V
 
         transfer_vectors.extend(&mut tmp.iter().cloned());
         sources.extend(&mut v_list.iter().cloned());
-        
-        let tmp_targets =  vec![*key.clone(); tmp.len()];
+
+        let tmp_targets = vec![*key.clone(); tmp.len()];
         targets.extend(&mut tmp_targets.iter().cloned());
     }
 
@@ -496,7 +548,7 @@ fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, V
         .map(|(_, x)| *x)
         .collect_vec();
 
-    let unique_targets: Vec<MortonKey> = targets 
+    let unique_targets: Vec<MortonKey> = targets
         .iter()
         .enumerate()
         .filter(|(i, _)| unique_indices.contains(i))
@@ -527,9 +579,49 @@ impl Fmm for KiFmm {
     }
 
     fn downward_pass(&mut self) {
-        // for level in 2..=self.tree.get_depth() {
-        //     let keys = self.tree.get_keys(level);
-        // }
+
+        // Iterate down the tree (M2L/L2L)
+        for level in 2..=self.tree.get_depth() {
+            let keys = self.tree.get_keys(level);
+
+            // TODO: Multithread M2L/L2L over keys at each level.
+            for target in keys.iter() {
+                for source in self.tree.get_interaction_list(&target).unwrap().iter() {
+                    self.m2l(target, source)
+                }
+
+                let parent = target.parent();
+                self.l2l(&parent, target);
+            }            
+        }
+
+        // Leaf level computations
+        // TODO: parallelise over leaves
+        let nleaves = self.tree.get_leaves().len();
+
+        for i in 0..nleaves {
+            let target = self.tree.get_leaves()[i];
+            
+            // X List interactions
+            for source in self.tree.get_x_list(&target).unwrap().iter() {
+                self.p2l(source, &target);
+            }
+
+            // W List interactions
+            for source in self.tree.get_w_list(&target).unwrap().iter() {
+                self.m2p(source, &target)
+            }
+
+            // Near field computations
+            // Translate local expansions to points, in each node.
+            self.l2p(&target);
+
+            // U List interactions
+            for source in self.tree.get_near_field(&target).unwrap().iter() {
+                self.p2p(source, &target);
+            }
+        }
+
     }
     fn run(&mut self) {
         self.upward_pass();
@@ -541,7 +633,9 @@ mod test {
     use std::vec;
 
     use mpi::ffi::INT_LEAST32_MAX;
+    use ndarray::*;
     use ndarray_linalg::assert;
+    use ndarray_linalg::*;
     use solvers_traits::fmm::Fmm;
     use solvers_traits::fmm::KiFmmNode;
     use solvers_traits::fmm::Translation;
@@ -550,8 +644,6 @@ mod test {
     use solvers_tree::types::morton::MortonKey;
     use solvers_tree::types::point::PointType;
     use solvers_tree::types::single_node::SingleNodeTree;
-    use ndarray_linalg::*;
-    use ndarray::*;
 
     use super::find_unique_v_list_interactions;
     use super::{KiFmm, LaplaceKernel};
@@ -655,8 +747,8 @@ mod test {
 
     #[test]
     fn test_downward_pass() {
-         // Create Kernel
-         let kernel = Box::new(LaplaceKernel {
+        // Create Kernel
+        let kernel = Box::new(LaplaceKernel {
             dim: 3,
             is_singular: true,
             value_dimension: 3,
@@ -680,18 +772,16 @@ mod test {
         // New FMM
         let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
 
-        kifmm.upward_pass();
-        kifmm.downward_pass();
+        // kifmm.upward_pass();
+        // kifmm.downward_pass();
 
         //  let m2l = kifmm.m2l.0.dot(&kifmm.m2l.1.dot(&kifmm.m2l.2));
-    //     println!("M2L Stuff {:?} {:?} \n {:?}  \n {:?} {:?}",
-    //     kifmm.m2l.0.ncols(),  kifmm.m2l.0.nrows(),
-    //     kifmm.m2l.1.len(),
-    //     kifmm.m2l.2.ncols(),  kifmm.m2l.2.nrows()
-    // );
+        //     println!("M2L Stuff {:?} {:?} \n {:?}  \n {:?} {:?}",
+        //     kifmm.m2l.0.ncols(),  kifmm.m2l.0.nrows(),
+        //     kifmm.m2l.1.len(),
+        //     kifmm.m2l.2.ncols(),  kifmm.m2l.2.nrows()
+        // );
 
         // println!("m2l r={:?} c={:?}", m2l.nrows(), m2l.ncols());
-
-
     }
 }
