@@ -30,16 +30,16 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
     );
     let ref_e = Triangle {};
     for _level in 0..refinement_level {
-        let nvertices_old = g.topology_mut().entity_count(0);
-        let ncells_old = g.topology_mut().entity_count(2);
-        let nvertices = g.topology_mut().entity_count(0) + g.topology_mut().entity_count(1);
+        let nvertices_old = g.topology().entity_count(0);
+        let ncells_old = g.topology().entity_count(2);
+        let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
         let mut coordinates = Array2D::<f64>::new((nvertices, 3));
         let mut cells = AdjacencyList::<usize>::new();
 
         for i in 0..ncells_old {
             let ti = g.topology().index_map()[i];
             let tedges = (0..3)
-                .map(|x| unsafe { g.topology_mut().connectivity(2, 1).row_unchecked(ti)[x] })
+                .map(|x| unsafe { g.topology().connectivity(2, 1).row_unchecked(ti)[x] })
                 .collect::<Vec<usize>>();
             let gi = g.geometry().index_map()[i];
             let tv = g.topology().cell(ti).unwrap();
