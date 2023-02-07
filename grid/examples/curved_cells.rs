@@ -6,7 +6,7 @@ use solvers_traits::grid::{Geometry, Grid, Topology};
 
 fn main() {
     // Create a grid of three cells. One cell is a curved triangle, one cell is a flat triangle, the other is a curved quadrilateral
-    let mut grid = SerialGrid::new(
+    let grid = SerialGrid::new(
         Array2D::from_data(
             vec![
                 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.5, 0.25, 0.0, 0.0, 0.5, 0.5, 0.5,
@@ -26,6 +26,8 @@ fn main() {
         ],
     );
 
+    let c20 = grid.topology().connectivity(2, 0);
+
     // Print information about the cells
     for i in 0..3 {
         let ti = grid.topology().index_map()[i];
@@ -44,16 +46,16 @@ fn main() {
             "cell {} is cell number {} in the toplogy and cell number {} in the geometry.",
             i, ti, gi
         );
-        let c20 = grid.topology_mut().connectivity(2, 0).row(ti).unwrap();
+        let vertices = c20.row(ti).unwrap();
         if ct == ReferenceCellType::Triangle {
             println!(
                 "The (topological) vertices of cell {} are {}, {}, and {}",
-                i, c20[0], c20[1], c20[2]
+                i, vertices[0], vertices[1], vertices[2]
             );
         } else {
             println!(
                 "The (topological) vertices of cell {} are {}, {}, {}, and {}",
-                i, c20[0], c20[1], c20[2], c20[3]
+                i, vertices[0], vertices[1], vertices[2], vertices[3]
             );
         }
         println!("The geometric points for this cell are:");
@@ -65,5 +67,5 @@ fn main() {
     }
 
     // Export the grid in gmsh format
-    export_as_gmsh(&mut grid, String::from("_examples_curved_cells.msh"));
+    export_as_gmsh(&grid, String::from("_examples_curved_cells.msh"));
 }
