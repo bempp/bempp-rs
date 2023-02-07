@@ -2,6 +2,7 @@
 use std::collections::HashSet;
 use std::vec;
 
+use cauchy::Scalar;
 use itertools::Itertools;
 use ndarray::*;
 use ndarray_linalg::SVDDC;
@@ -63,6 +64,20 @@ pub struct KiFmm {
 impl KiFmm {
     fn ncoeffs(order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
+    }
+
+    fn m2l_scale(level: u64) -> f64 {
+        if level < 2 {
+            panic!("M2L only performed on level 2 and below")
+        }
+
+        let m2l_scale;
+        if level == 2 {
+            m2l_scale = 1. / 2.
+        } else {
+            m2l_scale = 2.0.powf((level - 3) as f64);
+        }
+        m2l_scale
     }
 
     fn new(
@@ -161,7 +176,7 @@ impl KiFmm {
             let target_check_surface =
                 target.compute_surface(order, alpha_inner, tree.get_domain());
             let source_equivalent_surface =
-                source.compute_surface(order, alpha_outer, tree.get_domain());
+                source.compute_surface(order, alpha_inner, tree.get_domain());
 
             let tmp_gram = kernel
                 .gram(&source_equivalent_surface, &target_check_surface)
@@ -422,15 +437,14 @@ impl Translation for KiFmm {
                 .map(|(&a, &b)| a + b)
                 .collect();
 
-            self.tree.set_local_expansion(&out_node, &curr);
+            self.tree.set_local_expansion(&out_node, &curr, self.order);
         } else {
-            self.tree.set_local_expansion(&out_node, &out_local);
+            self.tree
+                .set_local_expansion(&out_node, &out_local, self.order);
         }
     }
 
     fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        let v_list = self.tree.get_interaction_list(&in_node).unwrap();
-
         let ncoeffs = KiFmm::ncoeffs(self.order);
 
         // Locate correct components of compressed M2L matrix.
@@ -443,17 +457,18 @@ impl Translation for KiFmm {
         let v_lidx = v_idx * ncoeffs;
         let v_ridx = v_lidx + ncoeffs;
         let vt_sub = self.m2l.2.slice(s![.., v_lidx..v_ridx]);
-        let scale = 1.0;
 
         let in_multipole = Array::from(self.tree.get_multipole_expansion(&in_node).unwrap());
 
-        let out_local = self.dc2e_inv.0.dot(
-            &self
-                .dc2e_inv
-                .1
-                .dot(&self.m2l.0.dot(&self.m2l.1.dot(&vt_sub.dot(&in_multipole)))),
-        );
-        let out_local = out_local.map(|&x| x * scale).to_vec();
+        let out_local = KiFmm::m2l_scale(in_node.level())
+            * self.kernel.scale(in_node.level())
+            * self.dc2e_inv.0.dot(
+                &self
+                    .dc2e_inv
+                    .1
+                    .dot(&self.m2l.0.dot(&self.m2l.1.dot(&vt_sub.dot(&in_multipole)))),
+            );
+        let out_local = out_local.to_vec();
 
         if let Some(curr) = self.tree.get_local_expansion(&out_node) {
             let curr: Vec<f64> = curr
@@ -462,9 +477,10 @@ impl Translation for KiFmm {
                 .map(|(&a, &b)| a + b)
                 .collect();
 
-            self.tree.set_local_expansion(&out_node, &curr);
+            self.tree.set_local_expansion(out_node, &curr, self.order);
         } else {
-            self.tree.set_local_expansion(&out_node, &out_local);
+            self.tree
+                .set_local_expansion(out_node, &out_local, self.order);
         }
     }
 
@@ -474,9 +490,7 @@ impl Translation for KiFmm {
 
     fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
 
-    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        
-    }
+    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
 }
 
 /// Algebraically defined list of transfer vectors in an octree
@@ -527,7 +541,7 @@ fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, V
         transfer_vectors.extend(&mut tmp.iter().cloned());
         sources.extend(&mut v_list.iter().cloned());
 
-        let tmp_targets = vec![*key.clone(); tmp.len()];
+        let tmp_targets = vec![**key; tmp.len()];
         targets.extend(&mut tmp_targets.iter().cloned());
     }
 
@@ -573,26 +587,27 @@ impl Fmm for KiFmm {
 
             // TODO: multithreading over keys at each level
             for key in keys.iter() {
-                self.m2m(&key, &key.parent())
+                self.m2m(key, &key.parent())
             }
         }
     }
 
     fn downward_pass(&mut self) {
-
         // Iterate down the tree (M2L/L2L)
         for level in 2..=self.tree.get_depth() {
             let keys = self.tree.get_keys(level);
 
             // TODO: Multithread M2L/L2L over keys at each level.
             for target in keys.iter() {
-                for source in self.tree.get_interaction_list(&target).unwrap().iter() {
+                // V List interactions
+                for source in self.tree.get_interaction_list(target).unwrap().iter() {
                     self.m2l(target, source)
                 }
 
+                // Translate parent local expansion to its children.
                 let parent = target.parent();
                 self.l2l(&parent, target);
-            }            
+            }
         }
 
         // Leaf level computations
@@ -601,7 +616,7 @@ impl Fmm for KiFmm {
 
         for i in 0..nleaves {
             let target = self.tree.get_leaves()[i];
-            
+
             // X List interactions
             for source in self.tree.get_x_list(&target).unwrap().iter() {
                 self.p2l(source, &target);
@@ -612,16 +627,14 @@ impl Fmm for KiFmm {
                 self.m2p(source, &target)
             }
 
-            // Near field computations
-            // Translate local expansions to points, in each node.
-            self.l2p(&target);
-
             // U List interactions
             for source in self.tree.get_near_field(&target).unwrap().iter() {
                 self.p2p(source, &target);
             }
-        }
 
+            // Translate local expansions to points, in each node.
+            self.l2p(&target);
+        }
     }
     fn run(&mut self) {
         self.upward_pass();
@@ -632,15 +645,16 @@ impl Fmm for KiFmm {
 mod test {
     use std::vec;
 
-    use mpi::ffi::INT_LEAST32_MAX;
     use ndarray::*;
     use ndarray_linalg::assert;
     use ndarray_linalg::*;
     use solvers_traits::fmm::Fmm;
     use solvers_traits::fmm::KiFmmNode;
     use solvers_traits::fmm::Translation;
+    use solvers_traits::kernel::Kernel;
     use solvers_traits::types::EvalType;
     use solvers_tree::constants::ROOT;
+    use solvers_tree::types::domain::Domain;
     use solvers_tree::types::morton::MortonKey;
     use solvers_tree::types::point::PointType;
     use solvers_tree::types::single_node::SingleNodeTree;
@@ -730,6 +744,52 @@ mod test {
     //         assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
     //     }
     // }
+
+    #[test]
+    fn test_m2l_scaling() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let order = 2;
+        let alpha_inner = 1.05;
+        let alpha_outer = 1.95;
+
+        let kernel = LaplaceKernel {
+            dim: 3,
+            is_singular: true,
+            value_dimension: 3,
+        };
+
+        // Test that same transfer vector results in same M2L matrices
+        let a = MortonKey::from_point(&point, &domain, 3);
+        let other_a = a.siblings()[2];
+        let res_a = a.find_transfer_vector(&other_a);
+
+        let b = MortonKey::from_point(&point, &domain, 7);
+        let other_b = b.siblings()[2];
+        let res_b = b.find_transfer_vector(&other_b);
+        assert_eq!(res_a, res_b);
+
+        let target_check_surface_a = a.compute_surface(order, alpha_inner, &domain);
+        let source_equivalent_surface_a = other_a.compute_surface(order, alpha_inner, &domain);
+        let se2tc_a = kernel
+            .gram(&source_equivalent_surface_a, &target_check_surface_a)
+            .unwrap();
+        let se2tc_a = Array::from(se2tc_a);
+
+        let target_check_surface_b = b.compute_surface(order, alpha_inner, &domain);
+        let source_equivalent_surface_b = other_b.compute_surface(order, alpha_inner, &domain);
+        let se2tc_b = kernel
+            .gram(&source_equivalent_surface_b, &target_check_surface_b)
+            .unwrap();
+        let se2tc_b = Array::from(se2tc_b);
+        //
+        println!("SE2TC A {:?}", KiFmm::m2l_scale(7) * se2tc_a);
+        println!("SE2TC B {:?}", se2tc_b);
+        assert!(false)
+    }
 
     #[test]
     fn test_transfer_vectors() {

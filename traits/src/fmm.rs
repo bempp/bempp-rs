@@ -22,7 +22,7 @@ pub trait Translation {
 
     // Local to Particle
     fn l2p(&mut self, node: &Self::NodeIndex);
-    
+
     // Particle to Local
     fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
@@ -61,7 +61,12 @@ pub trait FmmTree: Tree {
         &self,
         node_index: &Self::NodeIndex,
     ) -> Option<Self::NodeDataContainer>;
-    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataContainer);
+    fn set_local_expansion(
+        &mut self,
+        node_index: &Self::NodeIndex,
+        data: &Self::NodeDataContainer,
+        order: usize,
+    );
     fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataContainer>;
 
     // Getters for particle data
