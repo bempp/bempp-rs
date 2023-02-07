@@ -38,6 +38,7 @@ pub struct KiFmm {
             Points = Points,
             NodeIndicesSet = HashSet<MortonKey>,
             NodeDataContainer = Vec<f64>,
+            PointDataType = [f64; 2],
         >,
     >,
     pub order: usize,
@@ -95,6 +96,7 @@ impl KiFmm {
                 NodeDataType = NodeData,
                 FmmNodeDataType = NodeData,
                 NodeDataContainer = Vec<f64>,
+                PointDataType = [f64; 2],
             >,
         >,
         kernel: Box<dyn Kernel<Data = Vec<f64>>>,
@@ -369,7 +371,7 @@ impl Translation for KiFmm {
             leaf.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
 
         let sources = self.tree.get_points(leaf).unwrap();
-        let charges: Vec<f64> = sources.iter().map(|s| s.data).collect();
+        let charges: Vec<f64> = sources.iter().map(|s| s.data[0]).collect();
         let sources: Vec<[f64; 3]> = sources.iter().map(|s| s.coordinate).collect();
 
         // Check potential
@@ -484,13 +486,120 @@ impl Translation for KiFmm {
         }
     }
 
-    fn l2p(&mut self, node: &Self::NodeIndex) {}
+    fn l2p(&mut self, node: &Self::NodeIndex) {
+        let local_expansion = self.tree.get_local_expansion(node).unwrap();
+        let downward_equivalent_surface =
+            node.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
+        let points = self.tree.get_points(node).unwrap();
+        let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
+        let potential = self
+            .kernel
+            .evaluate(
+                &downward_equivalent_surface,
+                &local_expansion,
+                &point_coordinates,
+                &EvalType::Value,
+            )
+            .unwrap();
+        let points = points
+            .iter()
+            .zip(potential.iter())
+            .map(|(pnt, pot)| Point {
+                coordinate: pnt.coordinate,
+                global_idx: pnt.global_idx,
+                key: pnt.key,
+                data: [pnt.data[0], *pot],
+            })
+            .collect_vec();
+        self.tree.set_points(node, points);
+    }
 
-    fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let multipole_expansion = self.tree.get_multipole_expansion(in_node).unwrap();
+        let upward_equivalent_surface =
+            in_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
+        let points = self.tree.get_points(out_node).unwrap();
+        let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
+        let potential = self
+            .kernel
+            .evaluate(
+                &upward_equivalent_surface,
+                &multipole_expansion,
+                &point_coordinates,
+                &EvalType::Value,
+            )
+            .unwrap();
 
-    fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+        let points = points
+            .iter()
+            .zip(potential.iter())
+            .map(|(pnt, pot)| Point {
+                coordinate: pnt.coordinate,
+                global_idx: pnt.global_idx,
+                key: pnt.key,
+                data: [pnt.data[0], *pot],
+            })
+            .collect_vec();
+        self.tree.set_points(out_node, points);
+    }
 
-    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let points = self.tree.get_points(in_node).unwrap();
+        let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
+        let charges = points.iter().map(|&p| p.data[0]).collect_vec();
+        let downward_check_surface =
+            out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
+        let downward_check_potential = Array::from(
+            self.kernel
+                .evaluate(
+                    &point_coordinates,
+                    &charges,
+                    &downward_check_surface,
+                    &EvalType::Value,
+                )
+                .unwrap(),
+        );
+        let out_local = (self.kernel.scale(out_node.level())
+            * self
+                .dc2e_inv
+                .0
+                .dot(&self.dc2e_inv.1.dot(&downward_check_potential)))
+        .to_vec();
+        self.tree
+            .set_local_expansion(out_node, &out_local, self.order)
+    }
+
+    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let sources = self.tree.get_points(in_node).unwrap();
+        let source_coordinates: Vec<[f64; 3]> = sources.iter().map(|p| p.coordinate).collect();
+        let charges = sources.iter().map(|&p| p.data[0]).collect_vec();
+
+        let targets = self.tree.get_points(out_node).unwrap();
+        let targets_coordinates: Vec<[f64; 3]> = targets.iter().map(|p| p.coordinate).collect();
+
+        let potential = self
+            .kernel
+            .evaluate(
+                &source_coordinates,
+                &charges,
+                &targets_coordinates,
+                &EvalType::Value,
+            )
+            .unwrap();
+
+        let targets = targets
+            .iter()
+            .zip(potential.iter())
+            .map(|(pnt, pot)| Point {
+                coordinate: pnt.coordinate,
+                global_idx: pnt.global_idx,
+                key: pnt.key,
+                data: [pnt.data[0], *pot],
+            })
+            .collect_vec();
+
+        self.tree.set_points(out_node, targets);
+    }
 }
 
 /// Algebraically defined list of transfer vectors in an octree

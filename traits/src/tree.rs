@@ -21,6 +21,9 @@ pub trait Tree {
     // Type of element in a node's data container
     type NodeDataType;
 
+    // Type of element in a point's data container
+    type PointDataType;
+
     // Get depth of tree
     fn get_depth(&self) -> usize;
 
@@ -48,8 +51,14 @@ pub trait Tree {
     // Get tree leaf associated with a given point
     fn get_leaf(&self, point: &Self::Point) -> Option<&Self::NodeIndex>;
 
+    // Set data associated with a given leaf's points
+    fn set_points(&mut self, leaf: &Self::NodeIndex, points: Self::Points);
+
     // Get points associated with a tree leaf
     fn get_points(&self, leaf: &Self::NodeIndex) -> Option<&Self::Points>;
+
+    // Get data associated with a given point
+    fn get_point_data(&self, leaf: &Self::NodeIndex) -> Option<Vec<Self::PointDataType>>;
 
     // Set data associated with a given leaf node.
     fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType);

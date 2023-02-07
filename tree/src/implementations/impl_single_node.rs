@@ -159,7 +159,7 @@ impl SingleNodeTree {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
-                data: *d,
+                data: [*d, 0.],
             })
             .collect();
 
@@ -230,7 +230,7 @@ impl SingleNodeTree {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
-                data: *d,
+                data: [*d, 0.],
             })
             .collect();
 
@@ -347,6 +347,7 @@ impl Tree for SingleNodeTree {
     type NodeIndices = MortonKeys;
     type NodeIndicesSet = HashSet<MortonKey>;
     type NodeDataType = NodeData;
+    type PointDataType = [f64; 2];
 
     fn get_depth(&self) -> usize {
         self.depth
@@ -396,6 +397,20 @@ impl Tree for SingleNodeTree {
     // Get points associated with a tree leaf.
     fn get_points(&self, leaf: &MortonKey) -> Option<&Points> {
         self.leaves_to_points.get(leaf)
+    }
+
+    fn set_points(&mut self, leaf: &MortonKey, points: Self::Points) {
+        self.leaves_to_points.insert(*leaf, points);
+    }
+
+    fn get_point_data(&self, leaf: &Self::NodeIndex) -> Option<Vec<Self::PointDataType>> {
+        let data: Vec<[f64; 2]> = self
+            .get_points(leaf)
+            .unwrap()
+            .iter()
+            .map(|p| p.data)
+            .collect();
+        Some(data)
     }
 
     fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::NodeDataType> {
@@ -685,7 +700,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
-                data: 1.0,
+                data: [1., 0.],
             })
             .collect();
 
@@ -729,7 +744,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
-                data: 1.0,
+                data: [1., 0.],
             })
             .collect();
 
@@ -773,7 +788,7 @@ mod test {
                 coordinate: *p,
                 key: MortonKey::from_point(p, &domain, depth),
                 global_idx: i,
-                data: 1.0,
+                data: [1., 0.],
             })
             .collect();
 
@@ -809,7 +824,7 @@ mod test {
                 coordinate: p,
                 global_idx: i,
                 key: MortonKey::from_point(&p, &domain, depth),
-                data: 1.0,
+                data: [1., 0.],
             })
             // .cloned()
             .collect();

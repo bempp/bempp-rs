@@ -11,7 +11,7 @@ pub struct Point {
     pub coordinate: [PointType; 3],
     pub global_idx: usize,
     pub key: MortonKey,
-    pub data: PointType,
+    pub data: [PointType; 2],
 }
 
 /// Vector of **Points**.
