@@ -4,7 +4,7 @@ use solvers_traits::grid::{Geometry, Grid, Topology};
 
 fn main() {
     // Create a regular sphere
-    let mut grid = regular_sphere(6);
+    let grid = regular_sphere(6);
 
     // Get the number of points in the geometry
     println!(
@@ -15,17 +15,18 @@ fn main() {
     // Print the number of points and cells in the topology
     println!(
         "The grid has {} points in its topology",
-        grid.topology_mut().entity_count(0)
+        grid.topology().entity_count(0)
     );
-    println!("The grid has {} cells", grid.topology_mut().entity_count(2));
+    println!("The grid has {} cells", grid.topology().entity_count(2));
 
     // Print information about the first four cells
+    let c20 = grid.topology().connectivity(2, 0);
     for i in 0..4 {
         println!("");
 
         // Print the topological vertices of a cell
         let tcell = grid.topology().index_map()[i];
-        let t_vertices = grid.topology_mut().connectivity(2, 0).row(tcell).unwrap();
+        let t_vertices = c20.row(tcell).unwrap();
         println!(
             "Triangle {} has vertices with topological numbers {}, {}, and {}",
             i, t_vertices[0], t_vertices[1], t_vertices[2]
@@ -46,16 +47,16 @@ fn main() {
     }
 
     // Save the mesh in gmsh format
-    export_as_gmsh(&mut grid, String::from("_examples_grid.msh"));
+    export_as_gmsh(&grid, String::from("_examples_grid.msh"));
 }
 
 #[test]
 fn test_surface_area() {
     for levels in 1..7 {
-        let mut grid = regular_sphere(levels);
+        let grid = regular_sphere(levels);
 
         let mut area = 0.0;
-        for i in 0..grid.topology_mut().entity_count(2) {
+        for i in 0..grid.topology().entity_count(2) {
             let v = grid.geometry().cell_vertices(i).unwrap();
             let e1 = [
                 grid.geometry().point(v[1]).unwrap()[0] - grid.geometry().point(v[0]).unwrap()[0],

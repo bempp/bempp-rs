@@ -2,6 +2,7 @@
 
 use crate::cell::ReferenceCellType;
 use solvers_tools::arrays::AdjacencyList;
+use std::cell::Ref;
 
 pub trait Geometry {
     //! Grid geometry
@@ -39,10 +40,10 @@ pub trait Topology {
     fn index_map(&self) -> &[usize];
 
     /// The number of entities of dimension `dim`
-    fn entity_count(&mut self, dim: usize) -> usize;
+    fn entity_count(&self, dim: usize) -> usize;
 
     /// The indices of the vertices that from cell with index `index`
-    fn cell(&self, index: usize) -> Option<&[usize]>;
+    fn cell(&self, index: usize) -> Option<Ref<[usize]>>;
 
     /// The indices of the vertices that from cell with index `index`
     fn cell_type(&self, index: usize) -> Option<ReferenceCellType>;
@@ -50,10 +51,10 @@ pub trait Topology {
     /// Create the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
     ///
     /// If this function is called multiple times, it will do nothing after the first call
-    fn create_connectivity(&mut self, dim0: usize, dim1: usize);
+    fn create_connectivity(&self, dim0: usize, dim1: usize);
 
     /// Create the connectivity information for all dimensions
-    fn create_connectivity_all(&mut self) {
+    fn create_connectivity_all(&self) {
         for dim0 in 0..self.dim() {
             for dim1 in 0..self.dim() {
                 self.create_connectivity(dim0, dim1);
@@ -62,7 +63,7 @@ pub trait Topology {
     }
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&mut self, dim0: usize, dim1: usize) -> &AdjacencyList<usize>;
+    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>>;
 }
 
 pub trait Grid {
@@ -76,9 +77,6 @@ pub trait Grid {
 
     /// Get the grid topology (See [Topology])
     fn topology(&self) -> &Self::Topology;
-
-    /// Get a mutable version of the grid topology (See [Topology])
-    fn topology_mut(&mut self) -> &mut Self::Topology;
 
     /// Get the grid geometry (See [Geometry])
     fn geometry(&self) -> &Self::Geometry;
