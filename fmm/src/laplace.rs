@@ -4,10 +4,10 @@ use std::vec;
 
 use itertools::Itertools;
 use ndarray::*;
-use ndarray_linalg::*;
+use ndarray_linalg::{SVDDC};
 
 use solvers_traits::fmm::KiFmmNode;
-use solvers_traits::types::{Error, EvalType};
+use solvers_traits::types::{Error, EvalType, Result};
 use solvers_traits::{
     fmm::{Fmm, FmmTree, Translation},
     kernel::Kernel,
@@ -53,11 +53,11 @@ pub struct KiFmm {
     pub m2m: Vec<ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>>>,
     pub l2l: Vec<ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>>>,
     pub transfer_vectors: Vec<usize>,
-    // pub m2l: (
-    //     ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    //     ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>,
-    //     ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    // )
+    pub m2l: (
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+    )
 }
 
 impl KiFmm {
@@ -166,12 +166,15 @@ impl KiFmm {
             let ridx_sources = lidx_sources + ncols;
 
             se2tc.slice_mut(s![..,lidx_sources..ridx_sources]).assign(&tmp_gram);
-
         }
-        
-        // Use randomized svd here from rusty-compression instead.
-        // let (u, s, vt) = se2tc.svd(true, true).unwrap();
-        // let m2l = (u.unwrap(), s, vt.unwrap());
+
+        // TODO: replace with randomised SVD
+        let (u, s, vt) = se2tc.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        let s = Array2::from_diag(&s);
+        let u = u.unwrap();
+        let mut vt = vt.unwrap();
+        vt = vt.slice(s![0..nrows,..]).to_owned();
+        let m2l = (u, s, vt);
 
         KiFmm {
             kernel,
@@ -183,7 +186,7 @@ impl KiFmm {
             dc2e_inv,
             m2m,
             l2l,
-            // m2l,
+            m2l,
             transfer_vectors
         }
     }
@@ -386,15 +389,36 @@ impl Translation for KiFmm {
                 .map(|(&a, &b)| a + b)
                 .collect();
 
-            self.tree
-                .set_multipole_expansion(&out_node, &curr, self.order)
+            self.tree.set_multipole_expansion(&out_node, &curr, self.order)
         } else {
-            self.tree
-                .set_multipole_expansion(&out_node, &out_multipole, self.order)
+            self.tree.set_multipole_expansion(&out_node, &out_multipole, self.order)
         }
     }
 
-    fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
+    fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let in_local = Array::from(self.tree.get_local_expansion(in_node).unwrap());
+        
+        let operator_index = out_node
+            .siblings()
+            .iter()
+            .position(|&x| x == *out_node)
+            .unwrap();
+        
+        let out_local = self.l2l[operator_index].dot(&in_local).to_vec();
+
+        if let Some(curr) = self.tree.get_local_expansion(&out_node) {
+            let curr: Vec<f64> = curr
+                .iter()
+                .zip(out_local.iter())
+                .map(|(&a, &b)| a + b)
+                .collect();
+
+            self.tree.set_local_expansion(&out_node, &curr);
+        }  else {
+            self.tree.set_local_expansion(&out_node, &out_local);
+        }
+        
+    }
 
     fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {}
 
@@ -526,6 +550,8 @@ mod test {
     use solvers_tree::types::morton::MortonKey;
     use solvers_tree::types::point::PointType;
     use solvers_tree::types::single_node::SingleNodeTree;
+    use ndarray_linalg::*;
+    use ndarray::*;
 
     use super::find_unique_v_list_interactions;
     use super::{KiFmm, LaplaceKernel};
@@ -652,14 +678,20 @@ mod test {
         ));
 
         // New FMM
-        let mut kifmm = KiFmm::new(2, 1.05, 1.95, tree, kernel);
+        let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
 
         kifmm.upward_pass();
         kifmm.downward_pass();
 
+        //  let m2l = kifmm.m2l.0.dot(&kifmm.m2l.1.dot(&kifmm.m2l.2));
+    //     println!("M2L Stuff {:?} {:?} \n {:?}  \n {:?} {:?}",
+    //     kifmm.m2l.0.ncols(),  kifmm.m2l.0.nrows(),
+    //     kifmm.m2l.1.len(),
+    //     kifmm.m2l.2.ncols(),  kifmm.m2l.2.nrows()
+    // );
 
-        // println!("M2L Stuff {:?}", kifmm.m2l.1);
-        assert!(false)
+        // println!("m2l r={:?} c={:?}", m2l.nrows(), m2l.ncols());
+
 
     }
 }
