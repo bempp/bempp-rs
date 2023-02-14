@@ -130,7 +130,7 @@ impl KiFmm {
 
         // Store in two component format for stability, See Malhotra et. al (2015)
         let dc2e = Array1::from(dc2e)
-            .to_shape((nrows, ncols))
+            .to_shape((ncols, nrows))
             .unwrap()
             .to_owned();
         let (a, b, c) = pinv(&uc2e);
@@ -162,27 +162,34 @@ impl KiFmm {
             let cc2pe = kernel
                 .gram(&downward_equivalent_surface, &child_downward_check_surface)
                 .unwrap();
-            let cc2pe = Array::from_shape_vec((nrows, ncols), cc2pe).unwrap();
+            let cc2pe = Array::from_shape_vec((ncols, nrows), cc2pe).unwrap();
 
             l2l.push(kernel.scale(child.level()) * dc2e_inv.0.dot(&dc2e_inv.1.dot(&cc2pe)))
         }
 
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
-        let (sources, transfer_vectors, targets) = find_unique_v_list_interactions(3);
+        let (targets, transfer_vectors, sources) = find_unique_v_list_interactions(3);
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let mut se2tc: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
             Array2::zeros((nrows, ncols * sources.len()));
 
-        for (source, (i, target)) in sources.iter().zip(targets.iter().enumerate()) {
-            let target_check_surface =
-                target.compute_surface(order, alpha_inner, tree.get_domain());
+        for (((i, _), source), target) in transfer_vectors
+            .iter()
+            .enumerate()
+            .zip(sources.iter())
+            .zip(targets.iter())
+        {
             let source_equivalent_surface =
                 source.compute_surface(order, alpha_inner, tree.get_domain());
+
+            let target_check_surface =
+                target.compute_surface(order, alpha_inner, tree.get_domain());
 
             let tmp_gram = kernel
                 .gram(&source_equivalent_surface, &target_check_surface)
                 .unwrap();
+
             let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
             let lidx_sources = i * ncols;
             let ridx_sources = lidx_sources + ncols;
@@ -196,8 +203,7 @@ impl KiFmm {
         let (u, s, vt) = se2tc.svddc(ndarray_linalg::JobSvd::Some).unwrap();
         let s = Array2::from_diag(&s);
         let u = u.unwrap();
-        let mut vt = vt.unwrap();
-        vt = vt.slice(s![0..nrows, ..]).to_owned();
+        let vt = vt.unwrap();
         let m2l = (u, s, vt);
 
         KiFmm {
@@ -448,18 +454,19 @@ impl Translation for KiFmm {
 
     fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         let ncoeffs = KiFmm::ncoeffs(self.order);
-
         // Locate correct components of compressed M2L matrix.
-        let transfer_vector = in_node.find_transfer_vector(out_node);
+        let transfer_vector = out_node.find_transfer_vector(in_node);
         let v_idx = self
             .transfer_vectors
             .iter()
             .position(|&x| x == transfer_vector)
             .unwrap();
+
         let v_lidx = v_idx * ncoeffs;
         let v_ridx = v_lidx + ncoeffs;
         let vt_sub = self.m2l.2.slice(s![.., v_lidx..v_ridx]);
 
+        // TODO: Remove copy.
         let in_multipole = Array::from(self.tree.get_multipole_expansion(&in_node).unwrap());
 
         let out_local = KiFmm::m2l_scale(in_node.level())
@@ -470,6 +477,7 @@ impl Translation for KiFmm {
                     .1
                     .dot(&self.m2l.0.dot(&self.m2l.1.dot(&vt_sub.dot(&in_multipole)))),
             );
+
         let out_local = out_local.to_vec();
 
         if let Some(curr) = self.tree.get_local_expansion(&out_node) {
@@ -508,9 +516,10 @@ impl Translation for KiFmm {
                 coordinate: pnt.coordinate,
                 global_idx: pnt.global_idx,
                 key: pnt.key,
-                data: [pnt.data[0], *pot],
+                data: [pnt.data[0], *pot + pnt.data[1]],
             })
             .collect_vec();
+
         self.tree.set_points(node, points);
     }
 
@@ -537,68 +546,72 @@ impl Translation for KiFmm {
                 coordinate: pnt.coordinate,
                 global_idx: pnt.global_idx,
                 key: pnt.key,
-                data: [pnt.data[0], *pot],
+                data: [pnt.data[0], *pot + pnt.data[1]],
             })
             .collect_vec();
         self.tree.set_points(out_node, points);
     }
 
     fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        let points = self.tree.get_points(in_node).unwrap();
-        let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
-        let charges = points.iter().map(|&p| p.data[0]).collect_vec();
-        let downward_check_surface =
-            out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
-        let downward_check_potential = Array::from(
-            self.kernel
-                .evaluate(
-                    &point_coordinates,
-                    &charges,
-                    &downward_check_surface,
-                    &EvalType::Value,
-                )
-                .unwrap(),
-        );
-        let out_local = (self.kernel.scale(out_node.level())
-            * self
-                .dc2e_inv
-                .0
-                .dot(&self.dc2e_inv.1.dot(&downward_check_potential)))
-        .to_vec();
-        self.tree
-            .set_local_expansion(out_node, &out_local, self.order)
+        if let Some(points) = self.tree.get_points(in_node) {
+            let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
+            let charges = points.iter().map(|&p| p.data[0]).collect_vec();
+            let downward_check_surface =
+                out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
+            let downward_check_potential = Array::from(
+                self.kernel
+                    .evaluate(
+                        &point_coordinates,
+                        &charges,
+                        &downward_check_surface,
+                        &EvalType::Value,
+                    )
+                    .unwrap(),
+            );
+            let out_local = (self.kernel.scale(out_node.level())
+                * self
+                    .dc2e_inv
+                    .0
+                    .dot(&self.dc2e_inv.1.dot(&downward_check_potential)))
+            .to_vec();
+            self.tree
+                .set_local_expansion(out_node, &out_local, self.order)
+        }
     }
 
     fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        let sources = self.tree.get_points(in_node).unwrap();
-        let source_coordinates: Vec<[f64; 3]> = sources.iter().map(|p| p.coordinate).collect();
-        let charges = sources.iter().map(|&p| p.data[0]).collect_vec();
+        if let (Some(sources), Some(targets)) = (
+            self.tree.get_points(in_node),
+            self.tree.get_points(out_node),
+        ) {
+            // TODO: Get rid of this copy
+            let source_coordinates: Vec<[f64; 3]> = sources.iter().map(|p| p.coordinate).collect();
+            let charges = sources.iter().map(|&p| p.data[0]).collect_vec();
+            let targets_coordinates: Vec<[f64; 3]> = targets.iter().map(|p| p.coordinate).collect();
 
-        let targets = self.tree.get_points(out_node).unwrap();
-        let targets_coordinates: Vec<[f64; 3]> = targets.iter().map(|p| p.coordinate).collect();
+            let potential = self
+                .kernel
+                .evaluate(
+                    &source_coordinates,
+                    &charges,
+                    &targets_coordinates,
+                    &EvalType::Value,
+                )
+                .unwrap();
 
-        let potential = self
-            .kernel
-            .evaluate(
-                &source_coordinates,
-                &charges,
-                &targets_coordinates,
-                &EvalType::Value,
-            )
-            .unwrap();
+            let targets = targets
+                .iter()
+                .zip(potential.iter())
+                .map(|(pnt, pot)| Point {
+                    coordinate: pnt.coordinate,
+                    global_idx: pnt.global_idx,
+                    key: pnt.key,
+                    data: [pnt.data[0], *pot + pnt.data[1]],
+                })
+                .collect_vec();
 
-        let targets = targets
-            .iter()
-            .zip(potential.iter())
-            .map(|(pnt, pot)| Point {
-                coordinate: pnt.coordinate,
-                global_idx: pnt.global_idx,
-                key: pnt.key,
-                data: [pnt.data[0], *pot],
-            })
-            .collect_vec();
-
-        self.tree.set_points(out_node, targets);
+            self.tree.set_points(out_node, targets);
+        }
     }
 }
 
@@ -654,12 +667,12 @@ fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, V
         targets.extend(&mut tmp_targets.iter().cloned());
     }
 
-    let mut unique_transfer_vectors = HashSet::new();
+    let mut unique_transfer_vectors = Vec::new();
     let mut unique_indices = HashSet::new();
 
     for (i, vec) in transfer_vectors.iter().enumerate() {
         if !unique_transfer_vectors.contains(vec) {
-            unique_transfer_vectors.insert(*vec);
+            unique_transfer_vectors.push(*vec);
             unique_indices.insert(i);
         }
     }
@@ -677,7 +690,6 @@ fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, V
         .filter(|(i, _)| unique_indices.contains(i))
         .map(|(_, x)| *x)
         .collect_vec();
-    let unique_transfer_vectors = unique_transfer_vectors.iter().cloned().collect();
 
     (unique_targets, unique_transfer_vectors, unique_sources)
 }
@@ -709,8 +721,11 @@ impl Fmm for KiFmm {
             // TODO: Multithread M2L/L2L over keys at each level.
             for target in keys.iter() {
                 // V List interactions
-                for source in self.tree.get_interaction_list(target).unwrap().iter() {
-                    self.m2l(target, source)
+
+                if let Some(v_list) = self.tree.get_interaction_list(target) {
+                    for source in v_list.iter() {
+                        self.m2l(source, target)
+                    }
                 }
 
                 // Translate parent local expansion to its children.
@@ -727,18 +742,27 @@ impl Fmm for KiFmm {
             let target = self.tree.get_leaves()[i];
 
             // X List interactions
-            for source in self.tree.get_x_list(&target).unwrap().iter() {
-                self.p2l(source, &target);
+            if let Some(x_list) = self.tree.get_x_list(&target) {
+                // println!("Running X List");
+                for source in x_list.iter() {
+                    self.p2l(source, &target);
+                }
             }
 
             // W List interactions
-            for source in self.tree.get_w_list(&target).unwrap().iter() {
-                self.m2p(source, &target)
+            if let Some(w_list) = self.tree.get_w_list(&target) {
+                // println!("Running W List");
+                for source in w_list.iter() {
+                    self.m2p(source, &target)
+                }
             }
 
             // U List interactions
-            for source in self.tree.get_near_field(&target).unwrap().iter() {
-                self.p2p(source, &target);
+            if let Some(u_list) = self.tree.get_near_field(&target) {
+                // println!("Running U List");
+                for source in u_list.iter() {
+                    self.p2p(source, &target);
+                }
             }
 
             // Translate local expansions to points, in each node.
@@ -791,68 +815,68 @@ mod test {
         points
     }
 
-    // #[test]
-    // fn test_upward_pass() {
-    //     // Create Kernel
-    //     let kernel = Box::new(LaplaceKernel {
-    //         dim: 3,
-    //         is_singular: true,
-    //         value_dimension: 3,
-    //     });
+    #[test]
+    fn test_upward_pass() {
+        // Create Kernel
+        let kernel = Box::new(LaplaceKernel {
+            dim: 3,
+            is_singular: true,
+            value_dimension: 3,
+        });
 
-    //     // Create FmmTree
-    //     let npoints: usize = 10000;
-    //     let points = points_fixture(npoints);
-    //     let point_data = vec![1.0; npoints];
-    //     let depth = 2;
-    //     let n_crit = 150;
+        // Create FmmTree
+        let npoints: usize = 10000;
+        let points = points_fixture(npoints);
+        let point_data = vec![1.0; npoints];
+        let depth = 2;
+        let n_crit = 150;
 
-    //     let tree = Box::new(SingleNodeTree::new(
-    //         &points,
-    //         &point_data,
-    //         false,
-    //         Some(n_crit),
-    //         Some(depth),
-    //     ));
+        let tree = Box::new(SingleNodeTree::new(
+            &points,
+            &point_data,
+            false,
+            Some(n_crit),
+            Some(depth),
+        ));
 
-    //     // New FMM
-    //     let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
+        // New FMM
+        let mut kifmm = KiFmm::new(6, 1.05, 1.95, tree, kernel);
 
-    //     kifmm.upward_pass();
+        kifmm.upward_pass();
 
-    //     let root_multipole = kifmm.tree.get_multipole_expansion(&ROOT).unwrap();
-    //     let upward_equivalent_surface =
-    //         ROOT.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
+        let root_multipole = kifmm.tree.get_multipole_expansion(&ROOT).unwrap();
+        let upward_equivalent_surface =
+            ROOT.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
 
-    //     let distant_point = [[40.0, 0., 0.]];
-    //     let node_points = kifmm.tree.get_all_points();
-    //     let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data).collect();
-    //     let node_points: Vec<[f64; 3]> = node_points.iter().map(|p| p.coordinate).collect();
+        let distant_point = [[40.0, 0., 0.]];
+        let node_points = kifmm.tree.get_all_points();
+        let node_point_data: Vec<f64> = node_points.iter().map(|p| p.data[0]).collect();
+        let node_points: Vec<[f64; 3]> = node_points.iter().map(|p| p.coordinate).collect();
 
-    //     let direct = kifmm
-    //         .kernel
-    //         .evaluate(
-    //             &node_points,
-    //             &node_point_data,
-    //             &distant_point,
-    //             &EvalType::Value,
-    //         )
-    //         .unwrap();
+        let direct = kifmm
+            .kernel
+            .evaluate(
+                &node_points,
+                &node_point_data,
+                &distant_point,
+                &EvalType::Value,
+            )
+            .unwrap();
 
-    //     let result = kifmm
-    //         .kernel
-    //         .evaluate(
-    //             &upward_equivalent_surface,
-    //             &root_multipole,
-    //             &distant_point,
-    //             &EvalType::Value,
-    //         )
-    //         .unwrap();
+        let result = kifmm
+            .kernel
+            .evaluate(
+                &upward_equivalent_surface,
+                &root_multipole,
+                &distant_point,
+                &EvalType::Value,
+            )
+            .unwrap();
 
-    //     for (a, b) in result.iter().zip(direct.iter()) {
-    //         assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
-    //     }
-    // }
+        for (a, b) in result.iter().zip(direct.iter()) {
+            assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
+        }
+    }
 
     #[test]
     fn test_m2l_scaling() {
@@ -895,9 +919,9 @@ mod test {
             .unwrap();
         let se2tc_b = Array::from(se2tc_b);
         //
-        println!("SE2TC A {:?}", KiFmm::m2l_scale(7) * se2tc_a);
-        println!("SE2TC B {:?}", se2tc_b);
-        assert!(false)
+        // println!("SE2TC A {:?}", KiFmm::m2l_scale(7) * se2tc_a);
+        // println!("SE2TC B {:?}", se2tc_b);
+        // assert!(false)
     }
 
     #[test]
@@ -913,9 +937,10 @@ mod test {
             assert_eq!(a, b)
         }
     }
-
     #[test]
-    fn test_downward_pass() {
+    fn test_m2l() {
+        // Test that the local expansions of a given target node correspond to the
+        // multipole expansions of source nodes in its v list
         // Create Kernel
         let kernel = Box::new(LaplaceKernel {
             dim: 3,
@@ -924,7 +949,7 @@ mod test {
         });
 
         // Create FmmTree
-        let npoints: usize = 10000;
+        let npoints: usize = 1000;
         let points = points_fixture(npoints);
         let point_data = vec![1.0; npoints];
         let depth = 2;
@@ -941,16 +966,108 @@ mod test {
         // New FMM
         let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
 
-        // kifmm.upward_pass();
-        // kifmm.downward_pass();
+        kifmm.run();
 
-        //  let m2l = kifmm.m2l.0.dot(&kifmm.m2l.1.dot(&kifmm.m2l.2));
-        //     println!("M2L Stuff {:?} {:?} \n {:?}  \n {:?} {:?}",
-        //     kifmm.m2l.0.ncols(),  kifmm.m2l.0.nrows(),
-        //     kifmm.m2l.1.len(),
-        //     kifmm.m2l.2.ncols(),  kifmm.m2l.2.nrows()
-        // );
+        for key in kifmm.tree.get_leaves().iter() {
+            if let Some(v_list) = kifmm.tree.get_interaction_list(key) {
+                let downward_equivalent_surface =
+                    key.compute_surface(kifmm.order, kifmm.alpha_outer, kifmm.tree.get_domain());
+                let downward_check_surface =
+                    key.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
+                let local_expansion = kifmm.tree.get_local_expansion(key).unwrap();
+                let equivalent = kifmm
+                    .kernel
+                    .evaluate(
+                        &downward_equivalent_surface,
+                        &local_expansion,
+                        &downward_check_surface,
+                        &EvalType::Value,
+                    )
+                    .unwrap();
 
-        // println!("m2l r={:?} c={:?}", m2l.nrows(), m2l.ncols());
+                let mut direct = vec![0_f64; local_expansion.len()];
+
+                for source in v_list.iter() {
+                    let upward_equivalent_surface = source.compute_surface(
+                        kifmm.order,
+                        kifmm.alpha_inner,
+                        kifmm.tree.get_domain(),
+                    );
+                    let multipole_expansion = kifmm.tree.get_multipole_expansion(source).unwrap();
+
+                    let tmp = kifmm
+                        .kernel
+                        .evaluate(
+                            &upward_equivalent_surface,
+                            &multipole_expansion,
+                            &downward_check_surface,
+                            &EvalType::Value,
+                        )
+                        .unwrap();
+
+                    direct = direct.iter().zip(tmp.iter()).map(|(d, t)| d + t).collect();
+                }
+                for (a, b) in equivalent.iter().zip(direct.iter()) {
+                    assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_fmm() {
+        // Create Kernel
+        let kernel = Box::new(LaplaceKernel {
+            dim: 3,
+            is_singular: true,
+            value_dimension: 3,
+        });
+
+        // Create FmmTree
+        let npoints: usize = 10000;
+        let points = points_fixture(npoints);
+        let point_data = vec![1.0; npoints];
+        let depth = 3;
+        let n_crit = 150;
+
+        let tree = Box::new(SingleNodeTree::new(
+            &points,
+            &point_data,
+            false,
+            Some(n_crit),
+            Some(depth),
+        ));
+
+        // New FMM
+        let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
+
+        kifmm.run();
+
+        let leaves = vec![kifmm.tree.get_leaves()[0], kifmm.tree.get_leaves()[1]];
+        let fmm_potential: Vec<f64> = leaves
+            .iter()
+            .flat_map(|l| kifmm.tree.get_point_data(l).unwrap())
+            .map(|d| d[1])
+            .collect();
+        let node_points: Vec<_> = leaves
+            .iter()
+            .flat_map(|l| kifmm.tree.get_points(l).unwrap())
+            .collect();
+        let node_points_coordinates: Vec<[f64; 3]> =
+            node_points.iter().map(|p| p.coordinate).collect();
+        let direct_potential = kifmm
+            .kernel
+            .evaluate(
+                &points,
+                &point_data,
+                &node_points_coordinates,
+                &EvalType::Value,
+            )
+            .unwrap();
+
+        // Test whether answers are within 4 digits of each other
+        for (a, b) in fmm_potential.iter().zip(direct_potential.iter()) {
+            assert_approx_eq!(f64, *a, *b, epsilon = 1.0);
+        }
     }
 }

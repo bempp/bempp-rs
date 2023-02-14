@@ -459,6 +459,7 @@ impl FmmTree for SingleNodeTree {
         keys.append(&mut neighbors_children_adj);
         keys.append(&mut neighbors_adj);
         keys.append(&mut neighbors_parents_adj);
+        keys.push(*leaf);
 
         if !keys.is_empty() {
             Some(MortonKeys { keys, index: 0 })

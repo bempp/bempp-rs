@@ -280,7 +280,7 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
 }
 
 impl MortonKey {
-    // Checksum encoding unique transfer vector between this key, and another
+    // Checksum encoding unique transfer vector between this key, and another. ie. the vector other->self.
     pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
@@ -1542,6 +1542,7 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
+        // Test scale independence of transfer vectors
         let a = MortonKey::from_point(&point, &domain, 2);
         let other = a.siblings()[2];
         let res_a = a.find_transfer_vector(&other);
@@ -1551,7 +1552,22 @@ mod test {
         let res_b = b.find_transfer_vector(&other);
 
         assert_eq!(res_a, res_b);
+
+        // Test translational invariance of transfer vector
+        let a = MortonKey::from_point(&point, &domain, 2);
+        let other = a.siblings()[2];
+        let res_a = a.find_transfer_vector(&other);
+        
+        let shifted_point = [0.1, 0.1, 0.1];
+        let b = MortonKey::from_point(&shifted_point, &domain, 2);
+        let other = b.siblings()[2];
+        let res_b = b.find_transfer_vector(&other);
+
+        assert_eq!(res_a, res_b);
+
     }
+
+    
 
     #[test]
     #[should_panic(expected = "Transfer vectors only computed for keys at levels deeper than 2")]
