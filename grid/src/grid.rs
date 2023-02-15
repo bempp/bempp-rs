@@ -5,7 +5,7 @@ use solvers_element::element;
 use solvers_tools::arrays::{AdjacencyList, Array2D};
 use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
 use solvers_traits::element::FiniteElement;
-use solvers_traits::grid::{Geometry, Grid, Topology};
+use solvers_traits::grid::{Geometry, Grid, Ownership, Topology};
 use std::cell::{Ref, RefCell};
 
 /// Geometry of a serial grid
@@ -17,7 +17,7 @@ pub struct SerialGeometry {
     index_map: Vec<usize>,
 }
 
-fn create_element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dyn FiniteElement> {
+fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dyn FiniteElement> {
     match cell_type {
         ReferenceCellType::Triangle => {
             let degree = (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1;
@@ -61,7 +61,7 @@ impl SerialGeometry {
                 let npts = cell.len();
 
                 element_changes.push(index_map.len());
-                coordinate_elements.push(create_element_from_npts(cell_type, npts));
+                coordinate_elements.push(element_from_npts(cell_type, npts));
                 for (j, cell_j) in cells.iter_rows().enumerate() {
                     if cell_type == cell_types[j] && npts == cell_j.len() {
                         new_cells.add_row(cells.row(j).unwrap());
@@ -357,6 +357,10 @@ impl Topology for SerialTopology {
     fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>> {
         self.create_connectivity(dim0, dim1);
         self.connectivity[dim0][dim1].borrow()
+    }
+
+    fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
+        Ownership::Owned
     }
 }
 
