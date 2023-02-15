@@ -63,6 +63,85 @@ pub struct KiFmm {
 }
 
 impl KiFmm {
+    /// Algebraically defined list of transfer vectors in an octree
+    fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, Vec<MortonKey>) {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        // Encode point in centre of domain
+        let key = MortonKey::from_point(&point, &domain, level);
+
+        // Add neighbours, and their resp. siblings to v list.
+        let mut neighbours = key.neighbors();
+        let mut keys: Vec<MortonKey> = Vec::new();
+        keys.push(key);
+        keys.append(&mut neighbours);
+
+        for key in neighbours.iter() {
+            let mut siblings = key.siblings();
+            keys.append(&mut siblings);
+        }
+
+        // Keep only unique keys
+        let keys: Vec<&MortonKey> = keys.iter().unique().collect();
+
+        let mut transfer_vectors: Vec<usize> = Vec::new();
+        let mut targets: Vec<MortonKey> = Vec::new();
+        let mut sources: Vec<MortonKey> = Vec::new();
+
+        for key in keys.iter() {
+            // Dense v_list
+            let v_list = key
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| !key.is_adjacent(pnc))
+                .collect_vec();
+
+            // Find transfer vectors for everything in dense v list of each key
+            let tmp: Vec<usize> = v_list
+                .iter()
+                .map(|v| key.find_transfer_vector(v))
+                .collect_vec();
+
+            transfer_vectors.extend(&mut tmp.iter().cloned());
+            sources.extend(&mut v_list.iter().cloned());
+
+            let tmp_targets = vec![**key; tmp.len()];
+            targets.extend(&mut tmp_targets.iter().cloned());
+        }
+
+        let mut unique_transfer_vectors = Vec::new();
+        let mut unique_indices = HashSet::new();
+
+        for (i, vec) in transfer_vectors.iter().enumerate() {
+            if !unique_transfer_vectors.contains(vec) {
+                unique_transfer_vectors.push(*vec);
+                unique_indices.insert(i);
+            }
+        }
+
+        let unique_sources: Vec<MortonKey> = sources
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| unique_indices.contains(i))
+            .map(|(_, x)| *x)
+            .collect_vec();
+
+        let unique_targets: Vec<MortonKey> = targets
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| unique_indices.contains(i))
+            .map(|(_, x)| *x)
+            .collect_vec();
+
+        (unique_targets, unique_transfer_vectors, unique_sources)
+    }
+
     fn ncoeffs(order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
     }
@@ -168,7 +247,7 @@ impl KiFmm {
         }
 
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
-        let (targets, transfer_vectors, sources) = find_unique_v_list_interactions(3);
+        let (targets, transfer_vectors, sources) = KiFmm::find_unique_v_list_interactions(3);
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let mut se2tc: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
@@ -627,85 +706,6 @@ impl Translation for KiFmm {
     }
 }
 
-/// Algebraically defined list of transfer vectors in an octree
-fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, Vec<MortonKey>) {
-    let point = [0.5, 0.5, 0.5];
-    let domain = Domain {
-        origin: [0., 0., 0.],
-        diameter: [1., 1., 1.],
-    };
-
-    // Encode point in centre of domain
-    let key = MortonKey::from_point(&point, &domain, level);
-
-    // Add neighbours, and their resp. siblings to v list.
-    let mut neighbours = key.neighbors();
-    let mut keys: Vec<MortonKey> = Vec::new();
-    keys.push(key);
-    keys.append(&mut neighbours);
-
-    for key in neighbours.iter() {
-        let mut siblings = key.siblings();
-        keys.append(&mut siblings);
-    }
-
-    // Keep only unique keys
-    let keys: Vec<&MortonKey> = keys.iter().unique().collect();
-
-    let mut transfer_vectors: Vec<usize> = Vec::new();
-    let mut targets: Vec<MortonKey> = Vec::new();
-    let mut sources: Vec<MortonKey> = Vec::new();
-
-    for key in keys.iter() {
-        // Dense v_list
-        let v_list = key
-            .parent()
-            .neighbors()
-            .iter()
-            .flat_map(|pn| pn.children())
-            .filter(|pnc| !key.is_adjacent(pnc))
-            .collect_vec();
-
-        // Find transfer vectors for everything in dense v list of each key
-        let tmp: Vec<usize> = v_list
-            .iter()
-            .map(|v| key.find_transfer_vector(v))
-            .collect_vec();
-
-        transfer_vectors.extend(&mut tmp.iter().cloned());
-        sources.extend(&mut v_list.iter().cloned());
-
-        let tmp_targets = vec![**key; tmp.len()];
-        targets.extend(&mut tmp_targets.iter().cloned());
-    }
-
-    let mut unique_transfer_vectors = Vec::new();
-    let mut unique_indices = HashSet::new();
-
-    for (i, vec) in transfer_vectors.iter().enumerate() {
-        if !unique_transfer_vectors.contains(vec) {
-            unique_transfer_vectors.push(*vec);
-            unique_indices.insert(i);
-        }
-    }
-
-    let unique_sources: Vec<MortonKey> = sources
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| unique_indices.contains(i))
-        .map(|(_, x)| *x)
-        .collect_vec();
-
-    let unique_targets: Vec<MortonKey> = targets
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| unique_indices.contains(i))
-        .map(|(_, x)| *x)
-        .collect_vec();
-
-    (unique_targets, unique_transfer_vectors, unique_sources)
-}
-
 impl Fmm for KiFmm {
     fn upward_pass(&mut self) {
         // P2M over leaves. TODO: multithreading over all leaves
@@ -805,7 +805,6 @@ mod test {
     use solvers_tree::types::point::PointType;
     use solvers_tree::types::single_node::SingleNodeTree;
 
-    use super::find_unique_v_list_interactions;
     use super::{KiFmm, LaplaceKernel};
     use rand::prelude::*;
     use rand::SeedableRng;
@@ -939,8 +938,8 @@ mod test {
 
     #[test]
     fn test_transfer_vectors() {
-        let (_, mut l3, _) = find_unique_v_list_interactions(3);
-        let (_, mut l5, _) = find_unique_v_list_interactions(5);
+        let (_, mut l3, _) = KiFmm::find_unique_v_list_interactions(3);
+        let (_, mut l5, _) = KiFmm::find_unique_v_list_interactions(5);
         l3.sort();
         l5.sort();
 
