@@ -26,7 +26,7 @@ use crate::linalg::pinv;
 
 // TODO: Create from FMM Factory pattern, specialised for Rust in some way
 pub struct KiFmm {
-    pub kernel: Box<dyn Kernel<Data = Vec<f64>>>,
+    pub kernel: Box<dyn Kernel<PotentialData = Vec<f64>, GradientData = Vec<[f64; 3]>>>,
     pub tree: Box<
         dyn FmmTree<
             NodeIndex = MortonKey,
@@ -64,12 +64,14 @@ pub struct KiFmm {
 
 impl KiFmm {
     /// Algebraically defined list of transfer vectors in an octree
-    fn find_unique_v_list_interactions(level: u64) -> (Vec<MortonKey>, Vec<usize>, Vec<MortonKey>) {
+    fn find_unique_v_list_interactions() -> (Vec<MortonKey>, Vec<MortonKey>, Vec<usize>) {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
         };
+
+        let level = 3;
 
         // Encode point in centre of domain
         let key = MortonKey::from_point(&point, &domain, level);
@@ -139,7 +141,7 @@ impl KiFmm {
             .map(|(_, x)| *x)
             .collect_vec();
 
-        (unique_targets, unique_transfer_vectors, unique_sources)
+        (unique_targets, unique_sources, unique_transfer_vectors)
     }
 
     fn ncoeffs(order: usize) -> usize {
@@ -178,7 +180,7 @@ impl KiFmm {
                 PointDataType = [f64; 2],
             >,
         >,
-        kernel: Box<dyn Kernel<Data = Vec<f64>>>,
+        kernel: Box<dyn Kernel<PotentialData = Vec<f64>, GradientData = Vec<[f64; 3]>>>,
     ) -> KiFmm {
         // Compute equivalent and check surfaces at root level
         let upward_equivalent_surface = ROOT.compute_surface(order, alpha_inner, tree.get_domain());
@@ -247,7 +249,7 @@ impl KiFmm {
         }
 
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
-        let (targets, transfer_vectors, sources) = KiFmm::find_unique_v_list_interactions(3);
+        let (targets, sources, transfer_vectors) = KiFmm::find_unique_v_list_interactions();
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let mut se2tc: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
@@ -280,8 +282,8 @@ impl KiFmm {
 
         // TODO: replace with randomised SVD
         let (u, s, vt) = se2tc.svddc(ndarray_linalg::JobSvd::Some).unwrap();
-        let s = Array2::from_diag(&s);
         let u = u.unwrap();
+        let s = Array2::from_diag(&s);
         let vt = vt.unwrap();
         let m2l = (u, s, vt);
 
@@ -311,6 +313,7 @@ impl LaplaceKernel {
     fn potential(&self, sources: &[[f64; 3]], charges: &[f64], targets: &[[f64; 3]]) -> Vec<f64> {
         let mut potentials: Vec<f64> = vec![0.; targets.len()];
 
+        // TODO: Implement multithreaded
         for (i, target) in targets.iter().enumerate() {
             let mut potential = 0.0;
 
@@ -368,6 +371,7 @@ impl LaplaceKernel {
     ) -> Vec<[f64; 3]> {
         let mut gradients: Vec<[f64; 3]> = vec![[0., 0., 0.]; targets.len()];
 
+        // TODO: Implement multithreaded
         for (i, target) in targets.iter().enumerate() {
             for (source, charge) in sources.iter().zip(charges) {
                 gradients[i][0] -= charge * self.gradient_kernel(source, target, 0);
@@ -381,7 +385,8 @@ impl LaplaceKernel {
 }
 
 impl Kernel for LaplaceKernel {
-    type Data = Vec<f64>;
+    type PotentialData = Vec<f64>;
+    type GradientData = Vec<[f64; 3]>;
 
     fn dim(&self) -> usize {
         self.dim
@@ -395,26 +400,29 @@ impl Kernel for LaplaceKernel {
         self.value_dimension
     }
 
-    fn evaluate(
+    fn potential(
         &self,
         sources: &[[f64; 3]],
         charges: &[f64],
         targets: &[[f64; 3]],
-        eval_type: &solvers_traits::types::EvalType,
-    ) -> solvers_traits::types::Result<Self::Data> {
-        match eval_type {
-            EvalType::Value => {
-                solvers_traits::types::Result::Ok(self.potential(sources, charges, targets))
-            }
-            _ => solvers_traits::types::Result::Err(Error::Generic("foo".to_string())),
-        }
+    ) -> solvers_traits::types::Result<Self::PotentialData> {
+        solvers_traits::types::Result::Ok(self.potential(sources, charges, targets))
+    }
+
+    fn gradient(
+            &self,
+            sources: &[[f64; 3]],
+            charges: &[f64],
+            targets: &[[f64; 3]],
+        ) -> Result<Self::GradientData> {        
+        solvers_traits::types::Result::Ok(self.gradient(sources, charges, targets))
     }
 
     fn gram(
         &self,
         sources: &[[f64; 3]],
         targets: &[[f64; 3]],
-    ) -> solvers_traits::types::Result<Self::Data> {
+    ) -> solvers_traits::types::Result<Self::PotentialData> {
         let mut result: Vec<f64> = Vec::new();
 
         for target in targets.iter() {
@@ -462,11 +470,10 @@ impl Translation for KiFmm {
         // Check potential
         let check_potential = self
             .kernel
-            .evaluate(
+            .potential(
                 &sources[..],
                 &charges[..],
                 &upward_check_surface[..],
-                &EvalType::Value,
             )
             .unwrap();
 
@@ -581,11 +588,10 @@ impl Translation for KiFmm {
         let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
         let potential = self
             .kernel
-            .evaluate(
+            .potential(
                 &downward_equivalent_surface,
                 &local_expansion,
                 &point_coordinates,
-                &EvalType::Value,
             )
             .unwrap();
         let points = points
@@ -610,11 +616,10 @@ impl Translation for KiFmm {
         let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
         let potential = self
             .kernel
-            .evaluate(
+            .potential(
                 &upward_equivalent_surface,
                 &multipole_expansion,
                 &point_coordinates,
-                &EvalType::Value,
             )
             .unwrap();
 
@@ -640,11 +645,10 @@ impl Translation for KiFmm {
                 out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
             let downward_check_potential = Array::from(
                 self.kernel
-                    .evaluate(
+                    .potential(
                         &point_coordinates,
                         &charges,
                         &downward_check_surface,
-                        &EvalType::Value,
                     )
                     .unwrap(),
             );
@@ -682,11 +686,10 @@ impl Translation for KiFmm {
 
             let potential = self
                 .kernel
-                .evaluate(
+                .potential(
                     &source_coordinates,
                     &charges,
                     &targets_coordinates,
-                    &EvalType::Value,
                 )
                 .unwrap();
 
@@ -867,21 +870,19 @@ mod test {
 
         let direct = kifmm
             .kernel
-            .evaluate(
+            .potential(
                 &node_points,
                 &node_point_data,
                 &distant_point,
-                &EvalType::Value,
             )
             .unwrap();
 
         let result = kifmm
             .kernel
-            .evaluate(
+            .potential(
                 &upward_equivalent_surface,
                 &root_multipole,
                 &distant_point,
-                &EvalType::Value,
             )
             .unwrap();
 
@@ -937,19 +938,6 @@ mod test {
     }
 
     #[test]
-    fn test_transfer_vectors() {
-        let (_, mut l3, _) = KiFmm::find_unique_v_list_interactions(3);
-        let (_, mut l5, _) = KiFmm::find_unique_v_list_interactions(5);
-        l3.sort();
-        l5.sort();
-
-        assert_eq!(l3.len(), l5.len());
-
-        for (&a, &b) in l3.iter().zip(l5.iter()) {
-            assert_eq!(a, b)
-        }
-    }
-    #[test]
     fn test_m2l() {
         // Test that the local expansions of a given target node correspond to the
         // multipole expansions of source nodes in its v list
@@ -989,11 +977,10 @@ mod test {
                 let local_expansion = kifmm.tree.get_local_expansion(key).unwrap();
                 let equivalent = kifmm
                     .kernel
-                    .evaluate(
+                    .potential(
                         &downward_equivalent_surface,
                         &local_expansion,
                         &downward_check_surface,
-                        &EvalType::Value,
                     )
                     .unwrap();
 
@@ -1009,11 +996,10 @@ mod test {
 
                     let tmp = kifmm
                         .kernel
-                        .evaluate(
+                        .potential(
                             &upward_equivalent_surface,
                             &multipole_expansion,
                             &downward_check_surface,
-                            &EvalType::Value,
                         )
                         .unwrap();
 
@@ -1069,11 +1055,10 @@ mod test {
             node_points.iter().map(|p| p.coordinate).collect();
         let direct_potential = kifmm
             .kernel
-            .evaluate(
+            .potential(
                 &points,
                 &point_data,
                 &node_points_coordinates,
-                &EvalType::Value,
             )
             .unwrap();
 
@@ -1129,11 +1114,10 @@ mod test {
             node_points.iter().map(|p| p.coordinate).collect();
         let direct_potential = kifmm
             .kernel
-            .evaluate(
+            .potential(
                 &points,
                 &point_data,
                 &node_points_coordinates,
-                &EvalType::Value,
             )
             .unwrap();
 

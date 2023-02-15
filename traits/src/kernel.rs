@@ -3,7 +3,8 @@ use crate::types::{EvalType, Result};
 
 pub trait Kernel {
     // Evaluation data;
-    type Data;
+    type PotentialData;
+    type GradientData;
 
     // Space dimensions for the input of the kernel
     fn dim(&self) -> usize;
@@ -17,16 +18,23 @@ pub trait Kernel {
     // when sources and charges are identical.
     fn is_singular(&self) -> bool;
 
-    // Evaluate the kernel.
-    fn evaluate(
+    // Evaluate the potential kernel.
+    fn potential(
         &self,
         sources: &[[f64; 3]],
         charges: &[f64],
         targets: &[[f64; 3]],
-        eval_type: &EvalType,
-    ) -> Result<Self::Data>;
+    ) -> Result<Self::PotentialData>;
+    
+    // Evaluate the kernel gradient.
+    fn gradient(
+        &self,
+        sources: &[[f64; 3]],
+        charges: &[f64],
+        targets: &[[f64; 3]],
+    ) -> Result<Self::GradientData>;
 
-    fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::Data>;
+    fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::PotentialData>;
 
     fn scale(&self, level: u64) -> f64;
 }
