@@ -450,15 +450,16 @@ impl FmmTree for SingleNodeTree {
             .collect();
 
         // Parent level
-        let mut neighbors_parents_adj: Vec<MortonKey> = neighbours
-            .iter()
-            .map(|n| n.parent())
-            .filter(|np| self.keys_set.contains(np) && leaf.is_adjacent(np))
+        let mut parent_neighbours_adj: Vec<MortonKey> = leaf
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.keys_set.contains(pn) && leaf.is_adjacent(pn))
             .collect();
 
         keys.append(&mut neighbors_children_adj);
         keys.append(&mut neighbors_adj);
-        keys.append(&mut neighbors_parents_adj);
+        keys.append(&mut parent_neighbours_adj);
         keys.push(*leaf);
 
         if !keys.is_empty() {
