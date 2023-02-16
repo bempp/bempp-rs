@@ -534,8 +534,7 @@ impl FmmTree for SingleNodeTree {
         if let Some(x) = self.keys_to_data.get_mut(node_index) {
             x.set_multipole_expansion(data);
         } else {
-            let mut node_data = NodeData::new(NodeType::Fmm);
-            node_data.set_expansion_order(order);
+            let mut node_data = NodeData::new(order);
             node_data.set_multipole_expansion(data);
             self.keys_to_data.insert(*node_index, node_data);
         }
@@ -560,8 +559,7 @@ impl FmmTree for SingleNodeTree {
         if let Some(x) = self.keys_to_data.get_mut(node_index) {
             x.set_local_expansion(data);
         } else {
-            let mut node_data = NodeData::new(NodeType::Fmm);
-            node_data.set_expansion_order(order);
+            let mut node_data = NodeData::new(order);
             node_data.set_local_expansion(data);
             self.keys_to_data.insert(*node_index, node_data);
         }

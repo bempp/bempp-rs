@@ -1,8 +1,3 @@
-pub enum NodeType {
-    Default,
-    Fmm,
-}
-
 #[derive(Debug, Clone)]
 pub struct NodeData {
     pub field_size: Vec<usize>,

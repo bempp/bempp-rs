@@ -76,14 +76,17 @@ pub trait FmmTree: Tree {
 /// FmmData containers extend a data container with specialised methods for FMM data,
 /// specifically to handle the multipole and local expansion coefficients.
 pub trait FmmData {
-    type CoefficientDataType;
+    type CoefficientData;
+    type CoefficientViewMut;
+    type CoefficientView;
 
-    fn set_expansion_order(&mut self, order: usize);
-    fn get_expansion_order(&self) -> usize;
-    fn set_multipole_expansion(&mut self, data: &Self::CoefficientDataType);
-    fn get_multipole_expansion(&self) -> Self::CoefficientDataType;
-    fn set_local_expansion(&mut self, data: &Self::CoefficientDataType);
-    fn get_local_expansion(&self) -> Self::CoefficientDataType;
+    fn new(order: usize) -> Self;
+    fn set_multipole_expansion(&mut self, data: &Self::CoefficientData);
+    fn get_multipole_expansion(&self) -> Self::CoefficientView;
+    fn get_multipole_expansion_mut(&self) -> Self::CoefficientViewMut;
+    fn set_local_expansion(&mut self, data: &Self::CoefficientData);
+    fn get_local_expansion(&self) -> Self::CoefficientView;
+    fn get_local_expansion_mut(&self) -> Self::CoefficientViewMut;
 }
 
 pub trait Fmm {
