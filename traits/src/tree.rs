@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 pub trait Tree {
     // The computational domain defined by the tree
@@ -10,59 +12,31 @@ pub trait Tree {
     type Points;
 
     // Unique index for tree nodes
+    type LeafNodeIndex;
+
+    // Container for multiple tree nodes
+    type LeafNodeIndices;
+    
+    // Unique index for tree nodes
     type NodeIndex;
 
     // Container for multiple tree nodes
     type NodeIndices;
 
-    // A set of NodeIndices
-    type NodeIndicesSet;
-
-    // Type of element in a node's data container
-    type NodeDataType;
-
-    // Type of element in a point's data container
-    type PointDataType;
+    type RawNodeIndex;
 
     // Get depth of tree
     fn get_depth(&self) -> usize;
 
-    // Get adaptivity information
-    fn get_adaptive(&self) -> bool;
-
     // Get all leaves, gets local keys in multi-node setting
-    fn get_leaves(&self) -> &Self::NodeIndices;
-
-    // Get all keys as a set, gets local keys in a multi-node setting
-    fn get_leaves_set(&self) -> &Self::NodeIndicesSet;
-
-    // Get all keys as a set, gets local keys in a multi-node setting
-    fn get_keys_set(&self) -> &Self::NodeIndicesSet;
+    fn get_leaves(&self) -> &Self::LeafNodeIndices;
 
     // Get all keys at a given level, gets matching local keys in a multi-node setting
-    fn get_keys(&self, level: usize) -> Self::NodeIndices;
-
-    // Get all points, gets local keys in multi-node setting
-    fn get_all_points(&self) -> &Self::Points;
+    fn get_keys(&self) -> &Self::NodeIndices;
 
     // Get domain, gets global domain in multi-node setting
     fn get_domain(&self) -> &Self::Domain;
 
-    // Get tree leaf associated with a given point
-    fn get_leaf(&self, point: &Self::Point) -> Option<&Self::NodeIndex>;
+    fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
 
-    // Set data associated with a given leaf's points
-    fn set_points(&mut self, leaf: &Self::NodeIndex, points: Self::Points);
-
-    // Get points associated with a tree leaf
-    fn get_points(&self, leaf: &Self::NodeIndex) -> Option<&Self::Points>;
-
-    // Get data associated with a given point
-    fn get_point_data(&self, leaf: &Self::NodeIndex) -> Option<Vec<Self::PointDataType>>;
-
-    // Set data associated with a given leaf node.
-    fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType);
-
-    // Get data associated with a given leaf node.
-    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::NodeDataType>;
 }

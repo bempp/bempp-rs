@@ -410,11 +410,11 @@ impl Kernel for LaplaceKernel {
     }
 
     fn gradient(
-            &self,
-            sources: &[[f64; 3]],
-            charges: &[f64],
-            targets: &[[f64; 3]],
-        ) -> Result<Self::GradientData> {        
+        &self,
+        sources: &[[f64; 3]],
+        charges: &[f64],
+        targets: &[[f64; 3]],
+    ) -> Result<Self::GradientData> {
         solvers_traits::types::Result::Ok(self.gradient(sources, charges, targets))
     }
 
@@ -470,11 +470,7 @@ impl Translation for KiFmm {
         // Check potential
         let check_potential = self
             .kernel
-            .potential(
-                &sources[..],
-                &charges[..],
-                &upward_check_surface[..],
-            )
+            .potential(&sources[..], &charges[..], &upward_check_surface[..])
             .unwrap();
 
         let check_potential = Array1::from_vec(check_potential);
@@ -645,11 +641,7 @@ impl Translation for KiFmm {
                 out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
             let downward_check_potential = Array::from(
                 self.kernel
-                    .potential(
-                        &point_coordinates,
-                        &charges,
-                        &downward_check_surface,
-                    )
+                    .potential(&point_coordinates, &charges, &downward_check_surface)
                     .unwrap(),
             );
             let out_local = (self.kernel.scale(out_node.level())
@@ -686,11 +678,7 @@ impl Translation for KiFmm {
 
             let potential = self
                 .kernel
-                .potential(
-                    &source_coordinates,
-                    &charges,
-                    &targets_coordinates,
-                )
+                .potential(&source_coordinates, &charges, &targets_coordinates)
                 .unwrap();
 
             let targets = targets
@@ -870,20 +858,12 @@ mod test {
 
         let direct = kifmm
             .kernel
-            .potential(
-                &node_points,
-                &node_point_data,
-                &distant_point,
-            )
+            .potential(&node_points, &node_point_data, &distant_point)
             .unwrap();
 
         let result = kifmm
             .kernel
-            .potential(
-                &upward_equivalent_surface,
-                &root_multipole,
-                &distant_point,
-            )
+            .potential(&upward_equivalent_surface, &root_multipole, &distant_point)
             .unwrap();
 
         for (a, b) in result.iter().zip(direct.iter()) {
@@ -1055,11 +1035,7 @@ mod test {
             node_points.iter().map(|p| p.coordinate).collect();
         let direct_potential = kifmm
             .kernel
-            .potential(
-                &points,
-                &point_data,
-                &node_points_coordinates,
-            )
+            .potential(&points, &point_data, &node_points_coordinates)
             .unwrap();
 
         // Test whether answers are within 4 digits of each other
@@ -1114,11 +1090,7 @@ mod test {
             node_points.iter().map(|p| p.coordinate).collect();
         let direct_potential = kifmm
             .kernel
-            .potential(
-                &points,
-                &point_data,
-                &node_points_coordinates,
-            )
+            .potential(&points, &point_data, &node_points_coordinates)
             .unwrap();
 
         // Test whether answers are within 4 digits of each other

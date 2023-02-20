@@ -5,7 +5,7 @@ use crate::types::point::Point;
 
 impl PartialEq for Point {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
+        self.base_key == other.base_key
     }
 }
 
@@ -13,20 +13,20 @@ impl Eq for Point {}
 
 impl Ord for Point {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.key.cmp(&other.key)
+        self.base_key.cmp(&other.base_key)
     }
 }
 
 impl PartialOrd for Point {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // less_than(&self.morton, &other.morton)
-        Some(self.key.cmp(&other.key))
+        Some(self.base_key.cmp(&other.base_key))
     }
 }
 
 impl Hash for Point {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.key.hash(state);
+        self.base_key.hash(state);
     }
 }
 
@@ -70,17 +70,18 @@ mod test {
             .enumerate()
             .map(|(i, p)| Point {
                 coordinate: *p,
-                key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
+                base_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
+                encoded_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
-                data: [1.0, 0.],
+                data: vec![1.0, 0.],
             })
             .collect();
 
         points.sort();
 
         for i in 0..(points.len() - 1) {
-            let a = points[i];
-            let b = points[i + 1];
+            let a = &points[i];
+            let b = &points[i + 1];
             assert!(a <= b);
         }
     }

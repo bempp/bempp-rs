@@ -1557,17 +1557,14 @@ mod test {
         let a = MortonKey::from_point(&point, &domain, 2);
         let other = a.siblings()[2];
         let res_a = a.find_transfer_vector(&other);
-        
+
         let shifted_point = [0.1, 0.1, 0.1];
         let b = MortonKey::from_point(&shifted_point, &domain, 2);
         let other = b.siblings()[2];
         let res_b = b.find_transfer_vector(&other);
 
         assert_eq!(res_a, res_b);
-
     }
-
-    
 
     #[test]
     #[should_panic(expected = "Transfer vectors only computed for keys at levels deeper than 2")]

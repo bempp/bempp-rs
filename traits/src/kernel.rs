@@ -25,7 +25,7 @@ pub trait Kernel {
         charges: &[f64],
         targets: &[[f64; 3]],
     ) -> Result<Self::PotentialData>;
-    
+
     // Evaluate the kernel gradient.
     fn gradient(
         &self,
