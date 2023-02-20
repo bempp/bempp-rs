@@ -35,9 +35,9 @@ pub trait Translation {
 /// perform an FMM loop.
 pub trait FmmTree<'a>: Tree {
     // Container for data at tree nodes, must implement the FmmData trait
-    type LeafNodeIndex: FmmLeafNodeData;
+    type LeafNodeIndex: FmmLeafNodeData<'a>;
     type LeafNodeIndices: IntoIterator;
-    type NodeIndex: FmmNodeData;
+    type NodeIndex: FmmNodeData<'a>;
     type NodeIndices: IntoIterator;
     type RawNodeIndex;
 
@@ -65,22 +65,26 @@ pub trait FmmTree<'a>: Tree {
 
 /// FmmData containers extend a data container with specialised methods for FMM data,
 /// specifically to handle the multipole and local expansion coefficients.
-pub trait FmmNodeData {
+pub trait FmmNodeData<'a> {
     type CoefficientData;
     type CoefficientView;
 
     fn set_order(&mut self, order: usize);
     fn set_multipole_expansion(&mut self, data: &Self::CoefficientData);
-    fn get_multipole_expansion(&self) -> Self::CoefficientView;
+    fn get_multipole_expansion(&'a self) -> Self::CoefficientView;
     fn set_local_expansion(&mut self, data: &Self::CoefficientData);
-    fn get_local_expansion(&self) -> Self::CoefficientView;
+    fn get_local_expansion(&'a self) -> Self::CoefficientView;
 }
 
-pub trait FmmLeafNodeData {
-    type ParticleData;
-    type ParticleView;
-    fn get_leaf_data(&self) -> Self::ParticleView;
-    fn set_leaf_data(&self, data: &Self::ParticleData);
+pub trait FmmLeafNodeData<'a> {
+    type Points;
+    type PointData;
+    type PointDataView;
+    type PointIndices;
+    fn get_points(&'a self) -> Self::Points;
+    fn get_point_indices(&'a self) -> Self::PointIndices;
+    fn get_point_data(&'a self, index: usize) -> Self::PointDataView;
+    fn set_point_data(&mut self, index: usize, data: Self::PointData);
 }
 
 pub trait Fmm {

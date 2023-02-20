@@ -1,12 +1,11 @@
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
     vec,
 };
 
 use solvers_traits::{
-    fmm::{FmmNodeData, FmmTree},
+    fmm::FmmTree,
     tree::Tree,
 };
 
@@ -16,7 +15,7 @@ use crate::{
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
-        node::{self, LeafNode, LeafNodes, Node, NodeData, Nodes},
+        node::{LeafNode, LeafNodes, Node, NodeData, Nodes},
         point::{Point, PointType, Points},
         single_node::SingleNodeTree,
     },
