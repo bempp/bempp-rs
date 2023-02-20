@@ -35,23 +35,32 @@ pub trait Translation {
 /// perform an FMM loop.
 pub trait FmmTree<'a>: Tree {
     // Container for data at tree nodes, must implement the FmmData trait
-    // type FmmNodeDataType: FmmData;
-    // type NodeDataContainer;
-
     type LeafNodeIndex: FmmLeafNodeData;
     type LeafNodeIndices: IntoIterator;
     type NodeIndex: FmmNodeData;
     type NodeIndices: IntoIterator;
+    type RawNodeIndex;
 
     // Create a locally essential tree (LET) that handles all ghost octant communication.
     fn create_let(&mut self);
 
     // Query local data for interaction lists for a given node.
-    fn get_near_field(&'a self, node_index: &<Self as FmmTree<'a>>::NodeIndex) -> Option<<Self as FmmTree>::NodeIndices>;
-    fn get_x_list(&'a self, node_index: &<Self as FmmTree<'a>>::NodeIndex) -> Option<<Self as FmmTree>::NodeIndices>;
-    fn get_w_list(&'a self, node_index: &<Self as FmmTree<'a>>::NodeIndex) -> Option<<Self as FmmTree>::NodeIndices>;
-    fn get_interaction_list(&'a self, node_index: &<Self as FmmTree<'a>>::NodeIndex) -> Option<<Self as FmmTree>::NodeIndices>;
-
+    fn get_near_field(
+        &'a self,
+        node_index: &<Self as FmmTree<'a>>::RawNodeIndex,
+    ) -> Option<<Self as FmmTree>::LeafNodeIndices>;
+    fn get_x_list(
+        &'a self,
+        node_index: &<Self as FmmTree<'a>>::RawNodeIndex,
+    ) -> Option<<Self as FmmTree>::LeafNodeIndices>;
+    fn get_w_list(
+        &'a self,
+        node_index: &<Self as FmmTree<'a>>::RawNodeIndex,
+    ) -> Option<<Self as FmmTree>::NodeIndices>;
+    fn get_interaction_list(
+        &'a self,
+        node_index: &<Self as FmmTree<'a>>::RawNodeIndex,
+    ) -> Option<<Self as FmmTree>::NodeIndices>;
 }
 
 /// FmmData containers extend a data container with specialised methods for FMM data,

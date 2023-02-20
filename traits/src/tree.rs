@@ -16,7 +16,7 @@ pub trait Tree {
 
     // Container for multiple tree nodes
     type LeafNodeIndices;
-    
+
     // Unique index for tree nodes
     type NodeIndex;
 
@@ -38,5 +38,4 @@ pub trait Tree {
     fn get_domain(&self) -> &Self::Domain;
 
     fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
-
 }
