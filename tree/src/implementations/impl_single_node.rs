@@ -361,14 +361,14 @@ impl SingleNodeTree {
     }
 }
 
-impl Tree for SingleNodeTree {
+impl <'a>Tree<'a> for SingleNodeTree {
     type Domain = Domain;
     type Point = Point;
     type Points = Points;
-    type LeafNodeIndex = LeafNode;
-    type LeafNodeIndices = LeafNodes;
     type NodeIndex = Node;
     type NodeIndices = Nodes;
+    type LeafNodeIndex = LeafNode;
+    type LeafNodeIndices = LeafNodes;
     type RawNodeIndex = MortonKey;
 
     fn get_depth(&self) -> usize {
@@ -383,6 +383,10 @@ impl Tree for SingleNodeTree {
         &self.keys
     }
 
+    fn get_keys_mut(&mut self) -> &mut Self::NodeIndices {
+        &mut self.keys
+    }
+
     // Get domain, gets global domain in multi-node setting
     fn get_domain(&self) -> &Domain {
         &self.domain
@@ -391,22 +395,30 @@ impl Tree for SingleNodeTree {
     fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex> {
         &self.keys_set
     }
+
+    fn key_to_index(&self, key: Self::RawNodeIndex) -> usize {
+        self.key_to_index(key)
+    }
+
+    fn leaf_to_index(&self, key: Self::RawNodeIndex) -> usize {
+        self.leaf_to_index(key)
+    }
 }
 
 impl<'a> FmmTree<'a> for SingleNodeTree {
-    type NodeIndex = Node;
-    type LeafNodeIndex = LeafNode;
-    type LeafNodeIndices = Vec<&'a LeafNode>;
-    type NodeIndices = Vec<&'a Node>;
-    type RawNodeIndex = MortonKey;
+    type FmmNodeIndex = Node;
+    type FmmNodeIndices = Vec<&'a Node>;
+    type FmmLeafNodeIndex = LeafNode;
+    type FmmLeafNodeIndices = Vec<&'a LeafNode>;
+    type FmmRawNodeIndex = MortonKey;
 
     // Single node trees are already locally essential trees
     fn create_let(&mut self) {}
 
     fn get_interaction_list(
         &'a self,
-        node_index: &<Self as FmmTree>::RawNodeIndex,
-    ) -> Option<<Self as FmmTree>::NodeIndices> {
+        node_index: &Self::FmmRawNodeIndex,
+    ) -> Option<Self::FmmNodeIndices> {
         if node_index.level() >= 2 {
             let v_list = node_index
                 .parent()
@@ -431,8 +443,8 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
 
     fn get_near_field(
         &'a self,
-        node_index: &<Self as FmmTree>::RawNodeIndex,
-    ) -> Option<<Self as FmmTree>::LeafNodeIndices> {
+        node_index: &Self::FmmRawNodeIndex,
+    ) -> Option<Self::FmmLeafNodeIndices> {
         let mut u_list = Vec::<MortonKey>::new();
         let neighbours = node_index.neighbors();
 
@@ -476,8 +488,8 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
 
     fn get_w_list(
         &'a self,
-        node_index: &<Self as FmmTree>::RawNodeIndex,
-    ) -> Option<<Self as FmmTree>::NodeIndices> {
+        node_index: &Self::FmmRawNodeIndex,
+    ) -> Option<Self::FmmNodeIndices> {
         // Child level
         let w_list = node_index
             .neighbors()
@@ -499,8 +511,8 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
 
     fn get_x_list(
         &'a self,
-        node_index: &<Self as FmmTree>::RawNodeIndex,
-    ) -> Option<<Self as FmmTree>::LeafNodeIndices> {
+        node_index: &Self::FmmRawNodeIndex,
+    ) -> Option<Self::FmmLeafNodeIndices> {
         let x_list = node_index
             .parent()
             .neighbors()

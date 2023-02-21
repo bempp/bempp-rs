@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
-pub trait Tree {
+pub trait Tree<'a> {
     // The computational domain defined by the tree
     type Domain;
 
@@ -34,8 +34,14 @@ pub trait Tree {
     // Get all keys at a given level, gets matching local keys in a multi-node setting
     fn get_keys(&self) -> &Self::NodeIndices;
 
+    fn get_keys_mut(&mut self) -> &mut Self::NodeIndices;
+
     // Get domain, gets global domain in multi-node setting
     fn get_domain(&self) -> &Self::Domain;
 
     fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
+
+    fn key_to_index(&self, key: Self::RawNodeIndex) -> usize;
+    
+    fn leaf_to_index(&self, key: Self::RawNodeIndex) -> usize;
 }
