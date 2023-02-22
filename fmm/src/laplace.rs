@@ -750,13 +750,10 @@ impl <'a>Fmm for KiFmm<'a> {
         }
 
         // M2M over each key in a given level.
-        let keys = self.tree.get_keys();
-        let key_levels: Vec<u64> = keys.iter().map(|k| k.key.level()).collect();
+        let key_levels: Vec<u64> = self.tree.get_keys().iter().map(|n| n.key.level()).collect();
 
         for level in (1..=self.tree.get_depth()).rev() {
-            // let keys = self.tree.get_keys(level);
             let key_idxs: Vec<usize> = key_levels.iter().enumerate().filter(|(_, &l)| l==level.try_into().unwrap()).map(|(i, _)| i).collect();
-
             // TODO: multithreading over keys at each level
             for idx in key_idxs {
                 let key = &self.tree.get_keys()[idx].key.clone();
@@ -882,7 +879,7 @@ mod test {
         let npoints: usize = 10000;
         let points = points_fixture(npoints);
         let point_data = vec![vec![1.0, 0.0]; npoints];
-        let depth = 1;
+        let depth = 2;
         let n_crit = 150;
 
         let tree = Box::new(SingleNodeTree::new(
@@ -914,12 +911,10 @@ mod test {
             .potential(&points, &charges[..], &distant_point, &mut direct);
         
         let mut result = vec![0.];
-
         kifmm
             .kernel
             .potential(&upward_equivalent_surface, &root_multipole, &distant_point, &mut result);
 
-        println!("direct {:?} equivalent {:?}", direct, result);
         for (a, b) in result.iter().zip(direct.iter()) {
             assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
         }

@@ -54,21 +54,29 @@ pub fn group_points_by_encoded_leaves(points: &mut Points) -> LeafNodes {
             }
         }
     }
+    nodes.push(curr);
 
     nodes
 }
 
 /// Split tree coarse blocks by counting how many particles they contain.
-pub fn split_blocks(points: &mut Points, mut blocktree: MortonKeys, n_crit: usize) {
+pub fn split_blocks(points: &mut Points, mut blocktree: MortonKeys, n_crit: usize)  -> MortonKeys {
     let split_blocktree;
 
     loop {
         let mut new_blocktree = MortonKeys::new();
 
         // Map between blocks and the leaves they contain
-        assign_nodes_to_points(&blocktree, points);
+        let unmapped = assign_nodes_to_points(&blocktree, points);
 
-        let blocks = group_points_by_encoded_leaves(points);
+        let mut blocks = group_points_by_encoded_leaves(points);
+
+        // Add empty nodes to blocks 
+        for key in unmapped.iter() {
+            blocks.push(
+                LeafNode { key:*key, points: vec![] }
+            )
+        }
 
         // Generate a new blocktree with a block's children if they violate the n_crit parameter
         let mut check = 0;
@@ -90,13 +98,18 @@ pub fn split_blocks(points: &mut Points, mut blocktree: MortonKeys, n_crit: usiz
             blocktree = new_blocktree;
         }
     }
-    assign_nodes_to_points(&split_blocktree, points);
+    split_blocktree
+    // assign_nodes_to_points(&split_blocktree, points);
 }
 
 /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
-pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points) {
-    let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
-
+/// Return any keys that are unmapped.
+pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points) -> MortonKeys {
+    let mut map: HashMap<MortonKey, bool> =  HashMap::new();
+    for node in nodes.iter() {
+        map.insert(*node, false);
+    }
+    
     for point in points.iter_mut() {
         // Ancestor could be the key itself
         if let Some(ancestor) = point
@@ -105,11 +118,23 @@ pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points) {
             .into_iter()
             .sorted()
             .rev()
-            .find(|a| nodes.contains(a))
+            .find(|a| map.contains_key(a))
         {
             point.encoded_key = ancestor;
+            map.insert(ancestor, true);
         }
     }
+
+
+    let mut unmapped = MortonKeys::new();
+
+    for (node, is_mapped) in map.iter() {
+        if !is_mapped {
+            unmapped.push(*node)
+        }
+    }
+
+    unmapped
 }
 
 impl SingleNodeTree {
@@ -176,23 +201,38 @@ impl SingleNodeTree {
             index: 0,
         };
 
-        assign_nodes_to_points(&leaves, &mut points);
+        let unmapped = assign_nodes_to_points(&leaves, &mut points);
 
         // Sort the points into Morton order, to perform a groupby,
-        let leaves = group_points_by_encoded_leaves(&mut points);
+        let mut leaves = group_points_by_encoded_leaves(&mut points);
+        // Add empty nodes to leaves
+        for key in unmapped.iter() {
+            leaves.push(
+                LeafNode { key:*key, points: vec![] }
+            )
+        }
+
+
+        // Find all keys in tree
+        let mut hashes = HashSet::<MortonKey>::new();
         let mut keys = Vec::<Node>::new();
 
         for node in leaves.iter() {
             let ancestors = node
                 .key
-                .ancestors()
-                .into_iter()
-                .map(|k| Node {
-                    key: k.clone(),
-                    data: NodeData::default(),
-                })
-                .collect_vec();
-            keys.extend(ancestors);
+                .ancestors();
+
+            for key in ancestors.iter() {
+                if !hashes.contains(key) {
+                    // Insert a new node into keys
+                    keys.push(
+                        Node { key: *key, data: NodeData::default() }
+                    );
+
+                    hashes.insert(*key);
+                }
+            }
+
         }
 
         let depth = depth as usize;
@@ -260,13 +300,13 @@ impl SingleNodeTree {
         let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
         // Split the blocks based on the n_crit constraint
-        split_blocks(&mut points, blocktree, n_crit);
+        let mut balanced = split_blocks(&mut points, blocktree, n_crit);
 
         // TODO: Check if this is OK to do, when points don't occupy the whole grid, pretty sure it's NOT.
-        let mut balanced = MortonKeys {
-            keys: points.iter().map(|p| p.encoded_key).collect_vec(),
-            index: 0,
-        };
+        // let mut balanced = MortonKeys {
+        //     keys: points.iter().map(|p| p.encoded_key).collect_vec(),
+        //     index: 0,
+        // };
 
         // Balance and linearize
         balanced.sort();
@@ -277,19 +317,27 @@ impl SingleNodeTree {
         let leaves = group_points_by_encoded_leaves(&mut points);
 
         let depth = points.iter().map(|p| p.encoded_key.level()).max().unwrap() as usize;
-        let mut keys = Vec::new();
+        
+        // Find all keys in tree
+        let mut hashes = HashSet::<MortonKey>::new();
+        let mut keys = Vec::<Node>::new();
 
         for node in leaves.iter() {
             let ancestors = node
                 .key
-                .ancestors()
-                .into_iter()
-                .map(|k| Node {
-                    key: k.clone(),
-                    data: NodeData::default(),
-                })
-                .collect_vec();
-            keys.extend(ancestors);
+                .ancestors();
+
+            for key in ancestors.iter() {
+                if !hashes.contains(key) {
+                    // Insert a new node into keys
+                    keys.push(
+                        Node { key: *key, data: NodeData::default() }
+                    );
+
+                    hashes.insert(*key);
+                }
+            }
+
         }
 
         let keys_set: HashSet<MortonKey> = keys.iter().map(|k| k.key).collect();
