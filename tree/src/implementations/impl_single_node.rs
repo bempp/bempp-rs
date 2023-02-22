@@ -71,7 +71,7 @@ pub fn split_blocks(points: &mut Points, mut blocktree: MortonKeys, n_crit: usiz
 
         let mut blocks = group_points_by_encoded_leaves(points);
 
-        // Add empty nodes to blocks 
+        // Add empty nodes to blocks. TODO: FIX THIS HACK! 
         for key in unmapped.iter() {
             blocks.push(
                 LeafNode { key:*key, points: vec![] }
@@ -201,10 +201,12 @@ impl SingleNodeTree {
             index: 0,
         };
 
+        // Assign keys to points
         let unmapped = assign_nodes_to_points(&leaves, &mut points);
 
         // Sort the points into Morton order, to perform a groupby,
         let mut leaves = group_points_by_encoded_leaves(&mut points);
+
         // Add empty nodes to leaves
         for key in unmapped.iter() {
             leaves.push(
@@ -212,9 +214,8 @@ impl SingleNodeTree {
             )
         }
 
-
         // Find all keys in tree
-        let mut hashes = HashSet::<MortonKey>::new();
+        let mut tmp = HashSet::<MortonKey>::new();
         let mut keys = Vec::<Node>::new();
 
         for node in leaves.iter() {
@@ -223,20 +224,23 @@ impl SingleNodeTree {
                 .ancestors();
 
             for key in ancestors.iter() {
-                if !hashes.contains(key) {
+                if !tmp.contains(key) {
                     // Insert a new node into keys
                     keys.push(
                         Node { key: *key, data: NodeData::default() }
                     );
-
-                    hashes.insert(*key);
+                    tmp.insert(*key);
                 }
             }
-
         }
 
+        // Cast depth
         let depth = depth as usize;
+
+        // Form key set
         let keys_set: HashSet<MortonKey> = keys.iter().map(|k| k.key).collect();
+        
+        // Form index pointers
         let mut key_to_index: HashMap<MortonKey, usize> = HashMap::new();
         let mut leaf_to_index: HashMap<MortonKey, usize> = HashMap::new();
 
@@ -302,12 +306,6 @@ impl SingleNodeTree {
         // Split the blocks based on the n_crit constraint
         let mut balanced = split_blocks(&mut points, blocktree, n_crit);
 
-        // TODO: Check if this is OK to do, when points don't occupy the whole grid, pretty sure it's NOT.
-        // let mut balanced = MortonKeys {
-        //     keys: points.iter().map(|p| p.encoded_key).collect_vec(),
-        //     index: 0,
-        // };
-
         // Balance and linearize
         balanced.sort();
         balanced.balance();
@@ -315,8 +313,6 @@ impl SingleNodeTree {
 
         // Form leaf nodes
         let leaves = group_points_by_encoded_leaves(&mut points);
-
-        let depth = points.iter().map(|p| p.encoded_key.level()).max().unwrap() as usize;
         
         // Find all keys in tree
         let mut hashes = HashSet::<MortonKey>::new();
@@ -340,9 +336,13 @@ impl SingleNodeTree {
 
         }
 
+        // Find depth        
+        let depth = points.iter().map(|p| p.encoded_key.level()).max().unwrap() as usize;
+
+        // Calculate key set
         let keys_set: HashSet<MortonKey> = keys.iter().map(|k| k.key).collect();
 
-        // Impose order on final keys, and create index pointer.
+        // Form index pointers
         let mut key_to_index: HashMap<MortonKey, usize> = HashMap::new();
         let mut leaf_to_index: HashMap<MortonKey, usize> = HashMap::new();
 
