@@ -906,28 +906,32 @@ mod test {
         let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
 
         kifmm.run();
-        
+
         for leaf_node in kifmm.tree.get_leaves().iter() {
             if let Some(v_list) = kifmm.tree.get_interaction_list(&leaf_node.key) {
-                let downward_equivalent_surface =
-                    leaf_node.key.compute_surface(kifmm.order, kifmm.alpha_outer, kifmm.tree.get_domain());
-                let downward_check_surface =
-                leaf_node.key.compute_surface(kifmm.order, kifmm.alpha_inner, kifmm.tree.get_domain());
+                let downward_equivalent_surface = leaf_node.key.compute_surface(
+                    kifmm.order,
+                    kifmm.alpha_outer,
+                    kifmm.tree.get_domain(),
+                );
+                let downward_check_surface = leaf_node.key.compute_surface(
+                    kifmm.order,
+                    kifmm.alpha_inner,
+                    kifmm.tree.get_domain(),
+                );
                 // let local_expansion = kifmm.tree.get_local_expansion(key).unwrap();
                 let node_index = kifmm.tree.key_to_index(&leaf_node.key).unwrap();
                 let node = &kifmm.tree.get_keys()[node_index];
                 let local_expansion = node.get_local_expansion();
 
                 let mut equivalent = vec![0f64; local_expansion.len()];
-                
-                kifmm
-                    .kernel
-                    .potential(
-                        &downward_equivalent_surface,
-                        &local_expansion,
-                        &downward_check_surface,
-                        &mut equivalent
-                    );
+
+                kifmm.kernel.potential(
+                    &downward_equivalent_surface,
+                    &local_expansion,
+                    &downward_check_surface,
+                    &mut equivalent,
+                );
 
                 let mut direct = vec![0f64; local_expansion.len()];
 
@@ -941,17 +945,14 @@ mod test {
                     let source_node = &kifmm.tree.get_keys()[source_idx];
                     let multipole_expansion = source_node.get_multipole_expansion();
 
-
                     let mut tmp: Vec<f64> = vec![0f64; local_expansion.len()];
 
-                    kifmm
-                        .kernel
-                        .potential(
-                            &upward_equivalent_surface,
-                            &multipole_expansion,
-                            &downward_check_surface,
-                            &mut tmp
-                        );
+                    kifmm.kernel.potential(
+                        &upward_equivalent_surface,
+                        &multipole_expansion,
+                        &downward_check_surface,
+                        &mut tmp,
+                    );
 
                     direct = direct.iter().zip(tmp.iter()).map(|(d, t)| d + t).collect();
                 }
@@ -990,27 +991,32 @@ mod test {
         let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
 
         kifmm.run();
-        
+
         let leaf = kifmm.tree.get_leaves()[42].clone();
         let target_indices: Vec<usize> = leaf.get_points().iter().map(|p| p.global_idx).collect();
-        let fmm_potential: Vec<f64> = target_indices.iter().map(|i| *leaf.get_potential(*i)).collect();
+        let fmm_potential: Vec<f64> = target_indices
+            .iter()
+            .map(|i| *leaf.get_potential(*i))
+            .collect();
 
         let node_points = leaf.get_points();
-         
+
         let node_points_coordinates: Vec<[f64; 3]> =
             node_points.iter().map(|p| p.coordinate).collect();
-        
+
         let mut direct_potential = vec![0f64; node_points.len()];
         let charges: Vec<f64> = point_data.iter().map(|d| d[0]).collect();
-        kifmm
-            .kernel
-            .potential(&points, &charges[..], &node_points_coordinates, &mut direct_potential);
+        kifmm.kernel.potential(
+            &points,
+            &charges[..],
+            &node_points_coordinates,
+            &mut direct_potential,
+        );
 
         // Test whether answers are within 4 digits of each other
         for (a, b) in fmm_potential.iter().zip(direct_potential.iter()) {
             assert_approx_eq!(f64, *a, *b, epsilon = 1.0);
         }
-
     }
 
     #[test]
@@ -1041,21 +1047,27 @@ mod test {
         let mut kifmm = KiFmm::new(5, 1.05, 1.95, tree, kernel);
 
         kifmm.run();
-        
+
         let leaf = kifmm.tree.get_leaves()[42].clone();
         let target_indices: Vec<usize> = leaf.get_points().iter().map(|p| p.global_idx).collect();
-        let fmm_potential: Vec<f64> = target_indices.iter().map(|i| *leaf.get_potential(*i)).collect();
+        let fmm_potential: Vec<f64> = target_indices
+            .iter()
+            .map(|i| *leaf.get_potential(*i))
+            .collect();
 
         let node_points = leaf.get_points();
-         
+
         let node_points_coordinates: Vec<[f64; 3]> =
             node_points.iter().map(|p| p.coordinate).collect();
-        
+
         let mut direct_potential = vec![0f64; node_points.len()];
         let charges: Vec<f64> = point_data.iter().map(|d| d[0]).collect();
-        kifmm
-            .kernel
-            .potential(&points, &charges[..], &node_points_coordinates, &mut direct_potential);
+        kifmm.kernel.potential(
+            &points,
+            &charges[..],
+            &node_points_coordinates,
+            &mut direct_potential,
+        );
 
         // Test whether answers are within 4 digits of each other
         for (a, b) in fmm_potential.iter().zip(direct_potential.iter()) {
