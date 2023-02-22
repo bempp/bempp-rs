@@ -1,3 +1,5 @@
+use std::vec;
+
 use itertools::Itertools;
 use solvers_traits::fmm::{FmmLeafNodeData, FmmNodeData};
 
@@ -16,6 +18,17 @@ impl Default for LeafNode {
     }
 }
 
+impl Default for NodeData {
+    fn default() -> Self {
+        NodeData { 
+            field_size: Vec::default(), 
+            raw: Vec::default(), 
+            displacement: Vec::default(), 
+            init: false
+        }
+    }
+}
+
 impl Default for Node {
     fn default() -> Self {
         Node {
@@ -26,7 +39,7 @@ impl Default for Node {
 }
 
 impl <'a>FmmNodeData<'a> for Node {
-    type CoefficientData = Vec<f64>;
+    type CoefficientData = &'a [f64];
     type CoefficientView = &'a [f64];
 
     fn set_order(&mut self, order: usize) {
@@ -44,6 +57,7 @@ impl <'a>FmmNodeData<'a> for Node {
             .collect();
 
         self.data.raw = vec![0f64; ncoeffs * 2];
+        self.data.init = true;
     }
 
     fn get_local_expansion(&'a self) -> Self::CoefficientView {
@@ -54,49 +68,64 @@ impl <'a>FmmNodeData<'a> for Node {
         &self.data.raw[self.data.displacement[1]..]
     }
 
-    fn set_local_expansion(&mut self, data: &Self::CoefficientData) {
+    fn set_local_expansion(&mut self, data: Self::CoefficientData, order: usize) {
+
+        if !self.data.init {
+            self.set_order(order);
+        }
         for (i, elem) in self.data.raw[self.data.displacement[0]..self.data.displacement[1]]
             .iter_mut()
             .enumerate()
         {
-            *elem = data[i]
+            *elem += data[i]
         }
-    }
 
-    fn set_multipole_expansion(&mut self, data: &Self::CoefficientData) {
+    } 
+
+    fn set_multipole_expansion(&mut self, data: Self::CoefficientData, order: usize) {
+        
+        if !self.data.init {
+            self.set_order(order);
+        }
+        
         for (i, elem) in self.data.raw[self.data.displacement[1]..]
             .iter_mut()
             .enumerate()
         {
-            *elem = data[i]
+            *elem += data[i]
         }
     }
 }
 
 impl <'a>FmmLeafNodeData<'a> for LeafNode {
-    type Points = Vec<&'a Point>;
-    type PointData = Vec<f64>;
-    type PointDataView = &'a Vec<f64>;
-    type PointIndices = Vec<&'a usize>;
+    type Points = &'a Vec<Point>;
+    type PointData = f64;
+    type PointDataView = &'a f64;
+    type PointIndices = &'a Vec<usize>;
 
     fn get_points(&'a self) -> Self::Points {
-        let pts = self.points.iter().collect();
-        pts
+        &self.points
     }
 
-    fn get_point_indices(&'a self) -> Self::PointIndices {
-        let pts: Vec<&usize> = self.points.iter().map(|p| &p.global_idx).collect();
-        pts
-    }
-
-    fn get_point_data(&'a self, index: usize) -> Self::PointDataView {
+    fn get_charge(&'a self, index: usize) -> Self::PointDataView {
         let res: Vec<&Point> = self.points.iter().filter(|&p| p.global_idx == index).collect();
-        &res[0].data
+        &res[0].data[0]
     }
 
-    fn set_point_data(&mut self, index: usize, data: Self::PointData) {
+    fn set_charge(&mut self, index: usize, data: Self::PointData) {
         let mut pts: Vec<&mut Point> = self.points.iter_mut().filter(|p| p.global_idx == index).collect();
         let pt: &mut Point = pts[0];
-        pt.data =  data;
+        pt.data[0] =  data;
+    }
+
+    fn get_potential(&'a self, index: usize) -> Self::PointDataView {
+        let res: Vec<&Point> = self.points.iter().filter(|&p| p.global_idx == index).collect();
+        &res[0].data[1] 
+    }
+
+    fn set_potential(&mut self, index: usize, data: Self::PointData) {
+        let mut pts: Vec<&mut Point> = self.points.iter_mut().filter(|p| p.global_idx == index).collect();
+        let pt: &mut Point = pts[0];
+        pt.data[1] =  data; 
     }
 }

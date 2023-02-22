@@ -387,6 +387,10 @@ impl <'a>Tree<'a> for SingleNodeTree {
         &mut self.keys
     }
 
+    fn get_leaves_mut(&mut self) -> &mut Self::LeafNodeIndices {
+        &mut self.leaves
+    }
+
     // Get domain, gets global domain in multi-node setting
     fn get_domain(&self) -> &Domain {
         &self.domain
@@ -396,12 +400,12 @@ impl <'a>Tree<'a> for SingleNodeTree {
         &self.keys_set
     }
 
-    fn key_to_index(&self, key: Self::RawNodeIndex) -> usize {
-        self.key_to_index(key)
+    fn key_to_index(&self, key: &Self::RawNodeIndex) -> usize {
+        self.key_to_index[key]
     }
 
-    fn leaf_to_index(&self, key: Self::RawNodeIndex) -> usize {
-        self.leaf_to_index(key)
+    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> usize {
+        self.leaf_to_index[key]
     }
 }
 

@@ -31,6 +31,8 @@ pub trait Tree<'a> {
     // Get all leaves, gets local keys in multi-node setting
     fn get_leaves(&self) -> &Self::LeafNodeIndices;
 
+    fn get_leaves_mut(&mut self) -> &mut Self::LeafNodeIndices;
+
     // Get all keys at a given level, gets matching local keys in a multi-node setting
     fn get_keys(&self) -> &Self::NodeIndices;
 
@@ -41,7 +43,7 @@ pub trait Tree<'a> {
 
     fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
 
-    fn key_to_index(&self, key: Self::RawNodeIndex) -> usize;
+    fn key_to_index(&self, key: &Self::RawNodeIndex) -> usize;
     
-    fn leaf_to_index(&self, key: Self::RawNodeIndex) -> usize;
+    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> usize;
 }

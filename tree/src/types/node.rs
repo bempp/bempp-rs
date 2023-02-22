@@ -16,9 +16,10 @@ pub struct Node {
 
 pub type Nodes = Vec<Node>;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct NodeData {
     pub field_size: Vec<usize>,
     pub raw: Vec<f64>,
     pub displacement: Vec<usize>,
+    pub init: bool
 }

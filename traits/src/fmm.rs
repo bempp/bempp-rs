@@ -2,15 +2,16 @@
 
 use crate::tree::Tree;
 
+// pub trait Translation {}
+
 pub trait Translation {
     type NodeIndex;
-    type LeafNodeIndex;
 
     // Particle to Multipole
-    fn p2m(&mut self, node: &Self::LeafNodeIndex);
+    fn p2m(&mut self, leaf: &Self::NodeIndex);
 
-    // // Multipole to Multipole
-    // fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    // Multipole to Multipole
+    fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
     // // Multipole to Local
     // fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
@@ -75,9 +76,9 @@ pub trait FmmNodeData<'a> {
     type CoefficientView;
 
     fn set_order(&mut self, order: usize);
-    fn set_multipole_expansion(&mut self, data: &Self::CoefficientData);
+    fn set_multipole_expansion(&mut self, data: Self::CoefficientData, order: usize);
     fn get_multipole_expansion(&'a self) -> Self::CoefficientView;
-    fn set_local_expansion(&mut self, data: &Self::CoefficientData);
+    fn set_local_expansion(&mut self, data: Self::CoefficientData, order: usize);
     fn get_local_expansion(&'a self) -> Self::CoefficientView;
 }
 
@@ -87,16 +88,18 @@ pub trait FmmLeafNodeData<'a> {
     type PointDataView;
     type PointIndices;
     fn get_points(&'a self) -> Self::Points;
-    fn get_point_indices(&'a self) -> Self::PointIndices;
-    fn get_point_data(&'a self, index: usize) -> Self::PointDataView;
-    fn set_point_data(&mut self, index: usize, data: Self::PointData);
+    // fn get_point_indices(&'a self) -> Self::PointIndices;
+    fn get_charge(&'a self, index: usize) -> Self::PointDataView;
+    fn get_potential(&'a self, index: usize) -> Self::PointDataView;
+    fn set_charge(&mut self, index: usize, data: Self::PointData);
+    fn set_potential(&mut self, index: usize, data: Self::PointData);
 }
 
 pub trait Fmm {
     // FMM core loop
     fn upward_pass(&mut self);
-    fn downward_pass(&mut self);
-    fn run(&mut self);
+    // fn downward_pass(&mut self);
+    // fn run(&mut self);
 }
 
 // Special interface for NodeIndices in the KIFMM
