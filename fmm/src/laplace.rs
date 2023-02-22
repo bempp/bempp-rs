@@ -521,7 +521,6 @@ impl<'a> Translation for KiFmm<'a> {
         let in_node_idx = self.tree.key_to_index(in_node);
         let in_node = &self.tree.get_keys()[in_node_idx];
 
-        // let in_multipole = Array::from_vec(self.tree.get_multipole_expansion(in_node).unwrap());
         let in_multipole = ArrayView::from(in_node.get_multipole_expansion());
 
         let operator_index = in_node
@@ -539,192 +538,196 @@ impl<'a> Translation for KiFmm<'a> {
         out_node.set_multipole_expansion(out_multipole, self.order)
     }
 
-    // fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-    //     let in_local = Array::from(self.tree.get_local_expansion(in_node).unwrap());
+    fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let in_node_index = self.tree.key_to_index(in_node);
+        let in_node = &self.tree.get_keys()[in_node_index];
+        let in_local = ArrayView::from(in_node.get_local_expansion());
 
-    //     let operator_index = out_node
-    //         .siblings()
-    //         .iter()
-    //         .position(|&x| x == *out_node)
-    //         .unwrap();
+        let operator_index = out_node
+            .siblings()
+            .iter()
+            .position(|&x| x == *out_node)
+            .unwrap();
 
-    //     let out_local = self.l2l[operator_index].dot(&in_local).to_vec();
+        let out_local = self.l2l[operator_index].dot(&in_local);
+        let out_local = out_local.as_slice().unwrap();
 
-    //     if let Some(curr) = self.tree.get_local_expansion(&out_node) {
-    //         let curr: Vec<f64> = curr
-    //             .iter()
-    //             .zip(out_local.iter())
-    //             .map(|(&a, &b)| a + b)
-    //             .collect();
+        let out_node_idx = self.tree.key_to_index(out_node);
+        let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+        out_node.set_local_expansion(out_local, self.order)
+    }
 
-    //         self.tree.set_local_expansion(&out_node, &curr, self.order);
-    //     } else {
-    //         self.tree
-    //             .set_local_expansion(&out_node, &out_local, self.order);
-    //     }
-    // }
+    fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let ncoeffs = KiFmm::ncoeffs(self.order);
 
-    // fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-    //     let ncoeffs = KiFmm::ncoeffs(self.order);
-    //     // Locate correct components of compressed M2L matrix.
-    //     let transfer_vector = out_node.find_transfer_vector(in_node);
-    //     let v_idx = self
-    //         .transfer_vectors
-    //         .iter()
-    //         .position(|&x| x == transfer_vector)
-    //         .unwrap();
+        // Locate correct components of compressed M2L matrix.
+        let transfer_vector = out_node.find_transfer_vector(in_node);
+        let v_idx = self
+            .transfer_vectors
+            .iter()
+            .position(|&x| x == transfer_vector)
+            .unwrap();
 
-    //     let v_lidx = v_idx * ncoeffs;
-    //     let v_ridx = v_lidx + ncoeffs;
-    //     let vt_sub = self.m2l.2.slice(s![.., v_lidx..v_ridx]);
+        let v_lidx = v_idx * ncoeffs;
+        let v_ridx = v_lidx + ncoeffs;
+        let vt_sub = self.m2l.2.slice(s![.., v_lidx..v_ridx]);
 
-    //     // TODO: Remove copy.
-    //     let in_multipole = Array::from(self.tree.get_multipole_expansion(&in_node).unwrap());
+        // TODO: Remove copy.
+        let in_node_idx = self.tree.key_to_index(in_node);
+        let in_node = &self.tree.get_keys()[in_node_idx];
+        let in_multipole = ArrayView::from(in_node.get_multipole_expansion());
 
-    //     let out_local = KiFmm::m2l_scale(in_node.level())
-    //         * self.kernel.scale(in_node.level())
-    //         * self.dc2e_inv.0.dot(
-    //             &self
-    //                 .dc2e_inv
-    //                 .1
-    //                 .dot(&self.m2l.0.dot(&self.m2l.1.dot(&vt_sub.dot(&in_multipole)))),
-    //         );
+        let out_local = KiFmm::m2l_scale(in_node.key.level())
+            * self.kernel.scale(in_node.key.level())
+            * self.dc2e_inv.0.dot(
+                &self
+                    .dc2e_inv
+                    .1
+                    .dot(&self.m2l.0.dot(&self.m2l.1.dot(&vt_sub.dot(&in_multipole)))),
+            );
 
-    //     let out_local = out_local.to_vec();
+        let out_local = out_local.as_slice().unwrap();
+        let out_node_idx = self.tree.key_to_index(out_node);
+        let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+        out_node.set_local_expansion(out_local, self.order)
+    }
 
-    //     if let Some(curr) = self.tree.get_local_expansion(&out_node) {
-    //         let curr: Vec<f64> = curr
-    //             .iter()
-    //             .zip(out_local.iter())
-    //             .map(|(&a, &b)| a + b)
-    //             .collect();
+    fn l2p(&mut self, node: &Self::NodeIndex) {
+        let downward_equivalent_surface =
+            node.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
 
-    //         self.tree.set_local_expansion(out_node, &curr, self.order);
-    //     } else {
-    //         self.tree
-    //             .set_local_expansion(out_node, &out_local, self.order);
-    //     }
-    // }
+        let node_index = self.tree.key_to_index(node);
+        let leaf_node_index = self.tree.leaf_to_index(node);
 
-    // fn l2p(&mut self, node: &Self::NodeIndex) {
-    //     let local_expansion = self.tree.get_local_expansion(node).unwrap();
-    //     let downward_equivalent_surface =
-    //         node.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
-    //     let points = self.tree.get_points(node).unwrap();
-    //     let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
-    //     let potential = self
-    //         .kernel
-    //         .potential(
-    //             &downward_equivalent_surface,
-    //             &local_expansion,
-    //             &point_coordinates,
-    //         )
-    //         .unwrap();
-    //     let points = points
-    //         .iter()
-    //         .zip(potential.iter())
-    //         .map(|(pnt, pot)| Point {
-    //             coordinate: pnt.coordinate,
-    //             global_idx: pnt.global_idx,
-    //             key: pnt.key,
-    //             data: [pnt.data[0], *pot + pnt.data[1]],
-    //         })
-    //         .collect_vec();
+        let node = &self.tree.get_keys()[node_index];
+        let leaf_node = &self.tree.get_leaves()[leaf_node_index];
 
-    //     self.tree.set_points(node, points);
-    // }
+        let local_expansion = node.get_local_expansion();
+        let points = leaf_node.get_points();
+        let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
 
-    // fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-    //     let multipole_expansion = self.tree.get_multipole_expansion(in_node).unwrap();
-    //     let upward_equivalent_surface =
-    //         in_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
-    //     let points = self.tree.get_points(out_node).unwrap();
-    //     let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
-    //     let potential = self
-    //         .kernel
-    //         .potential(
-    //             &upward_equivalent_surface,
-    //             &multipole_expansion,
-    //             &point_coordinates,
-    //         )
-    //         .unwrap();
+        let mut potential = vec![0f64; point_coordinates.len()];
 
-    //     let points = points
-    //         .iter()
-    //         .zip(potential.iter())
-    //         .map(|(pnt, pot)| Point {
-    //             coordinate: pnt.coordinate,
-    //             global_idx: pnt.global_idx,
-    //             key: pnt.key,
-    //             data: [pnt.data[0], *pot + pnt.data[1]],
-    //         })
-    //         .collect_vec();
-    //     self.tree.set_points(out_node, points);
-    // }
+        self.kernel.potential(
+            &downward_equivalent_surface,
+            &local_expansion,
+            &point_coordinates,
+            &mut potential,
+        );
 
-    // fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-    //     if let Some(points) = self.tree.get_points(in_node) {
-    //         // TODO: Remove copy
-    //         let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
-    //         let charges = points.iter().map(|&p| p.data[0]).collect_vec();
-    //         let downward_check_surface =
-    //             out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
-    //         let downward_check_potential = Array::from(
-    //             self.kernel
-    //                 .potential(&point_coordinates, &charges, &downward_check_surface)
-    //                 .unwrap(),
-    //         );
-    //         let out_local = (self.kernel.scale(out_node.level())
-    //             * self
-    //                 .dc2e_inv
-    //                 .0
-    //                 .dot(&self.dc2e_inv.1.dot(&downward_check_potential)))
-    //         .to_vec();
+        let out_node = &mut self.tree.get_leaves_mut()[leaf_node_index];
+        let trg_indices: Vec<usize> = out_node.get_points().iter().map(|p| p.global_idx).collect();
+        for (&i, &p) in trg_indices.iter().zip(potential.iter()) {
+            out_node.set_potential(i, p)
+        }
+    }
 
-    //         if let Some(curr) = self.tree.get_local_expansion(&out_node) {
-    //             let curr: Vec<f64> = curr
-    //                 .iter()
-    //                 .zip(out_local.iter())
-    //                 .map(|(&a, &b)| a + b)
-    //                 .collect();
+    fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let upward_equivalent_surface =
+            in_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
 
-    //             self.tree.set_local_expansion(out_node, &curr, self.order);
-    //         } else {
-    //             self.tree
-    //                 .set_local_expansion(out_node, &out_local, self.order);
-    //         }
-    //     }
-    // }
+        let in_node_idx = self.tree.key_to_index(in_node);
+        let in_node = &self.tree.get_keys()[in_node_idx];
 
-    // fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-    //     if let (Some(sources), Some(targets)) = (
-    //         self.tree.get_points(in_node),
-    //         self.tree.get_points(out_node),
-    //     ) {
-    //         // TODO: Get rid of this copy
-    //         let source_coordinates: Vec<[f64; 3]> = sources.iter().map(|p| p.coordinate).collect();
-    //         let charges = sources.iter().map(|&p| p.data[0]).collect_vec();
-    //         let targets_coordinates: Vec<[f64; 3]> = targets.iter().map(|p| p.coordinate).collect();
+        let multipole_expansion = in_node.get_multipole_expansion();
 
-    //         let potential = self
-    //             .kernel
-    //             .potential(&source_coordinates, &charges, &targets_coordinates)
-    //             .unwrap();
+        let out_node_idx = self.tree.leaf_to_index(out_node);
+        let out_node = &self.tree.get_leaves()[out_node_idx];
+        let point_coordinates: Vec<[f64; 3]> =
+            out_node.get_points().iter().map(|p| p.coordinate).collect();
 
-    //         let targets = targets
-    //             .iter()
-    //             .zip(potential.iter())
-    //             .map(|(pnt, pot)| Point {
-    //                 coordinate: pnt.coordinate,
-    //                 global_idx: pnt.global_idx,
-    //                 key: pnt.key,
-    //                 data: [pnt.data[0], *pot + pnt.data[1]],
-    //             })
-    //             .collect_vec();
+        let mut potential = vec![0f64; point_coordinates.len()];
+        self.kernel.potential(
+            &upward_equivalent_surface,
+            &multipole_expansion,
+            &point_coordinates,
+            &mut potential,
+        );
 
-    //         self.tree.set_points(out_node, targets);
-    //     }
-    // }
+        let out_node = &mut self.tree.get_leaves_mut()[out_node_idx];
+        let trg_indices: Vec<usize> = out_node.get_points().iter().map(|p| p.global_idx).collect();
+        for (&i, &p) in trg_indices.iter().zip(potential.iter()) {
+            out_node.set_potential(i, p)
+        }
+    }
+
+    fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let in_node_idx = self.tree.leaf_to_index(in_node);
+        let in_node = &self.tree.get_leaves()[in_node_idx];
+
+        if in_node.get_points().len() > 0 {
+            let points = in_node.get_points();
+            let src_indices: Vec<usize> =
+                in_node.get_points().iter().map(|p| p.global_idx).collect();
+            let charges: Vec<f64> = src_indices
+                .iter()
+                .map(|i| *in_node.get_charge(*i))
+                .collect();
+            let point_coordinates: Vec<[f64; 3]> = points.iter().map(|p| p.coordinate).collect();
+
+            let downward_check_surface =
+                out_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
+
+            let mut downward_check_potential = vec![0f64; downward_check_surface.len()];
+
+            self.kernel.potential(
+                &point_coordinates,
+                &charges,
+                &downward_check_surface,
+                &mut downward_check_potential,
+            );
+
+            let downward_check_potential = ArrayView::from(&downward_check_potential);
+
+            let out_local = (self.kernel.scale(out_node.level())
+                * self
+                    .dc2e_inv
+                    .0
+                    .dot(&self.dc2e_inv.1.dot(&downward_check_potential)));
+
+            let out_local = out_local.as_slice().unwrap();
+            let out_node_idx = self.tree.key_to_index(out_node);
+            let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+            out_node.set_local_expansion(out_local, self.order)
+        }
+    }
+
+    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
+        let in_node_idx = self.tree.leaf_to_index(in_node);
+        let in_node = &self.tree.get_leaves()[in_node_idx];
+        let out_node_idx = self.tree.leaf_to_index(out_node);
+        let out_node = &self.tree.get_leaves()[out_node_idx];
+        let sources = in_node.get_points();
+        let targets = out_node.get_points();
+
+        if sources.len() > 0 && targets.len() > 0 {
+            // TODO: Get rid of this copy
+            let source_coordinates: Vec<[f64; 3]> = sources.iter().map(|p| p.coordinate).collect();
+            let src_indices: Vec<usize> = sources.iter().map(|p| p.global_idx).collect();
+            let charges: Vec<f64> = src_indices
+                .iter()
+                .map(|i| *in_node.get_charge(*i))
+                .collect();
+
+            let targets_coordinates: Vec<[f64; 3]> = targets.iter().map(|p| p.coordinate).collect();
+
+            let mut potential = vec![0f64; targets_coordinates.len()];
+
+            self.kernel.potential(
+                &source_coordinates,
+                &charges,
+                &targets_coordinates,
+                &mut potential,
+            );
+
+            let out_node = &mut self.tree.get_leaves_mut()[out_node_idx];
+            let trg_indices: Vec<usize> =
+                out_node.get_points().iter().map(|p| p.global_idx).collect();
+            for (&i, &p) in trg_indices.iter().zip(potential.iter()) {
+                out_node.set_potential(i, p)
+            }
+        }
+    }
 }
 
 impl<'a> Fmm for KiFmm<'a> {
@@ -915,52 +918,6 @@ mod test {
             assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
         }
     }
-
-    // #[test]
-    // fn test_m2l_scaling() {
-    //     let point = [0.5, 0.5, 0.5];
-    //     let domain = Domain {
-    //         origin: [0., 0., 0.],
-    //         diameter: [1., 1., 1.],
-    //     };
-    //     let order = 2;
-    //     let alpha_inner = 1.05;
-    //     let alpha_outer = 1.95;
-
-    //     let kernel = LaplaceKernel {
-    //         dim: 3,
-    //         is_singular: true,
-    //         value_dimension: 3,
-    //     };
-
-    //     // Test that same transfer vector results in same M2L matrices
-    //     let a = MortonKey::from_point(&point, &domain, 3);
-    //     let other_a = a.siblings()[2];
-    //     let res_a = a.find_transfer_vector(&other_a);
-
-    //     let b = MortonKey::from_point(&point, &domain, 7);
-    //     let other_b = b.siblings()[2];
-    //     let res_b = b.find_transfer_vector(&other_b);
-    //     assert_eq!(res_a, res_b);
-
-    //     let target_check_surface_a = a.compute_surface(order, alpha_inner, &domain);
-    //     let source_equivalent_surface_a = other_a.compute_surface(order, alpha_inner, &domain);
-    //     let se2tc_a = kernel
-    //         .gram(&source_equivalent_surface_a, &target_check_surface_a)
-    //         .unwrap();
-    //     let se2tc_a = Array::from(se2tc_a);
-
-    //     let target_check_surface_b = b.compute_surface(order, alpha_inner, &domain);
-    //     let source_equivalent_surface_b = other_b.compute_surface(order, alpha_inner, &domain);
-    //     let se2tc_b = kernel
-    //         .gram(&source_equivalent_surface_b, &target_check_surface_b)
-    //         .unwrap();
-    //     let se2tc_b = Array::from(se2tc_b);
-    //     //
-    //     // println!("SE2TC A {:?}", KiFmm::m2l_scale(7) * se2tc_a);
-    //     // println!("SE2TC B {:?}", se2tc_b);
-    //     // assert!(false)
-    // }
 
     // #[test]
     // fn test_m2l() {
