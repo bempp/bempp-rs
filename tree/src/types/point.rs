@@ -15,7 +15,7 @@ pub struct Point {
     pub global_idx: usize,
     // Key at finest level of encoding
     pub base_key: MortonKey,
-    // Key at a given level of encoding
+    // Key at a given level of encoding, strictly an ancestor of 'base_key'
     pub encoded_key: MortonKey,
     // Data associated with this Point
     pub data: Vec<PointType>,

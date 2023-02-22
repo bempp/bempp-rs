@@ -13,23 +13,23 @@ pub trait Translation {
     // Multipole to Multipole
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // // Multipole to Local
-    // fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    // Multipole to Local
+    fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // // Local to Local
-    // fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    // Local to Local
+    fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // // Multipole to Particle
-    // fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    // Multipole to Particle
+    fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // // Local to Particle
-    // fn l2p(&mut self, node: &Self::NodeIndex);
+    // Local to Particle
+    fn l2p(&mut self, node: &Self::NodeIndex);
 
-    // // Particle to Local
-    // fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    // Particle to Local
+    fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // // Particle to Particle
-    // fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
+    // Particle to Particle
+    fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 }
 
 /// FmmTree take care of ghost nodes on other processors, and have access to all
@@ -38,35 +38,32 @@ pub trait Translation {
 pub trait FmmTree<'a>: Tree<'a>
 {
     // Container for data at tree nodes, must implement the FmmData trait
-    type FmmLeafNodeIndex: FmmLeafNodeData<'a>;
-    type FmmLeafNodeIndices: IntoIterator;
-    type FmmNodeIndex: FmmNodeData<'a>;
-    type FmmNodeIndices: IntoIterator;
     type FmmRawNodeIndex;
+    type FmmRawNodeIndices: IntoIterator;
 
     // Create a locally essential tree (LET) that handles all ghost octant communication.
     fn create_let(&mut self);
 
     // Query local data for interaction lists for a given node.
     fn get_near_field(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmLeafNodeIndices>;
+    ) -> Option<Self::FmmRawNodeIndices>;
 
     fn get_x_list(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmLeafNodeIndices>;
+    ) -> Option<Self::FmmRawNodeIndices>;
     
     fn get_w_list(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmNodeIndices>;
+    ) -> Option<Self::FmmRawNodeIndices>;
     
     fn get_interaction_list(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmNodeIndices>;
+    ) -> Option<Self::FmmRawNodeIndices>;
 }
 
 /// FmmData containers extend a data container with specialised methods for FMM data,
@@ -87,19 +84,19 @@ pub trait FmmLeafNodeData<'a> {
     type PointData;
     type PointDataView;
     type PointIndices;
-    fn get_points(&'a self) -> Self::Points;
-    // fn get_point_indices(&'a self) -> Self::PointIndices;
+    fn get_points(&'a self) -> &'a Self::Points;
+    fn get_points_mut(&mut self) -> &mut Self::Points;
     fn get_charge(&'a self, index: usize) -> Self::PointDataView;
     fn get_potential(&'a self, index: usize) -> Self::PointDataView;
     fn set_charge(&mut self, index: usize, data: Self::PointData);
     fn set_potential(&mut self, index: usize, data: Self::PointData);
 }
 
-pub trait Fmm {
+pub trait Fmm<'a> {
     // FMM core loop
     fn upward_pass(&mut self);
-    // fn downward_pass(&mut self);
-    // fn run(&mut self);
+    fn downward_pass(&mut self);
+    fn run(&mut self);
 }
 
 // Special interface for NodeIndices in the KIFMM

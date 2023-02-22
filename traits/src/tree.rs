@@ -43,7 +43,7 @@ pub trait Tree<'a> {
 
     fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
 
-    fn key_to_index(&self, key: &Self::RawNodeIndex) -> usize;
+    fn key_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize>;
     
-    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> usize;
+    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize>;
 }

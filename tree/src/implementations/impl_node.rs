@@ -98,13 +98,17 @@ impl <'a>FmmNodeData<'a> for Node {
 }
 
 impl <'a>FmmLeafNodeData<'a> for LeafNode {
-    type Points = &'a Vec<Point>;
+    type Points =  Vec<Point>;
     type PointData = f64;
     type PointDataView = &'a f64;
     type PointIndices = &'a Vec<usize>;
 
-    fn get_points(&'a self) -> Self::Points {
+    fn get_points(&'a self) -> &'a Self::Points {
         &self.points
+    }
+
+    fn get_points_mut(&mut self) -> &mut Self::Points {
+        &mut self.points
     }
 
     fn get_charge(&'a self, index: usize) -> Self::PointDataView {
@@ -115,7 +119,7 @@ impl <'a>FmmLeafNodeData<'a> for LeafNode {
     fn set_charge(&mut self, index: usize, data: Self::PointData) {
         let mut pts: Vec<&mut Point> = self.points.iter_mut().filter(|p| p.global_idx == index).collect();
         let pt: &mut Point = pts[0];
-        pt.data[0] =  data;
+        pt.data[0] +=  data;
     }
 
     fn get_potential(&'a self, index: usize) -> Self::PointDataView {
@@ -126,6 +130,6 @@ impl <'a>FmmLeafNodeData<'a> for LeafNode {
     fn set_potential(&mut self, index: usize, data: Self::PointData) {
         let mut pts: Vec<&mut Point> = self.points.iter_mut().filter(|p| p.global_idx == index).collect();
         let pt: &mut Point = pts[0];
-        pt.data[1] =  data; 
+        pt.data[1] +=  data; 
     }
 }

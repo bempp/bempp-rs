@@ -252,6 +252,7 @@ impl SingleNodeTree {
             leaf_to_index.insert(leaf.key, i);
         }
 
+ 
         SingleNodeTree {
             depth,
             points,
@@ -448,29 +449,34 @@ impl <'a>Tree<'a> for SingleNodeTree {
         &self.keys_set
     }
 
-    fn key_to_index(&self, key: &Self::RawNodeIndex) -> usize {
-        self.key_to_index[key]
+    fn key_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize> {
+        if let Some(index) = self.key_to_index.get(key) {
+            return Some(*index);
+        } else {
+            None
+        }
     }
 
-    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> usize {
-        self.leaf_to_index[key]
+    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize> {
+        if let Some(index) = self.leaf_to_index.get(key) {
+            return Some(*index);
+        } else {
+            None
+        }
     }
 }
 
 impl<'a> FmmTree<'a> for SingleNodeTree {
-    type FmmNodeIndex = Node;
-    type FmmNodeIndices = Vec<&'a Node>;
-    type FmmLeafNodeIndex = LeafNode;
-    type FmmLeafNodeIndices = Vec<&'a LeafNode>;
     type FmmRawNodeIndex = MortonKey;
+    type FmmRawNodeIndices = MortonKeys;
 
     // Single node trees are already locally essential trees
     fn create_let(&mut self) {}
 
     fn get_interaction_list(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmNodeIndices> {
+    ) -> Option<Self::FmmRawNodeIndices> {
         if node_index.level() >= 2 {
             let v_list = node_index
                 .parent()
@@ -481,11 +487,7 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
                 .collect_vec();
 
             if !v_list.is_empty() {
-                let nodes: Vec<&Node> = v_list
-                    .iter()
-                    .map(|k| &self.keys[self.key_to_index[k]])
-                    .collect();
-                return Some(nodes);
+                return Some(MortonKeys{keys: v_list, index: 0});
             } else {
                 return None;
             }
@@ -494,9 +496,9 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
     }
 
     fn get_near_field(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmLeafNodeIndices> {
+    ) -> Option<Self::FmmRawNodeIndices> {
         let mut u_list = Vec::<MortonKey>::new();
         let neighbours = node_index.neighbors();
 
@@ -528,20 +530,16 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
         u_list.push(node_index.clone());
 
         if !u_list.is_empty() {
-            let nodes: Vec<&LeafNode> = u_list
-                .iter()
-                .map(|k| &self.leaves[self.leaf_to_index[k]])
-                .collect();
-            Some(nodes)
+            Some(MortonKeys{keys: u_list, index: 0})
         } else {
             None
         }
     }
 
     fn get_w_list(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmNodeIndices> {
+    ) -> Option<Self::FmmRawNodeIndices> {
         // Child level
         let w_list = node_index
             .neighbors()
@@ -551,20 +549,16 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
             .collect_vec();
 
         if !w_list.is_empty() {
-            let nodes: Vec<&Node> = w_list
-                .iter()
-                .map(|k| &self.keys[self.key_to_index[k]])
-                .collect();
-            Some(nodes)
+            Some(MortonKeys{keys: w_list, index: 0})
         } else {
             None
         }
     }
 
     fn get_x_list(
-        &'a self,
+        &self,
         node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmLeafNodeIndices> {
+    ) -> Option<Self::FmmRawNodeIndices> {
         let x_list = node_index
             .parent()
             .neighbors()
@@ -573,11 +567,7 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
             .collect_vec();
 
         if !x_list.is_empty() {
-            let nodes: Vec<&LeafNode> = x_list
-                .iter()
-                .map(|k| &self.leaves[self.leaf_to_index[k]])
-                .collect();
-            Some(nodes)
+            Some(MortonKeys{keys: x_list, index: 0})
         } else {
             None
         }
