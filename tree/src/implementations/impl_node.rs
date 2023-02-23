@@ -9,7 +9,7 @@ use crate::types::{
     point::{Point, Points},
 };
 
-impl <'a>FmmNodeData<'a> for Node {
+impl<'a> FmmNodeData<'a> for Node {
     type CoefficientData = &'a [f64];
     type CoefficientView = &'a [f64];
 
@@ -40,7 +40,6 @@ impl <'a>FmmNodeData<'a> for Node {
     }
 
     fn set_local_expansion(&mut self, data: Self::CoefficientData, order: usize) {
-
         if !self.data.init {
             self.set_order(order);
         }
@@ -50,15 +49,13 @@ impl <'a>FmmNodeData<'a> for Node {
         {
             *elem += data[i]
         }
-
-    } 
+    }
 
     fn set_multipole_expansion(&mut self, data: Self::CoefficientData, order: usize) {
-        
         if !self.data.init {
             self.set_order(order);
         }
-        
+
         for (i, elem) in self.data.raw[self.data.displacement[1]..]
             .iter_mut()
             .enumerate()
@@ -68,8 +65,8 @@ impl <'a>FmmNodeData<'a> for Node {
     }
 }
 
-impl <'a>FmmLeafNodeData<'a> for LeafNode {
-    type Points =  Vec<Point>;
+impl<'a> FmmLeafNodeData<'a> for LeafNode {
+    type Points = Vec<Point>;
     type PointData = f64;
     type PointDataView = &'a f64;
     type PointIndices = &'a Vec<usize>;
@@ -83,24 +80,40 @@ impl <'a>FmmLeafNodeData<'a> for LeafNode {
     }
 
     fn get_charge(&'a self, index: usize) -> Self::PointDataView {
-        let res: Vec<&Point> = self.points.iter().filter(|&p| p.global_idx == index).collect();
+        let res: Vec<&Point> = self
+            .points
+            .iter()
+            .filter(|&p| p.global_idx == index)
+            .collect();
         &res[0].data[0]
     }
 
     fn set_charge(&mut self, index: usize, data: Self::PointData) {
-        let mut pts: Vec<&mut Point> = self.points.iter_mut().filter(|p| p.global_idx == index).collect();
+        let mut pts: Vec<&mut Point> = self
+            .points
+            .iter_mut()
+            .filter(|p| p.global_idx == index)
+            .collect();
         let pt: &mut Point = pts[0];
-        pt.data[0] +=  data;
+        pt.data[0] += data;
     }
 
     fn get_potential(&'a self, index: usize) -> Self::PointDataView {
-        let res: Vec<&Point> = self.points.iter().filter(|&p| p.global_idx == index).collect();
-        &res[0].data[1] 
+        let res: Vec<&Point> = self
+            .points
+            .iter()
+            .filter(|&p| p.global_idx == index)
+            .collect();
+        &res[0].data[1]
     }
 
     fn set_potential(&mut self, index: usize, data: Self::PointData) {
-        let mut pts: Vec<&mut Point> = self.points.iter_mut().filter(|p| p.global_idx == index).collect();
+        let mut pts: Vec<&mut Point> = self
+            .points
+            .iter_mut()
+            .filter(|p| p.global_idx == index)
+            .collect();
         let pt: &mut Point = pts[0];
-        pt.data[1] +=  data; 
+        pt.data[1] += data;
     }
 }

@@ -1,8 +1,8 @@
 // Definition of kernel functions.
-use crate::types::{EvalType, Result};
+use crate::types::Result;
 
 pub trait Kernel {
-    // Evaluation data;
+    // Evaluation data.
     type PotentialData;
     type GradientData;
 
@@ -24,7 +24,7 @@ pub trait Kernel {
         sources: &[[f64; 3]],
         charges: &[f64],
         targets: &[[f64; 3]],
-        potentials: &mut [f64]
+        potentials: &mut [f64],
     );
 
     // Evaluate the kernel gradient.

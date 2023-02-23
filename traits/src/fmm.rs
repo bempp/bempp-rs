@@ -2,71 +2,64 @@
 
 use crate::tree::Tree;
 
-// pub trait Translation {}
-
+/// Translation provides an interface for field translations as required by the FMM.
 pub trait Translation {
+    // Key index
     type NodeIndex;
 
-    // Particle to Multipole
+    // Particle to Multipole.
     fn p2m(&mut self, leaf: &Self::NodeIndex);
 
-    // Multipole to Multipole
+    // Multipole to Multipole.
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // Multipole to Local
+    // Multipole to Local.
     fn m2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // Local to Local
+    // Local to Local.
     fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // Multipole to Particle
+    // Multipole to Particle.
     fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // Local to Particle
-    fn l2p(&mut self, node: &Self::NodeIndex);
+    // Local to Particle.
+    fn l2p(&mut self, leaf: &Self::NodeIndex);
 
-    // Particle to Local
+    // Particle to Local.
     fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 
-    // Particle to Particle
+    // Particle to Particle.
     fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex);
 }
 
 /// FmmTree take care of ghost nodes on other processors, and have access to all
 /// the information they need to build the interaction lists for a tree, as well as
 /// perform an FMM loop.
-pub trait FmmTree<'a>: Tree<'a>
-{
-    // Container for data at tree nodes, must implement the FmmData trait
+pub trait FmmTree<'a>: Tree<'a> {
     type FmmRawNodeIndex;
     type FmmRawNodeIndices: IntoIterator;
 
     // Create a locally essential tree (LET) that handles all ghost octant communication.
     fn create_let(&mut self);
 
-    // Query local data for interaction lists for a given node.
-    fn get_near_field(
-        &self,
-        node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmRawNodeIndices>;
+    // Query local nodes for the near field (u list) for a given node.
+    fn get_near_field(&self, node_index: &Self::FmmRawNodeIndex)
+        -> Option<Self::FmmRawNodeIndices>;
 
-    fn get_x_list(
-        &self,
-        node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmRawNodeIndices>;
-    
-    fn get_w_list(
-        &self,
-        node_index: &Self::FmmRawNodeIndex,
-    ) -> Option<Self::FmmRawNodeIndices>;
-    
+    // Query local nodes for the x list of a given node.
+    fn get_x_list(&self, node_index: &Self::FmmRawNodeIndex) -> Option<Self::FmmRawNodeIndices>;
+
+    // Query local nodes for the w list of a given node.
+    fn get_w_list(&self, node_index: &Self::FmmRawNodeIndex) -> Option<Self::FmmRawNodeIndices>;
+
+    // Query local nodes for the interaction list (u list) for a given node.
     fn get_interaction_list(
         &self,
         node_index: &Self::FmmRawNodeIndex,
     ) -> Option<Self::FmmRawNodeIndices>;
 }
 
-/// FmmData containers extend a data container with specialised methods for FMM data,
+/// FmmNodeData extends a data container with specialised methods for FMM data,
 /// specifically to handle the multipole and local expansion coefficients.
 pub trait FmmNodeData<'a> {
     type CoefficientData;
@@ -79,6 +72,8 @@ pub trait FmmNodeData<'a> {
     fn get_local_expansion(&'a self) -> Self::CoefficientView;
 }
 
+/// FmmLeafNodeData extends a data container with specialised methods for FMM leaf data,
+/// specifically to handle points, potentials and charges.
 pub trait FmmLeafNodeData<'a> {
     type Points;
     type PointData;
@@ -92,6 +87,7 @@ pub trait FmmLeafNodeData<'a> {
     fn set_potential(&mut self, index: usize, data: Self::PointData);
 }
 
+/// Fmm describes an interface of a generic FMM.
 pub trait Fmm<'a> {
     // FMM core loop
     fn upward_pass(&mut self);
@@ -99,7 +95,7 @@ pub trait Fmm<'a> {
     fn run(&mut self);
 }
 
-// Special interface for NodeIndices in the KIFMM
+// KiFmmNode describes methods specialised to the KIFMM.
 pub trait KiFmmNode {
     type Surface;
     type Domain;

@@ -1,4 +1,3 @@
-// use nalgebra as na;
 use ndarray::*;
 use ndarray_linalg::*;
 
