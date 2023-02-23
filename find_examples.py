@@ -53,11 +53,15 @@ for file, example_name in files:
     command = f"cargo {cmd} --example {example_name} --release"
     if options is not None:
         command += f" {options}"
-    if "{{NPROCESSES}}" in "":
-        for n in range(2, 5):
-            lines.append(command.replace("{{NPROCESSES}}", n))
+    if "{{NPROCESSES}}" in command:
+        for n in [2, 4]:
+            info = f"Running {example_name} on {n} processes"
+            lines.append(f"echo \"\n{'=' * len(info)}\n{info}\n{'=' * len(info)}\n\"")
+            lines.append(command.replace("{{NPROCESSES}}", f"{n}"))
     else:
+        info = f"Running {example_name}"
+        lines.append(f"echo \"\n{'=' * len(info)}\n{info}\n{'=' * len(info)}\n\"")
         lines.append(command)
 
 with open("examples.sh", "w") as f:
-    f.write("\n".join(lines))
+    f.write(" && \\\n".join(lines))

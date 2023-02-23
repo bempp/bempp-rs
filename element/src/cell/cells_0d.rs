@@ -3,28 +3,28 @@
 use crate::cell::*;
 
 /// The reference interval
-pub struct Interval;
+pub struct Point;
 
-impl ReferenceCell for Interval {
+impl ReferenceCell for Point {
     fn dim(&self) -> usize {
-        1
+        0
     }
 
     fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Interval
+        ReferenceCellType::Point
     }
 
     fn label(&self) -> &'static str {
-        "interval"
+        "point"
     }
 
     fn vertices(&self) -> &[f64] {
-        static VERTICES: [f64; 2] = [0.0, 1.0];
+        static VERTICES: [f64; 0] = [];
         &VERTICES
     }
 
     fn edges(&self) -> &[usize] {
-        static EDGES: [usize; 2] = [0, 1];
+        static EDGES: [usize; 0] = [];
         &EDGES
     }
 
@@ -39,17 +39,16 @@ impl ReferenceCell for Interval {
 
     fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 2]),
-            1 => Ok(vec![ReferenceCellType::Interval]),
+            0 => Ok(vec![ReferenceCellType::Point]),
             _ => Err(()),
         }
     }
 
     fn vertex_count(&self) -> usize {
-        2
+        1
     }
     fn edge_count(&self) -> usize {
-        1
+        0
     }
     fn face_count(&self) -> usize {
         0
@@ -65,18 +64,9 @@ impl ReferenceCell for Interval {
     ) -> Result<Vec<usize>, ()> {
         match entity_dim {
             0 => {
-                assert!(entity_number < 2);
+                assert!(entity_number < 1);
                 match connected_dim {
-                    0 => Ok(vec![entity_number]),
-                    1 => Ok(vec![0]),
-                    _ => Err(()),
-                }
-            }
-            1 => {
-                assert!(entity_number == 0);
-                match connected_dim {
-                    0 => Ok(vec![0, 1]),
-                    1 => Ok(vec![0]),
+                    0 => Ok(vec![0]),
                     _ => Err(()),
                 }
             }

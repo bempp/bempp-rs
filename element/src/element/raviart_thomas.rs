@@ -1,4 +1,4 @@
-//! Lagrange elements
+//! Raviart-Thomas elements
 
 use crate::cell::*;
 use crate::element::*;
@@ -9,8 +9,12 @@ use solvers_traits::element::ElementFamily;
 pub struct RaviartThomasElementTriangleDegree1 {}
 
 impl FiniteElement for RaviartThomasElementTriangleDegree1 {
-    const VALUE_SIZE: usize = 2;
-    const MAP_TYPE: MapType = MapType::ContravariantPiola;
+    fn value_size(&self) -> usize {
+        2
+    }
+    fn map_type(&self) -> MapType {
+        MapType::ContravariantPiola
+    }
 
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Triangle
@@ -30,7 +34,7 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData<Self>) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.point_count() {
@@ -80,6 +84,7 @@ mod test {
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
+            ReferenceCellType::Point => Point {}.dim(),
             ReferenceCellType::Interval => Interval {}.dim(),
             ReferenceCellType::Triangle => Triangle {}.dim(),
             ReferenceCellType::Quadrilateral => Quadrilateral {}.dim(),
@@ -91,6 +96,7 @@ mod test {
         let mut ndofs = 0;
         for dim in 0..cell_dim + 1 {
             let entity_count = match e.cell_type() {
+                ReferenceCellType::Point => Point {}.entity_count(dim).unwrap(),
                 ReferenceCellType::Interval => Interval {}.entity_count(dim).unwrap(),
                 ReferenceCellType::Triangle => Triangle {}.entity_count(dim).unwrap(),
                 ReferenceCellType::Quadrilateral => Quadrilateral {}.entity_count(dim).unwrap(),

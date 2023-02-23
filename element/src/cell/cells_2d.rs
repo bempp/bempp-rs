@@ -40,6 +40,15 @@ impl ReferenceCell for Triangle {
         &FACES_NV
     }
 
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+        match dim {
+            0 => Ok(vec![ReferenceCellType::Point; 3]),
+            1 => Ok(vec![ReferenceCellType::Interval; 3]),
+            2 => Ok(vec![ReferenceCellType::Triangle]),
+            _ => Err(()),
+        }
+    }
+
     fn vertex_count(&self) -> usize {
         3
     }
@@ -131,6 +140,15 @@ impl ReferenceCell for Quadrilateral {
     fn faces_nvertices(&self) -> &[usize] {
         static FACES_NV: [usize; 1] = [4];
         &FACES_NV
+    }
+
+    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+        match dim {
+            0 => Ok(vec![ReferenceCellType::Point; 4]),
+            1 => Ok(vec![ReferenceCellType::Interval; 4]),
+            2 => Ok(vec![ReferenceCellType::Quadrilateral]),
+            _ => Err(()),
+        }
     }
 
     fn vertex_count(&self) -> usize {
