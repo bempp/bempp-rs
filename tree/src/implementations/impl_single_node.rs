@@ -163,7 +163,7 @@ impl SingleNodeTree {
     /// Constructor for uniform trees
     pub fn uniform_tree(
         points: &[[PointType; 3]],
-        point_data: &Vec<Vec<PointType>>,
+        point_data: &[Vec<PointType>],
         &domain: &Domain,
         depth: u64,
     ) -> SingleNodeTree {
@@ -543,7 +543,7 @@ impl<'a> FmmTree<'a> for SingleNodeTree {
         u_list.append(&mut neighbors_children_adj);
         u_list.append(&mut neighbors_adj);
         u_list.append(&mut parent_neighbours_adj);
-        u_list.push(node_index.clone());
+        u_list.push(*node_index);
 
         if !u_list.is_empty() {
             Some(MortonKeys{keys: u_list, index: 0})

@@ -154,12 +154,12 @@ impl<'a> KiFmm<'a> {
             panic!("M2L only performed on level 2 and below")
         }
 
-        let m2l_scale;
-        if level == 2 {
-            m2l_scale = 1. / 2.
+        let m2l_scale = if level == 2 {
+            1. / 2.
         } else {
-            m2l_scale = 2.0.powf((level - 3) as f64);
-        }
+            2.0.powf((level - 3) as f64)
+        };
+
         m2l_scale
     }
 
@@ -511,7 +511,7 @@ impl<'a> Translation for KiFmm<'a> {
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         let in_node = self.tree.get_node(in_node).unwrap();
-        
+
         let in_multipole = ArrayView::from(in_node.get_multipole_expansion());
 
         let operator_index = in_node
@@ -581,8 +581,7 @@ impl<'a> Translation for KiFmm<'a> {
         let downward_equivalent_surface =
             key.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
 
-        
-        let node = self.tree.get_node(key).unwrap(); 
+        let node = self.tree.get_node(key).unwrap();
         let leaf_node = self.tree.get_leaf_node(key).unwrap();
 
         let local_expansion = node.get_local_expansion();
@@ -593,7 +592,7 @@ impl<'a> Translation for KiFmm<'a> {
 
         self.kernel.potential(
             &downward_equivalent_surface,
-            &local_expansion,
+            local_expansion,
             &point_coordinates,
             &mut potential,
         );
@@ -608,8 +607,11 @@ impl<'a> Translation for KiFmm<'a> {
     fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         // Check if source is a leaf
         if let Some(in_leaf_node) = self.tree.get_leaf_node(in_node) {
-            let upward_equivalent_surface =
-                in_leaf_node.key.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
+            let upward_equivalent_surface = in_leaf_node.key.compute_surface(
+                self.order,
+                self.alpha_inner,
+                self.tree.get_domain(),
+            );
 
             let in_node = self.tree.get_node(&in_leaf_node.key).unwrap();
 
@@ -622,7 +624,7 @@ impl<'a> Translation for KiFmm<'a> {
             let mut potential = vec![0f64; point_coordinates.len()];
             self.kernel.potential(
                 &upward_equivalent_surface,
-                &multipole_expansion,
+                multipole_expansion,
                 &point_coordinates,
                 &mut potential,
             );
@@ -639,9 +641,8 @@ impl<'a> Translation for KiFmm<'a> {
     fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         // First check if the source node is a leaf
         if let Some(in_node) = self.tree.get_leaf_node(in_node) {
-            
             // Then check if it has any points
-            if in_node.get_points().len() > 0 {
+            if !in_node.get_points().is_empty() {
                 let points = in_node.get_points();
                 let src_indices: Vec<usize> =
                     in_node.get_points().iter().map(|p| p.global_idx).collect();
@@ -687,7 +688,7 @@ impl<'a> Translation for KiFmm<'a> {
             let sources = in_node.get_points();
             let targets = out_node.get_points();
 
-            if sources.len() > 0 && targets.len() > 0 {
+            if !sources.is_empty() && !targets.is_empty() {
                 // TODO: Get rid of this copy
                 let source_coordinates: Vec<[f64; 3]> =
                     sources.iter().map(|p| p.coordinate).collect();
@@ -789,14 +790,14 @@ impl<'a> Fmm<'a> for KiFmm<'a> {
             // X List interactions
             if let Some(x_list) = self.tree.get_x_list(&target) {
                 for source in x_list.iter() {
-                    self.p2l(&source, &target);
+                    self.p2l(source, &target);
                 }
             }
 
             // W List interactions
             if let Some(w_list) = self.tree.get_w_list(&target) {
                 for source in w_list.iter() {
-                    self.m2p(&source, &target)
+                    self.m2p(source, &target)
                 }
             }
 
@@ -804,7 +805,7 @@ impl<'a> Fmm<'a> for KiFmm<'a> {
             if let Some(u_list) = self.tree.get_near_field(&target) {
                 // println!("Running U List");
                 for source in u_list.iter() {
-                    self.p2p(&source, &target);
+                    self.p2p(source, &target);
                 }
             }
 

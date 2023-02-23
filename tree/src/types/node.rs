@@ -1,6 +1,6 @@
 use crate::types::{morton::MortonKey, point::Points};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LeafNode {
     pub key: MortonKey,
     pub points: Points,
@@ -8,7 +8,7 @@ pub struct LeafNode {
 
 pub type LeafNodes = Vec<LeafNode>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Node {
     pub key: MortonKey,
     pub data: NodeData,
@@ -16,7 +16,7 @@ pub struct Node {
 
 pub type Nodes = Vec<Node>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NodeData {
     pub field_size: Vec<usize>,
     pub raw: Vec<f64>,

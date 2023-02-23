@@ -298,15 +298,15 @@ impl MortonKey {
         let mut z = a[2] as i64 - b[2] as i64;
 
         // Convert to an absolute transfer vector, wrt to key level.
-        x = x / 2_i64.pow(level_diff as u32);
-        y = y / 2_i64.pow(level_diff as u32);
-        z = z / 2_i64.pow(level_diff as u32);
+        x /= 2_i64.pow(level_diff as u32);
+        y /= 2_i64.pow(level_diff as u32);
+        z /= 2_i64.pow(level_diff as u32);
 
         fn positive_map(num: &mut i64) {
             if *num < 0 {
                 *num = 2 * (-1 * *num) + 1;
             } else {
-                *num = 2 * *num;
+                *num *= 2;
             }
         }
 
@@ -764,7 +764,7 @@ impl KiFmmNode for MortonKey {
         }
 
         // Translate box to specified centre, and scale
-        let scaled_diameter = self.diameter(&domain);
+        let scaled_diameter = self.diameter(domain);
         let dilated_diameter = scaled_diameter.map(|d| d * alpha);
 
         let mut scaled_surface = vec![[0f64; 3]; n_coeffs];

@@ -9,35 +9,6 @@ use crate::types::{
     point::{Point, Points},
 };
 
-impl Default for LeafNode {
-    fn default() -> Self {
-        LeafNode {
-            key: MortonKey::default(),
-            points: Points::default(),
-        }
-    }
-}
-
-impl Default for NodeData {
-    fn default() -> Self {
-        NodeData { 
-            field_size: Vec::default(), 
-            raw: Vec::default(), 
-            displacement: Vec::default(), 
-            init: false
-        }
-    }
-}
-
-impl Default for Node {
-    fn default() -> Self {
-        Node {
-            key: MortonKey::default(),
-            data: NodeData::default(),
-        }
-    }
-}
-
 impl <'a>FmmNodeData<'a> for Node {
     type CoefficientData = &'a [f64];
     type CoefficientView = &'a [f64];
