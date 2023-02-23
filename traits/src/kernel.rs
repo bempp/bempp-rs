@@ -33,7 +33,8 @@ pub trait Kernel {
         sources: &[[f64; 3]],
         charges: &[f64],
         targets: &[[f64; 3]],
-    ) -> Result<Self::GradientData>;
+        gradients: &mut [[f64; 3]],
+    );
 
     fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::PotentialData>;
 

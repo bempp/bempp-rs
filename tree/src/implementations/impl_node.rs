@@ -1,12 +1,10 @@
 use std::vec;
 
-use itertools::Itertools;
 use solvers_traits::fmm::{FmmLeafNodeData, FmmNodeData};
 
 use crate::types::{
-    morton::MortonKey,
-    node::{LeafNode, Node, NodeData},
-    point::{Point, Points},
+    node::{LeafNode, Node},
+    point::Point,
 };
 
 impl<'a> FmmNodeData<'a> for Node {
