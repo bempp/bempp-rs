@@ -465,8 +465,7 @@ impl<'a> Translation for KiFmm<'a> {
 
     fn p2m(&mut self, leaf: &Self::NodeIndex) {
         // Lookup leaf node
-        let leaf_node_idx = self.tree.leaf_to_index(leaf).unwrap();
-        let leaf_node = &self.tree.get_leaves()[leaf_node_idx];
+        let leaf_node = self.tree.get_leaf_node(leaf).unwrap();
 
         // Calculate check surface
         let upward_check_surface =
@@ -506,15 +505,13 @@ impl<'a> Translation for KiFmm<'a> {
         let multipole_expansion = multipole_expansion.as_slice().unwrap();
 
         // Set multipole expansion at node
-        let node_idx = self.tree.key_to_index(&leaf).unwrap();
-        let node = &mut self.tree.get_keys_mut()[node_idx];
+        let node = self.tree.get_node_mut(leaf).unwrap();
         node.set_multipole_expansion(multipole_expansion, self.order)
     }
 
     fn m2m(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        let in_node_idx = self.tree.key_to_index(in_node).unwrap();
-        let in_node = &self.tree.get_keys()[in_node_idx];
-
+        let in_node = self.tree.get_node(in_node).unwrap();
+        
         let in_multipole = ArrayView::from(in_node.get_multipole_expansion());
 
         let operator_index = in_node
@@ -527,14 +524,12 @@ impl<'a> Translation for KiFmm<'a> {
         let out_multipole = self.m2m[operator_index].dot(&in_multipole);
         let out_multipole = out_multipole.as_slice().unwrap();
 
-        let out_node_idx = self.tree.key_to_index(out_node).unwrap();
-        let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+        let out_node = self.tree.get_node_mut(out_node).unwrap();
         out_node.set_multipole_expansion(out_multipole, self.order)
     }
 
     fn l2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        let in_node_index = self.tree.key_to_index(in_node).unwrap();
-        let in_node = &self.tree.get_keys()[in_node_index];
+        let in_node = self.tree.get_node(in_node).unwrap();
         let in_local = ArrayView::from(in_node.get_local_expansion());
 
         let operator_index = out_node
@@ -546,8 +541,7 @@ impl<'a> Translation for KiFmm<'a> {
         let out_local = self.l2l[operator_index].dot(&in_local);
         let out_local = out_local.as_slice().unwrap();
 
-        let out_node_idx = self.tree.key_to_index(out_node).unwrap();
-        let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+        let out_node = self.tree.get_node_mut(out_node).unwrap();
         out_node.set_local_expansion(out_local, self.order)
     }
 
@@ -566,9 +560,7 @@ impl<'a> Translation for KiFmm<'a> {
         let v_ridx = v_lidx + ncoeffs;
         let vt_sub = self.m2l.2.slice(s![.., v_lidx..v_ridx]);
 
-        // TODO: Remove copy.
-        let in_node_idx = self.tree.key_to_index(in_node).unwrap();
-        let in_node = &self.tree.get_keys()[in_node_idx];
+        let in_node = self.tree.get_node(in_node).unwrap();
         let in_multipole = ArrayView::from(in_node.get_multipole_expansion());
 
         let out_local = KiFmm::m2l_scale(in_node.key.level())
@@ -581,20 +573,17 @@ impl<'a> Translation for KiFmm<'a> {
             );
 
         let out_local = out_local.as_slice().unwrap();
-        let out_node_idx = self.tree.key_to_index(out_node).unwrap();
-        let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+        let out_node = self.tree.get_node_mut(out_node).unwrap();
         out_node.set_local_expansion(out_local, self.order)
     }
 
-    fn l2p(&mut self, node: &Self::NodeIndex) {
+    fn l2p(&mut self, key: &Self::NodeIndex) {
         let downward_equivalent_surface =
-            node.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
+            key.compute_surface(self.order, self.alpha_outer, self.tree.get_domain());
 
-        let node_index = self.tree.key_to_index(node).unwrap();
-        let leaf_node_index = self.tree.leaf_to_index(node).unwrap();
-
-        let node = &self.tree.get_keys()[node_index];
-        let leaf_node = &self.tree.get_leaves()[leaf_node_index];
+        
+        let node = self.tree.get_node(key).unwrap(); 
+        let leaf_node = self.tree.get_leaf_node(key).unwrap();
 
         let local_expansion = node.get_local_expansion();
         let points = leaf_node.get_points();
@@ -609,7 +598,7 @@ impl<'a> Translation for KiFmm<'a> {
             &mut potential,
         );
 
-        let out_node = &mut self.tree.get_leaves_mut()[leaf_node_index];
+        let out_node = self.tree.get_leaf_node_mut(key).unwrap();
         let trg_indices: Vec<usize> = out_node.get_points().iter().map(|p| p.global_idx).collect();
         for (&i, &p) in trg_indices.iter().zip(potential.iter()) {
             out_node.set_potential(i, p)
@@ -618,16 +607,15 @@ impl<'a> Translation for KiFmm<'a> {
 
     fn m2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         // Check if source is a leaf
-        if let Some(in_node_idx) = self.tree.key_to_index(in_node) {
+        if let Some(in_leaf_node) = self.tree.get_leaf_node(in_node) {
             let upward_equivalent_surface =
-                in_node.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
+                in_leaf_node.key.compute_surface(self.order, self.alpha_inner, self.tree.get_domain());
 
-            let in_node = &self.tree.get_keys()[in_node_idx];
+            let in_node = self.tree.get_node(&in_leaf_node.key).unwrap();
 
             let multipole_expansion = in_node.get_multipole_expansion();
 
-            let out_node_idx = self.tree.leaf_to_index(out_node).unwrap();
-            let out_node = &self.tree.get_leaves()[out_node_idx];
+            let out_node = self.tree.get_leaf_node(out_node).unwrap();
             let point_coordinates: Vec<[f64; 3]> =
                 out_node.get_points().iter().map(|p| p.coordinate).collect();
 
@@ -639,7 +627,7 @@ impl<'a> Translation for KiFmm<'a> {
                 &mut potential,
             );
 
-            let out_node = &mut self.tree.get_leaves_mut()[out_node_idx];
+            let out_node = self.tree.get_leaf_node_mut(&out_node.key.clone()).unwrap();
             let trg_indices: Vec<usize> =
                 out_node.get_points().iter().map(|p| p.global_idx).collect();
             for (&i, &p) in trg_indices.iter().zip(potential.iter()) {
@@ -650,8 +638,8 @@ impl<'a> Translation for KiFmm<'a> {
 
     fn p2l(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
         // First check if the source node is a leaf
-        if let Some(in_node_idx) = self.tree.leaf_to_index(in_node) {
-            let in_node = &self.tree.get_leaves()[in_node_idx];
+        if let Some(in_node) = self.tree.get_leaf_node(in_node) {
+            
             // Then check if it has any points
             if in_node.get_points().len() > 0 {
                 let points = in_node.get_points();
@@ -685,20 +673,17 @@ impl<'a> Translation for KiFmm<'a> {
                         .dot(&self.dc2e_inv.1.dot(&downward_check_potential));
 
                 let out_local = out_local.as_slice().unwrap();
-                let out_node_idx = self.tree.key_to_index(out_node).unwrap();
-                let out_node = &mut self.tree.get_keys_mut()[out_node_idx];
+                let out_node = self.tree.get_node_mut(out_node).unwrap();
                 out_node.set_local_expansion(out_local, self.order)
             }
         }
     }
 
     fn p2p(&mut self, in_node: &Self::NodeIndex, out_node: &Self::NodeIndex) {
-        if let (Some(in_node_idx), Some(out_node_idx)) = (
-            self.tree.leaf_to_index(in_node),
-            self.tree.leaf_to_index(out_node),
+        if let (Some(in_node), Some(out_node)) = (
+            self.tree.get_leaf_node(in_node),
+            self.tree.get_leaf_node(out_node),
         ) {
-            let in_node = &self.tree.get_leaves()[in_node_idx];
-            let out_node = &self.tree.get_leaves()[out_node_idx];
             let sources = in_node.get_points();
             let targets = out_node.get_points();
 
@@ -724,7 +709,7 @@ impl<'a> Translation for KiFmm<'a> {
                     &mut potential,
                 );
 
-                let out_node = &mut self.tree.get_leaves_mut()[out_node_idx];
+                let out_node = self.tree.get_leaf_node_mut(&out_node.key.clone()).unwrap();
                 let trg_indices: Vec<usize> =
                     out_node.get_points().iter().map(|p| p.global_idx).collect();
                 for (&i, &p) in trg_indices.iter().zip(potential.iter()) {
@@ -919,9 +904,7 @@ mod test {
                     kifmm.alpha_inner,
                     kifmm.tree.get_domain(),
                 );
-                // let local_expansion = kifmm.tree.get_local_expansion(key).unwrap();
-                let node_index = kifmm.tree.key_to_index(&leaf_node.key).unwrap();
-                let node = &kifmm.tree.get_keys()[node_index];
+                let node = kifmm.tree.get_node(&leaf_node.key).unwrap();
                 let local_expansion = node.get_local_expansion();
 
                 let mut equivalent = vec![0f64; local_expansion.len()];
@@ -941,8 +924,7 @@ mod test {
                         kifmm.alpha_inner,
                         kifmm.tree.get_domain(),
                     );
-                    let source_idx = kifmm.tree.key_to_index(source).unwrap();
-                    let source_node = &kifmm.tree.get_keys()[source_idx];
+                    let source_node = kifmm.tree.get_node(source).unwrap();
                     let multipole_expansion = source_node.get_multipole_expansion();
 
                     let mut tmp: Vec<f64> = vec![0f64; local_expansion.len()];

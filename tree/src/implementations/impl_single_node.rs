@@ -449,20 +449,36 @@ impl <'a>Tree<'a> for SingleNodeTree {
         &self.keys_set
     }
 
-    fn key_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize> {
-        if let Some(index) = self.key_to_index.get(key) {
-            return Some(*index);
+    fn get_leaf_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::LeafNodeIndex> {
+        if let Some(index) = self.leaf_to_index.get(key) {
+            Some(&self.leaves[*index])
         } else {
             None
         }
     }
 
-    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize> {
+    fn get_leaf_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::LeafNodeIndex> {
         if let Some(index) = self.leaf_to_index.get(key) {
-            return Some(*index);
+            Some(&mut self.leaves[*index])
         } else {
             None
-        }
+        }  
+    }
+
+    fn get_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::NodeIndex> {
+        if let Some(index) = self.key_to_index.get(key) {
+            Some(&self.keys[*index])
+        } else {
+            None
+        } 
+    }
+
+    fn get_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::NodeIndex> {
+        if let Some(index) = self.key_to_index.get(key) {
+            Some(&mut self.keys[*index])
+        } else {
+            None
+        }  
     }
 }
 

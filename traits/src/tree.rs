@@ -43,7 +43,9 @@ pub trait Tree<'a> {
 
     fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
 
-    fn key_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize>;
+    fn get_leaf_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::LeafNodeIndex>;
+    fn get_leaf_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::LeafNodeIndex>;
+    fn get_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::NodeIndex>;
+    fn get_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::NodeIndex>;
     
-    fn leaf_to_index(&self, key: &Self::RawNodeIndex) -> Option<usize>;
 }
