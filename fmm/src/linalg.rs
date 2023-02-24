@@ -1,9 +1,10 @@
+//! Temporary home of linear algebra utilities. TODO: Replace with routines from Householder.
 use ndarray::*;
 use ndarray_linalg::*;
 
 const F64_EPSILON: f64 = 2.220_446_049_250_313E-16f64;
 
-// Moore-Penrose pseudoinverse
+/// Calculate the Moore-Penrose pseudoinverse.
 pub fn pinv<T: Scalar + Lapack>(
     array: &Array2<T>,
 ) -> (

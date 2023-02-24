@@ -67,7 +67,6 @@ impl<'a> FmmLeafNodeData<'a> for LeafNode {
     type Points = Vec<Point>;
     type PointData = f64;
     type PointDataView = &'a f64;
-    type PointIndices = &'a Vec<usize>;
 
     fn get_points(&'a self) -> &'a Self::Points {
         &self.points

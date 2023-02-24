@@ -1,4 +1,4 @@
-/// Laplace kernel
+//! Kernel Independent FMM (KIFMM) of Ying et. al. (2004).
 use std::collections::HashSet;
 
 use cauchy::Scalar;
@@ -22,7 +22,7 @@ use solvers_tree::types::{
 
 use crate::linalg::pinv;
 
-// TODO: Create from FMM Factory pattern, specialised for Rust in some way
+/// Concrete KiFmm struct, defined by an FmmTree and an associated Kernel.
 pub struct KiFmm<'a> {
     pub kernel: Box<dyn Kernel<PotentialData = Vec<f64>, GradientData = Vec<[f64; 3]>>>,
     pub tree: Box<
@@ -61,8 +61,9 @@ pub struct KiFmm<'a> {
     ),
 }
 
+/// Implementation of associated methods and constructors for the KIFMM.
 impl<'a> KiFmm<'a> {
-    /// Algebraically defined list of transfer vectors in an octree
+    /// Algebraically defined list of unique M2L interactions, called 'transfer vectors', for 3D FMM.
     fn find_unique_v_list_interactions() -> (Vec<MortonKey>, Vec<MortonKey>, Vec<usize>) {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
@@ -143,10 +144,12 @@ impl<'a> KiFmm<'a> {
         (unique_targets, unique_sources, unique_transfer_vectors)
     }
 
+    /// Number of coefficients related to a given expansion order.
     fn ncoeffs(order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
     }
 
+    /// Scaling function for the M2L operator at a given level.
     fn m2l_scale(level: u64) -> f64 {
         if level < 2 {
             panic!("M2L only performed on level 2 and below")
@@ -161,6 +164,7 @@ impl<'a> KiFmm<'a> {
         m2l_scale
     }
 
+    /// Constructor for the KiFmm.
     pub fn new(
         order: usize,
         alpha_inner: f64,
@@ -280,7 +284,6 @@ impl<'a> KiFmm<'a> {
                 .assign(&tmp_gram);
         }
 
-        // TODO: replace with randomised SVD
         let (u, s, vt) = se2tc.svddc(ndarray_linalg::JobSvd::Some).unwrap();
         let u = u.unwrap();
         let s = Array2::from_diag(&s);
@@ -303,6 +306,7 @@ impl<'a> KiFmm<'a> {
     }
 }
 
+/// Implementation of field translations for the KIFMM.
 impl<'a> Translation for KiFmm<'a> {
     type NodeIndex = MortonKey;
 
@@ -564,6 +568,7 @@ impl<'a> Translation for KiFmm<'a> {
     }
 }
 
+/// Implementation of the FMM for the KIFMM.
 impl<'a> Fmm<'a> for KiFmm<'a> {
     fn upward_pass(&mut self) {
         // P2M over leaves. TODO: multithreading over all leaves
