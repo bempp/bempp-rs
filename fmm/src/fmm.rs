@@ -665,19 +665,22 @@ impl<'a> Fmm<'a> for KiFmm<'a> {
     }
 }
 
+#[allow(unused_imports)]
 mod test {
     use solvers_tree::types::point::PointType;
 
-    use super::KiFmm;
-    use crate::laplace::LaplaceKernel;
     use rand::prelude::*;
     use rand::SeedableRng;
+    use float_cmp::assert_approx_eq;
+
     use solvers_traits::fmm::{Fmm, FmmLeafNodeData, FmmNodeData, FmmTree, KiFmmNode};
     use solvers_tree::types::single_node::SingleNodeTree;
 
-    use float_cmp::assert_approx_eq;
+    use crate::laplace::LaplaceKernel;
+    use super::KiFmm;
 
-    pub fn points_fixture(npoints: usize) -> Vec<[f64; 3]> {
+    #[allow(dead_code)]
+    fn points_fixture(npoints: usize) -> Vec<[f64; 3]> {
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
         let mut points: Vec<[PointType; 3]> = Vec::new();
