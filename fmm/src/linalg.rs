@@ -37,6 +37,7 @@ pub fn pinv<T: Scalar + Lapack>(
     (v.to_owned(), s_inv_mat.to_owned(), ut.to_owned())
 }
 
+#[allow(unused_imports)]
 mod test {
 
     use super::*;
