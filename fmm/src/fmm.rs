@@ -155,13 +155,11 @@ impl<'a> KiFmm<'a> {
             panic!("M2L only performed on level 2 and below")
         }
 
-        let m2l_scale = if level == 2 {
+        if level == 2 {
             1. / 2.
         } else {
             2.0.powf((level - 3) as f64)
-        };
-
-        m2l_scale
+        }
     }
 
     /// Constructor for the KiFmm.
