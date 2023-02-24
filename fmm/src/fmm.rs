@@ -669,15 +669,15 @@ impl<'a> Fmm<'a> for KiFmm<'a> {
 mod test {
     use solvers_tree::types::point::PointType;
 
+    use float_cmp::assert_approx_eq;
     use rand::prelude::*;
     use rand::SeedableRng;
-    use float_cmp::assert_approx_eq;
 
     use solvers_traits::fmm::{Fmm, FmmLeafNodeData, FmmNodeData, FmmTree, KiFmmNode};
     use solvers_tree::types::single_node::SingleNodeTree;
 
-    use crate::laplace::LaplaceKernel;
     use super::KiFmm;
+    use crate::laplace::LaplaceKernel;
 
     #[allow(dead_code)]
     fn points_fixture(npoints: usize) -> Vec<[f64; 3]> {
