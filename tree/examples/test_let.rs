@@ -78,3 +78,4 @@
 //         assert!(partner_max <= *max)
 //     }
 // }
+fn main() {}

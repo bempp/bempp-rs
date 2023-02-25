@@ -62,3 +62,4 @@
 //     let unique: Vec<i32> = received.iter().unique().cloned().collect();
 //     assert_eq!(unique.len() as i32, recv_count);
 // }
+fn main() {}

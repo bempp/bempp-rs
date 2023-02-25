@@ -112,3 +112,4 @@ use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 //         println!("\t ... test_no_overlaps passed on adaptive tree");
 //     }
 // }
+fn main() {}
