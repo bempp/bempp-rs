@@ -18,7 +18,7 @@ pub struct MortonKey {
 pub struct MortonKeys {
     /// A vector of MortonKeys
     pub keys: Vec<MortonKey>,
-    
+
     /// index for implementing the Iterator trait.
     pub index: usize,
 }
