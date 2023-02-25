@@ -31,9 +31,9 @@ jobs:
       - name: Install cargo-mpirun
         run: cargo install cargo-mpirun
       - uses: actions/checkout@v2
-      - name: Install LAPACK
+      - name: Install LAPACK & OpenBLAS
         run:
-          sudo apt-get install libblas-dev liblapack-dev
+          sudo apt-get install libopenblas-dev liblapack-dev
       - name: Style checks
         run: cargo fmt -- --check
 
