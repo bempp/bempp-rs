@@ -1,3 +1,4 @@
+//! Traits
 use std::collections::HashSet;
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.

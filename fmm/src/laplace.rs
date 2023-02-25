@@ -1,4 +1,4 @@
-/// Laplace kernel
+//! Laplace kernel implementation.
 use solvers_traits::{kernel::Kernel, types::Result};
 
 pub struct LaplaceKernel {
