@@ -7,13 +7,18 @@ pub type KeyType = u64;
 /// with respect to the deepest level of the octree, as well as 'morton', a bit-interleaved single
 /// integer representation.
 pub struct MortonKey {
+    /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [KeyType; 3],
+    /// The Morton encoded anchor.
     pub morton: KeyType,
 }
 
-/// Vector of **MortonKeys**.
+/// Container of **MortonKeys**.
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys {
+    /// A vector of MortonKeys
     pub keys: Vec<MortonKey>,
+
+    /// index for implementing the Iterator trait.
     pub index: usize,
 }

@@ -1,101 +1,65 @@
+//! Traits
+use std::collections::HashSet;
+
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
-pub trait Tree {
-    // The computational domain defined by the tree
+/// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
+/// it simply provides methods for accessing tree nodes, and associated data, and is generically
+/// defined for both single and multi-node settings.
+pub trait Tree<'a> {
+    // The computational domain defined by the tree.
     type Domain;
 
-    // The type of points that define a tree
+    // The type of points that define a tree.
     type Point;
 
-    // A container for multiple Points
+    // Container for multiple Points.
     type Points;
 
-    // Unique index for tree nodes
+    // A tree leaf nodes, containing leaf data.
+    type LeafNodeIndex;
+
+    // Container for multiple tree leaf nodes.
+    type LeafNodeIndices;
+
+    // A tree node, containing node data.
     type NodeIndex;
 
-    // Container for multiple tree nodes
+    // Container for multiple tree nodes.
     type NodeIndices;
 
-    // A set of NodeIndices
-    type NodeIndicesSet;
+    // A raw index for a node, for example a Morton Index from a space filling curve.
+    type RawNodeIndex;
 
-    // Type of element in a node's data container
-    type NodeDataType;
+    // Get depth of tree.
+    fn get_depth(&self) -> usize;
 
-    // Get adaptivity information
-    fn get_adaptive(&self) -> bool;
+    // Get a reference all leaves, gets local keys in multi-node setting.
+    fn get_leaves(&self) -> &Self::LeafNodeIndices;
 
-    // Get all keys, gets local keys in multi-node setting
+    // Get a mutable reference all leaves, gets local keys in multi-node setting.
+    fn get_leaves_mut(&mut self) -> &mut Self::LeafNodeIndices;
+
+    // Get a reference to all keys, gets local keys in a multi-node setting.
     fn get_keys(&self) -> &Self::NodeIndices;
 
-    // Get all keys as a set, gets local keys in a multi-node setting
-    fn get_keys_set(&self) -> &Self::NodeIndicesSet;
+    // Get a mutable reference to all keys, gets local keys in a multi-node setting.
+    fn get_keys_mut(&mut self) -> &mut Self::NodeIndices;
 
-    // Get all points, gets local keys in multi-node setting
-    fn get_all_points(&self) -> &Self::Points;
-
-    // Get domain, gets global domain in multi-node setting
+    // Get domain defined by the points, gets global domain in multi-node setting.
     fn get_domain(&self) -> &Self::Domain;
 
-    // Get tree leaf associated with a given point
-    fn get_leaf(&self, point: &Self::Point) -> Option<&Self::NodeIndex>;
+    // Get a reference to a hashset of all keys, gets matching local keys in a multi-node setting.
+    fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex>;
 
-    // Get points associated with a tree leaf
-    fn get_points(&self, leaf: &Self::NodeIndex) -> Option<&Self::Points>;
+    // Get a reference to a leaf node if it exists, checks locally in a multi-node setting.
+    fn get_leaf_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::LeafNodeIndex>;
 
-    // Set data associated with a given leaf node.
-    fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType);
+    // Get a mutable reference to a leaf node if it exists, checks locally in a multi-node setting.
+    fn get_leaf_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::LeafNodeIndex>;
 
-    // Get data associated with a given leaf node.
-    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::NodeDataType>;
-}
+    // Get a reference to a node if it exists, checks locally in a multi-node setting.
+    fn get_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::NodeIndex>;
 
-/// FmmTree take care of ghost nodes on other processors, and have access to all
-/// the information they need to build the interaction lists for a tree, as well as
-/// perform an FMM loop.
-pub trait FmmTree {
-    // Unique index for tree nodes
-    type NodeIndex;
-
-    // Container for multiple tree nodes
-    type NodeIndices;
-
-    // Container for data at tree nodes, must implement the FmmData trait
-    type NodeData: FmmData;
-
-    // Type of element in a node's data container
-    type NodeDataType;
-
-    // Create a locally essential tree (LET) that handles all ghost octant communication.
-    fn create_let(&mut self);
-
-    // Query local data for interaction lists for a given node.
-    fn get_near_field(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
-    fn get_interaction_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
-    fn get_x_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
-    fn get_w_list(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeIndices>;
-
-    // Getters/setters for expansion coefficients.
-    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType);
-    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType>;
-    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType);
-    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType>;
-
-    // FMM core loop
-    fn upward_pass(&self);
-    fn downward_pass(&self);
-    fn run(&self, expansion_order: usize);
-}
-
-/// FmmData containers extend a data container with specialised methods for FMM data,
-/// specifically to handle the multipole and local expansion coefficients.
-pub trait FmmData {
-    type NodeIndex;
-    type CoefficientDataType;
-
-    fn set_expansion_order(&mut self, order: usize);
-    fn get_expansion_order(&self) -> usize;
-    fn set_multipole_expansion(&mut self, data: &Self::CoefficientDataType);
-    fn get_multipole_expansion(&self) -> Self::CoefficientDataType;
-    fn set_local_expansion(&mut self, data: &Self::CoefficientDataType);
-    fn get_local_expansion(&self) -> Self::CoefficientDataType;
+    // Get a mutable reference to a node if it exists, checks locally in a multi-node setting.
+    fn get_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::NodeIndex>;
 }

@@ -1,42 +1,47 @@
-// Definition of kernel functions.
+//! Traits for creating integral equation kernels.
 use crate::types::Result;
 
+/// Interface for FMM kernels.
 pub trait Kernel {
-    // Evaluation data;
-    type Data: KernelEvaluationData;
+    /// Potential data container.
+    type PotentialData;
 
-    // Space dimensions for the input of the kernel
+    /// Gradient data container.
+    type GradientData;
+
+    /// Space dimensions for the input of the kernel.
     fn dim(&self) -> usize;
 
-    // Dimensionality of the output values
+    /// Dimensionality of the output values.
     fn value_dimension(&self) -> usize;
 
-    // Return of the kernel is singular.
-    //
-    // A singular kernel is not defined
-    // when sources and charges are identical.
+    /// Return of the kernel is singular.
+    ///
+    /// A singular kernel is not defined
+    /// when sources and charges are identical.
     fn is_singular(&self) -> bool;
 
-    // Evaluate the kernel.
-    fn evaluate(
+    /// Evaluate the potential kernel.
+    fn potential(
         &self,
-        sources: &[f64],
+        sources: &[[f64; 3]],
         charges: &[f64],
-        targets: &[f64],
-        eval_type: &EvalType,
-    ) -> Result<Data>;
-}
+        targets: &[[f64; 3]],
+        potentials: &mut [f64],
+    );
 
-// A trait that describes evaluation data for a kernel.
-pub trait KernelEvaluationData {
-    type Item: crate::types::Scalar;
+    /// Evaluate the gradient kernel.
+    fn gradient(
+        &self,
+        sources: &[[f64; 3]],
+        charges: &[f64],
+        targets: &[[f64; 3]],
+        gradients: &mut [[f64; 3]],
+    );
 
-    // The number of targets.
-    fn number_of_targets(&self) -> usize;
+    /// Evaluate the Gram matrix.
+    fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::PotentialData>;
 
-    // Dimensionality of the kernel output (e.g. scalar=1, vectorial = 3)
-    fn value_dimension(&self) -> usize;
-
-    // Return the data at a given target index.
-    fn data_at_target(&self, index: usize) -> &[Item];
+    /// Scale the kernel to a given level of an associated tree.
+    fn scale(&self, level: u64) -> f64;
 }

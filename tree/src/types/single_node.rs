@@ -2,39 +2,37 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::types::{
-    data::NodeData,
     domain::Domain,
-    morton::{MortonKey, MortonKeys},
-    point::{Point, Points},
+    node::{LeafNodes, Nodes},
+    point::Points,
 };
 
-/// Concrete local (non-distributed) Tree.
+use super::morton::MortonKey;
+
+/// Local Trees (non-distributed).
 #[derive(Debug)]
 pub struct SingleNodeTree {
-    /// Adaptivity is optional.
-    pub adaptive: bool,
+    /// Depth of a tree.
+    pub depth: usize,
 
-    ///  A vector of Cartesian points.
-    pub points: Points,
-
-    /// All ancestors of leaves in tree, as a set.
-    pub keys_set: HashSet<MortonKey>,
-
-    /// The leaves that span the tree, defined by its leaf nodes.
-    pub leaves: MortonKeys,
-
-    /// The nodes that span the tree, defined by its leaf nodes, as a set.
-    pub leaves_set: HashSet<MortonKey>,
-
-    /// Domain spanned by the points in the SingleNodeTree.
+    /// Domain spanned by the points.
     pub domain: Domain,
 
-    /// Map between the points and the nodes in the SingleNodeTree.
-    pub points_to_leaves: HashMap<Point, MortonKey>,
+    ///  All Points.
+    pub points: Points,
 
-    // Map between keys and data
-    pub keys_to_data: HashMap<MortonKey, NodeData>,
+    /// The leaves that span the tree, and associated Point data.
+    pub leaves: LeafNodes,
 
-    /// Map between the nodes in the SingleNodetree and the points they contain.
-    pub leaves_to_points: HashMap<MortonKey, Points>,
+    /// All nodes in tree, and associated Node data.
+    pub keys: Nodes,
+
+    /// A convenent wrapper for a set of all the the raw MortonKeys associated with nodes.
+    pub keys_set: HashSet<MortonKey>,
+
+    /// Index pointer mapping Mortonkeys of leaves to their index in the container of associated data.
+    pub leaf_to_index: HashMap<MortonKey, usize>,
+
+    /// Index pointer mapping MortonKeys of nodes to their index in the container of associated data.
+    pub key_to_index: HashMap<MortonKey, usize>,
 }
