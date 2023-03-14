@@ -1,5 +1,6 @@
 //! Traits useful across packages.
 
+// TODO Do we need this?
 // An indexable data view.
 pub trait IndexableView {
     // The Item type
@@ -17,5 +18,7 @@ pub trait IndexableView {
     // Get unchecked mutable access to data.
     unsafe fn get_unchecked_mut(&self, index: usize) -> Option<&mut Self::Item>;
 
-    // TODO: Iterator
+    // TODO: Iterator, Bracket notation
 }
+
+// Add view for 2d/3d ... container

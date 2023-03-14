@@ -20,6 +20,7 @@ pub enum MapType {
     L2Piola = 3,
 }
 
+// TODO Why is this in the traits interface?
 /// Tabulated data
 pub struct TabulatedData {
     data: Vec<f64>,
