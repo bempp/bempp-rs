@@ -1,15 +1,18 @@
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    vec,
+};
 
-use solvers_traits::tree::{FmmData, FmmTree, Tree};
+use solvers_traits::{fmm::FmmTree, tree::Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
-        data::NodeData,
         domain::Domain,
         morton::{MortonKey, MortonKeys},
+        node::{LeafNode, LeafNodes, Node, NodeData, Nodes},
         point::{Point, PointType, Points},
         single_node::SingleNodeTree,
     },
@@ -30,33 +33,63 @@ pub fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
     seeds
 }
 
+pub fn group_points_by_encoded_leaves(points: &mut Points) -> LeafNodes {
+    points.sort();
+    let mut nodes = Vec::new();
+    let mut curr = LeafNode {
+        key: points[0].encoded_key,
+        points: vec![points[0].clone()],
+    };
+    for point in points.iter().skip(1) {
+        if point.encoded_key == curr.key {
+            curr.points.push(point.clone())
+        } else {
+            nodes.push(curr);
+            curr = LeafNode {
+                key: point.encoded_key,
+                points: vec![point.clone()],
+            }
+        }
+    }
+    nodes.push(curr);
+
+    nodes
+}
+
 /// Split tree coarse blocks by counting how many particles they contain.
-pub fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -> MortonKeys {
+pub fn split_blocks(points: &mut Points, mut blocktree: MortonKeys, n_crit: usize) -> MortonKeys {
     let split_blocktree;
-    let mut blocks_to_points;
 
     loop {
         let mut new_blocktree = MortonKeys::new();
 
-        // Map between blocks and the leaves they contain, empty blocks are retained
-        blocks_to_points = assign_nodes_to_points(&blocktree, points);
+        // Map between blocks and the leaves they contain
+        let unmapped = assign_nodes_to_points(&blocktree, points);
+
+        let mut blocks = group_points_by_encoded_leaves(points);
+
+        // Add empty nodes to blocks. TODO: FIX THIS HACK!
+        for key in unmapped.iter() {
+            blocks.push(LeafNode {
+                key: *key,
+                points: vec![],
+            })
+        }
 
         // Generate a new blocktree with a block's children if they violate the n_crit parameter
         let mut check = 0;
-        for (&block, points) in blocks_to_points.iter() {
-            let npoints = points.len();
-
-            if npoints > n_crit {
-                let mut children = block.children();
-                new_blocktree.append(&mut children);
+        for block in blocks.iter() {
+            if block.points.len() > n_crit {
+                let mut children = block.key.children();
+                new_blocktree.append(&mut children)
             } else {
-                new_blocktree.push(block);
+                new_blocktree.push(block.key);
                 check += 1;
             }
         }
 
         // Return if we cycle through all blocks without splitting
-        if check == blocks_to_points.len() {
+        if check == blocks.len() {
             split_blocktree = new_blocktree;
             break;
         } else {
@@ -64,56 +97,41 @@ pub fn split_blocks(points: &Points, mut blocktree: MortonKeys, n_crit: usize) -
         }
     }
     split_blocktree
-}
-
-/// Create a mapping between points and octree nodes, assumed to overlap. Note that points
-/// are hashed by their associated Morton key.
-pub fn assign_points_to_nodes(points: &Points, nodes: &MortonKeys) -> HashMap<Point, MortonKey> {
-    let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
-    let mut map: HashMap<Point, MortonKey> = HashMap::new();
-
-    for point in points.iter() {
-        // The ancestor could be the key already assigned to the point
-        if let Some(ancestor) = point
-            .key
-            .ancestors()
-            .into_iter()
-            .sorted()
-            .rev()
-            .find(|a| nodes.contains(a))
-        {
-            map.insert(*point, ancestor);
-        }
-    }
-    map
+    // assign_nodes_to_points(&split_blocktree, points);
 }
 
 /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
-pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &Points) -> HashMap<MortonKey, Points> {
-    let nodes: HashSet<MortonKey> = nodes.iter().cloned().collect();
-    let mut map: HashMap<MortonKey, Points> = HashMap::new();
+/// Return any keys that are unmapped.
+pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points) -> MortonKeys {
+    let mut map: HashMap<MortonKey, bool> = HashMap::new();
+    for node in nodes.iter() {
+        map.insert(*node, false);
+    }
 
-    for point in points.iter() {
+    for point in points.iter_mut() {
         // Ancestor could be the key itself
         if let Some(ancestor) = point
-            .key
+            .base_key
             .ancestors()
             .into_iter()
             .sorted()
             .rev()
-            .find(|a| nodes.contains(a))
+            .find(|a| map.contains_key(a))
         {
-            map.entry(ancestor).or_default().push(*point)
+            point.encoded_key = ancestor;
+            map.insert(ancestor, true);
         }
     }
 
-    // Some nodes may be empty, however we want to retain them
-    for node in nodes.iter() {
-        if !map.contains_key(node) {
-            map.entry(*node).or_default();
+    let mut unmapped = MortonKeys::new();
+
+    for (node, is_mapped) in map.iter() {
+        if !is_mapped {
+            unmapped.push(*node)
         }
     }
-    map
+
+    unmapped
 }
 
 impl SingleNodeTree {
@@ -122,6 +140,7 @@ impl SingleNodeTree {
     /// user defined maximum leaf maximum occupancy n_crit.
     pub fn new(
         points: &[[PointType; 3]],
+        point_data: &Vec<Vec<PointType>>,
         adaptive: bool,
         n_crit: Option<usize>,
         depth: Option<u64>,
@@ -132,34 +151,41 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
         if adaptive {
-            SingleNodeTree::adaptive_tree(adaptive, points, &domain, n_crit)
+            SingleNodeTree::adaptive_tree(points, point_data, &domain, n_crit)
         } else {
-            SingleNodeTree::uniform_tree(adaptive, points, &domain, depth)
+            SingleNodeTree::uniform_tree(points, point_data, &domain, depth)
         }
     }
 
     /// Constructor for uniform trees
     pub fn uniform_tree(
-        adaptive: bool,
         points: &[[PointType; 3]],
+        point_data: &[Vec<PointType>],
         &domain: &Domain,
         depth: u64,
     ) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
-        let points: Points = points
+        let mut points: Points = points
             .iter()
+            .zip(point_data.iter())
             .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: *p,
-                key: MortonKey::from_point(p, &domain, depth),
-                global_idx: i,
+            .map(|(i, (&p, d))| {
+                let base_key = MortonKey::from_point(&p, &domain, DEEPEST_LEVEL);
+                let encoded_key = MortonKey::from_point(&p, &domain, depth);
+                Point {
+                    coordinate: p,
+                    base_key,
+                    encoded_key,
+                    global_idx: i,
+                    data: d.clone(),
+                }
             })
             .collect();
 
         // Generate complete tree at specified depth
         let diameter = 1 << (DEEPEST_LEVEL - depth);
 
-        let mut leaves = MortonKeys {
+        let leaves = MortonKeys {
             keys: (0..LEVEL_SIZE)
                 .step_by(diameter)
                 .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
@@ -172,58 +198,96 @@ impl SingleNodeTree {
             index: 0,
         };
 
-        let leaves_to_points = assign_nodes_to_points(&leaves, &points);
-        let points_to_leaves = assign_points_to_nodes(&points, &leaves);
+        // Assign keys to points
+        let unmapped = assign_nodes_to_points(&leaves, &mut points);
 
-        // Only retain keys that contain points
-        leaves = MortonKeys {
-            keys: leaves_to_points.keys().cloned().collect(),
-            index: 0,
-        };
+        // Sort the points into Morton order, to perform a groupby,
+        let mut leaves = group_points_by_encoded_leaves(&mut points);
 
-        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
-        let mut keys_set: HashSet<MortonKey> = HashSet::new();
-        for key in leaves.iter() {
-            let ancestors = key.ancestors();
-            keys_set.extend(&ancestors);
+        // Add empty nodes to leaves
+        for key in unmapped.iter() {
+            leaves.push(LeafNode {
+                key: *key,
+                points: vec![],
+            })
         }
 
-        let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
+        // Find all keys in tree
+        let mut tmp = HashSet::<MortonKey>::new();
+        let mut keys = Vec::<Node>::new();
+
+        for node in leaves.iter() {
+            let ancestors = node.key.ancestors();
+
+            for key in ancestors.iter() {
+                if !tmp.contains(key) {
+                    // Insert a new node into keys
+                    keys.push(Node {
+                        key: *key,
+                        data: NodeData::default(),
+                    });
+                    tmp.insert(*key);
+                }
+            }
+        }
+
+        // Cast depth
+        let depth = depth as usize;
+
+        // Form key set
+        let keys_set: HashSet<MortonKey> = keys.iter().map(|k| k.key).collect();
+
+        // Form index pointers
+        let mut key_to_index: HashMap<MortonKey, usize> = HashMap::new();
+        let mut leaf_to_index: HashMap<MortonKey, usize> = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(key.key, i);
+        }
+
+        for (i, leaf) in leaves.iter().enumerate() {
+            leaf_to_index.insert(leaf.key, i);
+        }
 
         SingleNodeTree {
-            adaptive,
+            depth,
             points,
-            keys_set,
-            leaves,
-            leaves_set,
             domain,
-            points_to_leaves,
-            leaves_to_points,
-            keys_to_data,
+            leaves,
+            keys,
+            keys_set,
+            key_to_index,
+            leaf_to_index,
         }
     }
 
     /// Constructor for adaptive trees
     pub fn adaptive_tree(
-        adaptive: bool,
         points: &[[PointType; 3]],
+        point_data: &Vec<Vec<PointType>>,
         &domain: &Domain,
         n_crit: usize,
     ) -> SingleNodeTree {
         // Encode points at deepest level
         let mut points: Points = points
             .iter()
+            .zip(point_data)
             .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: *p,
-                key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
-                global_idx: i,
+            .map(|(i, (p, d))| {
+                let key = MortonKey::from_point(p, &domain, DEEPEST_LEVEL);
+                Point {
+                    coordinate: *p,
+                    base_key: key,
+                    encoded_key: key,
+                    global_idx: i,
+                    data: d.clone(),
+                }
             })
             .collect();
 
         // Complete the region spanned by the points
         let mut complete = MortonKeys {
-            keys: points.iter().map(|p| p.key).collect_vec(),
+            keys: points.iter().map(|p| p.encoded_key).collect_vec(),
             index: 0,
         };
 
@@ -237,46 +301,63 @@ impl SingleNodeTree {
         let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
         // Split the blocks based on the n_crit constraint
-        let mut balanced = split_blocks(&points, blocktree, n_crit);
+        let mut balanced = split_blocks(&mut points, blocktree, n_crit);
 
         // Balance and linearize
         balanced.sort();
         balanced.balance();
         balanced.linearize();
 
-        // Find new maps between points and balanced tree
-        let points_to_leaves = assign_points_to_nodes(&points, &balanced);
+        // Form leaf nodes
+        let leaves = group_points_by_encoded_leaves(&mut points);
 
-        points = points
-            .iter()
-            .map(|p| Point {
-                coordinate: p.coordinate,
-                global_idx: p.global_idx,
-                key: *points_to_leaves.get(p).unwrap(),
-            })
-            .collect();
+        // Find all keys in tree
+        let mut hashes = HashSet::<MortonKey>::new();
+        let mut keys = Vec::<Node>::new();
 
-        let leaves_to_points = assign_nodes_to_points(&balanced, &points);
-        let leaves = balanced;
-        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
-        let mut keys_set: HashSet<MortonKey> = HashSet::new();
-        for key in leaves.iter() {
-            let ancestors = key.ancestors();
-            keys_set.extend(&ancestors);
+        for node in leaves.iter() {
+            let ancestors = node.key.ancestors();
+
+            for key in ancestors.iter() {
+                if !hashes.contains(key) {
+                    // Insert a new node into keys
+                    keys.push(Node {
+                        key: *key,
+                        data: NodeData::default(),
+                    });
+
+                    hashes.insert(*key);
+                }
+            }
         }
 
-        let keys_to_data: HashMap<MortonKey, NodeData> = HashMap::new();
+        // Find depth
+        let depth = points.iter().map(|p| p.encoded_key.level()).max().unwrap() as usize;
+
+        // Calculate key set
+        let keys_set: HashSet<MortonKey> = keys.iter().map(|k| k.key).collect();
+
+        // Form index pointers
+        let mut key_to_index: HashMap<MortonKey, usize> = HashMap::new();
+        let mut leaf_to_index: HashMap<MortonKey, usize> = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(key.key, i);
+        }
+
+        for (i, leaf) in leaves.iter().enumerate() {
+            leaf_to_index.insert(leaf.key, i);
+        }
 
         SingleNodeTree {
-            adaptive,
+            depth,
             points,
-            keys_set,
-            leaves,
-            leaves_set,
             domain,
-            points_to_leaves,
-            leaves_to_points,
-            keys_to_data,
+            leaves,
+            keys,
+            keys_set,
+            key_to_index,
+            leaf_to_index,
         }
     }
 
@@ -323,32 +404,34 @@ impl SingleNodeTree {
     }
 }
 
-impl Tree for SingleNodeTree {
+impl<'a> Tree<'a> for SingleNodeTree {
     type Domain = Domain;
     type Point = Point;
     type Points = Points;
-    type NodeIndex = MortonKey;
-    type NodeIndices = MortonKeys;
-    type NodeIndicesSet = HashSet<MortonKey>;
-    type NodeDataType = NodeData;
+    type NodeIndex = Node;
+    type NodeIndices = Nodes;
+    type LeafNodeIndex = LeafNode;
+    type LeafNodeIndices = LeafNodes;
+    type RawNodeIndex = MortonKey;
 
-    // Get adaptivity information
-    fn get_adaptive(&self) -> bool {
-        self.adaptive
+    fn get_depth(&self) -> usize {
+        self.depth
     }
 
-    // Get all keys, gets local keys in multi-node setting
-    fn get_keys(&self) -> &MortonKeys {
+    fn get_leaves(&self) -> &Self::LeafNodeIndices {
         &self.leaves
     }
 
-    fn get_keys_set(&self) -> &HashSet<MortonKey> {
-        &self.leaves_set
+    fn get_keys(&self) -> &Self::NodeIndices {
+        &self.keys
     }
 
-    // Get all points, gets local keys in multi-node setting
-    fn get_all_points(&self) -> &Points {
-        &self.points
+    fn get_keys_mut(&mut self) -> &mut Self::NodeIndices {
+        &mut self.keys
+    }
+
+    fn get_leaves_mut(&mut self) -> &mut Self::LeafNodeIndices {
+        &mut self.leaves
     }
 
     // Get domain, gets global domain in multi-node setting
@@ -356,161 +439,155 @@ impl Tree for SingleNodeTree {
         &self.domain
     }
 
-    // Get tree leaf associated with a given point
-    fn get_leaf(&self, point: &Point) -> Option<&MortonKey> {
-        self.points_to_leaves.get(point)
+    fn get_keys_set(&self) -> &HashSet<Self::RawNodeIndex> {
+        &self.keys_set
     }
 
-    // Get points associated with a tree leaf.
-    fn get_points(&self, leaf: &MortonKey) -> Option<&Points> {
-        self.leaves_to_points.get(leaf)
+    fn get_leaf_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::LeafNodeIndex> {
+        if let Some(index) = self.leaf_to_index.get(key) {
+            Some(&self.leaves[*index])
+        } else {
+            None
+        }
     }
 
-    fn get_data(&self, node_index: &Self::NodeIndex) -> Option<&Self::NodeDataType> {
-        self.keys_to_data.get(node_index)
+    fn get_leaf_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::LeafNodeIndex> {
+        if let Some(index) = self.leaf_to_index.get(key) {
+            Some(&mut self.leaves[*index])
+        } else {
+            None
+        }
     }
 
-    fn set_data(&mut self, node_index: &Self::NodeIndex, data: Self::NodeDataType) {
-        self.keys_to_data.insert(*node_index, data);
+    fn get_node(&self, key: &Self::RawNodeIndex) -> Option<&Self::NodeIndex> {
+        if let Some(index) = self.key_to_index.get(key) {
+            Some(&self.keys[*index])
+        } else {
+            None
+        }
+    }
+
+    fn get_node_mut(&mut self, key: &Self::RawNodeIndex) -> Option<&mut Self::NodeIndex> {
+        if let Some(index) = self.key_to_index.get(key) {
+            Some(&mut self.keys[*index])
+        } else {
+            None
+        }
     }
 }
 
-impl FmmTree for SingleNodeTree {
-    type NodeIndex = MortonKey;
-    type NodeIndices = MortonKeys;
-    type NodeData = NodeData;
-    type NodeDataType = Vec<f64>;
+impl<'a> FmmTree<'a> for SingleNodeTree {
+    type FmmRawNodeIndex = MortonKey;
+    type FmmRawNodeIndices = MortonKeys;
 
     // Single node trees are already locally essential trees
     fn create_let(&mut self) {}
 
-    // Calculate near field interaction list of leaf keys.
-    fn get_near_field(&self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices> {
-        let mut keys = Vec::<MortonKey>::new();
-        let neighbours = leaf.neighbors();
+    fn get_interaction_list(
+        &self,
+        node_index: &Self::FmmRawNodeIndex,
+    ) -> Option<Self::FmmRawNodeIndices> {
+        if node_index.level() >= 2 {
+            let v_list = node_index
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| self.keys_set.contains(pnc) && !node_index.is_adjacent(pnc))
+                .collect_vec();
+
+            if !v_list.is_empty() {
+                return Some(MortonKeys {
+                    keys: v_list,
+                    index: 0,
+                });
+            } else {
+                return None;
+            }
+        }
+        None
+    }
+
+    fn get_near_field(
+        &self,
+        node_index: &Self::FmmRawNodeIndex,
+    ) -> Option<Self::FmmRawNodeIndices> {
+        let mut u_list = Vec::<MortonKey>::new();
+        let neighbours = node_index.neighbors();
 
         // Child level
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.keys_set.contains(nc) && leaf.is_adjacent(nc))
+            .filter(|nc| self.keys_set.contains(nc) && node_index.is_adjacent(nc))
             .collect();
 
         // Key level
         let mut neighbors_adj: Vec<MortonKey> = neighbours
             .iter()
-            .filter(|n| self.keys_set.contains(n) && leaf.is_adjacent(n))
+            .filter(|n| self.keys_set.contains(n) && node_index.is_adjacent(n))
             .cloned()
             .collect();
 
         // Parent level
-        let mut neighbors_parents_adj: Vec<MortonKey> = neighbours
-            .iter()
-            .map(|n| n.parent())
-            .filter(|np| self.keys_set.contains(np) && leaf.is_adjacent(np))
-            .collect();
-
-        keys.append(&mut neighbors_children_adj);
-        keys.append(&mut neighbors_adj);
-        keys.append(&mut neighbors_parents_adj);
-
-        if !keys.is_empty() {
-            Some(MortonKeys { keys, index: 0 })
-        } else {
-            None
-        }
-    }
-
-    // Calculate compressible far field interactions of leaf & other keys.
-    fn get_interaction_list(&self, key: &Self::NodeIndex) -> Option<Self::NodeIndices> {
-        if key.level() >= 2 {
-            let keys = key
-                .parent()
-                .neighbors()
-                .iter()
-                .flat_map(|pn| pn.children())
-                .filter(|pnc| self.keys_set.contains(pnc) && key.is_adjacent(pnc))
-                .collect_vec();
-
-            if !keys.is_empty() {
-                return Some(MortonKeys { keys, index: 0 });
-            } else {
-                return None;
-            }
-        }
-        {
-            None
-        }
-    }
-
-    // Calculate M2P interactions of leaf key.
-    fn get_w_list(&self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices> {
-        // Child level
-        let keys = leaf
-            .neighbors()
-            .iter()
-            .flat_map(|n| n.children())
-            .filter(|nc| self.keys_set.contains(nc) && !leaf.is_adjacent(nc))
-            .collect_vec();
-
-        if !keys.is_empty() {
-            Some(MortonKeys { keys, index: 0 })
-        } else {
-            None
-        }
-    }
-
-    // Calculate P2L interactions of leaf key.
-    fn get_x_list(&self, leaf: &Self::NodeIndex) -> Option<Self::NodeIndices> {
-        let keys = leaf
+        let mut parent_neighbours_adj: Vec<MortonKey> = node_index
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.keys_set.contains(pn) && !leaf.is_adjacent(pn))
-            .collect_vec();
+            .filter(|pn| self.keys_set.contains(pn) && node_index.is_adjacent(pn))
+            .collect();
 
-        if !keys.is_empty() {
-            Some(MortonKeys { keys, index: 0 })
+        u_list.append(&mut neighbors_children_adj);
+        u_list.append(&mut neighbors_adj);
+        u_list.append(&mut parent_neighbours_adj);
+        u_list.push(*node_index);
+
+        if !u_list.is_empty() {
+            Some(MortonKeys {
+                keys: u_list,
+                index: 0,
+            })
         } else {
             None
         }
     }
 
-    // Set data associated with a tree node key
-    fn set_multipole_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
-        if let Some(x) = self.keys_to_data.get_mut(node_index) {
-            x.set_multipole_expansion(data);
+    fn get_w_list(&self, node_index: &Self::FmmRawNodeIndex) -> Option<Self::FmmRawNodeIndices> {
+        // Child level
+        let w_list = node_index
+            .neighbors()
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| self.keys_set.contains(nc) && !node_index.is_adjacent(nc))
+            .collect_vec();
+
+        if !w_list.is_empty() {
+            Some(MortonKeys {
+                keys: w_list,
+                index: 0,
+            })
+        } else {
+            None
         }
     }
 
-    // Get data associated with a tree node key
-    fn get_multipole_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
-        self.keys_to_data
-            .get(node_index)
-            .map(|x| x.get_multipole_expansion())
-    }
+    fn get_x_list(&self, node_index: &Self::FmmRawNodeIndex) -> Option<Self::FmmRawNodeIndices> {
+        let x_list = node_index
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.keys_set.contains(pn) && !node_index.is_adjacent(pn))
+            .collect_vec();
 
-    fn set_local_expansion(&mut self, node_index: &Self::NodeIndex, data: &Self::NodeDataType) {
-        if let Some(x) = self.keys_to_data.get_mut(node_index) {
-            x.set_local_expansion(data);
+        if !x_list.is_empty() {
+            Some(MortonKeys {
+                keys: x_list,
+                index: 0,
+            })
+        } else {
+            None
         }
     }
-
-    // Get data associated with a tree node key
-    fn get_local_expansion(&self, node_index: &Self::NodeIndex) -> Option<Self::NodeDataType> {
-        self.keys_to_data
-            .get(node_index)
-            .map(|x| x.get_local_expansion())
-    }
-
-    // TODO: Not implemented
-    fn downward_pass(&self) {}
-
-    // TODO: Not implemented
-    fn upward_pass(&self) {}
-
-    // TODO: Not implemented
-    fn run(&self, _expansion_order: usize) {}
 }
 
 #[cfg(test)]
@@ -538,17 +615,22 @@ mod test {
     #[test]
     pub fn test_uniform_tree() {
         let points = points_fixture(10000);
+        let point_data = vec![vec![1.0]; 10000];
         let depth = 4;
         let n_crit = 15;
-        let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
+        let tree = SingleNodeTree::new(&points, &point_data, false, Some(n_crit), Some(depth));
 
-        // Test that particle constraint is met at this level
-        for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
-            assert!(points.len() <= n_crit);
+        // Test that particle constraint is met at leaf level
+        for node in tree.leaves.iter() {
+            assert!(node.points.len() <= n_crit)
         }
 
         // Test that the tree really is uniform
-        let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .iter()
+            .map(|node| node.key.level())
+            .collect();
         let first = levels[0];
         assert!(levels.iter().all(|key| *key == first));
 
@@ -559,139 +641,67 @@ mod test {
     #[test]
     pub fn test_adaptive_tree() {
         let points = points_fixture(1000);
+        let point_data = vec![vec![1.0]; 1000];
         let adaptive = true;
         let n_crit = 15;
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
+        let tree = SingleNodeTree::new(&points, &point_data, adaptive, Some(n_crit), None);
 
         // Test that particle constraint is met
-        for (_, (_, points)) in tree.leaves_to_points.iter().enumerate() {
-            assert!(points.len() <= n_crit);
+        for node in tree.leaves.iter() {
+            assert!(node.points.len() <= n_crit)
         }
 
         // Test that tree is not uniform
-        let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .iter()
+            .map(|node| node.key.level())
+            .collect();
         let first = levels[0];
         assert_eq!(false, levels.iter().all(|level| *level == first));
 
-        // Test for overlaps in balanced tree
-        let keys: Vec<MortonKey> = tree.leaves.iter().cloned().collect();
-        for key in keys.iter() {
-            if !keys.iter().contains(key) {
-                let mut ancestors = key.ancestors();
-                ancestors.remove(key);
-
-                for ancestor in ancestors.iter() {
-                    assert!(!keys.contains(ancestor));
-                }
-            }
-        }
-
-        // Test that adjacent keys are 2:1 balanced
-        for key in keys.iter() {
-            let adjacent_levels: Vec<u64> = keys
+        // Test that adjacent leaves are 2:1 balanced
+        for node in tree.leaves.iter() {
+            let adjacent_levels: Vec<u64> = tree
+                .leaves
                 .iter()
                 .cloned()
-                .filter(|k| key.is_adjacent(k))
-                .map(|a| a.level())
+                .filter(|n| node.key.is_adjacent(&n.key))
+                .map(|n| n.key.level())
                 .collect();
 
             for l in adjacent_levels.iter() {
-                assert!(l.abs_diff(key.level()) <= 1);
+                assert!(l.abs_diff(node.key.level()) <= 1);
             }
         }
     }
 
-    pub fn test_no_overlaps_helper(keys: &MortonKeys) {
-        let tree_set: HashSet<MortonKey> = keys.clone().collect();
+    pub fn test_no_overlaps_helper(nodes: &LeafNodes) {
+        let key_set: HashSet<MortonKey> = nodes.iter().map(|n| n.key).clone().collect();
 
-        for node in tree_set.iter() {
+        for node in key_set.iter() {
             let ancestors = node.ancestors();
-            let int: Vec<&MortonKey> = tree_set.intersection(&ancestors).collect();
+            let int: Vec<&MortonKey> = key_set.intersection(&ancestors).collect();
+            assert!(int.len() == 1);
+        }
+    }
+    pub fn test_no_overlaps_helper_morton(keys: &MortonKeys) {
+        let key_set: HashSet<MortonKey> = keys.clone().collect();
+
+        for node in key_set.iter() {
+            let ancestors = node.ancestors();
+            let int: Vec<&MortonKey> = key_set.intersection(&ancestors).collect();
             assert!(int.len() == 1);
         }
     }
     #[test]
     pub fn test_no_overlaps() {
         let points = points_fixture(10000);
-        let uniform = SingleNodeTree::new(&points, false, Some(150), Some(4));
-        let adaptive = SingleNodeTree::new(&points, true, Some(150), None);
-        test_no_overlaps_helper(&uniform.get_keys());
-        test_no_overlaps_helper(&adaptive.get_keys());
-    }
-
-    #[test]
-    pub fn test_assign_points_to_nodes() {
-        // 1. Assume overlap
-        let points = points_fixture(100);
-
-        let domain = Domain {
-            origin: [0.0, 0.0, 0.0],
-            diameter: [1.0, 1.0, 1.0],
-        };
-        let depth = 1;
-
-        let points: Points = points
-            .iter()
-            .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: *p,
-                key: MortonKey::from_point(p, &domain, depth),
-                global_idx: i,
-            })
-            .collect();
-
-        let keys = MortonKeys {
-            keys: ROOT.children(),
-            index: 0,
-        };
-
-        let map = assign_points_to_nodes(&points, &keys);
-
-        // Test that all points have been mapped to something
-        for point in points.iter() {
-            assert!(map.contains_key(point));
-        }
-
-        // 2. No overlap
-        // Generate points in a single octant of the domain
-        let npoints = 10;
-        let mut range = StdRng::seed_from_u64(0);
-        let between = rand::distributions::Uniform::from(0.0..0.5);
-        let mut points: Vec<[PointType; 3]> = Vec::new();
-
-        for _ in 0..npoints {
-            points.push([
-                between.sample(&mut range),
-                between.sample(&mut range),
-                between.sample(&mut range),
-            ])
-        }
-
-        let domain = Domain {
-            origin: [0.0, 0.0, 0.0],
-            diameter: [1.0, 1.0, 1.0],
-        };
-        let depth = 1;
-
-        let points: Points = points
-            .iter()
-            .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: *p,
-                key: MortonKey::from_point(p, &domain, depth),
-                global_idx: i,
-            })
-            .collect();
-
-        let keys = MortonKeys {
-            keys: vec![ROOT.children().last().unwrap().clone()],
-            index: 0,
-        };
-
-        let map = assign_points_to_nodes(&points, &keys);
-
-        // Test that the map remains empty
-        assert!(map.is_empty());
+        let point_data = vec![vec![1.0]; 10000];
+        let uniform = SingleNodeTree::new(&points, &point_data, false, Some(150), Some(4));
+        let adaptive = SingleNodeTree::new(&points, &point_data, true, Some(150), None);
+        test_no_overlaps_helper(uniform.get_leaves());
+        test_no_overlaps_helper(adaptive.get_leaves());
     }
 
     #[test]
@@ -716,13 +726,18 @@ mod test {
         };
         let depth = 1;
 
-        let points: Points = points
+        let mut points: Points = points
             .iter()
             .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: *p,
-                key: MortonKey::from_point(p, &domain, depth),
-                global_idx: i,
+            .map(|(i, p)| {
+                let key = MortonKey::from_point(p, &domain, depth);
+                Point {
+                    coordinate: *p,
+                    encoded_key: key,
+                    base_key: key,
+                    global_idx: i,
+                    data: vec![1., 0.],
+                }
             })
             .collect();
 
@@ -731,15 +746,14 @@ mod test {
             index: 0,
         };
 
-        let map = assign_nodes_to_points(&keys, &points);
+        assign_nodes_to_points(&keys, &mut points);
 
-        // Test that map retains empty nodes
-        assert_eq!(map.keys().len(), keys.len());
+        let nodes = group_points_by_encoded_leaves(&mut points);
 
         // Test that a single octant contains all the points
-        for (_, points) in map.iter() {
-            if points.len() > 0 {
-                assert!(points.len() == npoints);
+        for node in nodes.iter() {
+            if node.points.len() > 0 {
+                assert!(node.points.len() == npoints);
             }
         }
     }
@@ -751,13 +765,18 @@ mod test {
             diameter: [1.0, 1.0, 1.0],
         };
         let depth = 5;
-        let points: Vec<Point> = points_fixture(10000)
+        let mut points: Vec<Point> = points_fixture(10000)
             .into_iter()
             .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: p,
-                global_idx: i,
-                key: MortonKey::from_point(&p, &domain, depth),
+            .map(|(i, p)| {
+                let key = MortonKey::from_point(&p, &domain, depth);
+                Point {
+                    coordinate: p,
+                    global_idx: i,
+                    base_key: key,
+                    encoded_key: key,
+                    data: vec![1., 0.],
+                }
             })
             // .cloned()
             .collect();
@@ -770,9 +789,13 @@ mod test {
             index: 0,
         };
 
-        let split_blocktree = split_blocks(&points, blocktree, n_crit);
+        split_blocks(&mut points, blocktree, n_crit);
+        let split_blocktree = MortonKeys {
+            keys: points.iter().map(|p| p.encoded_key).collect_vec(),
+            index: 0,
+        };
 
-        test_no_overlaps_helper(&split_blocktree);
+        test_no_overlaps_helper_morton(&split_blocktree);
 
         // Test case where the blocktree only partially covers the area
         let mut children = ROOT.children();
@@ -788,9 +811,12 @@ mod test {
 
         let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
-        let split_blocktree = split_blocks(&points, blocktree, 25);
-
-        test_no_overlaps_helper(&split_blocktree);
+        split_blocks(&mut points, blocktree, 25);
+        let split_blocktree = MortonKeys {
+            keys: points.iter().map(|p| p.encoded_key).collect_vec(),
+            index: 0,
+        };
+        test_no_overlaps_helper_morton(&split_blocktree);
     }
 
     #[test]

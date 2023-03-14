@@ -1,5 +1,6 @@
 pub mod impl_domain;
 pub mod impl_morton;
+pub mod impl_node;
 pub mod impl_point;
 pub mod impl_single_node;
 

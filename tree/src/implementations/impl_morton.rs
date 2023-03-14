@@ -8,6 +8,8 @@ use std::{
     vec,
 };
 
+use solvers_traits::fmm::KiFmmNode;
+
 use crate::{
     constants::{
         BYTE_DISPLACEMENT, BYTE_MASK, DEEPEST_LEVEL, DIRECTIONS, LEVEL_DISPLACEMENT, LEVEL_MASK,
@@ -278,6 +280,67 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
 }
 
 impl MortonKey {
+    // Checksum encoding unique transfer vector between this key, and another. ie. the vector other->self.
+    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+        // Only valid for keys at level 2 and below
+        if self.level() < 2 || other.level() < 2 {
+            panic!("Transfer vectors only computed for keys at levels deeper than 2")
+        }
+
+        let level_diff = DEEPEST_LEVEL - self.level();
+
+        let a = decode_key(self.morton);
+        let b = decode_key(other.morton);
+
+        // Compute transfer vector
+        let mut x = a[0] as i64 - b[0] as i64;
+        let mut y = a[1] as i64 - b[1] as i64;
+        let mut z = a[2] as i64 - b[2] as i64;
+
+        // Convert to an absolute transfer vector, wrt to key level.
+        x /= 2_i64.pow(level_diff as u32);
+        y /= 2_i64.pow(level_diff as u32);
+        z /= 2_i64.pow(level_diff as u32);
+
+        fn positive_map(num: &mut i64) {
+            if *num < 0 {
+                *num = 2 * (-1 * *num) + 1;
+            } else {
+                *num *= 2;
+            }
+        }
+
+        // Compute checksum via mapping to positive integers.
+        positive_map(&mut x);
+        positive_map(&mut y);
+        positive_map(&mut z);
+
+        let mut checksum = x;
+        checksum = (checksum << 16) | y;
+        checksum = (checksum << 16) | z;
+
+        checksum as usize
+    }
+
+    pub fn diameter(&self, domain: &Domain) -> [f64; 3] {
+        domain
+            .diameter
+            .map(|x| 0.5f64.powf(self.level() as f64) * x)
+    }
+
+    pub fn centre(&self, domain: &Domain) -> [f64; 3] {
+        let mut result = [0f64; 3];
+
+        let anchor_coordinate = self.to_coordinates(domain);
+        let diameter = self.diameter(domain);
+
+        for (i, (c, d)) in anchor_coordinate.iter().zip(diameter).enumerate() {
+            result[i] = c + d / 2.0;
+        }
+
+        result
+    }
+
     /// Return the anchor
     pub fn anchor(&self) -> &[KeyType; 3] {
         &self.anchor
@@ -636,6 +699,85 @@ impl PartialOrd for MortonKey {
 impl Hash for MortonKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
+    }
+}
+
+impl KiFmmNode for MortonKey {
+    type Surface = Vec<[f64; 3]>;
+    type Domain = Domain;
+
+    fn compute_surface(&self, order: usize, alpha: f64, domain: &Self::Domain) -> Self::Surface {
+        let n_coeffs = 6 * (order - 1).pow(2) + 2;
+
+        let mut surface = vec![[0f64; 3]; n_coeffs];
+
+        surface[0] = [-1.0, -1.0, -1.0];
+
+        let mut count = 1;
+
+        // Hold x fixed
+        for i in 0..(order - 1) {
+            for j in 0..(order - 1) {
+                let i = i as f64;
+                let j = j as f64;
+                let order = order as f64;
+
+                surface[count][0] = -1.0;
+                surface[count][1] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
+                surface[count][2] = (2.0 * j - (order - 1.0)) / (order - 1.0);
+                count += 1;
+            }
+        }
+
+        // Hold y fixed
+        for i in 0..(order - 1) {
+            for j in 0..(order - 1) {
+                let i = i as f64;
+                let j = j as f64;
+                let order = order as f64;
+
+                surface[count][0] = (2.0 * j - (order - 1.0)) / (order - 1.0);
+                surface[count][1] = -1.0;
+                surface[count][2] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
+                count += 1;
+            }
+        }
+
+        // Hold z fixed
+        for i in 0..(order - 1) {
+            for j in 0..(order - 1) {
+                let i = i as f64;
+                let j = j as f64;
+                let order = order as f64;
+                surface[count][0] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
+                surface[count][1] = (2.0 * j - (order - 1.0)) / (order - 1.0);
+                surface[count][2] = -1.0;
+                count += 1
+            }
+        }
+
+        // Reflect about origin, for remaining faces
+        for i in 0..(n_coeffs / 2) {
+            surface[count + i][0] = -1.0 * surface[i][0];
+            surface[count + i][1] = -1.0 * surface[i][1];
+            surface[count + i][2] = -1.0 * surface[i][2];
+        }
+
+        // Translate box to specified centre, and scale
+        let scaled_diameter = self.diameter(domain);
+        let dilated_diameter = scaled_diameter.map(|d| d * alpha);
+
+        let mut scaled_surface = vec![[0f64; 3]; n_coeffs];
+
+        let centre = self.centre(domain);
+
+        for i in 0..n_coeffs {
+            scaled_surface[i][0] = (surface[i][0] * (dilated_diameter[0] / 2.0)) + centre[0];
+            scaled_surface[i][1] = (surface[i][1] * (dilated_diameter[1] / 2.0)) + centre[1];
+            scaled_surface[i][2] = (surface[i][2] * (dilated_diameter[2] / 2.0)) + centre[2];
+        }
+
+        scaled_surface
     }
 }
 
@@ -1390,5 +1532,50 @@ mod test {
         let b = MortonKey::from_point(&point, &domain, 16);
         assert_ne!(a, b);
         assert_eq!(a.anchor, b.anchor);
+    }
+
+    #[test]
+    fn test_transfer_vector() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        // Test scale independence of transfer vectors
+        let a = MortonKey::from_point(&point, &domain, 2);
+        let other = a.siblings()[2];
+        let res_a = a.find_transfer_vector(&other);
+
+        let b = MortonKey::from_point(&point, &domain, 16);
+        let other = b.siblings()[2];
+        let res_b = b.find_transfer_vector(&other);
+
+        assert_eq!(res_a, res_b);
+
+        // Test translational invariance of transfer vector
+        let a = MortonKey::from_point(&point, &domain, 2);
+        let other = a.siblings()[2];
+        let res_a = a.find_transfer_vector(&other);
+
+        let shifted_point = [0.1, 0.1, 0.1];
+        let b = MortonKey::from_point(&shifted_point, &domain, 2);
+        let other = b.siblings()[2];
+        let res_b = b.find_transfer_vector(&other);
+
+        assert_eq!(res_a, res_b);
+    }
+
+    #[test]
+    #[should_panic(expected = "Transfer vectors only computed for keys at levels deeper than 2")]
+    fn test_transfer_vector_panic() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let key = MortonKey::from_point(&point, &domain, 1);
+        let sibling = key.siblings()[0];
+        key.find_transfer_vector(&sibling);
     }
 }

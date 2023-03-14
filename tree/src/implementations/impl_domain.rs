@@ -6,7 +6,7 @@ impl Domain {
     /// ensure correct Morton Encoding.
     pub fn from_local_points(points: &[[PointType; 3]]) -> Domain {
         // Increase size of bounding box to capture all points
-        let err: f64 = 0.1;
+        let err: f64 = 0.001;
         let max_x = points
             .iter()
             .max_by(|a, b| a[0].partial_cmp(&b[0]).unwrap())
