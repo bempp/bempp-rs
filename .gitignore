@@ -11,3 +11,9 @@ Cargo.lock
 
 # nano swp files
 .*.swp
+
+*.pyc
+
+examples.sh
+
+_*.msh

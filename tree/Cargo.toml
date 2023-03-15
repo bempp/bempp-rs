@@ -11,20 +11,17 @@ keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "rusty_tree"
+name = "solvers_tree"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
 itertools = "0.10"
-mpi = { git = "https://github.com/rsmpi/rsmpi", branch = "main"}
+mpi = { version = "0.6.*", optional = true }
 memoffset = "0.6"
-rand = "0.8.4"
-hyksort = {git = "https://github.com/rusty-solvers/hyksort", branch = "main"}
-vtkio = "0.6"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+rand = "0.8.*"
+hyksort = { path = "../hyksort", optional = true }
+solvers-traits = { path = "../traits" }
 
-# Build hdf5 dep from source until bug regarding 'H5Pget_fapl_direct' not being
-# included on Linux builds is released.
-hdf5 = {git = "https://github.com/aldanor/hdf5-rust.git", branch = "master"}
-
+[features]
+mpi = ["dep:mpi", "dep:hyksort"]
+strict = []

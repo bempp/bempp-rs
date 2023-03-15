@@ -1,43 +1,29 @@
 //! Push forward and pull back maps
 
-use crate::cell::*;
-use crate::element::*;
+use crate::cell::PhysicalCell;
+use crate::element::{FiniteElement, TabulatedData};
+pub use solvers_traits::element::MapType;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-#[repr(u8)]
-pub enum MapType {
-    Identity = 0,
-    CovariantPiola = 1,
-    ContravariantPiola = 2,
-    L2Piola = 3,
-}
-
-pub fn identity_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
-    data: &mut TabulatedData<'a, F>,
-    points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
+    _points: &[f64],
+    _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
-pub fn identity_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
-    data: &mut TabulatedData<'a, F>,
-    points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+pub fn identity_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
+    _points: &[f64],
+    _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 }
 
-pub fn contravariant_piola_push_forward<
-    'a,
-    'b,
-    F: FiniteElement,
-    F2: FiniteElement,
-    C: ReferenceCell,
->(
-    data: &mut TabulatedData<'a, F>,
+pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -54,7 +40,6 @@ pub fn contravariant_piola_push_forward<
             .tabulate(&points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -64,12 +49,12 @@ pub fn contravariant_piola_push_forward<
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = j[0] * j[3] - j[1] * j[2];
+            let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
                 temp_data[0] = *data.get(0, p, i, 0);
@@ -84,16 +69,10 @@ pub fn contravariant_piola_push_forward<
     }
 }
 
-pub fn contravariant_piola_pull_back<
-    'a,
-    'b,
-    F: FiniteElement,
-    F2: FiniteElement,
-    C: ReferenceCell,
->(
-    data: &mut TabulatedData<'a, F>,
+pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -110,7 +89,6 @@ pub fn contravariant_piola_pull_back<
             .tabulate(&points, 1, &mut derivs);
 
         let mut jinv = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -120,10 +98,10 @@ pub fn contravariant_piola_pull_back<
             jinv[2] = 0.0;
             jinv[3] = 0.0;
             for gp in 0..geometry_npts {
-                jinv[3] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv[1] -= derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv[2] -= derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                jinv[0] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                jinv[3] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv[1] -= derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv[2] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                jinv[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
 
             for i in 0..nbasis {
@@ -139,16 +117,10 @@ pub fn contravariant_piola_pull_back<
     }
 }
 
-pub fn covariant_piola_push_forward<
-    'a,
-    'b,
-    F: FiniteElement,
-    F2: FiniteElement,
-    C: ReferenceCell,
->(
-    data: &mut TabulatedData<'a, F>,
+pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -165,7 +137,6 @@ pub fn covariant_piola_push_forward<
             .tabulate(&points, 1, &mut derivs);
 
         let mut jinv_t = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -175,12 +146,12 @@ pub fn covariant_piola_push_forward<
             jinv_t[2] = 0.0;
             jinv_t[3] = 0.0;
             for gp in 0..geometry_npts {
-                jinv_t[3] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv_t[2] -= derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                jinv_t[1] -= derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                jinv_t[0] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                jinv_t[3] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv_t[2] -= derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                jinv_t[1] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                jinv_t[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = jinv_t[0] * jinv_t[3] - jinv_t[1] * jinv_t[2];
+            let det_j = jinv_t[0] * jinv_t[3] - jinv_t[1] * jinv_t[2];
             jinv_t[0] /= det_j;
             jinv_t[1] /= det_j;
             jinv_t[2] /= det_j;
@@ -199,10 +170,10 @@ pub fn covariant_piola_push_forward<
     }
 }
 
-pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
-    data: &mut TabulatedData<'a, F>,
+pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -219,7 +190,6 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C:
             .tabulate(&points, 1, &mut derivs);
 
         let mut j_t = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
 
         let mut temp_data = vec![0.0, 0.0];
 
@@ -229,10 +199,10 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C:
             j_t[2] = 0.0;
             j_t[3] = 0.0;
             for gp in 0..geometry_npts {
-                j_t[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j_t[2] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j_t[1] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j_t[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j_t[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j_t[2] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j_t[1] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j_t[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
 
             for i in 0..nbasis {
@@ -248,10 +218,10 @@ pub fn covariant_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C:
     }
 }
 
-pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
-    data: &mut TabulatedData<'a, F>,
+pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -268,9 +238,6 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: Ref
             .tabulate(&points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
-
-        let mut temp_data = vec![0.0, 0.0];
 
         for p in 0..npts {
             j[0] = 0.0;
@@ -278,12 +245,12 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: Ref
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = j[0] * j[3] - j[1] * j[2];
+            let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
                 *data.get_mut(0, p, i, 0) *= det_j;
@@ -294,10 +261,10 @@ pub fn l2_piola_push_forward<'a, 'b, F: FiniteElement, F2: FiniteElement, C: Ref
     }
 }
 
-pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: ReferenceCell>(
-    data: &mut TabulatedData<'a, F>,
+pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
+    data: &mut TabulatedData,
     points: &[f64],
-    geometry: &PhysicalCell<'b, F2, C>,
+    geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.deriv_count(), 1);
 
@@ -314,9 +281,6 @@ pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: Refere
             .tabulate(&points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
-        let mut det_j = 0.0;
-
-        let mut temp_data = vec![0.0, 0.0];
 
         for p in 0..npts {
             j[0] = 0.0;
@@ -324,12 +288,12 @@ pub fn l2_piola_pull_back<'a, 'b, F: FiniteElement, F2: FiniteElement, C: Refere
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertices()[gp * gdim + 1];
+                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
             }
-            det_j = j[0] * j[3] - j[1] * j[2];
+            let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
                 *data.get_mut(0, p, i, 0) /= det_j;
@@ -347,6 +311,51 @@ mod test {
     use crate::map::*;
     use approx::*;
 
+    pub struct TestPhysicalCell<'a, F: FiniteElement> {
+        vertices: &'a [f64],
+        coordinate_element: &'a F,
+        gdim: usize,
+        tdim: usize,
+        npts: usize,
+    }
+
+    impl<'a, F: FiniteElement> TestPhysicalCell<'a, F> {
+        pub fn new(
+            reference_cell: &'a impl ReferenceCell,
+            vertices: &'a [f64],
+            coordinate_element: &'a F,
+            gdim: usize,
+        ) -> Self {
+            let tdim = reference_cell.dim();
+            let npts = vertices.len() / gdim;
+            Self {
+                vertices,
+                coordinate_element,
+                gdim,
+                tdim,
+                npts,
+            }
+        }
+    }
+
+    impl<'a, F: FiniteElement> PhysicalCell<'a, F> for TestPhysicalCell<'a, F> {
+        fn tdim(&self) -> usize {
+            self.tdim
+        }
+        fn gdim(&self) -> usize {
+            self.gdim
+        }
+        fn coordinate_element(&self) -> &'a F {
+            self.coordinate_element
+        }
+        fn npts(&self) -> usize {
+            self.npts
+        }
+        fn vertex(&self, vertex_number: usize) -> &'a [f64] {
+            &self.vertices[self.tdim * (vertex_number)..self.tdim * (vertex_number + 1)]
+        }
+    }
+
     #[test]
     fn test_identity() {
         let e = LagrangeElementTriangleDegree1 {};
@@ -359,7 +368,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
@@ -391,7 +400,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
@@ -429,7 +438,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 
@@ -464,7 +473,7 @@ mod test {
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
         let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
-        let geometry = PhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
+        let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
         let pts = vec![0.3, 0.3];
 

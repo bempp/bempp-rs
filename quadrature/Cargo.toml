@@ -1,3 +1,7 @@
+[features]
+# Treat warnings as a build error.
+strict = []
+
 [package]
 name = "solvers-quadrature"
 version = "0.0.1"

@@ -1,3 +1,7 @@
+[features]
+# Treat warnings as a build error.
+strict = []
+
 [package]
 name = "solvers-element"
 version = "0.1.0"
@@ -17,6 +21,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 solvers-tools = { path = "../tools"}
+solvers-traits = { path = "../traits" }
 paste = "1.*"
 libc = "0.2"
 approx = "0.5"
