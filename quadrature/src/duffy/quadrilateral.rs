@@ -103,9 +103,6 @@ fn identical_quadrilaterals(
                     let eta3 = points[index3];
                     let xi = points[index4];
 
-                    let eta12 = eta1 * eta2;
-                    let eta123 = eta12 * eta3;
-
                     // First part
 
                     let weight = weights[index1]
@@ -192,6 +189,210 @@ fn identical_quadrilaterals(
     }
 }
 
+fn edge_adjacent_quadrilaterals(
+    interval_rule: &NumericalQuadratureDefinition,
+    test_singular_edge_vertices: (usize, usize),
+    trial_singular_edge_vertices: (usize, usize),
+) -> TestTrialNumericalQuadratureDefinition {
+    let NumericalQuadratureDefinition {
+        dim,
+        order,
+        npoints,
+        weights,
+        points,
+    } = interval_rule;
+
+    let n_output_points = 6 * npoints * npoints * npoints * npoints;
+
+    let mut test_output_points = Vec::<f64>::with_capacity(2 * n_output_points);
+    let mut trial_output_points = Vec::<f64>::with_capacity(2 * n_output_points);
+    let mut output_weights = Vec::<f64>::with_capacity(n_output_points);
+
+    for index1 in 0..*npoints {
+        for index2 in 0..*npoints {
+            for index3 in 0..*npoints {
+                for index4 in 0..*npoints {
+                    let eta1 = points[index1];
+                    let eta2 = points[index2];
+                    let eta3 = points[index3];
+                    let xi = points[index4];
+
+                    // First part
+
+                    let weight =
+                        weights[index1] * weights[index2] * weights[index3] * weights[index4];
+
+                    test_output_points.push((1.0 - xi) * eta3 + xi);
+                    test_output_points.push(xi * eta2);
+                    trial_output_points.push((1.0 - xi) * eta3);
+                    trial_output_points.push(xi * eta1);
+                    output_weights.push(weight * xi * xi * (1.0 - xi));
+
+                    // Second part
+
+                    test_output_points.push((1.0 - xi) * eta3);
+                    test_output_points.push(xi * eta2);
+                    trial_output_points.push(xi + (1.0 - xi) * eta3);
+                    trial_output_points.push(xi * eta1);
+                    output_weights.push(weight * xi * xi * (1.0 - xi));
+
+                    // Third part
+
+                    test_output_points.push((1.0 - xi * eta1) * eta3 + xi * eta1);
+                    test_output_points.push(xi * eta2);
+                    trial_output_points.push((1.0 - xi * eta1) * eta3);
+                    trial_output_points.push(xi);
+                    output_weights.push(weight * xi * xi * (1.0 - xi * eta1));
+
+                    // Fourth part
+
+                    test_output_points.push((1.0 - xi * eta1) * eta3 + xi * eta1);
+                    test_output_points.push(xi);
+                    trial_output_points.push((1.0 - xi * eta1) * eta3);
+                    trial_output_points.push(xi * eta2);
+                    output_weights.push(weight * xi * xi * (1.0 - xi * eta1));
+
+                    // Fifth part
+
+                    test_output_points.push((1.0 - xi * eta1) * eta3);
+                    test_output_points.push(xi * eta2);
+                    trial_output_points.push((1.0 - xi * eta1) * eta3 + xi * eta1);
+                    trial_output_points.push(xi);
+                    output_weights.push(weight * xi * xi * (1.0 - xi * eta1));
+
+                    // Sixth part
+
+                    test_output_points.push((1.0 - xi * eta1) * eta3);
+                    test_output_points.push(xi);
+                    trial_output_points.push((1.0 - xi * eta1) * eta3 + xi * eta1);
+                    trial_output_points.push(xi * eta2);
+                    output_weights.push(weight * xi * xi * (1.0 - xi * eta1));
+                }
+            }
+        }
+    }
+
+    transform_coords(
+        &mut test_output_points,
+        &create_quadrilateral_mapper(test_singular_edge_vertices.0, test_singular_edge_vertices.1),
+    );
+    transform_coords(
+        &mut trial_output_points,
+        &create_quadrilateral_mapper(
+            trial_singular_edge_vertices.0,
+            trial_singular_edge_vertices.1,
+        ),
+    );
+
+    TestTrialNumericalQuadratureDefinition {
+        dim: *dim,
+        order: *order,
+        npoints: n_output_points,
+        weights: output_weights,
+        test_points: test_output_points,
+        trial_points: trial_output_points,
+    }
+}
+
+fn vertex_adjacent_quadrilaterals(
+    interval_rule: &NumericalQuadratureDefinition,
+    test_singular_vertex: usize,
+    trial_singular_vertex: usize,
+) -> TestTrialNumericalQuadratureDefinition {
+    let NumericalQuadratureDefinition {
+        dim,
+        order,
+        npoints,
+        weights,
+        points,
+    } = interval_rule;
+
+    let n_output_points = 4 * npoints * npoints * npoints * npoints;
+
+    let mut test_output_points = Vec::<f64>::with_capacity(2 * n_output_points);
+    let mut trial_output_points = Vec::<f64>::with_capacity(2 * n_output_points);
+    let mut output_weights = Vec::<f64>::with_capacity(n_output_points);
+
+    for index1 in 0..*npoints {
+        for index2 in 0..*npoints {
+            for index3 in 0..*npoints {
+                for index4 in 0..*npoints {
+                    let eta1 = points[index1];
+                    let eta2 = points[index2];
+                    let eta3 = points[index3];
+                    let xi = points[index4];
+
+                    // First part
+
+                    let weight = weights[index1]
+                        * weights[index2]
+                        * weights[index3]
+                        * weights[index4]
+                        * xi
+                        * xi
+                        * xi;
+
+                    test_output_points.push(xi);
+                    test_output_points.push(xi * eta1);
+                    trial_output_points.push(xi * eta2);
+                    trial_output_points.push(xi * eta3);
+                    output_weights.push(weight);
+
+                    // Second part
+
+                    test_output_points.push(xi * eta1);
+                    test_output_points.push(xi);
+                    trial_output_points.push(xi * eta2);
+                    trial_output_points.push(xi * eta3);
+                    output_weights.push(weight);
+
+                    // Third part
+
+                    test_output_points.push(xi * eta1);
+                    test_output_points.push(xi * eta2);
+                    trial_output_points.push(xi);
+                    trial_output_points.push(xi * eta3);
+                    output_weights.push(weight);
+
+                    // Fourth part
+
+                    test_output_points.push(xi * eta1);
+                    test_output_points.push(xi * eta2);
+                    trial_output_points.push(xi * eta3);
+                    trial_output_points.push(xi);
+                    output_weights.push(weight);
+                }
+            }
+        }
+    }
+
+    let next_vertex = |index: usize| match index {
+        0 => 1,
+        1 => 3,
+        2 => 0,
+        3 => 2,
+        _ => panic!("Unknown vertex index."),
+    } as usize;
+
+    transform_coords(
+        &mut test_output_points,
+        &create_quadrilateral_mapper(test_singular_vertex, next_vertex(test_singular_vertex)),
+    );
+    transform_coords(
+        &mut trial_output_points,
+        &create_quadrilateral_mapper(trial_singular_vertex, next_vertex(trial_singular_vertex)),
+    );
+
+    TestTrialNumericalQuadratureDefinition {
+        dim: *dim,
+        order: *order,
+        npoints: n_output_points,
+        weights: output_weights,
+        test_points: test_output_points,
+        trial_points: trial_output_points,
+    }
+}
+
 pub fn quadrilateral_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
@@ -201,36 +402,36 @@ pub fn quadrilateral_duffy(
     match connectivity.connectivity_dimension {
         // Identical triangles
         2 => Ok(identical_quadrilaterals(&rule)),
-        // 0 => {
-        //     // Triangles have adjacent vertex
-        //     if connectivity.local_indices.len() != 1 {
-        //         Err(QuadratureError::ConnectivityError)
-        //     } else {
-        //         let (test_singular_vertex, trial_singular_vertex) = connectivity.local_indices[0];
-        //         Ok(vertex_adjacent_triangles(
-        //             &rule,
-        //             test_singular_vertex,
-        //             trial_singular_vertex,
-        //         ))
-        //     }
-        // }
-        // 1 => {
-        //     // Triangles have adjacent edge
-        //     if connectivity.local_indices.len() != 2 {
-        //         Err(QuadratureError::ConnectivityError)
-        //     } else {
-        //         let first_pair = connectivity.local_indices[0];
-        //         let second_pair = connectivity.local_indices[1];
+        0 => {
+            // Quadrilaterals have adjacent vertex
+            if connectivity.local_indices.len() != 1 {
+                Err(QuadratureError::ConnectivityError)
+            } else {
+                let (test_singular_vertex, trial_singular_vertex) = connectivity.local_indices[0];
+                Ok(vertex_adjacent_quadrilaterals(
+                    &rule,
+                    test_singular_vertex,
+                    trial_singular_vertex,
+                ))
+            }
+        }
+        1 => {
+            // Quadrilaterals have adjacent edge
+            if connectivity.local_indices.len() != 2 {
+                Err(QuadratureError::ConnectivityError)
+            } else {
+                let first_pair = connectivity.local_indices[0];
+                let second_pair = connectivity.local_indices[1];
 
-        //         let test_singular_edge = (first_pair.0, second_pair.0);
-        //         let trial_singular_edge = (first_pair.1, second_pair.1);
-        //         Ok(edge_adjacent_triangles(
-        //             &rule,
-        //             test_singular_edge,
-        //             trial_singular_edge,
-        //         ))
-        //     }
-        // }
+                let test_singular_edge = (first_pair.0, second_pair.0);
+                let trial_singular_edge = (first_pair.1, second_pair.1);
+                Ok(edge_adjacent_quadrilaterals(
+                    &rule,
+                    test_singular_edge,
+                    trial_singular_edge,
+                ))
+            }
+        }
         _ => Err(QuadratureError::ConnectivityError),
     }
 }
@@ -238,7 +439,7 @@ pub fn quadrilateral_duffy(
 #[cfg(test)]
 mod test {
 
-    use approx::{assert_relative_eq, assert_ulps_eq};
+    use approx::assert_relative_eq;
 
     use super::*;
 
@@ -279,38 +480,97 @@ mod test {
             sum
         };
 
-        for npoints in 1..30 {
-            let res = compute_integral(npoints);
-            println!("{}: {}", npoints, res)
+        assert_relative_eq!(
+            compute_integral(10),
+            0.23660050220466244,
+            epsilon = 0.0,
+            max_relative = 1E-10
+        );
+    }
+
+    #[test]
+    fn test_edge_adjacent_quadrilaterals() {
+        let compute_integral = |npoints: usize| -> f64 {
+            let connectivity = CellToCellConnectivity {
+                connectivity_dimension: 1,
+                local_indices: vec![(1, 0), (3, 2)],
+            };
+
+            let singular_rule = quadrilateral_duffy(&connectivity, npoints).unwrap();
+
+            let mut sum = 0.0;
+
+            for index in 0..singular_rule.npoints {
+                let (x1, x2) = (
+                    singular_rule.test_points[2 * index],
+                    singular_rule.test_points[2 * index + 1],
+                );
+
+                let (y1, y2) = (
+                    singular_rule.trial_points[2 * index],
+                    singular_rule.trial_points[2 * index + 1],
+                );
+
+                let weight = singular_rule.weights[index];
+
+                sum += laplace_green(x1, x2, 1.0 + y1, y2) * weight;
+            }
+
+            sum
+        };
+
+        for n in (1..30) {
+            println!("{} {}", n, compute_integral(n));
         }
 
-        // // The comparison values have been created with Bempp-cl
-        // // For the first 4 digits 0.0798 we also have independent
-        // // confirmation.
-        // // Comparisons were also performed with legacy Bempp.
-        // // The corresponding results are (order parameter refers to
-        // // the corresponding orders in legacy Bempp)
-        // // Order 2: 0.079267768872634842
-        // // Order 6: 0.07980853550151136
-        // // Order 14: 0.079821438597427713
+        // assert_relative_eq!(
+        //     compute_integral(10),
+        //     0.23660050220466244,
+        //     epsilon = 0.0,
+        //     max_relative = 1E-10
+        // );
+    }
+
+    #[test]
+    fn test_vertex_adjacent_quadrilaterals() {
+        let compute_integral = |npoints: usize| -> f64 {
+            let connectivity = CellToCellConnectivity {
+                connectivity_dimension: 0,
+                local_indices: vec![(1, 2)],
+            };
+
+            let singular_rule = quadrilateral_duffy(&connectivity, npoints).unwrap();
+
+            let mut sum = 0.0;
+
+            for index in 0..singular_rule.npoints {
+                let (x1, x2) = (
+                    singular_rule.test_points[2 * index],
+                    singular_rule.test_points[2 * index + 1],
+                );
+
+                let (y1, y2) = (
+                    singular_rule.trial_points[2 * index],
+                    singular_rule.trial_points[2 * index + 1],
+                );
+
+                let weight = singular_rule.weights[index];
+
+                sum += laplace_green(x1, x2, 1.0 + y1, -1.0 + y2) * weight;
+            }
+
+            sum
+        };
+
+        for n in (1..30) {
+            println!("{} {}", n, compute_integral(n));
+        }
 
         // assert_relative_eq!(
-        //     compute_integral(2),
-        //     0.07926776887263483,
+        //     compute_integral(10),
+        //     0.23660050220466244,
         //     epsilon = 0.0,
-        //     max_relative = 1E-13
-        // );
-        // assert_relative_eq!(
-        //     compute_integral(4),
-        //     0.07980853550151085,
-        //     epsilon = 0.0,
-        //     max_relative = 1E-13
-        // );
-        // assert_relative_eq!(
-        //     compute_integral(8),
-        //     0.07982143859742521,
-        //     epsilon = 0.0,
-        //     max_relative = 1E-13
+        //     max_relative = 1E-10
         // );
     }
 }
