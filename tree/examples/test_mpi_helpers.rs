@@ -6,7 +6,7 @@
 
 // use mpi::{collective::SystemOperation, environment::Universe, traits::*, Rank};
 
-// use solvers_tree::implementations::mpi_helpers::all_to_allv_sparse;
+// use bempp_tree::implementations::mpi_helpers::all_to_allv_sparse;
 
 // fn main() {
 //     // Setup an MPI environment

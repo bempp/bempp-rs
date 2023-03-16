@@ -5,7 +5,7 @@
 
 // use hyksort::hyksort;
 
-// use solvers_traits::tree::{FmmData, FmmTree, Tree};
+// use bempp_traits::tree::{FmmData, FmmTree, Tree};
 
 // use crate::{
 //     constants::{DEEPEST_LEVEL, K, LEVEL_SIZE, NCRIT, ROOT},

@@ -3,26 +3,26 @@
 strict = []
 
 [package]
-name = "solvers-fmm"
+name = "bempp-fmm"
 version = "0.1.0"
 edition = "2021"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 description = "FMM in Rust"
 license = "BSD-3-Clause"
-homepage = "https://github.com/rusty-solvers/solvers"
-repository = "https://github.com/rusty-solvers/solvers"
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
 readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_fmm"
+name = "bempp_fmm"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../tools" }
-solvers-tree = { path = "../tree" }
-solvers-traits = { path = "../traits" }
+bempp-tools = { path = "../tools" }
+bempp-tree = { path = "../tree" }
+bempp-traits = { path = "../traits" }
 approx = "0.5"
 cauchy = "0.4.*"
 itertools = "0.10"

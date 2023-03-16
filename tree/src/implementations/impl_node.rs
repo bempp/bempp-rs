@@ -1,6 +1,6 @@
 use std::vec;
 
-use solvers_traits::fmm::{FmmLeafNodeData, FmmNodeData};
+use bempp_traits::fmm::{FmmLeafNodeData, FmmNodeData};
 
 use crate::types::{
     node::{LeafNode, Node},

@@ -1,6 +1,6 @@
 //! Type definitions.
 
-pub use solvers_element::cell::*;
+pub use bempp_element::cell::*;
 
 #[derive(Debug)]
 pub enum QuadratureError {

@@ -1,5 +1,5 @@
 //! Laplace kernel implementation.
-use solvers_traits::{kernel::Kernel, types::Result};
+use bempp_traits::{kernel::Kernel, types::Result};
 
 pub struct LaplaceKernel {
     pub dim: usize,
@@ -106,7 +106,7 @@ impl Kernel for LaplaceKernel {
         &self,
         sources: &[[f64; 3]],
         targets: &[[f64; 3]],
-    ) -> solvers_traits::types::Result<Self::PotentialData> {
+    ) -> bempp_traits::types::Result<Self::PotentialData> {
         let mut result: Vec<f64> = Vec::new();
 
         for target in targets.iter() {
