@@ -1,10 +1,10 @@
 //! A parallel implementation of a grid
 use crate::grid::{SerialGeometry, SerialTopology};
+use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::element::FiniteElement;
+use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
-use solvers_tools::arrays::{AdjacencyList, Array2D};
-use solvers_traits::cell::ReferenceCellType;
-use solvers_traits::element::FiniteElement;
-use solvers_traits::grid::{Geometry, Grid, Ownership, Topology};
 use std::cell::Ref;
 
 /// Geometry of a parallel grid

@@ -1,15 +1,15 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
+use bempp_grid::parallel_grid::ParallelGrid;
+#[cfg(feature = "mpi")]
+use bempp_tools::arrays::{AdjacencyList, Array2D};
+#[cfg(feature = "mpi")]
+use bempp_traits::cell::ReferenceCellType;
+#[cfg(feature = "mpi")]
+use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
+#[cfg(feature = "mpi")]
 use mpi::{environment::Universe, request::WaitGuard, topology::Communicator, traits::*};
-#[cfg(feature = "mpi")]
-use solvers_grid::parallel_grid::ParallelGrid;
-#[cfg(feature = "mpi")]
-use solvers_tools::arrays::{AdjacencyList, Array2D};
-#[cfg(feature = "mpi")]
-use solvers_traits::cell::ReferenceCellType;
-#[cfg(feature = "mpi")]
-use solvers_traits::grid::{Geometry, Grid, Ownership, Topology};
 
 #[cfg(feature = "mpi")]
 use approx::*;
