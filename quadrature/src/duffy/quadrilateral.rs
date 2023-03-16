@@ -519,7 +519,7 @@ mod test {
             sum
         };
 
-        for n in (1..30) {
+        for n in 1..30 {
             println!("{} {}", n, compute_integral(n));
         }
 
