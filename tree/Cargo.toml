@@ -1,17 +1,17 @@
 [package]
-name = "solvers-tree"
+name = "bempp-tree"
 version = "1.1.0"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Srinath Kailasa <srinathkailasa@gmail.com>"]
 edition = "2021"
 description = "Octree data structures in Rust."
 license = "BSD-3-Clause"
-homepage = "https://github.com/rusty-fast-solvers/solvers-tree"
-repository = "https://github.com/rusty-fast-solvers/solvers-tree"
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_tree"
+name = "bempp_tree"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
@@ -20,7 +20,7 @@ mpi = { version = "0.6.*", optional = true }
 memoffset = "0.6"
 rand = "0.8.*"
 hyksort = { path = "../hyksort", optional = true }
-solvers-traits = { path = "../traits" }
+bempp-traits = { path = "../traits" }
 
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]

@@ -1,8 +1,8 @@
 ---
-name: solvers-fmm
-about: Create a issue relates to the solvers-fmm crate
+name: bempp-fmm
+about: Create a issue relates to the bempp-fmm crate
 title: ''
-labels: solvers-fmm
+labels: bempp-fmm
 assignees: ''
 
 ---
