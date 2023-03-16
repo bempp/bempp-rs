@@ -1,8 +1,8 @@
----
-name: solvers-quadrature
-about: Create a issue relates to the solvers-quadrature crate
+t---
+name: bempp-quadrature
+about: Create a issue relates to the bempp-quadrature crate
 title: ''
-labels: solvers-quadrature
+labels: bempp-quadrature
 assignees: ''
 
 ---

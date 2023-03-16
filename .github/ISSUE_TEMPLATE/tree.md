@@ -1,8 +1,8 @@
 ---
-name: solvers-tree
-about: Create a issue relates to the solvers-tree crate
+name: bempp-tree
+about: Create a issue relates to the bempp-tree crate
 title: ''
-labels: solvers-tree
+labels: bempp-tree
 assignees: ''
 
 ---

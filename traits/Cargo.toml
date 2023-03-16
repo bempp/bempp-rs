@@ -3,23 +3,23 @@
 strict = []
 
 [package]
-name = "solvers-traits"
+name = "bempp-traits"
 version = "0.0.1"
 authors = ["Timo Betcke"]
 edition = "2021"
-description = "Traits for all solvers components."
+description = "Traits for all bempp components."
 license = "BSD-3-Clause"
-homepage = "https://github.com/rusty-solvers/solvers"
-repository = "https://github.com/rusty-solvers/solvers"
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
 readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_traits"
+name = "bempp_traits"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
 cauchy="0.4.*"
 thiserror="1.*"
-solvers-tools = { path = "../tools"}
+bempp-tools = { path = "../tools"}

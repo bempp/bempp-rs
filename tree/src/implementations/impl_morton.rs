@@ -8,7 +8,7 @@ use std::{
     vec,
 };
 
-use solvers_traits::fmm::KiFmmNode;
+use bempp_traits::fmm::KiFmmNode;
 
 use crate::{
     constants::{

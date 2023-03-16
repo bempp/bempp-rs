@@ -6,15 +6,15 @@ use itertools::Itertools;
 use ndarray::*;
 use ndarray_linalg::SVDDC;
 
-use solvers_traits::fmm::{FmmLeafNodeData, FmmNodeData, KiFmmNode};
-use solvers_traits::{
+use bempp_traits::fmm::{FmmLeafNodeData, FmmNodeData, KiFmmNode};
+use bempp_traits::{
     fmm::{Fmm, FmmTree, Translation},
     kernel::Kernel,
 };
-use solvers_tree::constants::ROOT;
-use solvers_tree::types::node::{LeafNode, LeafNodes, Node, Nodes};
+use bempp_tree::constants::ROOT;
+use bempp_tree::types::node::{LeafNode, LeafNodes, Node, Nodes};
 
-use solvers_tree::types::{
+use bempp_tree::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},
     point::{Point, Points},
@@ -667,14 +667,14 @@ impl<'a> Fmm<'a> for KiFmm<'a> {
 
 #[allow(unused_imports)]
 mod test {
-    use solvers_tree::types::point::PointType;
+    use bempp_tree::types::point::PointType;
 
     use float_cmp::assert_approx_eq;
     use rand::prelude::*;
     use rand::SeedableRng;
 
-    use solvers_traits::fmm::{Fmm, FmmLeafNodeData, FmmNodeData, FmmTree, KiFmmNode};
-    use solvers_tree::types::single_node::SingleNodeTree;
+    use bempp_traits::fmm::{Fmm, FmmLeafNodeData, FmmNodeData, FmmTree, KiFmmNode};
+    use bempp_tree::types::single_node::SingleNodeTree;
 
     use super::KiFmm;
     use crate::laplace::LaplaceKernel;

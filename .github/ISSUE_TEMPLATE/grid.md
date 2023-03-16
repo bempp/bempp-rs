@@ -1,8 +1,8 @@
 ---
-name: solvers-grid
-about: Create a issue relates to the solvers-grid crate
+name: bempp-grid
+about: Create a issue relates to the bempp-grid crate
 title: ''
-labels: solvers-grid
+labels: bempp-grid
 assignees: ''
 
 ---

@@ -5,9 +5,9 @@
 
 // use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
-// use solvers_traits::tree::Tree;
+// use bempp_traits::tree::Tree;
 
-// use solvers_tree::types::{
+// use bempp_tree::types::{
 //     domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
 // };
 

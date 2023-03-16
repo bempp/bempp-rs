@@ -3,24 +3,24 @@
 strict = []
 
 [package]
-name = "solvers-quadrature"
+name = "bempp-quadrature"
 version = "0.0.1"
 authors = ["Timo Betcke"]
 edition = "2021"
 description = "A quadrature library for boundary element computations."
 license = "BSD-3-Clause"
-homepage = "https://github.com/rusty-solvers/solvers"
-repository = "https://github.com/rusty-solvers/solvers"
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
 readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_quadrature"
+name = "bempp_quadrature"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-element = {path = "../element"}
+bempp-element = {path = "../element"}
 lazy_static = "1.4"
 paste = "1.*"
 approx = "0.5"

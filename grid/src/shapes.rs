@@ -1,10 +1,10 @@
 //! Functions to create simple example grids
 
 use crate::grid::SerialGrid;
-use solvers_element::cell::Triangle;
-use solvers_tools::arrays::{AdjacencyList, Array2D};
-use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
-use solvers_traits::grid::{Geometry, Grid, Topology};
+use bempp_element::cell::Triangle;
+use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
+use bempp_traits::grid::{Geometry, Grid, Topology};
 
 /// Create a regular sphere
 ///
