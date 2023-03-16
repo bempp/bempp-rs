@@ -8,9 +8,9 @@ pub mod cells_2d;
 pub use cells_2d::*;
 pub mod cells_3d;
 pub use cells_3d::*;
-pub use solvers_traits::cell::PhysicalCell;
-pub use solvers_traits::cell::ReferenceCell;
-pub use solvers_traits::cell::ReferenceCellType;
+pub use bempp_traits::cell::PhysicalCell;
+pub use bempp_traits::cell::ReferenceCell;
+pub use bempp_traits::cell::ReferenceCellType;
 
 #[cfg(test)]
 mod test {

@@ -4,7 +4,7 @@ use std::{
     vec,
 };
 
-use solvers_traits::{fmm::FmmTree, tree::Tree};
+use bempp_traits::{fmm::FmmTree, tree::Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},

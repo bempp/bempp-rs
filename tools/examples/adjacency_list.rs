@@ -1,4 +1,4 @@
-use solvers_tools::arrays::AdjacencyList;
+use bempp_tools::arrays::AdjacencyList;
 
 fn main() {
     // Create an empty adjacency list

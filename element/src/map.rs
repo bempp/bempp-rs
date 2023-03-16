@@ -2,7 +2,7 @@
 
 use crate::cell::PhysicalCell;
 use crate::element::{FiniteElement, TabulatedData};
-pub use solvers_traits::element::MapType;
+pub use bempp_traits::element::MapType;
 
 pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
     data: &mut TabulatedData,

@@ -1,11 +1,11 @@
 //! A serial implementation of a grid
 use itertools::izip;
-use solvers_element::cell;
-use solvers_element::element;
-use solvers_tools::arrays::{AdjacencyList, Array2D};
-use solvers_traits::cell::{ReferenceCell, ReferenceCellType};
-use solvers_traits::element::FiniteElement;
-use solvers_traits::grid::{Geometry, Grid, Topology};
+use bempp_element::cell;
+use bempp_element::element;
+use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
+use bempp_traits::element::FiniteElement;
+use bempp_traits::grid::{Geometry, Grid, Topology};
 use std::cell::{Ref, RefCell};
 
 /// Geometry of a serial grid

@@ -2,7 +2,7 @@
 
 use crate::cell::*;
 use libc::size_t;
-pub use solvers_tools::RustyDataContainer;
+pub use bempp_tools::RustyDataContainer;
 
 pub struct ReferenceCellContainer(Box<dyn ReferenceCell>);
 
