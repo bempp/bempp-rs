@@ -7,10 +7,10 @@ pub use cells_1d::*;
 pub mod cells_2d;
 pub use cells_2d::*;
 pub mod cells_3d;
-pub use cells_3d::*;
 pub use bempp_traits::cell::PhysicalCell;
 pub use bempp_traits::cell::ReferenceCell;
 pub use bempp_traits::cell::ReferenceCellType;
+pub use cells_3d::*;
 
 #[cfg(test)]
 mod test {

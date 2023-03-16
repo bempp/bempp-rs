@@ -1,8 +1,8 @@
 //! C Interface
 
 use crate::cell::*;
-use libc::size_t;
 pub use bempp_tools::RustyDataContainer;
+use libc::size_t;
 
 pub struct ReferenceCellContainer(Box<dyn ReferenceCell>);
 
