@@ -1,7 +1,7 @@
 //! Functions for inputting and outputting grids to/from file
 use crate::grid::SerialGrid;
-use solvers_traits::cell::ReferenceCellType;
-use solvers_traits::grid::{Geometry, Grid, Topology};
+use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::grid::{Geometry, Grid, Topology};
 use std::fs;
 
 fn get_permutation_to_gmsh(cell_type: ReferenceCellType, degree: usize) -> Vec<usize> {
@@ -122,9 +122,9 @@ mod test {
     use crate::grid::SerialGrid;
     use crate::io::*;
     use crate::shapes::regular_sphere;
-    use solvers_tools::arrays::AdjacencyList;
-    use solvers_tools::arrays::Array2D;
-    use solvers_traits::cell::ReferenceCellType;
+    use bempp_tools::arrays::AdjacencyList;
+    use bempp_tools::arrays::Array2D;
+    use bempp_traits::cell::ReferenceCellType;
 
     #[test]
     fn test_gmsh_output_regular_sphere() {

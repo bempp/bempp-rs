@@ -3,26 +3,26 @@ mpi = ["dep:mpi"]
 strict = []
 
 [package]
-name = "solvers-grid"
+name = "bempp-grid"
 version = "0.1.0"
 edition = "2021"
 authors = ["Matthew Scroggs <matthew.w.scroggs@gmail.com>"]
 description = "A library for the evaluation of finite element basis functions."
 license = "BSD-3-Clause"
-homepage = "https://github.com/rusty-solvers/solvers"
-repository = "https://github.com/rusty-solvers/solvers"
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
 readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_grid"
+name = "bempp_grid"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../tools"}
-solvers-traits = { path = "../traits"}
-solvers-element = { path = "../element"}
+bempp-tools = { path = "../tools"}
+bempp-traits = { path = "../traits"}
+bempp-element = { path = "../element"}
 approx = "0.5"
 itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }

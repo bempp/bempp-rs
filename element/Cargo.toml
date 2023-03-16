@@ -3,25 +3,25 @@
 strict = []
 
 [package]
-name = "solvers-element"
+name = "bempp-element"
 version = "0.1.0"
 edition = "2021"
 authors = ["Matthew Scroggs <matthew.w.scroggs@gmail.com>"]
 description = "A library for the evaluation of finite element basis functions."
 license = "BSD-3-Clause"
-homepage = "https://github.com/rusty-solvers/solvers-element"
-repository = "https://github.com/rusty-solvers/solvers-element"
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
 readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "solvers_element"
+name = "bempp_element"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-solvers-tools = { path = "../tools"}
-solvers-traits = { path = "../traits" }
+bempp-tools = { path = "../tools"}
+bempp-traits = { path = "../traits" }
 paste = "1.*"
 libc = "0.2"
 approx = "0.5"

@@ -1,8 +1,8 @@
 ---
-name: solvers-traits
-about: Create a issue relates to the solvers-traits crate
+name: bempp-traits
+about: Create a issue relates to the bempp-traits crate
 title: ''
-labels: solvers-traits
+labels: bempp-traits
 assignees: ''
 
 ---

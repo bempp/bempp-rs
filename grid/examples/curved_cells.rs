@@ -1,8 +1,8 @@
-use solvers_grid::grid::SerialGrid;
-use solvers_grid::io::export_as_gmsh;
-use solvers_tools::arrays::{AdjacencyList, Array2D};
-use solvers_traits::cell::ReferenceCellType;
-use solvers_traits::grid::{Geometry, Grid, Topology};
+use bempp_grid::grid::SerialGrid;
+use bempp_grid::io::export_as_gmsh;
+use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn main() {
     // Create a grid of three cells. One cell is a curved triangle, one cell is a flat triangle, the other is a curved quadrilateral

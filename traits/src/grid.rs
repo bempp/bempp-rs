@@ -1,7 +1,7 @@
 //! Geometry and topology definitions
 
 use crate::cell::ReferenceCellType;
-use solvers_tools::arrays::AdjacencyList;
+use bempp_tools::arrays::AdjacencyList;
 use std::cell::Ref;
 
 /// The ownership of a mesh entity

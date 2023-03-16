@@ -3,7 +3,7 @@
 use crate::cell::*;
 use crate::element::*;
 use crate::map::*;
-use solvers_traits::element::ElementFamily;
+use bempp_traits::element::ElementFamily;
 
 /// Degree 1 Raviart-Thomas element on a triangle
 pub struct RaviartThomasElementTriangleDegree1 {}

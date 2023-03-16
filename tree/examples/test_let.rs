@@ -6,9 +6,9 @@
 
 // use mpi::{environment::Universe, traits::*};
 
-// use solvers_traits::tree::FmmTree;
+// use bempp_traits::tree::FmmTree;
 
-// use solvers_tree::types::{morton::MortonKey, multi_node::MultiNodeTree, point::PointType};
+// use bempp_tree::types::{morton::MortonKey, multi_node::MultiNodeTree, point::PointType};
 
 // pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
 //     let mut range = StdRng::seed_from_u64(0);
