@@ -4,6 +4,13 @@ use crate::cell::ReferenceCellType;
 use bempp_tools::arrays::AdjacencyList;
 use std::cell::Ref;
 
+/// The ownership of a mesh entity
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum Ownership {
+    Owned,
+    Ghost(usize, usize),
+}
+
 pub trait Geometry {
     //! Grid geometry
     //!
@@ -64,6 +71,9 @@ pub trait Topology {
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
     fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>>;
+
+    /// Get the ownership of a mesh entity
+    fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
 }
 
 pub trait Grid {

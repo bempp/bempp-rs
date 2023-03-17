@@ -1,5 +1,5 @@
 [features]
-# Treat warnings as a build error.
+mpi = ["dep:mpi"]
 strict = []
 
 [package]
@@ -25,3 +25,4 @@ bempp-traits = { path = "../traits"}
 bempp-element = { path = "../element"}
 approx = "0.5"
 itertools = "0.10"
+mpi = { version = "0.6.*", optional = true }
