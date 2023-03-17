@@ -3,11 +3,11 @@ mpi = ["dep:mpi"]
 strict = []
 
 [package]
-name = "bempp-grid"
+name = "bempp-bem"
 version = "0.1.0"
 edition = "2021"
 authors = ["Matthew Scroggs <matthew.w.scroggs@gmail.com>"]
-description = "A finite element grid library."
+description = "Boundary element method library."
 license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
@@ -16,7 +16,7 @@ keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
 [lib]
-name = "bempp_grid"
+name = "bempp_bem"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
