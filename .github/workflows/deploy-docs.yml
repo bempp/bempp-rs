@@ -38,7 +38,7 @@ jobs:
 
       - name: make index.html
         run: |
-          for f in target/doc/solvers_*
+          for f in target/doc/bempp_*
           do
           if [ -d "$f" ]
           then
