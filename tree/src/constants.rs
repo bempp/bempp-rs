@@ -4,7 +4,7 @@ use crate::types::morton::{KeyType, MortonKey};
 
 pub const K: i32 = 2;
 
-pub const NCRIT: usize = 150;
+pub const NCRIT: u64 = 150;
 
 pub const DEEPEST_LEVEL: KeyType = 16;
 
