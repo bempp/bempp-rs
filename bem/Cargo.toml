@@ -23,6 +23,7 @@ crate-type = ["lib", "cdylib"]
 bempp-tools = { path = "../tools"}
 bempp-traits = { path = "../traits"}
 bempp-element = { path = "../element"}
+bempp-grid = { path = "../grid"}
 approx = "0.5"
 itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
