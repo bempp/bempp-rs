@@ -519,16 +519,12 @@ mod test {
             sum
         };
 
-        for n in 1..30 {
-            println!("{} {}", n, compute_integral(n));
-        }
-
-        // assert_relative_eq!(
-        //     compute_integral(10),
-        //     0.23660050220466244,
-        //     epsilon = 0.0,
-        //     max_relative = 1E-10
-        // );
+        assert_relative_eq!(
+            compute_integral(10),
+            0.08850038917185951,
+            epsilon = 0.0,
+            max_relative = 1E-12
+        );
     }
 
     #[test]
@@ -562,15 +558,11 @@ mod test {
             sum
         };
 
-        for n in 1..30 {
-            println!("{} {}", n, compute_integral(n));
-        }
-
-        // assert_relative_eq!(
-        //     compute_integral(10),
-        //     0.23660050220466244,
-        //     epsilon = 0.0,
-        //     max_relative = 1E-10
-        // );
+        assert_relative_eq!(
+            compute_integral(10),
+            0.05959972386088679,
+            epsilon = 0.0,
+            max_relative = 1E-13
+        );
     }
 }
