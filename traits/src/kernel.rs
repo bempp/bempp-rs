@@ -24,23 +24,23 @@ pub trait Kernel {
     /// Evaluate the potential kernel.
     fn potential(
         &self,
-        sources: &[[f64; 3]],
+        sources: &[f64],
         charges: &[f64],
-        targets: &[[f64; 3]],
+        targets: &[f64],
         potentials: &mut [f64],
     );
 
-    /// Evaluate the gradient kernel.
+    /// Evaluate the potential gradient.
     fn gradient(
         &self,
-        sources: &[[f64; 3]],
+        sources: &[f64],
         charges: &[f64],
-        targets: &[[f64; 3]],
-        gradients: &mut [[f64; 3]],
+        targets: &[f64],
+        potentials: &mut [f64]
     );
 
     /// Evaluate the Gram matrix.
-    fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::PotentialData>;
+    fn gram(&self, sources: &[f64], targets: &[f64]) -> Result<Self::PotentialData>;
 
     /// Scale the kernel to a given level of an associated tree.
     fn scale(&self, level: u64) -> f64;
