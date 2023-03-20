@@ -1,4 +1,4 @@
-use bempp_tools::arrays::AdjacencyList;
+use bempp_tools::arrays::{AdjacencyList, Array2D};
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Grid, Topology};
 
@@ -16,12 +16,12 @@ pub trait DofMap {
     fn global_size(&self) -> usize;
 
     /// Get the local DOF numbers associated with a cell
-    fn cell_dofs(&self, cell: usize) -> &[usize];
+    fn cell_dofs(&self, cell: usize) -> Option<&[usize]>;
 }
 
 pub struct SerialDofMap {
     entity_dofs: [AdjacencyList<usize>; 4],
-    cell_dofs: Vec<Vec<usize>>, // TODO: use 2darray
+    cell_dofs: Array2D<usize>,
     size: usize,
 }
 
@@ -33,9 +33,9 @@ impl SerialDofMap {
         for d in 0..tdim + 1 {
             entity_dofs_data.push(vec![vec![]; grid.topology().entity_count(d)]);
         }
-        let mut cell_dofs = vec![];
+        let mut cell_dofs =
+            Array2D::<usize>::new((grid.topology().entity_count(tdim), element.dim()));
         for cell in 0..grid.topology().entity_count(tdim) {
-            let mut dofs = vec![0; element.dim()];
             for d in 0..tdim + 1 {
                 for (i, e) in unsafe {
                     grid.topology()
@@ -52,14 +52,12 @@ impl SerialDofMap {
                                 size += 1
                             }
                         }
-                        assert_eq!(entity_dofs_data[d][*e].len(), e_dofs.len()); // TODO: debug assert?
                         for (j, k) in e_dofs.iter().enumerate() {
-                            dofs[*k] = entity_dofs_data[d][*e][j];
+                            *cell_dofs.get_mut(cell, *k).unwrap() = entity_dofs_data[d][*e][j];
                         }
                     }
                 }
             }
-            cell_dofs.push(dofs);
         }
 
         let mut entity_dofs = [
@@ -95,8 +93,8 @@ impl DofMap for SerialDofMap {
     fn global_size(&self) -> usize {
         self.local_size()
     }
-    fn cell_dofs(&self, cell: usize) -> &[usize] {
-        &self.cell_dofs[cell]
+    fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
+        self.cell_dofs.row(cell)
     }
 }
 
