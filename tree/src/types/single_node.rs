@@ -1,5 +1,8 @@
 //! Data Structures and methods to create octrees on a single node.
-use std::{collections::{HashMap, HashSet}, vec};
+use std::{
+    collections::{HashMap, HashSet},
+    vec,
+};
 
 use crate::types::{
     domain::Domain,
@@ -29,7 +32,7 @@ pub struct SingleNodeTree {
     pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
 
     /// Associate levels with key indices.
-    pub levels_to_keys: HashMap<u64, (usize, usize)>, 
+    pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
     /// All leaves, returned as a set.
     pub leaves_set: HashSet<MortonKey>,

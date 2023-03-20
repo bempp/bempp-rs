@@ -13,13 +13,17 @@ pub trait Tree {
     type Point;
 
     // Slice of points.
-    type PointSlice<'a>: IntoIterator<Item = &'a Self::Point> where Self: 'a;
+    type PointSlice<'a>: IntoIterator<Item = &'a Self::Point>
+    where
+        Self: 'a;
 
-    // A tree node, containing node data.
+    // A tree node.
     type NodeIndex;
 
     // Slice of nodes.
-    type NodeIndexSlice<'a>: IntoIterator<Item = &'a Self::NodeIndex> where Self: 'a;
+    type NodeIndexSlice<'a>: IntoIterator<Item = &'a Self::NodeIndex>
+    where
+        Self: 'a;
 
     // Get depth of tree.
     fn get_depth(&self) -> u64;
@@ -36,13 +40,12 @@ pub trait Tree {
     // Get domain defined by the points, gets global domain in multi-node setting.
     fn get_domain<'a>(&'a self) -> &'a Self::Domain;
 
-    // Checks whether a a given node index corresponds to a leaf
+    // Checks whether a a given node corresponds to a leaf
     fn is_leaf(&self, key: &Self::NodeIndex) -> bool;
 
     // Checks whether a a given node is contained in the tree
     fn is_node(&self, key: &Self::NodeIndex) -> bool;
 }
-
 
 pub trait AttachedDataTree {
     type Data;
@@ -52,5 +55,5 @@ pub trait AttachedDataTree {
 
     fn get_data_mut(&self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&mut Self::Data>;
 
-    fn get_tree(&self) -> &Self::Tree;    
+    fn get_tree(&self) -> &Self::Tree;
 }

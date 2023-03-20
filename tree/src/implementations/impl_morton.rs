@@ -116,7 +116,7 @@ impl MortonKeys {
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
         let a = self.keys.iter().min().unwrap();
-        let b = self.   keys.iter().max().unwrap();
+        let b = self.keys.iter().max().unwrap();
         let completion = complete_region(a, b);
         let start_val = vec![*a];
         let end_val = vec![*b];
