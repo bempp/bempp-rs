@@ -48,12 +48,13 @@ pub trait Tree {
 }
 
 pub trait AttachedDataTree {
-    type Data;
+    type Data<'a>
+    where
+        Self: 'a;
     type Tree: Tree;
 
-    fn get_data(&self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&Self::Data>;
+    fn get_data<'a>(&'a self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&Self::Data<'a>>;
 
-    fn get_data_mut(&self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&mut Self::Data>;
+    fn get_data_mut<'a>(&'a mut self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&'a mut Self::Data<'a>>;
 
-    fn get_tree(&self) -> &Self::Tree;
 }

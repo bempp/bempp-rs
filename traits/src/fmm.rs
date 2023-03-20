@@ -20,42 +20,28 @@ pub trait TargetTranslation {
 }
 
 pub trait SourceDataTree {
-    type DataTree: AttachedDataTree;
+    type Tree: Tree;
     type Coefficient;
-    type Charge;
     type Coefficients<'a>: IntoIterator<Item = &'a Self::Coefficient>
-    where
-        Self: 'a;
-    type Charges<'a>: IntoIterator<Item = &'a Self::Charge>
     where
         Self: 'a;
 
     fn get_multipole_expansion<'a>(
         &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
+        key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<Self::Coefficients<'a>>;
 
     fn set_multipole_expansion<'a>(
-        &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
+        &'a mut self,
+        key: &<Self::Tree as Tree>::NodeIndex,
         coefficients: &Self::Coefficients<'a>,
     );
 
     fn get_points<'a>(
         &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
-    ) -> Option<<<Self::DataTree as AttachedDataTree>::Tree as Tree>::PointSlice<'a>>;
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::PointSlice<'a>>;
 
-    fn set_charges<'a>(
-        &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
-        charges: &Self::Charges<'a>,
-    );
-
-    fn get_charges<'a>(
-        &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
-    ) -> Option<Self::Charges<'a>>;
 }
 
 pub trait TargetDataTree {
@@ -98,7 +84,6 @@ pub trait TargetDataTree {
 }
 
 pub trait Fmm {
-    type Charges;
     type Potentials;
     type SourceDataTree: SourceDataTree;
     type TargetDataTree: TargetDataTree;
@@ -107,7 +92,6 @@ pub trait Fmm {
     fn init<'a>(
         &'a self,
         points: <Self::PartitionTree as Tree>::PointSlice<'a>,
-        charges: <Self::SourceDataTree as SourceDataTree>::Charges<'a>,
     );
 
     fn upward_pass(&self);

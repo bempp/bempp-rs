@@ -8,16 +8,15 @@ pub struct LaplaceKernel {
 }
 
 impl LaplaceKernel {
-
     fn new(dim: usize, is_singular: bool, value_dimension: usize) -> LaplaceKernel {
-        LaplaceKernel { dim, is_singular, value_dimension }
+        LaplaceKernel {
+            dim,
+            is_singular,
+            value_dimension,
+        }
     }
 
-    fn gradient_kernel_3D(
-        source: &[f64], 
-        target: &[f64], 
-        c: usize
-    ) -> f64 {
+    fn gradient_kernel_3D(source: &[f64], target: &[f64], c: usize) -> f64 {
         let num = source[c] - target[c];
         let invdiff: f64 = source
             .iter()
@@ -40,11 +39,7 @@ impl LaplaceKernel {
         }
     }
 
-    fn potential_kernel_3D(
-        &self,
-        source: &[f64],
-        target: &[f64],
-    ) -> f64 {
+    fn potential_kernel_3D(&self, source: &[f64], target: &[f64]) -> f64 {
         let mut tmp = source
             .iter()
             .zip(target.iter())
@@ -80,21 +75,13 @@ impl Kernel for LaplaceKernel {
         self.value_dimension
     }
 
-    fn potential(
-        &self,
-        sources: &[f64],
-        charges: &[f64],
-        targets: &[f64],
-        potentials: &mut [f64],
-    ) {
-
+    fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]) {
         for (i, j) in (0..targets.len()).step_by(self.dim()).enumerate() {
             let mut potential = 0.0;
-            let target = &targets[j..(j+self.dim())];
+            let target = &targets[j..(j + self.dim())];
 
             for (k, l) in (0..sources.len()).step_by(self.dim()).enumerate() {
-
-                let source = &sources[l..(l+self.dim())];
+                let source = &sources[l..(l + self.dim())];
                 let tmp;
                 if self.dim() == 3 {
                     tmp = self.potential_kernel_3D(source, target);
@@ -108,35 +95,25 @@ impl Kernel for LaplaceKernel {
         }
     }
 
+    fn gradient(&self, sources: &[f64], charges: &[f64], targets: &[f64], gradients: &mut [f64]) {
+        for (i, j) in (0..targets.len()).step_by(self.dim()).enumerate() {
+            let target = &targets[j..(j + self.dim())];
 
-    fn gradient(
-            &self,
-            sources: &[f64],
-            charges: &[f64],
-            targets: &[f64],
-            gradients: &mut [f64]
-        ) {
+            for (k, l) in (0..sources.len()).step_by(self.dim()).enumerate() {
+                let source = &sources[l..(l + self.dim())];
+                let charge = charges[k];
 
-            for (i, j) in (0..targets.len()).step_by(self.dim()).enumerate() {
-                let target = &targets[j..(j+self.dim())];
-    
-                for (k, l) in (0..sources.len()).step_by(self.dim()).enumerate() {
-    
-                    let source = &sources[l..(l+self.dim())];
-                    let charge = charges[k];
-
-                    if self.dim() == 3 {
-                        for c in (0..gradients.len()).step_by(self.dim()) {
-                            gradients[i..i+self.dim][0] -= charge * LaplaceKernel::gradient_kernel_3D(source, target, c);                            
-                        }
-
-                    } else {
-                        panic!("Gradient not implemented for dimension={:?}!", self.dim())
+                if self.dim() == 3 {
+                    for c in (0..gradients.len()).step_by(self.dim()) {
+                        gradients[i..i + self.dim][0] -=
+                            charge * LaplaceKernel::gradient_kernel_3D(source, target, c);
                     }
-    
+                } else {
+                    panic!("Gradient not implemented for dimension={:?}!", self.dim())
                 }
             }
-    } 
+        }
+    }
 
     fn gram(
         &self,
@@ -146,18 +123,18 @@ impl Kernel for LaplaceKernel {
         let mut result: Vec<f64> = Vec::new();
 
         for i in (0..targets.len()).step_by(self.dim()) {
-            let target = &targets[i..(i+self.dim())];
+            let target = &targets[i..(i + self.dim())];
             let mut row: Vec<f64> = Vec::new();
 
             for j in (0..sources.len()).step_by(self.dim()) {
-                let source = &sources[j..(j+self.dim())];
+                let source = &sources[j..(j + self.dim())];
 
                 let tmp;
                 if self.dim() == 3 {
                     tmp = self.potential_kernel_3D(source, target);
                 } else {
                     panic!("Gram not implemented for dimension={:?}!", self.dim())
-                } 
+                }
 
                 row.push(tmp);
             }
@@ -170,7 +147,6 @@ impl Kernel for LaplaceKernel {
         1. / (2f64.powf(level as f64))
     }
 }
-
 
 pub mod tests {
 
@@ -189,7 +165,6 @@ pub mod tests {
         let mut points = Vec::new();
 
         for _ in 0..npoints {
-
             for _ in 0..dim {
                 points.push(between.sample(&mut range))
             }
@@ -201,7 +176,6 @@ pub mod tests {
     #[test]
     #[should_panic(expected = "Kernel not implemented for dimension=2!")]
     pub fn test_potential_panics() {
-
         let dim = 2;
         let npoints = 100;
         let sources = points_fixture(npoints, dim);
@@ -210,13 +184,17 @@ pub mod tests {
         let mut potentials = vec![0.; npoints];
 
         let kernel = LaplaceKernel::new(dim, false, dim);
-        kernel.potential(&sources[..], &charges[..], &targets[..], &mut potentials[..]);
+        kernel.potential(
+            &sources[..],
+            &charges[..],
+            &targets[..],
+            &mut potentials[..],
+        );
     }
-    
+
     #[test]
     #[should_panic(expected = "Gradient not implemented for dimension=2!")]
     pub fn test_gradient_panics() {
-
         let dim = 2;
         let npoints = 100;
         let sources = points_fixture(npoints, dim);
@@ -225,7 +203,12 @@ pub mod tests {
         let mut potentials = vec![0.; npoints];
 
         let kernel = LaplaceKernel::new(dim, false, dim);
-        kernel.gradient(&sources[..], &charges[..], &targets[..], &mut potentials[..]);
+        kernel.gradient(
+            &sources[..],
+            &charges[..],
+            &targets[..],
+            &mut potentials[..],
+        );
     }
 
     #[test]
@@ -252,6 +235,6 @@ pub mod tests {
         let gram = kernel.gram(&sources[..], &targets[..]).unwrap();
 
         // Test dimension of output
-        assert_eq!(gram.len(), ntargets*nsources);
-   }
-}  
+        assert_eq!(gram.len(), ntargets * nsources);
+    }
+}

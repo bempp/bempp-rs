@@ -4,7 +4,7 @@ use std::{
     vec,
 };
 
-use bempp_traits::tree::Tree;
+use bempp_traits::tree::{AttachedDataTree, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -485,6 +485,9 @@ impl Tree for SingleNodeTree {
         self.keys_set.contains(key)
     }
 }
+
+
+
 
 #[cfg(test)]
 mod test {
