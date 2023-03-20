@@ -1,6 +1,6 @@
+use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::element::FiniteElement;
-use bempp_traits::grid::Grid;
-use bempp_traits::grid::Topology;
+use bempp_traits::grid::{Grid, Topology};
 
 pub trait DofMap {
     /// Get the DOF numbers on the local process associated with the given entity
@@ -20,18 +20,18 @@ pub trait DofMap {
 }
 
 pub struct SerialDofMap {
-    entity_dofs: Vec<Vec<Vec<usize>>>, // TODO: use adjacencylist
-    cell_dofs: Vec<Vec<usize>>,        // TODO: use 2darray
+    entity_dofs: [AdjacencyList<usize>; 4],
+    cell_dofs: Vec<Vec<usize>>, // TODO: use 2darray
     size: usize,
 }
 
 impl SerialDofMap {
     pub fn new(grid: &impl Grid, element: &impl FiniteElement) -> Self {
         let mut size = 0;
-        let mut entity_dofs: Vec<Vec<Vec<usize>>> = vec![];
+        let mut entity_dofs_data: Vec<Vec<Vec<usize>>> = vec![];
         let tdim = grid.topology().dim();
         for d in 0..tdim + 1 {
-            entity_dofs.push(vec![vec![]; grid.topology().entity_count(d)]);
+            entity_dofs_data.push(vec![vec![]; grid.topology().entity_count(d)]);
         }
         let mut cell_dofs = vec![];
         for cell in 0..grid.topology().entity_count(tdim) {
@@ -46,21 +46,34 @@ impl SerialDofMap {
                 } {
                     let e_dofs = element.entity_dofs(d, i);
                     if e_dofs.len() > 0 {
-                        if entity_dofs[d][*e].len() == 0 {
+                        if entity_dofs_data[d][*e].len() == 0 {
                             for _ in &e_dofs {
-                                entity_dofs[d][*e].push(size);
+                                entity_dofs_data[d][*e].push(size);
                                 size += 1
                             }
                         }
-                        assert_eq!(entity_dofs[d][*e].len(), e_dofs.len()); // TODO: debug assert?
+                        assert_eq!(entity_dofs_data[d][*e].len(), e_dofs.len()); // TODO: debug assert?
                         for (j, k) in e_dofs.iter().enumerate() {
-                            dofs[*k] = entity_dofs[d][*e][j];
+                            dofs[*k] = entity_dofs_data[d][*e][j];
                         }
                     }
                 }
             }
             cell_dofs.push(dofs);
         }
+
+        let mut entity_dofs = [
+            AdjacencyList::<usize>::new(),
+            AdjacencyList::<usize>::new(),
+            AdjacencyList::<usize>::new(),
+            AdjacencyList::<usize>::new(),
+        ];
+        for d in 0..tdim + 1 {
+            for row in &entity_dofs_data[d] {
+                entity_dofs[d].add_row(row);
+            }
+        }
+
         Self {
             entity_dofs,
             cell_dofs,
@@ -71,7 +84,7 @@ impl SerialDofMap {
 
 impl DofMap for SerialDofMap {
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        &self.entity_dofs[entity_dim][entity_number]
+        &self.entity_dofs[entity_dim].row(entity_number).unwrap()
     }
     fn local_size(&self) -> usize {
         self.size
@@ -90,9 +103,10 @@ impl DofMap for SerialDofMap {
 #[cfg(test)]
 mod test {
     use crate::dofmap::*;
-    use bempp_element::element::LagrangeElementTriangleDegree0;
-    use bempp_element::element::LagrangeElementTriangleDegree1;
-    use bempp_element::element::LagrangeElementTriangleDegree2;
+    use bempp_element::element::{
+        LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1,
+        LagrangeElementTriangleDegree2,
+    };
     use bempp_grid::shapes::regular_sphere;
 
     #[test]
