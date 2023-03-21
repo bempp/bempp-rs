@@ -4,7 +4,7 @@ use std::{
     vec,
 };
 
-use bempp_traits::tree::{AttachedDataTree, FmmInteractionLists, Tree};
+use bempp_traits::tree::{ FmmInteractionLists, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},

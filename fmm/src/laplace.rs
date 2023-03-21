@@ -16,29 +16,6 @@ impl LaplaceKernel {
         }
     }
 
-    fn gradient_kernel_3D(source: &[f64], target: &[f64], c: usize) -> f64 {
-        let num = source[c] - target[c];
-        let invdiff: f64 = source
-            .iter()
-            .zip(target.iter())
-            .map(|(s, t)| (s - t).powf(2.0))
-            .sum::<f64>()
-            .sqrt()
-            * std::f64::consts::PI
-            * 4.0;
-
-        let mut tmp = invdiff.recip();
-        tmp *= invdiff;
-        tmp *= invdiff;
-        tmp *= num;
-
-        if tmp.is_finite() {
-            tmp
-        } else {
-            0.
-        }
-    }
-
     fn potential_kernel_3D(&self, source: &[f64], target: &[f64]) -> f64 {
         let mut tmp = source
             .iter()
@@ -171,7 +148,6 @@ pub mod tests {
         );
     }
 
-   
     #[test]
     #[should_panic(expected = "Gram not implemented for dimension=2!")]
     pub fn test_gram_panics() {

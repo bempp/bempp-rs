@@ -1,13 +1,14 @@
 //! FMM traits
 use crate::tree::{AttachedDataTree, Tree};
+use crate::kernel::Kernel;
 
 pub trait SourceTranslation {
 
-    type Tree: Tree;
+    type Fmm: Fmm;
 
-    fn p2m<'a>(&self, leaves: &<Self::Tree as Tree>::NodeIndexSlice<'a>);
+    fn p2m(&mut self, fmm: &Self::Fmm);
 
-    fn m2m<'a>(&self, keys: &<Self::Tree as Tree>::NodeIndexSlice<'a>);
+    fn m2m(&mut self, fmm: &Self::Fmm);
 }
 
 pub trait TargetTranslation {
@@ -81,20 +82,20 @@ pub trait TargetDataTree {
 }
 
 pub trait Fmm {
-    type SourceDataTree: SourceDataTree;
-    type TargetDataTree: TargetDataTree;
-    type PartitionTree: Tree;
+
+    type Tree: Tree;
+
+    fn order(&self) -> usize;
 
     fn new<'a>(
-        points: <Self::PartitionTree as Tree>::PointSlice<'a>,
+        order: usize,
+        alpha_inner: f64,
+        alpha_outer: f64,
+        kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
+        points: <Self::Tree as Tree>::PointSlice<'a>,
+        point_data: <Self::Tree as Tree>::PointDataSlice<'a>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
     ) -> Self;
-
-    fn upward_pass(&self);
-
-    fn downward_pass(&self);
-
-    fn run(&self);
 }

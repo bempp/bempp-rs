@@ -11,6 +11,12 @@ use bempp_tree::types::single_node::SingleNodeTree;
 use itertools::Itertools;
 use std::{collections::HashMap, hash::Hash};
 
+use ndarray::*;
+
+use bempp_tree::constants::ROOT;
+
+use crate::linalg::pinv;
+
 pub struct FmmDataTree {
     multipoles: HashMap<MortonKey, Vec<f64>>,
     locals: HashMap<MortonKey, Vec<f64>>,
@@ -19,16 +25,25 @@ pub struct FmmDataTree {
 }
 
 pub struct KiFmmSingleNode {
-
     order: usize,
+
+    uc2e_inv: (
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+    ),
+
     alpha_inner: f64,
     alpha_outer: f64,
     kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
 
     tree: SingleNodeTree,
-    // TODO: Wrapped into ArcMutex
-    source_data_tree: FmmDataTree,
-    target_data_tree: FmmDataTree
+}
+
+impl KiFmmSingleNode {
+    /// Number of coefficients related to a given expansion order.
+    fn ncoeffs(order: usize) -> usize {
+        6 * (order - 1).pow(2) + 2
+    }
 }
 
 impl FmmDataTree {
@@ -104,40 +119,50 @@ impl SourceDataTree for FmmDataTree {
     }
 }
 
-impl SourceTranslation for KiFmmSingleNode {
+impl SourceTranslation for FmmDataTree {
+    type Fmm = KiFmmSingleNode;
 
-    type Tree = SingleNodeTree;
-
-    fn p2m<'a>(&self, leaves: &<Self::Tree as Tree>::NodeIndexSlice<'a>) {
-        
-
-        // Perform P2M over leaves in parallel
-        for leaf in self.tree.get_leaves() {
-
+    fn p2m(&mut self, fmm: &Self::Fmm) {
+        for leaf in fmm.tree.get_leaves() {
             // Calculate check surface
-            let upward_check_surface =
-                leaf.compute_surface(self.tree.get_domain(), self.order, self.alpha_outer);
+            let upward_check_surface = leaf
+                .compute_surface(fmm.tree.get_domain(), fmm.order(), fmm.alpha_outer)
+                .into_iter()
+                .flat_map(|[x, y, z]| vec![x, y, z])
+                .collect_vec();
 
-            // Lookup point data
-            if let Some(points) = self.tree.get_points(leaf) {
-                let coordinates = points.iter().map(|p| p.coordinate).collect_vec();
+            if let Some(points) = fmm.tree.get_points(leaf) {
+                // Lookup data
+                let coordinates = points
+                    .iter()
+                    .map(|p| p.coordinate)
+                    .flat_map(|[x, y, z]| vec![x, y, z])
+                    .collect_vec();
+
                 let charges = points.iter().map(|p| p.data[0]).collect_vec();
-                
+
                 // Calculate check potential
-                let mut check_potential = vec![0.; upward_check_surface.len()];
-                
-                self.kernel.potential(&coordinates[..], &charges[..], &upward_check_surface[..], &mut check_potential[..]);
+                let mut check_potential = vec![0.; upward_check_surface.len()/3];
+                fmm.kernel.potential(
+                    &coordinates[..],
+                    &charges[..],
+                    &upward_check_surface[..],
+                    &mut check_potential[..],
+                );
+                let check_potential = Array1::from_vec(check_potential);
 
                 // Calculate multipole expansion
+                let multipole_expansion = fmm.kernel.scale(leaf.level())
+                    * fmm.uc2e_inv.0.dot(&fmm.uc2e_inv.1.dot(&check_potential));
+                let multipole_expansion = multipole_expansion.as_slice().unwrap();
 
-                // Set multipole expansion
+                // Set multipole expansion at node
+                self.set_multipole_expansion(leaf, &multipole_expansion);
             }
         }
     }
 
-    fn m2m<'a>(&self, keys: &<Self::Tree as Tree>::NodeIndexSlice<'a>) {
-        
-    }
+    fn m2m(&mut self, fmm: &Self::Fmm) {}
 }
 
 impl TargetTranslation for FmmDataTree {
@@ -214,77 +239,137 @@ impl TargetDataTree for FmmDataTree {
     }
 }
 
-// impl Fmm for KiFmmSingleNode {
+impl Fmm for KiFmmSingleNode {
+    type Tree = SingleNodeTree;
 
-//     type SourceDataTree = FmmDataTree;
-//     type TargetDataTree = FmmDataTree;
-//     type PartitionTree = SingleNodeTree;
+    fn order(&self) -> usize {
+        self.order
+    }
 
-//     fn new<'a>(
-//             points: <Self::PartitionTree as Tree>::PointSlice<'a>,
-//             adaptive: bool,
-//             n_crit: Option<u64>,
-//             depth: Option<u64>
+    fn new<'a>(
+        order: usize,
+        alpha_inner: f64,
+        alpha_outer: f64,
+        kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
+        points: <Self::Tree as Tree>::PointSlice<'a>,
+        point_data: <Self::Tree as Tree>::PointDataSlice<'a>,
+        adaptive: bool,
+        n_crit: Option<u64>,
+        depth: Option<u64>,
+    ) -> Self {
+        let tree = SingleNodeTree::new(points, point_data, adaptive, n_crit, depth);
+        let upward_equivalent_surface = ROOT
+            .compute_surface(tree.get_domain(), order, alpha_inner)
+            .into_iter()
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-//         ) -> Self {
+        let upward_check_surface = ROOT
+            .compute_surface(tree.get_domain(), order, alpha_outer)
+            .into_iter()
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-//         let tree = SingleNodeTree::new(points, adaptive, n_crit, depth);
-//         let source_data_tree = FmmDataTree::new(&tree);
-//         let target_data_tree= FmmDataTree::new(&tree);
+        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
+        // as well as their inverses using DGESVD.
+        let uc2e = kernel
+            .gram(&upward_equivalent_surface, &upward_check_surface)
+            .unwrap();
 
-//         KiFmmSingleNode { tree , source_data_tree, target_data_tree }
-//     }
+        let nrows = KiFmmSingleNode::ncoeffs(order);
+        let ncols = nrows;
 
-//     fn upward_pass(&self) {
-//         // P2M over leaves
-//         let leaves = self.tree.get_leaves();
-//         self.source_data_tree.p2m(leaves);
+        let uc2e = Array1::from(uc2e)
+            .to_shape((nrows, ncols))
+            .unwrap()
+            .to_owned();
+        let (a, b, c) = pinv(&uc2e);
+        let uc2e_inv = (a.to_owned(), b.dot(&c).to_owned());
 
-//         // M2M over each key in a given level
-//         for level in (1..=self.tree.get_depth()).rev() {
-//             if let Some(keys) = self.tree.get_keys(level) {
-//                 self.source_data_tree.m2m(keys);
-//             }
-//         }
-//     }
+        Self {
+            order,
+            uc2e_inv,
+            alpha_inner,
+            alpha_outer,
+            kernel,
+            tree,
+        }
+    }
+}
 
-//     fn downward_pass(&self) {
+mod test {
 
-//         // Iterate down the tree (M2L/L2L)
-//         for level in 2..=self.tree.get_depth() {
+    use crate::laplace::LaplaceKernel;
 
-//             if let Some(keys) = self.tree.get_keys(level) {
-//                 for key in keys.iter() {
-//                     if let Some(v_list) = self.tree.get_interaction_list(key) {
-//                         self.target_data_tree.m2l(v_list);
-//                     }
-//                 }
+    use super::*;
 
-//                 self.target_data_tree.l2l(keys);
-//             }
-//         }
+    use bempp_tree::types::point::{PointType, Points};
+    use rand::prelude::*;
+    use rand::SeedableRng;
 
-//         // Leaf level computations
-//         let leaves = self.tree.leaves();
-//         for leaf in leaves.iter() {
-//             if let Some(x_list) = self.tree.get_x_list(leaf) {
-//                 self.target_data_tree.p2l(leaf, &x_list);
-//             }
-//         }
+    #[allow(dead_code)]
+    fn points_fixture(npoints: usize) -> Vec<Point> {
+        let mut range = StdRng::seed_from_u64(0);
+        let between = rand::distributions::Uniform::from(0.0..1.0);
+        let mut points: Vec<[PointType; 3]> = Vec::new();
 
-//         // W list
-//         self.target_data_tree.m2p(&leaves);
+        for _ in 0..npoints {
+            points.push([
+                between.sample(&mut range),
+                between.sample(&mut range),
+                between.sample(&mut range),
+            ])
+        }
 
-//         // U list
-//         self.target_data_tree.p2p(&leaves);
+        let points = points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                global_idx: i,
+                base_key: MortonKey::default(),
+                encoded_key: MortonKey::default(),
+                data: Vec::new(),
+            })
+            .collect_vec();
+        points
+    }
 
-//         // Translate local expansions to points in each node
-//         self.target_data_tree.l2p(&leaves);
+    #[test]
+    fn test_p2m() {
+        let npoints = 10000;
+        let points = points_fixture(npoints);
+        let point_data = vec![vec![1.0]; npoints];
+        let depth = 3;
+        let n_crit = 150;
 
-//     }
+        let order = 5;
+        let alpha_inner = 1.05;
+        let alpha_outer = 1.95;
+        let adaptive = false;
 
-//     fn run(&self) {
-//         self.upward_pass();
-//         self.downward_pass();
-//     }
-// }
+        let kernel = Box::new(LaplaceKernel {
+            dim: 3,
+            is_singular: false,
+            value_dimension: 3,
+        });
+
+        let fmm = KiFmmSingleNode::new(
+            order,
+            alpha_inner,
+            alpha_outer,
+            kernel,
+            &points,
+            &point_data,
+            adaptive,
+            Some(n_crit),
+            Some(depth),
+        );
+
+        let mut datatree = FmmDataTree::new(&fmm.tree);
+
+        datatree.p2m(&fmm);
+
+
+    }
+}
