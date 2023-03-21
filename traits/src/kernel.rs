@@ -6,9 +6,6 @@ pub trait Kernel {
     /// Potential data container.
     type PotentialData;
 
-    /// Gradient data container.
-    type GradientData;
-
     /// Space dimensions for the input of the kernel.
     fn dim(&self) -> usize;
 
@@ -23,9 +20,6 @@ pub trait Kernel {
 
     /// Evaluate the potential kernel.
     fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]);
-
-    /// Evaluate the potential gradient.
-    fn gradient(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]);
 
     /// Evaluate the Gram matrix.
     fn gram(&self, sources: &[f64], targets: &[f64]) -> Result<Self::PotentialData>;

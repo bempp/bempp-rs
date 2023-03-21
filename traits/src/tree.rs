@@ -17,6 +17,13 @@ pub trait Tree {
     where
         Self: 'a;
 
+    // Data to be attached to each point.
+    type PointData;
+
+    type PointDataSlice<'a>: IntoIterator<Item = &'a Self::PointData>
+    where
+        Self: 'a;
+
     // A tree node.
     type NodeIndex;
 
@@ -30,6 +37,7 @@ pub trait Tree {
 
     fn new<'a>(
         points: Self::PointSlice<'a>,
+        point_data: Self::PointDataSlice<'a>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,

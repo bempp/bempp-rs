@@ -61,7 +61,6 @@ impl LaplaceKernel {
 
 impl Kernel for LaplaceKernel {
     type PotentialData = Vec<f64>;
-    type GradientData = Vec<[f64; 3]>;
 
     fn dim(&self) -> usize {
         self.dim
@@ -92,26 +91,6 @@ impl Kernel for LaplaceKernel {
                 potential += charges[k] * tmp;
             }
             potentials[i] = potential
-        }
-    }
-
-    fn gradient(&self, sources: &[f64], charges: &[f64], targets: &[f64], gradients: &mut [f64]) {
-        for (i, j) in (0..targets.len()).step_by(self.dim()).enumerate() {
-            let target = &targets[j..(j + self.dim())];
-
-            for (k, l) in (0..sources.len()).step_by(self.dim()).enumerate() {
-                let source = &sources[l..(l + self.dim())];
-                let charge = charges[k];
-
-                if self.dim() == 3 {
-                    for c in (0..gradients.len()).step_by(self.dim()) {
-                        gradients[i..i + self.dim][0] -=
-                            charge * LaplaceKernel::gradient_kernel_3D(source, target, c);
-                    }
-                } else {
-                    panic!("Gradient not implemented for dimension={:?}!", self.dim())
-                }
-            }
         }
     }
 
@@ -192,25 +171,7 @@ pub mod tests {
         );
     }
 
-    #[test]
-    #[should_panic(expected = "Gradient not implemented for dimension=2!")]
-    pub fn test_gradient_panics() {
-        let dim = 2;
-        let npoints = 100;
-        let sources = points_fixture(npoints, dim);
-        let targets = points_fixture(npoints, dim);
-        let charges = vec![1.0; npoints];
-        let mut potentials = vec![0.; npoints];
-
-        let kernel = LaplaceKernel::new(dim, false, dim);
-        kernel.gradient(
-            &sources[..],
-            &charges[..],
-            &targets[..],
-            &mut potentials[..],
-        );
-    }
-
+   
     #[test]
     #[should_panic(expected = "Gram not implemented for dimension=2!")]
     pub fn test_gram_panics() {

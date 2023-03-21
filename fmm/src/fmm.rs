@@ -1,3 +1,4 @@
+use bempp_traits::kernel::Kernel;
 use bempp_traits::tree::Tree;
 use bempp_traits::{
     fmm::{Fmm, SourceDataTree, SourceTranslation, TargetDataTree, TargetTranslation},
@@ -18,11 +19,16 @@ pub struct FmmDataTree {
 }
 
 pub struct KiFmmSingleNode {
-    tree: SingleNodeTree,
 
+    order: usize,
+    alpha_inner: f64,
+    alpha_outer: f64,
+    kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
+
+    tree: SingleNodeTree,
     // TODO: Wrapped into ArcMutex
     source_data_tree: FmmDataTree,
-    target_data_tree: FmmDataTree,
+    target_data_tree: FmmDataTree
 }
 
 impl FmmDataTree {
@@ -98,10 +104,40 @@ impl SourceDataTree for FmmDataTree {
     }
 }
 
-impl SourceTranslation for FmmDataTree {
-    fn p2m(&self) {}
+impl SourceTranslation for KiFmmSingleNode {
 
-    fn m2m(&self) {}
+    type Tree = SingleNodeTree;
+
+    fn p2m<'a>(&self, leaves: &<Self::Tree as Tree>::NodeIndexSlice<'a>) {
+        
+
+        // Perform P2M over leaves in parallel
+        for leaf in self.tree.get_leaves() {
+
+            // Calculate check surface
+            let upward_check_surface =
+                leaf.compute_surface(self.tree.get_domain(), self.order, self.alpha_outer);
+
+            // Lookup point data
+            if let Some(points) = self.tree.get_points(leaf) {
+                let coordinates = points.iter().map(|p| p.coordinate).collect_vec();
+                let charges = points.iter().map(|p| p.data[0]).collect_vec();
+                
+                // Calculate check potential
+                let mut check_potential = vec![0.; upward_check_surface.len()];
+                
+                self.kernel.potential(&coordinates[..], &charges[..], &upward_check_surface[..], &mut check_potential[..]);
+
+                // Calculate multipole expansion
+
+                // Set multipole expansion
+            }
+        }
+    }
+
+    fn m2m<'a>(&self, keys: &<Self::Tree as Tree>::NodeIndexSlice<'a>) {
+        
+    }
 }
 
 impl TargetTranslation for FmmDataTree {

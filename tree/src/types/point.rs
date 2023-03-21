@@ -21,6 +21,9 @@ pub struct Point {
 
     /// Key at a given level of encoding, strictly an ancestor of 'base_key'.
     pub encoded_key: MortonKey,
+
+    /// Data stored at a given point
+    pub data: Vec<f64>
 }
 
 /// Vector of **Points**.

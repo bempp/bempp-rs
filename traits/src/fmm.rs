@@ -2,9 +2,12 @@
 use crate::tree::{AttachedDataTree, Tree};
 
 pub trait SourceTranslation {
-    fn p2m(&self);
 
-    fn m2m(&self);
+    type Tree: Tree;
+
+    fn p2m<'a>(&self, leaves: &<Self::Tree as Tree>::NodeIndexSlice<'a>);
+
+    fn m2m<'a>(&self, keys: &<Self::Tree as Tree>::NodeIndexSlice<'a>);
 }
 
 pub trait TargetTranslation {
