@@ -22,22 +22,10 @@ pub trait Kernel {
     fn is_singular(&self) -> bool;
 
     /// Evaluate the potential kernel.
-    fn potential(
-        &self,
-        sources: &[f64],
-        charges: &[f64],
-        targets: &[f64],
-        potentials: &mut [f64],
-    );
+    fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]);
 
     /// Evaluate the potential gradient.
-    fn gradient(
-        &self,
-        sources: &[f64],
-        charges: &[f64],
-        targets: &[f64],
-        potentials: &mut [f64]
-    );
+    fn gradient(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]);
 
     /// Evaluate the Gram matrix.
     fn gram(&self, sources: &[f64], targets: &[f64]) -> Result<Self::PotentialData>;

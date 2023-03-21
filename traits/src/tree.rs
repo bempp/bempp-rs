@@ -25,6 +25,16 @@ pub trait Tree {
     where
         Self: 'a;
 
+    // Copy of nodes
+    type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
+
+    fn new<'a>(
+        points: Self::PointSlice<'a>,
+        adaptive: bool,
+        n_crit: Option<u64>,
+        depth: Option<u64>,
+    ) -> Self;
+
     // Get depth of tree.
     fn get_depth(&self) -> u64;
 
@@ -55,6 +65,29 @@ pub trait AttachedDataTree {
 
     fn get_data<'a>(&'a self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&Self::Data<'a>>;
 
-    fn get_data_mut<'a>(&'a mut self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&'a mut Self::Data<'a>>;
+    fn get_data_mut<'a>(
+        &'a mut self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<&'a mut Self::Data<'a>>;
+}
 
+pub trait FmmInteractionLists {
+    type Tree: Tree;
+
+    fn get_v_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    fn get_x_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    fn get_w_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    fn get_u_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 }

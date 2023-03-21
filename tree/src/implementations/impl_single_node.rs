@@ -4,7 +4,7 @@ use std::{
     vec,
 };
 
-use bempp_traits::tree::{AttachedDataTree, Tree};
+use bempp_traits::tree::{AttachedDataTree, FmmInteractionLists, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -18,27 +18,6 @@ use crate::{
 };
 
 impl SingleNodeTree {
-    /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
-    /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
-    /// user defined maximum leaf maximum occupancy n_crit.
-    pub fn new(
-        points: &[[PointType; 3]],
-        adaptive: bool,
-        n_crit: Option<u64>,
-        depth: Option<u64>,
-    ) -> SingleNodeTree {
-        let domain = Domain::from_local_points(points);
-
-        let n_crit = n_crit.unwrap_or(NCRIT);
-        let depth = depth.unwrap_or(DEEPEST_LEVEL);
-
-        if adaptive {
-            SingleNodeTree::adaptive_tree(points, &domain, n_crit)
-        } else {
-            SingleNodeTree::uniform_tree(points, &domain, depth)
-        }
-    }
-
     /// Constructor for uniform trees
     pub fn uniform_tree(points: &[[PointType; 3]], &domain: &Domain, depth: u64) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
@@ -446,8 +425,33 @@ impl Tree for SingleNodeTree {
     type Domain = Domain;
     type NodeIndex = MortonKey;
     type NodeIndexSlice<'a> = &'a [MortonKey];
+    type NodeIndices = MortonKeys;
     type Point = Point;
     type PointSlice<'a> = &'a [Point];
+
+    /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
+    /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
+    /// user defined maximum leaf maximum occupancy n_crit.
+    fn new<'a>(
+        points: Self::PointSlice<'a>,
+        adaptive: bool,
+        n_crit: Option<u64>,
+        depth: Option<u64>,
+    ) -> SingleNodeTree {
+        // HACK: Come back and reconcile a runtime point dimension detector
+        let points = points.into_iter().map(|p| p.coordinate).collect_vec();
+
+        let domain = Domain::from_local_points(&points[..]);
+
+        let n_crit = n_crit.unwrap_or(NCRIT);
+        let depth = depth.unwrap_or(DEEPEST_LEVEL);
+
+        if adaptive {
+            SingleNodeTree::adaptive_tree(&points[..], &domain, n_crit)
+        } else {
+            SingleNodeTree::uniform_tree(&points[..], &domain, depth)
+        }
+    }
 
     fn get_depth(&self) -> u64 {
         self.depth
@@ -486,8 +490,120 @@ impl Tree for SingleNodeTree {
     }
 }
 
+impl FmmInteractionLists for SingleNodeTree {
+    type Tree = Self;
 
+    fn get_v_list<'a>(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        if key.level() >= 2 {
+            let v_list = key
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| self.keys_set.contains(pnc) && !key.is_adjacent(pnc))
+                .collect_vec();
 
+            if !v_list.is_empty() {
+                return Some(MortonKeys {
+                    keys: v_list,
+                    index: 0,
+                });
+            } else {
+                return None;
+            }
+        }
+        None
+    }
+
+    fn get_u_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        let mut u_list = Vec::<MortonKey>::new();
+        let neighbours = key.neighbors();
+
+        // Child level
+        let mut neighbors_children_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| self.keys_set.contains(nc) && key.is_adjacent(nc))
+            .collect();
+
+        // Key level
+        let mut neighbors_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .filter(|n| self.keys_set.contains(n) && key.is_adjacent(n))
+            .cloned()
+            .collect();
+
+        // Parent level
+        let mut parent_neighbours_adj: Vec<MortonKey> = key
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.keys_set.contains(pn) && key.is_adjacent(pn))
+            .collect();
+
+        u_list.append(&mut neighbors_children_adj);
+        u_list.append(&mut neighbors_adj);
+        u_list.append(&mut parent_neighbours_adj);
+        u_list.push(*key);
+
+        if !u_list.is_empty() {
+            Some(MortonKeys {
+                keys: u_list,
+                index: 0,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn get_w_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        let w_list = key
+            .neighbors()
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| self.keys_set.contains(nc) && !key.is_adjacent(nc))
+            .collect_vec();
+
+        if !w_list.is_empty() {
+            Some(MortonKeys {
+                keys: w_list,
+                index: 0,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn get_x_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        let x_list = key
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.keys_set.contains(pn) && !key.is_adjacent(pn))
+            .collect_vec();
+
+        if !x_list.is_empty() {
+            Some(MortonKeys {
+                keys: x_list,
+                index: 0,
+            })
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -495,7 +611,7 @@ mod test {
     use rand::prelude::*;
     use rand::SeedableRng;
 
-    pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
+    pub fn points_fixture(npoints: i32) -> Vec<Point> {
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
         let mut points: Vec<[PointType; 3]> = Vec::new();
@@ -508,6 +624,16 @@ mod test {
             ])
         }
 
+        let points = points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| Point {
+                coordinate: *p,
+                global_idx: i,
+                base_key: MortonKey::default(),
+                encoded_key: MortonKey::default(),
+            })
+            .collect_vec();
         points
     }
 
@@ -650,19 +776,7 @@ mod test {
         };
         let depth = 5;
         let mut points = Points {
-            points: points_fixture(10000)
-                .into_iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let key = MortonKey::from_point(&p, &domain, depth);
-                    Point {
-                        coordinate: p,
-                        global_idx: i,
-                        base_key: key,
-                        encoded_key: key,
-                    }
-                })
-                .collect(),
+            points: points_fixture(10000),
             index: 0,
         };
 

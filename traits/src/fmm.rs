@@ -34,18 +34,17 @@ pub trait SourceDataTree {
     fn set_multipole_expansion<'a>(
         &'a mut self,
         key: &<Self::Tree as Tree>::NodeIndex,
-        coefficients: &Self::Coefficients<'a>,
+        data: &Self::Coefficients<'a>,
     );
 
     fn get_points<'a>(
         &'a self,
         key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<<Self::Tree as Tree>::PointSlice<'a>>;
-
 }
 
 pub trait TargetDataTree {
-    type DataTree: AttachedDataTree;
+    type Tree: Tree;
     type Potential;
     type Coefficient;
     type Coefficients<'a>: IntoIterator<Item = &'a Self::Coefficient>
@@ -57,46 +56,42 @@ pub trait TargetDataTree {
 
     fn get_local_expansion<'a>(
         &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
+        key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<Self::Coefficients<'a>>;
 
     fn set_local_expansion<'a>(
-        &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
-        coefficients: &Self::Coefficients<'a>,
+        &'a mut self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+        data: &Self::Coefficients<'a>,
     );
-
-    fn get_points<'a>(
-        &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
-    ) -> Option<<<Self::DataTree as AttachedDataTree>::Tree as Tree>::PointSlice<'a>>;
 
     fn get_potentials<'a>(
         &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
+        key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<Self::Potentials<'a>>;
 
     fn set_potentials<'a>(
-        &'a self,
-        key: &<<Self::DataTree as AttachedDataTree>::Tree as Tree>::NodeIndex,
-        potentials: &Self::Potentials<'a>,
+        &'a mut self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+        data: &Self::Potentials<'a>,
     );
 }
 
 pub trait Fmm {
-    type Potentials;
     type SourceDataTree: SourceDataTree;
     type TargetDataTree: TargetDataTree;
     type PartitionTree: Tree;
 
-    fn init<'a>(
-        &'a self,
+    fn new<'a>(
         points: <Self::PartitionTree as Tree>::PointSlice<'a>,
-    );
+        adaptive: bool,
+        n_crit: Option<u64>,
+        depth: Option<u64>,
+    ) -> Self;
 
     fn upward_pass(&self);
 
-    fn downard_pass(&self);
+    fn downward_pass(&self);
 
     fn run(&self);
 }
