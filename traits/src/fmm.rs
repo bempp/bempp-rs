@@ -30,16 +30,16 @@ pub trait SourceDataTree {
     where
         Self: 'a;
 
-    fn get_multipole_expansion<'a>(
-        &'a self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<Self::Coefficients<'a>>;
+    // fn get_multipole_expansion<'a>(
+    //     &'a self,
+    //     key: &<Self::Tree as Tree>::NodeIndex,
+    // ) -> Option<Self::Coefficients<'a>>;
 
-    fn set_multipole_expansion<'a>(
-        &'a mut self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-        data: &Self::Coefficients<'a>,
-    );
+    // fn set_multipole_expansion<'a>(
+    //     &'a mut self,
+    //     key: &<Self::Tree as Tree>::NodeIndex,
+    //     data: &Self::Coefficients<'a>,
+    // );
 
     fn get_points<'a>(
         &'a self,

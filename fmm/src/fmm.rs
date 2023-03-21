@@ -12,13 +12,13 @@ use itertools::Itertools;
 use std::{collections::HashMap, hash::Hash};
 
 use ndarray::*;
-
+use std::sync::{Arc, Mutex};
 use bempp_tree::constants::ROOT;
 
 use crate::linalg::pinv;
 
 pub struct FmmDataTree {
-    multipoles: HashMap<MortonKey, Vec<f64>>,
+    multipoles: Arc<Mutex<HashMap<MortonKey, Vec<f64>>>>,
     locals: HashMap<MortonKey, Vec<f64>>,
     potentials: HashMap<MortonKey, Vec<f64>>,
     points: HashMap<MortonKey, Vec<Point>>,
@@ -67,7 +67,7 @@ impl FmmDataTree {
         }
 
         Self {
-            multipoles,
+            multipoles: Arc::new(Mutex::new(multipoles)),
             locals,
             potentials,
             points,
@@ -80,32 +80,32 @@ impl SourceDataTree for FmmDataTree {
     type Coefficient = f64;
     type Coefficients<'a> = &'a [f64];
 
-    fn get_multipole_expansion<'a>(
-        &'a self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<Self::Coefficients<'a>> {
-        if let Some(multipole) = self.multipoles.get(key) {
-            Some(multipole.as_slice())
-        } else {
-            None
-        }
-    }
+    // fn get_multipole_expansion<'a>(
+    //     &'a self,
+    //     key: &<Self::Tree as Tree>::NodeIndex,
+    // ) -> Option<Self::Coefficients<'a>> {
+    //     if let Some(multipole) = self.multipoles.get(key) {
+    //         Some(multipole.as_slice())
+    //     } else {
+    //         None
+    //     }
+    // }
 
-    fn set_multipole_expansion<'a>(
-        &'a mut self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-        data: &Self::Coefficients<'a>,
-    ) {
-        if let Some(multipole) = self.multipoles.get_mut(key) {
-            if !multipole.is_empty() {
-                for (curr, &new) in multipole.iter_mut().zip(data.iter()) {
-                    *curr += new;
-                }
-            } else {
-                *multipole = data.clone().to_vec();
-            }
-        }
-    }
+    // fn set_multipole_expansion<'a>(
+    //     &'a mut self,
+    //     key: &<Self::Tree as Tree>::NodeIndex,
+    //     data: &Self::Coefficients<'a>,
+    // ) {
+    //     if let Some(multipole) = self.multipoles.get_mut(key) {
+    //         if !multipole.is_empty() {
+    //             for (curr, &new) in multipole.iter_mut().zip(data.iter()) {
+    //                 *curr += new;
+    //             }
+    //         } else {
+    //             *multipole = data.clone().to_vec();
+    //         }
+    //     }
+    // }
 
     fn get_points<'a>(
         &'a self,
@@ -123,6 +123,10 @@ impl SourceTranslation for FmmDataTree {
     type Fmm = KiFmmSingleNode;
 
     fn p2m(&mut self, fmm: &Self::Fmm) {
+        
+        // let mut handles = vec![];
+        let num_threads: usize = std::thread::available_parallelism().unwrap().try_into().unwrap();
+
         for leaf in fmm.tree.get_leaves() {
             // Calculate check surface
             let upward_check_surface = leaf
@@ -157,7 +161,7 @@ impl SourceTranslation for FmmDataTree {
                 let multipole_expansion = multipole_expansion.as_slice().unwrap();
 
                 // Set multipole expansion at node
-                self.set_multipole_expansion(leaf, &multipole_expansion);
+                // self.set_multipole_expansion(leaf, &multipole_expansion);
             }
         }
     }
