@@ -1,23 +1,25 @@
 [workspace]
 
 members = [
+    "bem",
     "element",
+    "fmm",
+    "grid",
+    "hyksort",
     "quadrature",
     "tools",
     "tree",
-    "hyksort",
-    "fmm",
     "traits",
-    "grid"
 ]
 
 default-members = [
+    "bem",
     "element",
+    "fmm",
+    "grid",
+    "hyksort",
     "quadrature",
     "tools",
     "tree",
-    "hyksort",
-    "fmm",
     "traits",
-    "grid"
 ]
