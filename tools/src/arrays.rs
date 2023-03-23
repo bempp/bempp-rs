@@ -123,6 +123,9 @@ impl<T: Num + Copy> AdjacencyList<T> {
 impl<T> AdjacencyList<T> {
     /// Create an adjacency list
     pub fn from_data(data: Vec<T>, offsets: Vec<usize>) -> Self {
+        if offsets[offsets.len() - 1] != data.len() {
+            panic!("Final offset must be the length of the data.");
+        }
         Self {
             data: data,
             offsets: offsets,
