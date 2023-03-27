@@ -1,14 +1,11 @@
 //! FMM traits
-use crate::tree::{AttachedDataTree, Tree};
 use crate::kernel::Kernel;
+use crate::tree::{AttachedDataTree, Tree};
 
 pub trait SourceTranslation {
+    fn p2m(&self);
 
-    type Fmm: Fmm;
-
-    fn p2m(&mut self, fmm: &Self::Fmm);
-
-    fn m2m(&mut self, fmm: &Self::Fmm);
+    fn m2m(&self);
 }
 
 pub trait TargetTranslation {
@@ -30,16 +27,16 @@ pub trait SourceDataTree {
     where
         Self: 'a;
 
-    // fn get_multipole_expansion<'a>(
-    //     &'a self,
-    //     key: &<Self::Tree as Tree>::NodeIndex,
-    // ) -> Option<Self::Coefficients<'a>>;
+    fn get_multipole_expansion<'a>(
+        &'a self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<Self::Coefficients<'a>>;
 
-    // fn set_multipole_expansion<'a>(
-    //     &'a mut self,
-    //     key: &<Self::Tree as Tree>::NodeIndex,
-    //     data: &Self::Coefficients<'a>,
-    // );
+    fn set_multipole_expansion<'a>(
+        &'a mut self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+        data: &Self::Coefficients<'a>,
+    );
 
     fn get_points<'a>(
         &'a self,
@@ -82,20 +79,12 @@ pub trait TargetDataTree {
 }
 
 pub trait Fmm {
-
+    type Kernel: Kernel;
     type Tree: Tree;
 
     fn order(&self) -> usize;
 
-    fn new<'a>(
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
-        points: <Self::Tree as Tree>::PointSlice<'a>,
-        point_data: <Self::Tree as Tree>::PointDataSlice<'a>,
-        adaptive: bool,
-        n_crit: Option<u64>,
-        depth: Option<u64>,
-    ) -> Self;
+    fn kernel(&self) -> &Self::Kernel;
+
+    fn tree(&self) -> &Self::Tree;
 }

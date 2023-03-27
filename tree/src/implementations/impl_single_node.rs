@@ -4,7 +4,7 @@ use std::{
     vec,
 };
 
-use bempp_traits::tree::{ FmmInteractionLists, Tree};
+use bempp_traits::tree::{FmmInteractionLists, Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -19,7 +19,12 @@ use crate::{
 
 impl SingleNodeTree {
     /// Constructor for uniform trees
-    pub fn uniform_tree(points: &[[PointType; 3]], point_data: &[Vec<PointType>], &domain: &Domain, depth: u64) -> SingleNodeTree {
+    pub fn uniform_tree(
+        points: &[[PointType; 3]],
+        point_data: &[Vec<PointType>],
+        &domain: &Domain,
+        depth: u64,
+    ) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
         let mut points: Points = points
             .iter()
@@ -33,7 +38,7 @@ impl SingleNodeTree {
                     base_key,
                     encoded_key,
                     global_idx: i,
-                    data: d.clone()
+                    data: d.clone(),
                 }
             })
             .collect();
@@ -152,7 +157,7 @@ impl SingleNodeTree {
                     base_key: key,
                     encoded_key: key,
                     global_idx: i,
-                    data: d.clone()
+                    data: d.clone(),
                 }
             })
             .collect();
@@ -477,6 +482,10 @@ impl Tree for SingleNodeTree {
         }
     }
 
+    fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>> {
+        Some(&self.keys)
+    }
+
     fn get_leaves<'a>(&'a self) -> Self::NodeIndexSlice<'a> {
         &self.leaves
     }
@@ -640,7 +649,7 @@ mod test {
                 global_idx: i,
                 base_key: MortonKey::default(),
                 encoded_key: MortonKey::default(),
-                data: Vec::new()
+                data: Vec::new(),
             })
             .collect_vec();
         points
@@ -747,7 +756,7 @@ mod test {
                     encoded_key: key,
                     base_key: key,
                     global_idx: i,
-                    data: Vec::new()
+                    data: Vec::new(),
                 }
             })
             .collect();

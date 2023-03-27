@@ -23,7 +23,7 @@ pub struct Point {
     pub encoded_key: MortonKey,
 
     /// Data stored at a given point
-    pub data: Vec<f64>
+    pub data: Vec<f64>,
 }
 
 /// Vector of **Points**.

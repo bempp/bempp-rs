@@ -673,7 +673,7 @@ impl MortonKey {
         }
     }
 
-    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) ->  Vec<[f64; 3]> {
+    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<[f64; 3]> {
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
 
         let mut surface = vec![[0f64; 3]; n_coeffs];

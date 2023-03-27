@@ -11,20 +11,26 @@ use bempp_tree::types::single_node::SingleNodeTree;
 use itertools::Itertools;
 use std::{collections::HashMap, hash::Hash};
 
+use bempp_tree::constants::ROOT;
 use ndarray::*;
 use std::sync::{Arc, Mutex};
-use bempp_tree::constants::ROOT;
 
+use crate::laplace::LaplaceKernel;
 use crate::linalg::pinv;
+use std::sync::MutexGuard;
 
-pub struct FmmDataTree {
-    multipoles: Arc<Mutex<HashMap<MortonKey, Vec<f64>>>>,
+use rayon::prelude::*;
+
+
+pub struct FmmDataTree<T: Fmm> {
+    fmm: Arc<T>,
+    multipoles: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
     locals: HashMap<MortonKey, Vec<f64>>,
     potentials: HashMap<MortonKey, Vec<f64>>,
     points: HashMap<MortonKey, Vec<Point>>,
 }
 
-pub struct KiFmmSingleNode {
+pub struct KiFmm<T: Tree, S: Kernel> {
     order: usize,
 
     uc2e_inv: (
@@ -34,234 +40,24 @@ pub struct KiFmmSingleNode {
 
     alpha_inner: f64,
     alpha_outer: f64,
-    kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
 
-    tree: SingleNodeTree,
+    tree: T,
+    kernel: S,
 }
 
-impl KiFmmSingleNode {
+impl KiFmm<SingleNodeTree, LaplaceKernel> {
     /// Number of coefficients related to a given expansion order.
     fn ncoeffs(order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
-    }
-}
-
-impl FmmDataTree {
-    fn new<'a>(tree: &SingleNodeTree) -> Self {
-        let mut multipoles = HashMap::new();
-        let mut locals = HashMap::new();
-        let mut potentials = HashMap::new();
-        let mut points = HashMap::new();
-
-        for level in (0..=tree.get_depth()).rev() {
-            if let Some(keys) = tree.get_keys(level) {
-                for key in keys.iter() {
-                    multipoles.insert(key.clone(), Vec::new());
-                    locals.insert(key.clone(), Vec::new());
-                    potentials.insert(key.clone(), Vec::new());
-                    if let Some(point_data) = tree.get_points(key) {
-                        points.insert(key.clone(), point_data.iter().cloned().collect_vec());
-                    }
-                }
-            }
-        }
-
-        Self {
-            multipoles: Arc::new(Mutex::new(multipoles)),
-            locals,
-            potentials,
-            points,
-        }
-    }
-}
-
-impl SourceDataTree for FmmDataTree {
-    type Tree = SingleNodeTree;
-    type Coefficient = f64;
-    type Coefficients<'a> = &'a [f64];
-
-    // fn get_multipole_expansion<'a>(
-    //     &'a self,
-    //     key: &<Self::Tree as Tree>::NodeIndex,
-    // ) -> Option<Self::Coefficients<'a>> {
-    //     if let Some(multipole) = self.multipoles.get(key) {
-    //         Some(multipole.as_slice())
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    // fn set_multipole_expansion<'a>(
-    //     &'a mut self,
-    //     key: &<Self::Tree as Tree>::NodeIndex,
-    //     data: &Self::Coefficients<'a>,
-    // ) {
-    //     if let Some(multipole) = self.multipoles.get_mut(key) {
-    //         if !multipole.is_empty() {
-    //             for (curr, &new) in multipole.iter_mut().zip(data.iter()) {
-    //                 *curr += new;
-    //             }
-    //         } else {
-    //             *multipole = data.clone().to_vec();
-    //         }
-    //     }
-    // }
-
-    fn get_points<'a>(
-        &'a self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::PointSlice<'a>> {
-        if let Some(points) = self.points.get(key) {
-            Some(points.as_slice())
-        } else {
-            None
-        }
-    }
-}
-
-impl SourceTranslation for FmmDataTree {
-    type Fmm = KiFmmSingleNode;
-
-    fn p2m(&mut self, fmm: &Self::Fmm) {
-        
-        // let mut handles = vec![];
-        let num_threads: usize = std::thread::available_parallelism().unwrap().try_into().unwrap();
-
-        for leaf in fmm.tree.get_leaves() {
-            // Calculate check surface
-            let upward_check_surface = leaf
-                .compute_surface(fmm.tree.get_domain(), fmm.order(), fmm.alpha_outer)
-                .into_iter()
-                .flat_map(|[x, y, z]| vec![x, y, z])
-                .collect_vec();
-
-            if let Some(points) = fmm.tree.get_points(leaf) {
-                // Lookup data
-                let coordinates = points
-                    .iter()
-                    .map(|p| p.coordinate)
-                    .flat_map(|[x, y, z]| vec![x, y, z])
-                    .collect_vec();
-
-                let charges = points.iter().map(|p| p.data[0]).collect_vec();
-
-                // Calculate check potential
-                let mut check_potential = vec![0.; upward_check_surface.len()/3];
-                fmm.kernel.potential(
-                    &coordinates[..],
-                    &charges[..],
-                    &upward_check_surface[..],
-                    &mut check_potential[..],
-                );
-                let check_potential = Array1::from_vec(check_potential);
-
-                // Calculate multipole expansion
-                let multipole_expansion = fmm.kernel.scale(leaf.level())
-                    * fmm.uc2e_inv.0.dot(&fmm.uc2e_inv.1.dot(&check_potential));
-                let multipole_expansion = multipole_expansion.as_slice().unwrap();
-
-                // Set multipole expansion at node
-                // self.set_multipole_expansion(leaf, &multipole_expansion);
-            }
-        }
-    }
-
-    fn m2m(&mut self, fmm: &Self::Fmm) {}
-}
-
-impl TargetTranslation for FmmDataTree {
-    fn m2l(&self) {}
-
-    fn l2l(&self) {}
-
-    fn l2p(&self) {}
-
-    fn p2l(&self) {}
-
-    fn p2p(&self) {}
-}
-
-impl TargetDataTree for FmmDataTree {
-    type Coefficient = f64;
-    type Coefficients<'a> = &'a [f64];
-    type Potential = f64;
-    type Potentials<'a> = &'a [f64];
-    type Tree = SingleNodeTree;
-
-    fn get_local_expansion<'a>(
-        &'a self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<Self::Coefficients<'a>> {
-        if let Some(local) = self.locals.get(key) {
-            Some(local.as_slice())
-        } else {
-            None
-        }
-    }
-
-    fn set_local_expansion<'a>(
-        &'a mut self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-        data: &Self::Coefficients<'a>,
-    ) {
-        if let Some(locals) = self.locals.get_mut(key) {
-            if !locals.is_empty() {
-                for (curr, &new) in locals.iter_mut().zip(data.iter()) {
-                    *curr += new;
-                }
-            } else {
-                *locals = data.clone().to_vec();
-            }
-        }
-    }
-
-    fn get_potentials<'a>(
-        &'a self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<Self::Potentials<'a>> {
-        if let Some(potentials) = self.potentials.get(key) {
-            Some(potentials.as_slice())
-        } else {
-            None
-        }
-    }
-
-    fn set_potentials<'a>(
-        &'a mut self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-        data: &Self::Potentials<'a>,
-    ) {
-        if let Some(potentials) = self.potentials.get_mut(key) {
-            if !potentials.is_empty() {
-                for (curr, &new) in potentials.iter_mut().zip(data.iter()) {
-                    *curr += new;
-                }
-            } else {
-                *potentials = data.clone().to_vec();
-            }
-        }
-    }
-}
-
-impl Fmm for KiFmmSingleNode {
-    type Tree = SingleNodeTree;
-
-    fn order(&self) -> usize {
-        self.order
     }
 
     fn new<'a>(
         order: usize,
         alpha_inner: f64,
         alpha_outer: f64,
-        kernel: Box<dyn Kernel<PotentialData = Vec<f64>>>,
-        points: <Self::Tree as Tree>::PointSlice<'a>,
-        point_data: <Self::Tree as Tree>::PointDataSlice<'a>,
-        adaptive: bool,
-        n_crit: Option<u64>,
-        depth: Option<u64>,
+        kernel: LaplaceKernel,
+        tree: SingleNodeTree,
     ) -> Self {
-        let tree = SingleNodeTree::new(points, point_data, adaptive, n_crit, depth);
         let upward_equivalent_surface = ROOT
             .compute_surface(tree.get_domain(), order, alpha_inner)
             .into_iter()
@@ -280,7 +76,7 @@ impl Fmm for KiFmmSingleNode {
             .gram(&upward_equivalent_surface, &upward_check_surface)
             .unwrap();
 
-        let nrows = KiFmmSingleNode::ncoeffs(order);
+        let nrows = KiFmm::ncoeffs(order);
         let ncols = nrows;
 
         let uc2e = Array1::from(uc2e)
@@ -298,6 +94,232 @@ impl Fmm for KiFmmSingleNode {
             kernel,
             tree,
         }
+    }
+}
+
+impl FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
+    fn new(fmm: KiFmm<SingleNodeTree, LaplaceKernel>) -> Self {
+        let mut multipoles = HashMap::new();
+        let mut locals = HashMap::new();
+        let mut potentials = HashMap::new();
+        let mut points = HashMap::new();
+
+        if let Some(keys) = fmm.tree().get_all_keys() {
+            for key in keys.iter() {
+                multipoles.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
+                locals.insert(key.clone(), Vec::new());
+                potentials.insert(key.clone(), Vec::new());
+                if let Some(point_data) = fmm.tree().get_points(key) {
+                    points.insert(key.clone(), point_data.iter().cloned().collect_vec());
+                }
+            }
+    
+        }
+
+        Self {
+            fmm: Arc::new(fmm),
+            multipoles,
+            locals,
+            potentials,
+            points,
+        }
+    }
+}
+
+// impl SourceDataTree for FmmDataTree<LaplaceKernel> {
+//     type Tree = SingleNodeTree;
+//     type Coefficient = f64;
+//     type Coefficients<'a> = &'a [f64];
+
+//     fn get_multipole_expansion<'a>(
+//         &'a self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//     ) -> Option<Self::Coefficients<'a>> {
+//         if let Some(multipole) = self.multipoles.get(key) {
+//             Some(multipole.as_slice())
+//         } else {
+//             None
+//         }
+//     }
+
+//     fn set_multipole_expansion<'a>(
+//         &'a mut self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//         data: &Self::Coefficients<'a>,
+//     ) {
+//         if let Some(multipole) = self.multipoles.get_mut(key) {
+//             if !multipole.is_empty() {
+//                 for (curr, &new) in multipole.iter_mut().zip(data.iter()) {
+//                     *curr += new;
+//                 }
+//             } else {
+//                 *multipole = data.clone().to_vec();
+//             }
+//         }
+//     }
+
+//     fn get_points<'a>(
+//         &'a self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//     ) -> Option<<Self::Tree as Tree>::PointSlice<'a>> {
+//         if let Some(points) = self.points.get(key) {
+//             Some(points.as_slice())
+//         } else {
+//             None
+//         }
+//     }
+// }
+
+impl SourceTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
+    fn p2m(&self) {
+
+        let leaves = self.fmm.tree.get_leaves();
+        
+        leaves.par_iter().for_each(move |&leaf| {
+            let multipoles = Arc::clone(&self.multipoles.get(&leaf).unwrap());
+            let fmm = Arc::clone(&self.fmm);
+            
+            if let Some(points) = fmm.tree.get_points(&leaf) {
+                // Lookup data
+                let coordinates = points
+                    .iter()
+                    .map(|p| p.coordinate)
+                    .flat_map(|[x, y, z]| vec![x, y, z])
+                    .collect_vec();
+
+                let upward_check_surface = leaf
+                    .compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer)
+                    .into_iter()
+                    .flat_map(|[x, y, z]| vec![x, y, z])
+                    .collect_vec();
+
+                let charges = points.iter().map(|p| p.data[0]).collect_vec();
+
+                // Calculate check potential
+                let mut check_potential = vec![0.; upward_check_surface.len() / 3];
+                
+                fmm.kernel.potential(
+                    &coordinates[..],
+                    &charges[..],
+                    &upward_check_surface[..],
+                    &mut check_potential[..],
+                );
+
+                let check_potential = Array1::from_vec(check_potential);
+
+                // Calculate multipole expansion
+                let multipole_expansion = fmm.kernel.scale(leaf.level())
+                    * fmm.uc2e_inv.0.dot(&fmm.uc2e_inv.1.dot(&check_potential));
+                let multipole_expansion = multipole_expansion.as_slice().unwrap();
+
+                let mut curr = multipoles.lock().unwrap();
+
+                if curr.len() > 0 {
+                    for i in 0..curr.len() {
+                        curr[i] += multipole_expansion[i];
+                    }
+                } else {
+                    curr.extend(multipole_expansion);
+                }
+            }
+        }); 
+    }
+
+    fn m2m(&self) {}
+}
+
+// impl TargetTranslation for FmmDataTree {
+//     fn m2l(&self) {}
+
+//     fn l2l(&self) {}
+
+//     fn l2p(&self) {}
+
+//     fn p2l(&self) {}
+
+//     fn p2p(&self) {}
+// }
+
+// impl TargetDataTree for FmmDataTree {
+//     type Coefficient = f64;
+//     type Coefficients<'a> = &'a [f64];
+//     type Potential = f64;
+//     type Potentials<'a> = &'a [f64];
+//     type Tree = SingleNodeTree;
+
+//     fn get_local_expansion<'a>(
+//         &'a self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//     ) -> Option<Self::Coefficients<'a>> {
+//         if let Some(local) = self.locals.get(key) {
+//             Some(local.as_slice())
+//         } else {
+//             None
+//         }
+//     }
+
+//     fn set_local_expansion<'a>(
+//         &'a mut self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//         data: &Self::Coefficients<'a>,
+//     ) {
+//         if let Some(locals) = self.locals.get_mut(key) {
+//             if !locals.is_empty() {
+//                 for (curr, &new) in locals.iter_mut().zip(data.iter()) {
+//                     *curr += new;
+//                 }
+//             } else {
+//                 *locals = data.clone().to_vec();
+//             }
+//         }
+//     }
+
+//     fn get_potentials<'a>(
+//         &'a self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//     ) -> Option<Self::Potentials<'a>> {
+//         if let Some(potentials) = self.potentials.get(key) {
+//             Some(potentials.as_slice())
+//         } else {
+//             None
+//         }
+//     }
+
+//     fn set_potentials<'a>(
+//         &'a mut self,
+//         key: &<Self::Tree as Tree>::NodeIndex,
+//         data: &Self::Potentials<'a>,
+//     ) {
+//         if let Some(potentials) = self.potentials.get_mut(key) {
+//             if !potentials.is_empty() {
+//                 for (curr, &new) in potentials.iter_mut().zip(data.iter()) {
+//                     *curr += new;
+//                 }
+//             } else {
+//                 *potentials = data.clone().to_vec();
+//             }
+//         }
+//     }
+// }
+
+impl<T, U> Fmm for KiFmm<T, U>
+where
+    T: Tree,
+    U: Kernel,
+{
+    type Tree = T;
+    type Kernel = U;
+
+    fn order(&self) -> usize {
+        self.order
+    }
+
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
+
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
     }
 }
 
@@ -347,33 +369,38 @@ mod test {
         let depth = 3;
         let n_crit = 150;
 
-        let order = 5;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
         let adaptive = false;
 
-        let kernel = Box::new(LaplaceKernel {
+        let kernel = LaplaceKernel {
             dim: 3,
             is_singular: false,
             value_dimension: 3,
-        });
+        };
 
-        let fmm = KiFmmSingleNode::new(
-            order,
-            alpha_inner,
-            alpha_outer,
-            kernel,
+        let tree = SingleNodeTree::new(
             &points,
             &point_data,
             adaptive,
             Some(n_crit),
-            Some(depth),
+            Some(depth)
         );
 
-        let mut datatree = FmmDataTree::new(&fmm.tree);
+        let fmm = KiFmm::new(
+            order,
+            alpha_inner,
+            alpha_outer,
+            kernel,
+            tree
+        );
 
-        datatree.p2m(&fmm);
+        let datatree = FmmDataTree::new(fmm);
 
+        datatree.p2m();
 
+        println!("multipoles {:?}", datatree.multipoles);
+        assert!(false)
     }
 }

@@ -52,6 +52,9 @@ pub trait Tree {
     // Get a reference to keys at a given level, gets local keys in a multi-node setting.
     fn get_keys<'a>(&'a self, level: u64) -> Option<Self::NodeIndexSlice<'a>>;
 
+    // Get a reference to all keys, gets local keys in a multi-node setting.
+    fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>;
+    
     // Gets a reference to the points contained with a leaf node.
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
 
