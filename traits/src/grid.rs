@@ -33,6 +33,8 @@ pub trait Geometry {
 
     /// Return the index map from the input order to the storage order
     fn index_map(&self) -> &[usize];
+
+    fn evaluate_integration_element(&self, points: &[f64], data: &mut [f64]);
 }
 
 pub trait Topology {

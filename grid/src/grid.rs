@@ -7,6 +7,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use std::cell::{Ref, RefCell};
+use bempp_traits::element::TabulatedData;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -87,6 +88,7 @@ impl SerialGeometry {
     pub fn element_changes(&self) -> &Vec<usize> {
         &self.element_changes
     }
+
 }
 
 impl Geometry for SerialGeometry {
@@ -110,6 +112,31 @@ impl Geometry for SerialGeometry {
     }
     fn index_map(&self) -> &[usize] {
         &self.index_map
+    }
+    fn evaluate_integration_element(&self, points: &[f64], data: &mut [f64]) {
+        //for cell in 0..ncells {
+
+        //    data[cell] = sqrt(det(J^T * J)))
+        //}
+
+        let mut start = 0;
+        for (element, end) in self.coordinate_elements().iter().zip(self.element_changes()) {
+            for cell in start..*end {
+                // self.cell_vertices(cell);
+                let mut data = TabulatedData::new(&element, 1, points.len() / 3);
+                element.tabulate(points, 1, &data);
+                println!("{:?}", data)
+            }
+            start = *end;
+        }
+
+        for i in 0..self.cell_count() {
+            for pti in self.cell_vertices(i).unwrap() {
+                let pt = self.point(*pti).unwrap();
+                println!("  {} {} {}", pt[0], pt[1], pt[2]);
+            }
+            println!("");
+        }
     }
 }
 
@@ -197,7 +224,6 @@ impl SerialTopology {
             let mut adj: Vec<(usize, usize)> = vec![];
             for v in vertices {
                 for c in self.connectivity(0, tdim).row(*v).unwrap() {
-                    println!("{} {} {}", n, v, c);
                     let mut found = false;
                     for (i, a) in adj.iter().enumerate() {
                         if a.0 == *c {
