@@ -3,6 +3,7 @@
 use crate::cell::*;
 use crate::element::*;
 use crate::map::*;
+use bempp_tools::arrays::Array4D;
 use bempp_traits::element::ElementFamily;
 
 /// Degree 1 Raviart-Thomas element on a triangle
@@ -34,34 +35,34 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = -points[2 * pt];
-                    *data.get_mut(deriv, pt, 0, 1) = -points[2 * pt + 1];
-                    *data.get_mut(deriv, pt, 1, 0) = points[2 * pt] - 1.0;
-                    *data.get_mut(deriv, pt, 1, 1) = points[2 * pt + 1];
-                    *data.get_mut(deriv, pt, 2, 0) = -points[2 * pt];
-                    *data.get_mut(deriv, pt, 2, 1) = 1.0 - points[2 * pt + 1];
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -points[2 * pt];
+                    *data.get_mut(deriv, pt, 0, 1).unwrap() = -points[2 * pt + 1];
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = points[2 * pt] - 1.0;
+                    *data.get_mut(deriv, pt, 1, 1).unwrap() = points[2 * pt + 1];
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -points[2 * pt];
+                    *data.get_mut(deriv, pt, 2, 1).unwrap() = 1.0 - points[2 * pt + 1];
                 } else if deriv == 1 {
-                    *data.get_mut(deriv, pt, 0, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 0, 1) = 0.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 1.0;
-                    *data.get_mut(deriv, pt, 1, 1) = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 2, 1) = 0.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 0, 1).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0;
+                    *data.get_mut(deriv, pt, 1, 1).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 2, 1).unwrap() = 0.0;
                 } else if deriv == 2 {
-                    *data.get_mut(deriv, pt, 0, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 0, 1) = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 1, 1) = 1.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 2, 1) = -1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 0, 1).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 1, 1).unwrap() = 1.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 2, 1).unwrap() = -1.0;
                 } else {
                     for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
                     }
                 }
             }
@@ -116,17 +117,17 @@ mod test {
     fn test_raviart_thomas_1_triangle() {
         let e = RaviartThomasElementTriangleDegree1 {};
         assert_eq!(e.value_size(), 2);
-        let mut data = TabulatedData::new(&e, 0, 6);
+        let mut data = e.create_tabulate_array(0, 6);
         let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5];
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
-            assert_relative_eq!(*data.get(0, pt, 0, 0), -points[2 * pt]);
-            assert_relative_eq!(*data.get(0, pt, 0, 1), -points[2 * pt + 1]);
-            assert_relative_eq!(*data.get(0, pt, 1, 0), points[2 * pt] - 1.0);
-            assert_relative_eq!(*data.get(0, pt, 1, 1), points[2 * pt + 1]);
-            assert_relative_eq!(*data.get(0, pt, 2, 0), -points[2 * pt]);
-            assert_relative_eq!(*data.get(0, pt, 2, 1), 1.0 - points[2 * pt + 1]);
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), -points[2 * pt]);
+            assert_relative_eq!(*data.get(0, pt, 0, 1).unwrap(), -points[2 * pt + 1]);
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), points[2 * pt] - 1.0);
+            assert_relative_eq!(*data.get(0, pt, 1, 1).unwrap(), points[2 * pt + 1]);
+            assert_relative_eq!(*data.get(0, pt, 2, 0).unwrap(), -points[2 * pt]);
+            assert_relative_eq!(*data.get(0, pt, 2, 1).unwrap(), 1.0 - points[2 * pt + 1]);
         }
         check_dofs(e);
     }
