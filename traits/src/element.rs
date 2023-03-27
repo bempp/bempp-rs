@@ -1,7 +1,7 @@
 //! Finite element definitions
 
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::{Array4D, Array2D};
+use bempp_tools::arrays::{Array2D, Array4D};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -76,5 +76,4 @@ pub trait FiniteElement {
         let value_size = self.value_size();
         Array4D::<f64>::new((deriv_count, point_count, basis_count, value_size))
     }
-
 }
