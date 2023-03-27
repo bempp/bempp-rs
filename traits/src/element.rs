@@ -1,7 +1,7 @@
 //! Finite element definitions
 
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::Array4D;
+use bempp_tools::arrays::{Array4D, Array2D};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -60,7 +60,7 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut Array4D<f64>);
+    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>);
 
     /// The DOFs that are associated with a subentity of the reference cell
     fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize>;
@@ -76,4 +76,5 @@ pub trait FiniteElement {
         let value_size = self.value_size();
         Array4D::<f64>::new((deriv_count, point_count, basis_count, value_size))
     }
+
 }

@@ -2,12 +2,12 @@
 
 use crate::cell::PhysicalCell;
 use crate::element::FiniteElement;
-use bempp_tools::Array4D;
+use bempp_tools::arrays::{Array2D, Array4D};
 pub use bempp_traits::element::MapType;
 
 pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    _points: &[f64],
+    _points: &Array2D<f64>,
     _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -15,7 +15,7 @@ pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
 
 pub fn identity_pull_back<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    _points: &[f64],
+    _points: &Array2D<f64>,
     _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -23,14 +23,13 @@ pub fn identity_pull_back<'a, F: FiniteElement + 'a>(
 
 pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    points: &[f64],
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
         let nbasis = data.shape().2;
 
@@ -74,14 +73,13 @@ pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
 
 pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    points: &[f64],
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
         let nbasis = data.shape().2;
 
@@ -124,14 +122,13 @@ pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
 
 pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    points: &[f64],
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
         let nbasis = data.shape().2;
 
@@ -179,14 +176,13 @@ pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
 
 pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    points: &[f64],
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
         let nbasis = data.shape().2;
 
@@ -227,14 +223,13 @@ pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
 
 pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    points: &[f64],
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
         let nbasis = data.shape().2;
 
@@ -270,14 +265,13 @@ pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
 
 pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
     data: &mut Array4D<f64>,
-    points: &[f64],
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
         let nbasis = data.shape().2;
 
@@ -319,7 +313,7 @@ mod test {
     use approx::*;
 
     pub struct TestPhysicalCell<'a, F: FiniteElement> {
-        vertices: &'a [f64],
+        vertices: &'a Array2D<f64>,
         coordinate_element: &'a F,
         gdim: usize,
         tdim: usize,
@@ -329,12 +323,12 @@ mod test {
     impl<'a, F: FiniteElement> TestPhysicalCell<'a, F> {
         pub fn new(
             reference_cell: &'a impl ReferenceCell,
-            vertices: &'a [f64],
+            vertices: &'a Array2D<f64>,
             coordinate_element: &'a F,
             gdim: usize,
         ) -> Self {
             let tdim = reference_cell.dim();
-            let npts = vertices.len() / gdim;
+            let npts = vertices.shape().0;
             Self {
                 vertices,
                 coordinate_element,
@@ -359,7 +353,7 @@ mod test {
             self.npts
         }
         fn vertex(&self, vertex_number: usize) -> &'a [f64] {
-            &self.vertices[self.tdim * (vertex_number)..self.tdim * (vertex_number + 1)]
+            &self.vertices.row(vertex_number).unwrap()
         }
     }
 
@@ -374,10 +368,10 @@ mod test {
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         identity_push_forward(&mut data, &pts, &geometry);
 
@@ -406,10 +400,10 @@ mod test {
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         contravariant_piola_push_forward(&mut data, &pts, &geometry);
 
@@ -444,10 +438,10 @@ mod test {
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         covariant_piola_push_forward(&mut data, &pts, &geometry);
 
@@ -479,10 +473,10 @@ mod test {
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         l2_piola_push_forward(&mut data, &pts, &geometry);
 
