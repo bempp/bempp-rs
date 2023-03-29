@@ -124,6 +124,10 @@ impl<'a, C: Communicator> Topology for ParallelTopology<'a, C> {
         }
         self.ownership[dim][index]
     }
+
+    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>> {
+        self.serial_topology.adjacent_cells(cell)
+    }
 }
 
 /// Parallel grid
