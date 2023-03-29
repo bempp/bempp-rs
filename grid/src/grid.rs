@@ -160,14 +160,16 @@ impl Geometry for SerialGeometry {
     }
     fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
         let gdim = self.dim();
+        let tdim = points.shape().1;
         if points.shape().0 != jacobians.shape().0 {
             panic!("jacobians has wrong number of rows.");
         }
-        if gdim * points.shape().1 != jacobians.shape().1 {
+        if gdim * tdim != jacobians.shape().1 {
             panic!("jacobians has wrong number of columns.");
         }
         let element = self.element(cell);
         let mut data = element.create_tabulate_array(1, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let tdim = data.shape().0 - 1;
         element.tabulate(points, 1, &mut data);
         for p in 0..points.shape().0 {
             for i in 0..jacobians.shape().1 {
@@ -180,7 +182,7 @@ impl Geometry for SerialGeometry {
             let pt = unsafe { self.coordinates.row_unchecked(i) };
             for p in 0..points.shape().0 {
                 for j in 0..gdim {
-                    for k in 0..data.shape().0 - 1 {
+                    for k in 0..tdim {
                         unsafe {
                             *jacobians.get_unchecked_mut(p, k * gdim + j) +=
                                 pt[j] * data.get_unchecked(k + 1, p, i, 0);
@@ -196,6 +198,65 @@ impl Geometry for SerialGeometry {
         cell: usize,
         jacobian_determinants: &mut [f64],
     ) {
+        let gdim = self.dim();
+        let tdim = points.shape().1;
+        if points.shape().0 != jacobian_determinants.len() {
+            panic!("jacobian_determinants has wrong length.");
+        }
+        let mut js = Array2D::<f64>::new((points.shape().0, gdim * tdim)); // TODO: Memory is assigned here. Can we avoid this?
+        self.compute_jacobians(points, cell, &mut js);
+
+        for p in 0..points.shape().0 {
+            jacobian_determinants[p] = match tdim {
+                1 => match gdim {
+                    1 => unsafe { *js.get_unchecked(p, 0) },
+                    2 => unsafe {
+                        ((*js.get_unchecked(p, 0)).powi(2) + (*js.get_unchecked(p, 1)).powi(2))
+                            .sqrt()
+                    },
+                    3 => unsafe {
+                        ((*js.get_unchecked(p, 0)).powi(2)
+                            + (*js.get_unchecked(p, 1)).powi(2)
+                            + (*js.get_unchecked(p, 2)).powi(2))
+                        .sqrt()
+                    },
+                    _ => {
+                        panic!("Unsupported dimensions.");
+                    }
+                },
+                2 => match gdim {
+                    2 => unsafe {
+                        *js.get_unchecked(p, 0) * *js.get_unchecked(p, 3)
+                            - *js.get_unchecked(p, 1) * *js.get_unchecked(p, 2)
+                    },
+                    3 => unsafe {
+                        (((*js.get_unchecked(p, 0)).powi(2)
+                            + (*js.get_unchecked(p, 1)).powi(2)
+                            + (*js.get_unchecked(p, 2)).powi(2))
+                            * ((*js.get_unchecked(p, 3)).powi(2)
+                                + (*js.get_unchecked(p, 4)).powi(2)
+                                + (*js.get_unchecked(p, 5)).powi(2))
+                            - (*js.get_unchecked(p, 0) * *js.get_unchecked(p, 3)
+                                + *js.get_unchecked(p, 1) * *js.get_unchecked(p, 4)
+                                + *js.get_unchecked(p, 2) * *js.get_unchecked(p, 5))
+                            .powi(2))
+                        .sqrt()
+                    },
+                    _ => {
+                        panic!("Unsupported dimensions.");
+                    }
+                },
+                3 => match gdim {
+                    3 => unsafe { *js.get_unchecked(p, 0) },
+                    _ => {
+                        panic!("Unsupported dimensions.");
+                    }
+                },
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            }
+        }
     }
     fn compute_jacobian_inverses(
         &self,
@@ -765,6 +826,14 @@ mod test {
             assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 3.0);
             assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 1.0);
             assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0);
+        }
+
+        // test compute_jacobian_determinants
+        let mut dets = vec![0.0; 3];
+        g.geometry()
+            .compute_jacobian_determinants(&points, 0, &mut dets);
+        for i in 0..3 {
+            assert_relative_eq!(dets[i], 2.0 * 2.0_f64.sqrt());
         }
     }
 }
