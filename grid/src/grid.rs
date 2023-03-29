@@ -80,12 +80,24 @@ impl SerialGeometry {
         }
     }
 
+    /// TODO: document
     pub fn coordinate_elements(&self) -> &Vec<Box<dyn FiniteElement>> {
         &self.coordinate_elements
     }
 
+    /// TODO: document
     pub fn element_changes(&self) -> &Vec<usize> {
         &self.element_changes
+    }
+
+    /// Get the coordinate element associated with the given cell
+    pub fn element(&self, cell: usize) -> &Box<dyn FiniteElement> {
+        for i in 0..self.element_changes.len() - 1 {
+            if cell < self.element_changes[i + 1] {
+                return &self.coordinate_elements[i - 1];
+            }
+        }
+        &self.coordinate_elements[self.element_changes.len() - 1]
     }
 }
 
@@ -110,6 +122,49 @@ impl Geometry for SerialGeometry {
     }
     fn index_map(&self) -> &[usize] {
         &self.index_map
+    }
+    fn compute_points(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        reference_points: &mut Array2D<f64>,
+    ) {
+        if points.shape().0 != reference_points.shape().0 {
+            panic!("reference_points has wrong number of rows.");
+        }
+        if self.dim() != reference_points.shape().1 {
+            panic!("reference_points has wrong number of columns.");
+        }
+        let element = self.element(cell);
+        let mut data = element.create_tabulate_array(0, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        element.tabulate(points, 0, &mut data);
+        for p in 0..points.shape().0 {
+            for i in 0..reference_points.shape().1 {
+                unsafe {
+                    *reference_points.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        for i in 0..data.shape().2 {
+            let pt = unsafe { self.coordinates.row_unchecked(i) };
+            for p in 0..points.shape().0 {
+                for j in 0..self.dim() {
+                    unsafe {
+                        *reference_points.get_unchecked_mut(p, j) +=
+                            pt[j] * data.get_unchecked(0, p, i, 0);
+                    }
+                }
+            }
+        }
+    }
+    fn compute_jacobian(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {}
+    fn compute_jacobian_det(&self, points: &Array2D<f64>, cell: usize, jacobian_dets: &mut [f64]) {}
+    fn compute_jacobian_inverse(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobians: &mut Array2D<f64>,
+    ) {
     }
 }
 
@@ -399,6 +454,7 @@ impl Grid for SerialGrid {
 #[cfg(test)]
 mod test {
     use crate::grid::*;
+    use approx::*;
 
     #[test]
     fn test_connectivity() {
@@ -632,5 +688,30 @@ mod test {
         assert_eq!(g.topology().entity_count(1), 8);
         assert_eq!(g.topology().entity_count(2), 3);
         assert_eq!(g.geometry().point_count(), 13);
+    }
+
+    #[test]
+    fn test_points_and_jacobians() {
+        let g = SerialGrid::new(
+            Array2D::from_data(vec![2.0, 2.0, 0.0, 4.0, 2.0, 0.0, 5.0, 3.0, 1.0], (3, 3)),
+            AdjacencyList::from_data(vec![0, 1, 2], vec![0, 3]),
+            vec![ReferenceCellType::Triangle],
+        );
+        assert_eq!(g.topology().dim(), 2);
+        assert_eq!(g.geometry().dim(), 3);
+
+        let points = Array2D::from_data(vec![0.2, 0.0, 0.5, 0.5, 1.0 / 3.0, 1.0 / 3.0], (3, 2));
+        let mut physical_points = Array2D::new((3, 3));
+        g.geometry()
+            .compute_points(&points, 0, &mut physical_points);
+        assert_relative_eq!(*physical_points.get(0, 0).unwrap(), 2.4);
+        assert_relative_eq!(*physical_points.get(0, 1).unwrap(), 2.0);
+        assert_relative_eq!(*physical_points.get(0, 2).unwrap(), 0.0);
+        assert_relative_eq!(*physical_points.get(1, 0).unwrap(), 4.5);
+        assert_relative_eq!(*physical_points.get(1, 1).unwrap(), 2.5);
+        assert_relative_eq!(*physical_points.get(1, 2).unwrap(), 0.5);
+        assert_relative_eq!(*physical_points.get(2, 0).unwrap(), 11.0 / 3.0);
+        assert_relative_eq!(*physical_points.get(2, 1).unwrap(), 7.0 / 3.0);
+        assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0 / 3.0);
     }
 }
