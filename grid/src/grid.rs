@@ -3,7 +3,7 @@ use bempp_element::cell;
 use bempp_element::element;
 use bempp_tools::arrays::{AdjacencyList, Array2D};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::element::FiniteElement;
+use bempp_traits::element::{FiniteElement, ElementFamily};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use std::cell::{Ref, RefCell};
@@ -184,7 +184,7 @@ impl Geometry for SerialGeometry {
                 for j in 0..gdim {
                     for k in 0..tdim {
                         unsafe {
-                            *jacobians.get_unchecked_mut(p, k * gdim + j) +=
+                            *jacobians.get_unchecked_mut(p, k + tdim * j) +=
                                 pt[j] * data.get_unchecked(k + 1, p, i, 0);
                         }
                     }
@@ -206,6 +206,7 @@ impl Geometry for SerialGeometry {
         let mut js = Array2D::<f64>::new((points.shape().0, gdim * tdim)); // TODO: Memory is assigned here. Can we avoid this?
         self.compute_jacobians(points, cell, &mut js);
 
+        // TODO: is it faster if we move this for inside the match statement?
         for p in 0..points.shape().0 {
             jacobian_determinants[p] = match tdim {
                 1 => match gdim {
@@ -231,14 +232,14 @@ impl Geometry for SerialGeometry {
                     },
                     3 => unsafe {
                         (((*js.get_unchecked(p, 0)).powi(2)
-                            + (*js.get_unchecked(p, 1)).powi(2)
-                            + (*js.get_unchecked(p, 2)).powi(2))
-                            * ((*js.get_unchecked(p, 3)).powi(2)
-                                + (*js.get_unchecked(p, 4)).powi(2)
+                            + (*js.get_unchecked(p, 2)).powi(2)
+                            + (*js.get_unchecked(p, 4)).powi(2))
+                            * ((*js.get_unchecked(p, 1)).powi(2)
+                                + (*js.get_unchecked(p, 3)).powi(2)
                                 + (*js.get_unchecked(p, 5)).powi(2))
-                            - (*js.get_unchecked(p, 0) * *js.get_unchecked(p, 3)
-                                + *js.get_unchecked(p, 1) * *js.get_unchecked(p, 4)
-                                + *js.get_unchecked(p, 2) * *js.get_unchecked(p, 5))
+                            - (*js.get_unchecked(p, 0) * *js.get_unchecked(p, 1)
+                                + *js.get_unchecked(p, 2) * *js.get_unchecked(p, 3)
+                                + *js.get_unchecked(p, 4) * *js.get_unchecked(p, 5))
                             .powi(2))
                         .sqrt()
                     },
@@ -274,7 +275,22 @@ impl Geometry for SerialGeometry {
         cell: usize,
         jacobian_inverses: &mut Array2D<f64>,
     ) {
-        unimplemented!();
+        let gdim = self.dim();
+        let tdim = points.shape().1;
+        if points.shape().0 != jacobian_inverses.shape().0 {
+            panic!("jacobian_inverses has wrong number of rows.");
+        }
+        if gdim * tdim != jacobian_inverses.shape().1 {
+            panic!("jacobian_inverses has wrong number of columns.");
+        }
+        let element = self.element(cell);
+        if element.cell_type() == ReferenceCellType::Triangle && element.family() == ElementFamily::Lagrange && element.degree() == 1 {
+            // Map is affine
+            
+        } else {
+            // The map is not affine, an iterative method will be needed here to approximate the inverse map.
+            unimplemented!("Inverse jacobians for this cell not yet implemented.");
+        }
     }
 }
 
@@ -831,10 +847,10 @@ mod test {
         g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
             assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0);
-            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 3.0);
             assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0);
-            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 3.0);
-            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 1.0);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 1.0);
+            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0);
             assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0);
         }
 
