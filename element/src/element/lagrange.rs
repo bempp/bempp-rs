@@ -3,6 +3,7 @@
 use crate::cell::*;
 use crate::element::*;
 use crate::map::*;
+use bempp_tools::arrays::{Array2D, Array4D};
 
 /// Lagrange element
 pub struct LagrangeElement {
@@ -45,7 +46,7 @@ impl FiniteElement for LagrangeElement {
     fn dim(&self) -> usize {
         unimplemented!("dim not yet implemented for this element");
     }
-    fn tabulate(&self, _points: &[f64], _nderivs: usize, _data: &mut TabulatedData) {
+    fn tabulate(&self, _points: &Array2D<f64>, _nderivs: usize, _data: &mut Array4D<f64>) {
         unimplemented!("tabulate not yet implemented for this element");
     }
     fn entity_dofs(&self, _entity_dim: usize, _entity_number: usize) -> Vec<usize> {
@@ -82,14 +83,14 @@ impl FiniteElement for LagrangeElementIntervalDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..nderivs + 1 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = 1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
                 } else {
-                    *data.get_mut(deriv, pt, 0, 0) = 0.;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.;
                 }
             }
         }
@@ -132,19 +133,19 @@ impl FiniteElement for LagrangeElementIntervalDegree1 {
     fn dim(&self) -> usize {
         2
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = 1.0 - points[pt];
-                    *data.get_mut(deriv, pt, 1, 0) = points[pt];
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0 - *points.get(pt, 0).unwrap();
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = *points.get(pt, 0).unwrap();
                 } else if deriv == 1 {
-                    *data.get_mut(deriv, pt, 0, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0;
                 } else {
                     for fun in 0..2 {
-                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
                     }
                 }
             }
@@ -188,14 +189,14 @@ impl FiniteElement for LagrangeElementTriangleDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = 1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
                 } else {
-                    *data.get_mut(deriv, pt, 0, 0) = 0.;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.;
                 }
             }
         }
@@ -238,25 +239,26 @@ impl FiniteElement for LagrangeElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = 1.0 - points[2 * pt] - points[2 * pt + 1];
-                    *data.get_mut(deriv, pt, 1, 0) = points[2 * pt];
-                    *data.get_mut(deriv, pt, 2, 0) = points[2 * pt + 1];
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
+                        1.0 - *points.get(pt, 0).unwrap() - *points.get(pt, 1).unwrap();
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = *points.get(pt, 0).unwrap();
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = *points.get(pt, 1).unwrap();
                 } else if deriv == 1 {
-                    *data.get_mut(deriv, pt, 0, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 1.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
                 } else if deriv == 2 {
-                    *data.get_mut(deriv, pt, 0, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 1.0;
                 } else {
                     for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
                     }
                 }
             }
@@ -300,7 +302,7 @@ impl FiniteElement for LagrangeElementTriangleDegree2 {
     fn dim(&self) -> usize {
         6
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are:
         // * (1-x-y)(1-2x-2y)
         // * x(2x-1)
@@ -309,59 +311,59 @@ impl FiniteElement for LagrangeElementTriangleDegree2 {
         // * 4y(1-x-y)
         // * 4x(1-x-y)
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
-                let x = points[2 * pt];
-                let y = points[2 * pt + 1];
+            for pt in 0..data.shape().1 {
+                let x = *points.get(pt, 0).unwrap();
+                let y = *points.get(pt, 1).unwrap();
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = 2.0 * (1.0 - x - y) * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 1, 0) = x * (2.0 * x - 1.0);
-                    *data.get_mut(deriv, pt, 2, 0) = y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * x * y;
-                    *data.get_mut(deriv, pt, 4, 0) = 4.0 * y * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 5, 0) = 4.0 * x * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 2.0 * (1.0 - x - y) * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = x * (2.0 * x - 1.0);
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * x * y;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * y * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * x * (1.0 - x - y);
                 } else if deriv == 1 {
                     // d/dx
-                    *data.get_mut(deriv, pt, 0, 0) = -4.0 * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 1, 0) = 4.0 * x - 1.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * y;
-                    *data.get_mut(deriv, pt, 4, 0) = -4.0 * y;
-                    *data.get_mut(deriv, pt, 5, 0) = 4.0 - 8.0 * x - 4.0 * y;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -4.0 * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * x - 1.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * y;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -4.0 * y;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 - 8.0 * x - 4.0 * y;
                 } else if deriv == 2 {
                     // d/dx
-                    *data.get_mut(deriv, pt, 0, 0) = -4.0 * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 4.0 * y - 1.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * x;
-                    *data.get_mut(deriv, pt, 4, 0) = 4.0 - 4.0 * x - 8.0 * y;
-                    *data.get_mut(deriv, pt, 5, 0) = -4.0 * x;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -4.0 * (1.0 - x - y);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * y - 1.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * x;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 - 4.0 * x - 8.0 * y;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = -4.0 * x;
                 } else if deriv == 3 {
                     // d2/dx2
-                    *data.get_mut(deriv, pt, 0, 0) = 4.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 4.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 4, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 5, 0) = -8.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = -8.0;
                 } else if deriv == 4 {
                     // d2/dxdy
-                    *data.get_mut(deriv, pt, 0, 0) = 4.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 4.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 4, 0) = -8.0;
-                    *data.get_mut(deriv, pt, 5, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 0.0;
                 } else if deriv == 5 {
                     // d2/dy2
-                    *data.get_mut(deriv, pt, 0, 0) = 4.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 4.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 0.0;
-                    *data.get_mut(deriv, pt, 4, 0) = -8.0;
-                    *data.get_mut(deriv, pt, 5, 0) = 0.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 0.0;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 0.0;
                 } else {
                     for fun in 0..6 {
-                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
                     }
                 }
             }
@@ -407,14 +409,14 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) = 1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
                 } else {
-                    *data.get_mut(deriv, pt, 0, 0) = 0.;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.;
                 }
             }
         }
@@ -457,37 +459,40 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
     fn dim(&self) -> usize {
         4
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
+            for pt in 0..data.shape().1 {
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) =
-                        (1.0 - points[2 * pt]) * (1.0 - points[2 * pt + 1]);
-                    *data.get_mut(deriv, pt, 1, 0) = points[2 * pt] * (1.0 - points[2 * pt + 1]);
-                    *data.get_mut(deriv, pt, 2, 0) = (1.0 - points[2 * pt]) * points[2 * pt + 1];
-                    *data.get_mut(deriv, pt, 3, 0) = points[2 * pt] * points[2 * pt + 1];
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
+                        (1.0 - *points.get(pt, 0).unwrap()) * (1.0 - *points.get(pt, 1).unwrap());
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
+                        *points.get(pt, 0).unwrap() * (1.0 - *points.get(pt, 1).unwrap());
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
+                        (1.0 - *points.get(pt, 0).unwrap()) * *points.get(pt, 1).unwrap();
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() =
+                        *points.get(pt, 0).unwrap() * *points.get(pt, 1).unwrap();
                 } else if deriv == 1 {
                     // d/dx
-                    *data.get_mut(deriv, pt, 0, 0) = points[2 * pt + 1] - 1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 1.0 - points[2 * pt + 1];
-                    *data.get_mut(deriv, pt, 2, 0) = -points[2 * pt + 1];
-                    *data.get_mut(deriv, pt, 3, 0) = points[2 * pt + 1];
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = *points.get(pt, 1).unwrap() - 1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0 - *points.get(pt, 1).unwrap();
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -*points.get(pt, 1).unwrap();
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = *points.get(pt, 1).unwrap();
                 } else if deriv == 2 {
                     // d/dy
-                    *data.get_mut(deriv, pt, 0, 0) = points[2 * pt] - 1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = -points[2 * pt];
-                    *data.get_mut(deriv, pt, 2, 0) = 1.0 - points[2 * pt];
-                    *data.get_mut(deriv, pt, 3, 0) = points[2 * pt];
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = *points.get(pt, 0).unwrap() - 1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = -*points.get(pt, 0).unwrap();
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 1.0 - *points.get(pt, 0).unwrap();
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = *points.get(pt, 0).unwrap();
                 } else if deriv == 4 {
                     // d2/dxdy
-                    *data.get_mut(deriv, pt, 0, 0) = 1.0;
-                    *data.get_mut(deriv, pt, 1, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 2, 0) = -1.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 1.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -1.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 1.0;
                 } else {
                     for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
                     }
                 }
             }
@@ -531,120 +536,137 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree2 {
     fn dim(&self) -> usize {
         9
     }
-    fn tabulate(&self, points: &[f64], nderivs: usize, data: &mut TabulatedData) {
+    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.point_count() {
-                let x = points[2 * pt];
-                let y = points[2 * pt + 1];
+            for pt in 0..data.shape().1 {
+                let x = *points.get(pt, 0).unwrap();
+                let y = *points.get(pt, 1).unwrap();
                 if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0) =
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
                         (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0) =
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
                         x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0) =
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
                         (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0) =
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() =
+                        x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
                         4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0) =
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
                         (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0) = x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0) = 4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0) = 4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
+                        x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
+                        4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
+                        4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y);
                 } else if deriv == 1 {
                     // d/dx
-                    *data.get_mut(deriv, pt, 0, 0) = (4.0 * x - 3.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0) = (4.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0) = (4.0 * x - 3.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = (4.0 * x - 1.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0) =
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
+                        (4.0 * x - 3.0) * (1.0 - y) * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
+                        (4.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (4.0 * x - 3.0) * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = (4.0 * x - 1.0) * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
                         4.0 * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0) = (4.0 * x - 3.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0) = (4.0 * x - 1.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0) = 4.0 * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0) = 4.0 * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = (4.0 * x - 3.0) * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() = (4.0 * x - 1.0) * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
+                        4.0 * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
+                        4.0 * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y);
                 } else if deriv == 2 {
                     // d/dy
-                    *data.get_mut(deriv, pt, 0, 0) = (1.0 - x) * (1.0 - 2.0 * x) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 1, 0) = x * (2.0 * x - 1.0) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 2, 0) = (1.0 - x) * (1.0 - 2.0 * x) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = x * (2.0 * x - 1.0) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0) = 4.0 * x * (1.0 - x) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 5, 0) =
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
+                        (1.0 - x) * (1.0 - 2.0 * x) * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = x * (2.0 * x - 1.0) * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
+                        (1.0 - x) * (1.0 - 2.0 * x) * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = x * (2.0 * x - 1.0) * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * x * (1.0 - x) * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
                         (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 6, 0) = x * (2.0 * x - 1.0) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 7, 0) = 4.0 * x * (1.0 - x) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0) = 4.0 * x * (1.0 - x) * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
+                        x * (2.0 * x - 1.0) * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() = 4.0 * x * (1.0 - x) * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
+                        4.0 * x * (1.0 - x) * 4.0 * (1.0 - 2.0 * y);
                 } else if deriv == 3 {
                     // d2/dx2
-                    *data.get_mut(deriv, pt, 0, 0) = 4.0 * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0) = 4.0 * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0) = 4.0 * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0) = -8.0 * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0) = 4.0 * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0) = 4.0 * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0) = -8.0 * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0) = -8.0 * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0 * (1.0 - y) * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * (1.0 - y) * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0 * (1.0 - y) * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() = 4.0 * 4.0 * y * (1.0 - y);
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() = -8.0 * y * (2.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() = -8.0 * 4.0 * y * (1.0 - y);
                 } else if deriv == 4 {
                     // d2/dxdy
-                    *data.get_mut(deriv, pt, 0, 0) = (4.0 * x - 3.0) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 1, 0) = (4.0 * x - 1.0) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 2, 0) = (4.0 * x - 3.0) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = (4.0 * x - 1.0) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0) = 4.0 * (1.0 - 2.0 * x) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 5, 0) = (4.0 * x - 3.0) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 6, 0) = (4.0 * x - 1.0) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 7, 0) = 4.0 * (1.0 - 2.0 * x) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0) = 4.0 * (1.0 - 2.0 * x) * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = (4.0 * x - 3.0) * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = (4.0 * x - 1.0) * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (4.0 * x - 3.0) * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = (4.0 * x - 1.0) * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
+                        4.0 * (1.0 - 2.0 * x) * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
+                        (4.0 * x - 3.0) * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
+                        (4.0 * x - 1.0) * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
+                        4.0 * (1.0 - 2.0 * x) * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
+                        4.0 * (1.0 - 2.0 * x) * 4.0 * (1.0 - 2.0 * y);
                 } else if deriv == 5 {
                     // d2/dy2
-                    *data.get_mut(deriv, pt, 0, 0) = (1.0 - x) * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 1, 0) = x * (2.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 2, 0) = (1.0 - x) * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 3, 0) = x * (2.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 4, 0) = 4.0 * x * (1.0 - x) * 4.0;
-                    *data.get_mut(deriv, pt, 5, 0) = (1.0 - x) * (1.0 - 2.0 * x) * -8.0;
-                    *data.get_mut(deriv, pt, 6, 0) = x * (2.0 * x - 1.0) * -8.0;
-                    *data.get_mut(deriv, pt, 7, 0) = 4.0 * x * (1.0 - x) * 4.0;
-                    *data.get_mut(deriv, pt, 8, 0) = 4.0 * x * (1.0 - x) * -8.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = (1.0 - x) * (1.0 - 2.0 * x) * 4.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = x * (2.0 * x - 1.0) * 4.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (1.0 - x) * (1.0 - 2.0 * x) * 4.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = x * (2.0 * x - 1.0) * 4.0;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * x * (1.0 - x) * 4.0;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = (1.0 - x) * (1.0 - 2.0 * x) * -8.0;
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() = x * (2.0 * x - 1.0) * -8.0;
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() = 4.0 * x * (1.0 - x) * 4.0;
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() = 4.0 * x * (1.0 - x) * -8.0;
                 } else if deriv == 7 {
                     // d3/dx2dy
-                    *data.get_mut(deriv, pt, 0, 0) = 4.0 * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 1, 0) = 4.0 * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 2, 0) = 4.0 * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0) = -8.0 * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 5, 0) = 4.0 * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 6, 0) = 4.0 * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 7, 0) = -8.0 * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0) = -8.0 * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0 * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0 * (4.0 * y - 3.0);
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() = 4.0 * 4.0 * (1.0 - 2.0 * y);
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() = -8.0 * (4.0 * y - 1.0);
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() = -8.0 * 4.0 * (1.0 - 2.0 * y);
                 } else if deriv == 8 {
                     // d3/dxdy2
-                    *data.get_mut(deriv, pt, 0, 0) = (4.0 * x - 3.0) * 4.0;
-                    *data.get_mut(deriv, pt, 1, 0) = (4.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 2, 0) = (4.0 * x - 3.0) * 4.0;
-                    *data.get_mut(deriv, pt, 3, 0) = (4.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 4, 0) = 4.0 * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 5, 0) = (4.0 * x - 3.0) * -8.0;
-                    *data.get_mut(deriv, pt, 6, 0) = (4.0 * x - 1.0) * -8.0;
-                    *data.get_mut(deriv, pt, 7, 0) = 4.0 * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 8, 0) = 4.0 * (1.0 - 2.0 * x) * -8.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = (4.0 * x - 3.0) * 4.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = (4.0 * x - 1.0) * 4.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (4.0 * x - 3.0) * 4.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = (4.0 * x - 1.0) * 4.0;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * (1.0 - 2.0 * x) * 4.0;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = (4.0 * x - 3.0) * -8.0;
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() = (4.0 * x - 1.0) * -8.0;
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() = 4.0 * (1.0 - 2.0 * x) * 4.0;
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() = 4.0 * (1.0 - 2.0 * x) * -8.0;
                 } else if deriv == 12 {
                     // d3/dx2dy
-                    *data.get_mut(deriv, pt, 0, 0) = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 1, 0) = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 2, 0) = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 3, 0) = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 4, 0) = -8.0 * 4.0;
-                    *data.get_mut(deriv, pt, 5, 0) = 4.0 * -8.0;
-                    *data.get_mut(deriv, pt, 6, 0) = 4.0 * -8.0;
-                    *data.get_mut(deriv, pt, 7, 0) = -8.0 * 4.0;
-                    *data.get_mut(deriv, pt, 8, 0) = -8.0 * -8.0;
+                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0 * 4.0;
+                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * 4.0;
+                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * 4.0;
+                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * 4.0;
+                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0 * 4.0;
+                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * -8.0;
+                    *data.get_mut(deriv, pt, 6, 0).unwrap() = 4.0 * -8.0;
+                    *data.get_mut(deriv, pt, 7, 0).unwrap() = -8.0 * 4.0;
+                    *data.get_mut(deriv, pt, 8, 0).unwrap() = -8.0 * -8.0;
                 } else {
                     for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0) = 0.;
+                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
                     }
                 }
             }
@@ -665,8 +687,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree2 {
 
 #[cfg(test)]
 mod test {
-    use crate::cell::*;
-    use crate::element::*;
+    use crate::element::lagrange::*;
     use approx::*;
 
     fn check_dofs(e: impl FiniteElement) {
@@ -703,12 +724,12 @@ mod test {
     fn test_lagrange_0_interval() {
         let e = LagrangeElementIntervalDegree0 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = TabulatedData::new(&e, 0, 4);
-        let points = vec![0.0, 0.2, 0.4, 1.0];
+        let mut data = e.create_tabulate_array(0, 4);
+        let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
-            assert_relative_eq!(*data.get(0, pt, 0, 0), 1.0);
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), 1.0);
         }
         check_dofs(e);
     }
@@ -717,13 +738,16 @@ mod test {
     fn test_lagrange_1_interval() {
         let e = LagrangeElementIntervalDegree1 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = TabulatedData::new(&e, 0, 4);
-        let points = vec![0.0, 0.2, 0.4, 1.0];
+        let mut data = e.create_tabulate_array(0, 4);
+        let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
-            assert_relative_eq!(*data.get(0, pt, 0, 0), 1.0 - points[pt]);
-            assert_relative_eq!(*data.get(0, pt, 1, 0), points[pt]);
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                1.0 - *points.get(pt, 0).unwrap()
+            );
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get(pt, 0).unwrap());
         }
         check_dofs(e);
     }
@@ -732,12 +756,15 @@ mod test {
     fn test_lagrange_0_triangle() {
         let e = LagrangeElementTriangleDegree0 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = TabulatedData::new(&e, 0, 6);
-        let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5];
+        let mut data = e.create_tabulate_array(0, 6);
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            (6, 2),
+        );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
-            assert_relative_eq!(*data.get(0, pt, 0, 0), 1.0);
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), 1.0);
         }
         check_dofs(e);
     }
@@ -746,17 +773,20 @@ mod test {
     fn test_lagrange_1_triangle() {
         let e = LagrangeElementTriangleDegree1 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = TabulatedData::new(&e, 0, 6);
-        let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5];
+        let mut data = e.create_tabulate_array(0, 6);
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            (6, 2),
+        );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
             assert_relative_eq!(
-                *data.get(0, pt, 0, 0),
-                1.0 - points[2 * pt] - points[2 * pt + 1]
+                *data.get(0, pt, 0, 0).unwrap(),
+                1.0 - *points.get(pt, 0).unwrap() - *points.get(pt, 1).unwrap()
             );
-            assert_relative_eq!(*data.get(0, pt, 1, 0), points[2 * pt]);
-            assert_relative_eq!(*data.get(0, pt, 2, 0), points[2 * pt + 1]);
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get(pt, 0).unwrap());
+            assert_relative_eq!(*data.get(0, pt, 2, 0).unwrap(), *points.get(pt, 1).unwrap());
         }
         check_dofs(e);
     }
@@ -765,12 +795,15 @@ mod test {
     fn test_lagrange_0_quadrilateral() {
         let e = LagrangeElementQuadrilateralDegree0 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = TabulatedData::new(&e, 0, 6);
-        let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2];
+        let mut data = e.create_tabulate_array(0, 6);
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
-            assert_relative_eq!(*data.get(0, pt, 0, 0), 1.0);
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), 1.0);
         }
         check_dofs(e);
     }
@@ -779,24 +812,30 @@ mod test {
     fn test_lagrange_1_quadrilateral() {
         let e = LagrangeElementQuadrilateralDegree1 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = TabulatedData::new(&e, 0, 6);
-        let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2];
+        let mut data = e.create_tabulate_array(0, 6);
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
             assert_relative_eq!(
-                *data.get(0, pt, 0, 0),
-                (1.0 - points[2 * pt]) * (1.0 - points[2 * pt + 1])
+                *data.get(0, pt, 0, 0).unwrap(),
+                (1.0 - *points.get(pt, 0).unwrap()) * (1.0 - *points.get(pt, 1).unwrap())
             );
             assert_relative_eq!(
-                *data.get(0, pt, 1, 0),
-                points[2 * pt] * (1.0 - points[2 * pt + 1])
+                *data.get(0, pt, 1, 0).unwrap(),
+                *points.get(pt, 0).unwrap() * (1.0 - *points.get(pt, 1).unwrap())
             );
             assert_relative_eq!(
-                *data.get(0, pt, 2, 0),
-                (1.0 - points[2 * pt]) * points[2 * pt + 1]
+                *data.get(0, pt, 2, 0).unwrap(),
+                (1.0 - *points.get(pt, 0).unwrap()) * *points.get(pt, 1).unwrap()
             );
-            assert_relative_eq!(*data.get(0, pt, 3, 0), points[2 * pt] * points[2 * pt + 1]);
+            assert_relative_eq!(
+                *data.get(0, pt, 3, 0).unwrap(),
+                *points.get(pt, 0).unwrap() * *points.get(pt, 1).unwrap()
+            );
         }
         check_dofs(e);
     }

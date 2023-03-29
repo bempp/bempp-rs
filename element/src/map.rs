@@ -1,40 +1,40 @@
 //! Push forward and pull back maps
 
 use crate::cell::PhysicalCell;
-use crate::element::{FiniteElement, TabulatedData};
+use crate::element::FiniteElement;
+use bempp_tools::arrays::{Array2D, Array4D};
 pub use bempp_traits::element::MapType;
 
 pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    _points: &[f64],
+    data: &mut Array4D<f64>,
+    _points: &Array2D<f64>,
     _geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 }
 
 pub fn identity_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    _points: &[f64],
+    data: &mut Array4D<f64>,
+    _points: &Array2D<f64>,
     _geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 }
 
 pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    points: &[f64],
+    data: &mut Array4D<f64>,
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
-        let nbasis = data.basis_count();
+        let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = TabulatedData::new(geometry.coordinate_element(), 1, npts);
+        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
         geometry
             .coordinate_element()
             .tabulate(&points, 1, &mut derivs);
@@ -49,19 +49,21 @@ pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
+                j[0] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
             }
             let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
-                temp_data[0] = *data.get(0, p, i, 0);
-                temp_data[1] = *data.get(0, p, i, 1);
+                temp_data[0] = *data.get(0, p, i, 0).unwrap();
+                temp_data[1] = *data.get(0, p, i, 1).unwrap();
 
-                *data.get_mut(0, p, i, 0) = (j[0] * temp_data[0] + j[1] * temp_data[1]) / det_j;
-                *data.get_mut(0, p, i, 1) = (j[2] * temp_data[0] + j[3] * temp_data[1]) / det_j;
+                *data.get_mut(0, p, i, 0).unwrap() =
+                    (j[0] * temp_data[0] + j[1] * temp_data[1]) / det_j;
+                *data.get_mut(0, p, i, 1).unwrap() =
+                    (j[2] * temp_data[0] + j[3] * temp_data[1]) / det_j;
             }
         }
     } else {
@@ -70,20 +72,19 @@ pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
 }
 
 pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    points: &[f64],
+    data: &mut Array4D<f64>,
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
-        let nbasis = data.basis_count();
+        let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = TabulatedData::new(geometry.coordinate_element(), 1, npts);
+        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
         geometry
             .coordinate_element()
             .tabulate(&points, 1, &mut derivs);
@@ -98,18 +99,20 @@ pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
             jinv[2] = 0.0;
             jinv[3] = 0.0;
             for gp in 0..geometry_npts {
-                jinv[3] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
-                jinv[1] -= derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
-                jinv[2] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
-                jinv[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
+                jinv[3] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                jinv[1] -= derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                jinv[2] -= derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
+                jinv[0] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
             }
 
             for i in 0..nbasis {
-                temp_data[0] = *data.get(0, p, i, 0);
-                temp_data[1] = *data.get(0, p, i, 1);
+                temp_data[0] = *data.get(0, p, i, 0).unwrap();
+                temp_data[1] = *data.get(0, p, i, 1).unwrap();
 
-                *data.get_mut(0, p, i, 0) = jinv[0] * temp_data[0] + jinv[1] * temp_data[1];
-                *data.get_mut(0, p, i, 1) = jinv[2] * temp_data[0] + jinv[3] * temp_data[1];
+                *data.get_mut(0, p, i, 0).unwrap() =
+                    jinv[0] * temp_data[0] + jinv[1] * temp_data[1];
+                *data.get_mut(0, p, i, 1).unwrap() =
+                    jinv[2] * temp_data[0] + jinv[3] * temp_data[1];
             }
         }
     } else {
@@ -118,20 +121,19 @@ pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
 }
 
 pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    points: &[f64],
+    data: &mut Array4D<f64>,
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
-        let nbasis = data.basis_count();
+        let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = TabulatedData::new(geometry.coordinate_element(), 1, npts);
+        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
         geometry
             .coordinate_element()
             .tabulate(&points, 1, &mut derivs);
@@ -146,10 +148,10 @@ pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
             jinv_t[2] = 0.0;
             jinv_t[3] = 0.0;
             for gp in 0..geometry_npts {
-                jinv_t[3] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
-                jinv_t[2] -= derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
-                jinv_t[1] -= derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
-                jinv_t[0] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
+                jinv_t[3] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                jinv_t[2] -= derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                jinv_t[1] -= derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
+                jinv_t[0] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
             }
             let det_j = jinv_t[0] * jinv_t[3] - jinv_t[1] * jinv_t[2];
             jinv_t[0] /= det_j;
@@ -158,11 +160,13 @@ pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
             jinv_t[3] /= det_j;
 
             for i in 0..nbasis {
-                temp_data[0] = *data.get(0, p, i, 0);
-                temp_data[1] = *data.get(0, p, i, 1);
+                temp_data[0] = *data.get(0, p, i, 0).unwrap();
+                temp_data[1] = *data.get(0, p, i, 1).unwrap();
 
-                *data.get_mut(0, p, i, 0) = jinv_t[0] * temp_data[0] + jinv_t[1] * temp_data[1];
-                *data.get_mut(0, p, i, 1) = jinv_t[2] * temp_data[0] + jinv_t[3] * temp_data[1];
+                *data.get_mut(0, p, i, 0).unwrap() =
+                    jinv_t[0] * temp_data[0] + jinv_t[1] * temp_data[1];
+                *data.get_mut(0, p, i, 1).unwrap() =
+                    jinv_t[2] * temp_data[0] + jinv_t[3] * temp_data[1];
             }
         }
     } else {
@@ -171,20 +175,19 @@ pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
 }
 
 pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    points: &[f64],
+    data: &mut Array4D<f64>,
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
-        let nbasis = data.basis_count();
+        let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = TabulatedData::new(geometry.coordinate_element(), 1, npts);
+        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
         geometry
             .coordinate_element()
             .tabulate(&points, 1, &mut derivs);
@@ -199,18 +202,18 @@ pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
             j_t[2] = 0.0;
             j_t[3] = 0.0;
             for gp in 0..geometry_npts {
-                j_t[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
-                j_t[2] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
-                j_t[1] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
-                j_t[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
+                j_t[0] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j_t[2] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j_t[1] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
+                j_t[3] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
             }
 
             for i in 0..nbasis {
-                temp_data[0] = *data.get(0, p, i, 0);
-                temp_data[1] = *data.get(0, p, i, 1);
+                temp_data[0] = *data.get(0, p, i, 0).unwrap();
+                temp_data[1] = *data.get(0, p, i, 1).unwrap();
 
-                *data.get_mut(0, p, i, 0) = j_t[0] * temp_data[0] + j_t[1] * temp_data[1];
-                *data.get_mut(0, p, i, 1) = j_t[2] * temp_data[0] + j_t[3] * temp_data[1];
+                *data.get_mut(0, p, i, 0).unwrap() = j_t[0] * temp_data[0] + j_t[1] * temp_data[1];
+                *data.get_mut(0, p, i, 1).unwrap() = j_t[2] * temp_data[0] + j_t[3] * temp_data[1];
             }
         }
     } else {
@@ -219,20 +222,19 @@ pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
 }
 
 pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    points: &[f64],
+    data: &mut Array4D<f64>,
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
-        let nbasis = data.basis_count();
+        let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = TabulatedData::new(geometry.coordinate_element(), 1, npts);
+        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
         geometry
             .coordinate_element()
             .tabulate(&points, 1, &mut derivs);
@@ -245,15 +247,15 @@ pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
+                j[0] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
             }
             let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
-                *data.get_mut(0, p, i, 0) *= det_j;
+                *data.get_mut(0, p, i, 0).unwrap() *= det_j;
             }
         }
     } else {
@@ -262,20 +264,19 @@ pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
 }
 
 pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut TabulatedData,
-    points: &[f64],
+    data: &mut Array4D<f64>,
+    points: &Array2D<f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
-    assert_eq!(data.deriv_count(), 1);
+    assert_eq!(data.shape().0, 1);
 
     if geometry.tdim() == 2 && geometry.gdim() == 2 {
-        let gdim = geometry.gdim();
-        let npts = points.len() / gdim;
+        let npts = points.shape().0;
         let geometry_npts = geometry.npts();
-        let nbasis = data.basis_count();
+        let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = TabulatedData::new(geometry.coordinate_element(), 1, npts);
+        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
         geometry
             .coordinate_element()
             .tabulate(&points, 1, &mut derivs);
@@ -288,15 +289,15 @@ pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
             j[2] = 0.0;
             j[3] = 0.0;
             for gp in 0..geometry_npts {
-                j[0] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[0];
-                j[1] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[0];
-                j[2] += derivs.get(1, p, gp, 0) * geometry.vertex(gp)[1];
-                j[3] += derivs.get(2, p, gp, 0) * geometry.vertex(gp)[1];
+                j[0] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j[1] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[0];
+                j[2] += derivs.get(1, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
+                j[3] += derivs.get(2, p, gp, 0).unwrap() * geometry.vertex(gp)[1];
             }
             let det_j = j[0] * j[3] - j[1] * j[2];
 
             for i in 0..nbasis {
-                *data.get_mut(0, p, i, 0) /= det_j;
+                *data.get_mut(0, p, i, 0).unwrap() /= det_j;
             }
         }
     } else {
@@ -312,7 +313,7 @@ mod test {
     use approx::*;
 
     pub struct TestPhysicalCell<'a, F: FiniteElement> {
-        vertices: &'a [f64],
+        vertices: &'a Array2D<f64>,
         coordinate_element: &'a F,
         gdim: usize,
         tdim: usize,
@@ -322,12 +323,12 @@ mod test {
     impl<'a, F: FiniteElement> TestPhysicalCell<'a, F> {
         pub fn new(
             reference_cell: &'a impl ReferenceCell,
-            vertices: &'a [f64],
+            vertices: &'a Array2D<f64>,
             coordinate_element: &'a F,
             gdim: usize,
         ) -> Self {
             let tdim = reference_cell.dim();
-            let npts = vertices.len() / gdim;
+            let npts = vertices.shape().0;
             Self {
                 vertices,
                 coordinate_element,
@@ -352,141 +353,141 @@ mod test {
             self.npts
         }
         fn vertex(&self, vertex_number: usize) -> &'a [f64] {
-            &self.vertices[self.tdim * (vertex_number)..self.tdim * (vertex_number + 1)]
+            &self.vertices.row(vertex_number).unwrap()
         }
     }
 
     #[test]
     fn test_identity() {
         let e = LagrangeElementTriangleDegree1 {};
-        let mut data = TabulatedData::new(&e, 0, 1);
+        let mut data = e.create_tabulate_array(0, 1);
 
-        *data.get_mut(0, 0, 0, 0) = 0.5;
-        *data.get_mut(0, 0, 1, 0) = 0.4;
-        *data.get_mut(0, 0, 2, 0) = 0.3;
+        *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
+        *data.get_mut(0, 0, 1, 0).unwrap() = 0.4;
+        *data.get_mut(0, 0, 2, 0).unwrap() = 0.3;
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         identity_push_forward(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.5);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.4);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.3);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.5);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.4);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.3);
 
         identity_pull_back(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.5);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.4);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.3);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.5);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.4);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.3);
     }
 
     #[test]
     fn test_contravariant_piola() {
         let e = RaviartThomasElementTriangleDegree1 {};
-        let mut data = TabulatedData::new(&e, 0, 1);
+        let mut data = e.create_tabulate_array(0, 1);
 
-        *data.get_mut(0, 0, 0, 0) = 0.5;
-        *data.get_mut(0, 0, 0, 1) = 0.4;
-        *data.get_mut(0, 0, 1, 0) = 0.3;
-        *data.get_mut(0, 0, 1, 1) = 0.2;
-        *data.get_mut(0, 0, 2, 0) = 0.1;
-        *data.get_mut(0, 0, 2, 1) = 0.0;
+        *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
+        *data.get_mut(0, 0, 0, 1).unwrap() = 0.4;
+        *data.get_mut(0, 0, 1, 0).unwrap() = 0.3;
+        *data.get_mut(0, 0, 1, 1).unwrap() = 0.2;
+        *data.get_mut(0, 0, 2, 0).unwrap() = 0.1;
+        *data.get_mut(0, 0, 2, 1).unwrap() = 0.0;
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         contravariant_piola_push_forward(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.65);
-        assert_relative_eq!(*data.get(0, 0, 0, 1), -0.25);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.35);
-        assert_relative_eq!(*data.get(0, 0, 1, 1), -0.15);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.05);
-        assert_relative_eq!(*data.get(0, 0, 2, 1), -0.05);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.65);
+        assert_relative_eq!(*data.get(0, 0, 0, 1).unwrap(), -0.25);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.35);
+        assert_relative_eq!(*data.get(0, 0, 1, 1).unwrap(), -0.15);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.05);
+        assert_relative_eq!(*data.get(0, 0, 2, 1).unwrap(), -0.05);
 
         contravariant_piola_pull_back(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.5);
-        assert_relative_eq!(*data.get(0, 0, 0, 1), 0.4);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.3);
-        assert_relative_eq!(*data.get(0, 0, 1, 1), 0.2);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.1);
-        assert_relative_eq!(*data.get(0, 0, 2, 1), 0.0);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.5);
+        assert_relative_eq!(*data.get(0, 0, 0, 1).unwrap(), 0.4);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.3);
+        assert_relative_eq!(*data.get(0, 0, 1, 1).unwrap(), 0.2);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.1);
+        assert_relative_eq!(*data.get(0, 0, 2, 1).unwrap(), 0.0);
     }
 
     #[test]
     fn test_covariant_piola() {
         let e = RaviartThomasElementTriangleDegree1 {};
-        let mut data = TabulatedData::new(&e, 0, 1);
+        let mut data = e.create_tabulate_array(0, 1);
 
-        *data.get_mut(0, 0, 0, 0) = 0.5;
-        *data.get_mut(0, 0, 0, 1) = 0.4;
-        *data.get_mut(0, 0, 1, 0) = 0.3;
-        *data.get_mut(0, 0, 1, 1) = 0.2;
-        *data.get_mut(0, 0, 2, 0) = 0.1;
-        *data.get_mut(0, 0, 2, 1) = 0.0;
+        *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
+        *data.get_mut(0, 0, 0, 1).unwrap() = 0.4;
+        *data.get_mut(0, 0, 1, 0).unwrap() = 0.3;
+        *data.get_mut(0, 0, 1, 1).unwrap() = 0.2;
+        *data.get_mut(0, 0, 2, 0).unwrap() = 0.1;
+        *data.get_mut(0, 0, 2, 1).unwrap() = 0.0;
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         covariant_piola_push_forward(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.2);
-        assert_relative_eq!(*data.get(0, 0, 0, 1), -0.3);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.1);
-        assert_relative_eq!(*data.get(0, 0, 1, 1), -0.2);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.0);
-        assert_relative_eq!(*data.get(0, 0, 2, 1), -0.1);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.2);
+        assert_relative_eq!(*data.get(0, 0, 0, 1).unwrap(), -0.3);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.1);
+        assert_relative_eq!(*data.get(0, 0, 1, 1).unwrap(), -0.2);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.0);
+        assert_relative_eq!(*data.get(0, 0, 2, 1).unwrap(), -0.1);
 
         covariant_piola_pull_back(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.5);
-        assert_relative_eq!(*data.get(0, 0, 0, 1), 0.4);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.3);
-        assert_relative_eq!(*data.get(0, 0, 1, 1), 0.2);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.1);
-        assert_relative_eq!(*data.get(0, 0, 2, 1), 0.0);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.5);
+        assert_relative_eq!(*data.get(0, 0, 0, 1).unwrap(), 0.4);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.3);
+        assert_relative_eq!(*data.get(0, 0, 1, 1).unwrap(), 0.2);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.1);
+        assert_relative_eq!(*data.get(0, 0, 2, 1).unwrap(), 0.0);
     }
 
     #[test]
     fn test_l2_piola() {
         let e = LagrangeElementTriangleDegree1 {};
-        let mut data = TabulatedData::new(&e, 0, 1);
+        let mut data = e.create_tabulate_array(0, 1);
 
-        *data.get_mut(0, 0, 0, 0) = 0.5;
-        *data.get_mut(0, 0, 1, 0) = 0.4;
-        *data.get_mut(0, 0, 2, 0) = 0.3;
+        *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
+        *data.get_mut(0, 0, 1, 0).unwrap() = 0.4;
+        *data.get_mut(0, 0, 2, 0).unwrap() = 0.3;
 
         let coord_e = LagrangeElementTriangleDegree1 {};
         let ref_cell = Triangle {};
-        let vertices = vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0];
+        let vertices = Array2D::from_data(vec![0.0, 1.0, 1.0, 0.0, 2.0, 1.0], (3, 2));
         let geometry = TestPhysicalCell::new(&ref_cell, &vertices, &coord_e, 2);
 
-        let pts = vec![0.3, 0.3];
+        let pts = Array2D::from_data(vec![0.3, 0.3], (1, 2));
 
         l2_piola_push_forward(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 1.0);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.8);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.6);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 1.0);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.8);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.6);
 
         l2_piola_pull_back(&mut data, &pts, &geometry);
 
-        assert_relative_eq!(*data.get(0, 0, 0, 0), 0.5);
-        assert_relative_eq!(*data.get(0, 0, 1, 0), 0.4);
-        assert_relative_eq!(*data.get(0, 0, 2, 0), 0.3);
+        assert_relative_eq!(*data.get(0, 0, 0, 0).unwrap(), 0.5);
+        assert_relative_eq!(*data.get(0, 0, 1, 0).unwrap(), 0.4);
+        assert_relative_eq!(*data.get(0, 0, 2, 0).unwrap(), 0.3);
     }
 }
