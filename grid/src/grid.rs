@@ -404,6 +404,7 @@ pub struct SerialTopology {
     index_map: Vec<usize>,
     starts: Vec<usize>,
     cell_types: Vec<ReferenceCellType>,
+    adjacent_cells: Vec<RefCell<Vec<(usize, usize)>>>,
 }
 
 fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
@@ -456,12 +457,45 @@ impl SerialTopology {
             }
         }
 
+        let mut adjacent_cells = vec![];
+        for _ in cells.iter_rows() {
+            adjacent_cells.push(RefCell::new(vec![]));
+        }
+
         Self {
-            dim: dim,
-            connectivity: connectivity,
-            index_map: index_map,
-            starts: starts,
+            dim,
+            connectivity,
+            index_map,
+            starts,
             cell_types: cell_types_new,
+            adjacent_cells,
+        }
+    }
+
+    fn compute_adjacent_cells(&self) {
+        // TODO: this could be done quicker using multiplication of sparse matrices
+        let tdim = self.dim();
+        self.create_connectivity(tdim, 0);
+        self.create_connectivity(0, tdim);
+        for (n, vertices) in self.connectivity(tdim, 0).iter_rows().enumerate() {
+            let mut adj: Vec<(usize, usize)> = vec![];
+            for v in vertices {
+                for c in self.connectivity(0, tdim).row(*v).unwrap() {
+                    println!("{} {} {}", n, v, c);
+                    let mut found = false;
+                    for (i, a) in adj.iter().enumerate() {
+                        if a.0 == *c {
+                            adj[i] = (*c, a.1 + 1);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        adj.push((*c, 1));
+                    }
+                }
+            }
+            *self.adjacent_cells[n].borrow_mut() = adj;
         }
     }
 }
@@ -646,6 +680,13 @@ impl Topology for SerialTopology {
     fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
         Ownership::Owned
     }
+
+    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>> {
+        if self.adjacent_cells[0].borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.adjacent_cells[cell].borrow()
+    }
 }
 
 /// Serial grid
@@ -685,6 +726,52 @@ mod test {
     use crate::grid::*;
     use approx::*;
 
+    #[test]
+    fn test_adjacent_cells() {
+        let g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 0.0, 2.0, 1.0, 2.0,
+                    2.0, 2.0,
+                ],
+                (9, 2),
+            ),
+            AdjacencyList::from_data(
+                vec![
+                    0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 3, 4, 7, 3, 7, 6, 4, 5, 8, 4, 8, 7,
+                ],
+                vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
+            ),
+            vec![ReferenceCellType::Triangle; 8],
+        );
+        for i in g.topology().adjacent_cells(0).iter() {
+            println!("{} {}", i.0, i.1);
+        }
+        assert_eq!(g.topology().adjacent_cells(0).len(), 7);
+        for i in g.topology().adjacent_cells(0).iter() {
+            if i.0 == 0 {
+                assert_eq!(i.1, 3);
+            } else if i.0 == 1 || i.0 == 3 {
+                assert_eq!(i.1, 2);
+            } else if i.0 == 2 || i.0 == 4 || i.0 == 6 || i.0 == 7 {
+                assert_eq!(i.1, 1);
+            } else {
+                panic!("Cell is not adjacent.");
+            }
+        }
+        assert_eq!(g.topology().adjacent_cells(2).len(), 4);
+        for i in g.topology().adjacent_cells(2).iter() {
+            if i.0 == 2 {
+                assert_eq!(i.1, 3);
+            } else if i.0 == 3 {
+                assert_eq!(i.1, 2);
+            } else if i.0 == 0 || i.0 == 6 {
+                assert_eq!(i.1, 1);
+            } else {
+                panic!("Cell is not adjacent.");
+            }
+        }
+    }
     #[test]
     fn test_connectivity() {
         let g = SerialGrid::new(
