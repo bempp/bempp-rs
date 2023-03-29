@@ -129,10 +129,11 @@ impl Geometry for SerialGeometry {
         cell: usize,
         reference_points: &mut Array2D<f64>,
     ) {
+        let gdim = self.dim();
         if points.shape().0 != reference_points.shape().0 {
             panic!("reference_points has wrong number of rows.");
         }
-        if self.dim() != reference_points.shape().1 {
+        if gdim != reference_points.shape().1 {
             panic!("reference_points has wrong number of columns.");
         }
         let element = self.element(cell);
@@ -148,7 +149,7 @@ impl Geometry for SerialGeometry {
         for i in 0..data.shape().2 {
             let pt = unsafe { self.coordinates.row_unchecked(i) };
             for p in 0..points.shape().0 {
-                for j in 0..self.dim() {
+                for j in 0..gdim {
                     unsafe {
                         *reference_points.get_unchecked_mut(p, j) +=
                             pt[j] * data.get_unchecked(0, p, i, 0);
@@ -157,13 +158,44 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {}
+    fn compute_jacobian(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
+        let gdim = self.dim();
+        if points.shape().0 != jacobians.shape().0 {
+            panic!("jacobians has wrong number of rows.");
+        }
+        if gdim * points.shape().1 != jacobians.shape().1 {
+            panic!("jacobians has wrong number of columns.");
+        }
+        let element = self.element(cell);
+        let mut data = element.create_tabulate_array(1, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        element.tabulate(points, 1, &mut data);
+        for p in 0..points.shape().0 {
+            for i in 0..jacobians.shape().1 {
+                unsafe {
+                    *jacobians.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        for i in 0..data.shape().2 {
+            let pt = unsafe { self.coordinates.row_unchecked(i) };
+            for p in 0..points.shape().0 {
+                for j in 0..gdim {
+                    for k in 0..data.shape().0 - 1 {
+                        unsafe {
+                            *jacobians.get_unchecked_mut(p, k * gdim + j) +=
+                                pt[j] * data.get_unchecked(k + 1, p, i, 0);
+                        }
+                    }
+                }
+            }
+        }
+    }
     fn compute_jacobian_det(&self, points: &Array2D<f64>, cell: usize, jacobian_dets: &mut [f64]) {}
     fn compute_jacobian_inverse(
         &self,
         points: &Array2D<f64>,
         cell: usize,
-        jacobians: &mut Array2D<f64>,
+        jacobian_inverses: &mut Array2D<f64>,
     ) {
     }
 }
@@ -701,6 +733,8 @@ mod test {
         assert_eq!(g.geometry().dim(), 3);
 
         let points = Array2D::from_data(vec![0.2, 0.0, 0.5, 0.5, 1.0 / 3.0, 1.0 / 3.0], (3, 2));
+
+        // Test compute_points
         let mut physical_points = Array2D::new((3, 3));
         g.geometry()
             .compute_points(&points, 0, &mut physical_points);
@@ -713,5 +747,17 @@ mod test {
         assert_relative_eq!(*physical_points.get(2, 0).unwrap(), 11.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 1).unwrap(), 7.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0 / 3.0);
+
+        // Test compute_jacobian
+        let mut jacobians = Array2D::new((3, 6));
+        g.geometry().compute_jacobian(&points, 0, &mut jacobians);
+        for i in 0..3 {
+            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 3.0);
+            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 1.0);
+            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0);
+        }
     }
 }

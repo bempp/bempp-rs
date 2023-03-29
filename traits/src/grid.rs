@@ -59,7 +59,7 @@ pub trait Geometry {
         &self,
         points: &Array2D<f64>,
         cell: usize,
-        jacobians: &mut Array2D<f64>,
+        jacobian_inverses: &mut Array2D<f64>,
     );
 }
 
