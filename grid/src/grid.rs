@@ -3,7 +3,7 @@ use bempp_element::cell;
 use bempp_element::element;
 use bempp_tools::arrays::{AdjacencyList, Array2D};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::element::{FiniteElement, ElementFamily};
+use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use std::cell::{Ref, RefCell};
@@ -284,9 +284,112 @@ impl Geometry for SerialGeometry {
             panic!("jacobian_inverses has wrong number of columns.");
         }
         let element = self.element(cell);
-        if element.cell_type() == ReferenceCellType::Triangle && element.family() == ElementFamily::Lagrange && element.degree() == 1 {
+        if element.cell_type() == ReferenceCellType::Triangle
+            && element.family() == ElementFamily::Lagrange
+            && element.degree() == 1
+        {
             // Map is affine
-            
+            let mut js = Array2D::<f64>::new((points.shape().0, gdim * tdim)); // TODO: Memory is assigned here. Can we avoid this?
+            self.compute_jacobians(points, cell, &mut js);
+
+            // TODO: is it faster if we move this for inside the if statement?
+            for p in 0..points.shape().0 {
+                if tdim == 1 {
+                    if gdim == 1 {
+                        unsafe {
+                            *jacobian_inverses.get_unchecked_mut(p, 0) =
+                                1.0 / *js.get_unchecked(p, 0);
+                        }
+                    } else if gdim == 2 {
+                        unimplemented!("Inverse jacobian for this dimension not implemented yet.");
+                    } else if gdim == 3 {
+                        unimplemented!("Inverse jacobian for this dimension not implemented yet.");
+                    } else {
+                        panic!("Unsupported dimensions.");
+                    }
+                } else if tdim == 2 {
+                    if gdim == 2 {
+                        let det = unsafe {
+                            *js.get_unchecked(p, 0) * *js.get_unchecked(p, 3)
+                                - *js.get_unchecked(p, 1) * *js.get_unchecked(p, 2)
+                        };
+                        unsafe {
+                            *jacobian_inverses.get_unchecked_mut(p, 0) =
+                                js.get_unchecked(p, 3) / det;
+                            *jacobian_inverses.get_unchecked_mut(p, 1) =
+                                -js.get_unchecked(p, 1) / det;
+                            *jacobian_inverses.get_unchecked_mut(p, 2) =
+                                -js.get_unchecked(p, 2) / det;
+                            *jacobian_inverses.get_unchecked_mut(p, 3) =
+                                js.get_unchecked(p, 0) / det;
+                        }
+                    } else if gdim == 3 {
+                        let c = unsafe {
+                            (*js.get_unchecked(p, 3) * *js.get_unchecked(p, 4)
+                                - *js.get_unchecked(p, 2) * *js.get_unchecked(p, 5))
+                            .powi(2)
+                                + (*js.get_unchecked(p, 5) * *js.get_unchecked(p, 0)
+                                    - *js.get_unchecked(p, 4) * *js.get_unchecked(p, 1))
+                                .powi(2)
+                                + (*js.get_unchecked(p, 1) * *js.get_unchecked(p, 2)
+                                    - *js.get_unchecked(p, 0) * *js.get_unchecked(p, 3))
+                                .powi(2)
+                        };
+                        unsafe {
+                            *jacobian_inverses.get_unchecked_mut(p, 0) = (*js.get_unchecked(p, 0)
+                                * ((*js.get_unchecked(p, 5)).powi(2)
+                                    + (*js.get_unchecked(p, 3)).powi(2))
+                                - *js.get_unchecked(p, 1)
+                                    * (*js.get_unchecked(p, 2) * *js.get_unchecked(p, 3)
+                                        + *js.get_unchecked(p, 4) * *js.get_unchecked(p, 5)))
+                                / c;
+                            *jacobian_inverses.get_unchecked_mut(p, 1) = (*js.get_unchecked(p, 2)
+                                * ((*js.get_unchecked(p, 1)).powi(2)
+                                    + (*js.get_unchecked(p, 5)).powi(2))
+                                - *js.get_unchecked(p, 3)
+                                    * (*js.get_unchecked(p, 4) * *js.get_unchecked(p, 5)
+                                        + *js.get_unchecked(p, 0) * *js.get_unchecked(p, 1)))
+                                / c;
+                            *jacobian_inverses.get_unchecked_mut(p, 2) = (*js.get_unchecked(p, 4)
+                                * ((*js.get_unchecked(p, 3)).powi(2)
+                                    + (*js.get_unchecked(p, 1)).powi(2))
+                                - *js.get_unchecked(p, 5)
+                                    * (*js.get_unchecked(p, 0) * *js.get_unchecked(p, 1)
+                                        + *js.get_unchecked(p, 2) * *js.get_unchecked(p, 3)))
+                                / c;
+                            *jacobian_inverses.get_unchecked_mut(p, 3) = (*js.get_unchecked(p, 1)
+                                * ((*js.get_unchecked(p, 4)).powi(2)
+                                    + (*js.get_unchecked(p, 2)).powi(2))
+                                - *js.get_unchecked(p, 0)
+                                    * (*js.get_unchecked(p, 2) * *js.get_unchecked(p, 3)
+                                        + *js.get_unchecked(p, 4) * *js.get_unchecked(p, 5)))
+                                / c;
+                            *jacobian_inverses.get_unchecked_mut(p, 4) = (*js.get_unchecked(p, 3)
+                                * ((*js.get_unchecked(p, 0)).powi(2)
+                                    + (*js.get_unchecked(p, 4)).powi(2))
+                                - *js.get_unchecked(p, 2)
+                                    * (*js.get_unchecked(p, 4) * *js.get_unchecked(p, 5)
+                                        + *js.get_unchecked(p, 0) * *js.get_unchecked(p, 1)))
+                                / c;
+                            *jacobian_inverses.get_unchecked_mut(p, 5) = (*js.get_unchecked(p, 5)
+                                * ((*js.get_unchecked(p, 2)).powi(2)
+                                    + (*js.get_unchecked(p, 0)).powi(2))
+                                - *js.get_unchecked(p, 4)
+                                    * (*js.get_unchecked(p, 0) * *js.get_unchecked(p, 1)
+                                        + *js.get_unchecked(p, 2) * *js.get_unchecked(p, 3)))
+                                / c;
+                        }
+                    } else {
+                        panic!("Unsupported dimensions.");
+                    }
+                } else if tdim == 3 {
+                    if gdim == 3 {
+                        unimplemented!("Inverse jacobian for this dimension not implemented yet.");
+                    } else {
+                        panic!("Unsupported dimensions.");
+                    }
+                }
+            }
         } else {
             // The map is not affine, an iterative method will be needed here to approximate the inverse map.
             unimplemented!("Inverse jacobians for this cell not yet implemented.");
@@ -842,7 +945,7 @@ mod test {
         assert_relative_eq!(*physical_points.get(2, 1).unwrap(), 7.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0 / 3.0);
 
-        // Test compute_jacobian
+        // Test compute_jacobians
         let mut jacobians = Array2D::new((3, 6));
         g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
@@ -860,6 +963,19 @@ mod test {
             .compute_jacobian_determinants(&points, 0, &mut dets);
         for i in 0..3 {
             assert_relative_eq!(dets[i], 2.0 * 2.0_f64.sqrt());
+        }
+
+        // Test compute_jacobian_inverses
+        let mut jinvs = Array2D::new((3, 6));
+        g.geometry()
+            .compute_jacobian_inverses(&points, 0, &mut jinvs);
+        for i in 0..3 {
+            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), 0.5);
+            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), -0.75);
+            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), -0.75);
+            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0);
+            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), 0.5);
+            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.5);
         }
     }
 }
