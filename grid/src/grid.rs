@@ -7,7 +7,6 @@ use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use std::cell::{Ref, RefCell};
-use bempp_traits::element::TabulatedData;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
