@@ -2,7 +2,6 @@
 
 pub use bempp_traits::element::ElementFamily;
 pub use bempp_traits::element::FiniteElement;
-pub use bempp_traits::element::TabulatedData;
 pub mod lagrange;
 pub use lagrange::*;
 pub mod raviart_thomas;
