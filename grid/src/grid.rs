@@ -247,7 +247,17 @@ impl Geometry for SerialGeometry {
                     }
                 },
                 3 => match gdim {
-                    3 => unsafe { *js.get_unchecked(p, 0) },
+                    3 => unsafe {
+                        *js.get_unchecked(p, 0)
+                            * (*js.get_unchecked(p, 4) * *js.get_unchecked(p, 8)
+                                - *js.get_unchecked(p, 5) * *js.get_unchecked(p, 7))
+                            - *js.get_unchecked(p, 1)
+                                * (*js.get_unchecked(p, 3) * *js.get_unchecked(p, 8)
+                                    - *js.get_unchecked(p, 5) * *js.get_unchecked(p, 6))
+                            + *js.get_unchecked(p, 2)
+                                * (*js.get_unchecked(p, 3) * *js.get_unchecked(p, 7)
+                                    - *js.get_unchecked(p, 4) * *js.get_unchecked(p, 6))
+                    },
                     _ => {
                         panic!("Unsupported dimensions.");
                     }
