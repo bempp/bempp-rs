@@ -6,7 +6,7 @@ use bempp_quadrature::types::CellToCellConnectivity;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::DofMap;
 use bempp_traits::element::FiniteElement;
-use bempp_traits::grid::{Geometry, Grid};
+use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn laplace_green(x1: f64, x2: f64, x3: f64, y1: f64, y2: f64, y3: f64) -> f64 {
     let inv_dist =
@@ -88,17 +88,19 @@ fn main() {
                 *matrix.get_mut(*test_dof, *trial_dof).unwrap() = sum;
             }
         }
-        //for cell1 in grid.topology().adjacent_cells(cell0).iter() {
-        //println!(
-        //    "OFF DIAGONAL: {} {} (connected by {} vertex/vertices)",
-        //    cell0, cell1.0, cell1.1
-        //);
-        //println!(
-        //    "  {:?} and {:?}",
-        //    dofmap.cell_dofs(cell0).unwrap(),
-        //    dofmap.cell_dofs(cell1.0).unwrap()
-        //);
-        //}
+        for cell1 in grid.topology().adjacent_cells(cell0).iter() {
+            if cell1.1 == 2 {
+                let test_edges = grid.topology().connectivity(2, 1).row(cell0).unwrap();
+                let trial_edges = grid.topology().connectivity(2, 1).row(cell1.0).unwrap();
+                
+                println!(
+                    "OFF DIAGONAL: {} {} (connected by {} vertex/vertices)",
+                    cell0, cell1.0, cell1.1
+                );
+                println!("{:?} {:?}", grid.geometry().cell_vertices(cell0).unwrap(), grid.geometry().cell_vertices(cell1.0).unwrap());
+                println!("{:?} {:?}", grid.topology().connectivity(2, 1).row(cell0).unwrap(), grid.topology().connectivity(2, 1).row(cell1.0).unwrap());
+            }
+        }
     }
     println!("Laplace single layer matrix");
     for i in 0..dofmap.global_size() {
