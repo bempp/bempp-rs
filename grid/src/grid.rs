@@ -158,7 +158,7 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
+    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
         let gdim = self.dim();
         if points.shape().0 != jacobians.shape().0 {
             panic!("jacobians has wrong number of rows.");
@@ -190,13 +190,20 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian_det(&self, points: &Array2D<f64>, cell: usize, jacobian_dets: &mut [f64]) {}
-    fn compute_jacobian_inverse(
+    fn compute_jacobian_determinants(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_determinants: &mut [f64],
+    ) {
+    }
+    fn compute_jacobian_inverses(
         &self,
         points: &Array2D<f64>,
         cell: usize,
         jacobian_inverses: &mut Array2D<f64>,
     ) {
+        unimplemented!();
     }
 }
 
@@ -750,7 +757,7 @@ mod test {
 
         // Test compute_jacobian
         let mut jacobians = Array2D::new((3, 6));
-        g.geometry().compute_jacobian(&points, 0, &mut jacobians);
+        g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
             assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0);
             assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0);
