@@ -5,6 +5,7 @@ use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::types::CellToCellConnectivity;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::DofMap;
+use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid};
 
 fn laplace_green(x1: f64, x2: f64, x3: f64, y1: f64, y2: f64, y3: f64) -> f64 {
@@ -37,6 +38,11 @@ fn main() {
         same_triangle_rule.trial_points,
         (same_triangle_rule.npoints, 2),
     );
+    let mut test_table = element.create_tabulate_array(0, same_triangle_rule.npoints);
+    let mut trial_table = element.create_tabulate_array(0, same_triangle_rule.npoints);
+
+    element.tabulate(&test_points, 0, &mut test_table);
+    element.tabulate(&trial_points, 0, &mut trial_table);
 
     // Assign working memory
     let mut pts = Array2D::<f64>::new((2, 2));
@@ -52,30 +58,36 @@ fn main() {
         grid.geometry()
             .compute_jacobian_determinants(&trial_points, cell0, &mut trial_jdet);
 
-        let mut sum = 0.0;
+        for (test_i, test_dof) in dofmap.cell_dofs(cell0).unwrap().iter().enumerate() {
+            for (trial_i, trial_dof) in dofmap.cell_dofs(cell0).unwrap().iter().enumerate() {
+                let mut sum = 0.0;
 
-        for index in 0..same_triangle_rule.npoints {
-            unsafe {
-                *pts.get_unchecked_mut(0, 0) = *test_points.get_unchecked(index, 0);
-                *pts.get_unchecked_mut(0, 1) = *test_points.get_unchecked(index, 1);
-                *pts.get_unchecked_mut(1, 0) = *trial_points.get_unchecked(index, 0);
-                *pts.get_unchecked_mut(1, 1) = *trial_points.get_unchecked(index, 1);
+                for index in 0..same_triangle_rule.npoints {
+                    unsafe {
+                        *pts.get_unchecked_mut(0, 0) = *test_points.get_unchecked(index, 0);
+                        *pts.get_unchecked_mut(0, 1) = *test_points.get_unchecked(index, 1);
+                        *pts.get_unchecked_mut(1, 0) = *trial_points.get_unchecked(index, 0);
+                        *pts.get_unchecked_mut(1, 1) = *trial_points.get_unchecked(index, 1);
+                    }
+                    grid.geometry().compute_points(&pts, cell0, &mut mapped_pts);
+                    let weight = same_triangle_rule.weights[index];
+
+                    sum += laplace_green(
+                        unsafe { *mapped_pts.get_unchecked(0, 0) },
+                        unsafe { *mapped_pts.get_unchecked(0, 1) },
+                        unsafe { *mapped_pts.get_unchecked(0, 2) },
+                        unsafe { *mapped_pts.get_unchecked(1, 0) },
+                        unsafe { *mapped_pts.get_unchecked(1, 1) },
+                        unsafe { *mapped_pts.get_unchecked(1, 2) },
+                    ) * weight
+                        * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
+                        * test_jdet[index]
+                        * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
+                        * trial_jdet[index];
+                }
+                *matrix.get_mut(*test_dof, *trial_dof).unwrap() = sum;
             }
-            grid.geometry().compute_points(&pts, cell0, &mut mapped_pts);
-            let weight = same_triangle_rule.weights[index];
-
-            sum += laplace_green(
-                unsafe { *mapped_pts.get_unchecked(0, 0) },
-                unsafe { *mapped_pts.get_unchecked(0, 1) },
-                unsafe { *mapped_pts.get_unchecked(0, 2) },
-                unsafe { *mapped_pts.get_unchecked(1, 0) },
-                unsafe { *mapped_pts.get_unchecked(1, 1) },
-                unsafe { *mapped_pts.get_unchecked(1, 2) },
-            ) * weight
-                * test_jdet[index]
-                * trial_jdet[index];
         }
-        *matrix.get_mut(cell0, cell0).unwrap() = sum;
         //for cell1 in grid.topology().adjacent_cells(cell0).iter() {
         //println!(
         //    "OFF DIAGONAL: {} {} (connected by {} vertex/vertices)",
