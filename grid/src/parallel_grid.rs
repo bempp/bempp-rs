@@ -61,6 +61,37 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
     fn index_map(&self) -> &[usize] {
         self.serial_geometry.index_map()
     }
+    fn compute_points(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        reference_points: &mut Array2D<f64>,
+    ) {
+        self.serial_geometry
+            .compute_points(points, cell, reference_points)
+    }
+    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
+        self.serial_geometry
+            .compute_jacobians(points, cell, jacobians)
+    }
+    fn compute_jacobian_determinants(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_determinants: &mut [f64],
+    ) {
+        self.serial_geometry
+            .compute_jacobian_determinants(points, cell, jacobian_determinants)
+    }
+    fn compute_jacobian_inverses(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_inverses: &mut Array2D<f64>,
+    ) {
+        self.serial_geometry
+            .compute_jacobian_inverses(points, cell, jacobian_inverses)
+    }
 }
 
 /// Topology of a parallel grid
