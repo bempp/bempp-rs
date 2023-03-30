@@ -5,7 +5,7 @@ use crate::tree::{AttachedDataTree, Tree};
 pub trait SourceTranslation {
     fn p2m(&self);
 
-    fn m2m(&self);
+    fn m2m(&self, level: u64);
 }
 
 pub trait TargetTranslation {
@@ -87,4 +87,13 @@ pub trait Fmm {
     fn kernel(&self) -> &Self::Kernel;
 
     fn tree(&self) -> &Self::Tree;
+}
+
+pub trait FmmAlgorithm {
+
+    fn upward_pass(&self);
+
+    // fn downward_pass(&self);
+
+    fn run(&self);
 }

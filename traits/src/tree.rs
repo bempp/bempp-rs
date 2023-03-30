@@ -37,7 +37,6 @@ pub trait Tree {
 
     fn new<'a>(
         points: Self::PointSlice<'a>,
-        point_data: Self::PointDataSlice<'a>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,

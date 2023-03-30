@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    vec,
+    vec, hash::Hash,
 };
 
 use bempp_traits::tree::{FmmInteractionLists, Tree};
@@ -21,16 +21,14 @@ impl SingleNodeTree {
     /// Constructor for uniform trees
     pub fn uniform_tree(
         points: &[[PointType; 3]],
-        point_data: &[Vec<PointType>],
         &domain: &Domain,
         depth: u64,
     ) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
         let mut points: Points = points
             .iter()
-            .zip(point_data)
             .enumerate()
-            .map(|(i, (&p, d))| {
+            .map(|(i, &p)|{
                 let base_key = MortonKey::from_point(&p, &domain, DEEPEST_LEVEL);
                 let encoded_key = MortonKey::from_point(&p, &domain, depth);
                 Point {
@@ -38,7 +36,6 @@ impl SingleNodeTree {
                     base_key,
                     encoded_key,
                     global_idx: i,
-                    data: d.clone(),
                 }
             })
             .collect();
@@ -107,23 +104,20 @@ impl SingleNodeTree {
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup of nodes
-        keys.sort();
-        let levels_to_keys = keys
-            .iter()
-            .enumerate()
-            .fold(
-                (HashMap::new(), 0, keys[0].clone()),
-                |(mut levels_to_keys, curr_idx, curr), (i, key)| {
-                    if key.level() != curr.level() {
-                        levels_to_keys.insert(key.level(), (curr_idx, i));
+        keys.sort_by(|a, b| a.level().cmp(&b.level()));
 
-                        (levels_to_keys, i, key.clone())
-                    } else {
-                        (levels_to_keys, curr_idx, curr)
-                    }
-                },
-            )
-            .0;
+        let mut levels_to_keys = HashMap::new();
+        let mut curr = keys[0];
+        let mut curr_idx = 0;
+        for (i, key ) in keys.iter().enumerate() {
+
+            if key.level() != curr.level() {
+                levels_to_keys.insert(curr.level(), (curr_idx, i));
+                curr_idx = i;
+                curr = key.clone();
+            }
+        }
+        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
         SingleNodeTree {
             depth,
@@ -141,23 +135,20 @@ impl SingleNodeTree {
     /// Constructor for adaptive trees
     pub fn adaptive_tree(
         points: &[[PointType; 3]],
-        point_data: &[Vec<PointType>],
         &domain: &Domain,
         n_crit: u64,
     ) -> SingleNodeTree {
         // Encode points at deepest level
         let mut points: Points = points
             .iter()
-            .zip(point_data.iter())
             .enumerate()
-            .map(|(i, (&p, d))| {
+            .map(|(i, &p)| {
                 let key = MortonKey::from_point(&p, &domain, DEEPEST_LEVEL);
                 Point {
                     coordinate: p,
                     base_key: key,
                     encoded_key: key,
-                    global_idx: i,
-                    data: d.clone(),
+                    global_idx: i
                 }
             })
             .collect();
@@ -239,23 +230,20 @@ impl SingleNodeTree {
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup of nodes
-        keys.sort();
-        let levels_to_keys = keys
-            .iter()
-            .enumerate()
-            .fold(
-                (HashMap::new(), 0, keys[0].clone()),
-                |(mut levels_to_keys, curr_idx, curr), (i, key)| {
-                    if key.level() != curr.level() {
-                        levels_to_keys.insert(key.level(), (curr_idx, i));
+        keys.sort_by(|a, b| a.level().cmp(&b.level()));
 
-                        (levels_to_keys, i, key.clone())
-                    } else {
-                        (levels_to_keys, curr_idx, curr)
-                    }
-                },
-            )
-            .0;
+        let mut levels_to_keys = HashMap::new();
+        let mut curr = keys[0];
+        let mut curr_idx = 0;
+        for (i, key ) in keys.iter().enumerate() {
+
+            if key.level() != curr.level() {
+                levels_to_keys.insert(curr.level(), (curr_idx, i));
+                curr_idx = i;
+                curr = key.clone();
+            }
+        }
+        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
         SingleNodeTree {
             depth,
@@ -446,7 +434,6 @@ impl Tree for SingleNodeTree {
     /// user defined maximum leaf maximum occupancy n_crit.
     fn new<'a>(
         points: Self::PointSlice<'a>,
-        point_data: Self::PointDataSlice<'a>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
@@ -460,9 +447,9 @@ impl Tree for SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
         if adaptive {
-            SingleNodeTree::adaptive_tree(&points[..], point_data, &domain, n_crit)
+            SingleNodeTree::adaptive_tree(&points[..], &domain, n_crit)
         } else {
-            SingleNodeTree::uniform_tree(&points[..], point_data, &domain, depth)
+            SingleNodeTree::uniform_tree(&points[..], &domain, depth)
         }
     }
 
@@ -649,7 +636,6 @@ mod test {
                 global_idx: i,
                 base_key: MortonKey::default(),
                 encoded_key: MortonKey::default(),
-                data: Vec::new(),
             })
             .collect_vec();
         points
@@ -659,10 +645,9 @@ mod test {
     pub fn test_uniform_tree() {
         let npoints = 10000;
         let points = points_fixture(npoints);
-        let point_data = vec![vec![1.]; npoints as usize];
         let depth = 3;
         let n_crit = 150;
-        let tree = SingleNodeTree::new(&points, &point_data, false, Some(n_crit), Some(depth));
+        let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree.get_leaves().iter().map(|node| node.level()).collect();
@@ -677,11 +662,10 @@ mod test {
     pub fn test_adaptive_tree() {
         let npoints = 10000;
         let points = points_fixture(npoints);
-        let point_data = vec![vec![1.]; npoints as usize];
 
         let adaptive = true;
         let n_crit = 150;
-        let tree = SingleNodeTree::new(&points, &point_data, adaptive, Some(n_crit), None);
+        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
 
         // Test that tree is not uniform
         let levels: Vec<u64> = tree.get_leaves().iter().map(|node| node.level()).collect();
@@ -717,9 +701,8 @@ mod test {
     pub fn test_no_overlaps() {
         let npoints = 10000;
         let points = points_fixture(npoints);
-        let point_data = vec![vec![1.]; npoints as usize];
-        let uniform = SingleNodeTree::new(&points, &point_data, false, Some(150), Some(4));
-        let adaptive = SingleNodeTree::new(&points, &point_data, true, Some(150), None);
+        let uniform = SingleNodeTree::new(&points, false, Some(150), Some(4));
+        let adaptive = SingleNodeTree::new(&points, true, Some(150), None);
         test_no_overlaps_helper(uniform.get_leaves());
         test_no_overlaps_helper(adaptive.get_leaves());
     }
@@ -756,7 +739,6 @@ mod test {
                     encoded_key: key,
                     base_key: key,
                     global_idx: i,
-                    data: Vec::new(),
                 }
             })
             .collect();
@@ -866,5 +848,46 @@ mod test {
         for (a, b) in children.iter().zip(blocktree.iter()) {
             assert_eq!(a, b)
         }
+    }
+
+    #[test]
+    pub fn test_levels_to_keys() {
+        // Uniform tree
+        let npoints = 10000;
+        let points = points_fixture(npoints);
+        let depth = 3;
+        let tree = SingleNodeTree::new(&points, false, None, Some(depth));
+        
+        let keys = tree.get_all_keys().unwrap();
+
+        let depth = tree.get_depth();
+
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+
+            // Get keys at this level
+            if let Some(tmp) = tree.get_keys(level) {
+                tot += tmp.len();
+            }
+        }
+        assert_eq!(tot, keys.len());
+        
+        // Adaptive tree
+        let ncrit = 150;
+        let tree = SingleNodeTree::new(&points, true, Some(ncrit), None);
+        let keys = tree.get_all_keys().unwrap();
+        let depth = tree.get_depth();
+
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+
+            // Get keys at this level
+            if let Some(tmp) = tree.get_keys(level) {
+                tot += tmp.len();
+            }
+        }
+
+
+        assert_eq!(tot, keys.len());
     }
 }

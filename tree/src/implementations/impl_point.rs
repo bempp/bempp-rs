@@ -114,7 +114,6 @@ mod test {
                 base_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 encoded_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
-                data: Vec::new(),
             })
             .collect();
 
