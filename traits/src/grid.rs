@@ -1,7 +1,7 @@
 //! Geometry and topology definitions
 
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::AdjacencyList;
+use bempp_tools::arrays::{AdjacencyList, Array2D};
 use std::cell::Ref;
 
 /// The ownership of a mesh entity
@@ -33,6 +33,39 @@ pub trait Geometry {
 
     /// Return the index map from the input order to the storage order
     fn index_map(&self) -> &[usize];
+
+    ///  Compute the physical coordinates of a set of points in a given cell
+    fn compute_points(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        reference_points: &mut Array2D<f64>,
+    );
+
+    /// Evaluate the jacobian at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>);
+
+    /// Evaluate the determinand of the jacobian at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn compute_jacobian_determinants(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_determinants: &mut [f64],
+    );
+
+    /// Evaluate the jacobian inverse at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn compute_jacobian_inverses(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_inverses: &mut Array2D<f64>,
+    );
 }
 
 pub trait Topology {
