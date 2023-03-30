@@ -1,3 +1,4 @@
+use approx::*;
 use bempp_bem::dofmap::SerialDofMap;
 use bempp_element::element::LagrangeElementTriangleDegree0;
 use bempp_grid::shapes::regular_sphere;
@@ -20,7 +21,7 @@ fn main() {
     let element = LagrangeElementTriangleDegree0 {};
     let dofmap = SerialDofMap::new(&grid, &element);
 
-    let npoints = 4;
+    let npoints = 3;
     let same_triangle_rule = triangle_duffy(
         &CellToCellConnectivity {
             connectivity_dimension: 2,
@@ -44,13 +45,22 @@ fn main() {
     element.tabulate(&test_points, 0, &mut test_table);
     element.tabulate(&trial_points, 0, &mut trial_table);
 
+    let c20 = grid.topology().connectivity(2, 0);
+
     // Assign working memory
     let mut pts = Array2D::<f64>::new((2, 2));
     let mut mapped_pts = Array2D::<f64>::new((2, 3));
     let mut test_jdet = vec![0.0; same_triangle_rule.npoints];
     let mut trial_jdet = vec![0.0; same_triangle_rule.npoints];
 
+    let mut test_pt = Array2D::<f64>::new((1, 2));
+    let mut trial_pt = Array2D::<f64>::new((1, 2));
+    let mut test_mapped_pt = Array2D::<f64>::new((1, 3));
+    let mut trial_mapped_pt = Array2D::<f64>::new((1, 3));
+
     let mut matrix = Array2D::<f64>::new((dofmap.global_size(), dofmap.global_size()));
+
+    // TODO: index map for geometry and topology
 
     for cell0 in 0..grid.geometry().cell_count() {
         grid.geometry()
@@ -85,30 +95,223 @@ fn main() {
                         * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
                         * trial_jdet[index];
                 }
-                *matrix.get_mut(*test_dof, *trial_dof).unwrap() = sum;
+                *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
             }
         }
         for cell1 in grid.topology().adjacent_cells(cell0).iter() {
             if cell1.1 == 2 {
-                let test_edges = grid.topology().connectivity(2, 1).row(cell0).unwrap();
-                let trial_edges = grid.topology().connectivity(2, 1).row(cell1.0).unwrap();
-                
-                println!(
-                    "OFF DIAGONAL: {} {} (connected by {} vertex/vertices)",
-                    cell0, cell1.0, cell1.1
+                let test_cell = cell0;
+                let trial_cell = cell1.0;
+                let test_vertices = c20.row(test_cell).unwrap();
+                let trial_vertices = c20.row(trial_cell).unwrap();
+                let mut pairs = vec![];
+                for (test_i, test_v) in test_vertices.iter().enumerate() {
+                    for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                        if test_v == trial_v {
+                            pairs.push((test_i, trial_i));
+                        }
+                    }
+                }
+                let edge_adjacent_rule = triangle_duffy(
+                    &CellToCellConnectivity {
+                        connectivity_dimension: cell1.1 - 1,
+                        local_indices: pairs,
+                    },
+                    npoints,
+                )
+                .unwrap();
+
+                let ea_test_points = Array2D::from_data(
+                    edge_adjacent_rule.test_points,
+                    (edge_adjacent_rule.npoints, 2),
                 );
-                println!("{:?} {:?}", grid.geometry().cell_vertices(cell0).unwrap(), grid.geometry().cell_vertices(cell1.0).unwrap());
-                println!("{:?} {:?}", grid.topology().connectivity(2, 1).row(cell0).unwrap(), grid.topology().connectivity(2, 1).row(cell1.0).unwrap());
+                let ea_trial_points = Array2D::from_data(
+                    edge_adjacent_rule.trial_points,
+                    (edge_adjacent_rule.npoints, 2),
+                );
+                let mut test_table = element.create_tabulate_array(0, edge_adjacent_rule.npoints);
+                let mut trial_table = element.create_tabulate_array(0, edge_adjacent_rule.npoints);
+
+                element.tabulate(&ea_test_points, 0, &mut test_table);
+                element.tabulate(&ea_trial_points, 0, &mut trial_table);
+
+                let mut ea_test_jdet = vec![0.0; edge_adjacent_rule.npoints];
+                let mut ea_trial_jdet = vec![0.0; edge_adjacent_rule.npoints];
+
+                grid.geometry().compute_jacobian_determinants(
+                    &ea_test_points,
+                    test_cell,
+                    &mut ea_test_jdet,
+                );
+                grid.geometry().compute_jacobian_determinants(
+                    &ea_trial_points,
+                    trial_cell,
+                    &mut ea_trial_jdet,
+                );
+
+                for (test_i, test_dof) in dofmap.cell_dofs(test_cell).unwrap().iter().enumerate() {
+                    for (trial_i, trial_dof) in
+                        dofmap.cell_dofs(trial_cell).unwrap().iter().enumerate()
+                    {
+                        let mut sum = 0.0;
+
+                        for index in 0..edge_adjacent_rule.npoints {
+                            unsafe {
+                                *test_pt.get_unchecked_mut(0, 0) =
+                                    *ea_test_points.get_unchecked(index, 0);
+                                *test_pt.get_unchecked_mut(0, 1) =
+                                    *ea_test_points.get_unchecked(index, 1);
+                                *trial_pt.get_unchecked_mut(0, 0) =
+                                    *ea_trial_points.get_unchecked(index, 0);
+                                *trial_pt.get_unchecked_mut(0, 1) =
+                                    *ea_trial_points.get_unchecked(index, 1);
+                            }
+                            grid.geometry().compute_points(
+                                &test_pt,
+                                test_cell,
+                                &mut test_mapped_pt,
+                            );
+                            grid.geometry().compute_points(
+                                &trial_pt,
+                                trial_cell,
+                                &mut trial_mapped_pt,
+                            );
+                            let weight = edge_adjacent_rule.weights[index];
+
+                            if index == 0 {}
+                            sum += laplace_green(
+                                unsafe { *test_mapped_pt.get_unchecked(0, 0) },
+                                unsafe { *test_mapped_pt.get_unchecked(0, 1) },
+                                unsafe { *test_mapped_pt.get_unchecked(0, 2) },
+                                unsafe { *trial_mapped_pt.get_unchecked(1, 0) },
+                                unsafe { *trial_mapped_pt.get_unchecked(1, 1) },
+                                unsafe { *trial_mapped_pt.get_unchecked(1, 2) },
+                            ) * weight
+                                * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
+                                * ea_test_jdet[index]
+                                * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
+                                * ea_trial_jdet[index];
+                        }
+                        *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+                    }
+                }
             }
         }
     }
+
+    // Compare to result from bempp-cl
+    let from_cl = vec![
+        vec![
+            0.1854538822982487,
+            0.08755414595678074,
+            0.05963897421514472,
+            0.08755414595678074,
+            0.08755414595678074,
+            0.05963897421514473,
+            0.04670742127454548,
+            0.05963897421514472,
+        ],
+        vec![
+            0.08755414595678074,
+            0.1854538822982487,
+            0.08755414595678074,
+            0.05963897421514472,
+            0.05963897421514472,
+            0.08755414595678074,
+            0.05963897421514473,
+            0.04670742127454548,
+        ],
+        vec![
+            0.05963897421514472,
+            0.08755414595678074,
+            0.1854538822982487,
+            0.08755414595678074,
+            0.04670742127454548,
+            0.05963897421514472,
+            0.08755414595678074,
+            0.05963897421514473,
+        ],
+        vec![
+            0.08755414595678074,
+            0.05963897421514472,
+            0.08755414595678074,
+            0.1854538822982487,
+            0.05963897421514473,
+            0.04670742127454548,
+            0.05963897421514472,
+            0.08755414595678074,
+        ],
+        vec![
+            0.08755414595678074,
+            0.05963897421514472,
+            0.046707421274545476,
+            0.05963897421514473,
+            0.1854538822982487,
+            0.08755414595678074,
+            0.05963897421514472,
+            0.08755414595678074,
+        ],
+        vec![
+            0.05963897421514473,
+            0.08755414595678074,
+            0.05963897421514472,
+            0.046707421274545476,
+            0.08755414595678074,
+            0.1854538822982487,
+            0.08755414595678074,
+            0.05963897421514472,
+        ],
+        vec![
+            0.046707421274545476,
+            0.05963897421514473,
+            0.08755414595678074,
+            0.05963897421514472,
+            0.05963897421514472,
+            0.08755414595678074,
+            0.1854538822982487,
+            0.08755414595678074,
+        ],
+        vec![
+            0.05963897421514472,
+            0.046707421274545476,
+            0.05963897421514473,
+            0.08755414595678074,
+            0.08755414595678074,
+            0.05963897421514472,
+            0.08755414595678074,
+            0.1854538822982487,
+        ],
+    ];
+
+    println!("Laplace single layer matrix (from Bempp-cl)");
+    for i in 0..dofmap.global_size() {
+        println!("{:?}", from_cl[i]);
+    }
+
     println!("Laplace single layer matrix");
     for i in 0..dofmap.global_size() {
         println!("{:?}", matrix.row(i).unwrap());
     }
-    // Diagonal value computed using Bempp-cl is 0.1854538822982487
-    println!(
-        "Relative error of diagonal entry compared to Bempp-cl: {}",
-        (matrix.get(0, 0).unwrap() - 0.1854538822982487).abs() / 0.1854538822982487
-    );
+
+    for i in 0..8 {
+        for j in 0..8 {
+            if matrix.get(i, j).unwrap().abs() > 0.0001 {
+                println!(
+                    "entry ({},{})  cl: {}  rs: {}  error: {}",
+                    i,
+                    j,
+                    from_cl[i][j],
+                    matrix.get(i, j).unwrap(),
+                    (matrix.get(i, j).unwrap() - from_cl[i][j]).abs() / from_cl[i][j]
+                );
+            }
+        }
+    }
+    for i in 0..8 {
+        for j in 0..8 {
+            if matrix.get(i, j).unwrap().abs() > 0.0001 {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+            }
+        }
+    }
 }

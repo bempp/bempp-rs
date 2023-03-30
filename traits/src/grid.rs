@@ -31,7 +31,7 @@ pub trait Geometry {
     /// The number of cells
     fn cell_count(&self) -> usize;
 
-    /// Return the index map from the input order to the storage order
+    /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
 
     ///  Compute the physical coordinates of a set of points in a given cell
@@ -39,7 +39,7 @@ pub trait Geometry {
         &self,
         points: &Array2D<f64>,
         cell: usize,
-        reference_points: &mut Array2D<f64>,
+        physical_points: &mut Array2D<f64>,
     );
 
     /// Evaluate the jacobian at a set of points in a given cell
@@ -76,7 +76,7 @@ pub trait Topology {
     /// The dimension of the grid
     fn dim(&self) -> usize;
 
-    /// Return the index map from the input order to the storage order
+    /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
 
     /// The number of entities of dimension `dim`

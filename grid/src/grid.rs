@@ -127,31 +127,34 @@ impl Geometry for SerialGeometry {
         &self,
         points: &Array2D<f64>,
         cell: usize,
-        reference_points: &mut Array2D<f64>,
+        physical_points: &mut Array2D<f64>,
     ) {
         let gdim = self.dim();
-        if points.shape().0 != reference_points.shape().0 {
-            panic!("reference_points has wrong number of rows.");
+        if points.shape().0 != physical_points.shape().0 {
+            panic!("physical_points has wrong number of rows.");
         }
-        if gdim != reference_points.shape().1 {
-            panic!("reference_points has wrong number of columns.");
+        if gdim != physical_points.shape().1 {
+            panic!("physical_points has wrong number of columns.");
         }
         let element = self.element(cell);
         let mut data = element.create_tabulate_array(0, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
         element.tabulate(points, 0, &mut data);
         for p in 0..points.shape().0 {
-            for i in 0..reference_points.shape().1 {
+            for i in 0..physical_points.shape().1 {
                 unsafe {
-                    *reference_points.get_unchecked_mut(p, i) = 0.0;
+                    *physical_points.get_unchecked_mut(p, i) = 0.0;
                 }
             }
         }
         for i in 0..data.shape().2 {
-            let pt = unsafe { self.coordinates.row_unchecked(i) };
+            let pt = unsafe {
+                self.coordinates
+                    .row_unchecked(*self.cells.get_unchecked(cell, i))
+            };
             for p in 0..points.shape().0 {
                 for j in 0..gdim {
                     unsafe {
-                        *reference_points.get_unchecked_mut(p, j) +=
+                        *physical_points.get_unchecked_mut(p, j) +=
                             pt[j] * data.get_unchecked(0, p, i, 0);
                     }
                 }
@@ -179,7 +182,10 @@ impl Geometry for SerialGeometry {
             }
         }
         for i in 0..data.shape().2 {
-            let pt = unsafe { self.coordinates.row_unchecked(i) };
+            let pt = unsafe {
+                self.coordinates
+                    .row_unchecked(*self.cells.get_unchecked(cell, i))
+            };
             for p in 0..points.shape().0 {
                 for j in 0..gdim {
                     for k in 0..tdim {
@@ -1008,9 +1014,15 @@ mod test {
     #[test]
     fn test_points_and_jacobians() {
         let g = SerialGrid::new(
-            Array2D::from_data(vec![2.0, 2.0, 0.0, 4.0, 2.0, 0.0, 5.0, 3.0, 1.0], (3, 3)),
-            AdjacencyList::from_data(vec![0, 1, 2], vec![0, 3]),
-            vec![ReferenceCellType::Triangle],
+            Array2D::from_data(
+                vec![
+                    2.0, 2.0, 0.0, 4.0, 2.0, 0.0, 5.0, 3.0, 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 1.0,
+                    0.0, -1.0, 1.0,
+                ],
+                (6, 3),
+            ),
+            AdjacencyList::from_data(vec![0, 1, 2, 3, 4, 5], vec![0, 3, 6]),
+            vec![ReferenceCellType::Triangle, ReferenceCellType::Triangle],
         );
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
@@ -1030,6 +1042,17 @@ mod test {
         assert_relative_eq!(*physical_points.get(2, 0).unwrap(), 11.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 1).unwrap(), 7.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0 / 3.0);
+        g.geometry()
+            .compute_points(&points, 1, &mut physical_points);
+        assert_relative_eq!(*physical_points.get(0, 0).unwrap(), -0.2);
+        assert_relative_eq!(*physical_points.get(0, 1).unwrap(), 0.0);
+        assert_relative_eq!(*physical_points.get(0, 2).unwrap(), 1.0);
+        assert_relative_eq!(*physical_points.get(1, 0).unwrap(), -0.5);
+        assert_relative_eq!(*physical_points.get(1, 1).unwrap(), -0.5);
+        assert_relative_eq!(*physical_points.get(1, 2).unwrap(), 1.0);
+        assert_relative_eq!(*physical_points.get(2, 0).unwrap(), -1.0 / 3.0);
+        assert_relative_eq!(*physical_points.get(2, 1).unwrap(), -1.0 / 3.0);
+        assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0);
 
         // Test compute_jacobians
         let mut jacobians = Array2D::new((3, 6));
@@ -1042,6 +1065,15 @@ mod test {
             assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0);
             assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0);
         }
+        g.geometry().compute_jacobians(&points, 1, &mut jacobians);
+        for i in 0..3 {
+            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), -1.0);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), -1.0);
+            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 0.0);
+        }
 
         // test compute_jacobian_determinants
         let mut dets = vec![0.0; 3];
@@ -1049,6 +1081,11 @@ mod test {
             .compute_jacobian_determinants(&points, 0, &mut dets);
         for i in 0..3 {
             assert_relative_eq!(dets[i], 2.0 * 2.0_f64.sqrt());
+        }
+        g.geometry()
+            .compute_jacobian_determinants(&points, 1, &mut dets);
+        for i in 0..3 {
+            assert_relative_eq!(dets[i], 1.0);
         }
 
         // Test compute_jacobian_inverses
@@ -1062,6 +1099,16 @@ mod test {
             assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0);
             assert_relative_eq!(*jinvs.get(i, 4).unwrap(), 0.5);
             assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.5);
+        }
+        g.geometry()
+            .compute_jacobian_inverses(&points, 1, &mut jinvs);
+        for i in 0..3 {
+            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), -1.0);
+            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), 0.0);
+            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), 0.0);
+            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0);
+            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), -1.0);
+            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.0);
         }
     }
 }

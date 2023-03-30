@@ -65,10 +65,10 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         &self,
         points: &Array2D<f64>,
         cell: usize,
-        reference_points: &mut Array2D<f64>,
+        physical_points: &mut Array2D<f64>,
     ) {
         self.serial_geometry
-            .compute_points(points, cell, reference_points)
+            .compute_points(points, cell, physical_points)
     }
     fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
         self.serial_geometry
