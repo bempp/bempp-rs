@@ -1027,10 +1027,13 @@ mod test {
         assert_eq!(g.topology().dim(), 2);
         assert_eq!(g.geometry().dim(), 3);
 
-        let points = Array2D::from_data(vec![0.2, 0.0, 0.5, 0.5, 1.0 / 3.0, 1.0 / 3.0], (3, 2));
+        let points = Array2D::from_data(
+            vec![0.2, 0.0, 0.5, 0.5, 1.0 / 3.0, 1.0 / 3.0, 0.15, 0.3],
+            (4, 2),
+        );
 
         // Test compute_points
-        let mut physical_points = Array2D::new((3, 3));
+        let mut physical_points = Array2D::new((points.shape().0, 3));
         g.geometry()
             .compute_points(&points, 0, &mut physical_points);
         assert_relative_eq!(*physical_points.get(0, 0).unwrap(), 2.4);
@@ -1042,6 +1045,9 @@ mod test {
         assert_relative_eq!(*physical_points.get(2, 0).unwrap(), 11.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 1).unwrap(), 7.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0 / 3.0);
+        assert_relative_eq!(*physical_points.get(3, 0).unwrap(), 3.2);
+        assert_relative_eq!(*physical_points.get(3, 1).unwrap(), 2.3);
+        assert_relative_eq!(*physical_points.get(3, 2).unwrap(), 0.3);
         g.geometry()
             .compute_points(&points, 1, &mut physical_points);
         assert_relative_eq!(*physical_points.get(0, 0).unwrap(), -0.2);
@@ -1053,9 +1059,12 @@ mod test {
         assert_relative_eq!(*physical_points.get(2, 0).unwrap(), -1.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 1).unwrap(), -1.0 / 3.0);
         assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0);
+        assert_relative_eq!(*physical_points.get(3, 0).unwrap(), -0.15);
+        assert_relative_eq!(*physical_points.get(3, 1).unwrap(), -0.3);
+        assert_relative_eq!(*physical_points.get(3, 2).unwrap(), 1.0);
 
         // Test compute_jacobians
-        let mut jacobians = Array2D::new((3, 6));
+        let mut jacobians = Array2D::new((points.shape().0, 6));
         g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
             assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0);
@@ -1076,7 +1085,7 @@ mod test {
         }
 
         // test compute_jacobian_determinants
-        let mut dets = vec![0.0; 3];
+        let mut dets = vec![0.0; points.shape().0];
         g.geometry()
             .compute_jacobian_determinants(&points, 0, &mut dets);
         for i in 0..3 {
@@ -1089,7 +1098,7 @@ mod test {
         }
 
         // Test compute_jacobian_inverses
-        let mut jinvs = Array2D::new((3, 6));
+        let mut jinvs = Array2D::new((points.shape().0, 6));
         g.geometry()
             .compute_jacobian_inverses(&points, 0, &mut jinvs);
         for i in 0..3 {
