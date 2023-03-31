@@ -82,7 +82,8 @@ fn main() {
                         *pts.get_unchecked_mut(1, 0) = *trial_points.get_unchecked(index, 0);
                         *pts.get_unchecked_mut(1, 1) = *trial_points.get_unchecked(index, 1);
                     }
-                    grid.geometry().compute_points(&pts, cell0_gindex, &mut mapped_pts);
+                    grid.geometry()
+                        .compute_points(&pts, cell0_gindex, &mut mapped_pts);
                     let weight = same_triangle_rule.weights[index];
 
                     sum += laplace_green(
@@ -154,9 +155,17 @@ fn main() {
                     &mut ea_trial_jdet,
                 );
 
-                for (test_i, test_dof) in dofmap.cell_dofs(test_cell_tindex).unwrap().iter().enumerate() {
-                    for (trial_i, trial_dof) in
-                        dofmap.cell_dofs(trial_cell_tindex).unwrap().iter().enumerate()
+                for (test_i, test_dof) in dofmap
+                    .cell_dofs(test_cell_tindex)
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                {
+                    for (trial_i, trial_dof) in dofmap
+                        .cell_dofs(trial_cell_tindex)
+                        .unwrap()
+                        .iter()
+                        .enumerate()
                     {
                         let mut sum = 0.0;
 
@@ -187,9 +196,9 @@ fn main() {
                                 unsafe { *test_mapped_pt.get_unchecked(0, 0) },
                                 unsafe { *test_mapped_pt.get_unchecked(0, 1) },
                                 unsafe { *test_mapped_pt.get_unchecked(0, 2) },
-                                unsafe { *trial_mapped_pt.get_unchecked(1, 0) },
-                                unsafe { *trial_mapped_pt.get_unchecked(1, 1) },
-                                unsafe { *trial_mapped_pt.get_unchecked(1, 2) },
+                                unsafe { *trial_mapped_pt.get_unchecked(0, 0) },
+                                unsafe { *trial_mapped_pt.get_unchecked(0, 1) },
+                                unsafe { *trial_mapped_pt.get_unchecked(0, 2) },
                             ) * weight
                                 * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                                 * ea_test_jdet[index]
