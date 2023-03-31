@@ -60,8 +60,6 @@ fn main() {
 
     let mut matrix = Array2D::<f64>::new((dofmap.global_size(), dofmap.global_size()));
 
-    // TODO: index map for geometry and topology
-
     for cell0 in 0..grid.geometry().cell_count() {
         let cell0_tindex = grid.topology().index_map()[cell0];
         let cell0_gindex = grid.geometry().index_map()[cell0];
