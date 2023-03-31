@@ -103,7 +103,7 @@ fn main() {
             }
         }
         for cell1 in grid.topology().adjacent_cells(cell0_tindex).iter() {
-            if cell1.1 == 2 {
+            if cell1.1 < 3 {
                 let test_cell_tindex = cell0_tindex;
                 let test_cell_gindex = cell0_gindex;
                 let trial_cell_tindex = grid.topology().index_map()[cell1.0];
