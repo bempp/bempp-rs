@@ -24,7 +24,7 @@ fn create_triangle_mapper(v0: usize, v1: usize) -> impl Fn((f64, f64)) -> (f64, 
     //
     // The Duffy rule has vertices with a reference element
     // 0: (0, 0), 1: (1, 0), 2: (1, 1)
-    // We need to map (0, 0) -> v0, (0, 1) -> v1, and (0, 1) -> v2,
+    // We need to map (0, 0) -> v0, (1, 0) -> v1, and (1, 1) -> v2,
     // where v2 is implicitly defined as the index 3 - v0 - v1 (
     // since all triangle indices together sum up to 3)
 
@@ -555,6 +555,111 @@ mod test {
             epsilon = 0.0,
             max_relative = 1E-13
         );
+    }
+
+    macro_rules! edge_adjacent_triangles_rotation_test {
+        ($($name:ident: $indices:expr)*) => {
+        $(
+            #[test]
+            fn $name() {
+                let compute_integral = |npoints: usize, cell0_indices: [usize; 3], cell1_indices: [usize; 3]| -> f64 {
+                    let mut local_indices = vec![];
+                    for i in 0..3 {
+                        if cell0_indices[i] == 1 {
+                            for j in 0..3 {
+                                if cell1_indices[j] == 0 {
+                                    local_indices.push((i, j));
+                                }
+                            }
+                        }
+                    }
+                    for i in 0..3 {
+                        if cell0_indices[i] == 2 {
+                            for j in 0..3 {
+                                if cell1_indices[j] == 2 {
+                                    local_indices.push((i, j));
+                                }
+                            }
+                        }
+                    }
+                    let connectivity = CellToCellConnectivity {
+                        connectivity_dimension: 1,
+                        local_indices
+                    };
+
+                    let singular_rule = triangle_duffy(&connectivity, npoints).unwrap();
+
+                    let cell0 = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0];
+                    let cell1 = vec![1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
+
+                    let mut sum = 0.0;
+
+                    for index in 0..singular_rule.npoints {
+                        let (x1, x2) = (
+                            cell0[2*cell0_indices[0]] + singular_rule.test_points[2 * index] * (cell0[2*cell0_indices[1]] - cell0[2*cell0_indices[0]]) + singular_rule.test_points[2 * index + 1] * (cell0[2*cell0_indices[2]] - cell0[2*cell0_indices[0]]),
+                            cell0[2*cell0_indices[0] + 1] + singular_rule.test_points[2 * index] * (cell0[2*cell0_indices[1] + 1] - cell0[2*cell0_indices[0] + 1]) + singular_rule.test_points[2 * index + 1] * (cell0[2*cell0_indices[2] + 1] - cell0[2*cell0_indices[0] + 1]),
+                        );
+
+                        let (y1, y2) = (
+                            cell1[2*cell1_indices[0]] + singular_rule.trial_points[2 * index] * (cell1[2*cell1_indices[1]] - cell1[2*cell1_indices[0]]) + singular_rule.trial_points[2 * index + 1] * (cell1[2*cell1_indices[2]] - cell1[2*cell1_indices[0]]),
+                            cell1[2*cell1_indices[0] + 1] + singular_rule.trial_points[2 * index] * (cell1[2*cell1_indices[1] + 1] - cell1[2*cell1_indices[0] + 1]) + singular_rule.trial_points[2 * index + 1] * (cell1[2*cell1_indices[2] + 1] - cell1[2*cell1_indices[0] + 1]),
+                        );
+
+                        let weight = singular_rule.weights[index];
+                        sum += laplace_green(x1, x2, y1, y2) * weight;
+                    }
+                    sum
+                };
+                for npts in [2, 4, 8] {
+                    assert_relative_eq!(
+                        compute_integral(npts, [0, 1, 2], [0, 1, 2]),
+                        compute_integral(npts, $indices.0, $indices.1),
+                        epsilon = 0.0,
+                        max_relative = 1E-13
+                    );
+                }
+            }
+        )*
+        }
+    }
+
+    edge_adjacent_triangles_rotation_test! {
+         test_edge_adjacent_triangles_rotation_012_012: ([0, 1, 2], [0, 1, 2])
+         test_edge_adjacent_triangles_rotation_012_021: ([0, 1, 2], [0, 2, 1])
+         test_edge_adjacent_triangles_rotation_012_102: ([0, 1, 2], [1, 0, 2])
+         test_edge_adjacent_triangles_rotation_012_120: ([0, 1, 2], [1, 2, 0])
+         test_edge_adjacent_triangles_rotation_012_201: ([0, 1, 2], [2, 0, 1])
+         test_edge_adjacent_triangles_rotation_012_210: ([0, 1, 2], [2, 1, 0])
+         test_edge_adjacent_triangles_rotation_021_012: ([0, 2, 1], [0, 1, 2])
+         test_edge_adjacent_triangles_rotation_021_021: ([0, 2, 1], [0, 2, 1])
+         test_edge_adjacent_triangles_rotation_021_102: ([0, 2, 1], [1, 0, 2])
+         test_edge_adjacent_triangles_rotation_021_120: ([0, 2, 1], [1, 2, 0])
+         test_edge_adjacent_triangles_rotation_021_201: ([0, 2, 1], [2, 0, 1])
+         test_edge_adjacent_triangles_rotation_021_210: ([0, 2, 1], [2, 1, 0])
+         test_edge_adjacent_triangles_rotation_102_012: ([1, 0, 2], [0, 1, 2])
+         test_edge_adjacent_triangles_rotation_102_021: ([1, 0, 2], [0, 2, 1])
+         test_edge_adjacent_triangles_rotation_102_102: ([1, 0, 2], [1, 0, 2])
+         test_edge_adjacent_triangles_rotation_102_120: ([1, 0, 2], [1, 2, 0])
+         test_edge_adjacent_triangles_rotation_102_201: ([1, 0, 2], [2, 0, 1])
+         test_edge_adjacent_triangles_rotation_102_210: ([1, 0, 2], [2, 1, 0])
+         test_edge_adjacent_triangles_rotation_120_012: ([1, 2, 0], [0, 1, 2])
+         test_edge_adjacent_triangles_rotation_120_021: ([1, 2, 0], [0, 2, 1])
+         test_edge_adjacent_triangles_rotation_120_102: ([1, 2, 0], [1, 0, 2])
+         test_edge_adjacent_triangles_rotation_120_120: ([1, 2, 0], [1, 2, 0])
+         test_edge_adjacent_triangles_rotation_120_201: ([1, 2, 0], [2, 0, 1])
+         test_edge_adjacent_triangles_rotation_120_210: ([1, 2, 0], [2, 1, 0])
+         test_edge_adjacent_triangles_rotation_201_012: ([2, 0, 1], [0, 1, 2])
+         test_edge_adjacent_triangles_rotation_201_021: ([2, 0, 1], [0, 2, 1])
+         test_edge_adjacent_triangles_rotation_201_102: ([2, 0, 1], [1, 0, 2])
+         test_edge_adjacent_triangles_rotation_201_120: ([2, 0, 1], [1, 2, 0])
+         test_edge_adjacent_triangles_rotation_201_201: ([2, 0, 1], [2, 0, 1])
+         test_edge_adjacent_triangles_rotation_201_210: ([2, 0, 1], [2, 1, 0])
+         test_edge_adjacent_triangles_rotation_210_012: ([2, 1, 0], [0, 1, 2])
+         test_edge_adjacent_triangles_rotation_210_021: ([2, 1, 0], [0, 2, 1])
+         test_edge_adjacent_triangles_rotation_210_102: ([2, 1, 0], [1, 0, 2])
+         test_edge_adjacent_triangles_rotation_210_120: ([2, 1, 0], [1, 2, 0])
+         test_edge_adjacent_triangles_rotation_210_201: ([2, 1, 0], [2, 0, 1])
+         test_edge_adjacent_triangles_rotation_210_210: ([2, 1, 0], [2, 1, 0])
     }
 
     #[test]
