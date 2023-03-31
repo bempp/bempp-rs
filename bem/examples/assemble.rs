@@ -63,13 +63,16 @@ fn main() {
     // TODO: index map for geometry and topology
 
     for cell0 in 0..grid.geometry().cell_count() {
-        grid.geometry()
-            .compute_jacobian_determinants(&test_points, cell0, &mut test_jdet);
-        grid.geometry()
-            .compute_jacobian_determinants(&trial_points, cell0, &mut trial_jdet);
+        let cell0_tindex = grid.topology().index_map()[cell0];
+        let cell0_gindex = grid.geometry().index_map()[cell0];
 
-        for (test_i, test_dof) in dofmap.cell_dofs(cell0).unwrap().iter().enumerate() {
-            for (trial_i, trial_dof) in dofmap.cell_dofs(cell0).unwrap().iter().enumerate() {
+        grid.geometry()
+            .compute_jacobian_determinants(&test_points, cell0_gindex, &mut test_jdet);
+        grid.geometry()
+            .compute_jacobian_determinants(&trial_points, cell0_gindex, &mut trial_jdet);
+
+        for (test_i, test_dof) in dofmap.cell_dofs(cell0_tindex).unwrap().iter().enumerate() {
+            for (trial_i, trial_dof) in dofmap.cell_dofs(cell0_tindex).unwrap().iter().enumerate() {
                 let mut sum = 0.0;
 
                 for index in 0..same_triangle_rule.npoints {
@@ -79,7 +82,7 @@ fn main() {
                         *pts.get_unchecked_mut(1, 0) = *trial_points.get_unchecked(index, 0);
                         *pts.get_unchecked_mut(1, 1) = *trial_points.get_unchecked(index, 1);
                     }
-                    grid.geometry().compute_points(&pts, cell0, &mut mapped_pts);
+                    grid.geometry().compute_points(&pts, cell0_gindex, &mut mapped_pts);
                     let weight = same_triangle_rule.weights[index];
 
                     sum += laplace_green(
@@ -98,12 +101,14 @@ fn main() {
                 *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
             }
         }
-        for cell1 in grid.topology().adjacent_cells(cell0).iter() {
+        for cell1 in grid.topology().adjacent_cells(cell0_tindex).iter() {
             if cell1.1 == 2 {
-                let test_cell = cell0;
-                let trial_cell = cell1.0;
-                let test_vertices = c20.row(test_cell).unwrap();
-                let trial_vertices = c20.row(trial_cell).unwrap();
+                let test_cell_tindex = cell0_tindex;
+                let test_cell_gindex = cell0_gindex;
+                let trial_cell_tindex = grid.topology().index_map()[cell1.0];
+                let trial_cell_gindex = grid.geometry().index_map()[cell1.0];
+                let test_vertices = c20.row(test_cell_tindex).unwrap();
+                let trial_vertices = c20.row(trial_cell_tindex).unwrap();
                 let mut pairs = vec![];
                 for (test_i, test_v) in test_vertices.iter().enumerate() {
                     for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
@@ -140,18 +145,18 @@ fn main() {
 
                 grid.geometry().compute_jacobian_determinants(
                     &ea_test_points,
-                    test_cell,
+                    test_cell_gindex,
                     &mut ea_test_jdet,
                 );
                 grid.geometry().compute_jacobian_determinants(
                     &ea_trial_points,
-                    trial_cell,
+                    trial_cell_gindex,
                     &mut ea_trial_jdet,
                 );
 
-                for (test_i, test_dof) in dofmap.cell_dofs(test_cell).unwrap().iter().enumerate() {
+                for (test_i, test_dof) in dofmap.cell_dofs(test_cell_tindex).unwrap().iter().enumerate() {
                     for (trial_i, trial_dof) in
-                        dofmap.cell_dofs(trial_cell).unwrap().iter().enumerate()
+                        dofmap.cell_dofs(trial_cell_tindex).unwrap().iter().enumerate()
                     {
                         let mut sum = 0.0;
 
@@ -168,17 +173,16 @@ fn main() {
                             }
                             grid.geometry().compute_points(
                                 &test_pt,
-                                test_cell,
+                                test_cell_gindex,
                                 &mut test_mapped_pt,
                             );
                             grid.geometry().compute_points(
                                 &trial_pt,
-                                trial_cell,
+                                trial_cell_gindex,
                                 &mut trial_mapped_pt,
                             );
                             let weight = edge_adjacent_rule.weights[index];
 
-                            if index == 0 {}
                             sum += laplace_green(
                                 unsafe { *test_mapped_pt.get_unchecked(0, 0) },
                                 unsafe { *test_mapped_pt.get_unchecked(0, 1) },
