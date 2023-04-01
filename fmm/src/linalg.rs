@@ -15,6 +15,7 @@ pub fn pinv<T: Scalar + Lapack>(
     let (u, mut s, vt): (_, Array1<_>, _) = array.svd(true, true).unwrap();
 
     let u = u.unwrap();
+    // Truncate u
     let vt = vt.unwrap();
 
     let max_s = s[0];
