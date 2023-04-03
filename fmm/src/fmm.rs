@@ -413,25 +413,29 @@ impl SourceTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
         if let Some(nodes) = self.fmm.tree.get_keys(level) {
             nodes.par_iter().for_each(move |&node| {
                 let in_node = Arc::clone(&self.multipoles.get(&node).unwrap());
-                let out_node = Arc::clone(&self.multipoles.get(&node.parent()).unwrap());
-                let fmm = Arc::clone(&self.fmm);
-
-                let operator_index = node.siblings().iter().position(|&x| x == node).unwrap();
-
+                
                 let in_multipole_lock = in_node.lock().unwrap();
-                let in_multipole_ref = ArrayView::from(in_multipole_lock.deref());
 
-                let out_expansion = fmm.m2m[operator_index].dot(&in_multipole_ref);
-                let mut out_multipole = out_node.lock().unwrap();
-
-                if !out_multipole.is_empty() {
-                    out_multipole
-                        .iter_mut()
-                        .zip(out_expansion.iter())
-                        .for_each(|(c, m)| *c += *m);
-                } else {
-                    out_multipole.extend(out_expansion);
-                }
+                if !in_multipole_lock.is_empty() {
+                    let out_node = Arc::clone(&self.multipoles.get(&node.parent()).unwrap());
+                    let fmm = Arc::clone(&self.fmm);
+    
+                    let operator_index = node.siblings().iter().position(|&x| x == node).unwrap();
+    
+                    let in_multipole_ref = ArrayView::from(in_multipole_lock.deref());
+    
+                    let out_expansion = fmm.m2m[operator_index].dot(&in_multipole_ref);
+                    let mut out_multipole = out_node.lock().unwrap();
+    
+                    if !out_multipole.is_empty() {
+                        out_multipole
+                            .iter_mut()
+                            .zip(out_expansion.iter())
+                            .for_each(|(c, m)| *c += *m);
+                    } else {
+                        out_multipole.extend(out_expansion);
+                    }
+                }               
             })
         }
     }
@@ -957,15 +961,15 @@ mod test {
 
     #[test]
     fn test_p2m() {
-        let npoints = 10000;
+        let npoints = 1000000;
         let points = points_fixture(npoints);
-        let depth = 3;
+        let depth = 5;
         let n_crit = 150;
 
-        let order = 10;
+        let order = 5;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
-        let adaptive = false;
+        let adaptive = true;
 
         let kernel = LaplaceKernel {
             dim: 3,
@@ -979,6 +983,8 @@ mod test {
             Some(n_crit),
             Some(depth)
         );
+
+        println!("Nleaves {:?}", tree.get_leaves().len());
 
         let fmm = KiFmm::new(
             order,
@@ -996,7 +1002,6 @@ mod test {
         println!("P2M {:?}ms", elapsed);
         let leaf = source_datatree.fmm.tree.get_leaves()[0];
 
-        let leaf_expansion = source_datatree.multipoles.get(&leaf).unwrap().lock().unwrap().deref().clone();
         let points = source_datatree.points.get(&leaf).unwrap();
 
         let distant_point = vec![1000., 0., 0.];
@@ -1067,12 +1072,12 @@ mod test {
 
     // #[test]
     // fn test_upward_pass() {
-    //     let npoints = 10000;
+    //     let npoints = 1000000;
     //     let points = points_fixture(npoints);
     //     let depth = 3;
     //     let n_crit = 150;
 
-    //     let order = 10;
+    //     let order = 6;
     //     let alpha_inner = 1.05;
     //     let alpha_outer = 1.95;
     //     let adaptive = false;
@@ -1089,8 +1094,10 @@ mod test {
 
     //     let source_datatree = FmmDataTree::new(fmm);
 
+    //     let start = Instant::now();
     //     source_datatree.upward_pass();
-
+    //     println!("Upward Pass Time {:?}ms", start.elapsed().as_millis());
+        
     //     let distant_point = vec![1000., 0., 0.];
     //     let mut direct = vec![0.];
     //     let coordinates = points
