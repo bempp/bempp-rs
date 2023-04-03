@@ -26,6 +26,7 @@ pub trait Fmm {
     type Kernel: Kernel;
     type Tree: Tree;
 
+    // Expansion order.
     fn order(&self) -> usize;
 
     fn kernel(&self) -> &Self::Kernel;
@@ -33,10 +34,32 @@ pub trait Fmm {
     fn tree(&self) -> &Self::Tree;
 }
 
+
 pub trait FmmLoop {
     fn upward_pass(&self);
 
     fn downward_pass(&self);
 
     fn run(&self);
+}
+
+pub trait InteractionLists {
+    type Tree: Tree;
+
+    fn get_v_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    fn get_x_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    fn get_w_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    fn get_u_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 }

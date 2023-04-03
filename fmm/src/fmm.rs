@@ -922,6 +922,7 @@ mod test {
     use crate::laplace::LaplaceKernel;
 
     use super::*;
+    use std::time::Instant;
 
     use bempp_tree::types::point::{PointType, Points};
     use rand::prelude::*;
@@ -954,90 +955,14 @@ mod test {
         points
     }
 
-    // #[test]
-    // fn test_p2m() {
-    //     let npoints = 10000;
-    //     let points = points_fixture(npoints);
-    //     let depth = 3;
-    //     let n_crit = 150;
-
-    //     let order = 5;
-    //     let alpha_inner = 1.05;
-    //     let alpha_outer = 1.95;
-    //     let adaptive = false;
-
-    //     let kernel = LaplaceKernel {
-    //         dim: 3,
-    //         is_singular: false,
-    //         value_dimension: 3,
-    //     };
-
-    //     let tree = SingleNodeTree::new(
-    //         &points,
-    //         adaptive,
-    //         Some(n_crit),
-    //         Some(depth)
-    //     );
-
-    //     let fmm = KiFmm::new(
-    //         order,
-    //         order,
-    //         alpha_inner,
-    //         alpha_outer,
-    //         kernel,
-    //         tree
-    //     );
-
-    //     let source_datatree = FmmDataTree::new(fmm);
-
-    //     source_datatree.p2m();
-
-    //     let leaf = source_datatree.fmm.tree.get_leaves()[0];
-
-    //     let leaf_expansion = source_datatree.multipoles.get(&leaf).unwrap().lock().unwrap().deref().clone();
-    //     let points = source_datatree.points.get(&leaf).unwrap();
-
-    //     let distant_point = vec![1000., 0., 0.];
-    //     let mut direct = vec![0.];
-    //     let coordinates = points
-    //         .iter()
-    //         .map(|p| p.coordinate)
-    //         .flat_map(|[x, y, z]| vec![x, y, z])
-    //         .collect_vec();
-    //     let charges = vec![1.; coordinates.len()];
-    //     source_datatree.fmm.kernel.potential(&coordinates[..], &charges[..], &distant_point[..], &mut direct);
-
-    //     let expansion = source_datatree.multipoles.get(&leaf).unwrap().lock().unwrap().deref().clone();
-    //     let mut estimate = vec![0.];
-
-    //     let tree = SingleNodeTree::new(
-    //         &points,
-    //         adaptive,
-    //         Some(n_crit),
-    //         Some(depth)
-    //     );
-
-    //     let domain = tree.get_domain();
-
-    //     let equivalent_surface = leaf
-    //         .compute_surface(&domain, order, alpha_inner)
-    //         .into_iter()
-    //         .flat_map(|[x, y, z]| vec![x, y, z])
-    //         .collect_vec();
-
-    //     source_datatree.fmm.kernel.potential(&equivalent_surface[..], &expansion[..], &distant_point[..], &mut estimate[..]);
-    //     println!("key {:?} direct {:?} estimate {:?}", leaf, direct, estimate);
-    //     assert!(false)
-    // }
-
     #[test]
-    fn test_downward_pass() {
+    fn test_p2m() {
         let npoints = 10000;
         let points = points_fixture(npoints);
         let depth = 3;
         let n_crit = 150;
 
-        let order = 2;
+        let order = 10;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
         let adaptive = false;
@@ -1048,20 +973,97 @@ mod test {
             value_dimension: 3,
         };
 
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+        let tree = SingleNodeTree::new(
+            &points,
+            adaptive,
+            Some(n_crit),
+            Some(depth)
+        );
 
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+        let fmm = KiFmm::new(
+            order,
+            alpha_inner,
+            alpha_outer,
+            kernel,
+            tree
+        );
 
-        let datatree = FmmDataTree::new(fmm);
+        let source_datatree = FmmDataTree::new(fmm);
 
-        datatree.run();
+        let start = std::time::Instant::now();
+        source_datatree.p2m();
+        let elapsed = start.elapsed().as_millis();
+        println!("P2M {:?}ms", elapsed);
+        let leaf = source_datatree.fmm.tree.get_leaves()[0];
 
-        let leaf = &datatree.fmm.tree.get_leaves()[0];
+        let leaf_expansion = source_datatree.multipoles.get(&leaf).unwrap().lock().unwrap().deref().clone();
+        let points = source_datatree.points.get(&leaf).unwrap();
 
-        println!("{:?}", datatree.locals.get(leaf));
+        let distant_point = vec![1000., 0., 0.];
+        let mut direct = vec![0.];
+        let coordinates = points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let charges = vec![1.; coordinates.len()];
+        source_datatree.fmm.kernel.potential(&coordinates[..], &charges[..], &distant_point[..], &mut direct);
 
+        let expansion = source_datatree.multipoles.get(&leaf).unwrap().lock().unwrap().deref().clone();
+        let mut estimate = vec![0.];
+
+        let tree = SingleNodeTree::new(
+            &points,
+            adaptive,
+            Some(n_crit),
+            Some(depth)
+        );
+
+        let domain = tree.get_domain();
+
+        let equivalent_surface = leaf
+            .compute_surface(&domain, order, alpha_inner)
+            .into_iter()
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+
+        source_datatree.fmm.kernel.potential(&equivalent_surface[..], &expansion[..], &distant_point[..], &mut estimate[..]);
+        println!("key {:?} direct {:?} estimate {:?}", leaf, direct, estimate);
         assert!(false)
     }
+
+    // #[test]
+    // fn test_downward_pass() {
+    //     let npoints = 10000;
+    //     let points = points_fixture(npoints);
+    //     let depth = 3;
+    //     let n_crit = 150;
+
+    //     let order = 2;
+    //     let alpha_inner = 1.05;
+    //     let alpha_outer = 1.95;
+    //     let adaptive = false;
+
+    //     let kernel = LaplaceKernel {
+    //         dim: 3,
+    //         is_singular: false,
+    //         value_dimension: 3,
+    //     };
+
+    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+
+    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+
+    //     let datatree = FmmDataTree::new(fmm);
+
+    //     datatree.run();
+
+    //     let leaf = &datatree.fmm.tree.get_leaves()[0];
+
+    //     println!("{:?}", datatree.locals.get(leaf));
+
+    //     assert!(false)
+    // }
 
     // #[test]
     // fn test_upward_pass() {
