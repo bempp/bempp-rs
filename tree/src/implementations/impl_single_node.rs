@@ -5,7 +5,7 @@ use std::{
     vec,
 };
 
-use bempp_traits::tree::{FmmInteractionLists, Tree};
+use bempp_traits::tree::{Tree};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -472,8 +472,12 @@ impl Tree for SingleNodeTree {
         &self.keys_set
     }
 
-    fn get_leaves<'a>(&'a self) -> Self::NodeIndexSlice<'a> {
-        &self.leaves
+    fn get_all_leaves_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex> {
+        &self.leaves_set
+    }
+    
+    fn get_leaves<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>{
+        Some(&self.leaves)
     }
 
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>> {
@@ -490,121 +494,6 @@ impl Tree for SingleNodeTree {
 
     fn is_node(&self, key: &Self::NodeIndex) -> bool {
         self.keys_set.contains(key)
-    }
-}
-
-impl FmmInteractionLists for SingleNodeTree {
-    type Tree = Self;
-
-    fn get_v_list<'a>(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-        if key.level() >= 2 {
-            let v_list = key
-                .parent()
-                .neighbors()
-                .iter()
-                .flat_map(|pn| pn.children())
-                .filter(|pnc| self.keys_set.contains(pnc) && !key.is_adjacent(pnc))
-                .collect_vec();
-
-            if !v_list.is_empty() {
-                return Some(MortonKeys {
-                    keys: v_list,
-                    index: 0,
-                });
-            } else {
-                return None;
-            }
-        }
-        None
-    }
-
-    fn get_u_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-        let mut u_list = Vec::<MortonKey>::new();
-        let neighbours = key.neighbors();
-
-        // Child level
-        let mut neighbors_children_adj: Vec<MortonKey> = neighbours
-            .iter()
-            .flat_map(|n| n.children())
-            .filter(|nc| self.keys_set.contains(nc) && key.is_adjacent(nc))
-            .collect();
-
-        // Key level
-        let mut neighbors_adj: Vec<MortonKey> = neighbours
-            .iter()
-            .filter(|n| self.keys_set.contains(n) && key.is_adjacent(n))
-            .cloned()
-            .collect();
-
-        // Parent level
-        let mut parent_neighbours_adj: Vec<MortonKey> = key
-            .parent()
-            .neighbors()
-            .into_iter()
-            .filter(|pn| self.keys_set.contains(pn) && key.is_adjacent(pn))
-            .collect();
-
-        u_list.append(&mut neighbors_children_adj);
-        u_list.append(&mut neighbors_adj);
-        u_list.append(&mut parent_neighbours_adj);
-        u_list.push(*key);
-
-        if !u_list.is_empty() {
-            Some(MortonKeys {
-                keys: u_list,
-                index: 0,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn get_w_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-        let w_list = key
-            .neighbors()
-            .iter()
-            .flat_map(|n| n.children())
-            .filter(|nc| self.keys_set.contains(nc) && !key.is_adjacent(nc))
-            .collect_vec();
-
-        if !w_list.is_empty() {
-            Some(MortonKeys {
-                keys: w_list,
-                index: 0,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn get_x_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-        let x_list = key
-            .parent()
-            .neighbors()
-            .into_iter()
-            .filter(|pn| self.keys_set.contains(pn) && !key.is_adjacent(pn))
-            .collect_vec();
-
-        if !x_list.is_empty() {
-            Some(MortonKeys {
-                keys: x_list,
-                index: 0,
-            })
-        } else {
-            None
-        }
     }
 }
 
@@ -649,7 +538,7 @@ mod test {
         let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
 
         // Test that the tree really is uniform
-        let levels: Vec<u64> = tree.get_leaves().iter().map(|node| node.level()).collect();
+        let levels: Vec<u64> = tree.get_leaves().unwrap().iter().map(|node| node.level()).collect();
         let first = levels[0];
         assert!(levels.iter().all(|key| *key == first));
 
@@ -667,7 +556,7 @@ mod test {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
 
         // Test that tree is not uniform
-        let levels: Vec<u64> = tree.get_leaves().iter().map(|node| node.level()).collect();
+        let levels: Vec<u64> = tree.get_leaves().unwrap().iter().map(|node| node.level()).collect();
         let first = levels[0];
         assert_eq!(false, levels.iter().all(|level| *level == first));
 
@@ -702,8 +591,8 @@ mod test {
         let points = points_fixture(npoints);
         let uniform = SingleNodeTree::new(&points, false, Some(150), Some(4));
         let adaptive = SingleNodeTree::new(&points, true, Some(150), None);
-        test_no_overlaps_helper(uniform.get_leaves());
-        test_no_overlaps_helper(adaptive.get_leaves());
+        test_no_overlaps_helper(uniform.get_leaves().unwrap());
+        test_no_overlaps_helper(adaptive.get_leaves().unwrap());
     }
 
     #[test]

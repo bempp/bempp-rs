@@ -9,16 +9,22 @@ pub trait SourceTranslation {
 }
 
 pub trait TargetTranslation {
+    // V list (far field) interactions
     fn m2l(&self, level: u64);
 
+    // Translate local potential from parent to child.
     fn l2l(&self, level: u64);
 
-    fn l2p(&self);
-
+    // W list interactions.
     fn m2p(&self);
 
+    // X list interactions.
     fn p2l(&self);
 
+    // Translate local expansion to points within a leaf.
+    fn l2p(&self);
+
+    // U list (near field) interactions.
     fn p2p(&self);
 }
 

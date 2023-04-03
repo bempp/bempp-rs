@@ -47,7 +47,7 @@ pub trait Tree {
     fn get_depth(&self) -> u64;
 
     // Get a reference to all leaves, gets local keys in multi-node setting.
-    fn get_leaves<'a>(&'a self) -> Self::NodeIndexSlice<'a>;
+    fn get_leaves<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>;
 
     // Get a reference to keys at a given level, gets local keys in a multi-node setting.
     fn get_keys<'a>(&'a self, level: u64) -> Option<Self::NodeIndexSlice<'a>>;
@@ -55,7 +55,11 @@ pub trait Tree {
     // Get a reference to all keys, gets local keys in a multi-node setting.
     fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>;
 
+    // Get a reference to all keys as a set, gets local keys in a multi-node setting.
     fn get_all_keys_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex>;
+    
+    // Get a reference to all leaves as a set, gets local keys in a multi-node setting.
+    fn get_all_leaves_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex>;
 
     // Gets a reference to the points contained with a leaf node.
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
@@ -82,27 +86,6 @@ pub trait AttachedDataTree {
         &'a mut self,
         key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<&'a mut Self::Data<'a>>;
-}
-
-pub trait FmmInteractionLists {
-    type Tree: Tree;
-
-    fn get_v_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-    fn get_x_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-    fn get_w_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-    fn get_u_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 }
 
 pub trait MortonKeyInterface
