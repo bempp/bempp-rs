@@ -1,5 +1,6 @@
 //! Traits
 use std::collections::HashSet;
+use std::hash::Hash;
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 /// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
@@ -25,7 +26,7 @@ pub trait Tree {
         Self: 'a;
 
     // A tree node.
-    type NodeIndex;
+    type NodeIndex: MortonKeyInterface;
 
     // Slice of nodes.
     type NodeIndexSlice<'a>: IntoIterator<Item = &'a Self::NodeIndex>
@@ -53,7 +54,9 @@ pub trait Tree {
 
     // Get a reference to all keys, gets local keys in a multi-node setting.
     fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>;
-    
+
+    fn get_all_keys_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex>;
+
     // Gets a reference to the points contained with a leaf node.
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
 
@@ -100,4 +103,20 @@ pub trait FmmInteractionLists {
         &self,
         key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+}
+
+pub trait MortonKeyInterface
+where
+    Self: Hash + Eq,
+{
+    // Copy of nodes
+    type NodeIndices: IntoIterator<Item = Self>;
+
+    fn parent(&self) -> Self;
+
+    fn neighbors(&self) -> Self::NodeIndices;
+
+    fn children(&self) -> Self::NodeIndices;
+
+    fn is_adjacent(&self, other: &Self) -> bool;
 }

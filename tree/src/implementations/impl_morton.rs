@@ -21,6 +21,8 @@ use crate::{
     },
 };
 
+use bempp_traits::tree::MortonKeyInterface;
+
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     let depth = keys.iter().map(|k| k.level()).max().unwrap();
@@ -770,6 +772,32 @@ impl PartialOrd for MortonKey {
 impl Hash for MortonKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
+    }
+}
+
+impl MortonKeyInterface for MortonKey {
+    type NodeIndices = MortonKeys;
+
+    fn children(&self) -> Self::NodeIndices {
+        MortonKeys {
+            keys: self.children(),
+            index: 0,
+        }
+    }
+
+    fn parent(&self) -> Self {
+        self.parent()
+    }
+
+    fn neighbors(&self) -> Self::NodeIndices {
+        MortonKeys {
+            keys: self.neighbors(),
+            index: 0,
+        }
+    }
+
+    fn is_adjacent(&self, other: &Self) -> bool {
+        self.is_adjacent(other)
     }
 }
 

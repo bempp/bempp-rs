@@ -1,4 +1,4 @@
-use bempp_traits::fmm::FmmAlgorithm;
+use bempp_traits::fmm::FmmLoop;
 use bempp_traits::fmm::{Fmm, SourceTranslation, TargetTranslation};
 use bempp_traits::kernel::Kernel;
 use bempp_traits::tree::{FmmInteractionLists, MortonKeyInterface, Tree};
@@ -27,9 +27,9 @@ pub struct FmmDataTree<T: Fmm> {
     fmm: Arc<T>,
     multipoles: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
     locals: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
-    potentials: HashMap<MortonKey, Vec<f64>>,
+    potentials: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
     points: HashMap<MortonKey, Vec<Point>>,
-    charges: HashMap<MortonKey, Vec<f64>>,
+    charges: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
 }
 
 pub struct KiFmm<T: Tree, S: Kernel> {
@@ -326,12 +326,15 @@ impl FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
             for key in keys.iter() {
                 multipoles.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
                 locals.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
-                potentials.insert(key.clone(), Vec::new());
+                potentials.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
                 if let Some(point_data) = fmm.tree().get_points(key) {
                     points.insert(key.clone(), point_data.iter().cloned().collect_vec());
 
                     // TODO: Replace with a global index lookup at some point
-                    charges.insert(key.clone(), vec![1.0; point_data.len()]);
+                    charges.insert(
+                        key.clone(),
+                        Arc::new(Mutex::new(vec![1.0; point_data.len()])),
+                    );
                 }
             }
         }
@@ -356,7 +359,7 @@ impl SourceTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
         leaves.par_iter().for_each(move |&leaf| {
             let multipoles = Arc::clone(&self.multipoles.get(&leaf).unwrap());
             let fmm = Arc::clone(&self.fmm);
-
+            let charges = Arc::clone(&self.charges.get(&leaf).unwrap());
             if let Some(points) = self.points.get(&leaf) {
                 // Lookup data
                 let coordinates = points
@@ -371,7 +374,8 @@ impl SourceTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
                     .flat_map(|[x, y, z]| vec![x, y, z])
                     .collect_vec();
 
-                let charges = self.charges.get(&leaf).unwrap();
+                let charges_lock = charges.lock().unwrap();
+                let charges_ref = ArrayView::from(charges_lock.deref());
 
                 // Calculate check potential
                 let mut check_potential =
@@ -379,7 +383,7 @@ impl SourceTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                 fmm.kernel.potential(
                     &coordinates[..],
-                    &charges[..],
+                    &charges_ref.as_slice().unwrap(),
                     &upward_check_surface[..],
                     &mut check_potential[..],
                 );
@@ -640,16 +644,220 @@ impl TargetTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
                     out_local.extend(out_expansion);
                 }
             })
-        }    
+        }
     }
 
-    fn m2p(&self) {}
+    fn m2p(&self) {
+        let leaves = self.fmm.tree.get_leaves();
 
-    fn l2p(&self) {}
+        leaves.par_iter().for_each(move |&leaf| {
+            let fmm = Arc::clone(&self.fmm);
+            let out_node = Arc::clone(&self.potentials.get(&leaf).unwrap());
 
-    fn p2l(&self) {}
+            if let Some(points) = fmm.tree().get_points(&leaf) {
+                if let Some(w_list) = fmm.get_w_list(&leaf) {
+                    for source in w_list.iter() {
+                        let in_node = Arc::clone(&self.multipoles.get(&source).unwrap());
 
-    fn p2p(&self) {}
+                        let upward_equivalent_surface = source
+                            .compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner)
+                            .into_iter()
+                            .flat_map(|[x, y, z]| vec![x, y, z])
+                            .collect_vec();
+
+                        let multipole_expansion_lock = in_node.lock().unwrap();
+                        let multipole_expansion_ref =
+                            ArrayView::from(multipole_expansion_lock.deref());
+
+                        let coordinates = points
+                            .iter()
+                            .map(|p| p.coordinate)
+                            .flat_map(|[x, y, z]| vec![x, y, z])
+                            .collect_vec();
+
+                        let mut potential = vec![0f64; coordinates.len()];
+                        fmm.kernel().potential(
+                            &upward_equivalent_surface[..],
+                            &multipole_expansion_ref.as_slice().unwrap(),
+                            &coordinates[..],
+                            &mut potential,
+                        );
+
+                        let mut out_potential_lock = out_node.lock().unwrap();
+
+                        if !out_potential_lock.is_empty() {
+                            out_potential_lock
+                                .iter_mut()
+                                .zip(potential.iter())
+                                .for_each(|(p, n)| *p += *n);
+                        } else {
+                            out_potential_lock.extend(potential);
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    fn l2p(&self) {
+        let leaves = self.fmm.tree.get_leaves();
+
+        leaves.par_iter().for_each(move |&leaf| {
+            let fmm = Arc::clone(&self.fmm);
+            let out_potential = Arc::clone(&self.potentials.get(&leaf).unwrap());
+            let local = Arc::clone(&self.locals.get(&leaf).unwrap());
+
+            if let Some(points) = fmm.tree().get_points(&leaf) {
+                // Lookup data
+                let coordinates = points
+                    .iter()
+                    .map(|p| p.coordinate)
+                    .flat_map(|[x, y, z]| vec![x, y, z])
+                    .collect_vec();
+
+                let downward_equivalent_surface = leaf
+                    .compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer)
+                    .into_iter()
+                    .flat_map(|[x, y, z]| vec![x, y, z])
+                    .collect_vec();
+
+                let local_expansion_lock = local.lock().unwrap();
+                let local_expansion_ref = ArrayView::from(local_expansion_lock.deref());
+
+                let mut potential = vec![0f64; coordinates.len()];
+
+                fmm.kernel().potential(
+                    &downward_equivalent_surface[..],
+                    &local_expansion_ref.as_slice().unwrap(),
+                    &coordinates[..],
+                    &mut potential,
+                );
+
+                let mut out_potential_lock = out_potential.lock().unwrap();
+
+                if !out_potential_lock.is_empty() {
+                    out_potential_lock
+                        .iter_mut()
+                        .zip(potential.iter())
+                        .for_each(|(p, n)| *p += *n);
+                } else {
+                    out_potential_lock.extend(potential);
+                }
+            }
+        })
+    }
+
+    fn p2l(&self) {
+        let leaves = self.fmm.tree.get_leaves();
+
+        leaves.par_iter().for_each(move |&leaf| {
+            let fmm = Arc::clone(&self.fmm);
+            let out_node = Arc::clone(&self.locals.get(&leaf).unwrap());
+
+            if let Some(x_list) = fmm.tree().get_x_list(&leaf) {
+                for source in x_list.iter() {
+                    if let Some(points) = fmm.tree().get_points(&source) {
+                        let coordinates = points
+                            .iter()
+                            .map(|p| p.coordinate)
+                            .flat_map(|[x, y, z]| vec![x, y, z])
+                            .collect_vec();
+                        // TODO check whether I need to wrap anything in Arcs when using Rayon?
+                        let charges = self.charges.get(&source).unwrap();
+                        let charges_lock = charges.lock().unwrap();
+                        let charges_ref = ArrayView::from(charges_lock.deref());
+
+                        let downward_check_surface = leaf
+                            .compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_inner)
+                            .into_iter()
+                            .flat_map(|[x, y, z]| vec![x, y, z])
+                            .collect_vec();
+
+                        let mut downward_check_potential =
+                            vec![0f64; downward_check_surface.len() / fmm.kernel().dim()];
+                        fmm.kernel.potential(
+                            &coordinates[..],
+                            &charges_ref.as_slice().unwrap(),
+                            &downward_check_surface[..],
+                            &mut downward_check_potential[..],
+                        );
+
+                        let downward_check_potential = ArrayView::from(&downward_check_potential);
+
+                        let mut local_lock = out_node.lock().unwrap();
+
+                        let out_local = fmm.kernel().scale(leaf.level())
+                            * &fmm
+                                .dc2e_inv
+                                .0
+                                .dot(&fmm.dc2e_inv.1.dot(&downward_check_potential));
+
+                        if !local_lock.is_empty() {
+                            local_lock
+                                .iter_mut()
+                                .zip(out_local.iter())
+                                .for_each(|(o, l)| *o += *l);
+                        } else {
+                            local_lock.extend(out_local);
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    fn p2p(&self) {
+        let leaves = self.fmm.tree.get_leaves();
+
+        leaves.par_iter().for_each(move |&leaf| {
+            let fmm = Arc::clone(&self.fmm);
+            let out_node = Arc::clone(&self.potentials.get(&leaf).unwrap());
+
+            if let Some(out_points) = fmm.tree().get_points(&leaf) {
+                let out_coordinates = out_points
+                    .iter()
+                    .map(|p| p.coordinate)
+                    .flat_map(|[x, y, z]| vec![x, y, z])
+                    .collect_vec();
+
+                if let Some(u_list) = fmm.get_u_list(&leaf) {
+                    for source in u_list.iter() {
+                        if let Some(in_points) = fmm.tree().get_points(&source) {
+                            let in_coordinates = out_points
+                                .iter()
+                                .map(|p| p.coordinate)
+                                .flat_map(|[x, y, z]| vec![x, y, z])
+                                .collect_vec();
+
+                            let charges = Arc::clone(&self.charges.get(&leaf).unwrap());
+                            let charges_lock = charges.lock().unwrap();
+                            let charges_ref = ArrayView::from(charges_lock.deref());
+
+                            let mut potential = vec![0f64; out_coordinates.len()];
+
+                            fmm.kernel.potential(
+                                &in_coordinates[..],
+                                &charges_ref.as_slice().unwrap(),
+                                &out_coordinates[..],
+                                &mut potential,
+                            );
+
+                            let mut out_potential = out_node.lock().unwrap();
+
+                            if !out_potential.is_empty() {
+                                out_potential
+                                    .iter_mut()
+                                    .zip(potential.iter())
+                                    .for_each(|(c, p)| *c += *p);
+                            } else {
+                                out_potential.extend(potential)
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
 }
 
 impl<T, U> Fmm for KiFmm<T, U>
@@ -673,7 +881,7 @@ where
     }
 }
 
-impl<T> FmmAlgorithm for FmmDataTree<T>
+impl<T> FmmLoop for FmmDataTree<T>
 where
     T: Fmm,
     FmmDataTree<T>: SourceTranslation + TargetTranslation,
@@ -823,13 +1031,13 @@ mod test {
     // }
 
     #[test]
-    fn test_upward_pass() {
+    fn test_downward_pass() {
         let npoints = 10000;
         let points = points_fixture(npoints);
         let depth = 3;
         let n_crit = 150;
 
-        let order = 10;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
         let adaptive = false;
@@ -844,54 +1052,87 @@ mod test {
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
 
-        let source_datatree = FmmDataTree::new(fmm);
+        let datatree = FmmDataTree::new(fmm);
 
-        source_datatree.upward_pass();
+        datatree.run();
 
-        let distant_point = vec![1000., 0., 0.];
-        let mut direct = vec![0.];
-        let coordinates = points
-            .iter()
-            .map(|p| p.coordinate)
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
-        let charges = vec![1.; coordinates.len()];
-        source_datatree.fmm.kernel.potential(
-            &coordinates[..],
-            &charges[..],
-            &distant_point[..],
-            &mut direct,
-        );
-        println!("Direct {:?}", direct);
+        let leaf = &datatree.fmm.tree.get_leaves()[0];
 
-        let mut estimate = vec![0.];
+        println!("{:?}", datatree.locals.get(leaf));
 
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
-
-        let domain = tree.get_domain();
-
-        let equivalent_surface = ROOT
-            .compute_surface(&domain, order, alpha_inner)
-            .into_iter()
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
-        let expansion = source_datatree
-            .multipoles
-            .get(&ROOT)
-            .unwrap()
-            .lock()
-            .unwrap()
-            .deref()
-            .clone();
-
-        source_datatree.fmm.kernel.potential(
-            &equivalent_surface[..],
-            &expansion[..],
-            &distant_point[..],
-            &mut estimate[..],
-        );
-
-        println!("FMM {:?}", estimate);
         assert!(false)
     }
+
+    // #[test]
+    // fn test_upward_pass() {
+    //     let npoints = 10000;
+    //     let points = points_fixture(npoints);
+    //     let depth = 3;
+    //     let n_crit = 150;
+
+    //     let order = 10;
+    //     let alpha_inner = 1.05;
+    //     let alpha_outer = 1.95;
+    //     let adaptive = false;
+
+    //     let kernel = LaplaceKernel {
+    //         dim: 3,
+    //         is_singular: false,
+    //         value_dimension: 3,
+    //     };
+
+    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+
+    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+
+    //     let source_datatree = FmmDataTree::new(fmm);
+
+    //     source_datatree.upward_pass();
+
+    //     let distant_point = vec![1000., 0., 0.];
+    //     let mut direct = vec![0.];
+    //     let coordinates = points
+    //         .iter()
+    //         .map(|p| p.coordinate)
+    //         .flat_map(|[x, y, z]| vec![x, y, z])
+    //         .collect_vec();
+    //     let charges = vec![1.; coordinates.len()];
+    //     source_datatree.fmm.kernel.potential(
+    //         &coordinates[..],
+    //         &charges[..],
+    //         &distant_point[..],
+    //         &mut direct,
+    //     );
+    //     println!("Direct {:?}", direct);
+
+    //     let mut estimate = vec![0.];
+
+    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+
+    //     let domain = tree.get_domain();
+
+    //     let equivalent_surface = ROOT
+    //         .compute_surface(&domain, order, alpha_inner)
+    //         .into_iter()
+    //         .flat_map(|[x, y, z]| vec![x, y, z])
+    //         .collect_vec();
+    //     let expansion = source_datatree
+    //         .multipoles
+    //         .get(&ROOT)
+    //         .unwrap()
+    //         .lock()
+    //         .unwrap()
+    //         .deref()
+    //         .clone();
+
+    //     source_datatree.fmm.kernel.potential(
+    //         &equivalent_surface[..],
+    //         &expansion[..],
+    //         &distant_point[..],
+    //         &mut estimate[..],
+    //     );
+
+    //     println!("FMM {:?}", estimate);
+    //     assert!(false)
+    // }
 }

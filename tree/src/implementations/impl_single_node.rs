@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    vec, hash::Hash,
+    hash::Hash,
+    vec,
 };
 
 use bempp_traits::tree::{FmmInteractionLists, Tree};
@@ -19,16 +20,12 @@ use crate::{
 
 impl SingleNodeTree {
     /// Constructor for uniform trees
-    pub fn uniform_tree(
-        points: &[[PointType; 3]],
-        &domain: &Domain,
-        depth: u64,
-    ) -> SingleNodeTree {
+    pub fn uniform_tree(points: &[[PointType; 3]], &domain: &Domain, depth: u64) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
         let mut points: Points = points
             .iter()
             .enumerate()
-            .map(|(i, &p)|{
+            .map(|(i, &p)| {
                 let base_key = MortonKey::from_point(&p, &domain, DEEPEST_LEVEL);
                 let encoded_key = MortonKey::from_point(&p, &domain, depth);
                 Point {
@@ -109,8 +106,7 @@ impl SingleNodeTree {
         let mut levels_to_keys = HashMap::new();
         let mut curr = keys[0];
         let mut curr_idx = 0;
-        for (i, key ) in keys.iter().enumerate() {
-
+        for (i, key) in keys.iter().enumerate() {
             if key.level() != curr.level() {
                 levels_to_keys.insert(curr.level(), (curr_idx, i));
                 curr_idx = i;
@@ -148,7 +144,7 @@ impl SingleNodeTree {
                     coordinate: p,
                     base_key: key,
                     encoded_key: key,
-                    global_idx: i
+                    global_idx: i,
                 }
             })
             .collect();
@@ -235,8 +231,7 @@ impl SingleNodeTree {
         let mut levels_to_keys = HashMap::new();
         let mut curr = keys[0];
         let mut curr_idx = 0;
-        for (i, key ) in keys.iter().enumerate() {
-
+        for (i, key) in keys.iter().enumerate() {
             if key.level() != curr.level() {
                 levels_to_keys.insert(curr.level(), (curr_idx, i));
                 curr_idx = i;
@@ -471,6 +466,10 @@ impl Tree for SingleNodeTree {
 
     fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>> {
         Some(&self.keys)
+    }
+
+    fn get_all_keys_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex> {
+        &self.keys_set
     }
 
     fn get_leaves<'a>(&'a self) -> Self::NodeIndexSlice<'a> {
@@ -857,21 +856,20 @@ mod test {
         let points = points_fixture(npoints);
         let depth = 3;
         let tree = SingleNodeTree::new(&points, false, None, Some(depth));
-        
+
         let keys = tree.get_all_keys().unwrap();
 
         let depth = tree.get_depth();
 
         let mut tot = 0;
         for level in (0..=depth).rev() {
-
             // Get keys at this level
             if let Some(tmp) = tree.get_keys(level) {
                 tot += tmp.len();
             }
         }
         assert_eq!(tot, keys.len());
-        
+
         // Adaptive tree
         let ncrit = 150;
         let tree = SingleNodeTree::new(&points, true, Some(ncrit), None);
@@ -880,13 +878,11 @@ mod test {
 
         let mut tot = 0;
         for level in (0..=depth).rev() {
-
             // Get keys at this level
             if let Some(tmp) = tree.get_keys(level) {
                 tot += tmp.len();
             }
         }
-
 
         assert_eq!(tot, keys.len());
     }
