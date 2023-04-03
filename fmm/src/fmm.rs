@@ -1,3 +1,4 @@
+extern crate blas_src;
 use bempp_traits::fmm::FmmLoop;
 use bempp_traits::fmm::{Fmm, SourceTranslation, TargetTranslation};
 use bempp_traits::kernel::Kernel;
@@ -12,7 +13,7 @@ use ndarray_linalg::SVDDC;
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::{collections::HashMap, hash::Hash};
-
+use std::time::Instant;
 use bempp_tree::constants::ROOT;
 use ndarray::*;
 use std::sync::{Arc, Mutex};
@@ -387,13 +388,13 @@ impl SourceTranslation for FmmDataTree<KiFmm<SingleNodeTree, LaplaceKernel>> {
                     &upward_check_surface[..],
                     &mut check_potential[..],
                 );
-
                 let check_potential = Array1::from_vec(check_potential);
 
                 // Calculate multipole expansion
                 let multipole_expansion = fmm.kernel.scale(leaf.level())
                     * fmm.uc2e_inv.0.dot(&fmm.uc2e_inv.1.dot(&check_potential));
                 let multipole_expansion = multipole_expansion.as_slice().unwrap();
+                // let multipole_expansion = vec![0.; check_potential.len()]; 
 
                 let mut curr = multipoles.lock().unwrap();
 
@@ -927,6 +928,8 @@ mod test {
 
     use super::*;
     use std::time::Instant;
+    use std::env;
+    use num_cpus;
 
     use bempp_tree::types::point::{PointType, Points};
     use rand::prelude::*;
@@ -961,12 +964,24 @@ mod test {
 
     #[test]
     fn test_p2m() {
+
+        // Set the number of threads for Rayon
+        let num_cores = num_cpus::get();
+        println!("NCores {:?}", num_cores);
+        rayon::ThreadPoolBuilder::new()
+        .num_threads(8)
+        .build_global()
+        .unwrap();
+
+        env::set_var("OPENBLAS_NUM_THREADS", 1.to_string());
+        env::set_var("OMP_NUM_THREADS", 1.to_string());
+
         let npoints = 1000000;
         let points = points_fixture(npoints);
         let depth = 5;
         let n_crit = 150;
 
-        let order = 5;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
         let adaptive = true;
@@ -997,12 +1012,11 @@ mod test {
         let source_datatree = FmmDataTree::new(fmm);
 
         let start = std::time::Instant::now();
-        source_datatree.p2m();
+        source_datatree.upward_pass();
         let elapsed = start.elapsed().as_millis();
-        println!("P2M {:?}ms", elapsed);
-        let leaf = source_datatree.fmm.tree.get_leaves()[0];
+        println!("Upward Pass {:?}ms", elapsed);
 
-        let points = source_datatree.points.get(&leaf).unwrap();
+        let points = source_datatree.points.get(&ROOT).unwrap();
 
         let distant_point = vec![1000., 0., 0.];
         let mut direct = vec![0.];
@@ -1014,7 +1028,7 @@ mod test {
         let charges = vec![1.; coordinates.len()];
         source_datatree.fmm.kernel.potential(&coordinates[..], &charges[..], &distant_point[..], &mut direct);
 
-        let expansion = source_datatree.multipoles.get(&leaf).unwrap().lock().unwrap().deref().clone();
+        let expansion = source_datatree.multipoles.get(&ROOT).unwrap().lock().unwrap().deref().clone();
         let mut estimate = vec![0.];
 
         let tree = SingleNodeTree::new(
@@ -1026,14 +1040,14 @@ mod test {
 
         let domain = tree.get_domain();
 
-        let equivalent_surface = leaf
+        let equivalent_surface = ROOT
             .compute_surface(&domain, order, alpha_inner)
             .into_iter()
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
 
         source_datatree.fmm.kernel.potential(&equivalent_surface[..], &expansion[..], &distant_point[..], &mut estimate[..]);
-        println!("key {:?} direct {:?} estimate {:?}", leaf, direct, estimate);
+        println!("key {:?} direct {:?} estimate {:?}", ROOT, direct, estimate);
         assert!(false)
     }
 
