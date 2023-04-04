@@ -1,8 +1,15 @@
 //! Geometry and topology definitions
 
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::AdjacencyList;
+use bempp_tools::arrays::{AdjacencyList, Array2D};
 use std::cell::Ref;
+
+/// The ownership of a mesh entity
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum Ownership {
+    Owned,
+    Ghost(usize, usize),
+}
 
 pub trait Geometry {
     //! Grid geometry
@@ -24,8 +31,41 @@ pub trait Geometry {
     /// The number of cells
     fn cell_count(&self) -> usize;
 
-    /// Return the index map from the input order to the storage order
+    /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
+
+    ///  Compute the physical coordinates of a set of points in a given cell
+    fn compute_points(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        physical_points: &mut Array2D<f64>,
+    );
+
+    /// Evaluate the jacobian at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>);
+
+    /// Evaluate the determinand of the jacobian at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn compute_jacobian_determinants(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_determinants: &mut [f64],
+    );
+
+    /// Evaluate the jacobian inverse at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn compute_jacobian_inverses(
+        &self,
+        points: &Array2D<f64>,
+        cell: usize,
+        jacobian_inverses: &mut Array2D<f64>,
+    );
 }
 
 pub trait Topology {
@@ -36,7 +76,7 @@ pub trait Topology {
     /// The dimension of the grid
     fn dim(&self) -> usize;
 
-    /// Return the index map from the input order to the storage order
+    /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
 
     /// The number of entities of dimension `dim`
@@ -64,6 +104,16 @@ pub trait Topology {
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
     fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>>;
+
+    /// Get the ownership of a mesh entity
+    fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
+
+    /// Get the cell adjacency on the local process
+    ///
+    /// The `i`th row of the output gives the cells adjacent to the local cell with index `i`.
+    /// The entries in the output are (cell_index, number_of_shared_vertices).
+    // TODO: find a better return type for here
+    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>>;
 }
 
 pub trait Grid {

@@ -24,7 +24,7 @@ fn create_triangle_mapper(v0: usize, v1: usize) -> impl Fn((f64, f64)) -> (f64, 
     //
     // The Duffy rule has vertices with a reference element
     // 0: (0, 0), 1: (1, 0), 2: (1, 1)
-    // We need to map (0, 0) -> v0, (0, 1) -> v1, and (0, 1) -> v2,
+    // We need to map (0, 0) -> v0, (1, 0) -> v1, and (1, 1) -> v2,
     // where v2 is implicitly defined as the index 3 - v0 - v1 (
     // since all triangle indices together sum up to 3)
 
@@ -555,6 +555,91 @@ mod test {
             epsilon = 0.0,
             max_relative = 1E-13
         );
+    }
+
+    #[test]
+    fn test_edge_adjacent_triangles_rotations() {
+        let compute_integral = |npoints: usize,
+                                cell0_indices: [usize; 3],
+                                cell1_indices: [usize; 3]|
+         -> f64 {
+            let mut local_indices = vec![];
+            for (i0, c0) in cell0_indices.iter().enumerate() {
+                for (i1, c1) in cell1_indices.iter().enumerate() {
+                    if c0 == c1 {
+                        local_indices.push((i0, i1));
+                    }
+                }
+            }
+            let connectivity = CellToCellConnectivity {
+                connectivity_dimension: 1,
+                local_indices,
+            };
+
+            let singular_rule = triangle_duffy(&connectivity, npoints).unwrap();
+
+            let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+
+            let mut sum = 0.0;
+
+            for index in 0..singular_rule.npoints {
+                let (x1, x2) = (
+                    points[2 * cell0_indices[0]]
+                        + singular_rule.test_points[2 * index]
+                            * (points[2 * cell0_indices[1]] - points[2 * cell0_indices[0]])
+                        + singular_rule.test_points[2 * index + 1]
+                            * (points[2 * cell0_indices[2]] - points[2 * cell0_indices[0]]),
+                    points[2 * cell0_indices[0] + 1]
+                        + singular_rule.test_points[2 * index]
+                            * (points[2 * cell0_indices[1] + 1] - points[2 * cell0_indices[0] + 1])
+                        + singular_rule.test_points[2 * index + 1]
+                            * (points[2 * cell0_indices[2] + 1] - points[2 * cell0_indices[0] + 1]),
+                );
+
+                let (y1, y2) = (
+                    points[2 * cell1_indices[0]]
+                        + singular_rule.trial_points[2 * index]
+                            * (points[2 * cell1_indices[1]] - points[2 * cell1_indices[0]])
+                        + singular_rule.trial_points[2 * index + 1]
+                            * (points[2 * cell1_indices[2]] - points[2 * cell1_indices[0]]),
+                    points[2 * cell1_indices[0] + 1]
+                        + singular_rule.trial_points[2 * index]
+                            * (points[2 * cell1_indices[1] + 1] - points[2 * cell1_indices[0] + 1])
+                        + singular_rule.trial_points[2 * index + 1]
+                            * (points[2 * cell1_indices[2] + 1] - points[2 * cell1_indices[0] + 1]),
+                );
+
+                let weight = singular_rule.weights[index];
+                sum += laplace_green(x1, x2, y1, y2) * weight;
+            }
+            sum
+        };
+        for cell0_indices in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            for cell1_indices in [
+                [3, 1, 2],
+                [3, 2, 1],
+                [1, 3, 2],
+                [1, 2, 3],
+                [2, 3, 1],
+                [2, 1, 3],
+            ] {
+                for npts in [2, 4, 8] {
+                    assert_relative_eq!(
+                        compute_integral(npts, [0, 1, 2], [3, 1, 2]),
+                        compute_integral(npts, cell0_indices, cell1_indices),
+                        epsilon = 0.0,
+                        max_relative = 1E-13
+                    );
+                }
+            }
+        }
     }
 
     #[test]

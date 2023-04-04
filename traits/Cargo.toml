@@ -1,5 +1,4 @@
 [features]
-# Treat warnings as a build error.
 strict = []
 
 [package]

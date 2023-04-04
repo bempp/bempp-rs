@@ -90,6 +90,155 @@ impl<'a, T> Iterator for Array2DRowIterator<'a, T> {
     }
 }
 
+/// A three-dimensional rectangular array
+pub struct Array3D<T> {
+    /// The data in the array, in row-major order
+    data: Vec<T>,
+    /// The shape of the array
+    shape: (usize, usize, usize),
+}
+
+impl<T: Num + Clone> Array3D<T> {
+    /// Create an array from a data vector
+    pub fn new(shape: (usize, usize, usize)) -> Self {
+        Self {
+            data: vec![T::zero(); shape.0 * shape.1 * shape.2],
+            shape: shape,
+        }
+    }
+}
+
+impl<T> Array3D<T> {
+    /// Create an array from a data vector
+    pub fn from_data(data: Vec<T>, shape: (usize, usize, usize)) -> Self {
+        Self {
+            data: data,
+            shape: shape,
+        }
+    }
+    /// Get an item from the array
+    pub fn get(&self, index0: usize, index1: usize, index2: usize) -> Option<&T> {
+        if index0 >= self.shape.0 || index1 >= self.shape.1 || index2 >= self.shape.2 {
+            None
+        } else {
+            unsafe { Some(self.get_unchecked(index0, index1, index2)) }
+        }
+    }
+    /// Get a mutable item from the array
+    pub fn get_mut(&mut self, index0: usize, index1: usize, index2: usize) -> Option<&mut T> {
+        if index0 >= self.shape.0 || index1 >= self.shape.1 || index2 >= self.shape.2 {
+            None
+        } else {
+            unsafe { Some(self.get_unchecked_mut(index0, index1, index2)) }
+        }
+    }
+    /// Get an item from the array without checking bounds
+    pub unsafe fn get_unchecked(&self, index0: usize, index1: usize, index2: usize) -> &T {
+        self.data
+            .get_unchecked((index0 * self.shape.1 + index1) * self.shape.2 + index2)
+    }
+    /// Get a mutable item from the array without checking bounds
+    pub unsafe fn get_unchecked_mut(
+        &mut self,
+        index0: usize,
+        index1: usize,
+        index2: usize,
+    ) -> &mut T {
+        self.data
+            .get_unchecked_mut((index0 * self.shape.1 + index1) * self.shape.2 + index2)
+    }
+    /// Get the shape of the array
+    pub fn shape(&self) -> &(usize, usize, usize) {
+        &self.shape
+    }
+}
+
+/// A four-dimensional rectangular array
+pub struct Array4D<T> {
+    /// The data in the array, in row-major order
+    data: Vec<T>,
+    /// The shape of the array
+    shape: (usize, usize, usize, usize),
+}
+
+impl<T: Num + Clone> Array4D<T> {
+    /// Create an array from a data vector
+    pub fn new(shape: (usize, usize, usize, usize)) -> Self {
+        Self {
+            data: vec![T::zero(); shape.0 * shape.1 * shape.2 * shape.3],
+            shape: shape,
+        }
+    }
+}
+
+impl<T> Array4D<T> {
+    /// Create an array from a data vector
+    pub fn from_data(data: Vec<T>, shape: (usize, usize, usize, usize)) -> Self {
+        Self {
+            data: data,
+            shape: shape,
+        }
+    }
+    /// Get an item from the array
+    pub fn get(&self, index0: usize, index1: usize, index2: usize, index3: usize) -> Option<&T> {
+        if index0 >= self.shape.0
+            || index1 >= self.shape.1
+            || index2 >= self.shape.2
+            || index3 >= self.shape.3
+        {
+            None
+        } else {
+            unsafe { Some(self.get_unchecked(index0, index1, index2, index3)) }
+        }
+    }
+    /// Get a mutable item from the array
+    pub fn get_mut(
+        &mut self,
+        index0: usize,
+        index1: usize,
+        index2: usize,
+        index3: usize,
+    ) -> Option<&mut T> {
+        if index0 >= self.shape.0
+            || index1 >= self.shape.1
+            || index2 >= self.shape.2
+            || index3 >= self.shape.3
+        {
+            None
+        } else {
+            unsafe { Some(self.get_unchecked_mut(index0, index1, index2, index3)) }
+        }
+    }
+    /// Get an item from the array without checking bounds
+    pub unsafe fn get_unchecked(
+        &self,
+        index0: usize,
+        index1: usize,
+        index2: usize,
+        index3: usize,
+    ) -> &T {
+        self.data.get_unchecked(
+            ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
+        )
+    }
+    /// Get a mutable item from the array without checking bounds
+    pub unsafe fn get_unchecked_mut(
+        &mut self,
+        index0: usize,
+        index1: usize,
+        index2: usize,
+        index3: usize,
+    ) -> &mut T {
+        self.data.get_unchecked_mut(
+            ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
+        )
+    }
+    /// Get the shape of the array
+    pub fn shape(&self) -> &(usize, usize, usize, usize) {
+        &self.shape
+    }
+}
+
 /// An adjacency list
 ///
 /// An adjacency list stores two-dimensional data where each row may have a different number of items
@@ -123,6 +272,9 @@ impl<T: Num + Copy> AdjacencyList<T> {
 impl<T> AdjacencyList<T> {
     /// Create an adjacency list
     pub fn from_data(data: Vec<T>, offsets: Vec<usize>) -> Self {
+        if offsets[offsets.len() - 1] != data.len() {
+            panic!("Final offset must be the length of the data.");
+        }
         Self {
             data: data,
             offsets: offsets,
