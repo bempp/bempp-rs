@@ -57,26 +57,23 @@ impl SingleNodeTree {
         // Assign keys to points
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
-        // Assign leaves to points, and collect all leaf nodes
-        let leaves_to_points = points
-            .points
-            .iter()
-            .enumerate()
-            .fold(
-                (HashMap::new(), 0, points.points[0].clone()),
-                |(mut leaves_to_points, curr_idx, curr), (i, point)| {
-                    if point.encoded_key != curr.encoded_key {
-                        leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
+        // Group points by leaves
+        points.sort();
 
-                        (leaves_to_points, i, point.clone())
-                    } else {
-                        (leaves_to_points, curr_idx, curr)
-                    }
-                },
-            )
-            .0;
+        let mut leaves_to_points = HashMap::new();
+        let mut curr = points.points[0].clone();
+        let mut curr_idx = 0;
 
-        // Add unmapped leaves
+        for (i, point) in points.points.iter().enumerate() {
+            if point.encoded_key != curr.encoded_key {
+                leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
+                curr_idx = i;
+                curr = point.clone();
+            }
+        }
+        leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
+        
+        // Add unmapped leaves 
         let leaves = MortonKeys {
             keys: leaves_to_points
                 .keys()
@@ -175,23 +172,22 @@ impl SingleNodeTree {
 
         // Assign leaves to points, and collect all leaf nodes
         let unmapped = SingleNodeTree::assign_nodes_to_points(&balanced, &mut points);
-        let leaves_to_points = points
-            .points
-            .iter()
-            .enumerate()
-            .fold(
-                (HashMap::new(), 0, points.points[0].clone()),
-                |(mut leaves_to_points, curr_idx, curr), (i, point)| {
-                    if point.encoded_key != curr.encoded_key {
-                        leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
+        
+        // Group points by leaves
+        points.sort();
 
-                        (leaves_to_points, i, point.clone())
-                    } else {
-                        (leaves_to_points, curr_idx, curr)
-                    }
-                },
-            )
-            .0;
+        let mut leaves_to_points = HashMap::new();
+        let mut curr = points.points[0].clone();
+        let mut curr_idx = 0;
+
+        for (i, point) in points.points.iter().enumerate() {
+            if point.encoded_key != curr.encoded_key {
+                leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
+                curr_idx = i;
+                curr = point.clone();
+            }
+        }
+        leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
         // Add unmapped leaves
         let leaves = MortonKeys {
@@ -759,6 +755,19 @@ mod test {
         }
         assert_eq!(tot, keys.len());
 
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+            // Get all points at this level
+            if let Some(nodes) = tree.get_keys(level) {
+                for node in nodes.iter() {
+                    if let Some(points) = tree.get_points(node) {
+                        tot += points.len()
+                    }
+                }
+            }
+        }
+        assert_eq!(tot, npoints as usize);
+
         // Adaptive tree
         let ncrit = 150;
         let tree = SingleNodeTree::new(&points, true, Some(ncrit), None);
@@ -772,7 +781,19 @@ mod test {
                 tot += tmp.len();
             }
         }
-
         assert_eq!(tot, keys.len());
+
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+            // Get all points at this level
+            if let Some(nodes) = tree.get_keys(level) {
+                for node in nodes.iter() {
+                    if let Some(points) = tree.get_points(node) {
+                        tot += points.len()
+                    }
+                }
+            }
+        }
+        assert_eq!(tot, npoints as usize);
     }
 }
