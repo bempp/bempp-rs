@@ -4,7 +4,7 @@ pub struct Charge {
     pub data: f64,
 
     /// Global unique index.
-    pub global_idx: usize
+    pub global_idx: usize,
 }
 
 /// Container of **Points**.
@@ -16,4 +16,3 @@ pub struct Charges {
     /// index for implementing the Iterator trait.
     pub index: usize,
 }
-

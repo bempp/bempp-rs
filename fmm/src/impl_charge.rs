@@ -1,6 +1,6 @@
 use std::{
-    cmp::{Ord, PartialEq, Eq, Ordering},
-    hash::{Hash, Hasher}
+    cmp::{Eq, Ord, Ordering, PartialEq},
+    hash::{Hash, Hasher},
 };
 
 use crate::charge::{Charge, Charges};

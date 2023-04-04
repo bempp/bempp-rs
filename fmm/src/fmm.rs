@@ -26,11 +26,7 @@ use bempp_tree::{
     },
 };
 
-use crate::{
-    laplace::LaplaceKernel, 
-    linalg::pinv,
-    charge::{Charges}
-};
+use crate::{charge::Charges, laplace::LaplaceKernel, linalg::pinv};
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
