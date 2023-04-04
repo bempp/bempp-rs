@@ -1,8 +1,6 @@
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
-    vec,
 };
 
 use bempp_traits::tree::{Tree};

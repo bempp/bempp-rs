@@ -8,7 +8,7 @@ pub struct LaplaceKernel {
 }
 
 impl LaplaceKernel {
-    fn new(dim: usize, is_singular: bool, value_dimension: usize) -> LaplaceKernel {
+    pub fn new(dim: usize, is_singular: bool, value_dimension: usize) -> LaplaceKernel {
         LaplaceKernel {
             dim,
             is_singular,
@@ -16,7 +16,7 @@ impl LaplaceKernel {
         }
     }
 
-    fn potential_kernel_3D(&self, source: &[f64], target: &[f64]) -> f64 {
+    pub fn potential_kernel_3_d(&self, source: &[f64], target: &[f64]) -> f64 {
         let mut tmp = source
             .iter()
             .zip(target.iter())
@@ -60,7 +60,7 @@ impl Kernel for LaplaceKernel {
                 let source = &sources[l..(l + self.dim())];
                 let tmp;
                 if self.dim() == 3 {
-                    tmp = self.potential_kernel_3D(source, target);
+                    tmp = self.potential_kernel_3_d(source, target);
                 } else {
                     panic!("Kernel not implemented for dimension={:?}!", self.dim())
                 }
@@ -87,7 +87,7 @@ impl Kernel for LaplaceKernel {
 
                 let tmp;
                 if self.dim() == 3 {
-                    tmp = self.potential_kernel_3D(source, target);
+                    tmp = self.potential_kernel_3_d(source, target);
                 } else {
                     panic!("Gram not implemented for dimension={:?}!", self.dim())
                 }
