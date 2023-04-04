@@ -26,7 +26,11 @@ use bempp_tree::{
     },
 };
 
-use crate::{laplace::LaplaceKernel, linalg::pinv};
+use crate::{
+    laplace::LaplaceKernel, 
+    linalg::pinv,
+    charge::{Charges}
+};
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
@@ -318,7 +322,7 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
 }
 
 impl FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
-    fn new(fmm: KiFmm<SingleNodeTree, LaplaceKernel>) -> Self {
+    fn new(fmm: KiFmm<SingleNodeTree, LaplaceKernel>, charges: Charges) -> Self {
         let mut multipoles = HashMap::new();
         let mut locals = HashMap::new();
         let mut potentials = HashMap::new();
@@ -455,10 +459,6 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                 // Get interaction list for node
                 if let Some(v_list) = fmm_arc.get_v_list(&target) {
-                    // if level == 2 {
-                    //     println!("target {:?}  \n v list {:?} \n \n", target, v_list.len());
-                    // }
-
                     for source in v_list.iter() {
                         // Locate correct components of compressed M2L matrix.
                         let transfer_vector = target.find_transfer_vector(&source);
@@ -951,7 +951,7 @@ mod test {
 
     use crate::laplace::LaplaceKernel;
     use approx::assert_relative_eq;
-    use approx::{RelativeEq};
+    use approx::RelativeEq;
 
     use super::*;
     use bempp_traits::tree::AttachedDataTree;
@@ -993,7 +993,6 @@ mod test {
 
     #[test]
     fn test_m2l() {
-
         let kernel = LaplaceKernel {
             dim: 3,
             is_singular: true,
@@ -1006,12 +1005,7 @@ mod test {
         let depth = 2;
         let n_crit = 150;
 
-        let tree = SingleNodeTree::new(
-            &points,
-            false,
-            Some(n_crit),
-            Some(depth),
-        );
+        let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
         let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
@@ -1019,21 +1013,32 @@ mod test {
         // New FMM
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
 
+        let charges = Charges::new();
+
         // Attach to a data tree
-        let datatree = FmmData::new(fmm);
+        let datatree = FmmData::new(fmm, charges);
 
         // Run algorithm
         datatree.run();
 
         for target in datatree.fmm.tree().get_keys(2).unwrap().iter() {
-
             if let Some(v_list) = datatree.fmm.get_v_list(&target) {
-                let downward_equivalent_surface = target.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_outer)
+                let downward_equivalent_surface = target
+                    .compute_surface(
+                        datatree.fmm.tree().get_domain(),
+                        datatree.fmm.order,
+                        datatree.fmm.alpha_outer,
+                    )
                     .into_iter()
                     .flat_map(|[x, y, z]| vec![x, y, z])
                     .collect_vec();
 
-                let downward_check_surface = target.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_inner)
+                let downward_check_surface = target
+                    .compute_surface(
+                        datatree.fmm.tree().get_domain(),
+                        datatree.fmm.order,
+                        datatree.fmm.alpha_inner,
+                    )
                     .into_iter()
                     .flat_map(|[x, y, z]| vec![x, y, z])
                     .collect_vec();
@@ -1049,21 +1054,27 @@ mod test {
                     &downward_equivalent_surface[..],
                     &local_expansion_slice,
                     &downward_check_surface[..],
-                    &mut equivalent
+                    &mut equivalent,
                 );
 
                 let mut direct = vec![0f64; local_expansion_view.len()];
 
                 for source in v_list.iter() {
-
-                    let upward_equivalent_surface = source.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_inner)
+                    let upward_equivalent_surface = source
+                        .compute_surface(
+                            datatree.fmm.tree().get_domain(),
+                            datatree.fmm.order,
+                            datatree.fmm.alpha_inner,
+                        )
                         .into_iter()
                         .flat_map(|[x, y, z]| vec![x, y, z])
                         .collect_vec();
 
-                    let multipole_expansion_arc = Arc::clone(datatree.multipoles.get(&source).unwrap());
+                    let multipole_expansion_arc =
+                        Arc::clone(datatree.multipoles.get(&source).unwrap());
                     let multipole_expansion_lock = multipole_expansion_arc.lock().unwrap();
-                    let multipole_expansion_view = ArrayView::from(multipole_expansion_lock.deref());
+                    let multipole_expansion_view =
+                        ArrayView::from(multipole_expansion_lock.deref());
                     let multipole_expansion_slice = multipole_expansion_view.as_slice().unwrap();
 
                     let mut tmp: Vec<f64> = vec![0f64; local_expansion_view.len()];
@@ -1075,7 +1086,10 @@ mod test {
                         &mut tmp,
                     );
 
-                    direct.iter_mut().zip(tmp.iter()).for_each(|(d, t)| *d += *t);
+                    direct
+                        .iter_mut()
+                        .zip(tmp.iter())
+                        .for_each(|(d, t)| *d += *t);
                 }
 
                 for (a, b) in equivalent.iter().zip(direct.iter()) {
@@ -1104,8 +1118,9 @@ mod test {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+        let charges = Charges::new();
 
-        let datatree = FmmData::new(fmm);
+        let datatree = FmmData::new(fmm, charges);
 
         datatree.run();
 

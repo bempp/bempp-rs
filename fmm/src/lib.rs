@@ -4,3 +4,5 @@ pub mod fmm;
 pub mod helmholtz;
 pub mod laplace;
 pub mod linalg;
+pub mod charge;
+pub mod impl_charge;
