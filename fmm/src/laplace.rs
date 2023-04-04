@@ -104,11 +104,9 @@ impl Kernel for LaplaceKernel {
     }
 }
 
+#[allow(unused_imports)]
 pub mod tests {
 
-    use std::vec;
-
-    use ndarray_linalg::assert;
     use rand::prelude::*;
     use rand::SeedableRng;
 

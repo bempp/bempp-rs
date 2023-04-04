@@ -1,7 +1,6 @@
 //! Data Structures and methods to create octrees on a single node.
 use std::{
     collections::{HashMap, HashSet},
-    vec,
 };
 
 use crate::types::{

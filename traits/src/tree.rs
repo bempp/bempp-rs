@@ -36,8 +36,8 @@ pub trait Tree {
     // Copy of nodes
     type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
 
-    fn new<'a>(
-        points: Self::PointSlice<'a>,
+    fn new(
+        points: Self::PointSlice<'_>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
@@ -47,25 +47,25 @@ pub trait Tree {
     fn get_depth(&self) -> u64;
 
     // Get a reference to all leaves, gets local keys in multi-node setting.
-    fn get_leaves<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>;
+    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>;
 
     // Get a reference to keys at a given level, gets local keys in a multi-node setting.
-    fn get_keys<'a>(&'a self, level: u64) -> Option<Self::NodeIndexSlice<'a>>;
+    fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>>;
 
     // Get a reference to all keys, gets local keys in a multi-node setting.
-    fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>;
+    fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>>;
 
     // Get a reference to all keys as a set, gets local keys in a multi-node setting.
-    fn get_all_keys_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex>;
+    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex>;
     
     // Get a reference to all leaves as a set, gets local keys in a multi-node setting.
-    fn get_all_leaves_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex>;
+    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex>;
 
     // Gets a reference to the points contained with a leaf node.
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
 
     // Get domain defined by the points, gets global domain in multi-node setting.
-    fn get_domain<'a>(&'a self) -> &'a Self::Domain;
+    fn get_domain(&self) -> &'_ Self::Domain;
 
     // Checks whether a a given node corresponds to a leaf
     fn is_leaf(&self, key: &Self::NodeIndex) -> bool;

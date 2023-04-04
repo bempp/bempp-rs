@@ -26,7 +26,11 @@ use bempp_tree::{
     },
 };
 
-use crate::{charge::Charges, laplace::LaplaceKernel, linalg::pinv};
+use crate::{
+    laplace::LaplaceKernel, 
+    linalg::pinv,
+    charge::{Charges}
+};
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
@@ -66,6 +70,7 @@ pub struct KiFmm<T: Tree, S: Kernel> {
     kernel: S,
 }
 
+#[allow(dead_code)]
 impl KiFmm<SingleNodeTree, LaplaceKernel> {
     /// Scaling function for the M2L operator at a given level.
     fn m2l_scale(level: u64) -> f64 {
@@ -163,7 +168,7 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
         6 * (order - 1).pow(2) + 2
     }
 
-    fn new<'a>(
+    fn new(
         order: usize,
         alpha_inner: f64,
         alpha_outer: f64,
@@ -317,6 +322,7 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
     }
 }
 
+#[allow(dead_code)]
 impl FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
     fn new(fmm: KiFmm<SingleNodeTree, LaplaceKernel>, charges: Charges) -> Self {
         let mut multipoles = HashMap::new();
@@ -327,14 +333,14 @@ impl FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
         if let Some(keys) = fmm.tree().get_all_keys() {
             for key in keys.iter() {
-                multipoles.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
-                locals.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
-                potentials.insert(key.clone(), Arc::new(Mutex::new(Vec::new())));
+                multipoles.insert(*key, Arc::new(Mutex::new(Vec::new())));
+                locals.insert(*key, Arc::new(Mutex::new(Vec::new())));
+                potentials.insert(*key, Arc::new(Mutex::new(Vec::new())));
                 if let Some(point_data) = fmm.tree().get_points(key) {
-                    points.insert(key.clone(), point_data.iter().cloned().collect_vec());
+                    points.insert(*key, point_data.iter().cloned().collect_vec());
 
                     // TODO: Replace with a global index lookup at some point
-                    charges.insert(key.clone(), Arc::new(vec![1.0; point_data.len()]));
+                    charges.insert(*key, Arc::new(vec![1.0; point_data.len()]));
                 }
             }
         }
@@ -356,9 +362,9 @@ impl SourceTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
     fn p2m(&self) {
         if let Some(leaves) = self.fmm.tree.get_leaves() {
             leaves.par_iter().for_each(move |&leaf| {
-                let leaf_multipole_arc = Arc::clone(&self.multipoles.get(&leaf).unwrap());
+                let leaf_multipole_arc = Arc::clone(self.multipoles.get(&leaf).unwrap());
                 let fmm_arc = Arc::clone(&self.fmm);
-                let leaf_charges_arc = Arc::clone(&self.charges.get(&leaf).unwrap());
+                let leaf_charges_arc = Arc::clone(self.charges.get(&leaf).unwrap());
 
                 if let Some(leaf_points) = self.points.get(&leaf) {
                     // Lookup data
@@ -383,7 +389,7 @@ impl SourceTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                     fmm_arc.kernel.potential(
                         &leaf_coordinates[..],
-                        &leaf_charges_slice,
+                        leaf_charges_slice,
                         &upward_check_surface[..],
                         &mut check_potential[..],
                     );
@@ -415,12 +421,12 @@ impl SourceTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
         // Parallelise over nodes at a given level
         if let Some(sources) = self.fmm.tree.get_keys(level) {
             sources.par_iter().for_each(move |&source| {
-                let source_multipole_arc = Arc::clone(&self.multipoles.get(&source).unwrap());
+                let source_multipole_arc = Arc::clone(self.multipoles.get(&source).unwrap());
                 let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
                 if !source_multipole_lock.is_empty() {
                     let target_multipole_arc =
-                        Arc::clone(&self.multipoles.get(&source.parent()).unwrap());
+                        Arc::clone(self.multipoles.get(&source.parent()).unwrap());
                     let fmm_arc = Arc::clone(&self.fmm);
 
                     let operator_index =
@@ -451,13 +457,13 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
         if let Some(targets) = self.fmm.tree().get_keys(level) {
             targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_local_arc = Arc::clone(&self.locals.get(&target).unwrap());
+                let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
 
                 // Get interaction list for node
                 if let Some(v_list) = fmm_arc.get_v_list(&target) {
                     for source in v_list.iter() {
                         // Locate correct components of compressed M2L matrix.
-                        let transfer_vector = target.find_transfer_vector(&source);
+                        let transfer_vector = target.find_transfer_vector(source);
 
                         // Lookup appropriate M2L matrix
                         let ncoeffs = KiFmm::ncoeffs(self.fmm.order);
@@ -472,7 +478,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                         // Compute translation
                         let source_multipole_arc =
-                            Arc::clone(&self.multipoles.get(&source).unwrap());
+                            Arc::clone(self.multipoles.get(source).unwrap());
                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
                         let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
 
@@ -505,8 +511,8 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
     fn l2l(&self, level: u64) {
         if let Some(targets) = self.fmm.tree.get_keys(level) {
             targets.par_iter().for_each(move |&target| {
-                let source_local_arc = Arc::clone(&self.locals.get(&target.parent()).unwrap());
-                let target_local_arc = Arc::clone(&self.locals.get(&target).unwrap());
+                let source_local_arc = Arc::clone(self.locals.get(&target.parent()).unwrap());
+                let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
                 let fmm = Arc::clone(&self.fmm);
 
                 let operator_index = target.siblings().iter().position(|&x| x == target).unwrap();
@@ -533,13 +539,13 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
         if let Some(targets) = self.fmm.tree.get_leaves() {
             targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_potential_arc = Arc::clone(&self.potentials.get(&target).unwrap());
+                let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
 
                 if let Some(points) = fmm_arc.tree().get_points(&target) {
                     if let Some(w_list) = fmm_arc.get_w_list(&target) {
                         for source in w_list.iter() {
                             let source_multipole_arc =
-                                Arc::clone(&self.multipoles.get(&source).unwrap());
+                                Arc::clone(self.multipoles.get(source).unwrap());
 
                             let upward_equivalent_surface = source
                                 .compute_surface(
@@ -567,7 +573,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                             fmm_arc.kernel().potential(
                                 &upward_equivalent_surface[..],
-                                &source_multipole_slice,
+                                source_multipole_slice,
                                 &target_coordinates[..],
                                 &mut target_potential,
                             );
@@ -593,8 +599,8 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&leaf| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_potential_arc = Arc::clone(&self.potentials.get(&leaf).unwrap());
-                let source_local_arc = Arc::clone(&self.locals.get(&leaf).unwrap());
+                let target_potential_arc = Arc::clone(self.potentials.get(&leaf).unwrap());
+                let source_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
                 if let Some(target_points) = fmm_arc.tree().get_points(&leaf) {
                     // Lookup data
@@ -619,7 +625,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                     fmm_arc.kernel().potential(
                         &downward_equivalent_surface[..],
-                        &source_local_slice,
+                        source_local_slice,
                         &target_coordinates[..],
                         &mut target_potential,
                     );
@@ -643,18 +649,18 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&leaf| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_local_arc = Arc::clone(&self.locals.get(&leaf).unwrap());
+                let target_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
                 if let Some(x_list) = fmm_arc.get_x_list(&leaf) {
                     for source in x_list.iter() {
-                        if let Some(source_points) = fmm_arc.tree().get_points(&source) {
+                        if let Some(source_points) = fmm_arc.tree().get_points(source) {
                             let source_coordinates = source_points
                                 .iter()
                                 .map(|p| p.coordinate)
                                 .flat_map(|[x, y, z]| vec![x, y, z])
                                 .collect_vec();
 
-                            let source_charges = self.charges.get(&source).unwrap();
+                            let source_charges = self.charges.get(source).unwrap();
                             let source_charges_view = ArrayView::from(source_charges.deref());
                             let source_charges_slice = source_charges_view.as_slice().unwrap();
 
@@ -673,7 +679,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                             fmm_arc.kernel.potential(
                                 &source_coordinates[..],
-                                &source_charges_slice,
+                                source_charges_slice,
                                 &downward_check_surface[..],
                                 &mut downward_check_potential[..],
                             );
@@ -708,7 +714,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
         if let Some(targets) = self.fmm.tree.get_leaves() {
             targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_potential_arc = Arc::clone(&self.potentials.get(&target).unwrap());
+                let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
 
                 if let Some(target_points) = fmm_arc.tree().get_points(&target) {
                     let target_coordinates = target_points
@@ -719,7 +725,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
                     if let Some(u_list) = fmm_arc.get_u_list(&target) {
                         for source in u_list.iter() {
-                            if let Some(source_points) = fmm_arc.tree().get_points(&source) {
+                            if let Some(source_points) = fmm_arc.tree().get_points(source) {
                                 let source_coordinates = source_points
                                     .iter()
                                     .map(|p| p.coordinate)
@@ -727,7 +733,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                                     .collect_vec();
 
                                 let source_charges_arc =
-                                    Arc::clone(&self.charges.get(&source).unwrap());
+                                    Arc::clone(self.charges.get(source).unwrap());
                                 let source_charges_view =
                                     ArrayView::from(source_charges_arc.deref());
                                 let source_charges_slice = source_charges_view.as_slice().unwrap();
@@ -736,8 +742,8 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                                     vec![0f64; target_coordinates.len() / self.fmm.kernel.dim()];
 
                                 fmm_arc.kernel.potential(
-                                    &&source_coordinates[..],
-                                    &source_charges_slice,
+                                    &source_coordinates[..],
+                                    source_charges_slice,
                                     &target_coordinates[..],
                                     &mut target_potential,
                                 );
@@ -943,22 +949,17 @@ where
     }
 }
 
+#[allow(unused_imports)]
 mod test {
-
-    use crate::laplace::LaplaceKernel;
-    use approx::assert_relative_eq;
-    use approx::RelativeEq;
-
-    use super::*;
-    use bempp_traits::tree::AttachedDataTree;
-    use bempp_traits::tree::MortonKeyInterface;
-    use num_cpus;
-    use std::env;
-    use std::time::Instant;
-
-    use bempp_tree::types::point::{PointType, Points};
+    use approx::{RelativeEq, assert_relative_eq};
     use rand::prelude::*;
     use rand::SeedableRng;
+
+    use bempp_tree::types::point::{PointType};
+    
+    use crate::laplace::LaplaceKernel;
+    
+    use super::*;
 
     #[allow(dead_code)]
     fn points_fixture(npoints: usize) -> Vec<Point> {
@@ -1114,6 +1115,7 @@ mod test {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+        
         let charges = Charges::new();
 
         let datatree = FmmData::new(fmm, charges);

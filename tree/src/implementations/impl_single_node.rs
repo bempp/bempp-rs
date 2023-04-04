@@ -96,7 +96,7 @@ impl SingleNodeTree {
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup of nodes
-        keys.sort_by(|a, b| a.level().cmp(&b.level()));
+        keys.sort_by_key(|a| a.level());
 
         let mut levels_to_keys = HashMap::new();
         let mut curr = keys[0];
@@ -105,7 +105,7 @@ impl SingleNodeTree {
             if key.level() != curr.level() {
                 levels_to_keys.insert(curr.level(), (curr_idx, i));
                 curr_idx = i;
-                curr = key.clone();
+                curr = *key;
             }
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
@@ -220,7 +220,7 @@ impl SingleNodeTree {
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup of nodes
-        keys.sort_by(|a, b| a.level().cmp(&b.level()));
+        keys.sort_by_key(|a| a.level());
 
         let mut levels_to_keys = HashMap::new();
         let mut curr = keys[0];
@@ -229,7 +229,7 @@ impl SingleNodeTree {
             if key.level() != curr.level() {
                 levels_to_keys.insert(curr.level(), (curr_idx, i));
                 curr_idx = i;
-                curr = key.clone();
+                curr = *key;
             }
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
@@ -421,14 +421,14 @@ impl Tree for SingleNodeTree {
     /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
     /// user defined maximum leaf maximum occupancy n_crit.
-    fn new<'a>(
-        points: Self::PointSlice<'a>,
+    fn new(
+        points: Self::PointSlice<'_>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
     ) -> SingleNodeTree {
         // HACK: Come back and reconcile a runtime point dimension detector
-        let points = points.into_iter().map(|p| p.coordinate).collect_vec();
+        let points = points.iter().map(|p| p.coordinate).collect_vec();
 
         let domain = Domain::from_local_points(&points[..]);
 
@@ -446,11 +446,11 @@ impl Tree for SingleNodeTree {
         self.depth
     }
 
-    fn get_domain<'a>(&'a self) -> &'a Self::Domain {
+    fn get_domain(&self) -> &'_ Self::Domain {
         &self.domain
     }
 
-    fn get_keys<'a>(&'a self, level: u64) -> Option<Self::NodeIndexSlice<'a>> {
+    fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
             Some(&self.keys[l..r])
         } else {
@@ -458,19 +458,19 @@ impl Tree for SingleNodeTree {
         }
     }
 
-    fn get_all_keys<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>> {
+    fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>> {
         Some(&self.keys)
     }
 
-    fn get_all_keys_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex> {
+    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex> {
         &self.keys_set
     }
 
-    fn get_all_leaves_set<'a>(&'a self) -> &'a HashSet<Self::NodeIndex> {
+    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
         &self.leaves_set
     }
     
-    fn get_leaves<'a>(&'a self) -> Option<Self::NodeIndexSlice<'a>>{
+    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>{
         Some(&self.leaves)
     }
 
