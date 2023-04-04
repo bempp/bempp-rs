@@ -74,20 +74,6 @@ pub trait Tree {
     fn is_node(&self, key: &Self::NodeIndex) -> bool;
 }
 
-pub trait AttachedDataTree {
-    type Data<'a>
-    where
-        Self: 'a;
-    type Tree: Tree;
-
-    fn get_data<'a>(&'a self, key: &<Self::Tree as Tree>::NodeIndex) -> Option<&Self::Data<'a>>;
-
-    fn get_data_mut<'a>(
-        &'a mut self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<&'a mut Self::Data<'a>>;
-}
-
 pub trait MortonKeyInterface
 where
     Self: Hash + Eq,

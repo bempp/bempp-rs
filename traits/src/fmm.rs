@@ -1,6 +1,6 @@
 //! FMM traits
 use crate::kernel::Kernel;
-use crate::tree::{AttachedDataTree, Tree};
+use crate::tree::Tree;
 
 pub trait SourceTranslation {
     fn p2m(&self);
