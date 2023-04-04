@@ -26,11 +26,7 @@ use bempp_tree::{
     },
 };
 
-use crate::{
-    laplace::LaplaceKernel, 
-    linalg::pinv,
-    charge::{Charges}
-};
+use crate::{charge::Charges, laplace::LaplaceKernel, linalg::pinv};
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
@@ -477,8 +473,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                         let vt_sub = self.fmm.m2l.2.slice(s![.., v_lidx..v_ridx]);
 
                         // Compute translation
-                        let source_multipole_arc =
-                            Arc::clone(self.multipoles.get(source).unwrap());
+                        let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
                         let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
 
@@ -951,14 +946,14 @@ where
 
 #[allow(unused_imports)]
 mod test {
-    use approx::{RelativeEq, assert_relative_eq};
+    use approx::{assert_relative_eq, RelativeEq};
     use rand::prelude::*;
     use rand::SeedableRng;
 
-    use bempp_tree::types::point::{PointType};
-    
+    use bempp_tree::types::point::PointType;
+
     use crate::laplace::LaplaceKernel;
-    
+
     use super::*;
 
     #[allow(dead_code)]
@@ -1115,7 +1110,7 @@ mod test {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
-        
+
         let charges = Charges::new();
 
         let datatree = FmmData::new(fmm, charges);

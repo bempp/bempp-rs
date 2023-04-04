@@ -1,9 +1,7 @@
 use itertools::Itertools;
-use std::{
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
-use bempp_traits::tree::{Tree};
+use bempp_traits::tree::Tree;
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -70,8 +68,8 @@ impl SingleNodeTree {
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
-        
-        // Add unmapped leaves 
+
+        // Add unmapped leaves
         let leaves = MortonKeys {
             keys: leaves_to_points
                 .keys()
@@ -170,7 +168,7 @@ impl SingleNodeTree {
 
         // Assign leaves to points, and collect all leaf nodes
         let unmapped = SingleNodeTree::assign_nodes_to_points(&balanced, &mut points);
-        
+
         // Group points by leaves
         points.sort();
 
@@ -469,8 +467,8 @@ impl Tree for SingleNodeTree {
     fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
         &self.leaves_set
     }
-    
-    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>{
+
+    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
         Some(&self.leaves)
     }
 
@@ -532,7 +530,12 @@ mod test {
         let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
 
         // Test that the tree really is uniform
-        let levels: Vec<u64> = tree.get_leaves().unwrap().iter().map(|node| node.level()).collect();
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .unwrap()
+            .iter()
+            .map(|node| node.level())
+            .collect();
         let first = levels[0];
         assert!(levels.iter().all(|key| *key == first));
 
@@ -550,7 +553,12 @@ mod test {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), None);
 
         // Test that tree is not uniform
-        let levels: Vec<u64> = tree.get_leaves().unwrap().iter().map(|node| node.level()).collect();
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .unwrap()
+            .iter()
+            .map(|node| node.level())
+            .collect();
         let first = levels[0];
         assert_eq!(false, levels.iter().all(|level| *level == first));
 

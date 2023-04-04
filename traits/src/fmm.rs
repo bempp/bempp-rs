@@ -40,7 +40,6 @@ pub trait Fmm {
     fn tree(&self) -> &Self::Tree;
 }
 
-
 pub trait FmmLoop {
     fn upward_pass(&self);
 

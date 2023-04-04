@@ -57,7 +57,7 @@ pub trait Tree {
 
     // Get a reference to all keys as a set, gets local keys in a multi-node setting.
     fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex>;
-    
+
     // Get a reference to all leaves as a set, gets local keys in a multi-node setting.
     fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex>;
 

@@ -1,7 +1,5 @@
 //! Data Structures and methods to create octrees on a single node.
-use std::{
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::types::{
     domain::Domain,
