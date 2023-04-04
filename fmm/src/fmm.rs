@@ -8,7 +8,7 @@ use std::{
 
 use itertools::Itertools;
 use ndarray::*;
-use ndarray_linalg::SVDDC;
+use ndarray_linalg::{SVDDC, SVD};
 use rayon::prelude::*;
 
 use bempp_traits::{
@@ -448,44 +448,45 @@ impl SourceTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
 
 impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
     fn m2l(&self, level: u64) {
+
+
         if let Some(targets) = self.fmm.tree().get_keys(level) {
+        
             targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
                 let target_local_arc = Arc::clone(&self.locals.get(&target).unwrap());
 
                 // Get interaction list for node
                 if let Some(v_list) = fmm_arc.get_v_list(&target) {
-                    // Clone references for interior mutability
-                    let mut source_multipole_arcs = vec![];
-                    for source in v_list.iter() {
-                        source_multipole_arcs
-                            .push(Arc::clone(&self.multipoles.get(&source).unwrap()));
-                    }
 
-                    for (i, source) in v_list.iter().enumerate() {
-                        let ncoeffs = KiFmm::ncoeffs(self.fmm.order);
+                    // if level == 2 {
+                    //     println!("target {:?}  \n v list {:?} \n \n", target, v_list.len());
+                    // }
+                    
+                    for source in v_list.iter() {
 
                         // Locate correct components of compressed M2L matrix.
-                        let transfer_vector = source.find_transfer_vector(&target);
+                        let transfer_vector = target.find_transfer_vector(&source);
 
+                        // Lookup appropriate M2L matrix
+                        let ncoeffs = KiFmm::ncoeffs(self.fmm.order);
                         let v_idx = fmm_arc
                             .transfer_vectors
                             .iter()
                             .position(|&x| x == transfer_vector)
                             .unwrap();
-
                         let v_lidx = v_idx * ncoeffs;
                         let v_ridx = v_lidx + ncoeffs;
                         let vt_sub = self.fmm.m2l.2.slice(s![.., v_lidx..v_ridx]);
 
                         // Compute translation
-                        let source_multipole_arc = &source_multipole_arcs[i];
+                        let source_multipole_arc = Arc::clone(&self.multipoles.get(&source).unwrap());
                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
                         let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
 
                         let target_local_owned =
-                            KiFmm::m2l_scale(target.level())
-                                * fmm_arc.kernel.scale(target.level())
+                            KiFmm::m2l_scale(source.level())
+                                * fmm_arc.kernel.scale(source.level())
                                 * fmm_arc.dc2e_inv.0.dot(&self.fmm.dc2e_inv.1.dot(
                                     &fmm_arc.m2l.0.dot(
                                         &fmm_arc.m2l.1.dot(&vt_sub.dot(&source_multipole_view)),
@@ -992,82 +993,81 @@ mod test {
         points
     }
 
-    #[test]
-    fn test_p2m() {
-        let npoints = 1000000;
-        let points = points_fixture(npoints);
-        let depth = 5;
-        let n_crit = 150;
+    // #[test]
+    // fn test_p2m() {
+    //     let npoints = 1000000;
+    //     let points = points_fixture(npoints);
+    //     let depth = 5;
+    //     let n_crit = 150;
 
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 1.95;
-        let adaptive = false;
+    //     let order = 6;
+    //     let alpha_inner = 1.05;
+    //     let alpha_outer = 1.95;
+    //     let adaptive = false;
 
-        let kernel = LaplaceKernel {
-            dim: 3,
-            is_singular: false,
-            value_dimension: 3,
-        };
+    //     let kernel = LaplaceKernel {
+    //         dim: 3,
+    //         is_singular: false,
+    //         value_dimension: 3,
+    //     };
 
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
 
+    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
 
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+    //     let datatree = FmmData::new(fmm);
 
-        let datatree = FmmData::new(fmm);
+    //     let start = std::time::Instant::now();
+    //     datatree.upward_pass();
+    //     let elapsed = start.elapsed().as_millis();
+    //     println!("Upward Pass {:?}ms", elapsed);
 
-        let start = std::time::Instant::now();
-        datatree.upward_pass();
-        let elapsed = start.elapsed().as_millis();
-        println!("Upward Pass {:?}ms", elapsed);
+    //     let coordinates = points
+    //         .iter()
+    //         .map(|p| p.coordinate)
+    //         .flat_map(|[x, y, z]| vec![x, y, z])
+    //         .collect_vec();
+    //     let charges = vec![1.; coordinates.len()];
 
-        let coordinates = points
-            .iter()
-            .map(|p| p.coordinate)
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
-        let charges = vec![1.; coordinates.len()];
+    //     let distant_point = vec![1000., 0., 0.];
+    //     let mut direct = vec![0.];
 
-        let distant_point = vec![1000., 0., 0.];
-        let mut direct = vec![0.];
+    //     datatree.fmm.kernel.potential(
+    //         &coordinates[..],
+    //         &charges[..],
+    //         &distant_point[..],
+    //         &mut direct,
+    //     );
 
-        datatree.fmm.kernel.potential(
-            &coordinates[..],
-            &charges[..],
-            &distant_point[..],
-            &mut direct,
-        );
+    //     let expansion = datatree
+    //         .multipoles
+    //         .get(&ROOT)
+    //         .unwrap()
+    //         .lock()
+    //         .unwrap()
+    //         .deref()
+    //         .clone();
+    //     let mut estimate = vec![0.];
 
-        let expansion = datatree
-            .multipoles
-            .get(&ROOT)
-            .unwrap()
-            .lock()
-            .unwrap()
-            .deref()
-            .clone();
-        let mut estimate = vec![0.];
+    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
 
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+    //     let domain = tree.get_domain();
 
-        let domain = tree.get_domain();
+    //     let equivalent_surface = ROOT
+    //         .compute_surface(&domain, order, alpha_inner)
+    //         .into_iter()
+    //         .flat_map(|[x, y, z]| vec![x, y, z])
+    //         .collect_vec();
 
-        let equivalent_surface = ROOT
-            .compute_surface(&domain, order, alpha_inner)
-            .into_iter()
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
-
-        datatree.fmm.kernel.potential(
-            &equivalent_surface[..],
-            &expansion[..],
-            &distant_point[..],
-            &mut estimate[..],
-        );
-        println!("key {:?} direct {:?} estimate {:?}", ROOT, direct, estimate);
-        assert!(false)
-    }
+    //     datatree.fmm.kernel.potential(
+    //         &equivalent_surface[..],
+    //         &expansion[..],
+    //         &distant_point[..],
+    //         &mut estimate[..],
+    //     );
+    //     println!("key {:?} direct {:?} estimate {:?}", ROOT, direct, estimate);
+    //     assert!(false)
+    // }
 
     // #[test]
     // fn test_m2l() {
@@ -1094,7 +1094,7 @@ mod test {
     //         Some(n_crit),
     //         Some(depth),
     //     );
-    //     println!("keys {:?} {:?}", tree.get_all_keys().unwrap().len(), tree.get_all_keys_set().contains(&ROOT));
+    //     // println!("keys {:?} {:?}", tree.get_all_keys().unwrap().len(), tree.get_all_keys_set().contains(&ROOT));
     //     let order = 2;
     //     let alpha_inner = 1.05;
     //     let alpha_outer = 1.95;
@@ -1108,21 +1108,23 @@ mod test {
     //     // Run algorithm
     //     datatree.run();
 
-    //     for node in datatree.fmm.tree().get_keys(2).unwrap().iter() {
+    //     for target in datatree.fmm.tree().get_keys(2).unwrap().iter() {
 
-    //         if let Some(v_list) = datatree.fmm.get_v_list(&node) {
-
-    //             let downward_equivalent_surface = node.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_outer)
+    //         if let Some(v_list) = datatree.fmm.get_v_list(&target) {
+    //             // if level == 2 {
+    //             //     println!("target {:?}  \n v list {:?} \n \n", target, v_list.len());
+    //             // }
+    //             let downward_equivalent_surface = target.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_outer)
     //                 .into_iter()
     //                 .flat_map(|[x, y, z]| vec![x, y, z])
     //                 .collect_vec();
                 
-    //             let downward_check_surface = node.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_inner)
+    //             let downward_check_surface = target.compute_surface(datatree.fmm.tree().get_domain(), datatree.fmm.order, datatree.fmm.alpha_inner)
     //                 .into_iter()
     //                 .flat_map(|[x, y, z]| vec![x, y, z])
     //                 .collect_vec();
                 
-    //             let local_expansion_arc = Arc::clone(datatree.locals.get(&node).unwrap());
+    //             let local_expansion_arc = Arc::clone(datatree.locals.get(&target).unwrap());
     //             let local_expansion_lock = local_expansion_arc.lock().unwrap();
     //             let local_expansion_view = ArrayView::from(local_expansion_lock.deref());
     //             let local_expansion_slice = local_expansion_view.as_slice().unwrap();
@@ -1162,7 +1164,8 @@ mod test {
     //                 direct.iter_mut().zip(tmp.iter()).for_each(|(d, t)| *d += *t);
     //             }
 
-    //             println!("direct {:?} \ntimate {:?}\n", direct, local_expansion_slice);
+    //             // println!("targets {:?}", down);
+    //             println!("direct {:?} \ntimate {:?}\n", direct, equivalent);
     //             assert!(false);
     //             // for (a, b) in equivalent.iter().zip(direct.iter()) {
     //             //     // assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
@@ -1171,67 +1174,67 @@ mod test {
     //     }
     // }
 
-    // #[test]
-    // fn test_downward_pass() {
-    //     let npoints = 10000;
-    //     let points = points_fixture(npoints);
-    //     let points_clone = points.clone();
-    //     let depth = 3;
-    //     let n_crit = 150;
+    #[test]
+    fn test_downward_pass() {
+        let npoints = 10000;
+        let points = points_fixture(npoints);
+        let points_clone = points.clone();
+        let depth = 3;
+        let n_crit = 150;
 
-    //     let order = 5;
-    //     let alpha_inner = 1.05;
-    //     let alpha_outer = 1.95;
-    //     let adaptive = false;
+        let order = 7;
+        let alpha_inner = 1.05;
+        let alpha_outer = 1.95;
+        let adaptive = true;
 
-    //     let kernel = LaplaceKernel {
-    //         dim: 3,
-    //         is_singular: false,
-    //         value_dimension: 3,
-    //     };
+        let kernel = LaplaceKernel {
+            dim: 3,
+            is_singular: false,
+            value_dimension: 3,
+        };
 
-    //     let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
 
-    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
 
-    //     let datatree = FmmData::new(fmm);
+        let datatree = FmmData::new(fmm);
 
-    //     datatree.run();
+        datatree.run();
 
-    //     let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-    //     let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-    //     let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-    //     let mut direct = vec![0f64; pts.len()];
-    //     let all_point_coordinates = points_clone
-    //         .iter()
-    //         .map(|p| p.coordinate)
-    //         .flat_map(|[x, y, z]| vec![x, y, z])
-    //         .collect_vec();
+        let mut direct = vec![0f64; pts.len()];
+        let all_point_coordinates = points_clone
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-    //     let leaf_coordinates = pts
-    //         .iter()
-    //         .map(|p| p.coordinate)
-    //         .flat_map(|[x, y, z]| vec![x, y, z])
-    //         .collect_vec();
-    //     let all_charges = vec![1f64; points_clone.len()];
+        let leaf_coordinates = pts
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let all_charges = vec![1f64; points_clone.len()];
 
-    //     let kernel = LaplaceKernel {
-    //         dim: 3,
-    //         is_singular: false,
-    //         value_dimension: 3,
-    //     };
-    //     kernel.potential(
-    //         &all_point_coordinates[..],
-    //         &all_charges[..],
-    //         &leaf_coordinates[..],
-    //         &mut direct[..],
-    //     );
+        let kernel = LaplaceKernel {
+            dim: 3,
+            is_singular: false,
+            value_dimension: 3,
+        };
+        kernel.potential(
+            &all_point_coordinates[..],
+            &all_charges[..],
+            &leaf_coordinates[..],
+            &mut direct[..],
+        );
 
-    //     println!("direct {:?} \n estimate {:?}", direct, potentials);
-    //     // assert!(false);
-    // }
+        println!("direct {:?} \n estimate {:?}", direct, potentials);
+        assert!(false);
+    }
 
     // #[test]
     // fn test_upward_pass() {
