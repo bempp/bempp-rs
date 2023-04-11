@@ -67,13 +67,13 @@ fn upward_pass(n: usize) {
     datatree.upward_pass();
 }
 
-
-
 fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("FMM");
     group.sample_size(10);
     group.measurement_time(Duration::from_secs(10));
-    group.bench_function("Uniform 1000000", |b| b.iter(|| upward_pass(black_box(1000000))));
+    group.bench_function("Uniform 1000000", |b| {
+        b.iter(|| upward_pass(black_box(1000000)))
+    });
     group.finish();
 }
 

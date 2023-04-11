@@ -4,7 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
     sync::{Arc, Mutex},
-    time::Instant
+    time::Instant,
 };
 
 use itertools::Itertools;
@@ -298,13 +298,13 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
         }
 
         let l: usize = 0;
-        let r: usize = std::cmp::min(10, nrows);
-        
+        let r: usize = std::cmp::min(50, nrows);
+
         let (u, s, vt) = se2tc.svddc(ndarray_linalg::JobSvd::Some).unwrap();
-        
+
         let u = u.unwrap().slice(s![.., l..r]).to_owned();
         let s = Array2::from_diag(&s.slice(s![l..r]));
-        let vt = vt.unwrap().slice(s![l..r,..]).to_owned();
+        let vt = vt.unwrap().slice(s![l..r, ..]).to_owned();
 
         let m2l = (u, s, vt);
 
@@ -460,19 +460,19 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
             targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
                 let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
-                
-                // Assemble v list as a single BLAS operation
-                
 
-                // Get interaction list for node
+                // Assemble source data v list as a single BLAS operation
                 if let Some(v_list) = fmm_arc.get_v_list(&target) {
-                    
-                    for source in v_list.iter() {
+                    let ncoeffs = KiFmm::ncoeffs(fmm_arc.order);
+                    let mut vt =
+                        Array2::<f64>::zeros((fmm_arc.m2l.2.dim().0, ncoeffs * v_list.len()));
+                    let mut source_multipoles = Array1::<f64>::zeros(ncoeffs * v_list.len());
+
+                    for (i, source) in v_list.iter().enumerate() {
                         // Locate correct components of compressed M2L matrix.
                         let transfer_vector = target.find_transfer_vector(source);
 
                         // Lookup appropriate M2L matrix
-                        let ncoeffs = KiFmm::ncoeffs(self.fmm.order);
                         let v_idx = fmm_arc
                             .transfer_vectors
                             .iter()
@@ -480,41 +480,71 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                             .unwrap();
                         let v_lidx = v_idx * ncoeffs;
                         let v_ridx = v_lidx + ncoeffs;
-                        let vt_sub = self.fmm.m2l.2.slice(s![.., v_lidx..v_ridx]);
+                        let vt_sub = fmm_arc.m2l.2.slice(s![.., v_lidx..v_ridx]);
 
-                        // Compute translation
+                        vt.slice_mut(s![.., i * ncoeffs..(i * ncoeffs) + ncoeffs])
+                            .assign(&vt_sub);
+
                         let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
                         let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
 
-                        let target_local_owned =
-                            KiFmm::m2l_scale(source.level())
-                                * fmm_arc.kernel.scale(source.level())
-                                * fmm_arc.dc2e_inv.0.dot(&self.fmm.dc2e_inv.1.dot(
-                                    &fmm_arc.m2l.0.dot(
-                                        &fmm_arc.m2l.1.dot(&vt_sub.dot(&source_multipole_view)),
-                                    ),
-                                ));
+                        source_multipoles
+                            .slice_mut(s![i * ncoeffs..(i * ncoeffs) + ncoeffs])
+                            .assign(&source_multipole_view);
 
-                        // let target_local_owned = vec![0.; source_multipole_view.len()];
+                        // // Compute translation
+                        // let target_local_owned = KiFmm::m2l_scale(target.level())
+                        //     * fmm_arc.kernel.scale(target.level())
+                        //     * fmm_arc.dc2e_inv.0.dot(
+                        //         &self.fmm.dc2e_inv.1.dot(
+                        //             &fmm_arc
+                        //                 .m2l
+                        //                 .0
+                        //                 .dot(&fmm_arc.m2l.1.dot(&vt_sub.dot(&source_multipole_view))),
+                        //         ),
+                        //     );
 
-                        // Store computation
-                        let mut target_local_lock = target_local_arc.lock().unwrap();
+                        // // Store computation
+                        // let mut target_local_lock = target_local_arc.lock().unwrap();
 
-                        if !target_local_lock.is_empty() {
-                            target_local_lock
-                                .iter_mut()
-                                .zip(target_local_owned.iter())
-                                .for_each(|(c, m)| *c += *m);
-                        } else {
-                            target_local_lock.extend(target_local_owned);
-                        }
-
+                        // if !target_local_lock.is_empty() {
+                        //     target_local_lock
+                        //         .iter_mut()
+                        //         .zip(target_local_owned.iter())
+                        //         .for_each(|(c, m)| *c += *m);
+                        // } else {
+                        //     target_local_lock.extend(target_local_owned);
+                        // }
 
                     }
+
+                    // Compute translation
+                    let target_local_owned = KiFmm::m2l_scale(target.level())
+                        * fmm_arc.kernel.scale(target.level())
+                        * fmm_arc.dc2e_inv.0.dot(
+                            &self.fmm.dc2e_inv.1.dot(
+                                &fmm_arc
+                                    .m2l
+                                    .0
+                                    .dot(&fmm_arc.m2l.1.dot(&vt.dot(&source_multipoles))),
+                            ),
+                        );
+
+                    // Store computation
+                    let mut target_local_lock = target_local_arc.lock().unwrap();
+
+                    if !target_local_lock.is_empty() {
+                        target_local_lock
+                            .iter_mut()
+                            .zip(target_local_owned.iter())
+                            .for_each(|(c, m)| *c += *m);
+                    } else {
+                        target_local_lock.extend(target_local_owned);
+                    }
+
+
                 }
-
-
             })
         }
     }
@@ -948,7 +978,7 @@ where
                 self.l2l(level)
             }
             self.m2l(level);
-        };
+        }
         println!("M2L/L2L = {:?}ms", start.elapsed().as_millis());
 
         let start = Instant::now();
@@ -1124,73 +1154,80 @@ mod test {
     // }
     use rayon::ThreadPoolBuilder;
 
-    #[test]
-    fn test_fmm() {
+        #[test]
+        fn test_fmm() {
+            // let _ = rayon::ThreadPoolBuilder::new().num_threads(2).build_global().unwrap();
+            let npoints = 1000000;
+            let points = points_fixture(npoints);
+            let points_clone = points.clone();
+            let depth = 5;
+            let n_crit = 150;
 
-        let _ = rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
-        let npoints = 1000000;
-        let points = points_fixture(npoints);
-        let points_clone = points.clone();
-        let depth = 3;
-        let n_crit = 150;
+            let order = 9;
+            let alpha_inner = 1.05;
+            let alpha_outer = 2.9;
+            let adaptive = false;
 
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.9;
-        let adaptive = true;
+            let kernel = LaplaceKernel::new(3, false, 3);
 
-        let kernel = LaplaceKernel::new(3, false, 3);
-        
-        let start = Instant::now();
-        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
-        println!("Tree = {:?}ms", start.elapsed().as_millis());
+            let start = Instant::now();
+            let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+            println!("Tree = {:?}ms", start.elapsed().as_millis());
 
-        let start = Instant::now();
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
-        println!("FMM operators = {:?}ms", start.elapsed().as_millis());
+            let start = Instant::now();
+            let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
+            println!("FMM operators = {:?}ms", start.elapsed().as_millis());
 
-        let charges = Charges::new();
+            let charges = Charges::new();
 
-        let datatree = FmmData::new(fmm, charges);
+            let datatree = FmmData::new(fmm, charges);
+            
+            datatree.run();
+            
+            let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        datatree.run();
+            let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+            let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+            let mut direct = vec![0f64; pts.len()];
+            let all_point_coordinates = points_clone
+                .iter()
+                .map(|p| p.coordinate)
+                .flat_map(|[x, y, z]| vec![x, y, z])
+                .collect_vec();
 
-        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+            let leaf_coordinates = pts
+                .iter()
+                .map(|p| p.coordinate)
+                .flat_map(|[x, y, z]| vec![x, y, z])
+                .collect_vec();
+            let all_charges = vec![1f64; points_clone.len()];
 
-        let mut direct = vec![0f64; pts.len()];
-        let all_point_coordinates = points_clone
-            .iter()
-            .map(|p| p.coordinate)
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
+            let kernel = LaplaceKernel {
+                dim: 3,
+                is_singular: false,
+                value_dimension: 3,
+            };
+            kernel.potential(
+                &all_point_coordinates[..],
+                &all_charges[..],
+                &leaf_coordinates[..],
+                &mut direct[..],
+            );
 
-        let leaf_coordinates = pts
-            .iter()
-            .map(|p| p.coordinate)
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
-        let all_charges = vec![1f64; points_clone.len()];
+            // for (a, b) in potentials.iter().zip(direct.iter()) {
+            //     let are_equal = a.relative_eq(&b, 1e-4, 1e-4);
+            //     assert!(are_equal);
+            // }
 
-        let kernel = LaplaceKernel {
-            dim: 3,
-            is_singular: false,
-            value_dimension: 3,
-        };
-        kernel.potential(
-            &all_point_coordinates[..],
-            &all_charges[..],
-            &leaf_coordinates[..],
-            &mut direct[..],
-        );
+            let abs_error: f64 = potentials
+                .iter()
+                .zip(direct.iter())
+                .map(|(a, b)| (a - b).abs())
+                .sum();
+            let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        // for (a, b) in potentials.iter().zip(direct.iter()) {
-        //     let are_equal = a.relative_eq(&b, 1e-4, 1e-4);
-        //     assert!(are_equal);
-        // }
-        println!("{:?} \n{:?}", potentials, direct);
-        assert!(false)
+            println!("p={:?} rel_error={:?}\n", order, rel_error);
+            assert!(false)
     }
 }
