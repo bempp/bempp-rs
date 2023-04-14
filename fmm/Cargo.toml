@@ -29,6 +29,7 @@ itertools = "0.10"
 mpi = { version = "0.6.*" }
 rand = "0.8.*"
 ndarray = { version = "*", features = ["blas"]}
+ndarray-rand = "0.14.0"
 blas-src = { version = "*", features = ["openblas"] }
 openblas-src = { version = "*", features = ["cblas", "system"] }
 ndarray-linalg = { version = "*", features = ["openblas-system"] }
@@ -42,3 +43,6 @@ criterion = { version = "0.4", features = ["html_reports"] }
 [[bench]]
 name = "benchmark"
 harness = false
+
+[target.aarch64-apple-darwin]
+rustflags = [  "-C", "target-feature=+neon"]
