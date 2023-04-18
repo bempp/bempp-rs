@@ -344,7 +344,7 @@ mod test {
     fn test_laplace_single_layer_dp0_dp0() {
         let grid = regular_sphere(0);
         let element = LagrangeElementTriangleDegree0 {};
-        let space = SerialFunctionSpace::new(&grid, element);
+        let space = SerialFunctionSpace::new(&grid, &element);
 
         let matrix = laplace_single_layer(&space, &space);
 

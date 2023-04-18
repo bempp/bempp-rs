@@ -5,13 +5,13 @@ use bempp_traits::element::FiniteElement;
 
 pub struct SerialFunctionSpace<'a, E: FiniteElement> {
     grid: &'a SerialGrid,
-    element: E,
+    element: &'a E,
     dofmap: SerialDofMap,
 }
 
 impl<'a, E: FiniteElement> SerialFunctionSpace<'a, E> {
-    pub fn new(grid: &'a SerialGrid, element: E) -> Self {
-        let dofmap = SerialDofMap::new(grid, &element);
+    pub fn new(grid: &'a SerialGrid, element: &'a E) -> Self {
+        let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
             element,
@@ -32,6 +32,6 @@ impl<E: FiniteElement> FunctionSpace for SerialFunctionSpace<'_, E> {
         self.grid
     }
     fn element(&self) -> &E {
-        &self.element
+        self.element
     }
 }
