@@ -22,6 +22,24 @@ pub fn laplace_single_layer(
     test_element: &impl FiniteElement,
     test_dofmap: &impl DofMap,
 ) -> Array2D<f64> {
+    assemble(
+        laplace_green,
+        grid,
+        trial_element,
+        trial_dofmap,
+        test_element,
+        test_dofmap,
+    )
+}
+
+fn assemble(
+    kernel: fn(f64, f64, f64, f64, f64, f64) -> f64,
+    grid: &impl Grid,
+    trial_element: &impl FiniteElement,
+    trial_dofmap: &impl DofMap,
+    test_element: &impl FiniteElement,
+    test_dofmap: &impl DofMap,
+) -> Array2D<f64> {
     let npoints = 3;
 
     let c20 = grid.topology().connectivity(2, 0);
@@ -142,7 +160,7 @@ pub fn laplace_single_layer(
                                 );
                                 let trial_weight = trial_rule.weights[trial_index];
 
-                                sum += laplace_green(
+                                sum += kernel(
                                     unsafe { *test_mapped_pt.get_unchecked(0, 0) },
                                     unsafe { *test_mapped_pt.get_unchecked(0, 1) },
                                     unsafe { *test_mapped_pt.get_unchecked(0, 2) },
@@ -274,7 +292,7 @@ pub fn laplace_single_layer(
                             );
                             let weight = singular_rule.weights[index];
 
-                            sum += laplace_green(
+                            sum += kernel(
                                 unsafe { *test_mapped_pt.get_unchecked(0, 0) },
                                 unsafe { *test_mapped_pt.get_unchecked(0, 1) },
                                 unsafe { *test_mapped_pt.get_unchecked(0, 2) },
