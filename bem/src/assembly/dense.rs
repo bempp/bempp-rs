@@ -3,7 +3,7 @@ use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
 use bempp_quadrature::types::CellToCellConnectivity;
 use bempp_tools::arrays::Array2D;
-use bempp_traits::bem::DofMap;
+use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
@@ -16,31 +16,25 @@ fn laplace_green(x1: f64, x2: f64, x3: f64, y1: f64, y2: f64, y3: f64) -> f64 {
 }
 
 pub fn laplace_single_layer(
-    grid: &impl Grid,
-    trial_element: &impl FiniteElement,
-    trial_dofmap: &impl DofMap,
-    test_element: &impl FiniteElement,
-    test_dofmap: &impl DofMap,
+    trial_space: &impl FunctionSpace,
+    test_space: &impl FunctionSpace,
 ) -> Array2D<f64> {
-    assemble(
-        laplace_green,
-        grid,
-        trial_element,
-        trial_dofmap,
-        test_element,
-        test_dofmap,
-    )
+    assemble(laplace_green, trial_space, test_space)
 }
 
 fn assemble(
     kernel: fn(f64, f64, f64, f64, f64, f64) -> f64,
-    grid: &impl Grid,
-    trial_element: &impl FiniteElement,
-    trial_dofmap: &impl DofMap,
-    test_element: &impl FiniteElement,
-    test_dofmap: &impl DofMap,
+    trial_space: &impl FunctionSpace,
+    test_space: &impl FunctionSpace,
 ) -> Array2D<f64> {
+    // Note: currently assumes that the two grids are the same
+    // TODO: implement == and != for grids, then add:
+    // if *trial_space.grid() != *test_space.grid() {
+    //    unimplemented!("Assembling operators with spaces on different grids not yet supported");
+    // }
     let npoints = 3;
+
+    let grid = trial_space.grid();
 
     let c20 = grid.topology().connectivity(2, 0);
 
@@ -50,7 +44,10 @@ fn assemble(
     let mut test_mapped_pt = Array2D::<f64>::new((1, 3));
     let mut trial_mapped_pt = Array2D::<f64>::new((1, 3));
 
-    let mut matrix = Array2D::<f64>::new((test_dofmap.global_size(), trial_dofmap.global_size()));
+    let mut matrix = Array2D::<f64>::new((
+        test_space.dofmap().global_size(),
+        trial_space.dofmap().global_size(),
+    ));
 
     for test_cell in 0..grid.geometry().cell_count() {
         let test_cell_tindex = grid.topology().index_map()[test_cell];
@@ -98,11 +95,19 @@ fn assemble(
 
                 let test_points = Array2D::from_data(test_rule.points, (test_rule.npoints, 2));
                 let trial_points = Array2D::from_data(trial_rule.points, (trial_rule.npoints, 2));
-                let mut test_table = test_element.create_tabulate_array(0, test_rule.npoints);
-                let mut trial_table = trial_element.create_tabulate_array(0, trial_rule.npoints);
+                let mut test_table = test_space
+                    .element()
+                    .create_tabulate_array(0, test_rule.npoints);
+                let mut trial_table = trial_space
+                    .element()
+                    .create_tabulate_array(0, trial_rule.npoints);
 
-                test_element.tabulate(&test_points, 0, &mut test_table);
-                trial_element.tabulate(&trial_points, 0, &mut trial_table);
+                test_space
+                    .element()
+                    .tabulate(&test_points, 0, &mut test_table);
+                trial_space
+                    .element()
+                    .tabulate(&trial_points, 0, &mut trial_table);
 
                 let mut test_jdet = vec![0.0; test_rule.npoints];
                 let mut trial_jdet = vec![0.0; trial_rule.npoints];
@@ -118,13 +123,15 @@ fn assemble(
                     &mut trial_jdet,
                 );
 
-                for (test_i, test_dof) in test_dofmap
+                for (test_i, test_dof) in test_space
+                    .dofmap()
                     .cell_dofs(test_cell_tindex)
                     .unwrap()
                     .iter()
                     .enumerate()
                 {
-                    for (trial_i, trial_dof) in trial_dofmap
+                    for (trial_i, trial_dof) in trial_space
+                        .dofmap()
                         .cell_dofs(trial_cell_tindex)
                         .unwrap()
                         .iter()
@@ -235,11 +242,19 @@ fn assemble(
                     Array2D::from_data(singular_rule.test_points, (singular_rule.npoints, 2));
                 let trial_points =
                     Array2D::from_data(singular_rule.trial_points, (singular_rule.npoints, 2));
-                let mut test_table = test_element.create_tabulate_array(0, singular_rule.npoints);
-                let mut trial_table = trial_element.create_tabulate_array(0, singular_rule.npoints);
+                let mut test_table = test_space
+                    .element()
+                    .create_tabulate_array(0, singular_rule.npoints);
+                let mut trial_table = trial_space
+                    .element()
+                    .create_tabulate_array(0, singular_rule.npoints);
 
-                test_element.tabulate(&test_points, 0, &mut test_table);
-                trial_element.tabulate(&trial_points, 0, &mut trial_table);
+                test_space
+                    .element()
+                    .tabulate(&test_points, 0, &mut test_table);
+                trial_space
+                    .element()
+                    .tabulate(&trial_points, 0, &mut trial_table);
 
                 let mut test_jdet = vec![0.0; singular_rule.npoints];
                 let mut trial_jdet = vec![0.0; singular_rule.npoints];
@@ -255,13 +270,15 @@ fn assemble(
                     &mut trial_jdet,
                 );
 
-                for (test_i, test_dof) in test_dofmap
+                for (test_i, test_dof) in test_space
+                    .dofmap()
                     .cell_dofs(test_cell_tindex)
                     .unwrap()
                     .iter()
                     .enumerate()
                 {
-                    for (trial_i, trial_dof) in trial_dofmap
+                    for (trial_i, trial_dof) in trial_space
+                        .dofmap()
                         .cell_dofs(trial_cell_tindex)
                         .unwrap()
                         .iter()
@@ -318,7 +335,7 @@ fn assemble(
 #[cfg(test)]
 mod test {
     use crate::assembly::dense::*;
-    use crate::dofmap::SerialDofMap;
+    use crate::function_space::SerialFunctionSpace;
     use approx::*;
     use bempp_element::element::LagrangeElementTriangleDegree0;
     use bempp_grid::shapes::regular_sphere;
@@ -327,9 +344,9 @@ mod test {
     fn test_laplace_single_layer_dp0_dp0() {
         let grid = regular_sphere(0);
         let element = LagrangeElementTriangleDegree0 {};
-        let dofmap = SerialDofMap::new(&grid, &element);
+        let space = SerialFunctionSpace::new(&grid, element);
 
-        let matrix = laplace_single_layer(&grid, &element, &dofmap, &element, &dofmap);
+        let matrix = laplace_single_layer(&space, &space);
 
         // Compare to result from bempp-cl
         let from_cl = vec![

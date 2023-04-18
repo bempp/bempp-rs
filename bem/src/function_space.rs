@@ -25,7 +25,7 @@ impl<E: FiniteElement> FunctionSpace for SerialFunctionSpace<'_, E> {
     type Grid = SerialGrid;
     type FiniteElement = E;
 
-    fn dof_map(&self) -> &Self::DofMap {
+    fn dofmap(&self) -> &Self::DofMap {
         &self.dofmap
     }
     fn grid(&self) -> &Self::Grid {

@@ -23,7 +23,7 @@ pub trait FunctionSpace {
     type Grid: Grid;
     type FiniteElement: FiniteElement;
 
-    fn dof_map(&self) -> &Self::DofMap;
+    fn dofmap(&self) -> &Self::DofMap;
     fn grid(&self) -> &Self::Grid;
     fn element(&self) -> &Self::FiniteElement;
 }
