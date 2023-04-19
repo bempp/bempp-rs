@@ -70,6 +70,9 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         self.serial_geometry
             .compute_points(points, cell, physical_points)
     }
+    fn compute_normals(&self, points: &Array2D<f64>, cell: usize, normals: &mut Array2D<f64>) {
+        self.serial_geometry.compute_points(points, cell, normals)
+    }
     fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
         self.serial_geometry
             .compute_jacobians(points, cell, jacobians)

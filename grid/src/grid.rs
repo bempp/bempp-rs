@@ -161,6 +161,65 @@ impl Geometry for SerialGeometry {
             }
         }
     }
+    fn compute_normals(&self, points: &Array2D<f64>, cell: usize, normals: &mut Array2D<f64>) {
+        let gdim = self.dim();
+        if gdim != 3 {
+            unimplemented!("normals currently only implemented for 2D cells embedded in 3D.");
+        }
+        if points.shape().0 != normals.shape().0 {
+            panic!("normals has wrong number of rows.");
+        }
+        if gdim != normals.shape().1 {
+            panic!("normals has wrong number of columns.");
+        }
+        let element = self.element(cell);
+        let mut data = element.create_tabulate_array(1, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let mut axes = Array2D::<f64>::new((2, 3));
+        element.tabulate(points, 1, &mut data);
+        for p in 0..points.shape().0 {
+            for i in 0..axes.shape().0 {
+                for j in 0..axes.shape().1 {
+                    unsafe {
+                        *axes.get_unchecked_mut(i, j) = 0.0;
+                    }
+                }
+            }
+            for i in 0..data.shape().2 {
+                let pt = unsafe {
+                    self.coordinates
+                        .row_unchecked(*self.cells.get_unchecked(cell, i))
+                };
+                for j in 0..gdim {
+                    unsafe {
+                        *axes.get_unchecked_mut(0, j) += pt[j] * data.get_unchecked(1, p, i, 0);
+                        *axes.get_unchecked_mut(1, j) += pt[j] * data.get_unchecked(2, p, i, 0);
+                    }
+                }
+            }
+            unsafe {
+                *normals.get_unchecked_mut(p, 0) = *axes.get_unchecked(0, 1)
+                    * *axes.get_unchecked(1, 2)
+                    - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
+                *normals.get_unchecked_mut(p, 1) = *axes.get_unchecked(0, 2)
+                    * *axes.get_unchecked(1, 0)
+                    - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
+                *normals.get_unchecked_mut(p, 2) = *axes.get_unchecked(0, 0)
+                    * *axes.get_unchecked(1, 1)
+                    - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
+            }
+            let size = unsafe {
+                (*normals.get_unchecked(p, 0) * *normals.get_unchecked(p, 0)
+                    + *normals.get_unchecked(p, 1) * *normals.get_unchecked(p, 1)
+                    + *normals.get_unchecked(p, 2) * *normals.get_unchecked(p, 2))
+                .sqrt()
+            };
+            unsafe {
+                *normals.get_unchecked_mut(p, 0) /= size;
+                *normals.get_unchecked_mut(p, 1) /= size;
+                *normals.get_unchecked_mut(p, 2) /= size;
+            }
+        }
+    }
     fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
         let gdim = self.dim();
         let tdim = points.shape().1;
@@ -749,9 +808,6 @@ mod test {
             ),
             vec![ReferenceCellType::Triangle; 8],
         );
-        for i in g.topology().adjacent_cells(0).iter() {
-            println!("{} {}", i.0, i.1);
-        }
         assert_eq!(g.topology().adjacent_cells(0).len(), 7);
         for i in g.topology().adjacent_cells(0).iter() {
             if i.0 == 0 {
@@ -1119,5 +1175,45 @@ mod test {
             assert_relative_eq!(*jinvs.get(i, 4).unwrap(), -1.0);
             assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.0);
         }
+    }
+
+    #[test]
+    fn test_normals() {
+        let g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 1.0, 1.0, -1.0, 0.0, 1.0,
+                ],
+                (5, 3),
+            ),
+            AdjacencyList::from_data(vec![0, 1, 2, 1, 3, 2, 2, 3, 4], vec![0, 3, 6, 9]),
+            vec![
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+            ],
+        );
+
+        let points = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 3));
+
+        let mut normal = Array2D::<f64>::new((1, 3));
+
+        g.geometry().compute_normals(&points, 0, &mut normal);
+        assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), -1.0);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), 0.0);
+
+        g.geometry().compute_normals(&points, 1, &mut normal);
+        let a = f64::sqrt(1.0 / 3.0);
+        assert_relative_eq!(*normal.get(0, 0).unwrap(), a);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), a);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), a);
+
+        g.geometry().compute_normals(&points, 2, &mut normal);
+        assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), 1.0);
     }
 }

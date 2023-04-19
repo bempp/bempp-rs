@@ -34,13 +34,16 @@ pub trait Geometry {
     /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
 
-    ///  Compute the physical coordinates of a set of points in a given cell
+    /// Compute the physical coordinates of a set of points in a given cell
     fn compute_points(
         &self,
         points: &Array2D<f64>,
         cell: usize,
         physical_points: &mut Array2D<f64>,
     );
+
+    /// Compute the normals to a set of points in a given cell
+    fn compute_normals(&self, points: &Array2D<f64>, cell: usize, normals: &mut Array2D<f64>);
 
     /// Evaluate the jacobian at a set of points in a given cell
     ///
