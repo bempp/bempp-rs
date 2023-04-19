@@ -8,9 +8,48 @@ use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 
-fn laplace_green(x1: f64, x2: f64, x3: f64, y1: f64, y2: f64, y3: f64) -> f64 {
-    let inv_dist =
-        1.0 / f64::sqrt((x1 - y1) * (x1 - y1) + (x2 - y2) * (x2 - y2) + (x3 - y3) * (x3 - y3));
+fn laplace_green(x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> f64 {
+    let inv_dist = 1.0
+        / f64::sqrt(
+            (x[0] - y[0]) * (x[0] - y[0])
+                + (x[1] - y[1]) * (x[1] - y[1])
+                + (x[2] - y[2]) * (x[2] - y[2]),
+        );
+
+    0.25 * std::f64::consts::FRAC_1_PI * inv_dist
+}
+
+fn laplace_green_dx(x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> f64 {
+    let inv_dist = 1.0
+        / f64::sqrt(
+            (x[0] - y[0]) * (x[0] - y[0])
+                + (x[1] - y[1]) * (x[1] - y[1])
+                + (x[2] - y[2]) * (x[2] - y[2]),
+        );
+    let sum = (y[0] - x[0]) * nx[0] + (y[1] - x[1]) * nx[1] + (y[2] - x[2]) * nx[2];
+
+    0.25 * std::f64::consts::FRAC_1_PI * inv_dist * inv_dist * inv_dist * sum
+}
+
+fn laplace_green_dy(x: &[f64], y: &[f64], _nx: &[f64], ny: &[f64]) -> f64 {
+    let inv_dist = 1.0
+        / f64::sqrt(
+            (x[0] - y[0]) * (x[0] - y[0])
+                + (x[1] - y[1]) * (x[1] - y[1])
+                + (x[2] - y[2]) * (x[2] - y[2]),
+        );
+    let sum = (x[0] - y[0]) * ny[0] + (x[1] - y[1]) * ny[1] + (x[2] - y[2]) * ny[2];
+
+    0.25 * std::f64::consts::FRAC_1_PI * inv_dist * inv_dist * inv_dist * sum
+}
+
+fn laplace_green_dx_dy(x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> f64 {
+    let inv_dist = 1.0
+        / f64::sqrt(
+            (x[0] - y[0]) * (x[0] - y[0])
+                + (x[1] - y[1]) * (x[1] - y[1])
+                + (x[2] - y[2]) * (x[2] - y[2]),
+        );
 
     0.25 * std::f64::consts::FRAC_1_PI * inv_dist
 }
@@ -19,11 +58,34 @@ pub fn laplace_single_layer(
     trial_space: &impl FunctionSpace,
     test_space: &impl FunctionSpace,
 ) -> Array2D<f64> {
-    assemble(laplace_green, trial_space, test_space)
+    assemble(laplace_green, false, false, trial_space, test_space)
+}
+
+pub fn laplace_double_layer(
+    trial_space: &impl FunctionSpace,
+    test_space: &impl FunctionSpace,
+) -> Array2D<f64> {
+    assemble(laplace_green_dy, false, true, trial_space, test_space)
+}
+
+pub fn laplace_adjoint_double_layer(
+    trial_space: &impl FunctionSpace,
+    test_space: &impl FunctionSpace,
+) -> Array2D<f64> {
+    assemble(laplace_green_dx, true, false, trial_space, test_space)
+}
+
+pub fn laplace_hypersingular(
+    trial_space: &impl FunctionSpace,
+    test_space: &impl FunctionSpace,
+) -> Array2D<f64> {
+    assemble(laplace_green_dx_dy, true, true, trial_space, test_space)
 }
 
 fn assemble(
-    kernel: fn(f64, f64, f64, f64, f64, f64) -> f64,
+    kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
+    needs_test_normal: bool,
+    needs_trial_normal: bool,
     trial_space: &impl FunctionSpace,
     test_space: &impl FunctionSpace,
 ) -> Array2D<f64> {
@@ -32,7 +94,7 @@ fn assemble(
     // if *trial_space.grid() != *test_space.grid() {
     //    unimplemented!("Assembling operators with spaces on different grids not yet supported");
     // }
-    let npoints = 3;
+    let npoints = 4;
 
     let grid = trial_space.grid();
 
@@ -43,6 +105,9 @@ fn assemble(
     let mut trial_pt = Array2D::<f64>::new((1, 2));
     let mut test_mapped_pt = Array2D::<f64>::new((1, 3));
     let mut trial_mapped_pt = Array2D::<f64>::new((1, 3));
+
+    let mut test_normal = Array2D::<f64>::new((1, 3));
+    let mut trial_normal = Array2D::<f64>::new((1, 3));
 
     let mut matrix = Array2D::<f64>::new((
         test_space.dofmap().global_size(),
@@ -151,6 +216,13 @@ fn assemble(
                                 test_cell_gindex,
                                 &mut test_mapped_pt,
                             );
+                            if needs_test_normal {
+                                grid.geometry().compute_normals(
+                                    &test_pt,
+                                    test_cell_gindex,
+                                    &mut test_normal,
+                                );
+                            }
                             let test_weight = test_rule.weights[test_index];
 
                             for trial_index in 0..trial_rule.npoints {
@@ -165,15 +237,20 @@ fn assemble(
                                     trial_cell_gindex,
                                     &mut trial_mapped_pt,
                                 );
+                                if needs_trial_normal {
+                                    grid.geometry().compute_normals(
+                                        &trial_pt,
+                                        trial_cell_gindex,
+                                        &mut trial_normal,
+                                    );
+                                }
                                 let trial_weight = trial_rule.weights[trial_index];
 
                                 sum += kernel(
-                                    unsafe { *test_mapped_pt.get_unchecked(0, 0) },
-                                    unsafe { *test_mapped_pt.get_unchecked(0, 1) },
-                                    unsafe { *test_mapped_pt.get_unchecked(0, 2) },
-                                    unsafe { *trial_mapped_pt.get_unchecked(0, 0) },
-                                    unsafe { *trial_mapped_pt.get_unchecked(0, 1) },
-                                    unsafe { *trial_mapped_pt.get_unchecked(0, 2) },
+                                    unsafe { test_mapped_pt.row_unchecked(0) },
+                                    unsafe { trial_mapped_pt.row_unchecked(0) },
+                                    unsafe { test_normal.row_unchecked(0) },
+                                    unsafe { trial_normal.row_unchecked(0) },
                                 ) * test_weight
                                     * trial_weight
                                     * unsafe { test_table.get_unchecked(0, test_index, test_i, 0) }
@@ -307,15 +384,28 @@ fn assemble(
                                 trial_cell_gindex,
                                 &mut trial_mapped_pt,
                             );
+                            if needs_test_normal {
+                                grid.geometry().compute_normals(
+                                    &test_pt,
+                                    test_cell_gindex,
+                                    &mut test_normal,
+                                );
+                            }
+                            if needs_trial_normal {
+                                grid.geometry().compute_normals(
+                                    &trial_pt,
+                                    trial_cell_gindex,
+                                    &mut trial_normal,
+                                );
+                            }
+
                             let weight = singular_rule.weights[index];
 
                             sum += kernel(
-                                unsafe { *test_mapped_pt.get_unchecked(0, 0) },
-                                unsafe { *test_mapped_pt.get_unchecked(0, 1) },
-                                unsafe { *test_mapped_pt.get_unchecked(0, 2) },
-                                unsafe { *trial_mapped_pt.get_unchecked(0, 0) },
-                                unsafe { *trial_mapped_pt.get_unchecked(0, 1) },
-                                unsafe { *trial_mapped_pt.get_unchecked(0, 2) },
+                                unsafe { test_mapped_pt.row_unchecked(0) },
+                                unsafe { trial_mapped_pt.row_unchecked(0) },
+                                unsafe { test_normal.row_unchecked(0) },
+                                unsafe { trial_normal.row_unchecked(0) },
                             ) * weight
                                 * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                                 * test_jdet[index]
@@ -337,7 +427,7 @@ mod test {
     use crate::assembly::dense::*;
     use crate::function_space::SerialFunctionSpace;
     use approx::*;
-    use bempp_element::element::LagrangeElementTriangleDegree0;
+    use bempp_element::element::{LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1};
     use bempp_grid::shapes::regular_sphere;
 
     #[test]
@@ -434,14 +524,275 @@ mod test {
 
         for i in 0..8 {
             for j in 0..8 {
-                if matrix.get(i, j).unwrap().abs() > 0.0001 {
-                    assert_relative_eq!(
-                        *matrix.get(i, j).unwrap(),
-                        from_cl[i][j],
-                        epsilon = 0.0001
-                    );
-                }
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
             }
         }
     }
+
+    #[test]
+    fn test_laplace_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = LagrangeElementTriangleDegree0 {};
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let matrix = laplace_double_layer(&space, &space);
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                -1.9658941517361406e-33,
+                -0.08477786720045567,
+                -0.048343860959178774,
+                -0.08477786720045567,
+                -0.08477786720045566,
+                -0.048343860959178774,
+                -0.033625570841778946,
+                -0.04834386095917877,
+            ],
+            vec![
+                -0.08477786720045567,
+                -1.9658941517361406e-33,
+                -0.08477786720045567,
+                -0.048343860959178774,
+                -0.04834386095917877,
+                -0.08477786720045566,
+                -0.048343860959178774,
+                -0.033625570841778946,
+            ],
+            vec![
+                -0.048343860959178774,
+                -0.08477786720045567,
+                -1.9658941517361406e-33,
+                -0.08477786720045567,
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -0.08477786720045566,
+                -0.048343860959178774,
+            ],
+            vec![
+                -0.08477786720045567,
+                -0.048343860959178774,
+                -0.08477786720045567,
+                -1.9658941517361406e-33,
+                -0.048343860959178774,
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -0.08477786720045566,
+            ],
+            vec![
+                -0.08477786720045566,
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.04834386095917877,
+                4.910045345075783e-33,
+                -0.08477786720045566,
+                -0.048343860959178774,
+                -0.08477786720045566,
+            ],
+            vec![
+                -0.04834386095917877,
+                -0.08477786720045566,
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.08477786720045566,
+                4.910045345075783e-33,
+                -0.08477786720045566,
+                -0.048343860959178774,
+            ],
+            vec![
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -0.08477786720045566,
+                -0.04834386095917877,
+                -0.048343860959178774,
+                -0.08477786720045566,
+                4.910045345075783e-33,
+                -0.08477786720045566,
+            ],
+            vec![
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -0.08477786720045566,
+                -0.08477786720045566,
+                -0.048343860959178774,
+                -0.08477786720045566,
+                4.910045345075783e-33,
+            ],
+        ];
+
+        for i in 0..8 {
+            for j in 0..8 {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+            }
+        }
+    }
+
+    #[test]
+    fn test_laplace_adjoint_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = LagrangeElementTriangleDegree0 {};
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let matrix = laplace_adjoint_double_layer(&space, &space);
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                1.9658941517361406e-33,
+                -0.08478435261011981,
+                -0.048343860959178774,
+                -0.0847843526101198,
+                -0.08478435261011981,
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.048343860959178774,
+            ],
+            vec![
+                -0.0847843526101198,
+                1.9658941517361406e-33,
+                -0.08478435261011981,
+                -0.048343860959178774,
+                -0.048343860959178774,
+                -0.08478435261011981,
+                -0.04834386095917877,
+                -0.033625570841778946,
+            ],
+            vec![
+                -0.048343860959178774,
+                -0.0847843526101198,
+                1.9658941517361406e-33,
+                -0.08478435261011981,
+                -0.033625570841778946,
+                -0.048343860959178774,
+                -0.08478435261011981,
+                -0.04834386095917877,
+            ],
+            vec![
+                -0.08478435261011981,
+                -0.048343860959178774,
+                -0.0847843526101198,
+                1.9658941517361406e-33,
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.048343860959178774,
+                -0.08478435261011981,
+            ],
+            vec![
+                -0.0847843526101198,
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -4.910045345075783e-33,
+                -0.0847843526101198,
+                -0.048343860959178774,
+                -0.08478435261011981,
+            ],
+            vec![
+                -0.04834386095917877,
+                -0.0847843526101198,
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.08478435261011981,
+                -4.910045345075783e-33,
+                -0.0847843526101198,
+                -0.048343860959178774,
+            ],
+            vec![
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -0.0847843526101198,
+                -0.04834386095917877,
+                -0.048343860959178774,
+                -0.08478435261011981,
+                -4.910045345075783e-33,
+                -0.0847843526101198,
+            ],
+            vec![
+                -0.04834386095917877,
+                -0.033625570841778946,
+                -0.04834386095917877,
+                -0.0847843526101198,
+                -0.0847843526101198,
+                -0.048343860959178774,
+                -0.08478435261011981,
+                -4.910045345075783e-33,
+            ],
+        ];
+
+        for i in 0..8 {
+            for j in 0..8 {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+            }
+        }
+    }
+
+    /*
+    #[test]
+    fn test_laplace_hypersingular_p1_p1() {
+        let grid = regular_sphere(0);
+        let element = LagrangeElementTriangleDegree1 {};
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let matrix = laplace_hypersingular(&space, &space);
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                0.33550642155494004,
+                -0.10892459915262698,
+                -0.05664545560057827,
+                -0.05664545560057828,
+                -0.0566454556005783,
+                -0.05664545560057828,
+            ],
+            vec![
+                -0.10892459915262698,
+                0.33550642155494004,
+                -0.05664545560057828,
+                -0.05664545560057827,
+                -0.05664545560057828,
+                -0.05664545560057829,
+            ],
+            vec![
+                -0.05664545560057828,
+                -0.05664545560057827,
+                0.33550642155494004,
+                -0.10892459915262698,
+                -0.056645455600578286,
+                -0.05664545560057829,
+            ],
+            vec![
+                -0.05664545560057827,
+                -0.05664545560057828,
+                -0.10892459915262698,
+                0.33550642155494004,
+                -0.05664545560057828,
+                -0.056645455600578286,
+            ],
+            vec![
+                -0.05664545560057829,
+                -0.0566454556005783,
+                -0.05664545560057829,
+                -0.05664545560057829,
+                0.33550642155494004,
+                -0.10892459915262698,
+            ],
+            vec![
+                -0.05664545560057829,
+                -0.05664545560057831,
+                -0.05664545560057829,
+                -0.05664545560057829,
+                -0.10892459915262698,
+                0.33550642155494004,
+            ],
+        ];
+
+        for i in 0..6 {
+            for j in 0..6 {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+            }
+        }
+    }
+    */
 }
