@@ -1196,24 +1196,67 @@ mod test {
             ],
         );
 
-        let points = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 3));
+        let pt = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 3));
 
         let mut normal = Array2D::<f64>::new((1, 3));
 
-        g.geometry().compute_normals(&points, 0, &mut normal);
+        g.geometry().compute_normals(&pt, 0, &mut normal);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
         assert_relative_eq!(*normal.get(0, 1).unwrap(), -1.0);
         assert_relative_eq!(*normal.get(0, 2).unwrap(), 0.0);
 
-        g.geometry().compute_normals(&points, 1, &mut normal);
+        g.geometry().compute_normals(&pt, 1, &mut normal);
         let a = f64::sqrt(1.0 / 3.0);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), a);
         assert_relative_eq!(*normal.get(0, 1).unwrap(), a);
         assert_relative_eq!(*normal.get(0, 2).unwrap(), a);
 
-        g.geometry().compute_normals(&points, 2, &mut normal);
+        g.geometry().compute_normals(&pt, 2, &mut normal);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
         assert_relative_eq!(*normal.get(0, 1).unwrap(), 0.0);
         assert_relative_eq!(*normal.get(0, 2).unwrap(), 1.0);
+
+        // Test a curved quadrilateral cell
+        let curved_g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, -1.0, 0.0,
+                    -1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                ],
+                (9, 3),
+            ),
+            AdjacencyList::from_data(vec![0, 1, 2, 3, 4, 5, 6, 7, 8], vec![0, 9]),
+            vec![ReferenceCellType::Quadrilateral],
+        );
+
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 0.2, 0.3, 0.5, 0.9, 0.7, 1.0, 1.0, 0.3],
+            (5, 2),
+        );
+        let mut normals = Array2D::<f64>::new((5, 3));
+
+        curved_g
+            .geometry()
+            .compute_normals(&points, 0, &mut normals);
+
+        assert_relative_eq!(*normals.get(0, 0).unwrap(), 2.0 * f64::sqrt(1.0 / 5.0));
+        assert_relative_eq!(*normals.get(0, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normals.get(0, 2).unwrap(), f64::sqrt(1.0 / 5.0));
+
+        assert_relative_eq!(*normals.get(1, 0).unwrap(), 1.2 * f64::sqrt(1.0 / 2.44));
+        assert_relative_eq!(*normals.get(1, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normals.get(1, 2).unwrap(), f64::sqrt(1.0 / 2.44));
+
+        assert_relative_eq!(*normals.get(2, 0).unwrap(), 0.0);
+        assert_relative_eq!(*normals.get(2, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normals.get(2, 2).unwrap(), 1.0);
+
+        assert_relative_eq!(*normals.get(3, 0).unwrap(), -0.8 * f64::sqrt(1.0 / 1.64));
+        assert_relative_eq!(*normals.get(3, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normals.get(3, 2).unwrap(), f64::sqrt(1.0 / 1.64));
+
+        assert_relative_eq!(*normals.get(4, 0).unwrap(), -2.0 * f64::sqrt(1.0 / 5.0));
+        assert_relative_eq!(*normals.get(4, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normals.get(4, 2).unwrap(), f64::sqrt(1.0 / 5.0));
     }
 }
