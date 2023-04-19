@@ -102,4 +102,24 @@ mod test {
         let _g2 = regular_sphere(2);
         let _g3 = regular_sphere(3);
     }
+
+    #[test]
+    fn test_normal_is_outward() {
+        for i in 0..3 {
+            let g = regular_sphere(i);
+            let points = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 2));
+
+            let mut mapped_pt = Array2D::<f64>::new((1, 3));
+            let mut normal = Array2D::<f64>::new((1, 3));
+
+            for i in 0..g.geometry().cell_count() {
+                g.geometry().compute_points(&points, i, &mut mapped_pt);
+                g.geometry().compute_normals(&points, i, &mut normal);
+                let dot = *mapped_pt.get(0, 0).unwrap() * *normal.get(0, 0).unwrap()
+                    + *mapped_pt.get(0, 1).unwrap() * *normal.get(0, 1).unwrap()
+                    + *mapped_pt.get(0, 2).unwrap() * *normal.get(0, 2).unwrap();
+                assert!(dot > 0.0);
+            }
+        }
+    }
 }
