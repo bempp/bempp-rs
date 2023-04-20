@@ -2,6 +2,7 @@
 use bempp_element::cell;
 use bempp_element::element;
 use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
@@ -137,7 +138,7 @@ impl Geometry for SerialGeometry {
             panic!("physical_points has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = element.create_tabulate_array(0, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(0, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         element.tabulate(points, 0, &mut data);
         for p in 0..points.shape().0 {
             for i in 0..physical_points.shape().1 {
@@ -173,7 +174,7 @@ impl Geometry for SerialGeometry {
             panic!("normals has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = element.create_tabulate_array(1, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         let mut axes = Array2D::<f64>::new((2, 3));
         element.tabulate(points, 1, &mut data);
         for p in 0..points.shape().0 {
@@ -230,7 +231,7 @@ impl Geometry for SerialGeometry {
             panic!("jacobians has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = element.create_tabulate_array(1, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         let tdim = data.shape().0 - 1;
         element.tabulate(points, 1, &mut data);
         for p in 0..points.shape().0 {

@@ -1,4 +1,5 @@
 use bempp_tools::arrays::Array2D;
+use bempp_traits::arrays::Array2DAccess;
 
 fn main() {
     // Create an 2D array of zero integers of a given size

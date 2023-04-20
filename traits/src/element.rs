@@ -1,7 +1,7 @@
 //! Finite element definitions
 
+use crate::arrays::{Array2DAccess, Array4DAccess};
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::{Array2D, Array4D};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -60,7 +60,12 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>);
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    );
 
     /// The DOFs that are associated with a subentity of the reference cell
     fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize>;
@@ -68,12 +73,12 @@ pub trait FiniteElement {
     /// The push forward / pull back map to use for this element
     fn map_type(&self) -> MapType;
 
-    /// Create a data array full of zeros
-    fn create_tabulate_array(&self, nderivs: usize, npoints: usize) -> Array4D<f64> {
+    /// Get the required shape for a tabulation array
+    fn tabulate_array_shape(&self, nderivs: usize, npoints: usize) -> (usize, usize, usize, usize) {
         let deriv_count = compute_derivative_count(nderivs, self.cell_type()).unwrap();
         let point_count = npoints;
         let basis_count = self.dim();
         let value_size = self.value_size();
-        Array4D::<f64>::new((deriv_count, point_count, basis_count, value_size))
+        (deriv_count, point_count, basis_count, value_size)
     }
 }

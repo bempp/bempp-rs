@@ -2,28 +2,29 @@
 
 use crate::cell::PhysicalCell;
 use crate::element::FiniteElement;
-use bempp_tools::arrays::{Array2D, Array4D};
+use bempp_tools::arrays::Array4D;
+use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
 pub use bempp_traits::element::MapType;
 
 pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    _points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    _points: &impl Array2DAccess<'a, f64>,
     _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 }
 
 pub fn identity_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    _points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    _points: &impl Array2DAccess<'a, f64>,
     _geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
 }
 
 pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    points: &impl Array2DAccess<'a, f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -34,10 +35,11 @@ pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
         let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
+        let mut derivs =
+            Array4D::<f64>::new(geometry.coordinate_element().tabulate_array_shape(1, npts));
         geometry
             .coordinate_element()
-            .tabulate(&points, 1, &mut derivs);
+            .tabulate(points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
 
@@ -72,8 +74,8 @@ pub fn contravariant_piola_push_forward<'a, F: FiniteElement + 'a>(
 }
 
 pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    points: &impl Array2DAccess<'a, f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -84,10 +86,11 @@ pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
         let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
+        let mut derivs =
+            Array4D::<f64>::new(geometry.coordinate_element().tabulate_array_shape(1, npts));
         geometry
             .coordinate_element()
-            .tabulate(&points, 1, &mut derivs);
+            .tabulate(points, 1, &mut derivs);
 
         let mut jinv = vec![0.0, 0.0, 0.0, 0.0];
 
@@ -121,8 +124,8 @@ pub fn contravariant_piola_pull_back<'a, F: FiniteElement + 'a>(
 }
 
 pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    points: &impl Array2DAccess<'a, f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -133,10 +136,11 @@ pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
         let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
+        let mut derivs =
+            Array4D::<f64>::new(geometry.coordinate_element().tabulate_array_shape(1, npts));
         geometry
             .coordinate_element()
-            .tabulate(&points, 1, &mut derivs);
+            .tabulate(points, 1, &mut derivs);
 
         let mut jinv_t = vec![0.0, 0.0, 0.0, 0.0];
 
@@ -175,8 +179,8 @@ pub fn covariant_piola_push_forward<'a, F: FiniteElement + 'a>(
 }
 
 pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    points: &impl Array2DAccess<'a, f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -187,10 +191,11 @@ pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
         let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
+        let mut derivs =
+            Array4D::<f64>::new(geometry.coordinate_element().tabulate_array_shape(1, npts));
         geometry
             .coordinate_element()
-            .tabulate(&points, 1, &mut derivs);
+            .tabulate(points, 1, &mut derivs);
 
         let mut j_t = vec![0.0, 0.0, 0.0, 0.0];
 
@@ -222,8 +227,8 @@ pub fn covariant_piola_pull_back<'a, F: FiniteElement + 'a>(
 }
 
 pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    points: &impl Array2DAccess<'a, f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -234,10 +239,11 @@ pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
         let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
+        let mut derivs =
+            Array4D::<f64>::new(geometry.coordinate_element().tabulate_array_shape(1, npts));
         geometry
             .coordinate_element()
-            .tabulate(&points, 1, &mut derivs);
+            .tabulate(points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
 
@@ -264,8 +270,8 @@ pub fn l2_piola_push_forward<'a, F: FiniteElement + 'a>(
 }
 
 pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
-    data: &mut Array4D<f64>,
-    points: &Array2D<f64>,
+    data: &mut impl Array4DAccess<f64>,
+    points: &impl Array2DAccess<'a, f64>,
     geometry: &impl PhysicalCell<'a, F>,
 ) {
     assert_eq!(data.shape().0, 1);
@@ -276,10 +282,11 @@ pub fn l2_piola_pull_back<'a, F: FiniteElement + 'a>(
         let nbasis = data.shape().2;
 
         // TODO: get rid of memory assignment inside this function
-        let mut derivs = geometry.coordinate_element().create_tabulate_array(1, npts);
+        let mut derivs =
+            Array4D::<f64>::new(geometry.coordinate_element().tabulate_array_shape(1, npts));
         geometry
             .coordinate_element()
-            .tabulate(&points, 1, &mut derivs);
+            .tabulate(points, 1, &mut derivs);
 
         let mut j = vec![0.0, 0.0, 0.0, 0.0];
 
@@ -311,6 +318,7 @@ mod test {
     use crate::element::*;
     use crate::map::*;
     use approx::*;
+    use bempp_tools::arrays::Array2D;
 
     pub struct TestPhysicalCell<'a, F: FiniteElement> {
         vertices: &'a Array2D<f64>,
@@ -360,7 +368,7 @@ mod test {
     #[test]
     fn test_identity() {
         let e = LagrangeElementTriangleDegree1 {};
-        let mut data = e.create_tabulate_array(0, 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 1));
 
         *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
         *data.get_mut(0, 0, 1, 0).unwrap() = 0.4;
@@ -389,7 +397,7 @@ mod test {
     #[test]
     fn test_contravariant_piola() {
         let e = RaviartThomasElementTriangleDegree1 {};
-        let mut data = e.create_tabulate_array(0, 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 1));
 
         *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
         *data.get_mut(0, 0, 0, 1).unwrap() = 0.4;
@@ -427,7 +435,7 @@ mod test {
     #[test]
     fn test_covariant_piola() {
         let e = RaviartThomasElementTriangleDegree1 {};
-        let mut data = e.create_tabulate_array(0, 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 1));
 
         *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
         *data.get_mut(0, 0, 0, 1).unwrap() = 0.4;
@@ -465,7 +473,7 @@ mod test {
     #[test]
     fn test_l2_piola() {
         let e = LagrangeElementTriangleDegree1 {};
-        let mut data = e.create_tabulate_array(0, 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 1));
 
         *data.get_mut(0, 0, 0, 0).unwrap() = 0.5;
         *data.get_mut(0, 0, 1, 0).unwrap() = 0.4;

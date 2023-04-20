@@ -1,4 +1,5 @@
 use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
 use bempp_traits::bem::DofMap;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Grid, Topology};

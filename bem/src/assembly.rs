@@ -1,3 +1,4 @@
+use bempp_traits::arrays::Array2DAccess;
 pub mod dense;
 use crate::green;
 use bempp_tools::arrays::Array2D;

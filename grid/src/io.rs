@@ -122,8 +122,8 @@ mod test {
     use crate::grid::SerialGrid;
     use crate::io::*;
     use crate::shapes::regular_sphere;
-    use bempp_tools::arrays::AdjacencyList;
-    use bempp_tools::arrays::Array2D;
+    use bempp_tools::arrays::{AdjacencyList, Array2D};
+    use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
     use bempp_traits::cell::ReferenceCellType;
 
     #[test]

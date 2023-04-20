@@ -3,6 +3,7 @@ use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use bempp_tools::arrays::Array2D;
+use bempp_traits::arrays::Array2DAccess;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
@@ -173,8 +174,10 @@ pub fn assemble(
 
             let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
             let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
-            let mut test_table = test_space.element().create_tabulate_array(0, rule.npoints);
-            let mut trial_table = trial_space.element().create_tabulate_array(0, rule.npoints);
+            let mut test_table =
+                Array4D::<f64>::new(test_space.element().tabulate_array_shape(0, rule.npoints));
+            let mut trial_table =
+                Array4D::<f64>::new(trial_space.element().tabulate_array_shape(0, rule.npoints));
 
             test_space
                 .element()
@@ -318,8 +321,10 @@ pub fn hypersingular_assemble(
             );
             let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
             let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
-            let mut test_table = test_space.element().create_tabulate_array(1, rule.npoints);
-            let mut trial_table = trial_space.element().create_tabulate_array(1, rule.npoints);
+            let mut test_table =
+                Array4D::<f64>::new(test_space.element().tabulate_array_shape(1, rule.npoints));
+            let mut trial_table =
+                Array4D::<f64>::new(trial_space.element().tabulate_array_shape(1, rule.npoints));
 
             test_space
                 .element()

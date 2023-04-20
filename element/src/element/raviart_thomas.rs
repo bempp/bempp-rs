@@ -3,7 +3,7 @@
 use crate::cell::*;
 use crate::element::*;
 use crate::map::*;
-use bempp_tools::arrays::{Array2D, Array4D};
+use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
 use bempp_traits::element::ElementFamily;
 
 /// Degree 1 Raviart-Thomas element on a triangle
@@ -35,7 +35,12 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -81,6 +86,7 @@ impl FiniteElement for RaviartThomasElementTriangleDegree1 {
 mod test {
     use crate::element::raviart_thomas::*;
     use approx::*;
+    use bempp_tools::arrays::{Array2D, Array4D};
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -116,7 +122,7 @@ mod test {
     fn test_raviart_thomas_1_triangle() {
         let e = RaviartThomasElementTriangleDegree1 {};
         assert_eq!(e.value_size(), 2);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),

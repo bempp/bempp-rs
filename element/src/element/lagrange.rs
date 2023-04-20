@@ -3,7 +3,7 @@
 use crate::cell::*;
 use crate::element::*;
 use crate::map::*;
-use bempp_tools::arrays::{Array2D, Array4D};
+use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
 
 /// Lagrange element
 pub struct LagrangeElement {
@@ -46,7 +46,12 @@ impl FiniteElement for LagrangeElement {
     fn dim(&self) -> usize {
         unimplemented!("dim not yet implemented for this element");
     }
-    fn tabulate(&self, _points: &Array2D<f64>, _nderivs: usize, _data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        _points: &impl Array2DAccess<'a, f64>,
+        _nderivs: usize,
+        _data: &mut impl Array4DAccess<f64>,
+    ) {
         unimplemented!("tabulate not yet implemented for this element");
     }
     fn entity_dofs(&self, _entity_dim: usize, _entity_number: usize) -> Vec<usize> {
@@ -83,7 +88,12 @@ impl FiniteElement for LagrangeElementIntervalDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        _points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..nderivs + 1 {
             for pt in 0..data.shape().1 {
@@ -133,7 +143,12 @@ impl FiniteElement for LagrangeElementIntervalDegree1 {
     fn dim(&self) -> usize {
         2
     }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -189,7 +204,12 @@ impl FiniteElement for LagrangeElementTriangleDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        _points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -239,7 +259,12 @@ impl FiniteElement for LagrangeElementTriangleDegree1 {
     fn dim(&self) -> usize {
         3
     }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are 1-x-y, x, y
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -302,7 +327,12 @@ impl FiniteElement for LagrangeElementTriangleDegree2 {
     fn dim(&self) -> usize {
         6
     }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are:
         // * (1-x-y)(1-2x-2y)
         // * x(2x-1)
@@ -409,7 +439,12 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
     fn dim(&self) -> usize {
         1
     }
-    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        _points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -459,7 +494,12 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
     fn dim(&self) -> usize {
         4
     }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -536,7 +576,12 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree2 {
     fn dim(&self) -> usize {
         9
     }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    ) {
         // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
         for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
             for pt in 0..data.shape().1 {
@@ -689,6 +734,7 @@ impl FiniteElement for LagrangeElementQuadrilateralDegree2 {
 mod test {
     use crate::element::lagrange::*;
     use approx::*;
+    use bempp_tools::arrays::{Array2D, Array4D};
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -724,7 +770,7 @@ mod test {
     fn test_lagrange_0_interval() {
         let e = LagrangeElementIntervalDegree0 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 4);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
@@ -738,7 +784,7 @@ mod test {
     fn test_lagrange_1_interval() {
         let e = LagrangeElementIntervalDegree1 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 4);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
@@ -756,7 +802,7 @@ mod test {
     fn test_lagrange_0_triangle() {
         let e = LagrangeElementTriangleDegree0 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
@@ -773,7 +819,7 @@ mod test {
     fn test_lagrange_1_triangle() {
         let e = LagrangeElementTriangleDegree1 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
@@ -795,7 +841,7 @@ mod test {
     fn test_lagrange_0_quadrilateral() {
         let e = LagrangeElementQuadrilateralDegree0 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
@@ -812,7 +858,7 @@ mod test {
     fn test_lagrange_1_quadrilateral() {
         let e = LagrangeElementQuadrilateralDegree1 {};
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),

@@ -21,9 +21,9 @@ pub trait DofMap {
     fn is_serial(&self) -> bool;
 }
 
-pub trait FunctionSpace {
+pub trait FunctionSpace<'a> {
     type DofMap: DofMap;
-    type Grid: Grid;
+    type Grid: Grid<'a>;
     type FiniteElement: FiniteElement;
 
     /// Get the function space's DOF map

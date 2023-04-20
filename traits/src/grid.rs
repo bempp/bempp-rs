@@ -1,7 +1,7 @@
 //! Geometry and topology definitions
 
+use crate::arrays::{AdjacencyListAccess, Array2DAccess};
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::{AdjacencyList, Array2D};
 use std::cell::Ref;
 
 /// The ownership of a mesh entity
@@ -35,27 +35,37 @@ pub trait Geometry {
     fn index_map(&self) -> &[usize];
 
     /// Compute the physical coordinates of a set of points in a given cell
-    fn compute_points(
+    fn compute_points<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
-        physical_points: &mut Array2D<f64>,
+        physical_points: &mut impl Array2DAccess<'a, f64>,
     );
 
     /// Compute the normals to a set of points in a given cell
-    fn compute_normals(&self, points: &Array2D<f64>, cell: usize, normals: &mut Array2D<f64>);
+    fn compute_normals<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        normals: &mut impl Array2DAccess<'a, f64>,
+    );
 
     /// Evaluate the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>);
+    fn compute_jacobians<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        jacobians: &mut impl Array2DAccess<'a, f64>,
+    );
 
     /// Evaluate the determinand of the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_determinants(
+    fn compute_jacobian_determinants<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
         jacobian_determinants: &mut [f64],
     );
@@ -63,18 +73,20 @@ pub trait Geometry {
     /// Evaluate the jacobian inverse at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_inverses(
+    fn compute_jacobian_inverses<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
-        jacobian_inverses: &mut Array2D<f64>,
+        jacobian_inverses: &mut impl Array2DAccess<'a, f64>,
     );
 }
 
-pub trait Topology {
+pub trait Topology<'a> {
     //! Grid topology
     //!
     //! Grid topology provides information about which mesh entities are connected to other mesh entities
+
+    type C: AdjacencyListAccess<'a, usize>;
 
     /// The dimension of the grid
     fn dim(&self) -> usize;
@@ -106,7 +118,7 @@ pub trait Topology {
     }
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>>;
+    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::C>;
 
     /// Get the ownership of a mesh entity
     fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
@@ -119,11 +131,11 @@ pub trait Topology {
     fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>>;
 }
 
-pub trait Grid {
+pub trait Grid<'a> {
     //! A grid
 
     /// The type that implements [Topology]
-    type Topology: Topology;
+    type Topology: Topology<'a>;
 
     /// The type that implements [Geometry]
     type Geometry: Geometry;
