@@ -133,4 +133,7 @@ pub trait Grid {
 
     /// Get the grid geometry (See [Geometry])
     fn geometry(&self) -> &Self::Geometry;
+
+    // Check if the function space is stored in serial
+    fn is_serial(&self) -> bool;
 }

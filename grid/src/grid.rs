@@ -783,6 +783,10 @@ impl Grid for SerialGrid {
     fn geometry(&self) -> &Self::Geometry {
         &self.geometry
     }
+
+    fn is_serial(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

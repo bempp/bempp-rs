@@ -147,6 +147,9 @@ fn assemble(
     // if *trial_space.grid() != *test_space.grid() {
     //    unimplemented!("Assembling operators with spaces on different grids not yet supported");
     // }
+    if !trial_space.is_serial() || !test_space.is_serial() {
+        panic!("Dense assemble can only be used for function spaces stored in serial");
+    }
     let npoints = 4;
 
     let grid = trial_space.grid();

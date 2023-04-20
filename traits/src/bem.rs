@@ -16,6 +16,9 @@ pub trait DofMap {
 
     /// Get the local DOF numbers associated with a cell
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]>;
+
+    // Check if the function space is stored in serial
+    fn is_serial(&self) -> bool;
 }
 
 pub trait FunctionSpace {
@@ -23,7 +26,17 @@ pub trait FunctionSpace {
     type Grid: Grid;
     type FiniteElement: FiniteElement;
 
+    /// Get the function space's DOF map
     fn dofmap(&self) -> &Self::DofMap;
+
+    /// Get the grid that the element is defined on
     fn grid(&self) -> &Self::Grid;
+
+    /// Get the finite element used to define this function space
     fn element(&self) -> &Self::FiniteElement;
+
+    // Check if the function space is stored in serial
+    fn is_serial(&self) -> bool {
+        self.dofmap().is_serial() && self.grid().is_serial()
+    }
 }

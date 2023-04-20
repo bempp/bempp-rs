@@ -427,4 +427,8 @@ impl<'a, C: Communicator> Grid for ParallelGrid<'a, C> {
     fn geometry(&self) -> &Self::Geometry {
         &self.geometry
     }
+
+    fn is_serial(&self) -> bool {
+        false
+    }
 }

@@ -80,6 +80,9 @@ impl DofMap for SerialDofMap {
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         self.cell_dofs.row(cell)
     }
+    fn is_serial(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
