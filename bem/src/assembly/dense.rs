@@ -1,12 +1,110 @@
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
-use bempp_quadrature::types::CellToCellConnectivity;
+use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
+
+fn get_quadrature_rule(
+    test_celltype: ReferenceCellType,
+    trial_celltype: ReferenceCellType,
+    pairs: Vec<(usize, usize)>,
+    npoints: usize,
+) -> TestTrialNumericalQuadratureDefinition {
+    if pairs.len() == 0 {
+        // Standard rules
+        let mut npoints_test = 10 * npoints * npoints;
+        for p in available_rules(test_celltype) {
+            if p >= npoints * npoints && p < npoints_test {
+                npoints_test = p;
+            }
+        }
+        let mut npoints_trial = 10 * npoints * npoints;
+        for p in available_rules(trial_celltype) {
+            if p >= npoints * npoints && p < npoints_trial {
+                npoints_trial = p;
+            }
+        }
+        let test_rule = simplex_rule(test_celltype, npoints_test).unwrap();
+        let trial_rule = simplex_rule(trial_celltype, npoints_trial).unwrap();
+        if test_rule.dim != trial_rule.dim {
+            unimplemented!("Quadrature with different dimension cells not supported");
+        }
+        if test_rule.order != trial_rule.order {
+            unimplemented!("Quadrature with different trial and test orders not supported");
+        }
+        println!("{} {}", test_rule.order, trial_rule.order);
+        let dim = test_rule.dim;
+        let npts = test_rule.npoints * trial_rule.npoints;
+        let mut test_points = Vec::<f64>::with_capacity(dim * npts);
+        let mut trial_points = Vec::<f64>::with_capacity(dim * npts);
+        let mut weights = Vec::<f64>::with_capacity(npts);
+
+        for test_i in 0..test_rule.npoints {
+            for trial_i in 0..trial_rule.npoints {
+                for d in 0..dim {
+                    test_points.push(test_rule.points[dim * test_i + d]);
+                    trial_points.push(trial_rule.points[dim * trial_i + d]);
+                }
+                weights.push(test_rule.weights[test_i] * trial_rule.weights[trial_i]);
+            }
+        }
+
+        TestTrialNumericalQuadratureDefinition {
+            dim,
+            order: test_rule.order,
+            npoints: npts,
+            weights,
+            test_points,
+            trial_points,
+        }
+    } else {
+        // Singular rules
+        if test_celltype == ReferenceCellType::Triangle {
+            if trial_celltype != ReferenceCellType::Triangle {
+                unimplemented!("Mixed meshes not yet supported");
+            }
+            triangle_duffy(
+                &CellToCellConnectivity {
+                    connectivity_dimension: if pairs.len() == 1 {
+                        0
+                    } else if pairs.len() == 2 {
+                        1
+                    } else {
+                        2
+                    },
+                    local_indices: pairs,
+                },
+                npoints,
+            )
+            .unwrap()
+        } else {
+            if test_celltype != ReferenceCellType::Quadrilateral {
+                unimplemented!("Only triangles and quadrilaterals are currently supported");
+            }
+            if trial_celltype != ReferenceCellType::Quadrilateral {
+                unimplemented!("Mixed meshes not yet supported");
+            }
+            quadrilateral_duffy(
+                &CellToCellConnectivity {
+                    connectivity_dimension: if pairs.len() == 1 {
+                        0
+                    } else if pairs.len() == 2 {
+                        1
+                    } else {
+                        2
+                    },
+                    local_indices: pairs,
+                },
+                npoints,
+            )
+            .unwrap()
+        }
+    }
+}
 
 fn laplace_green(x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> f64 {
     let inv_dist = 1.0
@@ -134,275 +232,111 @@ fn assemble(
                     }
                 }
             }
-            if pairs.len() == 0 {
-                // Standard quadrature
-                let test_rule = simplex_rule(
-                    grid.topology().cell_type(test_cell_tindex).unwrap(),
-                    npoints_test_cell,
-                )
-                .unwrap();
-                let trial_rule = simplex_rule(
-                    grid.topology().cell_type(trial_cell_tindex).unwrap(),
-                    npoints_trial_cell,
-                )
-                .unwrap();
-
-                let test_points = Array2D::from_data(test_rule.points, (test_rule.npoints, 2));
-                let trial_points = Array2D::from_data(trial_rule.points, (trial_rule.npoints, 2));
-                let mut test_table = test_space
-                    .element()
-                    .create_tabulate_array(0, test_rule.npoints);
-                let mut trial_table = trial_space
-                    .element()
-                    .create_tabulate_array(0, trial_rule.npoints);
-
-                test_space
-                    .element()
-                    .tabulate(&test_points, 0, &mut test_table);
-                trial_space
-                    .element()
-                    .tabulate(&trial_points, 0, &mut trial_table);
-
-                let mut test_jdet = vec![0.0; test_rule.npoints];
-                let mut trial_jdet = vec![0.0; trial_rule.npoints];
-
-                grid.geometry().compute_jacobian_determinants(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jdet,
-                );
-                grid.geometry().compute_jacobian_determinants(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jdet,
-                );
-
-                for (test_i, test_dof) in test_space
-                    .dofmap()
-                    .cell_dofs(test_cell_tindex)
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                {
-                    for (trial_i, trial_dof) in trial_space
-                        .dofmap()
-                        .cell_dofs(trial_cell_tindex)
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        let mut sum = 0.0;
-
-                        for test_index in 0..test_rule.npoints {
-                            unsafe {
-                                *test_pt.get_unchecked_mut(0, 0) =
-                                    *test_points.get_unchecked(test_index, 0);
-                                *test_pt.get_unchecked_mut(0, 1) =
-                                    *test_points.get_unchecked(test_index, 1);
-                            }
-                            grid.geometry().compute_points(
-                                &test_pt,
-                                test_cell_gindex,
-                                &mut test_mapped_pt,
-                            );
-                            if needs_test_normal {
-                                grid.geometry().compute_normals(
-                                    &test_pt,
-                                    test_cell_gindex,
-                                    &mut test_normal,
-                                );
-                            }
-                            let test_weight = test_rule.weights[test_index];
-
-                            for trial_index in 0..trial_rule.npoints {
-                                unsafe {
-                                    *trial_pt.get_unchecked_mut(0, 0) =
-                                        *trial_points.get_unchecked(trial_index, 0);
-                                    *trial_pt.get_unchecked_mut(0, 1) =
-                                        *trial_points.get_unchecked(trial_index, 1);
-                                }
-                                grid.geometry().compute_points(
-                                    &trial_pt,
-                                    trial_cell_gindex,
-                                    &mut trial_mapped_pt,
-                                );
-                                if needs_trial_normal {
-                                    grid.geometry().compute_normals(
-                                        &trial_pt,
-                                        trial_cell_gindex,
-                                        &mut trial_normal,
-                                    );
-                                }
-                                let trial_weight = trial_rule.weights[trial_index];
-
-                                sum += kernel(
-                                    unsafe { test_mapped_pt.row_unchecked(0) },
-                                    unsafe { trial_mapped_pt.row_unchecked(0) },
-                                    unsafe { test_normal.row_unchecked(0) },
-                                    unsafe { trial_normal.row_unchecked(0) },
-                                ) * test_weight
-                                    * trial_weight
-                                    * unsafe { test_table.get_unchecked(0, test_index, test_i, 0) }
-                                    * test_jdet[test_index]
-                                    * unsafe {
-                                        trial_table.get_unchecked(0, trial_index, trial_i, 0)
-                                    }
-                                    * trial_jdet[trial_index];
-                            }
-                        }
-                        *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+            let mut pairs_ = vec![];
+            for (test_i, test_v) in test_vertices.iter().enumerate() {
+                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                    if test_v == trial_v {
+                        pairs_.push((test_i, trial_i));
                     }
                 }
-            } else {
-                // Singular quadrature
-                let singular_rule = if grid.topology().cell_type(test_cell_tindex).unwrap()
-                    == ReferenceCellType::Triangle
-                {
-                    if grid.topology().cell_type(trial_cell_tindex).unwrap()
-                        != ReferenceCellType::Triangle
-                    {
-                        unimplemented!("Mixed meshes not yet supported");
-                    }
-                    triangle_duffy(
-                        &CellToCellConnectivity {
-                            connectivity_dimension: if pairs.len() == 1 {
-                                0
-                            } else if pairs.len() == 2 {
-                                1
-                            } else {
-                                2
-                            },
-                            local_indices: pairs,
-                        },
-                        npoints,
-                    )
-                    .unwrap()
-                } else {
-                    if grid.topology().cell_type(test_cell_tindex).unwrap()
-                        != ReferenceCellType::Quadrilateral
-                    {
-                        unimplemented!("Only triangles and quadrilaterals are currently supported");
-                    }
-                    if grid.topology().cell_type(trial_cell_tindex).unwrap()
-                        != ReferenceCellType::Quadrilateral
-                    {
-                        unimplemented!("Mixed meshes not yet supported");
-                    }
-                    quadrilateral_duffy(
-                        &CellToCellConnectivity {
-                            connectivity_dimension: if pairs.len() == 1 {
-                                0
-                            } else if pairs.len() == 2 {
-                                1
-                            } else {
-                                2
-                            },
-                            local_indices: pairs,
-                        },
-                        npoints,
-                    )
-                    .unwrap()
-                };
+            }
+            let rule = get_quadrature_rule(
+                grid.topology().cell_type(test_cell_tindex).unwrap(),
+                grid.topology().cell_type(trial_cell_tindex).unwrap(),
+                pairs_,
+                npoints,
+            );
 
-                let test_points =
-                    Array2D::from_data(singular_rule.test_points, (singular_rule.npoints, 2));
-                let trial_points =
-                    Array2D::from_data(singular_rule.trial_points, (singular_rule.npoints, 2));
-                let mut test_table = test_space
-                    .element()
-                    .create_tabulate_array(0, singular_rule.npoints);
-                let mut trial_table = trial_space
-                    .element()
-                    .create_tabulate_array(0, singular_rule.npoints);
+            let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
+            let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
+            let mut test_table = test_space.element().create_tabulate_array(0, rule.npoints);
+            let mut trial_table = trial_space.element().create_tabulate_array(0, rule.npoints);
 
-                test_space
-                    .element()
-                    .tabulate(&test_points, 0, &mut test_table);
-                trial_space
-                    .element()
-                    .tabulate(&trial_points, 0, &mut trial_table);
+            test_space
+                .element()
+                .tabulate(&test_points, 0, &mut test_table);
+            trial_space
+                .element()
+                .tabulate(&trial_points, 0, &mut trial_table);
 
-                let mut test_jdet = vec![0.0; singular_rule.npoints];
-                let mut trial_jdet = vec![0.0; singular_rule.npoints];
+            let mut test_jdet = vec![0.0; rule.npoints];
+            let mut trial_jdet = vec![0.0; rule.npoints];
 
-                grid.geometry().compute_jacobian_determinants(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jdet,
-                );
-                grid.geometry().compute_jacobian_determinants(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jdet,
-                );
+            grid.geometry().compute_jacobian_determinants(
+                &test_points,
+                test_cell_gindex,
+                &mut test_jdet,
+            );
+            grid.geometry().compute_jacobian_determinants(
+                &trial_points,
+                trial_cell_gindex,
+                &mut trial_jdet,
+            );
 
-                for (test_i, test_dof) in test_space
+            for (test_i, test_dof) in test_space
+                .dofmap()
+                .cell_dofs(test_cell_tindex)
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
+                for (trial_i, trial_dof) in trial_space
                     .dofmap()
-                    .cell_dofs(test_cell_tindex)
+                    .cell_dofs(trial_cell_tindex)
                     .unwrap()
                     .iter()
                     .enumerate()
                 {
-                    for (trial_i, trial_dof) in trial_space
-                        .dofmap()
-                        .cell_dofs(trial_cell_tindex)
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        let mut sum = 0.0;
+                    let mut sum = 0.0;
 
-                        for index in 0..singular_rule.npoints {
-                            unsafe {
-                                *test_pt.get_unchecked_mut(0, 0) =
-                                    *test_points.get_unchecked(index, 0);
-                                *test_pt.get_unchecked_mut(0, 1) =
-                                    *test_points.get_unchecked(index, 1);
-                                *trial_pt.get_unchecked_mut(0, 0) =
-                                    *trial_points.get_unchecked(index, 0);
-                                *trial_pt.get_unchecked_mut(0, 1) =
-                                    *trial_points.get_unchecked(index, 1);
-                            }
-                            grid.geometry().compute_points(
+                    for index in 0..rule.npoints {
+                        unsafe {
+                            *test_pt.get_unchecked_mut(0, 0) = *test_points.get_unchecked(index, 0);
+                            *test_pt.get_unchecked_mut(0, 1) = *test_points.get_unchecked(index, 1);
+                            *trial_pt.get_unchecked_mut(0, 0) =
+                                *trial_points.get_unchecked(index, 0);
+                            *trial_pt.get_unchecked_mut(0, 1) =
+                                *trial_points.get_unchecked(index, 1);
+                        }
+                        grid.geometry().compute_points(
+                            &test_pt,
+                            test_cell_gindex,
+                            &mut test_mapped_pt,
+                        );
+                        grid.geometry().compute_points(
+                            &trial_pt,
+                            trial_cell_gindex,
+                            &mut trial_mapped_pt,
+                        );
+                        if needs_test_normal {
+                            grid.geometry().compute_normals(
                                 &test_pt,
                                 test_cell_gindex,
-                                &mut test_mapped_pt,
+                                &mut test_normal,
                             );
-                            grid.geometry().compute_points(
+                        }
+                        if needs_trial_normal {
+                            grid.geometry().compute_normals(
                                 &trial_pt,
                                 trial_cell_gindex,
-                                &mut trial_mapped_pt,
+                                &mut trial_normal,
                             );
-                            if needs_test_normal {
-                                grid.geometry().compute_normals(
-                                    &test_pt,
-                                    test_cell_gindex,
-                                    &mut test_normal,
-                                );
-                            }
-                            if needs_trial_normal {
-                                grid.geometry().compute_normals(
-                                    &trial_pt,
-                                    trial_cell_gindex,
-                                    &mut trial_normal,
-                                );
-                            }
-
-                            let weight = singular_rule.weights[index];
-
-                            sum += kernel(
-                                unsafe { test_mapped_pt.row_unchecked(0) },
-                                unsafe { trial_mapped_pt.row_unchecked(0) },
-                                unsafe { test_normal.row_unchecked(0) },
-                                unsafe { trial_normal.row_unchecked(0) },
-                            ) * weight
-                                * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
-                                * test_jdet[index]
-                                * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
-                                * trial_jdet[index];
                         }
-                        *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+
+                        let weight = rule.weights[index];
+
+                        sum += kernel(
+                            unsafe { test_mapped_pt.row_unchecked(0) },
+                            unsafe { trial_mapped_pt.row_unchecked(0) },
+                            unsafe { test_normal.row_unchecked(0) },
+                            unsafe { trial_normal.row_unchecked(0) },
+                        ) * weight
+                            * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
+                            * test_jdet[index]
+                            * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
+                            * trial_jdet[index];
                     }
+                    *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
                 }
             }
         }
