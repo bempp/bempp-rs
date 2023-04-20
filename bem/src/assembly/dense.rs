@@ -1,4 +1,3 @@
-use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
@@ -37,7 +36,6 @@ fn get_quadrature_rule(
         if test_rule.order != trial_rule.order {
             unimplemented!("Quadrature with different trial and test orders not supported");
         }
-        println!("{} {}", test_rule.order, trial_rule.order);
         let dim = test_rule.dim;
         let npts = test_rule.npoints * trial_rule.npoints;
         let mut test_points = Vec::<f64>::with_capacity(dim * npts);
@@ -107,41 +105,14 @@ fn get_quadrature_rule(
     }
 }
 
-pub fn laplace_single_layer(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
-) -> Array2D<f64> {
-    assemble(laplace_green, false, false, trial_space, test_space)
-}
-
-pub fn laplace_double_layer(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
-) -> Array2D<f64> {
-    assemble(laplace_green_dy, false, true, trial_space, test_space)
-}
-
-pub fn laplace_adjoint_double_layer(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
-) -> Array2D<f64> {
-    assemble(laplace_green_dx, true, false, trial_space, test_space)
-}
-
-pub fn laplace_hypersingular(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
-) -> Array2D<f64> {
-    hypersingular_assemble(laplace_green, trial_space, test_space)
-}
-
-fn assemble(
+pub fn assemble(
+    output: &mut Array2D<f64>,
     kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
-    needs_test_normal: bool,
     needs_trial_normal: bool,
+    needs_test_normal: bool,
     trial_space: &impl FunctionSpace,
     test_space: &impl FunctionSpace,
-) -> Array2D<f64> {
+) {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
     // if *trial_space.grid() != *test_space.grid() {
@@ -150,16 +121,17 @@ fn assemble(
     if !trial_space.is_serial() || !test_space.is_serial() {
         panic!("Dense assemble can only be used for function spaces stored in serial");
     }
+    if output.shape().0 != test_space.dofmap().global_size()
+        || output.shape().1 != trial_space.dofmap().global_size()
+    {
+        panic!("Matrix has wrong shape");
+    }
+
+    // TODO: allow user to configure this
     let npoints = 4;
 
     let grid = trial_space.grid();
-
     let c20 = grid.topology().connectivity(2, 0);
-
-    let mut matrix = Array2D::<f64>::new((
-        test_space.dofmap().global_size(),
-        trial_space.dofmap().global_size(),
-    ));
 
     for test_cell in 0..grid.geometry().cell_count() {
         let test_cell_tindex = grid.topology().index_map()[test_cell];
@@ -274,35 +246,38 @@ fn assemble(
                             * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
                             * trial_jdet[index];
                     }
-                    *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+                    *output.get_mut(*test_dof, *trial_dof).unwrap() += sum;
                 }
             }
         }
     }
-
-    matrix
 }
 
-fn hypersingular_assemble(
+pub fn hypersingular_assemble(
+    output: &mut Array2D<f64>,
     kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
     trial_space: &impl FunctionSpace,
     test_space: &impl FunctionSpace,
-) -> Array2D<f64> {
+) {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
     // if *trial_space.grid() != *test_space.grid() {
     //    unimplemented!("Assembling operators with spaces on different grids not yet supported");
     // }
+
+    if !trial_space.is_serial() || !test_space.is_serial() {
+        panic!("Dense assemble can only be used for function spaces stored in serial");
+    }
+    if output.shape().0 != test_space.dofmap().global_size()
+        || output.shape().1 != trial_space.dofmap().global_size()
+    {
+        panic!("Matrix has wrong shape");
+    }
+
     let npoints = 4;
 
     let grid = trial_space.grid();
-
     let c20 = grid.topology().connectivity(2, 0);
-
-    let mut matrix = Array2D::<f64>::new((
-        test_space.dofmap().global_size(),
-        trial_space.dofmap().global_size(),
-    ));
 
     for test_cell in 0..grid.geometry().cell_count() {
         let test_cell_tindex = grid.topology().index_map()[test_cell];
@@ -474,22 +449,90 @@ fn hypersingular_assemble(
                             * test_jdet[index]
                             * trial_jdet[index];
                     }
-                    *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+                    *output.get_mut(*test_dof, *trial_dof).unwrap() += sum;
                 }
             }
         }
     }
-
-    matrix
 }
 
 #[cfg(test)]
 mod test {
     use crate::assembly::dense::*;
     use crate::function_space::SerialFunctionSpace;
+    use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
     use approx::*;
     use bempp_element::element::{LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1};
     use bempp_grid::shapes::regular_sphere;
+
+    fn laplace_single_layer(
+        trial_space: &impl FunctionSpace,
+        test_space: &impl FunctionSpace,
+    ) -> Array2D<f64> {
+        let mut output = Array2D::<f64>::new((
+            test_space.dofmap().global_size(),
+            trial_space.dofmap().global_size(),
+        ));
+        assemble(
+            &mut output,
+            laplace_green,
+            false,
+            false,
+            trial_space,
+            test_space,
+        );
+        output
+    }
+
+    fn laplace_double_layer(
+        trial_space: &impl FunctionSpace,
+        test_space: &impl FunctionSpace,
+    ) -> Array2D<f64> {
+        let mut output = Array2D::<f64>::new((
+            test_space.dofmap().global_size(),
+            trial_space.dofmap().global_size(),
+        ));
+        assemble(
+            &mut output,
+            laplace_green_dy,
+            true,
+            false,
+            trial_space,
+            test_space,
+        );
+        output
+    }
+
+    fn laplace_adjoint_double_layer(
+        trial_space: &impl FunctionSpace,
+        test_space: &impl FunctionSpace,
+    ) -> Array2D<f64> {
+        let mut output = Array2D::<f64>::new((
+            test_space.dofmap().global_size(),
+            trial_space.dofmap().global_size(),
+        ));
+        assemble(
+            &mut output,
+            laplace_green_dx,
+            false,
+            true,
+            trial_space,
+            test_space,
+        );
+        output
+    }
+
+    fn laplace_hypersingular(
+        trial_space: &impl FunctionSpace,
+        test_space: &impl FunctionSpace,
+    ) -> Array2D<f64> {
+        let mut output = Array2D::<f64>::new((
+            test_space.dofmap().global_size(),
+            trial_space.dofmap().global_size(),
+        ));
+        hypersingular_assemble(&mut output, laplace_green, trial_space, test_space);
+        output
+    }
 
     #[test]
     fn test_laplace_single_layer_dp0_dp0() {
