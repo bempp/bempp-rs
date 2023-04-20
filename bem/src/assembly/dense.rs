@@ -187,15 +187,6 @@ fn assemble(
 
     let c20 = grid.topology().connectivity(2, 0);
 
-    // Assign working memory
-    let mut test_pt = Array2D::<f64>::new((1, 2));
-    let mut trial_pt = Array2D::<f64>::new((1, 2));
-    let mut test_mapped_pt = Array2D::<f64>::new((1, 3));
-    let mut trial_mapped_pt = Array2D::<f64>::new((1, 3));
-
-    let mut test_normal = Array2D::<f64>::new((1, 3));
-    let mut trial_normal = Array2D::<f64>::new((1, 3));
-
     let mut matrix = Array2D::<f64>::new((
         test_space.dofmap().global_size(),
         trial_space.dofmap().global_size(),
@@ -265,6 +256,27 @@ fn assemble(
                 &mut trial_jdet,
             );
 
+            let mut test_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
+            let mut trial_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
+            let mut test_normals = Array2D::<f64>::new((rule.npoints, 3));
+            let mut trial_normals = Array2D::<f64>::new((rule.npoints, 3));
+
+            grid.geometry()
+                .compute_points(&test_points, test_cell_gindex, &mut test_mapped_pts);
+            grid.geometry()
+                .compute_points(&trial_points, trial_cell_gindex, &mut trial_mapped_pts);
+            if needs_test_normal {
+                grid.geometry()
+                    .compute_normals(&test_points, test_cell_gindex, &mut test_normals);
+            }
+            if needs_trial_normal {
+                grid.geometry().compute_normals(
+                    &trial_points,
+                    trial_cell_gindex,
+                    &mut trial_normals,
+                );
+            }
+
             for (test_i, test_dof) in test_space
                 .dofmap()
                 .cell_dofs(test_cell_tindex)
@@ -282,47 +294,12 @@ fn assemble(
                     let mut sum = 0.0;
 
                     for index in 0..rule.npoints {
-                        unsafe {
-                            *test_pt.get_unchecked_mut(0, 0) = *test_points.get_unchecked(index, 0);
-                            *test_pt.get_unchecked_mut(0, 1) = *test_points.get_unchecked(index, 1);
-                            *trial_pt.get_unchecked_mut(0, 0) =
-                                *trial_points.get_unchecked(index, 0);
-                            *trial_pt.get_unchecked_mut(0, 1) =
-                                *trial_points.get_unchecked(index, 1);
-                        }
-                        grid.geometry().compute_points(
-                            &test_pt,
-                            test_cell_gindex,
-                            &mut test_mapped_pt,
-                        );
-                        grid.geometry().compute_points(
-                            &trial_pt,
-                            trial_cell_gindex,
-                            &mut trial_mapped_pt,
-                        );
-                        if needs_test_normal {
-                            grid.geometry().compute_normals(
-                                &test_pt,
-                                test_cell_gindex,
-                                &mut test_normal,
-                            );
-                        }
-                        if needs_trial_normal {
-                            grid.geometry().compute_normals(
-                                &trial_pt,
-                                trial_cell_gindex,
-                                &mut trial_normal,
-                            );
-                        }
-
-                        let weight = rule.weights[index];
-
                         sum += kernel(
-                            unsafe { test_mapped_pt.row_unchecked(0) },
-                            unsafe { trial_mapped_pt.row_unchecked(0) },
-                            unsafe { test_normal.row_unchecked(0) },
-                            unsafe { trial_normal.row_unchecked(0) },
-                        ) * weight
+                            unsafe { test_mapped_pts.row_unchecked(index) },
+                            unsafe { trial_mapped_pts.row_unchecked(index) },
+                            unsafe { test_normals.row_unchecked(index) },
+                            unsafe { trial_normals.row_unchecked(index) },
+                        ) * rule.weights[index]
                             * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                             * test_jdet[index]
                             * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
@@ -352,15 +329,6 @@ fn hypersingular_assemble(
     let grid = trial_space.grid();
 
     let c20 = grid.topology().connectivity(2, 0);
-
-    // Assign working memory
-    let mut test_pt = Array2D::<f64>::new((1, 2));
-    let mut trial_pt = Array2D::<f64>::new((1, 2));
-    let mut test_mapped_pt = Array2D::<f64>::new((1, 3));
-    let mut trial_mapped_pt = Array2D::<f64>::new((1, 3));
-
-    let mut test_normal = Array2D::<f64>::new((1, 3));
-    let mut trial_normal = Array2D::<f64>::new((1, 3));
 
     let mut matrix = Array2D::<f64>::new((
         test_space.dofmap().global_size(),
@@ -420,6 +388,10 @@ fn hypersingular_assemble(
             let mut trial_jdet = vec![0.0; rule.npoints];
             let mut test_jinv = Array2D::<f64>::new((rule.npoints, 6));
             let mut trial_jinv = Array2D::<f64>::new((rule.npoints, 6));
+            let mut test_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
+            let mut trial_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
+            let mut test_normals = Array2D::<f64>::new((rule.npoints, 3));
+            let mut trial_normals = Array2D::<f64>::new((rule.npoints, 3));
 
             grid.geometry().compute_jacobian_determinants(
                 &test_points,
@@ -441,6 +413,14 @@ fn hypersingular_assemble(
                 trial_cell_gindex,
                 &mut trial_jinv,
             );
+            grid.geometry()
+                .compute_points(&test_points, test_cell_gindex, &mut test_mapped_pts);
+            grid.geometry()
+                .compute_points(&trial_points, trial_cell_gindex, &mut trial_mapped_pts);
+            grid.geometry()
+                .compute_normals(&test_points, test_cell_gindex, &mut test_normals);
+            grid.geometry()
+                .compute_normals(&trial_points, trial_cell_gindex, &mut trial_normals);
 
             for (test_i, test_dof) in test_space
                 .dofmap()
@@ -459,37 +439,6 @@ fn hypersingular_assemble(
                     let mut sum = 0.0;
 
                     for index in 0..rule.npoints {
-                        unsafe {
-                            *test_pt.get_unchecked_mut(0, 0) = *test_points.get_unchecked(index, 0);
-                            *test_pt.get_unchecked_mut(0, 1) = *test_points.get_unchecked(index, 1);
-                            *trial_pt.get_unchecked_mut(0, 0) =
-                                *trial_points.get_unchecked(index, 0);
-                            *trial_pt.get_unchecked_mut(0, 1) =
-                                *trial_points.get_unchecked(index, 1);
-                        }
-                        grid.geometry().compute_points(
-                            &test_pt,
-                            test_cell_gindex,
-                            &mut test_mapped_pt,
-                        );
-                        grid.geometry().compute_points(
-                            &trial_pt,
-                            trial_cell_gindex,
-                            &mut trial_mapped_pt,
-                        );
-                        grid.geometry().compute_normals(
-                            &test_pt,
-                            test_cell_gindex,
-                            &mut test_normal,
-                        );
-                        grid.geometry().compute_normals(
-                            &trial_pt,
-                            trial_cell_gindex,
-                            &mut trial_normal,
-                        );
-
-                        let weight = rule.weights[index];
-
                         let g0 = (
                             unsafe {
                                 *trial_jinv.get_unchecked(index, 0)
@@ -531,14 +480,14 @@ fn hypersingular_assemble(
                             },
                         );
                         let n0 = (
-                            unsafe { *trial_normal.get_unchecked(0, 0) },
-                            unsafe { *trial_normal.get_unchecked(0, 1) },
-                            unsafe { *trial_normal.get_unchecked(0, 2) },
+                            unsafe { *trial_normals.get_unchecked(index, 0) },
+                            unsafe { *trial_normals.get_unchecked(index, 1) },
+                            unsafe { *trial_normals.get_unchecked(index, 2) },
                         );
                         let n1 = (
-                            unsafe { *test_normal.get_unchecked(0, 0) },
-                            unsafe { *test_normal.get_unchecked(0, 1) },
-                            unsafe { *test_normal.get_unchecked(0, 2) },
+                            unsafe { *test_normals.get_unchecked(index, 0) },
+                            unsafe { *test_normals.get_unchecked(index, 1) },
+                            unsafe { *test_normals.get_unchecked(index, 2) },
                         );
 
                         let dot_curls = (g0.0 * g1.0 + g0.1 * g1.1 + g0.2 * g1.2)
@@ -547,11 +496,11 @@ fn hypersingular_assemble(
                                 * (n0.0 * g1.0 + n0.1 * g1.1 + n0.2 * g1.2);
 
                         sum += kernel(
-                            unsafe { test_mapped_pt.row_unchecked(0) },
-                            unsafe { trial_mapped_pt.row_unchecked(0) },
-                            unsafe { test_normal.row_unchecked(0) },
-                            unsafe { trial_normal.row_unchecked(0) },
-                        ) * weight
+                            unsafe { test_mapped_pts.row_unchecked(index) },
+                            unsafe { trial_mapped_pts.row_unchecked(index) },
+                            unsafe { test_normals.row_unchecked(index) },
+                            unsafe { trial_normals.row_unchecked(index) },
+                        ) * rule.weights[index]
                             * dot_curls
                             * test_jdet[index]
                             * trial_jdet[index];
