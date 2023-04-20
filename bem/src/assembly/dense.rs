@@ -1,3 +1,4 @@
+use crate::function_space::SerialFunctionSpace;
 use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
@@ -107,40 +108,40 @@ fn get_quadrature_rule(
     }
 }
 
-pub fn laplace_single_layer(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+pub fn laplace_single_layer<E: FiniteElement, F: FiniteElement>(
+    trial_space: &SerialFunctionSpace<E>,
+    test_space: &SerialFunctionSpace<F>,
 ) -> Array2D<f64> {
     assemble(laplace_green, false, false, trial_space, test_space)
 }
 
-pub fn laplace_double_layer(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+pub fn laplace_double_layer<E: FiniteElement, F: FiniteElement>(
+    trial_space: &SerialFunctionSpace<E>,
+    test_space: &SerialFunctionSpace<F>,
 ) -> Array2D<f64> {
     assemble(laplace_green_dy, false, true, trial_space, test_space)
 }
 
-pub fn laplace_adjoint_double_layer(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+pub fn laplace_adjoint_double_layer<E: FiniteElement, F: FiniteElement>(
+    trial_space: &SerialFunctionSpace<E>,
+    test_space: &SerialFunctionSpace<F>,
 ) -> Array2D<f64> {
     assemble(laplace_green_dx, true, false, trial_space, test_space)
 }
 
-pub fn laplace_hypersingular(
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+pub fn laplace_hypersingular<E: FiniteElement, F: FiniteElement>(
+    trial_space: &SerialFunctionSpace<E>,
+    test_space: &SerialFunctionSpace<F>,
 ) -> Array2D<f64> {
     hypersingular_assemble(laplace_green, trial_space, test_space)
 }
 
-fn assemble(
+fn assemble<E: FiniteElement, F: FiniteElement>(
     kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
     needs_test_normal: bool,
     needs_trial_normal: bool,
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+    trial_space: &SerialFunctionSpace<E>,
+    test_space: &SerialFunctionSpace<F>,
 ) -> Array2D<f64> {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
@@ -280,10 +281,10 @@ fn assemble(
     matrix
 }
 
-fn hypersingular_assemble(
+fn hypersingular_assemble<E: FiniteElement, F: FiniteElement>(
     kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+    trial_space: &SerialFunctionSpace<E>,
+    test_space: &SerialFunctionSpace<F>,
 ) -> Array2D<f64> {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
