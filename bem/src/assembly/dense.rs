@@ -1,3 +1,4 @@
+use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
@@ -7,7 +8,6 @@ use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
-use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
