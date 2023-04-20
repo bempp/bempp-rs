@@ -232,18 +232,10 @@ fn assemble(
                     }
                 }
             }
-            let mut pairs_ = vec![];
-            for (test_i, test_v) in test_vertices.iter().enumerate() {
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                    if test_v == trial_v {
-                        pairs_.push((test_i, trial_i));
-                    }
-                }
-            }
             let rule = get_quadrature_rule(
                 grid.topology().cell_type(test_cell_tindex).unwrap(),
                 grid.topology().cell_type(trial_cell_tindex).unwrap(),
-                pairs_,
+                pairs,
                 npoints,
             );
 
