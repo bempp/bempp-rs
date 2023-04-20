@@ -398,417 +398,165 @@ fn hypersingular_assemble(
                     }
                 }
             }
-            if pairs.len() == 0 {
-                // Standard quadrature
-                let test_rule = simplex_rule(
-                    grid.topology().cell_type(test_cell_tindex).unwrap(),
-                    npoints_test_cell,
-                )
-                .unwrap();
-                let trial_rule = simplex_rule(
-                    grid.topology().cell_type(trial_cell_tindex).unwrap(),
-                    npoints_trial_cell,
-                )
-                .unwrap();
+            let rule = get_quadrature_rule(
+                grid.topology().cell_type(test_cell_tindex).unwrap(),
+                grid.topology().cell_type(trial_cell_tindex).unwrap(),
+                pairs,
+                npoints,
+            );
+            let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
+            let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
+            let mut test_table = test_space.element().create_tabulate_array(1, rule.npoints);
+            let mut trial_table = trial_space.element().create_tabulate_array(1, rule.npoints);
 
-                let test_points = Array2D::from_data(test_rule.points, (test_rule.npoints, 2));
-                let trial_points = Array2D::from_data(trial_rule.points, (trial_rule.npoints, 2));
-                let mut test_table = test_space
-                    .element()
-                    .create_tabulate_array(1, test_rule.npoints);
-                let mut trial_table = trial_space
-                    .element()
-                    .create_tabulate_array(1, trial_rule.npoints);
+            test_space
+                .element()
+                .tabulate(&test_points, 1, &mut test_table);
+            trial_space
+                .element()
+                .tabulate(&trial_points, 1, &mut trial_table);
 
-                test_space
-                    .element()
-                    .tabulate(&test_points, 1, &mut test_table);
-                trial_space
-                    .element()
-                    .tabulate(&trial_points, 1, &mut trial_table);
+            let mut test_jdet = vec![0.0; rule.npoints];
+            let mut trial_jdet = vec![0.0; rule.npoints];
+            let mut test_jinv = Array2D::<f64>::new((rule.npoints, 6));
+            let mut trial_jinv = Array2D::<f64>::new((rule.npoints, 6));
 
-                let mut test_jdet = vec![0.0; test_rule.npoints];
-                let mut trial_jdet = vec![0.0; trial_rule.npoints];
-                let mut test_jinv = Array2D::<f64>::new((test_rule.npoints, 6));
-                let mut trial_jinv = Array2D::<f64>::new((trial_rule.npoints, 6));
+            grid.geometry().compute_jacobian_determinants(
+                &test_points,
+                test_cell_gindex,
+                &mut test_jdet,
+            );
+            grid.geometry().compute_jacobian_determinants(
+                &trial_points,
+                trial_cell_gindex,
+                &mut trial_jdet,
+            );
+            grid.geometry().compute_jacobian_inverses(
+                &test_points,
+                test_cell_gindex,
+                &mut test_jinv,
+            );
+            grid.geometry().compute_jacobian_inverses(
+                &trial_points,
+                trial_cell_gindex,
+                &mut trial_jinv,
+            );
 
-                grid.geometry().compute_jacobian_determinants(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jdet,
-                );
-                grid.geometry().compute_jacobian_determinants(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jdet,
-                );
-                grid.geometry().compute_jacobian_inverses(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jinv,
-                );
-                grid.geometry().compute_jacobian_inverses(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jinv,
-                );
-
-                for (test_i, test_dof) in test_space
+            for (test_i, test_dof) in test_space
+                .dofmap()
+                .cell_dofs(test_cell_tindex)
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
+                for (trial_i, trial_dof) in trial_space
                     .dofmap()
-                    .cell_dofs(test_cell_tindex)
+                    .cell_dofs(trial_cell_tindex)
                     .unwrap()
                     .iter()
                     .enumerate()
                 {
-                    for (trial_i, trial_dof) in trial_space
-                        .dofmap()
-                        .cell_dofs(trial_cell_tindex)
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        let mut sum = 0.0;
+                    let mut sum = 0.0;
 
-                        for test_index in 0..test_rule.npoints {
-                            unsafe {
-                                *test_pt.get_unchecked_mut(0, 0) =
-                                    *test_points.get_unchecked(test_index, 0);
-                                *test_pt.get_unchecked_mut(0, 1) =
-                                    *test_points.get_unchecked(test_index, 1);
-                            }
-                            grid.geometry().compute_points(
-                                &test_pt,
-                                test_cell_gindex,
-                                &mut test_mapped_pt,
-                            );
-                            grid.geometry().compute_normals(
-                                &test_pt,
-                                test_cell_gindex,
-                                &mut test_normal,
-                            );
-                            let test_weight = test_rule.weights[test_index];
-
-                            for trial_index in 0..trial_rule.npoints {
-                                unsafe {
-                                    *trial_pt.get_unchecked_mut(0, 0) =
-                                        *trial_points.get_unchecked(trial_index, 0);
-                                    *trial_pt.get_unchecked_mut(0, 1) =
-                                        *trial_points.get_unchecked(trial_index, 1);
-                                }
-                                grid.geometry().compute_points(
-                                    &trial_pt,
-                                    trial_cell_gindex,
-                                    &mut trial_mapped_pt,
-                                );
-                                grid.geometry().compute_normals(
-                                    &trial_pt,
-                                    trial_cell_gindex,
-                                    &mut trial_normal,
-                                );
-                                let trial_weight = trial_rule.weights[trial_index];
-
-                                let g0 = (
-                                    unsafe {
-                                        *trial_jinv.get_unchecked(trial_index, 0)
-                                            * *trial_table.get_unchecked(1, trial_index, trial_i, 0)
-                                            + *trial_jinv.get_unchecked(trial_index, 3)
-                                                * *trial_table.get_unchecked(
-                                                    2,
-                                                    trial_index,
-                                                    trial_i,
-                                                    0,
-                                                )
-                                    },
-                                    unsafe {
-                                        *trial_jinv.get_unchecked(trial_index, 1)
-                                            * *trial_table.get_unchecked(1, trial_index, trial_i, 0)
-                                            + *trial_jinv.get_unchecked(trial_index, 4)
-                                                * *trial_table.get_unchecked(
-                                                    2,
-                                                    trial_index,
-                                                    trial_i,
-                                                    0,
-                                                )
-                                    },
-                                    unsafe {
-                                        *trial_jinv.get_unchecked(trial_index, 2)
-                                            * *trial_table.get_unchecked(1, trial_index, trial_i, 0)
-                                            + *trial_jinv.get_unchecked(trial_index, 5)
-                                                * *trial_table.get_unchecked(
-                                                    2,
-                                                    trial_index,
-                                                    trial_i,
-                                                    0,
-                                                )
-                                    },
-                                );
-                                let g1 = (
-                                    unsafe {
-                                        *test_jinv.get_unchecked(test_index, 0)
-                                            * *test_table.get_unchecked(1, test_index, test_i, 0)
-                                            + *test_jinv.get_unchecked(test_index, 3)
-                                                * *test_table
-                                                    .get_unchecked(2, test_index, test_i, 0)
-                                    },
-                                    unsafe {
-                                        *test_jinv.get_unchecked(test_index, 1)
-                                            * *test_table.get_unchecked(1, test_index, test_i, 0)
-                                            + *test_jinv.get_unchecked(test_index, 4)
-                                                * *test_table
-                                                    .get_unchecked(2, test_index, test_i, 0)
-                                    },
-                                    unsafe {
-                                        *test_jinv.get_unchecked(test_index, 2)
-                                            * *test_table.get_unchecked(1, test_index, test_i, 0)
-                                            + *test_jinv.get_unchecked(test_index, 5)
-                                                * *test_table
-                                                    .get_unchecked(2, test_index, test_i, 0)
-                                    },
-                                );
-                                let n0 = (
-                                    unsafe { *trial_normal.get_unchecked(0, 0) },
-                                    unsafe { *trial_normal.get_unchecked(0, 1) },
-                                    unsafe { *trial_normal.get_unchecked(0, 2) },
-                                );
-                                let n1 = (
-                                    unsafe { *test_normal.get_unchecked(0, 0) },
-                                    unsafe { *test_normal.get_unchecked(0, 1) },
-                                    unsafe { *test_normal.get_unchecked(0, 2) },
-                                );
-
-                                let dot_curls = (g0.0 * g1.0 + g0.1 * g1.1 + g0.2 * g1.2)
-                                    * (n0.0 * n1.0 + n0.1 * n1.1 + n0.2 * n1.2)
-                                    - (g0.0 * n1.0 + g0.1 * n1.1 + g0.2 * n1.2)
-                                        * (n0.0 * g1.0 + n0.1 * g1.1 + n0.2 * g1.2);
-
-                                sum += kernel(
-                                    unsafe { test_mapped_pt.row_unchecked(0) },
-                                    unsafe { trial_mapped_pt.row_unchecked(0) },
-                                    unsafe { test_normal.row_unchecked(0) },
-                                    unsafe { trial_normal.row_unchecked(0) },
-                                ) * test_weight
-                                    * trial_weight
-                                    * dot_curls
-                                    * test_jdet[test_index]
-                                    * trial_jdet[trial_index];
-                            }
+                    for index in 0..rule.npoints {
+                        unsafe {
+                            *test_pt.get_unchecked_mut(0, 0) = *test_points.get_unchecked(index, 0);
+                            *test_pt.get_unchecked_mut(0, 1) = *test_points.get_unchecked(index, 1);
+                            *trial_pt.get_unchecked_mut(0, 0) =
+                                *trial_points.get_unchecked(index, 0);
+                            *trial_pt.get_unchecked_mut(0, 1) =
+                                *trial_points.get_unchecked(index, 1);
                         }
-                        *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
-                    }
-                }
-            } else {
-                // Singular quadrature
-                let singular_rule = if grid.topology().cell_type(test_cell_tindex).unwrap()
-                    == ReferenceCellType::Triangle
-                {
-                    if grid.topology().cell_type(trial_cell_tindex).unwrap()
-                        != ReferenceCellType::Triangle
-                    {
-                        unimplemented!("Mixed meshes not yet supported");
-                    }
-                    triangle_duffy(
-                        &CellToCellConnectivity {
-                            connectivity_dimension: if pairs.len() == 1 {
-                                0
-                            } else if pairs.len() == 2 {
-                                1
-                            } else {
-                                2
-                            },
-                            local_indices: pairs,
-                        },
-                        npoints,
-                    )
-                    .unwrap()
-                } else {
-                    if grid.topology().cell_type(test_cell_tindex).unwrap()
-                        != ReferenceCellType::Quadrilateral
-                    {
-                        unimplemented!("Only triangles and quadrilaterals are currently supported");
-                    }
-                    if grid.topology().cell_type(trial_cell_tindex).unwrap()
-                        != ReferenceCellType::Quadrilateral
-                    {
-                        unimplemented!("Mixed meshes not yet supported");
-                    }
-                    quadrilateral_duffy(
-                        &CellToCellConnectivity {
-                            connectivity_dimension: if pairs.len() == 1 {
-                                0
-                            } else if pairs.len() == 2 {
-                                1
-                            } else {
-                                2
-                            },
-                            local_indices: pairs,
-                        },
-                        npoints,
-                    )
-                    .unwrap()
-                };
+                        grid.geometry().compute_points(
+                            &test_pt,
+                            test_cell_gindex,
+                            &mut test_mapped_pt,
+                        );
+                        grid.geometry().compute_points(
+                            &trial_pt,
+                            trial_cell_gindex,
+                            &mut trial_mapped_pt,
+                        );
+                        grid.geometry().compute_normals(
+                            &test_pt,
+                            test_cell_gindex,
+                            &mut test_normal,
+                        );
+                        grid.geometry().compute_normals(
+                            &trial_pt,
+                            trial_cell_gindex,
+                            &mut trial_normal,
+                        );
 
-                let test_points =
-                    Array2D::from_data(singular_rule.test_points, (singular_rule.npoints, 2));
-                let trial_points =
-                    Array2D::from_data(singular_rule.trial_points, (singular_rule.npoints, 2));
-                let mut test_table = test_space
-                    .element()
-                    .create_tabulate_array(1, singular_rule.npoints);
-                let mut trial_table = trial_space
-                    .element()
-                    .create_tabulate_array(1, singular_rule.npoints);
+                        let weight = rule.weights[index];
 
-                test_space
-                    .element()
-                    .tabulate(&test_points, 1, &mut test_table);
-                trial_space
-                    .element()
-                    .tabulate(&trial_points, 1, &mut trial_table);
-
-                let mut test_jdet = vec![0.0; singular_rule.npoints];
-                let mut trial_jdet = vec![0.0; singular_rule.npoints];
-                let mut test_jinv = Array2D::<f64>::new((singular_rule.npoints, 6));
-                let mut trial_jinv = Array2D::<f64>::new((singular_rule.npoints, 6));
-
-                grid.geometry().compute_jacobian_determinants(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jdet,
-                );
-                grid.geometry().compute_jacobian_determinants(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jdet,
-                );
-                grid.geometry().compute_jacobian_inverses(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jinv,
-                );
-                grid.geometry().compute_jacobian_inverses(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jinv,
-                );
-
-                for (test_i, test_dof) in test_space
-                    .dofmap()
-                    .cell_dofs(test_cell_tindex)
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                {
-                    for (trial_i, trial_dof) in trial_space
-                        .dofmap()
-                        .cell_dofs(trial_cell_tindex)
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        let mut sum = 0.0;
-
-                        for index in 0..singular_rule.npoints {
+                        let g0 = (
                             unsafe {
-                                *test_pt.get_unchecked_mut(0, 0) =
-                                    *test_points.get_unchecked(index, 0);
-                                *test_pt.get_unchecked_mut(0, 1) =
-                                    *test_points.get_unchecked(index, 1);
-                                *trial_pt.get_unchecked_mut(0, 0) =
-                                    *trial_points.get_unchecked(index, 0);
-                                *trial_pt.get_unchecked_mut(0, 1) =
-                                    *trial_points.get_unchecked(index, 1);
-                            }
-                            grid.geometry().compute_points(
-                                &test_pt,
-                                test_cell_gindex,
-                                &mut test_mapped_pt,
-                            );
-                            grid.geometry().compute_points(
-                                &trial_pt,
-                                trial_cell_gindex,
-                                &mut trial_mapped_pt,
-                            );
-                            grid.geometry().compute_normals(
-                                &test_pt,
-                                test_cell_gindex,
-                                &mut test_normal,
-                            );
-                            grid.geometry().compute_normals(
-                                &trial_pt,
-                                trial_cell_gindex,
-                                &mut trial_normal,
-                            );
+                                *trial_jinv.get_unchecked(index, 0)
+                                    * *trial_table.get_unchecked(1, index, trial_i, 0)
+                                    + *trial_jinv.get_unchecked(index, 3)
+                                        * *trial_table.get_unchecked(2, index, trial_i, 0)
+                            },
+                            unsafe {
+                                *trial_jinv.get_unchecked(index, 1)
+                                    * *trial_table.get_unchecked(1, index, trial_i, 0)
+                                    + *trial_jinv.get_unchecked(index, 4)
+                                        * *trial_table.get_unchecked(2, index, trial_i, 0)
+                            },
+                            unsafe {
+                                *trial_jinv.get_unchecked(index, 2)
+                                    * *trial_table.get_unchecked(1, index, trial_i, 0)
+                                    + *trial_jinv.get_unchecked(index, 5)
+                                        * *trial_table.get_unchecked(2, index, trial_i, 0)
+                            },
+                        );
+                        let g1 = (
+                            unsafe {
+                                *test_jinv.get_unchecked(index, 0)
+                                    * *test_table.get_unchecked(1, index, test_i, 0)
+                                    + *test_jinv.get_unchecked(index, 3)
+                                        * *test_table.get_unchecked(2, index, test_i, 0)
+                            },
+                            unsafe {
+                                *test_jinv.get_unchecked(index, 1)
+                                    * *test_table.get_unchecked(1, index, test_i, 0)
+                                    + *test_jinv.get_unchecked(index, 4)
+                                        * *test_table.get_unchecked(2, index, test_i, 0)
+                            },
+                            unsafe {
+                                *test_jinv.get_unchecked(index, 2)
+                                    * *test_table.get_unchecked(1, index, test_i, 0)
+                                    + *test_jinv.get_unchecked(index, 5)
+                                        * *test_table.get_unchecked(2, index, test_i, 0)
+                            },
+                        );
+                        let n0 = (
+                            unsafe { *trial_normal.get_unchecked(0, 0) },
+                            unsafe { *trial_normal.get_unchecked(0, 1) },
+                            unsafe { *trial_normal.get_unchecked(0, 2) },
+                        );
+                        let n1 = (
+                            unsafe { *test_normal.get_unchecked(0, 0) },
+                            unsafe { *test_normal.get_unchecked(0, 1) },
+                            unsafe { *test_normal.get_unchecked(0, 2) },
+                        );
 
-                            let weight = singular_rule.weights[index];
+                        let dot_curls = (g0.0 * g1.0 + g0.1 * g1.1 + g0.2 * g1.2)
+                            * (n0.0 * n1.0 + n0.1 * n1.1 + n0.2 * n1.2)
+                            - (g0.0 * n1.0 + g0.1 * n1.1 + g0.2 * n1.2)
+                                * (n0.0 * g1.0 + n0.1 * g1.1 + n0.2 * g1.2);
 
-                            let g0 = (
-                                unsafe {
-                                    *trial_jinv.get_unchecked(index, 0)
-                                        * *trial_table.get_unchecked(1, index, trial_i, 0)
-                                        + *trial_jinv.get_unchecked(index, 3)
-                                            * *trial_table.get_unchecked(2, index, trial_i, 0)
-                                },
-                                unsafe {
-                                    *trial_jinv.get_unchecked(index, 1)
-                                        * *trial_table.get_unchecked(1, index, trial_i, 0)
-                                        + *trial_jinv.get_unchecked(index, 4)
-                                            * *trial_table.get_unchecked(2, index, trial_i, 0)
-                                },
-                                unsafe {
-                                    *trial_jinv.get_unchecked(index, 2)
-                                        * *trial_table.get_unchecked(1, index, trial_i, 0)
-                                        + *trial_jinv.get_unchecked(index, 5)
-                                            * *trial_table.get_unchecked(2, index, trial_i, 0)
-                                },
-                            );
-                            let g1 = (
-                                unsafe {
-                                    *test_jinv.get_unchecked(index, 0)
-                                        * *test_table.get_unchecked(1, index, test_i, 0)
-                                        + *test_jinv.get_unchecked(index, 3)
-                                            * *test_table.get_unchecked(2, index, test_i, 0)
-                                },
-                                unsafe {
-                                    *test_jinv.get_unchecked(index, 1)
-                                        * *test_table.get_unchecked(1, index, test_i, 0)
-                                        + *test_jinv.get_unchecked(index, 4)
-                                            * *test_table.get_unchecked(2, index, test_i, 0)
-                                },
-                                unsafe {
-                                    *test_jinv.get_unchecked(index, 2)
-                                        * *test_table.get_unchecked(1, index, test_i, 0)
-                                        + *test_jinv.get_unchecked(index, 5)
-                                            * *test_table.get_unchecked(2, index, test_i, 0)
-                                },
-                            );
-                            let n0 = (
-                                unsafe { *trial_normal.get_unchecked(0, 0) },
-                                unsafe { *trial_normal.get_unchecked(0, 1) },
-                                unsafe { *trial_normal.get_unchecked(0, 2) },
-                            );
-                            let n1 = (
-                                unsafe { *test_normal.get_unchecked(0, 0) },
-                                unsafe { *test_normal.get_unchecked(0, 1) },
-                                unsafe { *test_normal.get_unchecked(0, 2) },
-                            );
-
-                            let dot_curls = (g0.0 * g1.0 + g0.1 * g1.1 + g0.2 * g1.2)
-                                * (n0.0 * n1.0 + n0.1 * n1.1 + n0.2 * n1.2)
-                                - (g0.0 * n1.0 + g0.1 * n1.1 + g0.2 * n1.2)
-                                    * (n0.0 * g1.0 + n0.1 * g1.1 + n0.2 * g1.2);
-
-                            sum += kernel(
-                                unsafe { test_mapped_pt.row_unchecked(0) },
-                                unsafe { trial_mapped_pt.row_unchecked(0) },
-                                unsafe { test_normal.row_unchecked(0) },
-                                unsafe { trial_normal.row_unchecked(0) },
-                            ) * weight
-                                * dot_curls
-                                * test_jdet[index]
-                                * trial_jdet[index];
-                        }
-                        *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+                        sum += kernel(
+                            unsafe { test_mapped_pt.row_unchecked(0) },
+                            unsafe { trial_mapped_pt.row_unchecked(0) },
+                            unsafe { test_normal.row_unchecked(0) },
+                            unsafe { trial_normal.row_unchecked(0) },
+                        ) * weight
+                            * dot_curls
+                            * test_jdet[index]
+                            * trial_jdet[index];
                     }
+                    *matrix.get_mut(*test_dof, *trial_dof).unwrap() += sum;
                 }
             }
         }
