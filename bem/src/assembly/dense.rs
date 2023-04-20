@@ -899,9 +899,6 @@ mod test {
     use bempp_element::element::{LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1};
     use bempp_grid::shapes::regular_sphere;
 
-    use bempp_grid::grid::SerialGrid;
-    use bempp_tools::arrays::{AdjacencyList, Array2D};
-
     #[test]
     fn test_laplace_single_layer_dp0_dp0() {
         let grid = regular_sphere(0);
