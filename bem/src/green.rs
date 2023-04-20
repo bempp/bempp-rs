@@ -1,4 +1,4 @@
-fn laplace_green(x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> f64 {
+pub fn laplace_green(x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> f64 {
     let inv_dist = 1.0
         / f64::sqrt(
             (x[0] - y[0]) * (x[0] - y[0])
@@ -9,7 +9,7 @@ fn laplace_green(x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> f64 {
     0.25 * std::f64::consts::FRAC_1_PI * inv_dist
 }
 
-fn laplace_green_dx(x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> f64 {
+pub fn laplace_green_dx(x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> f64 {
     let inv_dist = 1.0
         / f64::sqrt(
             (x[0] - y[0]) * (x[0] - y[0])
@@ -21,7 +21,7 @@ fn laplace_green_dx(x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> f64 {
     0.25 * std::f64::consts::FRAC_1_PI * inv_dist * inv_dist * inv_dist * sum
 }
 
-fn laplace_green_dy(x: &[f64], y: &[f64], _nx: &[f64], ny: &[f64]) -> f64 {
+pub fn laplace_green_dy(x: &[f64], y: &[f64], _nx: &[f64], ny: &[f64]) -> f64 {
     let inv_dist = 1.0
         / f64::sqrt(
             (x[0] - y[0]) * (x[0] - y[0])
