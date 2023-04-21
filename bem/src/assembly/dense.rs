@@ -1298,7 +1298,7 @@ mod test {
                     epsilon = 1e-4
                 );
                 assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
+                    matrix.get(i, j).unwrap().im,
                     from_cl[i][j].im,
                     epsilon = 1e-4
                 );
