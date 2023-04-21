@@ -53,6 +53,18 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
                 ],
                 (4, 1, 4),
             ),
+            // Basis = {(1-x)*(1-2*x)*(1-y)*(1-2*y), x*(2*x-1)*(1-y)*(1-2*y), (1-x)*(1-2*x)*y*(2*y-1), x*(2*x-1)*y*(2*y-1), 4*x*(1-x)*(1-y)*(1-2*y), (1-x)*(1-2*x)*4*y*(1-y), x*(2*x-1)*4*y*(1-y), 4*x*(1-x)*y*(2*y-1), 4*x*(1-x)*4*y*(1-y)}
+            2 => Array3D::from_data(
+                vec![
+                    1.0, -3.0, 2.0, -3.0, 9.0, -6.0, 2.0, -6.0, 4.0, 0.0, -1.0, 2.0, 0.0, 3.0,
+                    -6.0, 0.0, -2.0, 4.0, 0.0, 0.0, 0.0, -1.0, 3.0, -2.0, 2.0, -6.0, 4.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, -2.0, 0.0, -2.0, 4.0, 0.0, 4.0, -4.0, 0.0, -12.0, 12.0, 0.0,
+                    8.0, -8.0, 0.0, 0.0, 0.0, 4.0, -12.0, 8.0, -4.0, 12.0, -8.0, 0.0, 0.0, 0.0,
+                    0.0, -4.0, 8.0, 0.0, 4.0, -8.0, 0.0, 0.0, 0.0, 0.0, -4.0, 4.0, 0.0, 8.0, -8.0,
+                    0.0, 0.0, 0.0, 0.0, 16.0, -16.0, 0.0, -16.0, 16.0,
+                ],
+                (9, 1, 9),
+            ),
             _ => {
                 panic!("Degree not supported");
             }
@@ -92,7 +104,6 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
     } else {
         match cell_type {
             ReferenceCellType::Interval => match degree {
-                // Basis = {1 - x, x}
                 1 => [
                     AdjacencyList::<usize>::from_data(vec![0, 1], vec![0, 1, 2]),
                     AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
@@ -127,6 +138,12 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
                     AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
                     AdjacencyList::<usize>::new(),
                 ],
+                2 => [
+                    AdjacencyList::<usize>::from_data(vec![0, 1, 2, 3], vec![0, 1, 2, 3, 4]),
+                    AdjacencyList::<usize>::from_data(vec![4, 5, 6, 7], vec![0, 1, 2, 3, 4]),
+                    AdjacencyList::<usize>::from_data(vec![8], vec![0, 1]),
+                    AdjacencyList::<usize>::new(),
+                ],
                 _ => {
                     panic!("Degree not supported");
                 }
@@ -149,27 +166,6 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
         entity_dofs: entity_dofs,
     }
 }
-
-/*
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y);
-*/
 
 #[cfg(test)]
 mod test {
