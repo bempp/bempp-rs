@@ -22,16 +22,16 @@ pub enum MapType {
 }
 
 /// Compute the number of derivatives for a cell
-fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Result<usize, ()> {
+fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usize {
     match cell_type {
-        ReferenceCellType::Point => Ok(0),
-        ReferenceCellType::Interval => Ok(nderivs + 1),
-        ReferenceCellType::Triangle => Ok((nderivs + 1) * (nderivs + 2) / 2),
-        ReferenceCellType::Quadrilateral => Ok((nderivs + 1) * (nderivs + 2) / 2),
-        ReferenceCellType::Tetrahedron => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        ReferenceCellType::Hexahedron => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        ReferenceCellType::Prism => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        ReferenceCellType::Pyramid => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
+        ReferenceCellType::Point => 0,
+        ReferenceCellType::Interval => nderivs + 1,
+        ReferenceCellType::Triangle => (nderivs + 1) * (nderivs + 2) / 2,
+        ReferenceCellType::Quadrilateral => (nderivs + 1) * (nderivs + 2) / 2,
+        ReferenceCellType::Tetrahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCellType::Hexahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCellType::Prism => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCellType::Pyramid => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
     }
 }
 
@@ -75,7 +75,7 @@ pub trait FiniteElement {
 
     /// Get the required shape for a tabulation array
     fn tabulate_array_shape(&self, nderivs: usize, npoints: usize) -> (usize, usize, usize, usize) {
-        let deriv_count = compute_derivative_count(nderivs, self.cell_type()).unwrap();
+        let deriv_count = compute_derivative_count(nderivs, self.cell_type());
         let point_count = npoints;
         let basis_count = self.dim();
         let value_size = self.value_size();

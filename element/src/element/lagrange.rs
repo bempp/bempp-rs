@@ -325,4 +325,58 @@ mod test {
         }
         check_dofs(e);
     }
+
+    #[test]
+    fn test_lagrange_2_quadrilateral() {
+        let e = create(ReferenceCellType::Quadrilateral, 2, false);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            let x = *points.get(pt, 0).unwrap();
+            let y = *points.get(pt, 1).unwrap();
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 1, 0).unwrap(),
+                x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 2, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 3, 0).unwrap(),
+                x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 4, 0).unwrap(),
+                4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 5, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 6, 0).unwrap(),
+                x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 7, 0).unwrap(),
+                4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 8, 0).unwrap(),
+                4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y)
+            );
+        }
+        check_dofs(e);
+    }
 }

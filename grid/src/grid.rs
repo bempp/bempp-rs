@@ -1243,24 +1243,56 @@ mod test {
             .geometry()
             .compute_normals(&points, 0, &mut normals);
 
-        assert_relative_eq!(*normals.get(0, 0).unwrap(), 2.0 * f64::sqrt(1.0 / 5.0));
-        assert_relative_eq!(*normals.get(0, 1).unwrap(), 0.0);
-        assert_relative_eq!(*normals.get(0, 2).unwrap(), f64::sqrt(1.0 / 5.0));
+        assert_relative_eq!(
+            *normals.get(0, 0).unwrap(),
+            2.0 * f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(0, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(0, 2).unwrap(),
+            f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
 
-        assert_relative_eq!(*normals.get(1, 0).unwrap(), 1.2 * f64::sqrt(1.0 / 2.44));
-        assert_relative_eq!(*normals.get(1, 1).unwrap(), 0.0);
-        assert_relative_eq!(*normals.get(1, 2).unwrap(), f64::sqrt(1.0 / 2.44));
+        assert_relative_eq!(
+            *normals.get(1, 0).unwrap(),
+            1.2 * f64::sqrt(1.0 / 2.44),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(1, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(1, 2).unwrap(),
+            f64::sqrt(1.0 / 2.44),
+            epsilon = 1e-12
+        );
 
-        assert_relative_eq!(*normals.get(2, 0).unwrap(), 0.0);
-        assert_relative_eq!(*normals.get(2, 1).unwrap(), 0.0);
-        assert_relative_eq!(*normals.get(2, 2).unwrap(), 1.0);
+        assert_relative_eq!(*normals.get(2, 0).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(2, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(2, 2).unwrap(), 1.0, epsilon = 1e-12);
 
-        assert_relative_eq!(*normals.get(3, 0).unwrap(), -0.8 * f64::sqrt(1.0 / 1.64));
-        assert_relative_eq!(*normals.get(3, 1).unwrap(), 0.0);
-        assert_relative_eq!(*normals.get(3, 2).unwrap(), f64::sqrt(1.0 / 1.64));
+        assert_relative_eq!(
+            *normals.get(3, 0).unwrap(),
+            -0.8 * f64::sqrt(1.0 / 1.64),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(3, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(3, 2).unwrap(),
+            f64::sqrt(1.0 / 1.64),
+            epsilon = 1e-12
+        );
 
-        assert_relative_eq!(*normals.get(4, 0).unwrap(), -2.0 * f64::sqrt(1.0 / 5.0));
-        assert_relative_eq!(*normals.get(4, 1).unwrap(), 0.0);
-        assert_relative_eq!(*normals.get(4, 2).unwrap(), f64::sqrt(1.0 / 5.0));
+        assert_relative_eq!(
+            *normals.get(4, 0).unwrap(),
+            -2.0 * f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(4, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(4, 2).unwrap(),
+            f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
     }
 }

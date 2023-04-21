@@ -49,10 +49,10 @@ impl FiniteElement for CiarletElement {
     fn tabulate<'a>(
         &self,
         points: &impl Array2DAccess<'a, f64>,
-        nderivs: usize,
+        _nderivs: usize,
         data: &mut impl Array4DAccess<f64>,
     ) {
-        for deriv in 0..nderivs + 1 {
+        for deriv in 0..data.shape().0 {
             for pt in 0..data.shape().1 {
                 let evals = match self.cell_type {
                     ReferenceCellType::Interval => {
@@ -141,7 +141,7 @@ impl FiniteElement for CiarletElement {
                                     x * x * y * y,
                                 ],
                                 1 => vec![
-                                    1.0,
+                                    0.0,
                                     1.0,
                                     2.0 * x,
                                     0.0,
@@ -152,7 +152,7 @@ impl FiniteElement for CiarletElement {
                                     2.0 * x * y * y,
                                 ],
                                 2 => vec![
-                                    1.0,
+                                    0.0,
                                     0.0,
                                     0.0,
                                     1.0,
