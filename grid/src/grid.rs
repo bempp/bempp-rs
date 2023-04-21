@@ -1,7 +1,8 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
-use bempp_element::element;
-use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_element::element::{create_element, CiarletElement};
+use bempp_tools::arrays::{AdjacencyList, Array2D, Array4D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
@@ -10,39 +11,26 @@ use std::cell::{Ref, RefCell};
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
-    coordinate_elements: Vec<Box<dyn FiniteElement>>,
+    coordinate_elements: Vec<CiarletElement>,
     coordinates: Array2D<f64>,
     cells: AdjacencyList<usize>,
     element_changes: Vec<usize>,
     index_map: Vec<usize>,
 }
 
-fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dyn FiniteElement> {
-    match cell_type {
-        ReferenceCellType::Triangle => {
-            let degree = (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1;
-            match degree {
-                1 => Box::new(element::LagrangeElementTriangleDegree1 {}),
-                2 => Box::new(element::LagrangeElementTriangleDegree2 {}),
-                _ => {
-                    panic!("Unsupported degree (for now)");
-                }
+fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
+    create_element(
+        ElementFamily::Lagrange,
+        cell_type,
+        match cell_type {
+            ReferenceCellType::Triangle => (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1,
+            ReferenceCellType::Quadrilateral => (npts as f64).sqrt() as usize - 1,
+            _ => {
+                panic!("Unsupported cell type (for now)");
             }
-        }
-        ReferenceCellType::Quadrilateral => {
-            let degree = (npts as f64).sqrt() as usize - 1;
-            match degree {
-                1 => Box::new(element::LagrangeElementQuadrilateralDegree1 {}),
-                2 => Box::new(element::LagrangeElementQuadrilateralDegree2 {}),
-                _ => {
-                    panic!("Unsupported degree (for now)");
-                }
-            }
-        }
-        _ => {
-            panic!("Unsupported cell type (for now)");
-        }
-    }
+        },
+        false,
+    )
 }
 
 impl SerialGeometry {
@@ -81,7 +69,7 @@ impl SerialGeometry {
     }
 
     /// TODO: document
-    pub fn coordinate_elements(&self) -> &Vec<Box<dyn FiniteElement>> {
+    pub fn coordinate_elements(&self) -> &Vec<CiarletElement> {
         &self.coordinate_elements
     }
 
@@ -91,7 +79,7 @@ impl SerialGeometry {
     }
 
     /// Get the coordinate element associated with the given cell
-    pub fn element(&self, cell: usize) -> &Box<dyn FiniteElement> {
+    pub fn element(&self, cell: usize) -> &CiarletElement {
         for i in 0..self.element_changes.len() - 1 {
             if cell < self.element_changes[i + 1] {
                 return &self.coordinate_elements[i - 1];
@@ -123,11 +111,11 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
-    fn compute_points(
+    fn compute_points<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
-        physical_points: &mut Array2D<f64>,
+        physical_points: &mut impl Array2DAccess<'a, f64>,
     ) {
         let gdim = self.dim();
         if points.shape().0 != physical_points.shape().0 {
@@ -137,7 +125,7 @@ impl Geometry for SerialGeometry {
             panic!("physical_points has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = element.create_tabulate_array(0, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(0, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         element.tabulate(points, 0, &mut data);
         for p in 0..points.shape().0 {
             for i in 0..physical_points.shape().1 {
@@ -161,7 +149,76 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
+    fn compute_normals<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        normals: &mut impl Array2DAccess<'a, f64>,
+    ) {
+        let gdim = self.dim();
+        if gdim != 3 {
+            unimplemented!("normals currently only implemented for 2D cells embedded in 3D.");
+        }
+        if points.shape().0 != normals.shape().0 {
+            panic!("normals has wrong number of rows.");
+        }
+        if gdim != normals.shape().1 {
+            panic!("normals has wrong number of columns.");
+        }
+        let element = self.element(cell);
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut axes = Array2D::<f64>::new((2, 3));
+        element.tabulate(points, 1, &mut data);
+        for p in 0..points.shape().0 {
+            for i in 0..axes.shape().0 {
+                for j in 0..axes.shape().1 {
+                    unsafe {
+                        *axes.get_unchecked_mut(i, j) = 0.0;
+                    }
+                }
+            }
+            for i in 0..data.shape().2 {
+                let pt = unsafe {
+                    self.coordinates
+                        .row_unchecked(*self.cells.get_unchecked(cell, i))
+                };
+                for j in 0..gdim {
+                    unsafe {
+                        *axes.get_unchecked_mut(0, j) += pt[j] * data.get_unchecked(1, p, i, 0);
+                        *axes.get_unchecked_mut(1, j) += pt[j] * data.get_unchecked(2, p, i, 0);
+                    }
+                }
+            }
+            unsafe {
+                *normals.get_unchecked_mut(p, 0) = *axes.get_unchecked(0, 1)
+                    * *axes.get_unchecked(1, 2)
+                    - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
+                *normals.get_unchecked_mut(p, 1) = *axes.get_unchecked(0, 2)
+                    * *axes.get_unchecked(1, 0)
+                    - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
+                *normals.get_unchecked_mut(p, 2) = *axes.get_unchecked(0, 0)
+                    * *axes.get_unchecked(1, 1)
+                    - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
+            }
+            let size = unsafe {
+                (*normals.get_unchecked(p, 0) * *normals.get_unchecked(p, 0)
+                    + *normals.get_unchecked(p, 1) * *normals.get_unchecked(p, 1)
+                    + *normals.get_unchecked(p, 2) * *normals.get_unchecked(p, 2))
+                .sqrt()
+            };
+            unsafe {
+                *normals.get_unchecked_mut(p, 0) /= size;
+                *normals.get_unchecked_mut(p, 1) /= size;
+                *normals.get_unchecked_mut(p, 2) /= size;
+            }
+        }
+    }
+    fn compute_jacobians<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        jacobians: &mut impl Array2DAccess<'a, f64>,
+    ) {
         let gdim = self.dim();
         let tdim = points.shape().1;
         if points.shape().0 != jacobians.shape().0 {
@@ -171,7 +228,7 @@ impl Geometry for SerialGeometry {
             panic!("jacobians has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = element.create_tabulate_array(1, points.shape().0); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         let tdim = data.shape().0 - 1;
         element.tabulate(points, 1, &mut data);
         for p in 0..points.shape().0 {
@@ -198,9 +255,9 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian_determinants(
+    fn compute_jacobian_determinants<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
         jacobian_determinants: &mut [f64],
     ) {
@@ -275,11 +332,11 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian_inverses(
+    fn compute_jacobian_inverses<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
-        jacobian_inverses: &mut Array2D<f64>,
+        jacobian_inverses: &mut impl Array2DAccess<'a, f64>,
     ) {
         let gdim = self.dim();
         let tdim = points.shape().1;
@@ -522,7 +579,9 @@ fn all_in(a: &[usize], b: &[usize]) -> bool {
     true
 }
 
-impl Topology for SerialTopology {
+impl Topology<'_> for SerialTopology {
+    type Connectivity = AdjacencyList<usize>;
+
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
@@ -677,7 +736,7 @@ impl Topology for SerialTopology {
         }
     }
 
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>> {
+    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity> {
         self.create_connectivity(dim0, dim1);
         self.connectivity[dim0][dim1].borrow()
     }
@@ -712,7 +771,7 @@ impl SerialGrid {
         }
     }
 }
-impl Grid for SerialGrid {
+impl Grid<'_> for SerialGrid {
     type Topology = SerialTopology;
 
     type Geometry = SerialGeometry;
@@ -723,6 +782,10 @@ impl Grid for SerialGrid {
 
     fn geometry(&self) -> &Self::Geometry {
         &self.geometry
+    }
+
+    fn is_serial(&self) -> bool {
+        true
     }
 }
 
@@ -749,9 +812,6 @@ mod test {
             ),
             vec![ReferenceCellType::Triangle; 8],
         );
-        for i in g.topology().adjacent_cells(0).iter() {
-            println!("{} {}", i.0, i.1);
-        }
         assert_eq!(g.topology().adjacent_cells(0).len(), 7);
         for i in g.topology().adjacent_cells(0).iter() {
             if i.0 == 0 {
@@ -1119,5 +1179,120 @@ mod test {
             assert_relative_eq!(*jinvs.get(i, 4).unwrap(), -1.0);
             assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.0);
         }
+    }
+
+    #[test]
+    fn test_normals() {
+        let g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 1.0, 1.0, -1.0, 0.0, 1.0,
+                ],
+                (5, 3),
+            ),
+            AdjacencyList::from_data(vec![0, 1, 2, 1, 3, 2, 2, 3, 4], vec![0, 3, 6, 9]),
+            vec![
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Triangle,
+            ],
+        );
+
+        let pt = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 3));
+
+        let mut normal = Array2D::<f64>::new((1, 3));
+
+        g.geometry().compute_normals(&pt, 0, &mut normal);
+        assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), -1.0);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), 0.0);
+
+        g.geometry().compute_normals(&pt, 1, &mut normal);
+        let a = f64::sqrt(1.0 / 3.0);
+        assert_relative_eq!(*normal.get(0, 0).unwrap(), a);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), a);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), a);
+
+        g.geometry().compute_normals(&pt, 2, &mut normal);
+        assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), 1.0);
+
+        // Test a curved quadrilateral cell
+        let curved_g = SerialGrid::new(
+            Array2D::from_data(
+                vec![
+                    -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, -1.0, 0.0,
+                    -1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                ],
+                (9, 3),
+            ),
+            AdjacencyList::from_data(vec![0, 1, 2, 3, 4, 5, 6, 7, 8], vec![0, 9]),
+            vec![ReferenceCellType::Quadrilateral],
+        );
+
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 0.2, 0.3, 0.5, 0.9, 0.7, 1.0, 1.0, 0.3],
+            (5, 2),
+        );
+        let mut normals = Array2D::<f64>::new((5, 3));
+
+        curved_g
+            .geometry()
+            .compute_normals(&points, 0, &mut normals);
+
+        assert_relative_eq!(
+            *normals.get(0, 0).unwrap(),
+            2.0 * f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(0, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(0, 2).unwrap(),
+            f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
+
+        assert_relative_eq!(
+            *normals.get(1, 0).unwrap(),
+            1.2 * f64::sqrt(1.0 / 2.44),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(1, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(1, 2).unwrap(),
+            f64::sqrt(1.0 / 2.44),
+            epsilon = 1e-12
+        );
+
+        assert_relative_eq!(*normals.get(2, 0).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(2, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(2, 2).unwrap(), 1.0, epsilon = 1e-12);
+
+        assert_relative_eq!(
+            *normals.get(3, 0).unwrap(),
+            -0.8 * f64::sqrt(1.0 / 1.64),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(3, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(3, 2).unwrap(),
+            f64::sqrt(1.0 / 1.64),
+            epsilon = 1e-12
+        );
+
+        assert_relative_eq!(
+            *normals.get(4, 0).unwrap(),
+            -2.0 * f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
+        assert_relative_eq!(*normals.get(4, 1).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(
+            *normals.get(4, 2).unwrap(),
+            f64::sqrt(1.0 / 5.0),
+            epsilon = 1e-12
+        );
     }
 }

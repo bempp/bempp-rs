@@ -1,4 +1,5 @@
 use bempp_tools::arrays::AdjacencyList;
+use bempp_traits::arrays::AdjacencyListAccess;
 
 fn main() {
     // Create an empty adjacency list

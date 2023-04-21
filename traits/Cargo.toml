@@ -21,4 +21,4 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 cauchy="0.4.*"
 thiserror="1.*"
-bempp-tools = { path = "../tools"}
+num = "0.4"

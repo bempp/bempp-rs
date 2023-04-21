@@ -1,694 +1,180 @@
 //! Lagrange elements
 
-use crate::cell::*;
-use crate::element::*;
-use crate::map::*;
-use bempp_tools::arrays::{Array2D, Array4D};
+use crate::element::CiarletElement;
+use bempp_tools::arrays::{AdjacencyList, Array3D};
+use bempp_traits::arrays::Array3DAccess;
+use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::element::{ElementFamily, MapType};
 
-/// Lagrange element
-pub struct LagrangeElement {
-    celltype: ReferenceCellType,
-    degree: usize,
-}
-
-impl LagrangeElement {
-    pub fn new(celltype: ReferenceCellType, degree: usize) -> Self {
-        Self {
-            celltype: celltype,
-            degree: degree,
+/// Create a Lagrange element
+pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> CiarletElement {
+    if degree == 0 && !discontinuous {
+        panic!("Cannot create continuous degree 0 element");
+    }
+    let coefficients = match cell_type {
+        ReferenceCellType::Interval => match degree {
+            // Basis = {1}
+            0 => Array3D::from_data(vec![1.0], (1, 1, 1)),
+            // Basis = {1 - x, x}
+            1 => Array3D::from_data(vec![1.0, -1.0, 0.0, 1.0], (2, 1, 2)),
+            _ => {
+                panic!("Degree not supported");
+            }
+        },
+        ReferenceCellType::Triangle => match degree {
+            // Basis = {1}
+            0 => Array3D::from_data(vec![1.0], (1, 1, 1)),
+            // Basis = {1-x-y, x, y}
+            1 => Array3D::from_data(
+                vec![1.0, -1.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                (3, 1, 3),
+            ),
+            // Basis = {(1-x-y)(1-2x-2y), x(2x-1), y(2y - 1), 4xy, 4y(1-x-y), 4x(1-x-y)}
+            2 => Array3D::from_data(
+                vec![
+                    1.0, -3.0, -3.0, 2.0, 4.0, 2.0, -1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                    0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 4.0, 0.0, -4.0, -4.0,
+                    0.0, 4.0, 0.0, -4.0, -4.0, 0.0,
+                ],
+                (6, 1, 6),
+            ),
+            _ => {
+                panic!("Degree not supported");
+            }
+        },
+        ReferenceCellType::Quadrilateral => match degree {
+            // Basis = {0}
+            0 => Array3D::from_data(vec![1.0], (1, 1, 1)),
+            // Basis = {(1-x)(1-y), x(1-y), (1-x)y, xy}
+            1 => Array3D::from_data(
+                vec![
+                    1.0, -1.0, -1.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 0.0,
+                    1.0,
+                ],
+                (4, 1, 4),
+            ),
+            // Basis = {(1-x)*(1-2*x)*(1-y)*(1-2*y), x*(2*x-1)*(1-y)*(1-2*y), (1-x)*(1-2*x)*y*(2*y-1), x*(2*x-1)*y*(2*y-1), 4*x*(1-x)*(1-y)*(1-2*y), (1-x)*(1-2*x)*4*y*(1-y), x*(2*x-1)*4*y*(1-y), 4*x*(1-x)*y*(2*y-1), 4*x*(1-x)*4*y*(1-y)}
+            2 => Array3D::from_data(
+                vec![
+                    1.0, -3.0, 2.0, -3.0, 9.0, -6.0, 2.0, -6.0, 4.0, 0.0, -1.0, 2.0, 0.0, 3.0,
+                    -6.0, 0.0, -2.0, 4.0, 0.0, 0.0, 0.0, -1.0, 3.0, -2.0, 2.0, -6.0, 4.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, -2.0, 0.0, -2.0, 4.0, 0.0, 4.0, -4.0, 0.0, -12.0, 12.0, 0.0,
+                    8.0, -8.0, 0.0, 0.0, 0.0, 4.0, -12.0, 8.0, -4.0, 12.0, -8.0, 0.0, 0.0, 0.0,
+                    0.0, -4.0, 8.0, 0.0, 4.0, -8.0, 0.0, 0.0, 0.0, 0.0, -4.0, 4.0, 0.0, 8.0, -8.0,
+                    0.0, 0.0, 0.0, 0.0, 16.0, -16.0, 0.0, -16.0, 16.0,
+                ],
+                (9, 1, 9),
+            ),
+            _ => {
+                panic!("Degree not supported");
+            }
+        },
+        _ => {
+            panic!("Cell type not supported");
         }
-    }
-}
-
-impl FiniteElement for LagrangeElement {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        self.celltype
-    }
-    fn degree(&self) -> usize {
-        self.degree
-    }
-    fn highest_degree(&self) -> usize {
-        self.degree
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        unimplemented!("dim not yet implemented for this element");
-    }
-    fn tabulate(&self, _points: &Array2D<f64>, _nderivs: usize, _data: &mut Array4D<f64>) {
-        unimplemented!("tabulate not yet implemented for this element");
-    }
-    fn entity_dofs(&self, _entity_dim: usize, _entity_number: usize) -> Vec<usize> {
-        unimplemented!("entity_dofs not yet implemented for this element");
-    }
-}
-
-/// Degree 0 Lagrange element on an interval
-pub struct LagrangeElementIntervalDegree0 {}
-
-impl FiniteElement for LagrangeElementIntervalDegree0 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Interval
-    }
-    fn degree(&self) -> usize {
-        0
-    }
-    fn highest_degree(&self) -> usize {
-        0
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        1
-    }
-    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are 1-x-y, x, y
-        for deriv in 0..nderivs + 1 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
-                } else {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.;
-                }
+    };
+    let entity_dofs = if discontinuous {
+        let dofs = AdjacencyList::<usize>::from_data(
+            (0..coefficients.shape().0).collect(),
+            vec![0, coefficients.shape().0],
+        );
+        match cell_type {
+            ReferenceCellType::Interval => [
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0]),
+                dofs,
+                AdjacencyList::<usize>::new(),
+                AdjacencyList::<usize>::new(),
+            ],
+            ReferenceCellType::Triangle => [
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
+                dofs,
+                AdjacencyList::<usize>::new(),
+            ],
+            ReferenceCellType::Quadrilateral => [
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
+                dofs,
+                AdjacencyList::<usize>::new(),
+            ],
+            _ => {
+                panic!("Cell type not supported");
             }
         }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 1 && entity_number == 0 {
-            vec![0]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 1 Lagrange element on an interval
-pub struct LagrangeElementIntervalDegree1 {}
-
-impl FiniteElement for LagrangeElementIntervalDegree1 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Interval
-    }
-    fn degree(&self) -> usize {
-        1
-    }
-    fn highest_degree(&self) -> usize {
-        1
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        2
-    }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are 1-x-y, x, y
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0 - *points.get(pt, 0).unwrap();
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = *points.get(pt, 0).unwrap();
-                } else if deriv == 1 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0;
-                } else {
-                    for fun in 0..2 {
-                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
-                    }
+    } else {
+        match cell_type {
+            ReferenceCellType::Interval => match degree {
+                1 => [
+                    AdjacencyList::<usize>::from_data(vec![0, 1], vec![0, 1, 2]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
+                    AdjacencyList::<usize>::new(),
+                    AdjacencyList::<usize>::new(),
+                ],
+                _ => {
+                    panic!("Degree not supported");
                 }
+            },
+            ReferenceCellType::Triangle => match degree {
+                1 => [
+                    AdjacencyList::<usize>::from_data(vec![0, 1, 2], vec![0, 1, 2, 3]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
+                    AdjacencyList::<usize>::new(),
+                ],
+                2 => [
+                    AdjacencyList::<usize>::from_data(vec![0, 1, 2], vec![0, 1, 2, 3]),
+                    AdjacencyList::<usize>::from_data(vec![3, 4, 5], vec![0, 1, 2, 3]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
+                    AdjacencyList::<usize>::new(),
+                ],
+                _ => {
+                    panic!("Degree not supported");
+                }
+            },
+            ReferenceCellType::Quadrilateral => match degree {
+                1 => [
+                    AdjacencyList::<usize>::from_data(vec![0, 1, 2, 3], vec![0, 1, 2, 3, 4]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
+                    AdjacencyList::<usize>::new(),
+                ],
+                2 => [
+                    AdjacencyList::<usize>::from_data(vec![0, 1, 2, 3], vec![0, 1, 2, 3, 4]),
+                    AdjacencyList::<usize>::from_data(vec![4, 5, 6, 7], vec![0, 1, 2, 3, 4]),
+                    AdjacencyList::<usize>::from_data(vec![8], vec![0, 1]),
+                    AdjacencyList::<usize>::new(),
+                ],
+                _ => {
+                    panic!("Degree not supported");
+                }
+            },
+            _ => {
+                panic!("Cell type not supported");
             }
         }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 0 {
-            vec![entity_number]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 0 Lagrange element on a triangle
-pub struct LagrangeElementTriangleDegree0 {}
-
-impl FiniteElement for LagrangeElementTriangleDegree0 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Triangle
-    }
-    fn degree(&self) -> usize {
-        0
-    }
-    fn highest_degree(&self) -> usize {
-        0
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        1
-    }
-    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are 1-x-y, x, y
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
-                } else {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.;
-                }
-            }
-        }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 2 && entity_number == 0 {
-            vec![0]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 1 Lagrange element on a triangle
-pub struct LagrangeElementTriangleDegree1 {}
-
-impl FiniteElement for LagrangeElementTriangleDegree1 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Triangle
-    }
-    fn degree(&self) -> usize {
-        1
-    }
-    fn highest_degree(&self) -> usize {
-        1
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        3
-    }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are 1-x-y, x, y
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
-                        1.0 - *points.get(pt, 0).unwrap() - *points.get(pt, 1).unwrap();
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = *points.get(pt, 0).unwrap();
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = *points.get(pt, 1).unwrap();
-                } else if deriv == 1 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
-                } else if deriv == 2 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 1.0;
-                } else {
-                    for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
-                    }
-                }
-            }
-        }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 0 {
-            vec![entity_number]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 2 Lagrange element on a triangle
-pub struct LagrangeElementTriangleDegree2 {}
-
-impl FiniteElement for LagrangeElementTriangleDegree2 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Triangle
-    }
-    fn degree(&self) -> usize {
-        2
-    }
-    fn highest_degree(&self) -> usize {
-        2
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        6
-    }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are:
-        // * (1-x-y)(1-2x-2y)
-        // * x(2x-1)
-        // * y(2y - 1)
-        // * 4xy
-        // * 4y(1-x-y)
-        // * 4x(1-x-y)
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                let x = *points.get(pt, 0).unwrap();
-                let y = *points.get(pt, 1).unwrap();
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 2.0 * (1.0 - x - y) * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = x * (2.0 * x - 1.0);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * x * y;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * y * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * x * (1.0 - x - y);
-                } else if deriv == 1 {
-                    // d/dx
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -4.0 * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * x - 1.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * y;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -4.0 * y;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 - 8.0 * x - 4.0 * y;
-                } else if deriv == 2 {
-                    // d/dx
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -4.0 * (1.0 - x - y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * y - 1.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * x;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 - 4.0 * x - 8.0 * y;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = -4.0 * x;
-                } else if deriv == 3 {
-                    // d2/dx2
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = -8.0;
-                } else if deriv == 4 {
-                    // d2/dxdy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 0.0;
-                } else if deriv == 5 {
-                    // d2/dy2
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 0.0;
-                } else {
-                    for fun in 0..6 {
-                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
-                    }
-                }
-            }
-        }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 0 {
-            vec![entity_number]
-        } else if entity_dim == 1 {
-            vec![3 + entity_number]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 0 Lagrange element on a quadrilateral
-pub struct LagrangeElementQuadrilateralDegree0 {}
-
-impl FiniteElement for LagrangeElementQuadrilateralDegree0 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Quadrilateral
-    }
-    fn degree(&self) -> usize {
-        0
-    }
-    fn highest_degree(&self) -> usize {
-        0
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        1
-    }
-    fn tabulate(&self, _points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
-                } else {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.;
-                }
-            }
-        }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 2 && entity_number == 0 {
-            vec![0]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 1 Lagrange element on a quadrilateral
-pub struct LagrangeElementQuadrilateralDegree1 {}
-
-impl FiniteElement for LagrangeElementQuadrilateralDegree1 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Quadrilateral
-    }
-    fn degree(&self) -> usize {
-        1
-    }
-    fn highest_degree(&self) -> usize {
-        1
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        4
-    }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
-                        (1.0 - *points.get(pt, 0).unwrap()) * (1.0 - *points.get(pt, 1).unwrap());
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
-                        *points.get(pt, 0).unwrap() * (1.0 - *points.get(pt, 1).unwrap());
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
-                        (1.0 - *points.get(pt, 0).unwrap()) * *points.get(pt, 1).unwrap();
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() =
-                        *points.get(pt, 0).unwrap() * *points.get(pt, 1).unwrap();
-                } else if deriv == 1 {
-                    // d/dx
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = *points.get(pt, 1).unwrap() - 1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0 - *points.get(pt, 1).unwrap();
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -*points.get(pt, 1).unwrap();
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = *points.get(pt, 1).unwrap();
-                } else if deriv == 2 {
-                    // d/dy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = *points.get(pt, 0).unwrap() - 1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = -*points.get(pt, 0).unwrap();
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 1.0 - *points.get(pt, 0).unwrap();
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = *points.get(pt, 0).unwrap();
-                } else if deriv == 4 {
-                    // d2/dxdy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 1.0;
-                } else {
-                    for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
-                    }
-                }
-            }
-        }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 0 {
-            vec![entity_number]
-        } else {
-            vec![]
-        }
-    }
-}
-
-/// Degree 2 Lagrange element on a quadrilateral
-pub struct LagrangeElementQuadrilateralDegree2 {}
-
-impl FiniteElement for LagrangeElementQuadrilateralDegree2 {
-    fn value_size(&self) -> usize {
-        1
-    }
-    fn map_type(&self) -> MapType {
-        MapType::Identity
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Quadrilateral
-    }
-    fn degree(&self) -> usize {
-        2
-    }
-    fn highest_degree(&self) -> usize {
-        2
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::Lagrange
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        9
-    }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are (1-x)(1-y), x(1-y), (1-x)y, xy
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                let x = *points.get(pt, 0).unwrap();
-                let y = *points.get(pt, 1).unwrap();
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y);
-                } else if deriv == 1 {
-                    // d/dx
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
-                        (4.0 * x - 3.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() =
-                        (4.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (4.0 * x - 3.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = (4.0 * x - 1.0) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
-                        4.0 * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = (4.0 * x - 3.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() = (4.0 * x - 1.0) * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
-                        4.0 * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
-                        4.0 * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y);
-                } else if deriv == 2 {
-                    // d/dy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = x * (2.0 * x - 1.0) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = x * (2.0 * x - 1.0) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * x * (1.0 - x) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
-                        (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
-                        x * (2.0 * x - 1.0) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() = 4.0 * x * (1.0 - x) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
-                        4.0 * x * (1.0 - x) * 4.0 * (1.0 - 2.0 * y);
-                } else if deriv == 3 {
-                    // d2/dx2
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0 * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0 * (1.0 - y) * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() = 4.0 * 4.0 * y * (1.0 - y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() = -8.0 * y * (2.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() = -8.0 * 4.0 * y * (1.0 - y);
-                } else if deriv == 4 {
-                    // d2/dxdy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = (4.0 * x - 3.0) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = (4.0 * x - 1.0) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (4.0 * x - 3.0) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = (4.0 * x - 1.0) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() =
-                        4.0 * (1.0 - 2.0 * x) * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() =
-                        (4.0 * x - 3.0) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() =
-                        (4.0 * x - 1.0) * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() =
-                        4.0 * (1.0 - 2.0 * x) * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() =
-                        4.0 * (1.0 - 2.0 * x) * 4.0 * (1.0 - 2.0 * y);
-                } else if deriv == 5 {
-                    // d2/dy2
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = (1.0 - x) * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = x * (2.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (1.0 - x) * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = x * (2.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * x * (1.0 - x) * 4.0;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = (1.0 - x) * (1.0 - 2.0 * x) * -8.0;
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() = x * (2.0 * x - 1.0) * -8.0;
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() = 4.0 * x * (1.0 - x) * 4.0;
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() = 4.0 * x * (1.0 - x) * -8.0;
-                } else if deriv == 7 {
-                    // d3/dx2dy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0 * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0 * (4.0 * y - 3.0);
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() = 4.0 * 4.0 * (1.0 - 2.0 * y);
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() = -8.0 * (4.0 * y - 1.0);
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() = -8.0 * 4.0 * (1.0 - 2.0 * y);
-                } else if deriv == 8 {
-                    // d3/dxdy2
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = (4.0 * x - 3.0) * 4.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = (4.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = (4.0 * x - 3.0) * 4.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = (4.0 * x - 1.0) * 4.0;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = 4.0 * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = (4.0 * x - 3.0) * -8.0;
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() = (4.0 * x - 1.0) * -8.0;
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() = 4.0 * (1.0 - 2.0 * x) * 4.0;
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() = 4.0 * (1.0 - 2.0 * x) * -8.0;
-                } else if deriv == 12 {
-                    // d3/dx2dy
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 3, 0).unwrap() = 4.0 * 4.0;
-                    *data.get_mut(deriv, pt, 4, 0).unwrap() = -8.0 * 4.0;
-                    *data.get_mut(deriv, pt, 5, 0).unwrap() = 4.0 * -8.0;
-                    *data.get_mut(deriv, pt, 6, 0).unwrap() = 4.0 * -8.0;
-                    *data.get_mut(deriv, pt, 7, 0).unwrap() = -8.0 * 4.0;
-                    *data.get_mut(deriv, pt, 8, 0).unwrap() = -8.0 * -8.0;
-                } else {
-                    for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
-                    }
-                }
-            }
-        }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 0 {
-            vec![entity_number]
-        } else if entity_dim == 1 {
-            vec![4 + entity_number]
-        } else if entity_dim == 2 {
-            vec![8]
-        } else {
-            vec![]
-        }
+    };
+    CiarletElement {
+        cell_type,
+        degree,
+        highest_degree: degree,
+        map_type: MapType::Identity,
+        value_size: 1,
+        family: ElementFamily::Lagrange,
+        discontinuous: discontinuous,
+        dim: coefficients.shape().0,
+        coefficients: coefficients,
+        entity_dofs: entity_dofs,
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::cell::*;
     use crate::element::lagrange::*;
     use approx::*;
+    use bempp_tools::arrays::{Array2D, Array4D};
+    use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
+    use bempp_traits::element::FiniteElement;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -714,7 +200,7 @@ mod test {
                 ReferenceCellType::Pyramid => Pyramid {}.entity_count(dim).unwrap(),
             };
             for entity in 0..entity_count {
-                ndofs += e.entity_dofs(dim, entity).len();
+                ndofs += e.entity_dofs(dim, entity).unwrap().len();
             }
         }
         assert_eq!(ndofs, e.dim());
@@ -722,9 +208,9 @@ mod test {
 
     #[test]
     fn test_lagrange_0_interval() {
-        let e = LagrangeElementIntervalDegree0 {};
+        let e = create(ReferenceCellType::Interval, 0, true);
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 4);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
@@ -736,9 +222,9 @@ mod test {
 
     #[test]
     fn test_lagrange_1_interval() {
-        let e = LagrangeElementIntervalDegree1 {};
+        let e = create(ReferenceCellType::Interval, 1, false);
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 4);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
@@ -754,9 +240,9 @@ mod test {
 
     #[test]
     fn test_lagrange_0_triangle() {
-        let e = LagrangeElementTriangleDegree0 {};
+        let e = create(ReferenceCellType::Triangle, 0, true);
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
@@ -771,9 +257,9 @@ mod test {
 
     #[test]
     fn test_lagrange_1_triangle() {
-        let e = LagrangeElementTriangleDegree1 {};
+        let e = create(ReferenceCellType::Triangle, 1, false);
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
@@ -793,9 +279,9 @@ mod test {
 
     #[test]
     fn test_lagrange_0_quadrilateral() {
-        let e = LagrangeElementQuadrilateralDegree0 {};
+        let e = create(ReferenceCellType::Quadrilateral, 0, true);
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
@@ -810,9 +296,9 @@ mod test {
 
     #[test]
     fn test_lagrange_1_quadrilateral() {
-        let e = LagrangeElementQuadrilateralDegree1 {};
+        let e = create(ReferenceCellType::Quadrilateral, 1, false);
         assert_eq!(e.value_size(), 1);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
@@ -835,6 +321,60 @@ mod test {
             assert_relative_eq!(
                 *data.get(0, pt, 3, 0).unwrap(),
                 *points.get(pt, 0).unwrap() * *points.get(pt, 1).unwrap()
+            );
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_2_quadrilateral() {
+        let e = create(ReferenceCellType::Quadrilateral, 2, false);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            let x = *points.get(pt, 0).unwrap();
+            let y = *points.get(pt, 1).unwrap();
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 1, 0).unwrap(),
+                x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 2, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 3, 0).unwrap(),
+                x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 4, 0).unwrap(),
+                4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 5, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 6, 0).unwrap(),
+                x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 7, 0).unwrap(),
+                4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 8, 0).unwrap(),
+                4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y)
             );
         }
         check_dofs(e);
