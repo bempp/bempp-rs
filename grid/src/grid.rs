@@ -1,8 +1,8 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
-use bempp_element::element;
-use bempp_tools::arrays::{AdjacencyList, Array2D};
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
+use bempp_element::element::{create_element, CiarletElement};
+use bempp_tools::arrays::{AdjacencyList, Array2D, Array4D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
@@ -19,31 +19,18 @@ pub struct SerialGeometry {
 }
 
 fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
-    match cell_type {
-        ReferenceCellType::Triangle => {
-            let degree = (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1;
-            match degree {
-                1 => Box::new(element::LagrangeElementTriangleDegree1 {}),
-                2 => Box::new(element::LagrangeElementTriangleDegree2 {}),
-                _ => {
-                    panic!("Unsupported degree (for now)");
-                }
+    create_element(
+        ElementFamily::Lagrange,
+        cell_type,
+        match cell_type {
+            ReferenceCellType::Triangle => (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1,
+            ReferenceCellType::Quadrilateral => (npts as f64).sqrt() as usize - 1,
+            _ => {
+                panic!("Unsupported cell type (for now)");
             }
-        }
-        ReferenceCellType::Quadrilateral => {
-            let degree = (npts as f64).sqrt() as usize - 1;
-            match degree {
-                1 => Box::new(element::LagrangeElementQuadrilateralDegree1 {}),
-                2 => Box::new(element::LagrangeElementQuadrilateralDegree2 {}),
-                _ => {
-                    panic!("Unsupported degree (for now)");
-                }
-            }
-        }
-        _ => {
-            panic!("Unsupported cell type (for now)");
-        }
-    }
+        },
+        false,
+    )
 }
 
 impl SerialGeometry {
@@ -124,11 +111,11 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
-    fn compute_points(
+    fn compute_points<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
-        physical_points: &mut Array2D<f64>,
+        physical_points: &mut impl Array2DAccess<'a, f64>,
     ) {
         let gdim = self.dim();
         if points.shape().0 != physical_points.shape().0 {
@@ -162,7 +149,12 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_normals(&self, points: &Array2D<f64>, cell: usize, normals: &mut Array2D<f64>) {
+    fn compute_normals<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        normals: &mut impl Array2DAccess<'a, f64>,
+    ) {
         let gdim = self.dim();
         if gdim != 3 {
             unimplemented!("normals currently only implemented for 2D cells embedded in 3D.");
@@ -221,7 +213,12 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
+    fn compute_jacobians<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        jacobians: &mut impl Array2DAccess<'a, f64>,
+    ) {
         let gdim = self.dim();
         let tdim = points.shape().1;
         if points.shape().0 != jacobians.shape().0 {
@@ -258,9 +255,9 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian_determinants(
+    fn compute_jacobian_determinants<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
         jacobian_determinants: &mut [f64],
     ) {
@@ -335,11 +332,11 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn compute_jacobian_inverses(
+    fn compute_jacobian_inverses<'a>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'a, f64>,
         cell: usize,
-        jacobian_inverses: &mut Array2D<f64>,
+        jacobian_inverses: &mut impl Array2DAccess<'a, f64>,
     ) {
         let gdim = self.dim();
         let tdim = points.shape().1;
@@ -582,7 +579,9 @@ fn all_in(a: &[usize], b: &[usize]) -> bool {
     true
 }
 
-impl Topology for SerialTopology {
+impl Topology<'_> for SerialTopology {
+    type C = AdjacencyList<usize>;
+
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
@@ -772,7 +771,7 @@ impl SerialGrid {
         }
     }
 }
-impl Grid for SerialGrid {
+impl Grid<'_> for SerialGrid {
     type Topology = SerialTopology;
 
     type Geometry = SerialGeometry;

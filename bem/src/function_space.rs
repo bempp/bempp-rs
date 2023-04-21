@@ -20,7 +20,7 @@ impl<'a, E: FiniteElement> SerialFunctionSpace<'a, E> {
     }
 }
 
-impl<E: FiniteElement> FunctionSpace for SerialFunctionSpace<'_, E> {
+impl<'a, E: FiniteElement> FunctionSpace<'a> for SerialFunctionSpace<'a, E> {
     type DofMap = SerialDofMap;
     type Grid = SerialGrid;
     type FiniteElement = E;

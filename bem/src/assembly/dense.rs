@@ -2,8 +2,8 @@ use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use bempp_tools::arrays::Array2D;
-use bempp_traits::arrays::Array2DAccess;
+use bempp_tools::arrays::{Array2D, Array4D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
@@ -106,13 +106,13 @@ fn get_quadrature_rule(
     }
 }
 
-pub fn assemble(
+pub fn assemble<'a>(
     output: &mut Array2D<f64>,
     kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
     needs_trial_normal: bool,
     needs_test_normal: bool,
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+    trial_space: &impl FunctionSpace<'a>,
+    test_space: &impl FunctionSpace<'a>,
 ) {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
@@ -256,11 +256,11 @@ pub fn assemble(
     }
 }
 
-pub fn hypersingular_assemble(
+pub fn hypersingular_assemble<'a>(
     output: &mut Array2D<f64>,
     kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+    trial_space: &impl FunctionSpace<'a>,
+    test_space: &impl FunctionSpace<'a>,
 ) {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
@@ -467,12 +467,14 @@ mod test {
     use crate::function_space::SerialFunctionSpace;
     use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
     use approx::*;
-    use bempp_element::element::{LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1};
+    use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
+    use bempp_traits::cell::ReferenceCellType;
+    use bempp_traits::element::ElementFamily;
 
-    fn laplace_single_layer(
-        trial_space: &impl FunctionSpace,
-        test_space: &impl FunctionSpace,
+    fn laplace_single_layer<'a>(
+        trial_space: &impl FunctionSpace<'a>,
+        test_space: &impl FunctionSpace<'a>,
     ) -> Array2D<f64> {
         let mut output = Array2D::<f64>::new((
             test_space.dofmap().global_size(),
@@ -489,9 +491,9 @@ mod test {
         output
     }
 
-    fn laplace_double_layer(
-        trial_space: &impl FunctionSpace,
-        test_space: &impl FunctionSpace,
+    fn laplace_double_layer<'a>(
+        trial_space: &impl FunctionSpace<'a>,
+        test_space: &impl FunctionSpace<'a>,
     ) -> Array2D<f64> {
         let mut output = Array2D::<f64>::new((
             test_space.dofmap().global_size(),
@@ -508,9 +510,9 @@ mod test {
         output
     }
 
-    fn laplace_adjoint_double_layer(
-        trial_space: &impl FunctionSpace,
-        test_space: &impl FunctionSpace,
+    fn laplace_adjoint_double_layer<'a>(
+        trial_space: &impl FunctionSpace<'a>,
+        test_space: &impl FunctionSpace<'a>,
     ) -> Array2D<f64> {
         let mut output = Array2D::<f64>::new((
             test_space.dofmap().global_size(),
@@ -527,9 +529,9 @@ mod test {
         output
     }
 
-    fn laplace_hypersingular(
-        trial_space: &impl FunctionSpace,
-        test_space: &impl FunctionSpace,
+    fn laplace_hypersingular<'a>(
+        trial_space: &impl FunctionSpace<'a>,
+        test_space: &impl FunctionSpace<'a>,
     ) -> Array2D<f64> {
         let mut output = Array2D::<f64>::new((
             test_space.dofmap().global_size(),
@@ -542,7 +544,12 @@ mod test {
     #[test]
     fn test_laplace_single_layer_dp0_dp0() {
         let grid = regular_sphere(0);
-        let element = LagrangeElementTriangleDegree0 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let matrix = laplace_single_layer(&space, &space);
@@ -641,7 +648,12 @@ mod test {
     #[test]
     fn test_laplace_double_layer_dp0_dp0() {
         let grid = regular_sphere(0);
-        let element = LagrangeElementTriangleDegree0 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let matrix = laplace_double_layer(&space, &space);
@@ -740,7 +752,12 @@ mod test {
     #[test]
     fn test_laplace_adjoint_double_layer_dp0_dp0() {
         let grid = regular_sphere(0);
-        let element = LagrangeElementTriangleDegree0 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let matrix = laplace_adjoint_double_layer(&space, &space);
@@ -839,7 +856,12 @@ mod test {
     #[test]
     fn test_laplace_hypersingular_dp0_dp0() {
         let grid = regular_sphere(0);
-        let element = LagrangeElementTriangleDegree0 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let matrix = laplace_hypersingular(&space, &space);
@@ -854,7 +876,12 @@ mod test {
     #[test]
     fn test_laplace_hypersingular_p1_p1() {
         let grid = regular_sphere(0);
-        let element = LagrangeElementTriangleDegree1 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            false,
+        );
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let matrix = laplace_hypersingular(&space, &space);

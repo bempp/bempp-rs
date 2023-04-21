@@ -207,7 +207,7 @@ impl FiniteElement for CiarletElement {
     }
 }
 
-pub fn create(
+pub fn create_element(
     family: ElementFamily,
     cell_type: ReferenceCellType,
     degree: usize,
@@ -226,7 +226,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1() {
-        let e = create(
+        let e = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,

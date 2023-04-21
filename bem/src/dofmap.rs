@@ -11,7 +11,7 @@ pub struct SerialDofMap {
 }
 
 impl SerialDofMap {
-    pub fn new(grid: &impl Grid, element: &impl FiniteElement) -> Self {
+    pub fn new<'a>(grid: &impl Grid<'a>, element: &impl FiniteElement) -> Self {
         let mut size = 0;
         let mut entity_dofs_data: Vec<Vec<Vec<usize>>> = vec![];
         let tdim = grid.topology().dim();
@@ -29,10 +29,10 @@ impl SerialDofMap {
                         .iter()
                         .enumerate()
                 } {
-                    let e_dofs = element.entity_dofs(d, i);
+                    let e_dofs = element.entity_dofs(d, i).unwrap();
                     if e_dofs.len() > 0 {
                         if entity_dofs_data[d][*e].len() == 0 {
-                            for _ in &e_dofs {
+                            for _ in e_dofs {
                                 entity_dofs_data[d][*e].push(size);
                                 size += 1
                             }
@@ -89,16 +89,20 @@ impl DofMap for SerialDofMap {
 #[cfg(test)]
 mod test {
     use crate::dofmap::*;
-    use bempp_element::element::{
-        LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1,
-        LagrangeElementTriangleDegree2,
-    };
+    use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
+    use bempp_traits::cell::ReferenceCellType;
+    use bempp_traits::element::ElementFamily;
 
     #[test]
     fn test_dofmap_lagrange0() {
         let grid = regular_sphere(2);
-        let element = LagrangeElementTriangleDegree0 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
         assert_eq!(
@@ -110,7 +114,12 @@ mod test {
     #[test]
     fn test_dofmap_lagrange1() {
         let grid = regular_sphere(2);
-        let element = LagrangeElementTriangleDegree1 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            false,
+        );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
         assert_eq!(dofmap.local_size(), grid.topology().entity_count(0));
@@ -119,7 +128,12 @@ mod test {
     #[test]
     fn test_dofmap_lagrange2() {
         let grid = regular_sphere(2);
-        let element = LagrangeElementTriangleDegree2 {};
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            2,
+            false,
+        );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
         assert_eq!(

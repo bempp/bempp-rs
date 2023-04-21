@@ -1,12 +1,14 @@
 use approx::*;
 use bempp_bem::dofmap::SerialDofMap;
-use bempp_element::element::LagrangeElementTriangleDegree0;
+use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::types::CellToCellConnectivity;
-use bempp_tools::arrays::Array2D;
+use bempp_tools::arrays::{Array2D, Array4D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::bem::DofMap;
-use bempp_traits::element::FiniteElement;
+use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn laplace_green(x1: f64, x2: f64, x3: f64, y1: f64, y2: f64, y3: f64) -> f64 {
@@ -18,7 +20,12 @@ fn laplace_green(x1: f64, x2: f64, x3: f64, y1: f64, y2: f64, y3: f64) -> f64 {
 
 fn main() {
     let grid = regular_sphere(0);
-    let element = LagrangeElementTriangleDegree0 {};
+    let element = create_element(
+        ElementFamily::Lagrange,
+        ReferenceCellType::Triangle,
+        0,
+        true,
+    );
     let dofmap = SerialDofMap::new(&grid, &element);
 
     let npoints = 3;
@@ -39,8 +46,10 @@ fn main() {
         same_triangle_rule.trial_points,
         (same_triangle_rule.npoints, 2),
     );
-    let mut test_table = element.create_tabulate_array(0, same_triangle_rule.npoints);
-    let mut trial_table = element.create_tabulate_array(0, same_triangle_rule.npoints);
+    let mut test_table =
+        Array4D::<f64>::new(element.tabulate_array_shape(0, same_triangle_rule.npoints));
+    let mut trial_table =
+        Array4D::<f64>::new(element.tabulate_array_shape(0, same_triangle_rule.npoints));
 
     element.tabulate(&test_points, 0, &mut test_table);
     element.tabulate(&trial_points, 0, &mut trial_table);
@@ -133,8 +142,12 @@ fn main() {
                     edge_adjacent_rule.trial_points,
                     (edge_adjacent_rule.npoints, 2),
                 );
-                let mut test_table = element.create_tabulate_array(0, edge_adjacent_rule.npoints);
-                let mut trial_table = element.create_tabulate_array(0, edge_adjacent_rule.npoints);
+                let mut test_table = Array4D::<f64>::new(
+                    element.tabulate_array_shape(0, edge_adjacent_rule.npoints),
+                );
+                let mut trial_table = Array4D::<f64>::new(
+                    element.tabulate_array_shape(0, edge_adjacent_rule.npoints),
+                );
 
                 element.tabulate(&ea_test_points, 0, &mut test_table);
                 element.tabulate(&ea_trial_points, 0, &mut trial_table);

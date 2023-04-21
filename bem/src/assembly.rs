@@ -1,4 +1,3 @@
-use bempp_traits::arrays::Array2DAccess;
 pub mod dense;
 use crate::green;
 use bempp_tools::arrays::Array2D;
@@ -24,13 +23,13 @@ pub enum PDEType {
 // TODO: template over float type
 
 /// Assemble an operator into a dense matrix
-pub fn assemble_dense(
+pub fn assemble_dense<'a>(
     // TODO: ouput should be `&mut impl ArrayAccess2D` once such a trait exists
     output: &mut Array2D<f64>,
     operator: BoundaryOperator,
     pde: PDEType,
-    trial_space: &impl FunctionSpace,
-    test_space: &impl FunctionSpace,
+    trial_space: &impl FunctionSpace<'a>,
+    test_space: &impl FunctionSpace<'a>,
 ) {
     let kernel = match pde {
         PDEType::Laplace => match operator {
@@ -73,14 +72,17 @@ mod test {
     use crate::function_space::SerialFunctionSpace;
     use crate::green::laplace_green;
     use approx::*;
-    use bempp_element::element::{LagrangeElementTriangleDegree0, LagrangeElementTriangleDegree1};
+    use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
     use bempp_tools::arrays::Array2D;
+    use bempp_traits::arrays::Array2DAccess;
     use bempp_traits::bem::DofMap;
+    use bempp_traits::cell::ReferenceCellType;
+    use bempp_traits::element::ElementFamily;
 
-    fn laplace_single_layer(
-        trial_space: &impl FunctionSpace,
-        test_space: &impl FunctionSpace,
+    fn laplace_single_layer<'a>(
+        trial_space: &impl FunctionSpace<'a>,
+        test_space: &impl FunctionSpace<'a>,
     ) -> Array2D<f64> {
         let mut output = Array2D::<f64>::new((
             test_space.dofmap().global_size(),
@@ -100,8 +102,18 @@ mod test {
     #[test]
     fn test_laplace_single_layer() {
         let grid = regular_sphere(1);
-        let element0 = LagrangeElementTriangleDegree0 {};
-        let element1 = LagrangeElementTriangleDegree1 {};
+        let element0 = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
+        let element1 = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            false,
+        );
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 

@@ -1,6 +1,7 @@
 use bempp_grid::grid::SerialGrid;
 use bempp_grid::io::export_as_gmsh;
 use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 
