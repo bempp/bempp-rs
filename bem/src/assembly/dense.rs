@@ -470,7 +470,9 @@ pub fn hypersingular_assemble<'a>(
 mod test {
     use crate::assembly::dense::*;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy, GreenParameters};
+    use crate::green::{
+        helmholtz_green, laplace_green, laplace_green_dx, laplace_green_dy, GreenParameters,
+    };
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
@@ -938,26 +940,127 @@ mod test {
             }
         }
     }
-    /*
-        fn helmholtz_single_layer<'a>(
-            trial_space: &impl FunctionSpace<'a>,
-            test_space: &impl FunctionSpace<'a>,
-            k: f64,
-        ) -> Array2D<f64> {
-            let mut matrix = Array2D::<f64>::new((
-                test_space.dofmap().global_size(),
-                trial_space.dofmap().global_size(),
-            ));
-            assemble(
-                &mut matrix,
-                helmholtz_green,
-                &GreenParameters::Wavenumber(3.0),
-                false,
-                false,
-                trial_space,
-                test_space,
-            );
-            output
+
+    #[test]
+    fn test_helmholtz_single_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            helmholtz_green,
+            &GreenParameters::Wavenumber(3.0),
+            false,
+            false,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                0.08742460357596939,
+                -0.02332791148192136,
+                -0.04211947809894265,
+                -0.02332791148192136,
+                -0.023327911481921364,
+                -0.042119478098942634,
+                -0.03447046598405515,
+                -0.04211947809894265,
+            ],
+            vec![
+                -0.023327911481921364,
+                0.08742460357596939,
+                -0.02332791148192136,
+                -0.04211947809894265,
+                -0.04211947809894265,
+                -0.02332791148192136,
+                -0.042119478098942634,
+                -0.03447046598405515,
+            ],
+            vec![
+                -0.04211947809894265,
+                -0.02332791148192136,
+                0.08742460357596939,
+                -0.02332791148192136,
+                -0.03447046598405515,
+                -0.04211947809894265,
+                -0.023327911481921364,
+                -0.042119478098942634,
+            ],
+            vec![
+                -0.02332791148192136,
+                -0.04211947809894265,
+                -0.023327911481921364,
+                0.08742460357596939,
+                -0.042119478098942634,
+                -0.03447046598405515,
+                -0.04211947809894265,
+                -0.02332791148192136,
+            ],
+            vec![
+                -0.023327911481921364,
+                -0.04211947809894265,
+                -0.03447046598405515,
+                -0.042119478098942634,
+                0.08742460357596939,
+                -0.02332791148192136,
+                -0.04211947809894265,
+                -0.023327911481921364,
+            ],
+            vec![
+                -0.042119478098942634,
+                -0.02332791148192136,
+                -0.04211947809894265,
+                -0.034470465984055156,
+                -0.02332791148192136,
+                0.08742460357596939,
+                -0.023327911481921364,
+                -0.04211947809894265,
+            ],
+            vec![
+                -0.03447046598405515,
+                -0.042119478098942634,
+                -0.023327911481921364,
+                -0.04211947809894265,
+                -0.04211947809894265,
+                -0.023327911481921364,
+                0.08742460357596939,
+                -0.02332791148192136,
+            ],
+            vec![
+                -0.04211947809894265,
+                -0.034470465984055156,
+                -0.042119478098942634,
+                -0.02332791148192136,
+                -0.023327911481921364,
+                -0.04211947809894265,
+                -0.02332791148192136,
+                0.08742460357596939,
+            ],
+        ];
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                println!("{i} {j} {ndofs}");
+                println!("{} {}", *matrix.get(i, j).unwrap(), from_cl[i][j]);
+            }
+            println!();
         }
-    */
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+            }
+        }
+    }
 }

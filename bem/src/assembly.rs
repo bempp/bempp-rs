@@ -1,5 +1,6 @@
 pub mod dense;
 use crate::green;
+use crate::green::{GreenParameters, Scalar};
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::FunctionSpace;
 
@@ -43,8 +44,8 @@ pub fn assemble_dense<'a>(
             }
         },
         PDEType::Helmholtz(_) => match operator {
-            BoundaryOperator::SingleLayer => green::laplace_green,
-            BoundaryOperator::DoubleLayer => green::laplace_green_dy,
+            BoundaryOperator::SingleLayer => green::helmholtz_green,
+            BoundaryOperator::DoubleLayer => green::test::<f64>,
             BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
             BoundaryOperator::Hypersingular => green::laplace_green,
             _ => {
@@ -53,8 +54,8 @@ pub fn assemble_dense<'a>(
         },
     };
     let params = match pde {
-        PDEType::Laplace => green::GreenParameters::None,
-        PDEType::Helmholtz(k) => green::GreenParameters::Wavenumber(k),
+        PDEType::Laplace => GreenParameters::None,
+        PDEType::Helmholtz(k) => GreenParameters::Wavenumber(k),
     };
     let needs_trial_normal = match operator {
         BoundaryOperator::DoubleLayer => true,
