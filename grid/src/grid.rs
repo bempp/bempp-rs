@@ -11,14 +11,14 @@ use std::cell::{Ref, RefCell};
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
-    coordinate_elements: Vec<Box<dyn FiniteElement>>,
+    coordinate_elements: Vec<CiarletElement>,
     coordinates: Array2D<f64>,
     cells: AdjacencyList<usize>,
     element_changes: Vec<usize>,
     index_map: Vec<usize>,
 }
 
-fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> Box<dyn FiniteElement> {
+fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
     match cell_type {
         ReferenceCellType::Triangle => {
             let degree = (((1 + 8 * npts) as f64).sqrt() as usize - 1) / 2 - 1;
@@ -82,7 +82,7 @@ impl SerialGeometry {
     }
 
     /// TODO: document
-    pub fn coordinate_elements(&self) -> &Vec<Box<dyn FiniteElement>> {
+    pub fn coordinate_elements(&self) -> &Vec<CiarletElement> {
         &self.coordinate_elements
     }
 
@@ -92,7 +92,7 @@ impl SerialGeometry {
     }
 
     /// Get the coordinate element associated with the given cell
-    pub fn element(&self, cell: usize) -> &Box<dyn FiniteElement> {
+    pub fn element(&self, cell: usize) -> &CiarletElement {
         for i in 0..self.element_changes.len() - 1 {
             if cell < self.element_changes[i + 1] {
                 return &self.coordinate_elements[i - 1];

@@ -4,7 +4,7 @@ use crate::cell::PhysicalCell;
 use crate::element::FiniteElement;
 use bempp_tools::arrays::Array4D;
 use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
-pub use bempp_traits::element::MapType;
+use bempp_traits::element::MapType;
 
 pub fn identity_push_forward<'a, F: FiniteElement + 'a>(
     data: &mut impl Array4DAccess<f64>,
