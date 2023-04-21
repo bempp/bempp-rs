@@ -6,7 +6,7 @@ pub enum GreenParameters {
     Wavenumber(f64),
 }
 
-pub trait Scalar: Num {
+pub trait Scalar: Num + std::ops::AddAssign {
     // Get 1 over pi as this scalar type
     fn inv_pi() -> Self;
     // Get the distance between x and y as this scalar type
