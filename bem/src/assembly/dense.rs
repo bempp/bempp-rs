@@ -472,7 +472,8 @@ mod test {
     use crate::assembly::dense::*;
     use crate::function_space::SerialFunctionSpace;
     use crate::green::{
-        helmholtz_green, laplace_green, laplace_green_dx, laplace_green_dy, GreenParameters,
+        helmholtz_green, helmholtz_green_dx, helmholtz_green_dy, laplace_green, laplace_green_dx,
+        laplace_green_dy, GreenParameters,
     };
     use approx::*;
     use bempp_element::element::create_element;
@@ -591,7 +592,7 @@ mod test {
 
         for i in 0..ndofs {
             for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
             }
         }
     }
@@ -706,7 +707,7 @@ mod test {
 
         for i in 0..ndofs {
             for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
             }
         }
     }
@@ -821,7 +822,7 @@ mod test {
 
         for i in 0..ndofs {
             for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
             }
         }
     }
@@ -850,7 +851,7 @@ mod test {
 
         for i in 0..ndofs {
             for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), 0.0, epsilon = 0.0001);
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), 0.0, epsilon = 1e-4);
             }
         }
     }
@@ -937,7 +938,7 @@ mod test {
                 assert_relative_eq!(
                     *matrix.get(i, j).unwrap(),
                     from_cl[perm[i]][perm[j]],
-                    epsilon = 0.0001
+                    epsilon = 1e-4
                 );
             }
         }
@@ -1053,7 +1054,7 @@ mod test {
 
         for i in 0..ndofs {
             for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
             }
         }
     }
@@ -1170,12 +1171,383 @@ mod test {
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().re,
                     from_cl[i][j].re,
-                    epsilon = 0.0001
+                    epsilon = 1e-4
                 );
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().im,
                     from_cl[i][j].im,
-                    epsilon = 0.0001
+                    epsilon = 1e-4
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            helmholtz_green_dy,
+            &GreenParameters::Wavenumber(3.0),
+            true,
+            false,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                Complex::new(-1.025266688854119e-33, -7.550086433767158e-36),
+                Complex::new(-0.07902626473768169, -0.08184681047051735),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07902626473768172, -0.08184681047051737),
+                Complex::new(-0.07902626473768169, -0.08184681047051737),
+                Complex::new(0.01906923918000323, -0.10276858786959302),
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.019069239180003215, -0.10276858786959299),
+            ],
+            vec![
+                Complex::new(-0.07902626473768172, -0.08184681047051737),
+                Complex::new(-1.025266688854119e-33, 1.0291684702482414e-35),
+                Complex::new(-0.0790262647376817, -0.08184681047051737),
+                Complex::new(0.019069239180003212, -0.10276858786959299),
+                Complex::new(0.019069239180003212, -0.10276858786959298),
+                Complex::new(-0.07902626473768168, -0.08184681047051737),
+                Complex::new(0.01906923918000323, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+            ],
+            vec![
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07902626473768172, -0.08184681047051737),
+                Complex::new(-1.025266688854119e-33, -7.550086433767158e-36),
+                Complex::new(-0.07902626473768169, -0.08184681047051735),
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.019069239180003215, -0.10276858786959299),
+                Complex::new(-0.07902626473768169, -0.08184681047051737),
+                Complex::new(0.01906923918000323, -0.10276858786959302),
+            ],
+            vec![
+                Complex::new(-0.0790262647376817, -0.08184681047051737),
+                Complex::new(0.019069239180003212, -0.10276858786959299),
+                Complex::new(-0.07902626473768172, -0.08184681047051737),
+                Complex::new(-1.025266688854119e-33, 1.0291684702482414e-35),
+                Complex::new(0.01906923918000323, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+                Complex::new(0.019069239180003212, -0.10276858786959298),
+                Complex::new(-0.07902626473768168, -0.08184681047051737),
+            ],
+            vec![
+                Complex::new(-0.07902626473768172, -0.08184681047051737),
+                Complex::new(0.019069239180003215, -0.10276858786959298),
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.01906923918000323, -0.10276858786959299),
+                Complex::new(5.00373588753262e-33, -1.8116810507789718e-36),
+                Complex::new(-0.07902626473768169, -0.08184681047051735),
+                Complex::new(0.019069239180003212, -0.10276858786959299),
+                Complex::new(-0.07902626473768169, -0.08184681047051737),
+            ],
+            vec![
+                Complex::new(0.019069239180003222, -0.10276858786959299),
+                Complex::new(-0.07902626473768173, -0.08184681047051737),
+                Complex::new(0.01906923918000322, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+                Complex::new(-0.07902626473768169, -0.08184681047051735),
+                Complex::new(7.314851820797302e-33, -1.088140415641433e-35),
+                Complex::new(-0.07902626473768169, -0.08184681047051737),
+                Complex::new(0.01906923918000322, -0.10276858786959299),
+            ],
+            vec![
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.01906923918000323, -0.10276858786959299),
+                Complex::new(-0.07902626473768172, -0.08184681047051737),
+                Complex::new(0.019069239180003215, -0.10276858786959298),
+                Complex::new(0.019069239180003212, -0.10276858786959299),
+                Complex::new(-0.07902626473768169, -0.08184681047051737),
+                Complex::new(5.00373588753262e-33, -1.8116810507789718e-36),
+                Complex::new(-0.07902626473768169, -0.08184681047051735),
+            ],
+            vec![
+                Complex::new(0.01906923918000322, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+                Complex::new(0.019069239180003222, -0.10276858786959299),
+                Complex::new(-0.07902626473768173, -0.08184681047051737),
+                Complex::new(-0.07902626473768169, -0.08184681047051737),
+                Complex::new(0.01906923918000322, -0.10276858786959299),
+                Complex::new(-0.07902626473768169, -0.08184681047051735),
+                Complex::new(7.314851820797302e-33, -1.088140415641433e-35),
+            ],
+        ];
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().re,
+                    from_cl[i][j].re,
+                    epsilon = 1e-4
+                );
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().re,
+                    from_cl[i][j].im,
+                    epsilon = 1e-4
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            helmholtz_green_dx,
+            &GreenParameters::Wavenumber(3.0),
+            false,
+            true,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                Complex::new(1.025266688854119e-33, 7.550086433767158e-36),
+                Complex::new(-0.079034545070751, -0.08184700030244885),
+                Complex::new(0.019069239180003205, -0.10276858786959298),
+                Complex::new(-0.07903454507075097, -0.08184700030244886),
+                Complex::new(-0.07903454507075099, -0.08184700030244887),
+                Complex::new(0.01906923918000323, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.019069239180003212, -0.10276858786959298),
+            ],
+            vec![
+                Complex::new(-0.07903454507075097, -0.08184700030244885),
+                Complex::new(1.025266688854119e-33, -1.0291684702482414e-35),
+                Complex::new(-0.079034545070751, -0.08184700030244887),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07903454507075099, -0.08184700030244887),
+                Complex::new(0.019069239180003233, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+            ],
+            vec![
+                Complex::new(0.019069239180003205, -0.10276858786959298),
+                Complex::new(-0.07903454507075097, -0.08184700030244886),
+                Complex::new(1.025266688854119e-33, 7.550086433767158e-36),
+                Complex::new(-0.079034545070751, -0.08184700030244885),
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.019069239180003212, -0.10276858786959298),
+                Complex::new(-0.07903454507075099, -0.08184700030244887),
+                Complex::new(0.01906923918000323, -0.10276858786959299),
+            ],
+            vec![
+                Complex::new(-0.079034545070751, -0.08184700030244887),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07903454507075097, -0.08184700030244885),
+                Complex::new(1.025266688854119e-33, -1.0291684702482414e-35),
+                Complex::new(0.019069239180003233, -0.10276858786959299),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07903454507075099, -0.08184700030244887),
+            ],
+            vec![
+                Complex::new(-0.07903454507075099, -0.08184700030244887),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.01906923918000323, -0.10276858786959302),
+                Complex::new(-5.00373588753262e-33, 1.8116810507789718e-36),
+                Complex::new(-0.07903454507075099, -0.08184700030244885),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07903454507075099, -0.08184700030244886),
+            ],
+            vec![
+                Complex::new(0.019069239180003233, -0.10276858786959302),
+                Complex::new(-0.07903454507075099, -0.08184700030244886),
+                Complex::new(0.019069239180003212, -0.10276858786959298),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+                Complex::new(-0.07903454507075099, -0.08184700030244885),
+                Complex::new(-7.314851820797302e-33, 1.088140415641433e-35),
+                Complex::new(-0.07903454507075099, -0.08184700030244886),
+                Complex::new(0.019069239180003215, -0.10276858786959298),
+            ],
+            vec![
+                Complex::new(0.10089706509966115, -0.07681163409722505),
+                Complex::new(0.01906923918000323, -0.10276858786959302),
+                Complex::new(-0.07903454507075099, -0.08184700030244887),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(0.01906923918000321, -0.10276858786959298),
+                Complex::new(-0.07903454507075099, -0.08184700030244886),
+                Complex::new(-5.00373588753262e-33, 1.8116810507789718e-36),
+                Complex::new(-0.07903454507075099, -0.08184700030244885),
+            ],
+            vec![
+                Complex::new(0.019069239180003212, -0.10276858786959298),
+                Complex::new(0.10089706509966115, -0.07681163409722506),
+                Complex::new(0.019069239180003233, -0.10276858786959302),
+                Complex::new(-0.07903454507075099, -0.08184700030244886),
+                Complex::new(-0.07903454507075099, -0.08184700030244886),
+                Complex::new(0.019069239180003215, -0.10276858786959298),
+                Complex::new(-0.07903454507075099, -0.08184700030244885),
+                Complex::new(-7.314851820797302e-33, 1.088140415641433e-35),
+            ],
+        ];
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().re,
+                    from_cl[i][j].re,
+                    epsilon = 1e-4
+                );
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().im,
+                    from_cl[i][j].im,
+                    epsilon = 1e-4
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_hypersingular_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        hypersingular_assemble(
+            &mut matrix,
+            helmholtz_green,
+            &GreenParameters::Wavenumber(3.0),
+            &space,
+            &space,
+        );
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, 0.0, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, 0.0, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_hypersingular_p1_p1() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            false,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+
+        hypersingular_assemble(
+            &mut matrix,
+            helmholtz_green,
+            &GreenParameters::Wavenumber(3.0),
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        let from_cl = vec![
+            vec![
+                Complex::new(-0.24054975187128322, -0.37234907871793793),
+                Complex::new(-0.2018803657726846, -0.3708486980714607),
+                Complex::new(-0.31151549914430937, -0.36517694339435425),
+                Complex::new(-0.31146604913280734, -0.3652407688678574),
+                Complex::new(-0.3114620814217625, -0.36524076431695807),
+                Complex::new(-0.311434147468966, -0.36530056813389983),
+            ],
+            vec![
+                Complex::new(-0.2018803657726846, -0.3708486980714607),
+                Complex::new(-0.24054975187128322, -0.3723490787179379),
+                Complex::new(-0.31146604913280734, -0.3652407688678574),
+                Complex::new(-0.31151549914430937, -0.36517694339435425),
+                Complex::new(-0.3114620814217625, -0.36524076431695807),
+                Complex::new(-0.311434147468966, -0.36530056813389983),
+            ],
+            vec![
+                Complex::new(-0.31146604913280734, -0.3652407688678574),
+                Complex::new(-0.31151549914430937, -0.36517694339435425),
+                Complex::new(-0.24054975187128322, -0.3723490787179379),
+                Complex::new(-0.2018803657726846, -0.3708486980714607),
+                Complex::new(-0.31146208142176246, -0.36524076431695807),
+                Complex::new(-0.31143414746896597, -0.36530056813389983),
+            ],
+            vec![
+                Complex::new(-0.31151549914430937, -0.36517694339435425),
+                Complex::new(-0.31146604913280734, -0.3652407688678574),
+                Complex::new(-0.2018803657726846, -0.3708486980714607),
+                Complex::new(-0.24054975187128322, -0.3723490787179379),
+                Complex::new(-0.3114620814217625, -0.36524076431695807),
+                Complex::new(-0.311434147468966, -0.36530056813389983),
+            ],
+            vec![
+                Complex::new(-0.31146208142176257, -0.36524076431695807),
+                Complex::new(-0.3114620814217625, -0.3652407643169581),
+                Complex::new(-0.3114620814217625, -0.3652407643169581),
+                Complex::new(-0.3114620814217625, -0.3652407643169581),
+                Complex::new(-0.24056452443903534, -0.37231826606213236),
+                Complex::new(-0.20188036577268464, -0.37084869807146076),
+            ],
+            vec![
+                Complex::new(-0.3114335658086867, -0.36530052927274986),
+                Complex::new(-0.31143356580868675, -0.36530052927274986),
+                Complex::new(-0.3114335658086867, -0.36530052927274986),
+                Complex::new(-0.3114335658086867, -0.36530052927274986),
+                Complex::new(-0.2018803657726846, -0.37084869807146076),
+                Complex::new(-0.2402983805938184, -0.37203286968364935),
+            ],
+        ];
+
+        let perm = vec![0, 5, 2, 4, 3, 1];
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().re,
+                    from_cl[perm[i]][perm[j]].re,
+                    epsilon = 1e-4
+                );
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().im,
+                    from_cl[perm[i]][perm[j]].im,
+                    epsilon = 1e-4
                 );
             }
         }
