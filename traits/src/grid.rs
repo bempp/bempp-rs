@@ -86,7 +86,7 @@ pub trait Topology<'a> {
     //!
     //! Grid topology provides information about which mesh entities are connected to other mesh entities
 
-    type C: AdjacencyListAccess<'a, usize>;
+    type Connectivity: AdjacencyListAccess<'a, usize>;
 
     /// The dimension of the grid
     fn dim(&self) -> usize;
@@ -118,7 +118,7 @@ pub trait Topology<'a> {
     }
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::C>;
+    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity>;
 
     /// Get the ownership of a mesh entity
     fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;

@@ -580,7 +580,7 @@ fn all_in(a: &[usize], b: &[usize]) -> bool {
 }
 
 impl Topology<'_> for SerialTopology {
-    type C = AdjacencyList<usize>;
+    type Connectivity = AdjacencyList<usize>;
 
     fn index_map(&self) -> &[usize] {
         &self.index_map
@@ -736,7 +736,7 @@ impl Topology<'_> for SerialTopology {
         }
     }
 
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>> {
+    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity> {
         self.create_connectivity(dim0, dim1);
         self.connectivity[dim0][dim1].borrow()
     }
