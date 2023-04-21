@@ -14,10 +14,11 @@ pub enum BoundaryOperator {
     MagneticField,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum PDEType {
     Laplace,
+    Helmholtz(f64),
 }
 
 // TODO: template over float type
@@ -41,6 +42,19 @@ pub fn assemble_dense<'a>(
                 panic!("Invalid operator");
             }
         },
+        PDEType::Helmholtz(_) => match operator {
+            BoundaryOperator::SingleLayer => green::laplace_green,
+            BoundaryOperator::DoubleLayer => green::laplace_green_dy,
+            BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
+            BoundaryOperator::Hypersingular => green::laplace_green,
+            _ => {
+                panic!("Invalid operator");
+            }
+        },
+    };
+    let params = match pde {
+        PDEType::Laplace => green::GreenParameters::None,
+        PDEType::Helmholtz(k) => green::GreenParameters::Wavenumber(k),
     };
     let needs_trial_normal = match operator {
         BoundaryOperator::DoubleLayer => true,
@@ -52,11 +66,12 @@ pub fn assemble_dense<'a>(
     };
 
     if operator == BoundaryOperator::Hypersingular {
-        dense::hypersingular_assemble(output, kernel, trial_space, test_space);
+        dense::hypersingular_assemble(output, kernel, &params, trial_space, test_space);
     } else {
         dense::assemble(
             output,
             kernel,
+            &params,
             needs_trial_normal,
             needs_test_normal,
             trial_space,
@@ -70,7 +85,7 @@ mod test {
     use crate::assembly::dense;
     use crate::assembly::*;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green::laplace_green;
+    use crate::green::{laplace_green, GreenParameters};
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
@@ -79,25 +94,6 @@ mod test {
     use bempp_traits::bem::DofMap;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::ElementFamily;
-
-    fn laplace_single_layer<'a>(
-        trial_space: &impl FunctionSpace<'a>,
-        test_space: &impl FunctionSpace<'a>,
-    ) -> Array2D<f64> {
-        let mut output = Array2D::<f64>::new((
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ));
-        dense::assemble(
-            &mut output,
-            laplace_green,
-            false,
-            false,
-            trial_space,
-            test_space,
-        );
-        output
-    }
 
     #[test]
     fn test_laplace_single_layer() {
@@ -117,7 +113,17 @@ mod test {
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 
-        let matrix = laplace_single_layer(&space0, &space1);
+        let mut matrix =
+            Array2D::<f64>::new((space1.dofmap().global_size(), space0.dofmap().global_size()));
+        dense::assemble(
+            &mut matrix,
+            laplace_green,
+            &GreenParameters::None,
+            false,
+            false,
+            &space0,
+            &space1,
+        );
 
         let mut matrix2 =
             Array2D::<f64>::new((space1.dofmap().global_size(), space0.dofmap().global_size()));

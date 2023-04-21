@@ -1,3 +1,4 @@
+use crate::green::GreenParameters;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
@@ -108,7 +109,8 @@ fn get_quadrature_rule(
 
 pub fn assemble<'a>(
     output: &mut Array2D<f64>,
-    kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
+    kernel: fn(&[f64], &[f64], &[f64], &[f64], &GreenParameters) -> f64,
+    params: &GreenParameters,
     needs_trial_normal: bool,
     needs_test_normal: bool,
     trial_space: &impl FunctionSpace<'a>,
@@ -243,6 +245,7 @@ pub fn assemble<'a>(
                             unsafe { trial_mapped_pts.row_unchecked(index) },
                             unsafe { test_normals.row_unchecked(index) },
                             unsafe { trial_normals.row_unchecked(index) },
+                            params,
                         ) * rule.weights[index]
                             * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                             * test_jdet[index]
@@ -258,7 +261,8 @@ pub fn assemble<'a>(
 
 pub fn hypersingular_assemble<'a>(
     output: &mut Array2D<f64>,
-    kernel: fn(&[f64], &[f64], &[f64], &[f64]) -> f64,
+    kernel: fn(&[f64], &[f64], &[f64], &[f64], &GreenParameters) -> f64,
+    params: &GreenParameters,
     trial_space: &impl FunctionSpace<'a>,
     test_space: &impl FunctionSpace<'a>,
 ) {
@@ -449,6 +453,7 @@ pub fn hypersingular_assemble<'a>(
                             unsafe { trial_mapped_pts.row_unchecked(index) },
                             unsafe { test_normals.row_unchecked(index) },
                             unsafe { trial_normals.row_unchecked(index) },
+                            params,
                         ) * rule.weights[index]
                             * dot_curls
                             * test_jdet[index]
@@ -465,81 +470,12 @@ pub fn hypersingular_assemble<'a>(
 mod test {
     use crate::assembly::dense::*;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy};
+    use crate::green::{laplace_green, laplace_green_dx, laplace_green_dy, GreenParameters};
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::ElementFamily;
-
-    fn laplace_single_layer<'a>(
-        trial_space: &impl FunctionSpace<'a>,
-        test_space: &impl FunctionSpace<'a>,
-    ) -> Array2D<f64> {
-        let mut output = Array2D::<f64>::new((
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ));
-        assemble(
-            &mut output,
-            laplace_green,
-            false,
-            false,
-            trial_space,
-            test_space,
-        );
-        output
-    }
-
-    fn laplace_double_layer<'a>(
-        trial_space: &impl FunctionSpace<'a>,
-        test_space: &impl FunctionSpace<'a>,
-    ) -> Array2D<f64> {
-        let mut output = Array2D::<f64>::new((
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ));
-        assemble(
-            &mut output,
-            laplace_green_dy,
-            true,
-            false,
-            trial_space,
-            test_space,
-        );
-        output
-    }
-
-    fn laplace_adjoint_double_layer<'a>(
-        trial_space: &impl FunctionSpace<'a>,
-        test_space: &impl FunctionSpace<'a>,
-    ) -> Array2D<f64> {
-        let mut output = Array2D::<f64>::new((
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ));
-        assemble(
-            &mut output,
-            laplace_green_dx,
-            false,
-            true,
-            trial_space,
-            test_space,
-        );
-        output
-    }
-
-    fn laplace_hypersingular<'a>(
-        trial_space: &impl FunctionSpace<'a>,
-        test_space: &impl FunctionSpace<'a>,
-    ) -> Array2D<f64> {
-        let mut output = Array2D::<f64>::new((
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ));
-        hypersingular_assemble(&mut output, laplace_green, trial_space, test_space);
-        output
-    }
 
     #[test]
     fn test_laplace_single_layer_dp0_dp0() {
@@ -552,7 +488,18 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let matrix = laplace_single_layer(&space, &space);
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            laplace_green,
+            &GreenParameters::None,
+            false,
+            false,
+            &space,
+            &space,
+        );
 
         // Compare to result from bempp-cl
         let from_cl = vec![
@@ -638,8 +585,8 @@ mod test {
             ],
         ];
 
-        for i in 0..8 {
-            for j in 0..8 {
+        for i in 0..ndofs {
+            for j in 0..ndofs {
                 assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
             }
         }
@@ -656,7 +603,18 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let matrix = laplace_double_layer(&space, &space);
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            laplace_green_dy,
+            &GreenParameters::None,
+            true,
+            false,
+            &space,
+            &space,
+        );
 
         // Compare to result from bempp-cl
         let from_cl = vec![
@@ -742,8 +700,8 @@ mod test {
             ],
         ];
 
-        for i in 0..8 {
-            for j in 0..8 {
+        for i in 0..ndofs {
+            for j in 0..ndofs {
                 assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
             }
         }
@@ -760,7 +718,18 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let matrix = laplace_adjoint_double_layer(&space, &space);
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            laplace_green_dx,
+            &GreenParameters::None,
+            false,
+            true,
+            &space,
+            &space,
+        );
 
         // Compare to result from bempp-cl
         let from_cl = vec![
@@ -846,8 +815,8 @@ mod test {
             ],
         ];
 
-        for i in 0..8 {
-            for j in 0..8 {
+        for i in 0..ndofs {
+            for j in 0..ndofs {
                 assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
             }
         }
@@ -864,10 +833,19 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let matrix = laplace_hypersingular(&space, &space);
+        let ndofs = space.dofmap().global_size();
 
-        for i in 0..8 {
-            for j in 0..8 {
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        hypersingular_assemble(
+            &mut matrix,
+            laplace_green,
+            &GreenParameters::None,
+            &space,
+            &space,
+        );
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
                 assert_relative_eq!(*matrix.get(i, j).unwrap(), 0.0, epsilon = 0.0001);
             }
         }
@@ -884,7 +862,17 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let matrix = laplace_hypersingular(&space, &space);
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+
+        hypersingular_assemble(
+            &mut matrix,
+            laplace_green,
+            &GreenParameters::None,
+            &space,
+            &space,
+        );
 
         // Compare to result from bempp-cl
         let from_cl = vec![
@@ -940,8 +928,8 @@ mod test {
 
         let perm = vec![0, 5, 2, 4, 3, 1];
 
-        for i in 0..6 {
-            for j in 0..6 {
+        for i in 0..ndofs {
+            for j in 0..ndofs {
                 assert_relative_eq!(
                     *matrix.get(i, j).unwrap(),
                     from_cl[perm[i]][perm[j]],
@@ -950,4 +938,26 @@ mod test {
             }
         }
     }
+    /*
+        fn helmholtz_single_layer<'a>(
+            trial_space: &impl FunctionSpace<'a>,
+            test_space: &impl FunctionSpace<'a>,
+            k: f64,
+        ) -> Array2D<f64> {
+            let mut matrix = Array2D::<f64>::new((
+                test_space.dofmap().global_size(),
+                trial_space.dofmap().global_size(),
+            ));
+            assemble(
+                &mut matrix,
+                helmholtz_green,
+                &GreenParameters::Wavenumber(3.0),
+                false,
+                false,
+                trial_space,
+                test_space,
+            );
+            output
+        }
+    */
 }
