@@ -33,42 +33,40 @@ pub fn assemble_dense<'a, T: Scalar>(
     trial_space: &impl FunctionSpace<'a>,
     test_space: &impl FunctionSpace<'a>,
 ) {
-    let kernel = match pde {
-        PDEType::Laplace => match operator {
-            BoundaryOperator::SingleLayer => green::laplace_green,
-            BoundaryOperator::DoubleLayer => green::laplace_green_dy,
-            BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
-            BoundaryOperator::Hypersingular => green::laplace_green,
-            _ => {
-                panic!("Invalid operator");
-            }
-        },
-        PDEType::Helmholtz(_) => match operator {
-            BoundaryOperator::SingleLayer => green::helmholtz_green,
-            BoundaryOperator::DoubleLayer => green::helmholtz_green_dy,
-            BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
-            BoundaryOperator::Hypersingular => green::helmholtz_green,
-            _ => {
-                panic!("Invalid operator");
-            }
-        },
-    };
     let params = match pde {
         PDEType::Laplace => GreenParameters::None,
         PDEType::Helmholtz(k) => GreenParameters::Wavenumber(k),
     };
-    let needs_trial_normal = match operator {
-        BoundaryOperator::DoubleLayer => true,
-        _ => false,
-    };
-    let needs_test_normal = match operator {
-        BoundaryOperator::AdjointDoubleLayer => true,
-        _ => false,
-    };
-
-    if operator == BoundaryOperator::Hypersingular {
-        dense::hypersingular_assemble(output, kernel, &params, trial_space, test_space);
+    if operator == BoundaryOperator::Hypersingular && pde == PDEType::Laplace {
+        dense::laplace_hypersingular_assemble(output, &params, trial_space, test_space);
     } else {
+        let kernel = match pde {
+            PDEType::Laplace => match operator {
+                BoundaryOperator::SingleLayer => green::laplace_green,
+                BoundaryOperator::DoubleLayer => green::laplace_green_dy,
+                BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            PDEType::Helmholtz(_) => match operator {
+                BoundaryOperator::SingleLayer => green::helmholtz_green,
+                BoundaryOperator::DoubleLayer => green::helmholtz_green_dy,
+                BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        };
+        let needs_trial_normal = match operator {
+            BoundaryOperator::DoubleLayer => true,
+            _ => false,
+        };
+        let needs_test_normal = match operator {
+            BoundaryOperator::AdjointDoubleLayer => true,
+            _ => false,
+        };
+
         dense::assemble(
             output,
             kernel,

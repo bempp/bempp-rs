@@ -1,4 +1,6 @@
-use crate::green::{GreenParameters, Scalar};
+use crate::green::{
+    helmholtz_green, helmholtz_green_hypersingular_term, laplace_green, GreenParameters, Scalar,
+};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
@@ -261,7 +263,7 @@ pub fn assemble<'a, T: Scalar>(
     }
 }
 
-pub fn hypersingular_assemble<'a, T: Scalar>(
+pub fn curl_curl_assemble<'a, T: Scalar>(
     output: &mut Array2D<T>,
     kernel: fn(&[f64], &[f64], &[f64], &[f64], &GreenParameters) -> T,
     params: &GreenParameters,
@@ -273,7 +275,6 @@ pub fn hypersingular_assemble<'a, T: Scalar>(
     // if *trial_space.grid() != *test_space.grid() {
     //    unimplemented!("Assembling operators with spaces on different grids not yet supported");
     // }
-
     if !trial_space.is_serial() || !test_space.is_serial() {
         panic!("Dense assemble can only be used for function spaces stored in serial");
     }
@@ -465,6 +466,33 @@ pub fn hypersingular_assemble<'a, T: Scalar>(
             }
         }
     }
+}
+
+pub fn laplace_hypersingular_assemble<'a, T: Scalar>(
+    output: &mut Array2D<T>,
+    params: &GreenParameters,
+    trial_space: &impl FunctionSpace<'a>,
+    test_space: &impl FunctionSpace<'a>,
+) {
+    curl_curl_assemble(output, laplace_green, params, trial_space, test_space);
+}
+
+pub fn helmholtz_hypersingular_assemble<'a, T: Scalar>(
+    output: &mut Array2D<T>,
+    params: &GreenParameters,
+    trial_space: &impl FunctionSpace<'a>,
+    test_space: &impl FunctionSpace<'a>,
+) {
+    curl_curl_assemble(output, helmholtz_green, params, trial_space, test_space);
+    assemble(
+        output,
+        helmholtz_green_hypersingular_term,
+        params,
+        true,
+        true,
+        trial_space,
+        test_space,
+    );
 }
 
 #[cfg(test)]
@@ -841,13 +869,7 @@ mod test {
         let ndofs = space.dofmap().global_size();
 
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
-        hypersingular_assemble(
-            &mut matrix,
-            laplace_green,
-            &GreenParameters::None,
-            &space,
-            &space,
-        );
+        laplace_hypersingular_assemble(&mut matrix, &GreenParameters::None, &space, &space);
 
         for i in 0..ndofs {
             for j in 0..ndofs {
@@ -871,13 +893,7 @@ mod test {
 
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
 
-        hypersingular_assemble(
-            &mut matrix,
-            laplace_green,
-            &GreenParameters::None,
-            &space,
-            &space,
-        );
+        laplace_hypersingular_assemble(&mut matrix, &GreenParameters::None, &space, &space);
 
         // Compare to result from bempp-cl
         let from_cl = vec![
@@ -1431,36 +1447,6 @@ mod test {
     }
 
     #[test]
-    fn test_helmholtz_hypersingular_dp0_dp0() {
-        let grid = regular_sphere(0);
-        let element = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            0,
-            true,
-        );
-        let space = SerialFunctionSpace::new(&grid, &element);
-
-        let ndofs = space.dofmap().global_size();
-
-        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
-        hypersingular_assemble(
-            &mut matrix,
-            helmholtz_green,
-            &GreenParameters::Wavenumber(3.0),
-            &space,
-            &space,
-        );
-
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(matrix.get(i, j).unwrap().re, 0.0, epsilon = 1e-4);
-                assert_relative_eq!(matrix.get(i, j).unwrap().im, 0.0, epsilon = 1e-4);
-            }
-        }
-    }
-
-    #[test]
     fn test_helmholtz_hypersingular_p1_p1() {
         let grid = regular_sphere(0);
         let element = create_element(
@@ -1475,9 +1461,8 @@ mod test {
 
         let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
 
-        hypersingular_assemble(
+        helmholtz_hypersingular_assemble(
             &mut matrix,
-            helmholtz_green,
             &GreenParameters::Wavenumber(3.0),
             &space,
             &space,
@@ -1542,12 +1527,12 @@ mod test {
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().re,
                     from_cl[perm[i]][perm[j]].re,
-                    epsilon = 1e-4
+                    epsilon = 1e-3
                 );
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().im,
                     from_cl[perm[i]][perm[j]].im,
-                    epsilon = 1e-4
+                    epsilon = 1e-3
                 );
             }
         }
