@@ -123,12 +123,22 @@ pub fn helmholtz_green<T: Scalar>(
     }
 }
 
-pub fn test<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
+pub fn helmholtz_green_dx<T: Scalar>(
+    _x: &[f64],
+    _y: &[f64],
     _nx: &[f64],
     _ny: &[f64],
     _params: &GreenParameters,
 ) -> T {
-    T::quarter() * T::inv_pi() / T::dist(x, y)
+    T::quarter()
+}
+
+pub fn helmholtz_green_dy<T: Scalar>(
+    _x: &[f64],
+    _y: &[f64],
+    _nx: &[f64],
+    _ny: &[f64],
+    _params: &GreenParameters,
+) -> T {
+    T::quarter()
 }
