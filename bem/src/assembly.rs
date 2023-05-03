@@ -1,6 +1,6 @@
 pub mod dense;
 use crate::green;
-use crate::green::{GreenParameters, Scalar};
+use crate::green::Scalar;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::FunctionSpace;
 
@@ -33,58 +33,91 @@ pub fn assemble_dense<'a, T: Scalar>(
     trial_space: &impl FunctionSpace<'a>,
     test_space: &impl FunctionSpace<'a>,
 ) {
-    let params = match pde {
-        PDEType::Laplace => GreenParameters::None,
-        PDEType::Helmholtz(k) => GreenParameters::Wavenumber(k),
+    match pde {
+        PDEType::Laplace => match operator {
+            BoundaryOperator::SingleLayer => {
+                dense::assemble(
+                    output,
+                    &green::LaplaceGreenKernel {},
+                    false,
+                    false,
+                    trial_space,
+                    test_space,
+                );
+            }
+            BoundaryOperator::DoubleLayer => {
+                dense::assemble(
+                    output,
+                    &green::LaplaceGreenDyKernel {},
+                    false,
+                    true,
+                    trial_space,
+                    test_space,
+                );
+            }
+            BoundaryOperator::AdjointDoubleLayer => {
+                dense::assemble(
+                    output,
+                    &green::LaplaceGreenDxKernel {},
+                    true,
+                    false,
+                    trial_space,
+                    test_space,
+                );
+            }
+            BoundaryOperator::Hypersingular => {
+                dense::laplace_hypersingular_assemble(output, trial_space, test_space);
+            }
+            _ => {
+                panic!("Invalid operator");
+            }
+        },
+        PDEType::Helmholtz(k) => match operator {
+            BoundaryOperator::SingleLayer => {
+                dense::assemble(
+                    output,
+                    &green::HelmholtzGreenKernel { k },
+                    false,
+                    false,
+                    trial_space,
+                    test_space,
+                );
+            }
+            BoundaryOperator::DoubleLayer => {
+                dense::assemble(
+                    output,
+                    &green::HelmholtzGreenDyKernel { k },
+                    false,
+                    true,
+                    trial_space,
+                    test_space,
+                );
+            }
+            BoundaryOperator::AdjointDoubleLayer => {
+                dense::assemble(
+                    output,
+                    &green::HelmholtzGreenDxKernel { k },
+                    true,
+                    false,
+                    trial_space,
+                    test_space,
+                );
+            }
+            BoundaryOperator::Hypersingular => {
+                dense::helmholtz_hypersingular_assemble(output, trial_space, test_space, k);
+            }
+            _ => {
+                panic!("Invalid operator");
+            }
+        },
     };
-    if operator == BoundaryOperator::Hypersingular && pde == PDEType::Laplace {
-        dense::laplace_hypersingular_assemble(output, &params, trial_space, test_space);
-    } else {
-        let kernel = match pde {
-            PDEType::Laplace => match operator {
-                BoundaryOperator::SingleLayer => green::laplace_green,
-                BoundaryOperator::DoubleLayer => green::laplace_green_dy,
-                BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            PDEType::Helmholtz(_) => match operator {
-                BoundaryOperator::SingleLayer => green::helmholtz_green,
-                BoundaryOperator::DoubleLayer => green::helmholtz_green_dy,
-                BoundaryOperator::AdjointDoubleLayer => green::laplace_green_dx,
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        };
-        let needs_trial_normal = match operator {
-            BoundaryOperator::DoubleLayer => true,
-            _ => false,
-        };
-        let needs_test_normal = match operator {
-            BoundaryOperator::AdjointDoubleLayer => true,
-            _ => false,
-        };
-
-        dense::assemble(
-            output,
-            kernel,
-            &params,
-            needs_trial_normal,
-            needs_test_normal,
-            trial_space,
-            test_space,
-        );
-    }
 }
-
 #[cfg(test)]
 mod test {
     use crate::assembly::dense;
     use crate::assembly::*;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green::{helmholtz_green, laplace_green, GreenParameters};
+    use crate::green::{HelmholtzGreenKernel, LaplaceGreenKernel};
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
@@ -117,8 +150,7 @@ mod test {
             Array2D::<f64>::new((space1.dofmap().global_size(), space0.dofmap().global_size()));
         dense::assemble(
             &mut matrix,
-            laplace_green,
-            &GreenParameters::None,
+            &LaplaceGreenKernel {},
             false,
             false,
             &space0,
@@ -171,8 +203,7 @@ mod test {
         ));
         dense::assemble(
             &mut matrix,
-            helmholtz_green,
-            &GreenParameters::Wavenumber(2.5),
+            &HelmholtzGreenKernel { k: 2.5 },
             false,
             false,
             &space0,

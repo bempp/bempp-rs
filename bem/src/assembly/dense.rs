@@ -1,5 +1,6 @@
 use crate::green::{
-    helmholtz_green, helmholtz_green_hypersingular_term, laplace_green, GreenParameters, Scalar,
+    HelmholtzGreenHypersingularTermKernel, HelmholtzGreenKernel, LaplaceGreenKernel, Scalar,
+    SingularKernel,
 };
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
@@ -111,8 +112,7 @@ fn get_quadrature_rule(
 
 pub fn assemble<'a, T: Scalar>(
     output: &mut Array2D<T>,
-    kernel: fn(&[f64], &[f64], &[f64], &[f64], &GreenParameters) -> T,
-    params: &GreenParameters,
+    kernel: &impl SingularKernel,
     needs_trial_normal: bool,
     needs_test_normal: bool,
     trial_space: &impl FunctionSpace<'a>,
@@ -242,12 +242,11 @@ pub fn assemble<'a, T: Scalar>(
                     let mut sum = T::zero();
 
                     for index in 0..rule.npoints {
-                        sum += kernel(
+                        sum += kernel.eval::<T>(
                             unsafe { test_mapped_pts.row_unchecked(index) },
                             unsafe { trial_mapped_pts.row_unchecked(index) },
                             unsafe { test_normals.row_unchecked(index) },
                             unsafe { trial_normals.row_unchecked(index) },
-                            params,
                         ) * T::from_f64(
                             rule.weights[index]
                                 * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
@@ -265,8 +264,7 @@ pub fn assemble<'a, T: Scalar>(
 
 pub fn curl_curl_assemble<'a, T: Scalar>(
     output: &mut Array2D<T>,
-    kernel: fn(&[f64], &[f64], &[f64], &[f64], &GreenParameters) -> T,
-    params: &GreenParameters,
+    kernel: &impl SingularKernel,
     trial_space: &impl FunctionSpace<'a>,
     test_space: &impl FunctionSpace<'a>,
 ) {
@@ -451,12 +449,11 @@ pub fn curl_curl_assemble<'a, T: Scalar>(
                             - (g0.0 * n1.0 + g0.1 * n1.1 + g0.2 * n1.2)
                                 * (n0.0 * g1.0 + n0.1 * g1.1 + n0.2 * g1.2);
 
-                        sum += kernel(
+                        sum += kernel.eval::<T>(
                             unsafe { test_mapped_pts.row_unchecked(index) },
                             unsafe { trial_mapped_pts.row_unchecked(index) },
                             unsafe { test_normals.row_unchecked(index) },
                             unsafe { trial_normals.row_unchecked(index) },
-                            params,
                         ) * T::from_f64(
                             rule.weights[index] * dot_curls * test_jdet[index] * trial_jdet[index],
                         );
@@ -470,24 +467,22 @@ pub fn curl_curl_assemble<'a, T: Scalar>(
 
 pub fn laplace_hypersingular_assemble<'a, T: Scalar>(
     output: &mut Array2D<T>,
-    params: &GreenParameters,
     trial_space: &impl FunctionSpace<'a>,
     test_space: &impl FunctionSpace<'a>,
 ) {
-    curl_curl_assemble(output, laplace_green, params, trial_space, test_space);
+    curl_curl_assemble(output, &LaplaceGreenKernel {}, trial_space, test_space);
 }
 
 pub fn helmholtz_hypersingular_assemble<'a, T: Scalar>(
     output: &mut Array2D<T>,
-    params: &GreenParameters,
     trial_space: &impl FunctionSpace<'a>,
     test_space: &impl FunctionSpace<'a>,
+    k: f64,
 ) {
-    curl_curl_assemble(output, helmholtz_green, params, trial_space, test_space);
+    curl_curl_assemble(output, &HelmholtzGreenKernel { k }, trial_space, test_space);
     assemble(
         output,
-        helmholtz_green_hypersingular_term,
-        params,
+        &HelmholtzGreenHypersingularTermKernel { k },
         true,
         true,
         trial_space,
@@ -499,10 +494,7 @@ pub fn helmholtz_hypersingular_assemble<'a, T: Scalar>(
 mod test {
     use crate::assembly::dense::*;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green::{
-        helmholtz_green, helmholtz_green_dx, helmholtz_green_dy, laplace_green, laplace_green_dx,
-        laplace_green_dy, GreenParameters,
-    };
+    use crate::green;
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
@@ -526,8 +518,7 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            laplace_green,
-            &GreenParameters::None,
+            &green::LaplaceGreenKernel {},
             false,
             false,
             &space,
@@ -641,8 +632,7 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            laplace_green_dy,
-            &GreenParameters::None,
+            &green::LaplaceGreenDyKernel {},
             true,
             false,
             &space,
@@ -756,8 +746,7 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            laplace_green_dx,
-            &GreenParameters::None,
+            &green::LaplaceGreenDxKernel {},
             false,
             true,
             &space,
@@ -869,7 +858,7 @@ mod test {
         let ndofs = space.dofmap().global_size();
 
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
-        laplace_hypersingular_assemble(&mut matrix, &GreenParameters::None, &space, &space);
+        laplace_hypersingular_assemble(&mut matrix, &space, &space);
 
         for i in 0..ndofs {
             for j in 0..ndofs {
@@ -893,7 +882,7 @@ mod test {
 
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
 
-        laplace_hypersingular_assemble(&mut matrix, &GreenParameters::None, &space, &space);
+        laplace_hypersingular_assemble(&mut matrix, &space, &space);
 
         // Compare to result from bempp-cl
         let from_cl = vec![
@@ -976,8 +965,7 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            helmholtz_green,
-            &GreenParameters::Wavenumber(3.0),
+            &green::HelmholtzGreenKernel { k: 3.0 },
             false,
             false,
             &space,
@@ -1090,8 +1078,7 @@ mod test {
         let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            helmholtz_green,
-            &GreenParameters::Wavenumber(3.0),
+            &green::HelmholtzGreenKernel { k: 3.0 },
             false,
             false,
             &space,
@@ -1214,8 +1201,7 @@ mod test {
         let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            helmholtz_green_dy,
-            &GreenParameters::Wavenumber(3.0),
+            &green::HelmholtzGreenDyKernel { k: 3.0 },
             true,
             false,
             &space,
@@ -1338,8 +1324,7 @@ mod test {
         let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            helmholtz_green_dx,
-            &GreenParameters::Wavenumber(3.0),
+            &green::HelmholtzGreenDxKernel { k: 3.0 },
             false,
             true,
             &space,
@@ -1461,12 +1446,7 @@ mod test {
 
         let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
 
-        helmholtz_hypersingular_assemble(
-            &mut matrix,
-            &GreenParameters::Wavenumber(3.0),
-            &space,
-            &space,
-        );
+        helmholtz_hypersingular_assemble(&mut matrix, &space, &space, 3.0);
 
         // Compare to result from bempp-cl
         let from_cl = vec![

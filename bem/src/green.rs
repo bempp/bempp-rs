@@ -1,11 +1,6 @@
 use num::complex::Complex;
 use num::Num;
 
-pub enum GreenParameters {
-    None,
-    Wavenumber(f64),
-}
-
 pub trait Scalar: Num + std::ops::AddAssign {
     /// Get 1 over 4*pi as this scalar type
     fn inv_4pi() -> Self;
@@ -102,101 +97,79 @@ impl Scalar for Complex<f64> {
     }
 }
 
-pub fn laplace_green<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    _nx: &[f64],
-    _ny: &[f64],
-    _params: &GreenParameters,
-) -> T {
-    T::inv_4pi() / T::dist(x, y)
+pub trait SingularKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], nx: &[f64], ny: &[f64]) -> T;
 }
 
-pub fn laplace_green_dx<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    nx: &[f64],
-    _ny: &[f64],
-    _params: &GreenParameters,
-) -> T {
-    T::inv_4pi() * T::subdot(y, x, nx) / T::dist_cubed(x, y)
-}
-
-pub fn laplace_green_dy<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    _nx: &[f64],
-    ny: &[f64],
-    _params: &GreenParameters,
-) -> T {
-    T::inv_4pi() * T::subdot(x, y, ny) / T::dist_cubed(x, y)
-}
-
-pub fn helmholtz_green<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    _nx: &[f64],
-    _ny: &[f64],
-    params: &GreenParameters,
-) -> T {
-    if let GreenParameters::Wavenumber(k) = params {
-        let dist = f64::dist(x, y);
-        T::inv_4pi() * T::eix(k * dist) / T::from_f64(dist)
-    } else {
-        panic!("Helmholtz Green's function needs a wavenumber");
+pub struct LaplaceGreenKernel {}
+impl SingularKernel for LaplaceGreenKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> T {
+        T::inv_4pi() / T::dist(x, y)
     }
 }
 
-pub fn helmholtz_green_dx<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    nx: &[f64],
-    _ny: &[f64],
-    params: &GreenParameters,
-) -> T {
-    if let GreenParameters::Wavenumber(k) = params {
+pub struct LaplaceGreenDxKernel {}
+impl SingularKernel for LaplaceGreenDxKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> T {
+        T::inv_4pi() * T::subdot(y, x, nx) / T::dist_cubed(x, y)
+    }
+}
+
+pub struct LaplaceGreenDyKernel {}
+impl SingularKernel for LaplaceGreenDyKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], _nx: &[f64], ny: &[f64]) -> T {
+        T::inv_4pi() * T::subdot(x, y, ny) / T::dist_cubed(x, y)
+    }
+}
+
+pub struct HelmholtzGreenKernel {
+    pub k: f64,
+}
+impl SingularKernel for HelmholtzGreenKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], _nx: &[f64], _ny: &[f64]) -> T {
+        let dist = f64::dist(x, y);
+        T::inv_4pi() * T::eix(self.k * dist) / T::from_f64(dist)
+    }
+}
+
+pub struct HelmholtzGreenDxKernel {
+    pub k: f64,
+}
+impl SingularKernel for HelmholtzGreenDxKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], nx: &[f64], _ny: &[f64]) -> T {
         let sq = f64::dist_squared(x, y);
         let dist = sq.sqrt();
         T::inv_4pi()
             * T::subdot(x, y, nx)
-            * (T::from_f64(*k) * T::ieix(k * dist) - T::eix(k * dist) / T::from_f64(dist))
+            * (T::from_f64(self.k) * T::ieix(self.k * dist)
+                - T::eix(self.k * dist) / T::from_f64(dist))
             / T::from_f64(sq)
-    } else {
-        panic!("Helmholtz Green's function needs a wavenumber");
     }
 }
 
-pub fn helmholtz_green_dy<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    _nx: &[f64],
-    ny: &[f64],
-    params: &GreenParameters,
-) -> T {
-    if let GreenParameters::Wavenumber(k) = params {
+pub struct HelmholtzGreenDyKernel {
+    pub k: f64,
+}
+impl SingularKernel for HelmholtzGreenDyKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], _nx: &[f64], ny: &[f64]) -> T {
         let sq = f64::dist_squared(x, y);
         let dist = sq.sqrt();
         T::inv_4pi()
             * T::subdot(y, x, ny)
-            * (T::from_f64(*k) * T::ieix(k * dist) - T::eix(k * dist) / T::from_f64(dist))
+            * (T::from_f64(self.k) * T::ieix(self.k * dist)
+                - T::eix(self.k * dist) / T::from_f64(dist))
             / T::from_f64(sq)
-    } else {
-        panic!("Helmholtz Green's function needs a wavenumber");
     }
 }
 
-pub fn helmholtz_green_hypersingular_term<T: Scalar>(
-    x: &[f64],
-    y: &[f64],
-    nx: &[f64],
-    ny: &[f64],
-    params: &GreenParameters,
-) -> T {
-    if let GreenParameters::Wavenumber(k) = params {
+pub struct HelmholtzGreenHypersingularTermKernel {
+    pub k: f64,
+}
+impl SingularKernel for HelmholtzGreenHypersingularTermKernel {
+    fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], nx: &[f64], ny: &[f64]) -> T {
         let dist = f64::dist(x, y);
-        T::from_f64(*k) * T::from_f64(*k) * T::neg_inv_4pi() * T::eix(k * dist) / T::from_f64(dist)
+        T::from_f64(self.k) * T::from_f64(self.k) * T::neg_inv_4pi() * T::eix(self.k * dist)
+            / T::from_f64(dist)
             * T::dot(nx, ny)
-    } else {
-        panic!("Helmholtz Green's function needs a wavenumber");
     }
 }
