@@ -1,6 +1,6 @@
 //! Get rules on simplices.
 
-pub use bempp_element::cell::ReferenceCellType;
+pub use bempp_traits::cell::ReferenceCellType;
 
 use crate::simplex_rule_definitions::SIMPLEX_RULE_DEFINITIONS;
 use crate::types::NumericalQuadratureDefinition;

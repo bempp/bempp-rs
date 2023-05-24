@@ -1,6 +1,6 @@
 //! Definition of simplex rules.
 
-use bempp_element::cell::ReferenceCellType;
+use bempp_traits::cell::ReferenceCellType;
 use std::collections::HashMap;
 
 lazy_static! {
