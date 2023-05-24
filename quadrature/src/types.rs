@@ -1,6 +1,6 @@
 //! Type definitions.
 
-pub use bempp_element::cell::*;
+pub use bempp_traits::cell::ReferenceCellType;
 
 #[derive(Debug)]
 pub enum QuadratureError {
