@@ -1,4 +1,5 @@
 //! Orthonormal polynomials
+
 use bempp_traits::arrays::{Array2DAccess, Array3DAccess};
 use bempp_traits::cell::ReferenceCellType;
 
@@ -16,6 +17,11 @@ fn tabulate_legendre_polynomials_interval<'a>(
 
     for i in 0..data.shape().2 {
         *data.get_mut(0, 0, i).unwrap() = 1.0;
+    }
+    for i in 1..data.shape().0 {
+        for j in 0..data.shape().2 {
+            *data.get_mut(i, 0, j).unwrap() = 0.0;
+        }
     }
 
     if degree == 0 {
@@ -58,6 +64,15 @@ fn tabulate_legendre_polynomials_interval<'a>(
         }
     }
 }
+
+fn tri_index(i: usize, j: usize) -> usize {
+    i * (i + 1) / 2 + j
+}
+
+fn quad_index(i: usize, j: usize, n: usize) -> usize {
+    (n + 1) * i + j
+}
+
 /// Tabulate orthonormal polynomials on a quadrilateral
 fn tabulate_legendre_polynomials_quadrilateral<'a>(
     points: &impl Array2DAccess<'a, f64>,
@@ -65,13 +80,183 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
     derivatives: usize,
     data: &mut impl Array3DAccess<f64>,
 ) {
+    assert_eq!(data.shape().0, (derivatives + 1) * (derivatives + 2) / 2);
+    assert_eq!(data.shape().1, (degree + 1) * (degree + 1));
+    assert_eq!(data.shape().2, points.shape().0);
+    assert_eq!(points.shape().1, 2);
+
+    for i in 0..data.shape().2 {
+        *data
+            .get_mut(tri_index(0, 0), quad_index(0, 0, degree), i)
+            .unwrap() = 1.0;
+    }
+    for i0 in 0..derivatives + 1 {
+        for i1 in 0..derivatives + 1 - i0 {
+            if i0 + i1 > 0 {
+                for j in 0..data.shape().2 {
+                    *data
+                        .get_mut(tri_index(i0, i1), quad_index(0, 0, degree), j)
+                        .unwrap() = 0.0;
+                }
+            }
+        }
+    }
+
+    if degree == 0 {
+        return;
+    }
+
+    for i in 0..data.shape().2 {
+        *data
+            .get_mut(tri_index(0, 0), quad_index(0, 1, degree), i)
+            .unwrap() = *points.get(i, 1).unwrap() * 2.0 - 1.0;
+    }
+    for py in 2..degree + 1 {
+        let a = 1.0 - 1.0 / py as f64;
+        for i in 0..data.shape().2 {
+            *data
+                .get_mut(tri_index(0, 0), quad_index(0, py, degree), i)
+                .unwrap() = (*points.get(i, 1).unwrap() * 2.0 - 1.0)
+                * *data
+                    .get(tri_index(0, 0), quad_index(0, py - 1, degree), i)
+                    .unwrap()
+                * (a + 1.0)
+                - *data
+                    .get(tri_index(0, 0), quad_index(0, py - 2, degree), i)
+                    .unwrap()
+                    * a;
+        }
+    }
+
+    /*
+
+      { // scope
+      }
+      for (std::size_t ky = 1; ky <= nderiv; ++ky)
+      {
+        // Get reference to this derivative
+        auto result = stdex::submdspan(P, idx(0, ky), stdex::full_extent,
+                                       stdex::full_extent);
+        auto result0 = stdex::submdspan(P, idx(0, ky - 1), stdex::full_extent,
+                                        stdex::full_extent);
+        for (std::size_t i = 0; i < result.extent(1); ++i)
+        {
+          result(quad_idx(0, 1), i)
+              = (x1[i] * 2.0 - 1.0) * result(quad_idx(0, 0), i)
+                + 2 * ky * result0(quad_idx(0, 0), i);
+        }
+
+        for (std::size_t py = 2; py <= n; ++py)
+        {
+          const T a = 1.0 - 1.0 / static_cast<T>(py);
+          for (std::size_t i = 0; i < result.extent(1); ++i)
+          {
+            result(quad_idx(0, py), i)
+                = (x1[i] * 2.0 - 1.0) * result(quad_idx(0, py - 1), i) * (a + 1.0)
+                  + 2 * ky * result0(quad_idx(0, py - 1), i) * (a + 1.0)
+                  - result(quad_idx(0, py - 2), i) * a;
+          }
+        }
+      }
+
+      // Take tensor product with another interval
+      for (std::size_t ky = 0; ky <= nderiv; ++ky)
+      {
+        auto result = stdex::submdspan(P, idx(0, ky), stdex::full_extent,
+                                       stdex::full_extent);
+        for (std::size_t py = 0; py <= n; ++py)
+        {
+          for (std::size_t i = 0; i < result.extent(1); ++i)
+          {
+            result(quad_idx(1, py), i)
+                = (x0[i] * 2.0 - 1.0) * result(quad_idx(0, py), i);
+          }
+        }
+      }
+
+      for (std::size_t px = 2; px <= n; ++px)
+      {
+        const T a = 1.0 - 1.0 / static_cast<T>(px);
+        for (std::size_t ky = 0; ky <= nderiv; ++ky)
+        {
+          auto result = stdex::submdspan(P, idx(0, ky), stdex::full_extent,
+                                         stdex::full_extent);
+          for (std::size_t py = 0; py <= n; ++py)
+          {
+            for (std::size_t i = 0; i < result.extent(1); ++i)
+            {
+              result(quad_idx(px, py), i) = (x0[i] * 2.0 - 1.0)
+                                                * result(quad_idx(px - 1, py), i)
+                                                * (a + 1.0)
+                                            - result(quad_idx(px - 2, py), i) * a;
+            }
+          }
+        }
+      }
+
+      for (std::size_t kx = 1; kx <= nderiv; ++kx)
+      {
+        for (std::size_t ky = 0; ky <= nderiv - kx; ++ky)
+        {
+          auto result = stdex::submdspan(P, idx(kx, ky), stdex::full_extent,
+                                         stdex::full_extent);
+          auto result0 = stdex::submdspan(P, idx(kx - 1, ky), stdex::full_extent,
+                                          stdex::full_extent);
+          for (std::size_t py = 0; py <= n; ++py)
+          {
+            for (std::size_t i = 0; i < result.extent(1); ++i)
+            {
+              result(quad_idx(1, py), i)
+                  = (x0[i] * 2.0 - 1.0) * result(quad_idx(0, py), i)
+                    + 2 * kx * result0(quad_idx(0, py), i);
+            }
+          }
+        }
+
+        for (std::size_t px = 2; px <= n; ++px)
+        {
+          const T a = 1.0 - 1.0 / static_cast<T>(px);
+          for (std::size_t ky = 0; ky <= nderiv - kx; ++ky)
+          {
+            auto result = stdex::submdspan(P, idx(kx, ky), stdex::full_extent,
+                                           stdex::full_extent);
+            auto result0 = stdex::submdspan(P, idx(kx - 1, ky), stdex::full_extent,
+                                            stdex::full_extent);
+            for (std::size_t py = 0; py <= n; ++py)
+            {
+              for (std::size_t i = 0; i < result.extent(1); ++i)
+              {
+                result(quad_idx(px, py), i)
+                    = (x0[i] * 2.0 - 1.0) * result(quad_idx(px - 1, py), i)
+                          * (a + 1.0)
+                      + 2 * kx * result0(quad_idx(px - 1, py), i) * (a + 1.0)
+                      - result(quad_idx(px - 2, py), i) * a;
+              }
+            }
+          }
+        }
+      }
+
+    */
+
+    // Normalise
+    for px in 0..degree + 1 {
+        for py in 0..degree + 1 {
+            for i in 0..data.shape().0 {
+                for j in 0..data.shape().2 {
+                    *data.get_mut(i, quad_index(px, py, degree), j).unwrap() *=
+                        f64::sqrt((2.0 * px as f64 + 1.0) * (2.0 * py as f64 + 1.0))
+                }
+            }
+        }
+    }
 }
 /// Tabulate orthonormal polynomials on a triangle
 fn tabulate_legendre_polynomials_triangle<'a>(
-    points: &impl Array2DAccess<'a, f64>,
-    degree: usize,
-    derivatives: usize,
-    data: &mut impl Array3DAccess<f64>,
+    _points: &impl Array2DAccess<'a, f64>,
+    _degree: usize,
+    _derivatives: usize,
+    _data: &mut impl Array3DAccess<f64>,
 ) {
 }
 
@@ -246,6 +431,39 @@ mod test {
                     (data.get(0, i, 2 * k + 1).unwrap() - data.get(0, i, 2 * k).unwrap()) / epsilon,
                     epsilon = 1e-5
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_legendre_quadrilataral() {
+        let degree = 4;
+
+        let rule = simplex_rule(ReferenceCellType::Quadrilateral, 28).unwrap();
+        let points = Array2D::from_data(rule.points, (rule.npoints, 2));
+
+        let mut data = Array3D::<f64>::new((1, (degree + 1) * (degree + 1), rule.npoints));
+        tabulate_legendre_polynomials(
+            ReferenceCellType::Quadrilateral,
+            &points,
+            degree,
+            0,
+            &mut data,
+        );
+
+        for i in 0..data.shape().1 {
+            for j in 0..data.shape().1 {
+                let mut product = 0.0;
+                for k in 0..rule.npoints {
+                    product +=
+                        data.get(0, i, k).unwrap() * data.get(0, j, k).unwrap() * rule.weights[k];
+                }
+                println!("{i} {j} {product}");
+                if i == j {
+                    assert_relative_eq!(product, 1.0, epsilon = 1e-12);
+                } else {
+                    assert_relative_eq!(product, 0.0, epsilon = 1e-12);
+                }
             }
         }
     }
