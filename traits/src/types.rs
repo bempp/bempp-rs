@@ -2,8 +2,8 @@
 
 // Definition of scalar types.
 // For now we simply derive from the `caucy::Scalar` type.
-pub trait Scalar {}
-impl<T: cauchy::Scalar> Scalar for T {}
+pub use cauchy::Scalar;
+pub use cauchy::{c32, c64};
 
 // Declare if entity is local, a ghost, or remote.
 pub enum Locality {
@@ -21,14 +21,3 @@ pub enum Error {
 
 // Result Type
 pub type Result<T> = std::result::Result<T, Error>;
-
-// Evaluation Mode.
-//
-// - `Value`: Declares that only values required.
-// - `Deriv`: Declare that only derivative required.
-// - `ValueDeriv` Both values and derivatives required.
-pub enum EvalType {
-    Value,
-    Deriv,
-    ValueDeriv,
-}
