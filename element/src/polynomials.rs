@@ -49,7 +49,7 @@ fn tabulate_legendre_polynomials_interval<'a>(
 }
 
 fn tri_index(i: usize, j: usize) -> usize {
-    (j + 1) * (j + 2) / 2 + i - 1
+    (i + j + 1) * (i + j) / 2 + j
 }
 
 fn quad_index(i: usize, j: usize, n: usize) -> usize {
