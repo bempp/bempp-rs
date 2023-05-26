@@ -209,8 +209,9 @@ fn tabulate_legendre_polynomials_triangle<'a>(
     assert_eq!(points.shape().1, 2);
 
     for i in 0..data.shape().2 {
-        *data.get_mut(tri_index(0, 0), tri_index(0, 0), i).unwrap() = 1.0;
+        *data.get_mut(tri_index(0, 0), tri_index(0, 0), i).unwrap() = f64::sqrt(2.0);
     }
+
     for k in 1..data.shape().0 {
         for i in 0..data.shape().2 {
             *data.get_mut(k, tri_index(0, 0), i).unwrap() = 0.0;
@@ -220,12 +221,13 @@ fn tabulate_legendre_polynomials_triangle<'a>(
     for kx in 0..derivatives + 1 {
         for ky in 0..derivatives + 1 - kx {
             for p in 1..degree + 1 {
-                let a = (2.0 * p as f64 - 1.0) / p as f64;
+                let a = 2.0 - 1.0 / p as f64;
+                let scale1 = f64::sqrt((p as f64 + 0.5) * (p as f64 + 1.0) / ((p as f64 - 0.5) * p as f64));
                 for i in 0..data.shape().2 {
                     *data.get_mut(tri_index(kx, ky), tri_index(0, p), i).unwrap() =
                         (*points.get(i, 0).unwrap() * 2.0 + *points.get(i, 1).unwrap() - 1.0)
                             * *data.get(tri_index(kx, ky), tri_index(0, p - 1), i).unwrap()
-                            * a;
+                            * a * scale1;
                 }
                 if kx > 0 {
                     for i in 0..data.shape().2 {
@@ -234,7 +236,7 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                             * a
                             * *data
                                 .get(tri_index(kx - 1, ky), tri_index(0, p - 1), i)
-                                .unwrap();
+                                .unwrap() * scale1;
                     }
                 }
                 if ky > 0 {
@@ -243,16 +245,18 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                             * a
                             * *data
                                 .get(tri_index(kx, ky - 1), tri_index(0, p - 1), i)
-                                .unwrap();
+                                .unwrap() * scale1;
                     }
                 }
                 if p > 1 {
+                    let scale2 = f64::sqrt((p as f64 + 0.5) * (p as f64 + 1.0)) / f64::sqrt((p as f64 - 1.5) * (p as f64 - 1.0));
+
                     for i in 0..data.shape().2 {
                         let b = 1.0 - *points.get(i, 1).unwrap();
                         *data.get_mut(tri_index(kx, ky), tri_index(0, p), i).unwrap() -= b
                             * b
                             * *data.get(tri_index(kx, ky), tri_index(0, p - 2), i).unwrap()
-                            * (a - 1.0)
+                            * (a - 1.0) * scale2;
                     }
                     if ky > 0 {
                         for i in 0..data.shape().2 {
@@ -261,7 +265,7 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                                 * (*points.get(i, 1).unwrap() - 1.0)
                                 * *data
                                     .get(tri_index(kx, ky - 1), tri_index(0, p - 2), i)
-                                    .unwrap()
+                                    .unwrap() * scale2
                                 * (a - 1.0);
                         }
                     }
@@ -272,16 +276,17 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                                 * (ky as f64 - 1.0)
                                 * *data
                                     .get(tri_index(kx, ky - 2), tri_index(0, p - 2), i)
-                                    .unwrap()
+                                    .unwrap() * scale2
                                 * (a - 1.0);
                         }
                     }
                 }
             }
             for p in 0..degree {
+                let scale3 = f64::sqrt((p as f64 + 2.0) / (p as f64 + 1.0));
                 for i in 0..data.shape().2 {
                     *data.get_mut(tri_index(kx, ky), tri_index(1, p), i).unwrap() =
-                        *data.get(tri_index(kx, ky), tri_index(0, p), i).unwrap()
+                        *data.get(tri_index(kx, ky), tri_index(0, p), i).unwrap() * scale3
                             * ((*points.get(i, 1).unwrap() * 2.0 - 1.0) * (1.5 + p as f64)
                                 + 0.5
                                 + p as f64);
@@ -291,10 +296,12 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                         *data.get_mut(tri_index(kx, ky), tri_index(1, p), i).unwrap() += 2.0
                             * ky as f64
                             * (1.5 + p as f64)
-                            * *data.get(tri_index(kx, ky - 1), tri_index(0, p), i).unwrap();
+                            * *data.get(tri_index(kx, ky - 1), tri_index(0, p), i).unwrap() * scale3;
                     }
                 }
                 for q in 1..degree - p {
+                    let scale4 = f64::sqrt((p as f64 + q as f64 + 2.0) / (p as f64 + q as f64 + 1.0));
+                    let scale5 = f64::sqrt((p as f64 + q as f64 + 2.0) / (p as f64 + q as f64));
                     let a1 = ((p + q + 1) * (2 * p + 2 * q + 3)) as f64
                         / ((q + 1) * (2 * p + q + 2)) as f64;
                     let a2 = ((2 * p + 1) * (2 * p + 1) * (p + q + 1)) as f64
@@ -306,11 +313,11 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                         *data
                             .get_mut(tri_index(kx, ky), tri_index(q + 1, p), i)
                             .unwrap() =
-                            *data.get_mut(tri_index(kx, ky), tri_index(q, p), i).unwrap()
+                            *data.get_mut(tri_index(kx, ky), tri_index(q, p), i).unwrap() * scale4
                                 * ((*points.get(i, 1).unwrap() * 2.0 - 1.0) * a1 + a2)
                                 - *data
                                     .get_mut(tri_index(kx, ky), tri_index(q - 1, p), i)
-                                    .unwrap()
+                                    .unwrap() * scale5
                                     * a3;
                     }
                     if ky > 0 {
@@ -322,20 +329,9 @@ fn tabulate_legendre_polynomials_triangle<'a>(
                                 * a1
                                 * *data
                                     .get_mut(tri_index(kx, ky - 1), tri_index(q, p), i)
-                                    .unwrap();
+                                    .unwrap() * scale4;
                         }
                     }
-                }
-            }
-        }
-    }
-
-    for px in 0..degree + 1 {
-        for py in 0..degree + 1 - px {
-            let scale = 2.0 * f64::sqrt((py as f64 + 0.5) * (py as f64 + px as f64 + 1.0));
-            for k in 0..data.shape().0 {
-                for i in 0..data.shape().2 {
-                    *data.get_mut(k, tri_index(px, py), i).unwrap() *= scale;
                 }
             }
         }
