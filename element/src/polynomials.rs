@@ -352,6 +352,30 @@ fn tabulate_legendre_polynomials_triangle<'a>(
     }
 }
 
+pub fn legendre_shape<'a>(
+    cell_type: ReferenceCellType,
+    points: &impl Array2DAccess<'a, f64>,
+    degree: usize,
+    derivatives: usize,
+) -> (usize, usize, usize) {
+    match cell_type {
+        ReferenceCellType::Interval => (derivatives + 1, degree + 1, points.shape().0),
+        ReferenceCellType::Triangle => (
+            (derivatives + 1) * (derivatives + 2) / 2,
+            (degree + 1) * (degree + 2) / 2,
+            points.shape().0,
+        ),
+        ReferenceCellType::Quadrilateral => (
+            (derivatives + 1) * (derivatives + 2) / 2,
+            (degree + 1) * (degree + 1),
+            points.shape().0,
+        ),
+        _ => {
+            panic!("Unsupported cell type");
+        }
+    }
+}
+
 /// Tabulate orthonormal polynomials
 pub fn tabulate_legendre_polynomials<'a>(
     cell_type: ReferenceCellType,
@@ -390,7 +414,12 @@ mod test {
         let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
         let points = Array2D::from_data(rule.points, (rule.npoints, 1));
 
-        let mut data = Array3D::<f64>::new((1, degree + 1, rule.npoints));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Interval,
+            &points,
+            degree,
+            0,
+        ));
         tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 0, &mut data);
 
         for i in 0..degree + 1 {
@@ -416,7 +445,12 @@ mod test {
         let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
         let points = Array2D::from_data(rule.points, (rule.npoints, 2));
 
-        let mut data = Array3D::<f64>::new((1, (degree + 1) * (degree + 2) / 2, rule.npoints));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Triangle,
+            &points,
+            degree,
+            0,
+        ));
         tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 0, &mut data);
 
         for i in 0..data.shape().1 {
@@ -452,7 +486,12 @@ mod test {
         let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
         let points = Array2D::from_data(rule.points, (rule.npoints, 2));
 
-        let mut data = Array3D::<f64>::new((1, (degree + 1) * (degree + 1), rule.npoints));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Quadrilateral,
+            &points,
+            degree,
+            0,
+        ));
         tabulate_legendre_polynomials(
             ReferenceCellType::Quadrilateral,
             &points,
@@ -489,7 +528,12 @@ mod test {
         }
         let points = Array2D::from_data(p, (20, 1));
 
-        let mut data = Array3D::<f64>::new((2, degree + 1, points.shape().0));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Interval,
+            &points,
+            degree,
+            1,
+        ));
         tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
@@ -524,7 +568,12 @@ mod test {
         }
         let points = Array2D::from_data(p, (165, 2));
 
-        let mut data = Array3D::<f64>::new((3, (degree + 1) * (degree + 2) / 2, points.shape().0));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Triangle,
+            &points,
+            degree,
+            1,
+        ));
         tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
@@ -562,7 +611,12 @@ mod test {
         }
         let points = Array2D::from_data(p, (300, 2));
 
-        let mut data = Array3D::<f64>::new((3, (degree + 1) * (degree + 1), points.shape().0));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Quadrilateral,
+            &points,
+            degree,
+            1,
+        ));
         tabulate_legendre_polynomials(
             ReferenceCellType::Quadrilateral,
             &points,
@@ -597,7 +651,12 @@ mod test {
         }
         let points = Array2D::from_data(p, (20, 1));
 
-        let mut data = Array3D::<f64>::new((4, degree + 1, points.shape().0));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Interval,
+            &points,
+            degree,
+            3,
+        ));
         tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 3, &mut data);
 
         for k in 0..points.shape().0 {
@@ -678,7 +737,12 @@ mod test {
         }
         let points = Array2D::from_data(p, (121, 2));
 
-        let mut data = Array3D::<f64>::new((3, (degree + 1) * (degree + 1), points.shape().0));
+        let mut data = Array3D::<f64>::new(legendre_shape(
+            ReferenceCellType::Quadrilateral,
+            &points,
+            degree,
+            1,
+        ));
         tabulate_legendre_polynomials(
             ReferenceCellType::Quadrilateral,
             &points,
