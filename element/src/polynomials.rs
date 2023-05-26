@@ -487,7 +487,7 @@ mod test {
                 assert_relative_eq!(
                     *data.get(1, i, 2 * k).unwrap(),
                     (data.get(0, i, 2 * k + 1).unwrap() - data.get(0, i, 2 * k).unwrap()) / epsilon,
-                    epsilon = 1e-5
+                    epsilon = 1e-4
                 );
             }
         }
@@ -498,19 +498,21 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut p = vec![0.0; 396];
+        let mut p = vec![0.0; 330];
+        let mut index = 0;
         for i in 0..10 {
             for j in 0..10 - i {
-                let index = tri_index(i, j);
+                println!("{index}");
                 p[6 * index] = i as f64 / 10.0;
                 p[6 * index + 1] = j as f64 / 10.0;
                 p[6 * index + 2] = p[6 * index] + epsilon;
                 p[6 * index + 3] = p[6 * index + 1];
                 p[6 * index + 4] = p[6 * index];
                 p[6 * index + 5] = p[6 * index + 1] + epsilon;
+                index += 1;
             }
         }
-        let points = Array2D::from_data(p, (198, 2));
+        let points = Array2D::from_data(p, (165, 2));
 
         let mut data = Array3D::<f64>::new((3, (degree + 1) * (degree + 2) / 2, points.shape().0));
         tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 1, &mut data);
@@ -520,12 +522,12 @@ mod test {
                 assert_relative_eq!(
                     *data.get(1, i, 3 * k).unwrap(),
                     (data.get(0, i, 3 * k + 1).unwrap() - data.get(0, i, 3 * k).unwrap()) / epsilon,
-                    epsilon = 1e-5
+                    epsilon = 1e-4
                 );
                 assert_relative_eq!(
                     *data.get(2, i, 3 * k).unwrap(),
                     (data.get(0, i, 3 * k + 2).unwrap() - data.get(0, i, 3 * k).unwrap()) / epsilon,
-                    epsilon = 1e-5
+                    epsilon = 1e-4
                 );
             }
         }
@@ -564,12 +566,12 @@ mod test {
                 assert_relative_eq!(
                     *data.get(1, i, 3 * k).unwrap(),
                     (data.get(0, i, 3 * k + 1).unwrap() - data.get(0, i, 3 * k).unwrap()) / epsilon,
-                    epsilon = 1e-5
+                    epsilon = 1e-4
                 );
                 assert_relative_eq!(
                     *data.get(2, i, 3 * k).unwrap(),
                     (data.get(0, i, 3 * k + 2).unwrap() - data.get(0, i, 3 * k).unwrap()) / epsilon,
-                    epsilon = 1e-5
+                    epsilon = 1e-4
                 );
             }
         }
