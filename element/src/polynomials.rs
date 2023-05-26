@@ -26,27 +26,17 @@ fn tabulate_legendre_polynomials_interval<'a>(
 
     if degree > 0 {
         let root3 = f64::sqrt(3.0);
-        for i in 0..data.shape().2 {
-            *data.get_mut(0, 1, i).unwrap() = (points.get(i, 0).unwrap() * 2.0 - 1.0) * root3;
-        }
 
-        for p in 2..degree + 1 {
-            let a = 1.0 - 1.0 / p as f64;
-            let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
-            let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
+        for k in 0..derivatives + 1 {
             for i in 0..data.shape().2 {
-                *data.get_mut(0, p, i).unwrap() =
-                    (points.get(i, 0).unwrap() * 2.0 - 1.0) * data.get(0, p - 1, i).unwrap() * b
-                        - data.get(0, p - 2, i).unwrap() * c;
+                *data.get_mut(k, 1, i).unwrap() =
+                    (points.get(i, 0).unwrap() * 2.0 - 1.0) * data.get(k, 0, i).unwrap() * root3;
             }
-        }
-
-        for k in 1..derivatives + 1 {
-            for i in 0..data.shape().2 {
-                *data.get_mut(k, 1, i).unwrap() = ((points.get(i, 0).unwrap() * 2.0 - 1.0)
-                    * data.get(k, 0, i).unwrap()
-                    + 2.0 * k as f64 * data.get(k - 1, 0, i).unwrap())
-                    * root3;
+            if k > 0 {
+                for i in 0..data.shape().2 {
+                    *data.get_mut(k, 1, i).unwrap() +=
+                        2.0 * k as f64 * data.get(k - 1, 0, i).unwrap() * root3;
+                }
             }
             for p in 2..degree + 1 {
                 let a = 1.0 - 1.0 / p as f64;
@@ -56,8 +46,13 @@ fn tabulate_legendre_polynomials_interval<'a>(
                     *data.get_mut(k, p, i).unwrap() = (points.get(i, 0).unwrap() * 2.0 - 1.0)
                         * data.get(k, p - 1, i).unwrap()
                         * b
-                        + 2.0 * k as f64 * data.get(k - 1, p - 1, i).unwrap() * b
                         - data.get(k, p - 2, i).unwrap() * c;
+                }
+                if k > 0 {
+                    for i in 0..data.shape().2 {
+                        *data.get_mut(k, p, i).unwrap() +=
+                            2.0 * k as f64 * data.get(k - 1, p - 1, i).unwrap() * b;
+                    }
                 }
             }
         }
@@ -107,45 +102,28 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
 
     if degree > 0 {
         let root3 = f64::sqrt(3.0);
-        for i in 0..data.shape().2 {
-            *data
-                .get_mut(tri_index(0, 0), quad_index(1, 0, degree), i)
-                .unwrap() = (points.get(i, 0).unwrap() * 2.0 - 1.0) * root3;
-        }
 
-        for p in 2..degree + 1 {
-            let a = 1.0 - 1.0 / p as f64;
-            let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
-            let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
-            for i in 0..data.shape().2 {
-                *data
-                    .get_mut(tri_index(0, 0), quad_index(p, 0, degree), i)
-                    .unwrap() = (points.get(i, 0).unwrap() * 2.0 - 1.0)
-                    * data
-                        .get(tri_index(0, 0), quad_index(p - 1, 0, degree), i)
-                        .unwrap()
-                    * b
-                    - data
-                        .get(tri_index(0, 0), quad_index(p - 2, 0, degree), i)
-                        .unwrap()
-                        * c;
-            }
-        }
-
-        for k in 1..derivatives + 1 {
+        for k in 0..derivatives + 1 {
             for i in 0..data.shape().2 {
                 *data
                     .get_mut(tri_index(k, 0), quad_index(1, 0, degree), i)
-                    .unwrap() = ((points.get(i, 0).unwrap() * 2.0 - 1.0)
+                    .unwrap() = (points.get(i, 0).unwrap() * 2.0 - 1.0)
                     * data
                         .get(tri_index(k, 0), quad_index(0, 0, degree), i)
                         .unwrap()
-                    + 2.0
+                    * root3;
+            }
+            if k > 0 {
+                for i in 0..data.shape().2 {
+                    *data
+                        .get_mut(tri_index(k, 0), quad_index(1, 0, degree), i)
+                        .unwrap() += 2.0
                         * k as f64
                         * data
                             .get(tri_index(k - 1, 0), quad_index(0, 0, degree), i)
-                            .unwrap())
-                    * root3;
+                            .unwrap()
+                        * root3;
+                }
             }
             for p in 2..degree + 1 {
                 let a = 1.0 - 1.0 / p as f64;
@@ -159,16 +137,22 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
                             .get(tri_index(k, 0), quad_index(p - 1, 0, degree), i)
                             .unwrap()
                         * b
-                        + 2.0
-                            * k as f64
-                            * data
-                                .get(tri_index(k - 1, 0), quad_index(p - 1, 0, degree), i)
-                                .unwrap()
-                            * b
                         - data
                             .get(tri_index(k, 0), quad_index(p - 2, 0, degree), i)
                             .unwrap()
                             * c;
+                }
+                if k > 0 {
+                    for i in 0..data.shape().2 {
+                        *data
+                            .get_mut(tri_index(k, 0), quad_index(p, 0, degree), i)
+                            .unwrap() += 2.0
+                            * k as f64
+                            * data
+                                .get(tri_index(k - 1, 0), quad_index(p - 1, 0, degree), i)
+                                .unwrap()
+                            * b;
+                    }
                 }
             }
         }
@@ -185,45 +169,28 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
 
     if degree > 0 {
         let root3 = f64::sqrt(3.0);
-        for i in 0..data.shape().2 {
-            *data
-                .get_mut(tri_index(0, 0), quad_index(0, 1, degree), i)
-                .unwrap() = (points.get(i, 1).unwrap() * 2.0 - 1.0) * root3;
-        }
 
-        for p in 2..degree + 1 {
-            let a = 1.0 - 1.0 / p as f64;
-            let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
-            let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
-            for i in 0..data.shape().2 {
-                *data
-                    .get_mut(tri_index(0, 0), quad_index(0, p, degree), i)
-                    .unwrap() = (points.get(i, 1).unwrap() * 2.0 - 1.0)
-                    * data
-                        .get(tri_index(0, 0), quad_index(0, p - 1, degree), i)
-                        .unwrap()
-                    * b
-                    - data
-                        .get(tri_index(0, 0), quad_index(0, p - 2, degree), i)
-                        .unwrap()
-                        * c;
-            }
-        }
-
-        for k in 1..derivatives + 1 {
+        for k in 0..derivatives + 1 {
             for i in 0..data.shape().2 {
                 *data
                     .get_mut(tri_index(0, k), quad_index(0, 1, degree), i)
-                    .unwrap() = ((points.get(i, 1).unwrap() * 2.0 - 1.0)
+                    .unwrap() = (points.get(i, 1).unwrap() * 2.0 - 1.0)
                     * data
                         .get(tri_index(0, k), quad_index(0, 0, degree), i)
                         .unwrap()
-                    + 2.0
+                    * root3;
+            }
+            if k > 0 {
+                for i in 0..data.shape().2 {
+                    *data
+                        .get_mut(tri_index(0, k), quad_index(0, 1, degree), i)
+                        .unwrap() += 2.0
                         * k as f64
                         * data
                             .get(tri_index(0, k - 1), quad_index(0, 0, degree), i)
-                            .unwrap())
-                    * root3;
+                            .unwrap()
+                        * root3;
+                }
             }
             for p in 2..degree + 1 {
                 let a = 1.0 - 1.0 / p as f64;
@@ -237,16 +204,22 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
                             .get(tri_index(0, k), quad_index(0, p - 1, degree), i)
                             .unwrap()
                         * b
-                        + 2.0
-                            * k as f64
-                            * data
-                                .get(tri_index(0, k - 1), quad_index(0, p - 1, degree), i)
-                                .unwrap()
-                            * b
                         - data
                             .get(tri_index(0, k), quad_index(0, p - 2, degree), i)
                             .unwrap()
                             * c;
+                }
+                if k > 0 {
+                    for i in 0..data.shape().2 {
+                        *data
+                            .get_mut(tri_index(0, k), quad_index(0, p, degree), i)
+                            .unwrap() += 2.0
+                            * k as f64
+                            * data
+                                .get(tri_index(0, k - 1), quad_index(0, p - 1, degree), i)
+                                .unwrap()
+                            * b;
+                    }
                 }
             }
         }
@@ -543,7 +516,6 @@ mod test {
         }
     }
 
-
     #[test]
     fn test_legendre_interval_derivative() {
         let degree = 6;
@@ -744,7 +716,13 @@ mod test {
         let points = Array2D::from_data(p, (121, 2));
 
         let mut data = Array3D::<f64>::new((3, (degree + 1) * (degree + 1), points.shape().0));
-        tabulate_legendre_polynomials(ReferenceCellType::Quadrilateral, &points, degree, 1, &mut data);
+        tabulate_legendre_polynomials(
+            ReferenceCellType::Quadrilateral,
+            &points,
+            degree,
+            1,
+            &mut data,
+        );
 
         for k in 0..points.shape().0 {
             let x = *points.get(k, 0).unwrap();
@@ -782,10 +760,18 @@ mod test {
             assert_relative_eq!(*data.get(2, 2, k).unwrap(), 0.0, epsilon = 1e-12);
 
             // 3 => sqrt(3)*(2y - 1)
-            assert_relative_eq!(*data.get(0, 3, k).unwrap(), f64::sqrt(3.0) * (2.0 * y - 1.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(0, 3, k).unwrap(),
+                f64::sqrt(3.0) * (2.0 * y - 1.0),
+                epsilon = 1e-12
+            );
 
             assert_relative_eq!(*data.get(1, 3, k).unwrap(), 0.0, epsilon = 1e-12);
-            assert_relative_eq!(*data.get(2, 3, k).unwrap(), 2.0 * f64::sqrt(3.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(2, 3, k).unwrap(),
+                2.0 * f64::sqrt(3.0),
+                epsilon = 1e-12
+            );
 
             // 4 => 3*(2x - 1)*(2y - 1)
             assert_relative_eq!(
@@ -798,7 +784,11 @@ mod test {
                 6.0 * (2.0 * y - 1.0),
                 epsilon = 1e-12
             );
-            assert_relative_eq!(*data.get(2, 4, k).unwrap(), 6.0 * (2.0 * x - 1.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(2, 4, k).unwrap(),
+                6.0 * (2.0 * x - 1.0),
+                epsilon = 1e-12
+            );
 
             // 5 => sqrt(15)*(6x^2 - 6x + 1)*(2y - 1)
             assert_relative_eq!(
@@ -811,12 +801,24 @@ mod test {
                 f64::sqrt(15.0) * (12.0 * x - 6.0) * (2.0 * y - 1.0),
                 epsilon = 1e-12
             );
-            assert_relative_eq!(*data.get(2, 5, k).unwrap(), 2.0 * f64::sqrt(15.0) * (6.0 * x * x - 6.0 * x + 1.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(2, 5, k).unwrap(),
+                2.0 * f64::sqrt(15.0) * (6.0 * x * x - 6.0 * x + 1.0),
+                epsilon = 1e-12
+            );
 
             // 6 => sqrt(5)*(6y^2 - 6y + 1)
-            assert_relative_eq!(*data.get(0, 6, k).unwrap(), f64::sqrt(5.0) * (6.0 * y * y - 6.0 * y + 1.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(0, 6, k).unwrap(),
+                f64::sqrt(5.0) * (6.0 * y * y - 6.0 * y + 1.0),
+                epsilon = 1e-12
+            );
             assert_relative_eq!(*data.get(1, 6, k).unwrap(), 0.0, epsilon = 1e-12);
-            assert_relative_eq!(*data.get(2, 6, k).unwrap(), f64::sqrt(5.0) * (12.0 * y - 6.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(2, 6, k).unwrap(),
+                f64::sqrt(5.0) * (12.0 * y - 6.0),
+                epsilon = 1e-12
+            );
 
             // 7 => sqrt(15)*(2x - 1)*(6y^2 - 6y + 1)
             assert_relative_eq!(
@@ -826,10 +828,14 @@ mod test {
             );
             assert_relative_eq!(
                 *data.get(1, 7, k).unwrap(),
-                2.0 * f64::sqrt(15.0)  * (6.0 * y * y - 6.0 * y + 1.0),
+                2.0 * f64::sqrt(15.0) * (6.0 * y * y - 6.0 * y + 1.0),
                 epsilon = 1e-12
             );
-            assert_relative_eq!(*data.get(2, 7, k).unwrap(), f64::sqrt(15.0) * (2.0 * x - 1.0) * (12.0 * y - 6.0), epsilon = 1e-12);
+            assert_relative_eq!(
+                *data.get(2, 7, k).unwrap(),
+                f64::sqrt(15.0) * (2.0 * x - 1.0) * (12.0 * y - 6.0),
+                epsilon = 1e-12
+            );
 
             // 8 => 5*(6x^2 - 6x + 1)*(6y^2 - 6y + 1)
             assert_relative_eq!(
@@ -842,9 +848,11 @@ mod test {
                 5.0 * (12.0 * x - 6.0) * (6.0 * y * y - 6.0 * y + 1.0),
                 epsilon = 1e-12
             );
-            assert_relative_eq!(*data.get(2, 8, k).unwrap(), 
+            assert_relative_eq!(
+                *data.get(2, 8, k).unwrap(),
                 5.0 * (12.0 * y - 6.0) * (6.0 * x * x - 6.0 * x + 1.0),
-                epsilon = 1e-12);
+                epsilon = 1e-12
+            );
         }
     }
 }
