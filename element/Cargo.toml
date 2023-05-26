@@ -22,6 +22,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 bempp-tools = { path = "../tools"}
 bempp-traits = { path = "../traits" }
+bempp-quadrature = { path = "../quadrature" }
 paste = "1.*"
 libc = "0.2"
 approx = "0.5"
