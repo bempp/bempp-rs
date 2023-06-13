@@ -1,6 +1,9 @@
 //! Traits for multipole-to-local (M2L) field translations
 
-pub trait PrecompTransData {
+pub trait FieldTranslationData {
+
+    fn new() -> Self;
+
     fn compute_transfer_vectors();
     
     fn compute_m2l_data();
@@ -16,3 +19,4 @@ pub trait FieldTranslation {
     // Convolution operation over each level.
     fn m2l(&self, level: u64);
 }
+
