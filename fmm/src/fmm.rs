@@ -1398,6 +1398,6 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
         println!("p={:?} rel_error={:?}\n", order, rel_error);
-        assert!(false)
+        // assert!(false)
     }
 }
