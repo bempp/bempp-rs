@@ -674,11 +674,11 @@ mod test {
 
     #[test]
     pub fn test_split_blocks() {
-        let domain = Domain {
+        let _domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1.0, 1.0, 1.0],
         };
-        let depth = 5;
+        let _depth = 5;
         let mut points = Points {
             points: points_fixture(10000),
             index: 0,
