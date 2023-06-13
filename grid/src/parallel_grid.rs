@@ -1,8 +1,9 @@
 //! A parallel implementation of a grid
 use crate::grid::{SerialGeometry, SerialTopology};
+use bempp_element::element::CiarletElement;
 use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
 use std::cell::Ref;
@@ -26,7 +27,7 @@ impl<'a, C: Communicator> ParallelGeometry<'a, C> {
         }
     }
 
-    pub fn coordinate_elements(&self) -> &Vec<Box<dyn FiniteElement>> {
+    pub fn coordinate_elements(&self) -> &Vec<CiarletElement> {
         self.serial_geometry.coordinate_elements()
     }
 
@@ -61,33 +62,46 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
     fn index_map(&self) -> &[usize] {
         self.serial_geometry.index_map()
     }
-    fn compute_points(
+    fn compute_points<'b>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'b, f64>,
         cell: usize,
-        physical_points: &mut Array2D<f64>,
+        physical_points: &mut impl Array2DAccess<'b, f64>,
     ) {
         self.serial_geometry
             .compute_points(points, cell, physical_points)
     }
-    fn compute_jacobians(&self, points: &Array2D<f64>, cell: usize, jacobians: &mut Array2D<f64>) {
+    fn compute_normals<'b>(
+        &self,
+        points: &impl Array2DAccess<'b, f64>,
+        cell: usize,
+        normals: &mut impl Array2DAccess<'b, f64>,
+    ) {
+        self.serial_geometry.compute_points(points, cell, normals)
+    }
+    fn compute_jacobians<'b>(
+        &self,
+        points: &impl Array2DAccess<'b, f64>,
+        cell: usize,
+        jacobians: &mut impl Array2DAccess<'b, f64>,
+    ) {
         self.serial_geometry
             .compute_jacobians(points, cell, jacobians)
     }
-    fn compute_jacobian_determinants(
+    fn compute_jacobian_determinants<'b>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'b, f64>,
         cell: usize,
         jacobian_determinants: &mut [f64],
     ) {
         self.serial_geometry
             .compute_jacobian_determinants(points, cell, jacobian_determinants)
     }
-    fn compute_jacobian_inverses(
+    fn compute_jacobian_inverses<'b>(
         &self,
-        points: &Array2D<f64>,
+        points: &impl Array2DAccess<'b, f64>,
         cell: usize,
-        jacobian_inverses: &mut Array2D<f64>,
+        jacobian_inverses: &mut impl Array2DAccess<'b, f64>,
     ) {
         self.serial_geometry
             .compute_jacobian_inverses(points, cell, jacobian_inverses)
@@ -125,7 +139,9 @@ impl<'a, C: Communicator> ParallelTopology<'a, C> {
     }
 }
 
-impl<'a, C: Communicator> Topology for ParallelTopology<'a, C> {
+impl<'a, C: Communicator> Topology<'a> for ParallelTopology<'a, C> {
+    type Connectivity = AdjacencyList<usize>;
+
     fn index_map(&self) -> &[usize] {
         self.serial_topology.index_map()
     }
@@ -145,7 +161,7 @@ impl<'a, C: Communicator> Topology for ParallelTopology<'a, C> {
         self.serial_topology.create_connectivity(dim0, dim1)
     }
 
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<AdjacencyList<usize>> {
+    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity> {
         self.serial_topology.connectivity(dim0, dim1)
     }
 
@@ -412,9 +428,8 @@ impl<'a, C: Communicator> ParallelGrid<'a, C> {
         self.comm
     }
 }
-impl<'a, C: Communicator> Grid for ParallelGrid<'a, C> {
+impl<'a, C: Communicator> Grid<'a> for ParallelGrid<'a, C> {
     type Topology = ParallelTopology<'a, C>;
-
     type Geometry = ParallelGeometry<'a, C>;
 
     fn topology(&self) -> &Self::Topology {
@@ -423,5 +438,9 @@ impl<'a, C: Communicator> Grid for ParallelGrid<'a, C> {
 
     fn geometry(&self) -> &Self::Geometry {
         &self.geometry
+    }
+
+    fn is_serial(&self) -> bool {
+        false
     }
 }

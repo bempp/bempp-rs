@@ -1,7 +1,7 @@
 //! Finite element definitions
 
+use crate::arrays::{Array2DAccess, Array4DAccess};
 use crate::cell::ReferenceCellType;
-use bempp_tools::arrays::{Array2D, Array4D};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -22,16 +22,16 @@ pub enum MapType {
 }
 
 /// Compute the number of derivatives for a cell
-fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> Result<usize, ()> {
+fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usize {
     match cell_type {
-        ReferenceCellType::Point => Ok(0),
-        ReferenceCellType::Interval => Ok(nderivs + 1),
-        ReferenceCellType::Triangle => Ok((nderivs + 1) * (nderivs + 2) / 2),
-        ReferenceCellType::Quadrilateral => Ok((nderivs + 1) * (nderivs + 2) / 2),
-        ReferenceCellType::Tetrahedron => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        ReferenceCellType::Hexahedron => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        ReferenceCellType::Prism => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
-        ReferenceCellType::Pyramid => Ok((nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6),
+        ReferenceCellType::Point => 0,
+        ReferenceCellType::Interval => nderivs + 1,
+        ReferenceCellType::Triangle => (nderivs + 1) * (nderivs + 2) / 2,
+        ReferenceCellType::Quadrilateral => (nderivs + 1) * (nderivs + 2) / 2,
+        ReferenceCellType::Tetrahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCellType::Hexahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCellType::Prism => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCellType::Pyramid => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
     }
 }
 
@@ -60,20 +60,25 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>);
+    fn tabulate<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        nderivs: usize,
+        data: &mut impl Array4DAccess<f64>,
+    );
 
     /// The DOFs that are associated with a subentity of the reference cell
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize>;
+    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Option<&[usize]>;
 
     /// The push forward / pull back map to use for this element
     fn map_type(&self) -> MapType;
 
-    /// Create a data array full of zeros
-    fn create_tabulate_array(&self, nderivs: usize, npoints: usize) -> Array4D<f64> {
-        let deriv_count = compute_derivative_count(nderivs, self.cell_type()).unwrap();
+    /// Get the required shape for a tabulation array
+    fn tabulate_array_shape(&self, nderivs: usize, npoints: usize) -> (usize, usize, usize, usize) {
+        let deriv_count = compute_derivative_count(nderivs, self.cell_type());
         let point_count = npoints;
         let basis_count = self.dim();
         let value_size = self.value_size();
-        Array4D::<f64>::new((deriv_count, point_count, basis_count, value_size))
+        (deriv_count, point_count, basis_count, value_size)
     }
 }

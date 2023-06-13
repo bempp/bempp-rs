@@ -22,3 +22,4 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 libc = "0.2"
 num = "0.4"
+bempp-traits = { path = "../traits"}

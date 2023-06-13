@@ -1,5 +1,6 @@
 use bempp_grid::io::export_as_gmsh;
 use bempp_grid::shapes::regular_sphere;
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn main() {

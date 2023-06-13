@@ -61,15 +61,12 @@ mod test {
                                 } else {
                                     for c_n in &connectivity {
                                         let c_vertices = c.connectivity(c_dim, *c_n, 0).unwrap();
-                                        println!("{} {} {} {}", e_dim, e_n, c_dim, c_n);
                                         if e_dim < c_dim {
                                             for i in &e_vertices {
-                                                println!(" c {}", i);
                                                 assert!(c_vertices.contains(&i));
                                             }
                                         } else {
                                             for i in &c_vertices {
-                                                println!(" e {}", i);
                                                 assert!(e_vertices.contains(&i));
                                             }
                                         }

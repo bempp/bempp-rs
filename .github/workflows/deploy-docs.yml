@@ -31,7 +31,7 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: "mpich"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Build docs
         run: cargo doc
@@ -56,4 +56,4 @@ jobs:
           path: 'target/doc'
       - name: Deploy docs to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v2

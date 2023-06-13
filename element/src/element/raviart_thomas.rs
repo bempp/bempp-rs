@@ -1,86 +1,93 @@
 //! Raviart-Thomas elements
 
-use crate::cell::*;
-use crate::element::*;
-use crate::map::*;
-use bempp_tools::arrays::{Array2D, Array4D};
-use bempp_traits::element::ElementFamily;
+use crate::element::CiarletElement;
+use bempp_tools::arrays::{AdjacencyList, Array3D};
+use bempp_traits::arrays::Array3DAccess;
+use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::element::{ElementFamily, MapType};
 
-/// Degree 1 Raviart-Thomas element on a triangle
-pub struct RaviartThomasElementTriangleDegree1 {}
-
-impl FiniteElement for RaviartThomasElementTriangleDegree1 {
-    fn value_size(&self) -> usize {
-        2
-    }
-    fn map_type(&self) -> MapType {
-        MapType::ContravariantPiola
-    }
-
-    fn cell_type(&self) -> ReferenceCellType {
-        ReferenceCellType::Triangle
-    }
-    fn degree(&self) -> usize {
-        1
-    }
-    fn highest_degree(&self) -> usize {
-        1
-    }
-    fn family(&self) -> ElementFamily {
-        ElementFamily::RaviartThomas
-    }
-    fn discontinuous(&self) -> bool {
-        false
-    }
-    fn dim(&self) -> usize {
-        3
-    }
-    fn tabulate(&self, points: &Array2D<f64>, nderivs: usize, data: &mut Array4D<f64>) {
-        // Basis functions are 1-x-y, x, y
-        for deriv in 0..(nderivs + 1) * (nderivs + 2) / 2 {
-            for pt in 0..data.shape().1 {
-                if deriv == 0 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -*points.get(pt, 0).unwrap();
-                    *data.get_mut(deriv, pt, 0, 1).unwrap() = -*points.get(pt, 1).unwrap();
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = *points.get(pt, 0).unwrap() - 1.0;
-                    *data.get_mut(deriv, pt, 1, 1).unwrap() = *points.get(pt, 1).unwrap();
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -*points.get(pt, 0).unwrap();
-                    *data.get_mut(deriv, pt, 2, 1).unwrap() = 1.0 - *points.get(pt, 1).unwrap();
-                } else if deriv == 1 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 0, 1).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 1.0;
-                    *data.get_mut(deriv, pt, 1, 1).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 2, 1).unwrap() = 0.0;
-                } else if deriv == 2 {
-                    *data.get_mut(deriv, pt, 0, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 0, 1).unwrap() = -1.0;
-                    *data.get_mut(deriv, pt, 1, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 1, 1).unwrap() = 1.0;
-                    *data.get_mut(deriv, pt, 2, 0).unwrap() = 0.0;
-                    *data.get_mut(deriv, pt, 2, 1).unwrap() = -1.0;
-                } else {
-                    for fun in 0..3 {
-                        *data.get_mut(deriv, pt, fun, 0).unwrap() = 0.;
-                    }
-                }
+/// Create a Raviart-Thomas element
+pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> CiarletElement {
+    let coefficients = match cell_type {
+        ReferenceCellType::Triangle => match degree {
+            // Basis = {(-x, -y), (x-1,y), (-x, 1-y)}
+            1 => Array3D::from_data(
+                vec![
+                    0.0, -1.0, 0.0, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0,
+                    1.0, 0.0, -1.0,
+                ],
+                (3, 2, 3),
+            ),
+            _ => {
+                panic!("Degree not supported");
+            }
+        },
+        _ => {
+            panic!("Cell type not supported");
+        }
+    };
+    let entity_dofs = if discontinuous {
+        let dofs = AdjacencyList::<usize>::from_data(
+            (0..coefficients.shape().0).collect(),
+            vec![0, coefficients.shape().0],
+        );
+        match cell_type {
+            ReferenceCellType::Triangle => [
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
+                dofs,
+                AdjacencyList::<usize>::new(),
+            ],
+            ReferenceCellType::Quadrilateral => [
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
+                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
+                dofs,
+                AdjacencyList::<usize>::new(),
+            ],
+            _ => {
+                panic!("Cell type not supported");
             }
         }
-    }
-    fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Vec<usize> {
-        if entity_dim == 1 {
-            vec![entity_number]
-        } else {
-            vec![]
+    } else {
+        match cell_type {
+            ReferenceCellType::Triangle => match degree {
+                1 => [
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
+                    AdjacencyList::<usize>::from_data(vec![0, 1, 2], vec![0, 1, 2, 3]),
+                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
+                    AdjacencyList::<usize>::new(),
+                ],
+                _ => {
+                    panic!("Degree not supported");
+                }
+            },
+            _ => {
+                panic!("Cell type not supported");
+            }
         }
+    };
+    CiarletElement {
+        cell_type,
+        degree,
+        highest_degree: degree,
+        map_type: MapType::ContravariantPiola,
+        value_size: 2,
+        family: ElementFamily::RaviartThomas,
+        discontinuous: discontinuous,
+        dim: coefficients.shape().0,
+        coefficients: coefficients,
+        entity_dofs: entity_dofs,
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::cell::*;
     use crate::element::raviart_thomas::*;
     use approx::*;
+    use bempp_tools::arrays::{Array2D, Array4D};
+    use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
+    use bempp_traits::element::FiniteElement;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -106,7 +113,7 @@ mod test {
                 ReferenceCellType::Pyramid => Pyramid {}.entity_count(dim).unwrap(),
             };
             for entity in 0..entity_count {
-                ndofs += e.entity_dofs(dim, entity).len();
+                ndofs += e.entity_dofs(dim, entity).unwrap().len();
             }
         }
         assert_eq!(ndofs, e.dim());
@@ -114,9 +121,9 @@ mod test {
 
     #[test]
     fn test_raviart_thomas_1_triangle() {
-        let e = RaviartThomasElementTriangleDegree1 {};
+        let e = create(ReferenceCellType::Triangle, 1, false);
         assert_eq!(e.value_size(), 2);
-        let mut data = e.create_tabulate_array(0, 6);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
             vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),

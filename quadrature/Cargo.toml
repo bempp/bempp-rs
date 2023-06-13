@@ -20,7 +20,7 @@ name = "bempp_quadrature"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-bempp-element = {path = "../element"}
+bempp-traits = {path = "../traits"}
 lazy_static = "1.4"
 paste = "1.*"
 approx = "0.5"

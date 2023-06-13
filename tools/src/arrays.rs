@@ -1,9 +1,10 @@
 //! Containers to store multi-dimensional data
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array3DAccess, Array4DAccess};
 use num::Num;
 use std::clone::Clone;
 
 /// A two-dimensional rectangular array
-pub struct Array2D<T> {
+pub struct Array2D<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
     /// The shape of the array
@@ -18,9 +19,7 @@ impl<T: Num + Clone> Array2D<T> {
             shape: shape,
         }
     }
-}
 
-impl<T> Array2D<T> {
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize)) -> Self {
         Self {
@@ -28,8 +27,12 @@ impl<T> Array2D<T> {
             shape: shape,
         }
     }
-    /// Get an item from the array
-    pub fn get(&self, index0: usize, index1: usize) -> Option<&T> {
+}
+
+impl<'a, T: Num + 'a> Array2DAccess<'a, T> for Array2D<T> {
+    type I = Array2DRowIterator<'a, T>;
+
+    fn get(&self, index0: usize, index1: usize) -> Option<&T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
             None
         } else {
@@ -37,7 +40,7 @@ impl<T> Array2D<T> {
         }
     }
     /// Get a mutable item from the array
-    pub fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
+    fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 {
             None
         } else {
@@ -45,7 +48,7 @@ impl<T> Array2D<T> {
         }
     }
     /// Get a row of the array
-    pub fn row(&self, index: usize) -> Option<&[T]> {
+    fn row(&self, index: usize) -> Option<&[T]> {
         if index >= self.shape.0 {
             None
         } else {
@@ -53,23 +56,23 @@ impl<T> Array2D<T> {
         }
     }
     /// Get an item from the array without checking bounds
-    pub unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
+    unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
         self.data.get_unchecked(index0 * self.shape.1 + index1)
     }
     /// Get a mutable item from the array without checking bounds
-    pub unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
+    unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
         self.data.get_unchecked_mut(index0 * self.shape.1 + index1)
     }
     /// Get a row of the array without checking bounds
-    pub unsafe fn row_unchecked(&self, index: usize) -> &[T] {
+    unsafe fn row_unchecked(&self, index: usize) -> &[T] {
         &self.data[index * self.shape.1..(index + 1) * self.shape.1]
     }
     /// Get the shape of the array
-    pub fn shape(&self) -> &(usize, usize) {
+    fn shape(&self) -> &(usize, usize) {
         &self.shape
     }
     /// Iterate through the rows
-    pub fn iter_rows(&self) -> Array2DRowIterator<'_, T> {
+    fn iter_rows(&'a self) -> Self::I {
         Array2DRowIterator::<T> {
             array: &self,
             index: 0,
@@ -77,12 +80,12 @@ impl<T> Array2D<T> {
     }
 }
 
-pub struct Array2DRowIterator<'a, T> {
+pub struct Array2DRowIterator<'a, T: Num> {
     array: &'a Array2D<T>,
     index: usize,
 }
 
-impl<'a, T> Iterator for Array2DRowIterator<'a, T> {
+impl<'a, T: Num> Iterator for Array2DRowIterator<'a, T> {
     type Item = &'a [T];
     fn next(&mut self) -> Option<Self::Item> {
         self.index += 1;
@@ -91,7 +94,7 @@ impl<'a, T> Iterator for Array2DRowIterator<'a, T> {
 }
 
 /// A three-dimensional rectangular array
-pub struct Array3D<T> {
+pub struct Array3D<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
     /// The shape of the array
@@ -106,9 +109,6 @@ impl<T: Num + Clone> Array3D<T> {
             shape: shape,
         }
     }
-}
-
-impl<T> Array3D<T> {
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize, usize)) -> Self {
         Self {
@@ -116,45 +116,38 @@ impl<T> Array3D<T> {
             shape: shape,
         }
     }
-    /// Get an item from the array
-    pub fn get(&self, index0: usize, index1: usize, index2: usize) -> Option<&T> {
+}
+
+impl<T: Num> Array3DAccess<T> for Array3D<T> {
+    fn get(&self, index0: usize, index1: usize, index2: usize) -> Option<&T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 || index2 >= self.shape.2 {
             None
         } else {
             unsafe { Some(self.get_unchecked(index0, index1, index2)) }
         }
     }
-    /// Get a mutable item from the array
-    pub fn get_mut(&mut self, index0: usize, index1: usize, index2: usize) -> Option<&mut T> {
+    fn get_mut(&mut self, index0: usize, index1: usize, index2: usize) -> Option<&mut T> {
         if index0 >= self.shape.0 || index1 >= self.shape.1 || index2 >= self.shape.2 {
             None
         } else {
             unsafe { Some(self.get_unchecked_mut(index0, index1, index2)) }
         }
     }
-    /// Get an item from the array without checking bounds
-    pub unsafe fn get_unchecked(&self, index0: usize, index1: usize, index2: usize) -> &T {
+    unsafe fn get_unchecked(&self, index0: usize, index1: usize, index2: usize) -> &T {
         self.data
             .get_unchecked((index0 * self.shape.1 + index1) * self.shape.2 + index2)
     }
-    /// Get a mutable item from the array without checking bounds
-    pub unsafe fn get_unchecked_mut(
-        &mut self,
-        index0: usize,
-        index1: usize,
-        index2: usize,
-    ) -> &mut T {
+    unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize, index2: usize) -> &mut T {
         self.data
             .get_unchecked_mut((index0 * self.shape.1 + index1) * self.shape.2 + index2)
     }
-    /// Get the shape of the array
-    pub fn shape(&self) -> &(usize, usize, usize) {
+    fn shape(&self) -> &(usize, usize, usize) {
         &self.shape
     }
 }
 
 /// A four-dimensional rectangular array
-pub struct Array4D<T> {
+pub struct Array4D<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
     /// The shape of the array
@@ -169,9 +162,6 @@ impl<T: Num + Clone> Array4D<T> {
             shape: shape,
         }
     }
-}
-
-impl<T> Array4D<T> {
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize, usize, usize)) -> Self {
         Self {
@@ -179,8 +169,10 @@ impl<T> Array4D<T> {
             shape: shape,
         }
     }
-    /// Get an item from the array
-    pub fn get(&self, index0: usize, index1: usize, index2: usize, index3: usize) -> Option<&T> {
+}
+
+impl<T: Num> Array4DAccess<T> for Array4D<T> {
+    fn get(&self, index0: usize, index1: usize, index2: usize, index3: usize) -> Option<&T> {
         if index0 >= self.shape.0
             || index1 >= self.shape.1
             || index2 >= self.shape.2
@@ -191,8 +183,7 @@ impl<T> Array4D<T> {
             unsafe { Some(self.get_unchecked(index0, index1, index2, index3)) }
         }
     }
-    /// Get a mutable item from the array
-    pub fn get_mut(
+    fn get_mut(
         &mut self,
         index0: usize,
         index1: usize,
@@ -209,8 +200,7 @@ impl<T> Array4D<T> {
             unsafe { Some(self.get_unchecked_mut(index0, index1, index2, index3)) }
         }
     }
-    /// Get an item from the array without checking bounds
-    pub unsafe fn get_unchecked(
+    unsafe fn get_unchecked(
         &self,
         index0: usize,
         index1: usize,
@@ -221,8 +211,7 @@ impl<T> Array4D<T> {
             ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
         )
     }
-    /// Get a mutable item from the array without checking bounds
-    pub unsafe fn get_unchecked_mut(
+    unsafe fn get_unchecked_mut(
         &mut self,
         index0: usize,
         index1: usize,
@@ -233,8 +222,7 @@ impl<T> Array4D<T> {
             ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
         )
     }
-    /// Get the shape of the array
-    pub fn shape(&self) -> &(usize, usize, usize, usize) {
+    fn shape(&self) -> &(usize, usize, usize, usize) {
         &self.shape
     }
 }
@@ -242,14 +230,14 @@ impl<T> Array4D<T> {
 /// An adjacency list
 ///
 /// An adjacency list stores two-dimensional data where each row may have a different number of items
-pub struct AdjacencyList<T> {
+pub struct AdjacencyList<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
     /// The starting index of each row, plus a final entry that is the length of data
     offsets: Vec<usize>,
 }
 
-impl<T: Num + Clone> AdjacencyList<T> {
+impl<T: Num + Copy> AdjacencyList<T> {
     /// Create an adjacency list
     pub fn new() -> Self {
         Self {
@@ -257,9 +245,6 @@ impl<T: Num + Clone> AdjacencyList<T> {
             offsets: vec![0],
         }
     }
-}
-
-impl<T: Num + Copy> AdjacencyList<T> {
     /// Add a new row of data to the end
     pub fn add_row(&mut self, row: &[T]) {
         for i in row {
@@ -267,9 +252,6 @@ impl<T: Num + Copy> AdjacencyList<T> {
         }
         self.offsets.push(self.offsets.last().unwrap() + row.len());
     }
-}
-
-impl<T> AdjacencyList<T> {
     /// Create an adjacency list
     pub fn from_data(data: Vec<T>, offsets: Vec<usize>) -> Self {
         if offsets[offsets.len() - 1] != data.len() {
@@ -280,8 +262,12 @@ impl<T> AdjacencyList<T> {
             offsets: offsets,
         }
     }
+}
+
+impl<'a, T: Num + 'a> AdjacencyListAccess<'a, T> for AdjacencyList<T> {
+    type I = AdjacencyListRowIterator<'a, T>;
     /// Get an item from the adjacency list
-    pub fn get(&self, index0: usize, index1: usize) -> Option<&T> {
+    fn get(&self, index0: usize, index1: usize) -> Option<&T> {
         if index0 >= self.offsets.len() - 1
             || self.offsets[index0] + index1 >= self.offsets[index0 + 1]
         {
@@ -291,7 +277,7 @@ impl<T> AdjacencyList<T> {
         }
     }
     /// Get a mutable item from the adjacency list
-    pub fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
+    fn get_mut(&mut self, index0: usize, index1: usize) -> Option<&mut T> {
         if index0 >= self.offsets.len() - 1
             || self.offsets[index0] + index1 >= self.offsets[index0 + 1]
         {
@@ -301,7 +287,7 @@ impl<T> AdjacencyList<T> {
         }
     }
     /// Get a row from the adjacency list
-    pub fn row(&self, index: usize) -> Option<&[T]> {
+    fn row(&self, index: usize) -> Option<&[T]> {
         if index >= self.offsets.len() - 1 {
             None
         } else {
@@ -309,27 +295,27 @@ impl<T> AdjacencyList<T> {
         }
     }
     /// Get an item from the adjacency list without checking bounds
-    pub unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
+    unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T {
         self.data.get_unchecked(self.offsets[index0] + index1)
     }
     /// Get a mutable item from the adjacency list without checking bounds
-    pub unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
+    unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T {
         self.data.get_unchecked_mut(self.offsets[index0] + index1)
     }
     /// Get a row from the adjacency list without checking bounds
-    pub unsafe fn row_unchecked(&self, index: usize) -> &[T] {
+    unsafe fn row_unchecked(&self, index: usize) -> &[T] {
         &self.data[self.offsets[index]..self.offsets[index + 1]]
     }
     /// Get the vector of offsets
-    pub fn offsets(&self) -> &[usize] {
+    fn offsets(&self) -> &[usize] {
         &self.offsets
     }
     /// Get the number of rows
-    pub fn num_rows(&self) -> usize {
+    fn num_rows(&self) -> usize {
         self.offsets.len() - 1
     }
     /// Iterate through the rows
-    pub fn iter_rows(&self) -> AdjacencyListRowIterator<'_, T> {
+    fn iter_rows(&'a self) -> Self::I {
         AdjacencyListRowIterator::<T> {
             alist: &self,
             index: 0,
@@ -337,12 +323,12 @@ impl<T> AdjacencyList<T> {
     }
 }
 
-pub struct AdjacencyListRowIterator<'a, T> {
+pub struct AdjacencyListRowIterator<'a, T: Num> {
     alist: &'a AdjacencyList<T>,
     index: usize,
 }
 
-impl<'a, T> Iterator for AdjacencyListRowIterator<'a, T> {
+impl<'a, T: Num> Iterator for AdjacencyListRowIterator<'a, T> {
     type Item = &'a [T];
     fn next(&mut self) -> Option<Self::Item> {
         self.index += 1;

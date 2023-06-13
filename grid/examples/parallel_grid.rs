@@ -5,6 +5,8 @@ use bempp_grid::parallel_grid::ParallelGrid;
 #[cfg(feature = "mpi")]
 use bempp_tools::arrays::{AdjacencyList, Array2D};
 #[cfg(feature = "mpi")]
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
+#[cfg(feature = "mpi")]
 use bempp_traits::cell::ReferenceCellType;
 #[cfg(feature = "mpi")]
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};

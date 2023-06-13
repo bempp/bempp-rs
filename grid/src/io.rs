@@ -1,6 +1,7 @@
 //! Functions for inputting and outputting grids to/from file
 use crate::grid::SerialGrid;
 use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use std::fs;
 
@@ -122,8 +123,7 @@ mod test {
     use crate::grid::SerialGrid;
     use crate::io::*;
     use crate::shapes::regular_sphere;
-    use bempp_tools::arrays::AdjacencyList;
-    use bempp_tools::arrays::Array2D;
+    use bempp_tools::arrays::{AdjacencyList, Array2D};
     use bempp_traits::cell::ReferenceCellType;
 
     #[test]
