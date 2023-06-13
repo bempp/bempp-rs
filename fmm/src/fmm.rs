@@ -17,6 +17,7 @@ use bempp_traits::{
     fmm::{Fmm, FmmLoop, InteractionLists, SourceTranslation, TargetTranslation},
     kernel::Kernel,
     tree::Tree,
+    field::{FieldTranslation, PrecompTransData}
 };
 use bempp_tree::{
     constants::ROOT,
@@ -26,6 +27,10 @@ use bempp_tree::{
         point::Point,
         single_node::SingleNodeTree,
     },
+};
+use bempp_field::{
+    FftFieldTranslation,
+    
 };
 
 use crate::{
@@ -67,6 +72,8 @@ pub struct KiFmm<T: Tree, S: Kernel> {
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
     ),
+
+
 
     tree: T,
     kernel: S,
@@ -399,8 +406,11 @@ where
 }
 
 #[allow(dead_code)]
-impl FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
-    pub fn new(fmm: KiFmm<SingleNodeTree, LaplaceKernel>, _charges: Charges) -> Self {
+impl <T>FmmData<KiFmm<SingleNodeTree, T>> 
+where
+    T: Kernel
+{
+    pub fn new(fmm: KiFmm<SingleNodeTree, T>, _charges: Charges) -> Self {
         let mut multipoles = HashMap::new();
         let mut locals = HashMap::new();
         let mut potentials = HashMap::new();

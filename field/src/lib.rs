@@ -1,6 +1,6 @@
-use bempp_traits::field::{PrecompTransData, PrecompFftTransData, PrecompSvdTransData};
+use bempp_traits::field::{PrecompTransData, FieldTranslation};
 
-struct FftTrans {
+pub struct FftFieldTranslation {
 
     // Maps between convolution and surface grids
     surf_to_conv_map: bool,
@@ -18,7 +18,7 @@ struct FftTrans {
 }
 
 
-struct SvdTrans {
+pub struct SvdFieldTranslation {
 
     // Compression rank, if unspecified estimated from data.
     k: bool,
@@ -29,3 +29,19 @@ struct SvdTrans {
     // Unique transfer vectors to lookup m2l unique kernel interactions
     transfer_vectors: bool,
 }
+
+impl PrecompTransData for FftFieldTranslation {
+
+    fn compute_transfer_vectors() {}
+    fn compute_m2l_data() {}
+
+}
+
+
+impl PrecompTransData for SvdFieldTranslation {
+
+    fn compute_transfer_vectors() {}
+    fn compute_m2l_data() {}
+
+}
+
