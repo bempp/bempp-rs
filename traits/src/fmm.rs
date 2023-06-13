@@ -9,8 +9,6 @@ pub trait SourceTranslation {
 }
 
 pub trait TargetTranslation {
-
-
     fn m2l_batched(&self, level: u64);
 
     // V list (far field) interactions

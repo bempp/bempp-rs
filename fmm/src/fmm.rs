@@ -1,15 +1,14 @@
 extern crate blas_src;
 
 use itertools::Itertools;
+use ndarray::Array2;
 use ndarray::*;
-use ndarray::{Array2, ShapeBuilder};
 use ndarray_linalg::SVDDC;
-use ndarray_rand::{rand_distr::Normal, RandomExt};
 use rayon::prelude::*;
 use std::sync::RwLock;
 use std::{
     collections::{HashMap, HashSet},
-    ops::{Deref, DerefMut},
+    ops::Deref,
     sync::{Arc, Mutex},
     time::Instant,
 };

@@ -1,5 +1,8 @@
 use itertools::Itertools;
-use std::{collections::{HashMap, HashSet}, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Instant,
+};
 
 use bempp_traits::tree::Tree;
 

@@ -45,11 +45,7 @@ pub fn matrix_rank<T: Scalar + Lapack>(array: &Array2<T>) -> usize {
 
     let tol = s[0] * T::real(*max_dim as f64) * T::real(F64_EPSILON);
 
-    let significant: Vec<bool> = s
-        .iter()
-        .map(|sv| sv > &tol)
-        .filter(|sv| *sv == true)
-        .collect();
+    let significant: Vec<bool> = s.iter().map(|sv| sv > &tol).filter(|sv| *sv).collect();
     let rank = significant.iter().len();
 
     rank
