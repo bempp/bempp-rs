@@ -6,9 +6,6 @@ pub trait Kernel {
     /// Potential data container.
     type PotentialData;
 
-    /// Gradient data container.
-    type GradientData;
-
     /// Space dimensions for the input of the kernel.
     fn dim(&self) -> usize;
 
@@ -22,25 +19,10 @@ pub trait Kernel {
     fn is_singular(&self) -> bool;
 
     /// Evaluate the potential kernel.
-    fn potential(
-        &self,
-        sources: &[[f64; 3]],
-        charges: &[f64],
-        targets: &[[f64; 3]],
-        potentials: &mut [f64],
-    );
-
-    /// Evaluate the gradient kernel.
-    fn gradient(
-        &self,
-        sources: &[[f64; 3]],
-        charges: &[f64],
-        targets: &[[f64; 3]],
-        gradients: &mut [[f64; 3]],
-    );
+    fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]);
 
     /// Evaluate the Gram matrix.
-    fn gram(&self, sources: &[[f64; 3]], targets: &[[f64; 3]]) -> Result<Self::PotentialData>;
+    fn gram(&self, sources: &[f64], targets: &[f64]) -> Result<Self::PotentialData>;
 
     /// Scale the kernel to a given level of an associated tree.
     fn scale(&self, level: u64) -> f64;

@@ -21,10 +21,15 @@ pub struct Point {
 
     /// Key at a given level of encoding, strictly an ancestor of 'base_key'.
     pub encoded_key: MortonKey,
-
-    /// Data associated with this Point.
-    pub data: Vec<PointType>,
 }
 
 /// Vector of **Points**.
-pub type Points = Vec<Point>;
+/// Container of **Points**.
+#[derive(Clone, Debug, Default)]
+pub struct Points {
+    /// A vector of Points
+    pub points: Vec<Point>,
+
+    /// index for implementing the Iterator trait.
+    pub index: usize,
+}

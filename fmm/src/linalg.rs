@@ -15,6 +15,7 @@ pub fn pinv<T: Scalar + Lapack>(
     let (u, mut s, vt): (_, Array1<_>, _) = array.svd(true, true).unwrap();
 
     let u = u.unwrap();
+    // Truncate u
     let vt = vt.unwrap();
 
     let max_s = s[0];
@@ -35,6 +36,19 @@ pub fn pinv<T: Scalar + Lapack>(
 
     // Return components
     (v.to_owned(), s_inv_mat.to_owned(), ut.to_owned())
+}
+
+pub fn matrix_rank<T: Scalar + Lapack>(array: &Array2<T>) -> usize {
+    let (_, s, _): (_, Array1<_>, _) = array.svd(false, false).unwrap();
+    let shape = array.shape();
+    let max_dim = shape.iter().max().unwrap();
+
+    let tol = s[0] * T::real(*max_dim as f64) * T::real(F64_EPSILON);
+
+    let significant: Vec<bool> = s.iter().map(|sv| sv > &tol).filter(|sv| *sv).collect();
+    let rank = significant.iter().len();
+
+    rank
 }
 
 #[allow(unused_imports)]

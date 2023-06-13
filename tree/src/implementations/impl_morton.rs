@@ -8,8 +8,6 @@ use std::{
     vec,
 };
 
-use bempp_traits::fmm::KiFmmNode;
-
 use crate::{
     constants::{
         BYTE_DISPLACEMENT, BYTE_MASK, DEEPEST_LEVEL, DIRECTIONS, LEVEL_DISPLACEMENT, LEVEL_MASK,
@@ -22,6 +20,8 @@ use crate::{
         point::PointType,
     },
 };
+
+use bempp_traits::tree::MortonKeyInterface;
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
@@ -674,39 +674,8 @@ impl MortonKey {
             result
         }
     }
-}
 
-impl PartialEq for MortonKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.morton == other.morton
-    }
-}
-impl Eq for MortonKey {}
-
-impl Ord for MortonKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.morton.cmp(&other.morton)
-    }
-}
-
-impl PartialOrd for MortonKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        //    less_than(self, other)
-        Some(self.morton.cmp(&other.morton))
-    }
-}
-
-impl Hash for MortonKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.morton.hash(state);
-    }
-}
-
-impl KiFmmNode for MortonKey {
-    type Surface = Vec<[f64; 3]>;
-    type Domain = Domain;
-
-    fn compute_surface(&self, order: usize, alpha: f64, domain: &Self::Domain) -> Self::Surface {
+    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<[f64; 3]> {
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
 
         let mut surface = vec![[0f64; 3]; n_coeffs];
@@ -778,6 +747,57 @@ impl KiFmmNode for MortonKey {
         }
 
         scaled_surface
+    }
+}
+
+impl PartialEq for MortonKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.morton == other.morton
+    }
+}
+impl Eq for MortonKey {}
+
+impl Ord for MortonKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.morton.cmp(&other.morton)
+    }
+}
+
+impl PartialOrd for MortonKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.morton.cmp(&other.morton))
+    }
+}
+
+impl Hash for MortonKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.morton.hash(state);
+    }
+}
+
+impl MortonKeyInterface for MortonKey {
+    type NodeIndices = MortonKeys;
+
+    fn children(&self) -> Self::NodeIndices {
+        MortonKeys {
+            keys: self.children(),
+            index: 0,
+        }
+    }
+
+    fn parent(&self) -> Self {
+        self.parent()
+    }
+
+    fn neighbors(&self) -> Self::NodeIndices {
+        MortonKeys {
+            keys: self.neighbors(),
+            index: 0,
+        }
+    }
+
+    fn is_adjacent(&self, other: &Self) -> bool {
+        self.is_adjacent(other)
     }
 }
 

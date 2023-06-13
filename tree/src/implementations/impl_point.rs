@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
-use crate::types::point::Point;
+use crate::types::point::{Point, Points};
 
 impl PartialEq for Point {
     fn eq(&self, other: &Self) -> bool {
@@ -27,6 +27,47 @@ impl PartialOrd for Point {
 impl Hash for Point {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.encoded_key.hash(state);
+    }
+}
+
+impl Points {
+    pub fn new() -> Points {
+        Points {
+            points: Vec::new(),
+            index: 0,
+        }
+    }
+
+    pub fn add(&mut self, item: Point) {
+        self.points.push(item);
+    }
+
+    pub fn sort(&mut self) {
+        self.points.sort();
+    }
+}
+
+impl Iterator for Points {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.points.len() {
+            return None;
+        }
+
+        self.index += 1;
+        self.points.get(self.index).cloned()
+    }
+}
+
+impl FromIterator<Point> for Points {
+    fn from_iter<I: IntoIterator<Item = Point>>(iter: I) -> Self {
+        let mut c = Points::new();
+
+        for i in iter {
+            c.add(i);
+        }
+        c
     }
 }
 
@@ -73,7 +114,6 @@ mod test {
                 base_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 encoded_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
-                data: vec![1.0, 0.],
             })
             .collect();
 
