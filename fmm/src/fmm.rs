@@ -326,7 +326,7 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
         let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
         let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
 
-        let (r, gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
 
         let st = st.unwrap().slice(s![left..right, ..]).to_owned();
         // let gamma = Array2::from_diag(&gamma.slice(s![left..right]));
@@ -538,7 +538,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                 transfer_vector_to_m2l.insert(*tv, Arc::new(Mutex::new(Vec::new())));
             }
 
-            targets.par_iter().enumerate().for_each(|(i, &target)| {
+            targets.par_iter().enumerate().for_each(|(_i, &target)| {
                 if let Some(v_list) = self.fmm.get_v_list(&target) {
                     let calculated_transfer_vectors = v_list
                         .iter()
@@ -653,9 +653,9 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                 let ncoeffs = KiFmm::ncoeffs(fmm_arc.order);
 
                 if let Some(v_list) = fmm_arc.get_v_list(&target) {
-                    for (i, source) in v_list.iter().enumerate() {
+                    for (_i, source) in v_list.iter().enumerate() {
                         // Locate correct components of compressed M2L matrix.
-                        let transfer_vector = target.find_transfer_vector(source);
+                        let _transfer_vector = target.find_transfer_vector(source);
 
                         // let c_idx = fmm_arc
                         //     .transfer_vectors
