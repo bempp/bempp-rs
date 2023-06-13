@@ -29,7 +29,11 @@ use bempp_tree::{
     },
 };
 
-use crate::{charge::Charges, laplace::LaplaceKernel, linalg::{pinv, matrix_rank}};
+use crate::{
+    charge::Charges,
+    laplace::LaplaceKernel,
+    linalg::{matrix_rank, pinv},
+};
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
@@ -340,7 +344,11 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
             let ridx = lidx + k;
 
             c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
-            println!("Rank of k_fat {:?} true rank of submatrix {:?}", k, matrix_rank(&tmp));
+            println!(
+                "Rank of k_fat {:?} true rank of submatrix {:?}",
+                k,
+                matrix_rank(&tmp)
+            );
         }
 
         // println!(
@@ -349,7 +357,7 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
         //     st.shape(),
         //     c.shape()
         // );
-      
+
         // Recompress compressed M2L matrices stored in 'c'
         // let mut kvec = Vec::new();
         // let tol = 1e-14;
@@ -366,15 +374,13 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
         //     let vtbar = vtbar.unwrap();
         //     let k_sub = sbar.iter().enumerate().find(|(_, &x)| x <= tol).map(|(i, _)| i).unwrap_or(k);
         //     // let k_sub = std::cmp::min(k_sub, k/2);
-            
+
         //     kvec.push(k_sub);
         //     print!("tf {:?} ksub {:?} k {:?} \n", tf, k_sub, k)
-            
+
         // }
 
         let m2l = (u, st, c);
-
-
 
         Self {
             order,
@@ -586,7 +592,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                         // Compressed multipole
                         let compressed_source_multipole_owned =
                             self.fmm.m2l.1.dot(&source_multipole_view);
-                        
+
                         multipoles
                             .slice_mut(s![.., i])
                             .assign(&compressed_source_multipole_owned);
@@ -1321,7 +1327,6 @@ mod test {
 
     #[test]
     fn test_fmm() {
-        // let _ = rayon::ThreadPoolBuilder::new().num_threads(2).build_global().unwrap();
         let npoints = 100000;
         let points = points_fixture(npoints);
         let points_clone = points.clone();
