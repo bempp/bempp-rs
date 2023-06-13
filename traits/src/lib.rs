@@ -10,3 +10,4 @@ pub mod grid;
 pub mod kernel;
 pub mod tree;
 pub mod types;
+pub mod field;

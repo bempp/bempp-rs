@@ -1,5 +1,4 @@
 //! Traits for creating integral equation kernels.
-use crate::types::Result;
 
 /// Interface for FMM kernels.
 pub trait Kernel {

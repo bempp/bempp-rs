@@ -1,5 +1,5 @@
 //! Laplace kernel implementation.
-use bempp_traits::{kernel::Kernel, types::Result};
+use bempp_traits::{kernel::Kernel};
 
 pub struct LaplaceKernel {
     pub dim: usize,
