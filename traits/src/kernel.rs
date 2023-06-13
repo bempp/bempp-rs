@@ -3,8 +3,6 @@ use crate::types::Result;
 
 /// Interface for FMM kernels.
 pub trait Kernel {
-    /// Potential data container.
-    type PotentialData;
 
     /// Space dimensions for the input of the kernel.
     fn dim(&self) -> usize;
@@ -22,7 +20,7 @@ pub trait Kernel {
     fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]);
 
     /// Evaluate the Gram matrix.
-    fn gram(&self, sources: &[f64], targets: &[f64]) -> Result<Self::PotentialData>;
+    fn gram(&self, sources: &[f64], targets: &[f64], result: &mut Vec<f64>);
 
     /// Scale the kernel to a given level of an associated tree.
     fn scale(&self, level: u64) -> f64;

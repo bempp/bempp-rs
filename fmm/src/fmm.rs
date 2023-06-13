@@ -75,110 +75,115 @@ pub struct KiFmm<T: Tree, S: Kernel> {
     k: usize,
 }
 
+
+/// Number of coefficients related to a given expansion order.
+pub fn ncoeffs(order: usize) -> usize {
+    6 * (order - 1).pow(2) + 2
+}
+
+/// Scaling function for the M2L operator at a given level.
+pub fn m2l_scale(level: u64) -> f64 {
+    if level < 2 {
+        panic!("M2L only performed on level 2 and below")
+    }
+
+    if level == 2 {
+        1. / 2.
+    } else {
+        2_f64.powf((level - 3) as f64)
+    }
+}
+/// Algebraically defined list of unique M2L interactions, called 'transfer vectors', for 3D FMM.
+pub fn find_unique_v_list_interactions() -> (Vec<MortonKey>, Vec<MortonKey>, Vec<usize>) {
+    let point = [0.5, 0.5, 0.5];
+    let domain = Domain {
+        origin: [0., 0., 0.],
+        diameter: [1., 1., 1.],
+    };
+
+    // Encode point in centre of domain
+    let key = MortonKey::from_point(&point, &domain, 3);
+
+    // Add neighbours, and their resp. siblings to v list.
+    let mut neighbours = key.neighbors();
+    let mut keys: Vec<MortonKey> = Vec::new();
+    keys.push(key);
+    keys.append(&mut neighbours);
+
+    for key in neighbours.iter() {
+        let mut siblings = key.siblings();
+        keys.append(&mut siblings);
+    }
+
+    // Keep only unique keys
+    let keys: Vec<&MortonKey> = keys.iter().unique().collect();
+
+    let mut transfer_vectors: Vec<usize> = Vec::new();
+    let mut targets: Vec<MortonKey> = Vec::new();
+    let mut sources: Vec<MortonKey> = Vec::new();
+
+    for key in keys.iter() {
+        // Dense v_list
+        let v_list = key
+            .parent()
+            .neighbors()
+            .iter()
+            .flat_map(|pn| pn.children())
+            .filter(|pnc| !key.is_adjacent(pnc))
+            .collect_vec();
+
+        // Find transfer vectors for everything in dense v list of each key
+        let tmp: Vec<usize> = v_list
+            .iter()
+            .map(|v| key.find_transfer_vector(v))
+            .collect_vec();
+
+        transfer_vectors.extend(&mut tmp.iter().cloned());
+        sources.extend(&mut v_list.iter().cloned());
+
+        let tmp_targets = vec![**key; tmp.len()];
+        targets.extend(&mut tmp_targets.iter().cloned());
+    }
+
+    let mut unique_transfer_vectors = Vec::new();
+    let mut unique_indices = HashSet::new();
+
+    for (i, vec) in transfer_vectors.iter().enumerate() {
+        if !unique_transfer_vectors.contains(vec) {
+            unique_transfer_vectors.push(*vec);
+            unique_indices.insert(i);
+        }
+    }
+
+    let unique_sources: Vec<MortonKey> = sources
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| unique_indices.contains(i))
+        .map(|(_, x)| *x)
+        .collect_vec();
+
+    let unique_targets: Vec<MortonKey> = targets
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| unique_indices.contains(i))
+        .map(|(_, x)| *x)
+        .collect_vec();
+
+    (unique_targets, unique_sources, unique_transfer_vectors)
+}
+
+
 #[allow(dead_code)]
-impl KiFmm<SingleNodeTree, LaplaceKernel> {
-    /// Scaling function for the M2L operator at a given level.
-    pub fn m2l_scale(level: u64) -> f64 {
-        if level < 2 {
-            panic!("M2L only performed on level 2 and below")
-        }
-
-        if level == 2 {
-            1. / 2.
-        } else {
-            2_f64.powf((level - 3) as f64)
-        }
-    }
-    /// Algebraically defined list of unique M2L interactions, called 'transfer vectors', for 3D FMM.
-    pub fn find_unique_v_list_interactions() -> (Vec<MortonKey>, Vec<MortonKey>, Vec<usize>) {
-        let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
-        };
-
-        // Encode point in centre of domain
-        let key = MortonKey::from_point(&point, &domain, 3);
-
-        // Add neighbours, and their resp. siblings to v list.
-        let mut neighbours = key.neighbors();
-        let mut keys: Vec<MortonKey> = Vec::new();
-        keys.push(key);
-        keys.append(&mut neighbours);
-
-        for key in neighbours.iter() {
-            let mut siblings = key.siblings();
-            keys.append(&mut siblings);
-        }
-
-        // Keep only unique keys
-        let keys: Vec<&MortonKey> = keys.iter().unique().collect();
-
-        let mut transfer_vectors: Vec<usize> = Vec::new();
-        let mut targets: Vec<MortonKey> = Vec::new();
-        let mut sources: Vec<MortonKey> = Vec::new();
-
-        for key in keys.iter() {
-            // Dense v_list
-            let v_list = key
-                .parent()
-                .neighbors()
-                .iter()
-                .flat_map(|pn| pn.children())
-                .filter(|pnc| !key.is_adjacent(pnc))
-                .collect_vec();
-
-            // Find transfer vectors for everything in dense v list of each key
-            let tmp: Vec<usize> = v_list
-                .iter()
-                .map(|v| key.find_transfer_vector(v))
-                .collect_vec();
-
-            transfer_vectors.extend(&mut tmp.iter().cloned());
-            sources.extend(&mut v_list.iter().cloned());
-
-            let tmp_targets = vec![**key; tmp.len()];
-            targets.extend(&mut tmp_targets.iter().cloned());
-        }
-
-        let mut unique_transfer_vectors = Vec::new();
-        let mut unique_indices = HashSet::new();
-
-        for (i, vec) in transfer_vectors.iter().enumerate() {
-            if !unique_transfer_vectors.contains(vec) {
-                unique_transfer_vectors.push(*vec);
-                unique_indices.insert(i);
-            }
-        }
-
-        let unique_sources: Vec<MortonKey> = sources
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| unique_indices.contains(i))
-            .map(|(_, x)| *x)
-            .collect_vec();
-
-        let unique_targets: Vec<MortonKey> = targets
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| unique_indices.contains(i))
-            .map(|(_, x)| *x)
-            .collect_vec();
-
-        (unique_targets, unique_sources, unique_transfer_vectors)
-    }
-
-    /// Number of coefficients related to a given expansion order.
-    pub fn ncoeffs(order: usize) -> usize {
-        6 * (order - 1).pow(2) + 2
-    }
-
+impl <T>KiFmm<SingleNodeTree, T> 
+where
+    T: Kernel
+{
     pub fn new(
         order: usize,
         alpha_inner: f64,
         alpha_outer: f64,
         k: usize,
-        kernel: LaplaceKernel,
+        kernel: T,
         tree: SingleNodeTree,
     ) -> Self {
         let upward_equivalent_surface = ROOT
@@ -207,19 +212,18 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
 
         // Compute upward check to equivalent, and downward check to equivalent Gram matrices
         // as well as their inverses using DGESVD.
-        let uc2e = kernel
-            .gram(&upward_equivalent_surface, &upward_check_surface)
-            .unwrap();
+        
+        let mut uc2e = Vec::<f64>::new();
+        kernel.gram(&upward_equivalent_surface, &upward_check_surface, &mut uc2e);
 
-        let dc2e = kernel
-            .gram(&downward_equivalent_surface, &downward_check_surface)
-            .unwrap();
+        let mut dc2e = Vec::<f64>::new();
+        kernel.gram(&downward_equivalent_surface, &downward_check_surface, &mut dc2e);
 
         let mut m2m: Vec<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>> = Vec::new();
         let mut l2l: Vec<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>> = Vec::new();
 
-        let nrows = KiFmm::ncoeffs(order);
-        let ncols = KiFmm::ncoeffs(order);
+        let nrows = ncoeffs(order);
+        let ncols = ncoeffs(order);
 
         let uc2e = Array1::from(uc2e)
             .to_shape((nrows, ncols))
@@ -252,24 +256,21 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
                 .flat_map(|[x, y, z]| vec![x, y, z])
                 .collect_vec();
 
-            let pc2ce = kernel
-                .gram(&child_upward_equivalent_surface, &upward_check_surface)
-                .unwrap();
+            let mut pc2ce = Vec::new();
+            kernel.gram(&child_upward_equivalent_surface, &upward_check_surface, &mut pc2ce);
 
             let pc2e = Array::from_shape_vec((nrows, ncols), pc2ce).unwrap();
-
             m2m.push(uc2e_inv.0.dot(&uc2e_inv.1.dot(&pc2e)));
 
-            let cc2pe = kernel
-                .gram(&downward_equivalent_surface, &child_downward_check_surface)
-                .unwrap();
+            let mut cc2pe = Vec::new();
+            kernel.gram(&downward_equivalent_surface, &child_downward_check_surface, &mut cc2pe);
             let cc2pe = Array::from_shape_vec((ncols, nrows), cc2pe).unwrap();
 
             l2l.push(kernel.scale(child.level()) * dc2e_inv.0.dot(&dc2e_inv.1.dot(&cc2pe)))
         }
 
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
-        let (targets, sources, transfer_vectors) = KiFmm::find_unique_v_list_interactions();
+        let (targets, sources, transfer_vectors) = find_unique_v_list_interactions();
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let mut se2tc_fat: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
@@ -296,9 +297,8 @@ impl KiFmm<SingleNodeTree, LaplaceKernel> {
                 .flat_map(|[x, y, z]| vec![x, y, z])
                 .collect_vec();
 
-            let tmp_gram = kernel
-                .gram(&source_equivalent_surface[..], &target_check_surface[..])
-                .unwrap();
+            let mut tmp_gram = Vec::new();
+            kernel.gram(&source_equivalent_surface[..], &target_check_surface[..], &mut tmp_gram);
 
             let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
             let lidx_sources = i * ncols;
@@ -434,7 +434,10 @@ impl FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
     }
 }
 
-impl SourceTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
+impl <T>SourceTranslation for FmmData<KiFmm<SingleNodeTree, T>> 
+where 
+    T: Kernel + std::marker::Send + std::marker::Sync
+{
     fn p2m(&self) {
         if let Some(leaves) = self.fmm.tree.get_leaves() {
             leaves.par_iter().for_each(move |&leaf| {
@@ -528,7 +531,10 @@ impl SourceTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
     }
 }
 
-impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
+impl <T>TargetTranslation for FmmData<KiFmm<SingleNodeTree, T>> 
+where
+    T: Kernel + std::marker::Sync + std::marker::Send
+{
     fn m2l_batched(&self, level: u64) {
         if let Some(targets) = self.fmm.tree().get_keys(level) {
             let mut transfer_vector_to_m2l =
@@ -605,7 +611,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                         self.fmm.m2l.0.dot(&compressed_check_potential_owned);
 
                     // Compute local
-                    let locals_owned = KiFmm::m2l_scale(level)
+                    let locals_owned = m2l_scale(level)
                         * self.fmm.kernel.scale(level)
                         * self
                             .fmm
@@ -650,7 +656,7 @@ impl TargetTranslation for FmmData<KiFmm<SingleNodeTree, LaplaceKernel>> {
                 let fmm_arc = Arc::clone(&self.fmm);
                 let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
 
-                let ncoeffs = KiFmm::ncoeffs(fmm_arc.order);
+                let ncoeffs = ncoeffs(fmm_arc.order);
 
                 if let Some(v_list) = fmm_arc.get_v_list(&target) {
                     for (_i, source) in v_list.iter().enumerate() {
@@ -1398,6 +1404,6 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
         println!("p={:?} rel_error={:?}\n", order, rel_error);
-        // assert!(false)
+        assert!(false)
     }
 }
