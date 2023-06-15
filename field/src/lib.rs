@@ -1,50 +1,32 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use ndarray::*;
 use ndarray_linalg::SVDDC;
 
-use bempp_traits::{
-    field::{FieldTranslation, FieldTranslationData},
-    kernel::Kernel,
-};
-use bempp_tree::types::{
-    domain::{self, Domain},
-    morton::MortonKey,
-};
+use bempp_traits::{field::FieldTranslationData, kernel::Kernel};
+use bempp_tree::types::{domain::Domain, morton::MortonKey};
 
 #[derive(Default)]
-pub struct FftFieldTranslationNaive {
+pub struct FftFieldTranslationNaiveKiFmm<T>
+where
+    T: Kernel + Default,
+{
     // Maps between convolution and surface grids
-    surf_to_conv_map: bool,
-    conv_to_surf_map: bool,
+    pub surf_to_conv_map: HashMap<usize, usize>,
+    pub conv_to_surf_map: HashMap<usize, usize>,
 
     // Map from potentials to surface grid
-    potentials_to_surf: bool,
+    pub potentials_to_surf: ArrayBase<OwnedRepr<f64>, Dim<[usize; 3]>>,
 
     // Precomputed FFT of unique kernel interactions placed on
     // convolution grid.
-    m2l: bool,
+    pub m2l: ArrayBase<OwnedRepr<f64>, Dim<[usize; 3]>>,
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
-    transfer_vectors: Vec<TransferVector>,
-}
+    pub transfer_vectors: Vec<TransferVector>,
 
-#[derive(Default)]
-pub struct FftFieldTranslation {
-    // Maps between convolution and surface grids
-    pub surf_to_conv_map: bool,
-    pub conv_to_surf_map: bool,
-
-    // Map from potentials to surface grid
-    pub potentials_to_surf: bool,
-
-    // Precomputed FFT of unique kernel interactions placed on
-    // convolution grid.
-    pub m2l: bool,
-
-    // Unique transfer vectors to lookup m2l unique kernel interactions
-    pub transfer_vectors: Vec<usize>,
+    pub kernel: T,
 }
 
 #[derive(Default)]
@@ -189,49 +171,30 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     result
 }
 
-/// Scaling function for the M2L operator at a given level.
-pub fn m2l_scale(level: u64) -> f64 {
-    if level < 2 {
-        panic!("M2L only performed on level 2 and below")
-    }
-
-    if level == 2 {
-        1. / 2.
-    } else {
-        2_f64.powf((level - 3) as f64)
-    }
-}
-
-// impl <T>FieldTranslationData<T> for FftFieldTranslation
-// where
-//     T: Kernel
-// {
-
-//     fn compute_transfer_vectors() {
-//         let transfer_vectors = compute_transfer_vectors();
-
-//     }
-
-// }
-
-impl<T> FieldTranslationData<T> for FftFieldTranslationNaive
+impl<T> FieldTranslationData<T> for FftFieldTranslationNaiveKiFmm<T>
 where
-    T: Kernel,
+    T: Kernel + Default,
 {
-    type TransferVector = Vec<TransferVector>;
-    type M2LOperators = bool;
     type Domain = Domain;
+    type M2LOperators = bool;
+    type TransferVector = Vec<TransferVector>;
+
+    fn compute_m2l_operators(
+        &self,
+        expansion_order: usize,
+        domain: Self::Domain,
+    ) -> Self::M2LOperators {
+        for t in self.transfer_vectors.iter() {}
+
+        true
+    }
 
     fn compute_transfer_vectors(&self) -> Self::TransferVector {
         compute_transfer_vectors()
     }
 
-    fn compute_m2l_operators(&self, expansion_order: usize, domain: Domain) -> Self::M2LOperators {
-        true
-    }
-
     fn ncoeffs(&self, expansion_order: usize) -> usize {
-        1
+        6 * (expansion_order - 1).pow(2) + 2
     }
 }
 
@@ -261,7 +224,6 @@ where
         domain: Self::Domain,
     ) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
-        // let (targets, sources, transfer_vectors) = find_unique_v_list_interactions();
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let nrows = self.ncoeffs(expansion_order);
@@ -366,7 +328,6 @@ where
         domain: Self::Domain,
     ) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
-        // let (targets, sources, transfer_vectors) = find_unique_v_list_interactions();
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let nrows = self.ncoeffs(expansion_order);
@@ -445,18 +406,6 @@ where
     }
 }
 
-// impl FftFieldTranslation {
-//     pub fn new() -> Self {
-//         FftFieldTranslation::default()
-//     }
-// }
-
-impl FftFieldTranslationNaive {
-    pub fn new() -> Self {
-        FftFieldTranslationNaive::default()
-    }
-}
-
 impl<T> SvdFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel + Default,
@@ -508,6 +457,113 @@ where
         result.kernel = kernel;
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
+
+        result
+    }
+}
+
+impl<T> FftFieldTranslationNaiveKiFmm<T>
+where
+    T: Kernel + Default,
+{
+    pub fn new(kernel: T, expansion_order: usize, domain: Domain) -> Self {
+        let mut result = FftFieldTranslationNaiveKiFmm::default();
+
+        // Create maps between surface and convolution grids
+        let (surf_to_conv, conv_to_surf) =
+            FftFieldTranslationNaiveKiFmm::<T>::compute_surf_to_conv_map(expansion_order);
+        result.surf_to_conv_map = surf_to_conv;
+        result.conv_to_surf_map = conv_to_surf;
+
+        result.kernel = kernel;
+
+        result.transfer_vectors = result.compute_transfer_vectors();
+        // result.m2l = result.compute_m2l_operators(expansion_order, domain);
+
+        result
+    }
+
+    pub fn compute_surf_to_conv_map(
+        expansion_order: usize,
+    ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
+        let n = 2 * expansion_order - 1;
+
+        // Index maps between surface and convolution grids
+        let mut surf_to_conv: HashMap<usize, usize> = HashMap::new();
+        let mut conv_to_surf: HashMap<usize, usize> = HashMap::new();
+
+        // Initialise surface grid index
+        let mut surf_index = 0;
+
+        // The boundaries of the surface grid
+        let lower = expansion_order - 1;
+        let upper = 2 * expansion_order - 2;
+
+        // Iterate through the entire convolution grid marking the boundaries
+        // This makes the map much easier to understand and debug
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i * n * n + j * n + k;
+                    if (i >= lower && j >= lower && k == lower)
+                        || (i >= lower && j >= lower && k == upper)
+                        || (j >= lower && k >= lower && i == upper)
+                        || (j >= lower && k >= lower && i == lower)
+                        || (k >= lower && i >= lower && j == lower)
+                        || (k >= lower && i >= lower && j == upper)
+                    {
+                        surf_to_conv.insert(surf_index, conv_idx);
+                        conv_to_surf.insert(conv_idx, surf_index);
+                        surf_index += 1;
+                    }
+                }
+            }
+        }
+
+        (surf_to_conv, conv_to_surf)
+    }
+
+    pub fn compute_kernel(
+        &self,
+        expansion_order: usize,
+        convolution_grid: &Vec<[f64; 3]>,
+        min_target: [f64; 3],
+    ) -> Vec<Vec<Vec<f64>>> {
+        let n = 2 * expansion_order - 1;
+        let mut result = vec![vec![vec![0f64; n]; n]; n];
+
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i * n * n + j * n + k;
+                    let src = convolution_grid[conv_idx];
+                    result[i][j][k] = self.kernel.kernel(&src[..], &min_target[..]);
+                }
+            }
+        }
+        result
+    }
+
+    pub fn compute_signal(
+        &self,
+        expansion_order: usize,
+        convolution_grid: &Vec<[f64; 3]>,
+        charges: Vec<f64>,
+    ) -> Vec<Vec<Vec<f64>>> {
+        let n = 2 * expansion_order - 1;
+        let mut result = vec![vec![vec![0f64; n]; n]; n];
+
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i * n * n + j * n + k;
+                    if self.conv_to_surf_map.contains_key(&conv_idx) {
+                        let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
+                        result[i][j][k] = charges[*surf_idx]
+                    }
+                }
+            }
+        }
 
         result
     }

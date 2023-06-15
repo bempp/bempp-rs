@@ -1,21 +1,18 @@
 extern crate blas_src;
 
-use bempp_traits::field;
 use itertools::Itertools;
 use ndarray::*;
-use ndarray_linalg::SVDDC;
 use rayon::prelude::*;
 use std::sync::RwLock;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ops::Deref,
     sync::{Arc, Mutex},
     time::Instant,
 };
 
 use bempp_field::{
-    FftFieldTranslation, FftFieldTranslationNaive, SvdFieldTranslationKiFmm,
-    SvdFieldTranslationNaiveKiFmm,
+    FftFieldTranslationNaiveKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationNaiveKiFmm,
 };
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
@@ -26,18 +23,13 @@ use bempp_traits::{
 use bempp_tree::{
     constants::ROOT,
     types::{
-        domain::Domain,
         morton::{MortonKey, MortonKeys},
         point::Point,
         single_node::SingleNodeTree,
     },
 };
 
-use crate::{
-    charge::Charges,
-    laplace::LaplaceKernel,
-    linalg::{matrix_rank, pinv},
-};
+use crate::{charge::Charges, linalg::pinv};
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
@@ -695,17 +687,6 @@ where
                             .0
                             .dot(&self.fmm.dc2e_inv.1.dot(&check_potential_owned));
 
-                    // Compute local
-                    // let locals_owned = KiFmm::m2l_scale(level)
-                    //     * self.fmm.kernel.scale(level)
-                    //     * self.fmm.dc2e_inv.0.dot(
-                    //         &self
-                    //             .fmm
-                    //             .dc2e_inv
-                    //             .1
-                    //             .dot(&self.fmm.m2l.0.dot(&c_sub.dot(&multipoles))),
-                    //     );
-
                     // Assign locals
                     for (i, (_, target)) in m2l_rw.iter().enumerate() {
                         let target_local_arc = Arc::clone(self.locals.get(target).unwrap());
@@ -817,9 +798,9 @@ where
     }
 }
 
-impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, FftFieldTranslationNaive>>
+impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, FftFieldTranslationNaiveKiFmm<T>>>
 where
-    T: Kernel + std::marker::Sync + std::marker::Send,
+    T: Kernel + std::marker::Sync + std::marker::Send + Default,
 {
     fn m2l(&self, level: u64) {}
 
@@ -1072,116 +1053,6 @@ mod test {
         points
     }
 
-    // #[test]
-    // fn test_m2l() {
-    //     let kernel = LaplaceKernel {
-    //         dim: 3,
-    //         is_singular: true,
-    //         value_dimension: 3,
-    //     };
-
-    //     // Create FmmTree
-    //     let npoints: usize = 10000;
-    //     let points = points_fixture(npoints);
-    //     let depth = 2;
-    //     let n_crit = 150;
-
-    //     let tree = SingleNodeTree::new(&points, false, Some(n_crit), Some(depth));
-    //     let order = 2;
-    //     let alpha_inner = 1.05;
-    //     let alpha_outer = 1.95;
-
-    //     // New FMM
-    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree);
-
-    //     let charges = Charges::new();
-
-    //     // Attach to a data tree
-    //     let datatree = FmmData::new(fmm, charges);
-
-    //     // Run algorithm
-    //     datatree.run();
-
-    //     for target in datatree.fmm.tree().get_keys(2).unwrap().iter() {
-    //         if let Some(v_list) = datatree.fmm.get_v_list(&target) {
-    //             let downward_equivalent_surface = target
-    //                 .compute_surface(
-    //                     datatree.fmm.tree().get_domain(),
-    //                     datatree.fmm.order,
-    //                     datatree.fmm.alpha_outer,
-    //                 )
-    //                 .into_iter()
-    //                 .flat_map(|[x, y, z]| vec![x, y, z])
-    //                 .collect_vec();
-
-    //             let downward_check_surface = target
-    //                 .compute_surface(
-    //                     datatree.fmm.tree().get_domain(),
-    //                     datatree.fmm.order,
-    //                     datatree.fmm.alpha_inner,
-    //                 )
-    //                 .into_iter()
-    //                 .flat_map(|[x, y, z]| vec![x, y, z])
-    //                 .collect_vec();
-
-    //             let local_expansion_arc = Arc::clone(datatree.locals.get(&target).unwrap());
-    //             let local_expansion_lock = local_expansion_arc.lock().unwrap();
-    //             let local_expansion_view = ArrayView::from(local_expansion_lock.deref());
-    //             let local_expansion_slice = local_expansion_view.as_slice().unwrap();
-
-    //             let mut equivalent = vec![0f64; local_expansion_view.len()];
-
-    //             datatree.fmm.kernel().potential(
-    //                 &downward_equivalent_surface[..],
-    //                 &local_expansion_slice,
-    //                 &downward_check_surface[..],
-    //                 &mut equivalent,
-    //             );
-
-    //             let mut direct = vec![0f64; local_expansion_view.len()];
-
-    //             for source in v_list.iter() {
-    //                 let upward_equivalent_surface = source
-    //                     .compute_surface(
-    //                         datatree.fmm.tree().get_domain(),
-    //                         datatree.fmm.order,
-    //                         datatree.fmm.alpha_inner,
-    //                     )
-    //                     .into_iter()
-    //                     .flat_map(|[x, y, z]| vec![x, y, z])
-    //                     .collect_vec();
-
-    //                 let multipole_expansion_arc =
-    //                     Arc::clone(datatree.multipoles.get(&source).unwrap());
-    //                 let multipole_expansion_lock = multipole_expansion_arc.lock().unwrap();
-    //                 let multipole_expansion_view =
-    //                     ArrayView::from(multipole_expansion_lock.deref());
-    //                 let multipole_expansion_slice = multipole_expansion_view.as_slice().unwrap();
-
-    //                 let mut tmp: Vec<f64> = vec![0f64; local_expansion_view.len()];
-
-    //                 datatree.fmm.kernel().potential(
-    //                     &upward_equivalent_surface[..],
-    //                     &multipole_expansion_slice,
-    //                     &downward_check_surface[..],
-    //                     &mut tmp,
-    //                 );
-
-    //                 direct
-    //                     .iter_mut()
-    //                     .zip(tmp.iter())
-    //                     .for_each(|(d, t)| *d += *t);
-    //             }
-
-    //             for (a, b) in equivalent.iter().zip(direct.iter()) {
-    //                 let are_equal = a.relative_eq(&b, 1e-5, 1e-5);
-    //                 assert!(are_equal);
-    //             }
-    //         }
-    //     }
-    // }
-    use rayon::ThreadPoolBuilder;
-
     #[test]
     fn test_fmm() {
         let npoints = 100000;
@@ -1203,6 +1074,7 @@ mod test {
         println!("Tree = {:?}ms", start.elapsed().as_millis());
 
         let start = Instant::now();
+
         // let m2l_data = SvdFieldTranslationNaiveKiFmm::new(
         //     kernel.clone(),
         //     Some(k),

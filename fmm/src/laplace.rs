@@ -50,6 +50,25 @@ impl Kernel for LaplaceKernel {
         self.value_dimension
     }
 
+    fn kernel(&self, source: &[f64], target: &[f64]) -> f64 {
+        let mut tmp = source
+            .iter()
+            .zip(target.iter())
+            .map(|(s, t)| (s - t).powf(2.0))
+            .sum::<f64>()
+            .powf(0.5)
+            * std::f64::consts::PI
+            * 4.0;
+
+        tmp = tmp.recip();
+
+        if tmp.is_finite() {
+            tmp
+        } else {
+            0.
+        }
+    }
+
     fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]) {
         for (i, j) in (0..targets.len()).step_by(self.dim()).enumerate() {
             let mut potential = 0.0;
@@ -59,7 +78,7 @@ impl Kernel for LaplaceKernel {
                 let source = &sources[l..(l + self.dim())];
                 let tmp;
                 if self.dim() == 3 {
-                    tmp = self.potential_kernel_3_d(source, target);
+                    tmp = self.kernel(source, target);
                 } else {
                     panic!("Kernel not implemented for dimension={:?}!", self.dim())
                 }

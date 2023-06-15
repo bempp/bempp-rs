@@ -22,4 +22,6 @@ pub trait Kernel {
 
     /// Scale the kernel to a given level of an associated tree.
     fn scale(&self, level: u64) -> f64;
+
+    fn kernel(&self, source: &[f64], target: &[f64]) -> f64;
 }
