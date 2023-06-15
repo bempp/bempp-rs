@@ -89,6 +89,7 @@ where
     pub kernel: T,
 }
 
+#[derive(Debug)]
 pub struct TransferVector {
     pub vector: usize,
     pub source: MortonKey,
@@ -450,12 +451,6 @@ where
 //     }
 // }
 
-// impl SvdFieldTranslation {
-//     pub fn new() -> Self {
-//         SvdFieldTranslation::default()
-//     }
-// }
-
 impl FftFieldTranslationNaive {
     pub fn new() -> Self {
         FftFieldTranslationNaive::default()
@@ -470,12 +465,19 @@ where
         let mut result = SvdFieldTranslationNaiveKiFmm::default();
 
         if let Some(k) = k {
-            result.k = k;
+            // Compression rank <= number of coefficients
+            let ncoeffs = result.ncoeffs(expansion_order);
+            if k <= ncoeffs {
+                result.k = k
+            } else {
+                result.k = ncoeffs;
+            }
         } else {
-            // TODO: Should be data driven
+            // TODO: Should be data driven if nothing is provided by the user
             result.k = 50;
         }
 
+        result.kernel = kernel;
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
 
@@ -491,12 +493,19 @@ where
         let mut result = SvdFieldTranslationKiFmm::default();
 
         if let Some(k) = k {
-            result.k = k;
+            // Compression rank <= number of coefficients
+            let ncoeffs = result.ncoeffs(expansion_order);
+            if k <= ncoeffs {
+                result.k = k
+            } else {
+                result.k = ncoeffs;
+            }
         } else {
-            // TODO: Should be data driven
+            // TODO: Should be data driven if nothing is provided by the user
             result.k = 50;
         }
 
+        result.kernel = kernel;
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
 

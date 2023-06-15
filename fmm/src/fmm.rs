@@ -1194,7 +1194,7 @@ mod test {
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = true;
-        let k = 84;
+        let k = 453;
 
         let kernel = LaplaceKernel::new(3, false, 3);
 
@@ -1202,70 +1202,69 @@ mod test {
         let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
         println!("Tree = {:?}ms", start.elapsed().as_millis());
 
-        let translation_type = "svd".to_string();
-
         let start = Instant::now();
-        let m2l_data = SvdFieldTranslationNaiveKiFmm::new(
+        // let m2l_data = SvdFieldTranslationNaiveKiFmm::new(
+        //     kernel.clone(),
+        //     Some(k),
+        //     order,
+        //     tree.get_domain().clone(),
+        // );
+
+        let m2l_data = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
             Some(k),
             order,
             tree.get_domain().clone(),
         );
-
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
-        // println!("FMM operators = {:?}ms", start.elapsed().as_millis());
+        println!("FMM operators = {:?}ms", start.elapsed().as_millis());
 
-        // let charges = Charges::new();
+        let charges = Charges::new();
 
-        // let datatree = FmmData::new(fmm, charges);
+        let datatree = FmmData::new(fmm, charges);
 
-        // datatree.run();
+        datatree.run();
 
-        // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        // let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        // let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        // let mut direct = vec![0f64; pts.len()];
-        // let all_point_coordinates = points_clone
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
+        let mut direct = vec![0f64; pts.len()];
+        let all_point_coordinates = points_clone
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-        // let leaf_coordinates = pts
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
-        // let all_charges = vec![1f64; points_clone.len()];
+        let leaf_coordinates = pts
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let all_charges = vec![1f64; points_clone.len()];
 
-        // let kernel = LaplaceKernel {
-        //     dim: 3,
-        //     is_singular: false,
-        //     value_dimension: 3,
-        // };
-        // kernel.potential(
-        //     &all_point_coordinates[..],
-        //     &all_charges[..],
-        //     &leaf_coordinates[..],
-        //     &mut direct[..],
-        // );
+        let kernel = LaplaceKernel {
+            dim: 3,
+            is_singular: false,
+            value_dimension: 3,
+        };
+        kernel.potential(
+            &all_point_coordinates[..],
+            &all_charges[..],
+            &leaf_coordinates[..],
+            &mut direct[..],
+        );
 
-        // // for (a, b) in potentials.iter().zip(direct.iter()) {
-        // //     let are_equal = a.relative_eq(&b, 1e-4, 1e-4);
-        // //     assert!(are_equal);
-        // // }
+        let abs_error: f64 = potentials
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        // let abs_error: f64 = potentials
-        //     .iter()
-        //     .zip(direct.iter())
-        //     .map(|(a, b)| (a - b).abs())
-        //     .sum();
-        // let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-
-        // println!("p={:?} rel_error={:?}\n", order, rel_error);
-        // assert!(false)
+        println!("p={:?} rel_error={:?}\n", order, rel_error);
+        assert!(false)
     }
 }

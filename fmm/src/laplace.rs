@@ -1,7 +1,7 @@
 //! Laplace kernel implementation.
 use bempp_traits::kernel::Kernel;
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct LaplaceKernel {
     pub dim: usize,
     pub is_singular: bool,
@@ -79,7 +79,6 @@ impl Kernel for LaplaceKernel {
 
             for j in (0..sources.len()).step_by(self.dim()) {
                 let source = &sources[j..(j + self.dim())];
-
                 let tmp;
                 if self.dim() == 3 {
                     tmp = self.potential_kernel_3_d(source, target);
