@@ -2,7 +2,6 @@
 
 /// Interface for FMM kernels.
 pub trait Kernel {
-
     /// Space dimensions for the input of the kernel.
     fn dim(&self) -> usize;
 

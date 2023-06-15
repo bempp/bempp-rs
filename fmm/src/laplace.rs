@@ -1,6 +1,7 @@
 //! Laplace kernel implementation.
-use bempp_traits::{kernel::Kernel};
+use bempp_traits::kernel::Kernel;
 
+#[derive(Default, Clone)]
 pub struct LaplaceKernel {
     pub dim: usize,
     pub is_singular: bool,
@@ -37,7 +38,6 @@ impl LaplaceKernel {
 }
 
 impl Kernel for LaplaceKernel {
-
     fn dim(&self) -> usize {
         self.dim
     }
@@ -70,12 +70,7 @@ impl Kernel for LaplaceKernel {
         }
     }
 
-    fn gram(
-        &self,
-        sources: &[f64],
-        targets: &[f64],
-        result: &mut Vec<f64>
-    ){
+    fn gram(&self, sources: &[f64], targets: &[f64], result: &mut Vec<f64>) {
         // let mut result: Vec<f64> = Vec::new();
 
         for i in (0..targets.len()).step_by(self.dim()) {

@@ -21,3 +21,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 bempp-traits = { path = "../traits" }
+bempp-tree = { path = "../tree" }
+itertools = "0.10"
+ndarray = { version = "*", features = ["blas"]}
+ndarray-linalg = { version = "*", features = ["openblas-system"] }
