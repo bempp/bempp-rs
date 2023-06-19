@@ -25,3 +25,6 @@ bempp-tree = { path = "../tree" }
 itertools = "0.10"
 ndarray = { version = "*", features = ["blas"]}
 ndarray-linalg = { version = "*", features = ["openblas-system"] }
+ndarray-ndimage = "0.3.0"
+ndrustfft = "0.4.0"
+num = "0.4.0"
