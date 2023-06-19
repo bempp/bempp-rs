@@ -875,7 +875,6 @@ where
                         ndfft(&tmp2, &mut padded_signal_hat, &mut handler_ax0, 0);
 
                         // 3.Compute convolution to find check potential
-                        // TODO: NEEDS TO BE APPROPRIATELY SCALED
                         let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
 
                         // Hadamard product
@@ -901,10 +900,10 @@ where
                             tmp.push(element);
                         }
 
-
                         // Compute local coefficients from check potentials
-                        let check_potential = Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap();
-
+                        // TODO: NEEDS TO BE APPROPRIATELY SCALED
+                        let check_potential = Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap()*self.m2l_scale(level);
+// 
                         // Compute local
                         let target_local_owned = self.m2l_scale(target.level())
                             * fmm_arc.kernel.scale(target.level())
