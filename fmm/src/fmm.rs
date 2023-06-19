@@ -10,7 +10,7 @@ use std::{
     time::Instant,
 };
 use ndarray_ndimage::{pad, PadMode};
-use ndrustfft::{Complex, FftHandler, ndfft};
+use ndrustfft::{Complex, FftHandler, R2cFftHandler, ndfft, ndfft_r2c, ndifft, ndifft_r2c};
 
 use bempp_field::{
     FftFieldTranslationNaiveKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationNaiveKiFmm,
@@ -859,19 +859,18 @@ where
                             [r-k, 0],
                         ];
                         let padded_signal = pad(&signal, &padding, PadMode::Constant(0.));
-                        let padded_signal = padded_signal.map(|&x| Complex::new(x, 0.0));
 
                         // 2. FFT of the padded signal
                         // 2.1 Init the handlers for FFTs along each axis
                         let mut handler_ax0 = FftHandler::<f64>::new(p);
                         let mut handler_ax1 = FftHandler::<f64>::new(q);
-                        let mut handler_ax2 = FftHandler::<f64>::new(r);
+                        let mut handler_ax2 = R2cFftHandler::<f64>::new(r);
 
                         // 2.2 Compute the transform along each axis
-                        let mut padded_signal_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r));
-                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r));
-                        ndfft(&padded_signal, &mut tmp1, &mut handler_ax2, 2);
-                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r));
+                        let mut padded_signal_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                        ndfft_r2c(&padded_signal, &mut tmp1, &mut handler_ax2, 2);
+                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
                         ndfft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
                         ndfft(&tmp2, &mut padded_signal_hat, &mut handler_ax0, 0);
 
@@ -883,11 +882,49 @@ where
                         let check_potential_hat = padded_kernel_hat * padded_signal_hat;
 
                         // 3.1 Compute iFFT to find check potentials
+                        let mut check_potential: Array3<f64> = Array3::zeros((p, q, r));
+                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r/2+1));
+                        ndifft(&check_potential_hat, &mut tmp1, &mut handler_ax0, 0);
+                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r/2+1));
+                        ndifft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
+                        ndifft_r2c(&tmp2, &mut check_potential, &mut handler_ax2, 2);
+
+                        // Filter check potentials
+                        let check_potential = check_potential
+                            .slice(s![p-m-1..p, q-n-1..q, r-k-1..r]);
+                        
+                        let (_, target_surface_idxs) = target.surface_grid(fmm_arc.order);
+
+                        let mut tmp = Vec::new();
+                        for index in target_surface_idxs.iter() {
+                            let element = check_potential[[index[0], index[1], index[2]]];
+                            tmp.push(element);
+                        }
 
 
                         // Compute local coefficients from check potentials
+                        let check_potential = Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap();
+
+                        // Compute local
+                        let target_local_owned = self.m2l_scale(target.level())
+                            * fmm_arc.kernel.scale(target.level())
+                            * fmm_arc
+                                .dc2e_inv
+                                .0
+                                .dot(&self.fmm.dc2e_inv.1.dot(&check_potential));
 
                         // Store computation
+                        let target_local_owned = vec![0f64; 6*(fmm_arc.order -1 ).pow(2) + 2];
+                        let mut target_local_lock = target_local_arc.lock().unwrap();
+
+                        if !target_local_lock.is_empty() {
+                            target_local_lock
+                                .iter_mut()
+                                .zip(target_local_owned.iter())
+                                .for_each(|(c, m)| *c += *m);
+                        } else {
+                            target_local_lock.extend(target_local_owned);
+                        }
                     }
                 }
             })
@@ -1159,7 +1196,7 @@ mod test {
         let depth = 4;
         let n_crit = 150;
 
-        let order = 8;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = true;
@@ -1180,12 +1217,12 @@ mod test {
         //     tree.get_domain().clone(),
         // );
 
-        let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-            kernel.clone(),
-            Some(k),
-            order,
-            tree.get_domain().clone(),
-        );
+        // let m2l_data_svd = SvdFieldTranslationKiFmm::new(
+        //     kernel.clone(),
+        //     Some(k),
+        //     order,
+        //     tree.get_domain().clone(),
+        // );
         println!("SVD operators = {:?}ms", start.elapsed().as_millis());
 
         let start = Instant::now();
@@ -1193,15 +1230,15 @@ mod test {
             FftFieldTranslationNaiveKiFmm::new(kernel.clone(), order, tree.get_domain().clone());
         println!("FFT operators = {:?}ms", start.elapsed().as_millis());
 
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+
+        let charges = Charges::new();
+
+        let datatree = FmmData::new(fmm, charges);
+
+        datatree.run();
+
         assert!(false);
-        // let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
-
-        // let charges = Charges::new();
-
-        // let datatree = FmmData::new(fmm, charges);
-
-        // datatree.run();
-
         // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
         // let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();

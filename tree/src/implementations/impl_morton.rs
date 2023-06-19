@@ -740,7 +740,7 @@ impl MortonKey {
         grid
     }
 
-    pub fn surface_grid(&self, order: usize) -> (Vec<[f64; 3]>, Vec<[f64; 3]>) {
+    pub fn surface_grid(&self, order: usize) -> (Vec<[f64; 3]>, Vec<[usize; 3]>) {
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
 
         let mut surface: Vec<[f64; 3]> = vec![[0f64; 3]; n_coeffs];
@@ -766,7 +766,7 @@ impl MortonKey {
             }
         }
 
-        let surface_idxs = surface.clone();
+        let surface_idxs = surface.iter().clone().map(|&[a, b, c]| [a as usize, b as usize, c as usize]).collect();
 
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         surface.iter_mut().for_each(|point| {

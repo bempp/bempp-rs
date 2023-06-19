@@ -5,7 +5,7 @@ use ndarray::*;
 use ndarray_linalg::SVDDC;
 use ndarray_ndimage::{pad, PadMode};
 use num::Float;
-use ndrustfft::{Complex, FftHandler, ndfft};
+use ndrustfft::{Complex, FftHandler, R2cFftHandler, ndfft, ndfft_r2c};
 
 use bempp_traits::{field::FieldTranslationData, kernel::Kernel};
 use bempp_tree::types::{domain::Domain, morton::MortonKey};
@@ -236,22 +236,19 @@ where
 
             let padded_kernel = pad(&kernel, &padding, PadMode::Constant(0.));
 
-            // Map to complex for FFT
-            let padded_kernel = padded_kernel.map(|&x| Complex::new(x, 0.0));
-
-            let mut padded_kernel_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r));
+            let mut padded_kernel_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
 
             // Compute FFT of kernel for this transfer vector
             { 
                 // 1. Init the handlers for FFTs along each axis
                 let mut handler_ax0 = FftHandler::<f64>::new(p);
                 let mut handler_ax1 = FftHandler::<f64>::new(q);
-                let mut handler_ax2 = FftHandler::<f64>::new(r);
+                let mut handler_ax2 = R2cFftHandler::<f64>::new(r);
 
                 // 2. Compute the transform along each axis
-                let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r));
-                ndfft(&padded_kernel, &mut tmp1, &mut handler_ax2, 2);
-                let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r));
+                let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                ndfft_r2c(&padded_kernel, &mut tmp1, &mut handler_ax2, 2);
+                let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
                 ndfft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
                 ndfft(&tmp2, &mut padded_kernel_hat, &mut handler_ax0, 0);
 
@@ -559,6 +556,7 @@ where
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
 
+        
         result
     }
 
