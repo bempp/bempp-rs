@@ -24,7 +24,7 @@ where
 
     // Precomputed FFT of unique kernel interactions placed on
     // convolution grid.
-    pub m2l: ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>,
+    pub m2l: Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>>,
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -256,7 +256,6 @@ where
                 ndfft(&tmp2, &mut padded_kernel_hat, &mut handler_ax0, 0);
 
             }
-             
 
             // Store FFT of kernel for this transfer vector
             {
@@ -558,7 +557,7 @@ where
         result.kernel = kernel;
 
         result.transfer_vectors = result.compute_transfer_vectors();
-        // result.m2l = result.compute_m2l_operators(expansion_order, domain);
+        result.m2l = result.compute_m2l_operators(expansion_order, domain);
 
         result
     }
@@ -628,7 +627,7 @@ where
         &self,
         expansion_order: usize,
         convolution_grid: &Vec<[f64; 3]>,
-        charges: Vec<f64>,
+        charges: &Vec<f64>,
     ) -> Vec<Vec<Vec<f64>>> {
         let n = 2 * expansion_order - 1;
         let mut result = vec![vec![vec![0f64; n]; n]; n];

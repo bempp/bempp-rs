@@ -39,6 +39,7 @@ rayon = "1.5.1"
 num_cpus = "1.0"
 ndrustfft = "0.4.0"
 num = "0.4.0"
+ndarray-ndimage = "0.3.0"
 
 [target.aarch64-apple-darwin]
 rustflags = [  "-C", "target-feature=+neon"]
