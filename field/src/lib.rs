@@ -15,6 +15,9 @@ pub struct FftFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel + Default,
 {
+    // Amount to dilate inner check surface by
+    pub alpha: f64,
+
     // Maps between convolution and surface grids
     pub surf_to_conv_map: HashMap<usize, usize>,
     pub conv_to_surf_map: HashMap<usize, usize>,
@@ -37,6 +40,9 @@ pub struct SvdFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel + Default,
 {
+    // Amount to dilate inner check surface by
+    pub alpha: f64,
+
     // Compression rank, if unspecified estimated from data.
     pub k: usize,
 
@@ -58,6 +64,9 @@ pub struct SvdFieldTranslationKiFmm<T>
 where
     T: Kernel + Default,
 {
+    // Amount to dilate inner check surface by
+    pub alpha: f64,
+
     // Compression rank, if unspecified estimated from data.
     pub k: usize,
 
@@ -187,25 +196,23 @@ where
         expansion_order: usize,
         domain: Self::Domain,
     ) -> Self::M2LOperators {
-        let alpha_inner = 1.05;
-
         let mut result: Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>> = Vec::new();
 
         for t in self.transfer_vectors.iter() {
             let source_equivalent_surface =
                 t.source
-                    .compute_surface(&domain, expansion_order, alpha_inner);
+                    .compute_surface(&domain, expansion_order, self.alpha);
 
             let conv_grid_sources = t.source.convolution_grid(
                 expansion_order,
                 &domain,
                 &source_equivalent_surface,
-                alpha_inner,
+                self.alpha,
             );
 
             let target_check_surface =
                 t.target
-                    .compute_surface(&domain, expansion_order, alpha_inner);
+                    .compute_surface(&domain, expansion_order, self.alpha);
             // Find min target
             let sums: Vec<f64> = target_check_surface
                 .iter()
@@ -306,8 +313,6 @@ where
         let nrows = self.ncoeffs(expansion_order);
         let ncols = self.ncoeffs(expansion_order);
 
-        let alpha_inner = 1.05;
-
         let mut se2tc_fat: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
             Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
 
@@ -317,14 +322,14 @@ where
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t
                 .source
-                .compute_surface(&domain, expansion_order, alpha_inner)
+                .compute_surface(&domain, expansion_order, self.alpha)
                 .into_iter()
                 .flat_map(|[x, y, z]| vec![x, y, z])
                 .collect_vec();
 
             let target_check_surface = t
                 .target
-                .compute_surface(&domain, expansion_order, alpha_inner)
+                .compute_surface(&domain, expansion_order, self.alpha)
                 .into_iter()
                 .flat_map(|[x, y, z]| vec![x, y, z])
                 .collect_vec();
@@ -410,8 +415,6 @@ where
         let nrows = self.ncoeffs(expansion_order);
         let ncols = self.ncoeffs(expansion_order);
 
-        let alpha_inner = 1.05;
-
         let mut se2tc_fat: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
             Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
 
@@ -421,14 +424,14 @@ where
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t
                 .source
-                .compute_surface(&domain, expansion_order, alpha_inner)
+                .compute_surface(&domain, expansion_order, self.alpha)
                 .into_iter()
                 .flat_map(|[x, y, z]| vec![x, y, z])
                 .collect_vec();
 
             let target_check_surface = t
                 .target
-                .compute_surface(&domain, expansion_order, alpha_inner)
+                .compute_surface(&domain, expansion_order, self.alpha)
                 .into_iter()
                 .flat_map(|[x, y, z]| vec![x, y, z])
                 .collect_vec();
@@ -487,7 +490,13 @@ impl<T> SvdFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel + Default,
 {
-    pub fn new(kernel: T, k: Option<usize>, expansion_order: usize, domain: Domain) -> Self {
+    pub fn new(
+        kernel: T,
+        k: Option<usize>,
+        expansion_order: usize,
+        domain: Domain,
+        alpha: f64,
+    ) -> Self {
         let mut result = SvdFieldTranslationNaiveKiFmm::default();
 
         if let Some(k) = k {
@@ -503,6 +512,7 @@ where
             result.k = 50;
         }
 
+        result.alpha = alpha;
         result.kernel = kernel;
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
@@ -515,7 +525,13 @@ impl<T> SvdFieldTranslationKiFmm<T>
 where
     T: Kernel + Default,
 {
-    pub fn new(kernel: T, k: Option<usize>, expansion_order: usize, domain: Domain) -> Self {
+    pub fn new(
+        kernel: T,
+        k: Option<usize>,
+        expansion_order: usize,
+        domain: Domain,
+        alpha: f64,
+    ) -> Self {
         let mut result = SvdFieldTranslationKiFmm::default();
 
         if let Some(k) = k {
@@ -531,6 +547,7 @@ where
             result.k = 50;
         }
 
+        result.alpha = alpha;
         result.kernel = kernel;
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
@@ -543,7 +560,7 @@ impl<T> FftFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel + Default,
 {
-    pub fn new(kernel: T, expansion_order: usize, domain: Domain) -> Self {
+    pub fn new(kernel: T, expansion_order: usize, domain: Domain, alpha: f64) -> Self {
         let mut result = FftFieldTranslationNaiveKiFmm::default();
 
         // Create maps between surface and convolution grids
@@ -554,6 +571,7 @@ where
 
         result.kernel = kernel;
 
+        result.alpha = alpha;
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
 

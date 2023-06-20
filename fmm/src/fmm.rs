@@ -31,35 +31,6 @@ use bempp_tree::{
 };
 
 use crate::{charge::Charges, linalg::pinv};
-fn format_complex_array_3d(arr: &Vec<Vec<Vec<Complex<f32>>>>) -> String {
-    let mut output = String::new();
-
-    output.push_str("np.array([\n");
-    for matrix in arr {
-        output.push_str(" [\n");
-        for row in matrix {
-            output.push_str("  [");
-            for cell in row {
-                output.push_str(&format!("{}+{}j, ", cell.re, cell.im));
-            }
-            // Remove last comma and space, then add closing brackets and newline.
-            let len = output.len();
-            output.truncate(len - 2);
-            output.push_str("],\n");
-        }
-        // Remove last comma and newline, then add closing brackets and newline.
-        let len = output.len();
-        output.truncate(len - 2);
-        output.push_str("]\n ],\n");
-    }
-    // Remove last comma and newline, then add closing brackets and newline.
-    let len = output.len();
-    output.truncate(len - 4);
-    output.push_str("\n])");
-
-    output
-}
-
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
     multipoles: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
@@ -834,7 +805,7 @@ where
 {
     fn m2l(&self, level: u64) {
         if let Some(targets) = self.fmm.tree().get_keys(level) {
-            targets.iter().for_each(move |&target| {
+            targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
                 let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
 
@@ -1270,6 +1241,7 @@ mod test {
             Some(k),
             order,
             tree.get_domain().clone(),
+            alpha_inner,
         );
 
         let m2l_data_svd = SvdFieldTranslationKiFmm::new(
@@ -1277,15 +1249,20 @@ mod test {
             Some(k),
             order,
             tree.get_domain().clone(),
+            alpha_inner,
         );
         println!("SVD operators = {:?}ms", start.elapsed().as_millis());
 
         let start = Instant::now();
-        let m2l_data_fft =
-            FftFieldTranslationNaiveKiFmm::new(kernel.clone(), order, tree.get_domain().clone());
+        let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
+            kernel.clone(),
+            order,
+            tree.get_domain().clone(),
+            alpha_inner,
+        );
         println!("FFT operators = {:?}ms", start.elapsed().as_millis());
 
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
         let charges = Charges::new();
 
