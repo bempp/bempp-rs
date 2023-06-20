@@ -4,8 +4,8 @@ use itertools::Itertools;
 use ndarray::*;
 use ndarray_linalg::SVDDC;
 use ndarray_ndimage::{pad, PadMode};
+use ndrustfft::{ndfft, ndfft_r2c, Complex, FftHandler, R2cFftHandler};
 use num::Float;
-use ndrustfft::{Complex, FftHandler, R2cFftHandler, ndfft, ndfft_r2c};
 
 use bempp_traits::{field::FieldTranslationData, kernel::Kernel};
 use bempp_tree::types::{domain::Domain, morton::MortonKey};
@@ -187,25 +187,30 @@ where
         expansion_order: usize,
         domain: Self::Domain,
     ) -> Self::M2LOperators {
-        
         let alpha_inner = 1.05;
 
         let mut result: Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>> = Vec::new();
-        
-        for t in self.transfer_vectors.iter() {
 
-            let source_equivalent_surface = t
-                .source
-                .compute_surface(&domain, expansion_order, alpha_inner);
-            
-            let conv_grid_sources = t
-                .source.convolution_grid(expansion_order, &domain, &source_equivalent_surface);
-            
-            let target_check_surface = t
-                .target
-                .compute_surface(&domain, expansion_order, alpha_inner);
+        for t in self.transfer_vectors.iter() {
+            let source_equivalent_surface =
+                t.source
+                    .compute_surface(&domain, expansion_order, alpha_inner);
+
+            let conv_grid_sources = t.source.convolution_grid(
+                expansion_order,
+                &domain,
+                &source_equivalent_surface,
+                alpha_inner,
+            );
+
+            let target_check_surface =
+                t.target
+                    .compute_surface(&domain, expansion_order, alpha_inner);
             // Find min target
-            let sums: Vec<f64> = target_check_surface.iter().map(|point| point.iter().sum()).collect_vec();
+            let sums: Vec<f64> = target_check_surface
+                .iter()
+                .map(|point| point.iter().sum())
+                .collect_vec();
             let min_index = sums
                 .iter()
                 .enumerate()
@@ -214,52 +219,48 @@ where
                 .unwrap();
             let min_target = target_check_surface[min_index];
 
-
             let kernel = self.compute_kernel(expansion_order, &conv_grid_sources, min_target);
             let m = kernel.len();
             let n = kernel[0].len();
             let k = kernel[0][0].len();
 
             // Precompute and store the FFT of each unique kernel interaction
-            let kernel = Array3::from_shape_vec((m, n, k), kernel.into_iter().flatten().flatten().collect()).unwrap();
+            let kernel =
+                Array3::from_shape_vec((m, n, k), kernel.into_iter().flatten().flatten().collect())
+                    .unwrap();
 
             // Begin by calculating pad lengths along each dimension
-            let p = 2*m;
-            let q = 2*n;
-            let r = 2*k;
+            let p = 2 * m;
+            let q = 2 * n;
+            let r = 2 * k;
 
-            let padding = [
-                [0, p-m],
-                [0, q-n],
-                [0, r-k],
-            ];
+            let padding = [[0, p - m], [0, q - n], [0, r - k]];
 
             let padded_kernel = pad(&kernel, &padding, PadMode::Constant(0.));
 
-            let mut padded_kernel_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+            // Flip the kernel
+            let padded_kernel = padded_kernel.slice(s![..;-1,..;-1,..;-1]).to_owned();
+            let mut padded_kernel_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
 
             // Compute FFT of kernel for this transfer vector
-            { 
+            {
                 // 1. Init the handlers for FFTs along each axis
                 let mut handler_ax0 = FftHandler::<f64>::new(p);
                 let mut handler_ax1 = FftHandler::<f64>::new(q);
                 let mut handler_ax2 = R2cFftHandler::<f64>::new(r);
 
                 // 2. Compute the transform along each axis
-                let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
                 ndfft_r2c(&padded_kernel, &mut tmp1, &mut handler_ax2, 2);
-                let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
                 ndfft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
                 ndfft(&tmp2, &mut padded_kernel_hat, &mut handler_ax0, 0);
-
             }
 
             // Store FFT of kernel for this transfer vector
             {
                 result.push(padded_kernel_hat);
-
             }
-
         }
 
         result
@@ -556,7 +557,6 @@ where
         result.transfer_vectors = result.compute_transfer_vectors();
         result.m2l = result.compute_m2l_operators(expansion_order, domain);
 
-        
         result
     }
 
@@ -621,12 +621,7 @@ where
         result
     }
 
-    pub fn compute_signal(
-        &self,
-        expansion_order: usize,
-        convolution_grid: &Vec<[f64; 3]>,
-        charges: &Vec<f64>,
-    ) -> Vec<Vec<Vec<f64>>> {
+    pub fn compute_signal(&self, expansion_order: usize, charges: &Vec<f64>) -> Vec<Vec<Vec<f64>>> {
         let n = 2 * expansion_order - 1;
         let mut result = vec![vec![vec![0f64; n]; n]; n];
 

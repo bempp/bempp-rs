@@ -2,6 +2,8 @@ extern crate blas_src;
 
 use itertools::Itertools;
 use ndarray::*;
+use ndarray_ndimage::{pad, PadMode};
+use ndrustfft::{ndfft, ndfft_r2c, ndifft, ndifft_r2c, Complex, FftHandler, R2cFftHandler};
 use rayon::prelude::*;
 use std::{
     collections::HashMap,
@@ -9,8 +11,6 @@ use std::{
     sync::{Arc, Mutex, RwLock},
     time::Instant,
 };
-use ndarray_ndimage::{pad, PadMode};
-use ndrustfft::{Complex, FftHandler, R2cFftHandler, ndfft, ndfft_r2c, ndifft, ndifft_r2c};
 
 use bempp_field::{
     FftFieldTranslationNaiveKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationNaiveKiFmm,
@@ -31,6 +31,34 @@ use bempp_tree::{
 };
 
 use crate::{charge::Charges, linalg::pinv};
+fn format_complex_array_3d(arr: &Vec<Vec<Vec<Complex<f32>>>>) -> String {
+    let mut output = String::new();
+
+    output.push_str("np.array([\n");
+    for matrix in arr {
+        output.push_str(" [\n");
+        for row in matrix {
+            output.push_str("  [");
+            for cell in row {
+                output.push_str(&format!("{}+{}j, ", cell.re, cell.im));
+            }
+            // Remove last comma and space, then add closing brackets and newline.
+            let len = output.len();
+            output.truncate(len - 2);
+            output.push_str("],\n");
+        }
+        // Remove last comma and newline, then add closing brackets and newline.
+        let len = output.len();
+        output.truncate(len - 2);
+        output.push_str("]\n ],\n");
+    }
+    // Remove last comma and newline, then add closing brackets and newline.
+    let len = output.len();
+    output.truncate(len - 4);
+    output.push_str("\n])");
+
+    output
+}
 
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
@@ -806,7 +834,7 @@ where
 {
     fn m2l(&self, level: u64) {
         if let Some(targets) = self.fmm.tree().get_keys(level) {
-            targets.par_iter().for_each(move |&target| {
+            targets.iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
                 let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
 
@@ -832,32 +860,31 @@ where
                             fmm_arc.order,
                             fmm_arc.tree().get_domain(),
                             &source_equivalent_surface,
+                            fmm_arc.alpha_inner,
                         );
                         let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
-                        let signal = fmm_arc.m2l.compute_signal(
-                            fmm_arc.order,
-                            &source_convolution_grid,
-                            source_multipole_lock.deref(),
-                        );
+                        let signal = fmm_arc
+                            .m2l
+                            .compute_signal(fmm_arc.order, source_multipole_lock.deref());
 
                         // 1. Pad the signal
                         let m = signal.len();
                         let n = signal[0].len();
                         let k = signal[0][0].len();
-                        
-                        let p = 2*m;
-                        let q = 2*n;
-                        let r = 2*k;
-                        
-                        let signal = Array3::from_shape_vec((m, n, k), signal.into_iter().flatten().flatten().collect()).unwrap();
-                        
-                        let padding = [
-                            [p-m, 0],
-                            [q-n, 0],
-                            [r-k, 0],
-                        ];
+
+                        let p = 2 * m;
+                        let q = 2 * n;
+                        let r = 2 * k;
+
+                        let signal = Array3::from_shape_vec(
+                            (m, n, k),
+                            signal.into_iter().flatten().flatten().collect(),
+                        )
+                        .unwrap();
+
+                        let padding = [[p - m, 0], [q - n, 0], [r - k, 0]];
                         let padded_signal = pad(&signal, &padding, PadMode::Constant(0.));
 
                         // 2. FFT of the padded signal
@@ -867,10 +894,11 @@ where
                         let mut handler_ax2 = R2cFftHandler::<f64>::new(r);
 
                         // 2.2 Compute the transform along each axis
-                        let mut padded_signal_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
-                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                        let mut padded_signal_hat: Array3<Complex<f64>> =
+                            Array3::zeros((p, q, r / 2 + 1));
+                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
                         ndfft_r2c(&padded_signal, &mut tmp1, &mut handler_ax2, 2);
-                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r/2 + 1));
+                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
                         ndfft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
                         ndfft(&tmp2, &mut padded_signal_hat, &mut handler_ax0, 0);
 
@@ -882,16 +910,16 @@ where
 
                         // 3.1 Compute iFFT to find check potentials
                         let mut check_potential: Array3<f64> = Array3::zeros((p, q, r));
-                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r/2+1));
+                        let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
                         ndifft(&check_potential_hat, &mut tmp1, &mut handler_ax0, 0);
-                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r/2+1));
+                        let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
                         ndifft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
                         ndifft_r2c(&tmp2, &mut check_potential, &mut handler_ax2, 2);
 
                         // Filter check potentials
-                        let check_potential = check_potential
-                            .slice(s![p-m-1..p, q-n-1..q, r-k-1..r]);
-                        
+                        let check_potential =
+                            check_potential.slice(s![p - m - 1..p, q - n - 1..q, r - k - 1..r]);
+
                         let (_, target_surface_idxs) = target.surface_grid(fmm_arc.order);
 
                         let mut tmp = Vec::new();
@@ -901,9 +929,37 @@ where
                         }
 
                         // Compute local coefficients from check potentials
-                        // TODO: NEEDS TO BE APPROPRIATELY SCALED
-                        let check_potential = Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap()*self.m2l_scale(level);
-// 
+                        let check_potential =
+                            Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap();
+
+                        // if level == fmm_arc.tree().get_depth() {
+
+                        //     let mut direct = vec![0f64; target_surface_idxs.len()];
+                        //     let source_coordinates = source.compute_surface(fmm_arc.tree().get_domain(), fmm_arc.order, fmm_arc.alpha_inner)
+                        //         .into_iter()
+                        //         .flat_map(|[x, y, z]| vec![x, y, z])
+                        //         .collect_vec();
+                        //     let target_coordinates = target.compute_surface(fmm_arc.tree().get_domain(), fmm_arc.order, fmm_arc.alpha_inner)
+                        //         .into_iter()
+                        //         .flat_map(|[x, y, z]| vec![x, y, z])
+                        //         .collect_vec();
+
+                        //     let source_mult = source_multipole_lock.deref();
+
+                        //     fmm_arc.kernel.potential(
+                        //         &source_coordinates[..],
+                        //         &source_mult[..],
+                        //         &target_coordinates[..],
+                        //         &mut direct[..],
+                        //     );
+
+                        //     // println!("surface grid {:?} \n", source.compute_surface(fmm_arc.tree().get_domain(), fmm_arc.order, fmm_arc.alpha_inner));
+                        //     // println!("convolution grid{:?}", source_convolution_grid);
+                        //     println!("fft {:?}", check_potential);
+                        //     println!("direct {:?}", direct);
+                        //     panic!("foo");
+
+                        // }
                         // Compute local
                         let target_local_owned = self.m2l_scale(target.level())
                             * fmm_arc.kernel.scale(target.level())
@@ -913,7 +969,7 @@ where
                                 .dot(&self.fmm.dc2e_inv.1.dot(&check_potential));
 
                         // Store computation
-                        let target_local_owned = vec![0f64; 6*(fmm_arc.order -1 ).pow(2) + 2];
+                        // let target_local_owned = vec![0f64; 6*(fmm_arc.order -1 ).pow(2) + 2];
                         let mut target_local_lock = target_local_arc.lock().unwrap();
 
                         if !target_local_lock.is_empty() {
@@ -1195,7 +1251,7 @@ mod test {
         let depth = 4;
         let n_crit = 150;
 
-        let order = 2;
+        let order = 5;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = true;
@@ -1209,19 +1265,19 @@ mod test {
 
         let start = Instant::now();
 
-        // let m2l_data = SvdFieldTranslationNaiveKiFmm::new(
-        //     kernel.clone(),
-        //     Some(k),
-        //     order,
-        //     tree.get_domain().clone(),
-        // );
+        let m2l_data_svd_naive = SvdFieldTranslationNaiveKiFmm::new(
+            kernel.clone(),
+            Some(k),
+            order,
+            tree.get_domain().clone(),
+        );
 
-        // let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-        //     kernel.clone(),
-        //     Some(k),
-        //     order,
-        //     tree.get_domain().clone(),
-        // );
+        let m2l_data_svd = SvdFieldTranslationKiFmm::new(
+            kernel.clone(),
+            Some(k),
+            order,
+            tree.get_domain().clone(),
+        );
         println!("SVD operators = {:?}ms", start.elapsed().as_millis());
 
         let start = Instant::now();
@@ -1237,46 +1293,45 @@ mod test {
 
         datatree.run();
 
-        assert!(false);
-        // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        // let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        // let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        // let mut direct = vec![0f64; pts.len()];
-        // let all_point_coordinates = points_clone
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
+        let mut direct = vec![0f64; pts.len()];
+        let all_point_coordinates = points_clone
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-        // let leaf_coordinates = pts
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
-        // let all_charges = vec![1f64; points_clone.len()];
+        let leaf_coordinates = pts
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let all_charges = vec![1f64; points_clone.len()];
 
-        // let kernel = LaplaceKernel {
-        //     dim: 3,
-        //     is_singular: false,
-        //     value_dimension: 3,
-        // };
-        // kernel.potential(
-        //     &all_point_coordinates[..],
-        //     &all_charges[..],
-        //     &leaf_coordinates[..],
-        //     &mut direct[..],
-        // );
+        let kernel = LaplaceKernel {
+            dim: 3,
+            is_singular: false,
+            value_dimension: 3,
+        };
+        kernel.potential(
+            &all_point_coordinates[..],
+            &all_charges[..],
+            &leaf_coordinates[..],
+            &mut direct[..],
+        );
 
-        // let abs_error: f64 = potentials
-        //     .iter()
-        //     .zip(direct.iter())
-        //     .map(|(a, b)| (a - b).abs())
-        //     .sum();
-        // let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        let abs_error: f64 = potentials
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        // println!("p={:?} rel_error={:?}\n", order, rel_error);
-        // assert!(false)
+        println!("p={:?} rel_error={:?}\n", order, rel_error);
+        assert!(false)
     }
 }

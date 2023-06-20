@@ -680,6 +680,7 @@ impl MortonKey {
         order: usize,
         domain: &Domain,
         surface: &Vec<[f64; 3]>,
+        alpha: f64,
     ) -> Vec<[f64; 3]> {
         // Number of convolution points along each axis
         let n = 2 * order - 1;
@@ -693,7 +694,11 @@ impl MortonKey {
             }
         }
 
-        let diameter = self.diameter(domain);
+        let diameter = self
+            .diameter(domain)
+            .iter()
+            .map(|x| x * alpha)
+            .collect_vec();
 
         // Shift and scale to embed surface grid inside convolution grid
         // Scale
@@ -766,7 +771,11 @@ impl MortonKey {
             }
         }
 
-        let surface_idxs = surface.iter().clone().map(|&[a, b, c]| [a as usize, b as usize, c as usize]).collect();
+        let surface_idxs = surface
+            .iter()
+            .clone()
+            .map(|&[a, b, c]| [a as usize, b as usize, c as usize])
+            .collect();
 
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         surface.iter_mut().for_each(|point| {
