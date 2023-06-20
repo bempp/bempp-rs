@@ -63,11 +63,6 @@ pub struct KiFmm<T: Tree, U: Kernel, V: FieldTranslationData<U>> {
     m2l: V,
 }
 
-// /// Number of coefficients related to a given expansion order.
-// pub fn ncoeffs(order: usize) -> usize {
-//     6 * (order - 1).pow(2) + 2
-// }
-
 #[allow(dead_code)]
 impl<T, U> KiFmm<SingleNodeTree, T, U>
 where
@@ -188,9 +183,7 @@ where
             l2l,
             kernel,
             tree,
-            // transfer_vectors,
             m2l,
-            // k,
         }
     }
 }
@@ -822,17 +815,6 @@ where
                             .unwrap();
 
                         // Compute FFT of signal
-                        let source_equivalent_surface = source.compute_surface(
-                            fmm_arc.tree().get_domain(),
-                            fmm_arc.order,
-                            fmm_arc.alpha_inner,
-                        );
-                        let source_convolution_grid = source.convolution_grid(
-                            fmm_arc.order,
-                            fmm_arc.tree().get_domain(),
-                            &source_equivalent_surface,
-                            fmm_arc.alpha_inner,
-                        );
                         let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
@@ -903,34 +885,6 @@ where
                         let check_potential =
                             Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap();
 
-                        // if level == fmm_arc.tree().get_depth() {
-
-                        //     let mut direct = vec![0f64; target_surface_idxs.len()];
-                        //     let source_coordinates = source.compute_surface(fmm_arc.tree().get_domain(), fmm_arc.order, fmm_arc.alpha_inner)
-                        //         .into_iter()
-                        //         .flat_map(|[x, y, z]| vec![x, y, z])
-                        //         .collect_vec();
-                        //     let target_coordinates = target.compute_surface(fmm_arc.tree().get_domain(), fmm_arc.order, fmm_arc.alpha_inner)
-                        //         .into_iter()
-                        //         .flat_map(|[x, y, z]| vec![x, y, z])
-                        //         .collect_vec();
-
-                        //     let source_mult = source_multipole_lock.deref();
-
-                        //     fmm_arc.kernel.potential(
-                        //         &source_coordinates[..],
-                        //         &source_mult[..],
-                        //         &target_coordinates[..],
-                        //         &mut direct[..],
-                        //     );
-
-                        //     // println!("surface grid {:?} \n", source.compute_surface(fmm_arc.tree().get_domain(), fmm_arc.order, fmm_arc.alpha_inner));
-                        //     // println!("convolution grid{:?}", source_convolution_grid);
-                        //     println!("fft {:?}", check_potential);
-                        //     println!("direct {:?}", direct);
-                        //     panic!("foo");
-
-                        // }
                         // Compute local
                         let target_local_owned = self.m2l_scale(target.level())
                             * fmm_arc.kernel.scale(target.level())
@@ -940,7 +894,6 @@ where
                                 .dot(&self.fmm.dc2e_inv.1.dot(&check_potential));
 
                         // Store computation
-                        // let target_local_owned = vec![0f64; 6*(fmm_arc.order -1 ).pow(2) + 2];
                         let mut target_local_lock = target_local_arc.lock().unwrap();
 
                         if !target_local_lock.is_empty() {
@@ -1222,7 +1175,7 @@ mod test {
         let depth = 4;
         let n_crit = 150;
 
-        let order = 5;
+        let order = 8;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = true;
@@ -1262,7 +1215,7 @@ mod test {
         );
         println!("FFT operators = {:?}ms", start.elapsed().as_millis());
 
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
         let charges = Charges::new();
 

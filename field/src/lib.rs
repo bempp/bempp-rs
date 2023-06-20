@@ -22,9 +22,6 @@ where
     pub surf_to_conv_map: HashMap<usize, usize>,
     pub conv_to_surf_map: HashMap<usize, usize>,
 
-    // Map from potentials to surface grid
-    pub potentials_to_surf: ArrayBase<OwnedRepr<f64>, Dim<[usize; 3]>>,
-
     // Precomputed FFT of unique kernel interactions placed on
     // convolution grid.
     pub m2l: Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>>,
