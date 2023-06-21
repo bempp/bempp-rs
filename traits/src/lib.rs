@@ -4,6 +4,7 @@ pub mod arrays;
 pub mod bem;
 pub mod cell;
 pub mod element;
+pub mod field;
 pub mod fmm;
 pub mod general;
 pub mod grid;

@@ -9,11 +9,6 @@ pub trait SourceTranslation {
 }
 
 pub trait TargetTranslation {
-    fn m2l_batched(&self, level: u64);
-
-    // V list (far field) interactions
-    fn m2l(&self, level: u64);
-
     // Translate local potential from parent to child.
     fn l2l(&self, level: u64);
 

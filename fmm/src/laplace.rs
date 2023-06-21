@@ -1,6 +1,7 @@
 //! Laplace kernel implementation.
-use bempp_traits::{kernel::Kernel, types::Result};
+use bempp_traits::kernel::Kernel;
 
+#[derive(Debug, Default, Clone)]
 pub struct LaplaceKernel {
     pub dim: usize,
     pub is_singular: bool,
@@ -37,8 +38,6 @@ impl LaplaceKernel {
 }
 
 impl Kernel for LaplaceKernel {
-    type PotentialData = Vec<f64>;
-
     fn dim(&self) -> usize {
         self.dim
     }
@@ -51,6 +50,25 @@ impl Kernel for LaplaceKernel {
         self.value_dimension
     }
 
+    fn kernel(&self, source: &[f64], target: &[f64]) -> f64 {
+        let mut tmp = source
+            .iter()
+            .zip(target.iter())
+            .map(|(s, t)| (s - t).powf(2.0))
+            .sum::<f64>()
+            .powf(0.5)
+            * std::f64::consts::PI
+            * 4.0;
+
+        tmp = tmp.recip();
+
+        if tmp.is_finite() {
+            tmp
+        } else {
+            0.
+        }
+    }
+
     fn potential(&self, sources: &[f64], charges: &[f64], targets: &[f64], potentials: &mut [f64]) {
         for (i, j) in (0..targets.len()).step_by(self.dim()).enumerate() {
             let mut potential = 0.0;
@@ -60,7 +78,7 @@ impl Kernel for LaplaceKernel {
                 let source = &sources[l..(l + self.dim())];
                 let tmp;
                 if self.dim() == 3 {
-                    tmp = self.potential_kernel_3_d(source, target);
+                    tmp = self.kernel(source, target);
                 } else {
                     panic!("Kernel not implemented for dimension={:?}!", self.dim())
                 }
@@ -71,12 +89,8 @@ impl Kernel for LaplaceKernel {
         }
     }
 
-    fn gram(
-        &self,
-        sources: &[f64],
-        targets: &[f64],
-    ) -> bempp_traits::types::Result<Self::PotentialData> {
-        let mut result: Vec<f64> = Vec::new();
+    fn gram(&self, sources: &[f64], targets: &[f64], result: &mut Vec<f64>) {
+        // let mut result: Vec<f64> = Vec::new();
 
         for i in (0..targets.len()).step_by(self.dim()) {
             let target = &targets[i..(i + self.dim())];
@@ -84,7 +98,6 @@ impl Kernel for LaplaceKernel {
 
             for j in (0..sources.len()).step_by(self.dim()) {
                 let source = &sources[j..(j + self.dim())];
-
                 let tmp;
                 if self.dim() == 3 {
                     tmp = self.potential_kernel_3_d(source, target);
@@ -96,7 +109,7 @@ impl Kernel for LaplaceKernel {
             }
             result.append(&mut row);
         }
-        Result::Ok(result)
+        // Result::Ok(result)
     }
 
     fn scale(&self, level: u64) -> f64 {
@@ -155,7 +168,8 @@ pub mod tests {
         let targets = points_fixture(npoints, dim);
 
         let kernel = LaplaceKernel::new(dim, false, dim);
-        kernel.gram(&sources[..], &targets[..]).unwrap();
+        let mut gram = Vec::<f64>::new();
+        kernel.gram(&sources[..], &targets[..], &mut gram);
     }
 
     #[test]
@@ -167,7 +181,8 @@ pub mod tests {
         let targets = points_fixture(ntargets, dim);
 
         let kernel = LaplaceKernel::new(dim, false, dim);
-        let gram = kernel.gram(&sources[..], &targets[..]).unwrap();
+        let mut gram = Vec::<f64>::new();
+        kernel.gram(&sources[..], &targets[..], &mut gram);
 
         // Test dimension of output
         assert_eq!(gram.len(), ntargets * nsources);
