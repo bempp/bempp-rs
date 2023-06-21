@@ -1,9 +1,12 @@
 //! Implementation of the Laplace kernel
-use crate::kernel::EvalType;
+use crate::traits::Kernel;
+use crate::types::{EvalType, KernelType};
+use bempp_traits::types::c64;
+use num;
 use rayon::prelude::*;
 use std::marker::PhantomData;
 
-use crate::kernel::{check_dimensions_assemble, check_dimensions_evaluate, Kernel, KernelType};
+use crate::helpers::check_dimensions_evaluate;
 use bempp_traits::types::Scalar;
 use num::traits::FloatConst;
 
@@ -21,8 +24,11 @@ impl<T: Scalar> Laplace3dKernel<T> {
     }
 }
 
-impl Kernel for Laplace3dKernel<f64> {
-    type T = f64;
+impl<T: Scalar + Send + Sync> Kernel for Laplace3dKernel<T>
+where
+    <T as Scalar>::Real: Send + Sync,
+{
+    type T = T;
 
     fn domain_component_count(&self) -> usize {
         1
@@ -38,9 +44,9 @@ impl Kernel for Laplace3dKernel<f64> {
 
     fn evaluate_st(
         &self,
-        eval_type: crate::kernel::EvalType,
-        sources: &[f64],
-        targets: &[f64],
+        eval_type: crate::types::EvalType,
+        sources: &[<Self::T as Scalar>::Real],
+        targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
     ) {
@@ -50,9 +56,9 @@ impl Kernel for Laplace3dKernel<f64> {
 
     fn evaluate_mt(
         &self,
-        eval_type: crate::kernel::EvalType,
-        sources: &[f64],
-        targets: &[f64],
+        eval_type: crate::types::EvalType,
+        sources: &[<Self::T as Scalar>::Real],
+        targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
         thread_pool: &rayon::ThreadPool,
@@ -77,25 +83,27 @@ impl Kernel for Laplace3dKernel<f64> {
         })
     }
 
-    fn range_component_count(&self, eval_type: crate::kernel::EvalType) -> usize {
+    fn range_component_count(&self, eval_type: crate::types::EvalType) -> usize {
         laplace_component_count(eval_type)
     }
 }
 
-pub fn evaluate_laplace_one_target(
+pub fn evaluate_laplace_one_target<T: Scalar>(
     eval_type: EvalType,
-    target: &[f64],
-    sources: &[f64],
-    charges: &[f64],
-    result: &mut [f64],
+    target: &[<T as Scalar>::Real],
+    sources: &[<T as Scalar>::Real],
+    charges: &[T],
+    result: &mut [T],
 ) {
     let ncharges = charges.len();
     let nsources = ncharges;
-    let m_inv_4pi = 0.25 * f64::FRAC_1_PI();
+    let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
+    let zero_real = <T::Real as num::Zero>::zero();
+    let one_real = <T::Real as num::One>::one();
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result = 0.0;
+            let mut my_result = T::zero();
             for index in 0..sources.len() {
                 let diff_norm = ((target[0] - sources[index]) * (target[0] - sources[index])
                     + (target[1] - sources[nsources + index])
@@ -104,25 +112,25 @@ pub fn evaluate_laplace_one_target(
                         * (target[2] - sources[2 * nsources + index]))
                     .sqrt();
                 let inv_diff_norm = {
-                    if diff_norm == 0.0 {
-                        0.0
+                    if diff_norm == zero_real {
+                        zero_real
                     } else {
-                        1.0 / diff_norm
+                        one_real / diff_norm
                     }
                 };
 
-                my_result += charges[index] * inv_diff_norm;
+                my_result += charges[index].mul_real(inv_diff_norm);
             }
-            result[0] = m_inv_4pi * my_result;
+            result[0] = my_result.mul_real(m_inv_4pi);
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
             // correctly auto-vectorized.
 
-            let mut my_result0 = 0.0;
-            let mut my_result1 = 0.0;
-            let mut my_result2 = 0.0;
-            let mut my_result3 = 0.0;
+            let mut my_result0 = T::zero();
+            let mut my_result1 = T::zero();
+            let mut my_result2 = T::zero();
+            let mut my_result3 = T::zero();
 
             for index in 0..sources.len() {
                 let diff0 = sources[index] - target[0];
@@ -130,29 +138,40 @@ pub fn evaluate_laplace_one_target(
                 let diff2 = sources[nsources + index] - target[2];
                 let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
                 let inv_diff_norm = {
-                    if diff_norm == 0.0 {
-                        0.0
+                    if diff_norm == zero_real {
+                        zero_real
                     } else {
-                        1.0 / diff_norm
+                        one_real / diff_norm
                     }
                 };
                 let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
 
-                my_result0 += charges[index] * inv_diff_norm;
-                my_result1 += diff0 * charges[index] * inv_diff_norm_cubed;
-                my_result2 += diff1 * charges[index] * inv_diff_norm_cubed;
-                my_result3 += diff2 * charges[index] * inv_diff_norm_cubed;
+                my_result0 += charges[index].mul_real(inv_diff_norm);
+                my_result1 += charges[index].mul_real(diff0 * inv_diff_norm_cubed);
+                my_result2 += charges[index].mul_real(diff1 * inv_diff_norm_cubed);
+                my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
             }
 
-            result[0] = m_inv_4pi * my_result0;
-            result[1] = m_inv_4pi * my_result1;
-            result[2] = m_inv_4pi * my_result2;
-            result[3] = m_inv_4pi * my_result3;
+            result[0] = my_result0.mul_real(m_inv_4pi);
+            result[1] = my_result1.mul_real(m_inv_4pi);
+            result[2] = my_result2.mul_real(m_inv_4pi);
+            result[3] = my_result3.mul_real(m_inv_4pi);
         }
     }
 }
 
-fn laplace_component_count(eval_type: crate::kernel::EvalType) -> usize {
+// // Small wrapper to test compiler SIMD output for different types.
+// pub fn evaluate_laplace_one_target_wrapper(
+//     eval_type: EvalType,
+//     target: &[f32],
+//     sources: &[f32],
+//     charges: &[f32],
+//     result: &mut [f32],
+// ) {
+//     evaluate_laplace_one_target(eval_type, target, sources, charges, result);
+// }
+
+fn laplace_component_count(eval_type: EvalType) -> usize {
     match eval_type {
         EvalType::Value => 1,
         EvalType::ValueDeriv => 4,

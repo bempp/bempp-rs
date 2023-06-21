@@ -1,65 +1,12 @@
-//! Trait for Green's function kernels
-use bempp_traits::types::{c64, Scalar};
-use rayon::ThreadPool;
-
-pub trait Kernel {
-    type T: Scalar;
-
-    fn evaluate_st(
-        &self,
-        eval_type: EvalType,
-        sources: &[f64],
-        targets: &[f64],
-        charges: &[Self::T],
-        result: &mut [Self::T],
-    );
-
-    fn evaluate_mt(
-        &self,
-        eval_type: EvalType,
-        sources: &[f64],
-        targets: &[f64],
-        charges: &[Self::T],
-        result: &mut [Self::T],
-        thread_pool: &ThreadPool,
-    );
-
-    fn kernel_type(&self) -> &KernelType;
-
-    fn domain_component_count(&self) -> usize;
-
-    fn space_dimension(&self) -> usize;
-
-    fn range_component_count(&self, eval_type: EvalType) -> usize;
-}
-
-// Evaluation Mode.
-//
-// - `Value`: Declares that only values required.
-// - `Deriv`: Declare that only derivative required.
-// - `ValueDeriv` Both values and derivatives required.
-#[derive(Clone, Copy)]
-pub enum EvalType {
-    Value,
-    ValueDeriv,
-}
-
-/// This enum defines the type of the kernel.
-#[derive(Clone, Copy)]
-pub enum KernelType {
-    /// The Laplace kernel defined as g(x, y) = 1 / (4 pi | x- y| )
-    Laplace,
-    /// The Helmholtz kernel defined as g(x, y) = exp( 1j * k * | x- y| ) / (4 pi | x- y| )
-    Helmholtz(c64),
-    /// The modified Helmholtz kernel defined as g(x, y) = exp( -omega * | x- y| ) / (4 * pi * | x- y |)
-    ModifiedHelmholtz(f64),
-}
+use crate::traits::Kernel;
+use crate::types::EvalType;
+use bempp_traits::types::Scalar;
 
 pub(crate) fn check_dimensions_evaluate<K: Kernel, T: Scalar>(
     kernel: &K,
     eval_type: EvalType,
-    sources: &[f64],
-    targets: &[f64],
+    sources: &[T::Real],
+    targets: &[T::Real],
     charges: &[T],
     result: &[T],
 ) {
