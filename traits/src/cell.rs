@@ -1,4 +1,16 @@
 use crate::element::FiniteElement;
+use std::fmt;
+
+#[derive(Debug)]
+pub struct InvalidConnectivity;
+
+impl fmt::Display for InvalidConnectivity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid connectivity")
+    }
+}
+
+impl std::error::Error for InvalidConnectivity {}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -71,7 +83,7 @@ pub trait ReferenceCell {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()>;
+    ) -> Result<Vec<usize>, InvalidConnectivity>;
 
     /// The reference cell type
     fn cell_type(&self) -> ReferenceCellType;

@@ -1,4 +1,3 @@
-
 //! Lagrange elements
 
 use crate::element::CiarletElement;

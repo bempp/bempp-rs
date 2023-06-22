@@ -151,7 +151,7 @@ pub extern "C" fn reference_cell_container_get_connectivity(
 
     let vec = match connectivity {
         Ok(v) => v,
-        Err(()) => Vec::<usize>::new(),
+        Err(InvalidConnectivity) => Vec::<usize>::new(),
     };
     RustyDataContainer::from_vec(vec).to_box()
 }

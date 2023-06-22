@@ -66,7 +66,7 @@ impl ReferenceCell for Triangle {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 3);
@@ -76,10 +76,10 @@ impl ReferenceCell for Triangle {
                         0 => Ok(vec![1, 2]),
                         1 => Ok(vec![0, 2]),
                         2 => Ok(vec![0, 1]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -89,11 +89,11 @@ impl ReferenceCell for Triangle {
                         0 => Ok(vec![1, 2]),
                         1 => Ok(vec![0, 2]),
                         2 => Ok(vec![0, 1]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => Ok(vec![entity_number]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -102,10 +102,10 @@ impl ReferenceCell for Triangle {
                     0 => Ok(vec![0, 1, 2]),
                     1 => Ok(vec![0, 1, 2]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
@@ -168,7 +168,7 @@ impl ReferenceCell for Quadrilateral {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 4);
@@ -179,10 +179,10 @@ impl ReferenceCell for Quadrilateral {
                         1 => Ok(vec![0, 2]),
                         2 => Ok(vec![1, 3]),
                         3 => Ok(vec![2, 3]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -193,7 +193,7 @@ impl ReferenceCell for Quadrilateral {
                         .to_vec()),
                     1 => Ok(vec![entity_number]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -202,10 +202,10 @@ impl ReferenceCell for Quadrilateral {
                     0 => Ok(vec![0, 1, 2, 3]),
                     1 => Ok(vec![0, 1, 2, 3]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
