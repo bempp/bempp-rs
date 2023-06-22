@@ -19,7 +19,7 @@ fn get_quadrature_rule(
     pairs: Vec<(usize, usize)>,
     npoints: usize,
 ) -> TestTrialNumericalQuadratureDefinition {
-    if pairs.len() == 0 {
+    if pairs.is_empty() {
         // Standard rules
         let mut npoints_test = 10 * npoints * npoints;
         for p in available_rules(test_celltype) {
