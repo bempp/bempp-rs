@@ -639,13 +639,13 @@ where
         let n = 2 * expansion_order - 1;
         let mut result = vec![vec![vec![0f64; n]; n]; n];
 
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
+        for (i, result_i) in result.iter_mut().enumerate() {
+            for (j, result_ij) in result_i.iter_mut().enumerate() {
+                for (k, result_ijk) in result_ij.iter_mut().enumerate() {
                     let conv_idx = i * n * n + j * n + k;
                     if self.conv_to_surf_map.contains_key(&conv_idx) {
                         let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
-                        result[i][j][k] = charges[*surf_idx]
+                        *result_ijk = charges[*surf_idx]
                     }
                 }
             }

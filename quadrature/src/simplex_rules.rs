@@ -33,8 +33,8 @@ pub fn simplex_rule(
             dim,
             order: *order,
             npoints,
-            weights: weights.iter().copied().collect(),
-            points: points.iter().copied().collect(),
+            weights: weights.to_vec(),
+            points: points.to_vec(),
         })
     } else {
         Err(QuadratureError::RuleNotFound)
