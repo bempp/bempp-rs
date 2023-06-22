@@ -3,15 +3,14 @@ use ndarray::*;
 use ndarray_linalg::*;
 
 const F64_EPSILON: f64 = 2.220_446_049_250_313E-16f64;
+type D = Dim<[usize; 2]>;
+type Type1<T> = ArrayBase<OwnedRepr<T>, D>;
+type Type2<T> = ArrayBase<OwnedRepr<<T as Scalar>::Real>, D>;
 
 /// Calculate the Moore-Penrose pseudoinverse.
 pub fn pinv<T: Scalar + Lapack>(
     array: &Array2<T>,
-) -> (
-    ArrayBase<OwnedRepr<T>, Dim<[usize; 2]>>,
-    ArrayBase<OwnedRepr<<T as Scalar>::Real>, Dim<[usize; 2]>>,
-    ArrayBase<OwnedRepr<T>, Dim<[usize; 2]>>,
-) {
+) -> (Type1<T>, Type2<T>, Type1<T>) {
     let (u, mut s, vt): (_, Array1<_>, _) = array.svd(true, true).unwrap();
 
     let u = u.unwrap();

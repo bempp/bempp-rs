@@ -193,9 +193,9 @@ impl FiniteElement for CiarletElement {
                 for i in 0..self.coefficients.shape().0 {
                     for j in 0..self.coefficients.shape().1 {
                         *data.get_mut(deriv, pt, i, j).unwrap() = 0.0;
-                        for k in 0..self.coefficients.shape().2 {
+                        for (k, e) in evals.iter().enumerate() {
                             *data.get_mut(deriv, pt, i, j).unwrap() +=
-                                unsafe { *self.coefficients.get_unchecked(i, j, k) } * evals[k];
+                                unsafe { *self.coefficients.get_unchecked(i, j, k) } * *e;
                         }
                     }
                 }

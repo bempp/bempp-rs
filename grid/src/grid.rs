@@ -37,7 +37,7 @@ impl SerialGeometry {
     pub fn new(
         coordinates: Array2D<f64>,
         cells: &AdjacencyList<usize>,
-        cell_types: &Vec<ReferenceCellType>,
+        cell_types: &[ReferenceCellType],
     ) -> Self {
         let mut index_map = vec![];
         let mut element_changes = vec![];
@@ -60,11 +60,11 @@ impl SerialGeometry {
         }
 
         Self {
-            coordinate_elements: coordinate_elements,
-            coordinates: coordinates,
+            coordinate_elements,
+            coordinates,
             cells: new_cells,
-            element_changes: element_changes,
-            index_map: index_map,
+            element_changes,
+            index_map,
         }
     }
 
@@ -140,10 +140,10 @@ impl Geometry for SerialGeometry {
                     .row_unchecked(*self.cells.get_unchecked(cell, i))
             };
             for p in 0..points.shape().0 {
-                for j in 0..gdim {
+                for (j, pt_j) in pt.iter().enumerate() {
                     unsafe {
                         *physical_points.get_unchecked_mut(p, j) +=
-                            pt[j] * data.get_unchecked(0, p, i, 0);
+                            *pt_j * data.get_unchecked(0, p, i, 0);
                     }
                 }
             }
@@ -182,10 +182,10 @@ impl Geometry for SerialGeometry {
                     self.coordinates
                         .row_unchecked(*self.cells.get_unchecked(cell, i))
                 };
-                for j in 0..gdim {
+                for (j, pt_j) in pt.iter().enumerate() {
                     unsafe {
-                        *axes.get_unchecked_mut(0, j) += pt[j] * data.get_unchecked(1, p, i, 0);
-                        *axes.get_unchecked_mut(1, j) += pt[j] * data.get_unchecked(2, p, i, 0);
+                        *axes.get_unchecked_mut(0, j) += *pt_j * data.get_unchecked(1, p, i, 0);
+                        *axes.get_unchecked_mut(1, j) += *pt_j * data.get_unchecked(2, p, i, 0);
                     }
                 }
             }
@@ -244,11 +244,11 @@ impl Geometry for SerialGeometry {
                     .row_unchecked(*self.cells.get_unchecked(cell, i))
             };
             for p in 0..points.shape().0 {
-                for j in 0..gdim {
+                for (j, pt_j) in pt.iter().enumerate() {
                     for k in 0..tdim {
                         unsafe {
                             *jacobians.get_unchecked_mut(p, k + tdim * j) +=
-                                pt[j] * data.get_unchecked(k + 1, p, i, 0);
+                                *pt_j * data.get_unchecked(k + 1, p, i, 0);
                         }
                     }
                 }
@@ -270,8 +270,8 @@ impl Geometry for SerialGeometry {
         self.compute_jacobians(points, cell, &mut js);
 
         // TODO: is it faster if we move this for inside the match statement?
-        for p in 0..points.shape().0 {
-            jacobian_determinants[p] = match tdim {
+        for (p, jdet) in jacobian_determinants.iter_mut().enumerate() {
+            *jdet = match tdim {
                 1 => match gdim {
                     1 => unsafe { *js.get_unchecked(p, 0) },
                     2 => unsafe {
@@ -482,7 +482,7 @@ fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
 }
 
 impl SerialTopology {
-    pub fn new(cells: &AdjacencyList<usize>, cell_types: &Vec<ReferenceCellType>) -> Self {
+    pub fn new(cells: &AdjacencyList<usize>, cell_types: &[ReferenceCellType]) -> Self {
         let mut index_map = vec![];
         let mut vertices = vec![];
         let mut starts = vec![];

@@ -73,10 +73,10 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
         map_type: MapType::ContravariantPiola,
         value_size: 2,
         family: ElementFamily::RaviartThomas,
-        discontinuous: discontinuous,
+        discontinuous,
         dim: coefficients.shape().0,
-        coefficients: coefficients,
-        entity_dofs: entity_dofs,
+        coefficients,
+        entity_dofs,
     }
 }
 
