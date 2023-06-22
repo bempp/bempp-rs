@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+      - *
+#permissions:
+#  contents: read
+#  pages: write
+#  id-token: write
 
 concurrency:
   group: "pages"
@@ -47,6 +47,9 @@ jobs:
           done
           echo "</ul></body></html>" >> target/doc/index.html
 
+      - name: Set file permissions
+        run: chmod -R 744 target/doc
+
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
@@ -54,6 +57,6 @@ jobs:
         uses: actions/upload-pages-artifact@v1
         with:
           path: 'target/doc'
-      - name: Deploy docs to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
+#      - name: Deploy docs to GitHub Pages
+#        id: deployment
+#        uses: actions/deploy-pages@v2
