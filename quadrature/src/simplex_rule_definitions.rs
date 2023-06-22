@@ -7,8 +7,7 @@ type HM = HashMap<usize, (usize, Vec<f64>, Vec<f64>)>;
 
 lazy_static! {
     pub(crate) static ref SIMPLEX_RULE_DEFINITIONS: HashMap<ReferenceCellType, HM> = {
-        let mut m =
-            HashMap::<ReferenceCellType, HM>::new();
+        let mut m = HashMap::<ReferenceCellType, HM>::new();
         m.insert(
             ReferenceCellType::Triangle,
             HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new(),

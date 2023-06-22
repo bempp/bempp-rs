@@ -45,15 +45,9 @@ type UC2Type = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 pub struct KiFmm<T: Tree, U: Kernel, V: FieldTranslationData<U>> {
     order: usize,
 
-    uc2e_inv: (
-        UC2Type,
-        UC2Type,
-    ),
+    uc2e_inv: (UC2Type, UC2Type),
 
-    dc2e_inv: (
-        UC2Type,
-        UC2Type,
-    ),
+    dc2e_inv: (UC2Type, UC2Type),
 
     alpha_inner: f64,
     alpha_outer: f64,

@@ -8,9 +8,7 @@ type Type1<T> = ArrayBase<OwnedRepr<T>, D>;
 type Type2<T> = ArrayBase<OwnedRepr<<T as Scalar>::Real>, D>;
 
 /// Calculate the Moore-Penrose pseudoinverse.
-pub fn pinv<T: Scalar + Lapack>(
-    array: &Array2<T>,
-) -> (Type1<T>, Type2<T>, Type1<T>) {
+pub fn pinv<T: Scalar + Lapack>(array: &Array2<T>) -> (Type1<T>, Type2<T>, Type1<T>) {
     let (u, mut s, vt): (_, Array1<_>, _) = array.svd(true, true).unwrap();
 
     let u = u.unwrap();

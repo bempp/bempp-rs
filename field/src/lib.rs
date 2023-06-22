@@ -46,11 +46,7 @@ where
     pub k: usize,
 
     // Precomputed SVD compressed m2l interaction
-    pub m2l: (
-        SvdM2lEntry,
-        SvdM2lEntry,
-        SvdM2lEntry,
-    ),
+    pub m2l: (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry),
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -70,11 +66,7 @@ where
     pub k: usize,
 
     // Precomputed SVD compressed m2l interaction
-    pub m2l: (
-        SvdM2lEntry,
-        SvdM2lEntry,
-        SvdM2lEntry,
-    ),
+    pub m2l: (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry),
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -287,11 +279,7 @@ where
     T: Kernel + Default,
 {
     type TransferVector = Vec<TransferVector>;
-    type M2LOperators = (
-        SvdM2lEntry,
-        SvdM2lEntry,
-        SvdM2lEntry,
-    );
+    type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
     type Domain = Domain;
 
     fn compute_transfer_vectors(&self) -> Self::TransferVector {
@@ -389,11 +377,7 @@ where
     T: Kernel + Default,
 {
     type TransferVector = Vec<TransferVector>;
-    type M2LOperators = (
-        SvdM2lEntry,
-        SvdM2lEntry,
-        SvdM2lEntry,
-    );
+    type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
     type Domain = Domain;
 
     fn compute_transfer_vectors(&self) -> Self::TransferVector {

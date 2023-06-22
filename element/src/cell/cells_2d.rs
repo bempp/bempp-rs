@@ -188,9 +188,7 @@ impl ReferenceCell for Quadrilateral {
             1 => {
                 assert!(entity_number < 4);
                 match connected_dim {
-                    0 => Ok(self.edges()
-                        [entity_number * 2..(entity_number + 1) * 2]
-                        .to_vec()),
+                    0 => Ok(self.edges()[entity_number * 2..(entity_number + 1) * 2].to_vec()),
                     1 => Ok(vec![entity_number]),
                     2 => Ok(vec![0]),
                     _ => Err(InvalidConnectivity),
