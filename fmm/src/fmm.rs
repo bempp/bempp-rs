@@ -40,18 +40,14 @@ pub struct FmmData<T: Fmm> {
     charges: HashMap<MortonKey, Arc<Vec<f64>>>,
 }
 
+type UC2Type = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
+
 pub struct KiFmm<T: Tree, U: Kernel, V: FieldTranslationData<U>> {
     order: usize,
 
-    uc2e_inv: (
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    ),
+    uc2e_inv: (UC2Type, UC2Type),
 
-    dc2e_inv: (
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    ),
+    dc2e_inv: (UC2Type, UC2Type),
 
     alpha_inner: f64,
     alpha_outer: f64,
@@ -115,8 +111,8 @@ where
             &mut dc2e,
         );
 
-        let mut m2m: Vec<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>> = Vec::new();
-        let mut l2l: Vec<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>> = Vec::new();
+        let mut m2m: Vec<UC2Type> = Vec::new();
+        let mut l2l: Vec<UC2Type> = Vec::new();
 
         let nrows = m2l.ncoeffs(order);
         let ncols = m2l.ncoeffs(order);
@@ -608,13 +604,13 @@ where
                 if let Some(v_list) = self.fmm.get_v_list(&target) {
                     let calculated_transfer_vectors = v_list
                         .iter()
-                        .map(|source| target.find_transfer_vector(&source))
+                        .map(|source| target.find_transfer_vector(source))
                         .collect::<Vec<usize>>();
                     for (transfer_vector, &source) in
                         calculated_transfer_vectors.iter().zip(v_list.iter())
                     {
                         let m2l_arc =
-                            Arc::clone(transfer_vector_to_m2l.get(&transfer_vector).unwrap());
+                            Arc::clone(transfer_vector_to_m2l.get(transfer_vector).unwrap());
                         let mut m2l_lock = m2l_arc.lock().unwrap();
                         m2l_lock.push((source, target));
                     }

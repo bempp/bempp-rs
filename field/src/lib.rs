@@ -5,10 +5,12 @@ use ndarray::*;
 use ndarray_linalg::SVDDC;
 use ndarray_ndimage::{pad, PadMode};
 use ndrustfft::{ndfft, ndfft_r2c, Complex, FftHandler, R2cFftHandler};
-use num::Float;
 
 use bempp_traits::{field::FieldTranslationData, kernel::Kernel};
 use bempp_tree::types::{domain::Domain, morton::MortonKey};
+
+type FftM2LEntry = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
+type SvdM2lEntry = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 
 #[derive(Default)]
 pub struct FftFieldTranslationNaiveKiFmm<T>
@@ -24,7 +26,7 @@ where
 
     // Precomputed FFT of unique kernel interactions placed on
     // convolution grid.
-    pub m2l: Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>>,
+    pub m2l: Vec<FftM2LEntry>,
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -44,11 +46,7 @@ where
     pub k: usize,
 
     // Precomputed SVD compressed m2l interaction
-    pub m2l: (
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    ),
+    pub m2l: (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry),
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -68,11 +66,7 @@ where
     pub k: usize,
 
     // Precomputed SVD compressed m2l interaction
-    pub m2l: (
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    ),
+    pub m2l: (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry),
 
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -193,7 +187,8 @@ where
         expansion_order: usize,
         domain: Self::Domain,
     ) -> Self::M2LOperators {
-        let mut result: Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>> = Vec::new();
+        type TranslationType = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
+        let mut result: Vec<TranslationType> = Vec::new();
 
         for t in self.transfer_vectors.iter() {
             let source_equivalent_surface =
@@ -284,11 +279,7 @@ where
     T: Kernel + Default,
 {
     type TransferVector = Vec<TransferVector>;
-    type M2LOperators = (
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    );
+    type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
     type Domain = Domain;
 
     fn compute_transfer_vectors(&self) -> Self::TransferVector {
@@ -310,10 +301,10 @@ where
         let nrows = self.ncoeffs(expansion_order);
         let ncols = self.ncoeffs(expansion_order);
 
-        let mut se2tc_fat: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
+        let mut se2tc_fat: SvdM2lEntry =
             Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
 
-        let mut se2tc_thin: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
+        let mut se2tc_thin: SvdM2lEntry =
             Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
@@ -386,11 +377,7 @@ where
     T: Kernel + Default,
 {
     type TransferVector = Vec<TransferVector>;
-    type M2LOperators = (
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-    );
+    type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
     type Domain = Domain;
 
     fn compute_transfer_vectors(&self) -> Self::TransferVector {
@@ -412,10 +399,10 @@ where
         let nrows = self.ncoeffs(expansion_order);
         let ncols = self.ncoeffs(expansion_order);
 
-        let mut se2tc_fat: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
+        let mut se2tc_fat: SvdM2lEntry =
             Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
 
-        let mut se2tc_thin: ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> =
+        let mut se2tc_thin: SvdM2lEntry =
             Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
@@ -597,12 +584,9 @@ where
             for j in 0..n {
                 for k in 0..n {
                     let conv_idx = i * n * n + j * n + k;
-                    if (i >= lower && j >= lower && k == lower)
-                        || (i >= lower && j >= lower && k == upper)
-                        || (j >= lower && k >= lower && i == upper)
-                        || (j >= lower && k >= lower && i == lower)
-                        || (k >= lower && i >= lower && j == lower)
-                        || (k >= lower && i >= lower && j == upper)
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
                     {
                         surf_to_conv.insert(surf_index, conv_idx);
                         conv_to_surf.insert(conv_idx, surf_index);
@@ -618,35 +602,35 @@ where
     pub fn compute_kernel(
         &self,
         expansion_order: usize,
-        convolution_grid: &Vec<[f64; 3]>,
+        convolution_grid: &[[f64; 3]],
         min_target: [f64; 3],
     ) -> Vec<Vec<Vec<f64>>> {
         let n = 2 * expansion_order - 1;
         let mut result = vec![vec![vec![0f64; n]; n]; n];
 
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
+        for (i, result_i) in result.iter_mut().enumerate() {
+            for (j, result_ij) in result_i.iter_mut().enumerate() {
+                for (k, result_ijk) in result_ij.iter_mut().enumerate() {
                     let conv_idx = i * n * n + j * n + k;
                     let src = convolution_grid[conv_idx];
-                    result[i][j][k] = self.kernel.kernel(&src[..], &min_target[..]);
+                    *result_ijk = self.kernel.kernel(&src[..], &min_target[..]);
                 }
             }
         }
         result
     }
 
-    pub fn compute_signal(&self, expansion_order: usize, charges: &Vec<f64>) -> Vec<Vec<Vec<f64>>> {
+    pub fn compute_signal(&self, expansion_order: usize, charges: &[f64]) -> Vec<Vec<Vec<f64>>> {
         let n = 2 * expansion_order - 1;
         let mut result = vec![vec![vec![0f64; n]; n]; n];
 
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
+        for (i, result_i) in result.iter_mut().enumerate() {
+            for (j, result_ij) in result_i.iter_mut().enumerate() {
+                for (k, result_ijk) in result_ij.iter_mut().enumerate() {
                     let conv_idx = i * n * n + j * n + k;
                     if self.conv_to_surf_map.contains_key(&conv_idx) {
                         let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
-                        result[i][j][k] = charges[*surf_idx]
+                        *result_ijk = charges[*surf_idx]
                     }
                 }
             }

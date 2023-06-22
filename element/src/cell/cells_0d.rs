@@ -37,10 +37,10 @@ impl ReferenceCell for Point {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point],
+            _ => vec![],
         }
     }
 
@@ -61,16 +61,16 @@ impl ReferenceCell for Point {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 1);
                 match connected_dim {
                     0 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }

@@ -679,7 +679,7 @@ impl MortonKey {
         &self,
         order: usize,
         domain: &Domain,
-        surface: &Vec<[f64; 3]>,
+        surface: &[[f64; 3]],
         alpha: f64,
     ) -> Vec<[f64; 3]> {
         // Number of convolution points along each axis
@@ -757,12 +757,9 @@ impl MortonKey {
         for i in 0..order {
             for j in 0..order {
                 for k in 0..order {
-                    if (i >= lower && j >= lower && k == lower)
-                        || (i >= lower && j >= lower && k == upper)
-                        || (j >= lower && k >= lower && i == upper)
-                        || (j >= lower && k >= lower && i == lower)
-                        || (k >= lower && i >= lower && j == lower)
-                        || (k >= lower && i >= lower && j == upper)
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
                     {
                         surface[idx] = [i as f64, j as f64, k as f64];
                         idx += 1;

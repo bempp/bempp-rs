@@ -21,7 +21,7 @@ impl SerialDofMap {
         let mut cell_dofs =
             Array2D::<usize>::new((grid.topology().entity_count(tdim), element.dim()));
         for cell in 0..grid.topology().entity_count(tdim) {
-            for d in 0..tdim + 1 {
+            for (d, ed_data) in entity_dofs_data.iter_mut().enumerate() {
                 for (i, e) in unsafe {
                     grid.topology()
                         .connectivity(tdim, d)
@@ -30,15 +30,15 @@ impl SerialDofMap {
                         .enumerate()
                 } {
                     let e_dofs = element.entity_dofs(d, i).unwrap();
-                    if e_dofs.len() > 0 {
-                        if entity_dofs_data[d][*e].len() == 0 {
+                    if !e_dofs.is_empty() {
+                        if ed_data[*e].is_empty() {
                             for _ in e_dofs {
-                                entity_dofs_data[d][*e].push(size);
+                                ed_data[*e].push(size);
                                 size += 1
                             }
                         }
                         for (j, k) in e_dofs.iter().enumerate() {
-                            *cell_dofs.get_mut(cell, *k).unwrap() = entity_dofs_data[d][*e][j];
+                            *cell_dofs.get_mut(cell, *k).unwrap() = ed_data[*e][j];
                         }
                     }
                 }
@@ -51,9 +51,9 @@ impl SerialDofMap {
             AdjacencyList::<usize>::new(),
             AdjacencyList::<usize>::new(),
         ];
-        for d in 0..tdim + 1 {
-            for row in &entity_dofs_data[d] {
-                entity_dofs[d].add_row(row);
+        for (ed, ed_data) in entity_dofs.iter_mut().zip(entity_dofs_data.iter()) {
+            for row in ed_data {
+                ed.add_row(row);
             }
         }
 
@@ -67,7 +67,7 @@ impl SerialDofMap {
 
 impl DofMap for SerialDofMap {
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        &self.entity_dofs[entity_dim].row(entity_number).unwrap()
+        self.entity_dofs[entity_dim].row(entity_number).unwrap()
     }
     fn local_size(&self) -> usize {
         self.size

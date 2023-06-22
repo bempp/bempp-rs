@@ -11,9 +11,15 @@ pub trait Array1DAccess<'a, T: Num> {
     fn get_mut(&mut self, index: usize) -> Option<&mut T>;
 
     /// Get an item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked(&self, index: usize) -> &T;
 
     /// Get a mutable item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut T;
 
     /// Get the shape of the array
@@ -36,12 +42,21 @@ pub trait Array2DAccess<'a, T: Num> {
     fn row(&self, index: usize) -> Option<&[T]>;
 
     /// Get an item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T;
 
     /// Get a mutable item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T;
 
     /// Get a row of the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn row_unchecked(&self, index: usize) -> &[T];
 
     /// Get the shape of the array
@@ -59,9 +74,15 @@ pub trait Array3DAccess<T: Num> {
     fn get_mut(&mut self, index0: usize, index1: usize, index2: usize) -> Option<&mut T>;
 
     /// Get an item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked(&self, index0: usize, index1: usize, index2: usize) -> &T;
 
     /// Get a mutable item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize, index2: usize) -> &mut T;
 
     /// Get the shape of the array
@@ -82,6 +103,9 @@ pub trait Array4DAccess<T: Num> {
     ) -> Option<&mut T>;
 
     /// Get an item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked(
         &self,
         index0: usize,
@@ -91,6 +115,9 @@ pub trait Array4DAccess<T: Num> {
     ) -> &T;
 
     /// Get a mutable item from the array without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked_mut(
         &mut self,
         index0: usize,
@@ -116,12 +143,21 @@ pub trait AdjacencyListAccess<'a, T: Num> {
     fn row(&self, index: usize) -> Option<&[T]>;
 
     /// Get an item from the adjacency list without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked(&self, index0: usize, index1: usize) -> &T;
 
     /// Get a mutable item from the adjacency list without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize) -> &mut T;
 
     /// Get a row from the adjacency list without checking bounds
+    ///
+    /// # Safety
+    /// This function does not perform bound checks
     unsafe fn row_unchecked(&self, index: usize) -> &[T];
 
     /// Get the vector of offsets

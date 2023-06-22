@@ -16,16 +16,13 @@ impl<T: Num + Clone> Array2D<T> {
     pub fn new(shape: (usize, usize)) -> Self {
         Self {
             data: vec![T::zero(); shape.0 * shape.1],
-            shape: shape,
+            shape,
         }
     }
 
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize)) -> Self {
-        Self {
-            data: data,
-            shape: shape,
-        }
+        Self { data, shape }
     }
 }
 
@@ -52,7 +49,7 @@ impl<'a, T: Num + 'a> Array2DAccess<'a, T> for Array2D<T> {
         if index >= self.shape.0 {
             None
         } else {
-            unsafe { Some(&self.row_unchecked(index)) }
+            unsafe { Some(self.row_unchecked(index)) }
         }
     }
     /// Get an item from the array without checking bounds
@@ -74,7 +71,7 @@ impl<'a, T: Num + 'a> Array2DAccess<'a, T> for Array2D<T> {
     /// Iterate through the rows
     fn iter_rows(&'a self) -> Self::I {
         Array2DRowIterator::<T> {
-            array: &self,
+            array: self,
             index: 0,
         }
     }
@@ -106,15 +103,12 @@ impl<T: Num + Clone> Array3D<T> {
     pub fn new(shape: (usize, usize, usize)) -> Self {
         Self {
             data: vec![T::zero(); shape.0 * shape.1 * shape.2],
-            shape: shape,
+            shape,
         }
     }
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize, usize)) -> Self {
-        Self {
-            data: data,
-            shape: shape,
-        }
+        Self { data, shape }
     }
 }
 
@@ -159,15 +153,12 @@ impl<T: Num + Clone> Array4D<T> {
     pub fn new(shape: (usize, usize, usize, usize)) -> Self {
         Self {
             data: vec![T::zero(); shape.0 * shape.1 * shape.2 * shape.3],
-            shape: shape,
+            shape,
         }
     }
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize, usize, usize)) -> Self {
-        Self {
-            data: data,
-            shape: shape,
-        }
+        Self { data, shape }
     }
 }
 
@@ -237,6 +228,12 @@ pub struct AdjacencyList<T: Num> {
     offsets: Vec<usize>,
 }
 
+impl<T: Num + Copy> Default for AdjacencyList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Num + Copy> AdjacencyList<T> {
     /// Create an adjacency list
     pub fn new() -> Self {
@@ -257,10 +254,7 @@ impl<T: Num + Copy> AdjacencyList<T> {
         if offsets[offsets.len() - 1] != data.len() {
             panic!("Final offset must be the length of the data.");
         }
-        Self {
-            data: data,
-            offsets: offsets,
-        }
+        Self { data, offsets }
     }
 }
 
@@ -317,7 +311,7 @@ impl<'a, T: Num + 'a> AdjacencyListAccess<'a, T> for AdjacencyList<T> {
     /// Iterate through the rows
     fn iter_rows(&'a self) -> Self::I {
         AdjacencyListRowIterator::<T> {
-            alist: &self,
+            alist: self,
             index: 0,
         }
     }

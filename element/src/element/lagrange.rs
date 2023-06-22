@@ -160,10 +160,10 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
         map_type: MapType::Identity,
         value_size: 1,
         family: ElementFamily::Lagrange,
-        discontinuous: discontinuous,
+        discontinuous,
         dim: coefficients.shape().0,
-        coefficients: coefficients,
-        entity_dofs: entity_dofs,
+        coefficients,
+        entity_dofs,
     }
 }
 
@@ -190,14 +190,14 @@ mod test {
         let mut ndofs = 0;
         for dim in 0..cell_dim + 1 {
             let entity_count = match e.cell_type() {
-                ReferenceCellType::Point => Point {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Interval => Interval {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Triangle => Triangle {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Quadrilateral => Quadrilateral {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Tetrahedron => Tetrahedron {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Hexahedron => Hexahedron {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Prism => Prism {}.entity_count(dim).unwrap(),
-                ReferenceCellType::Pyramid => Pyramid {}.entity_count(dim).unwrap(),
+                ReferenceCellType::Point => Point {}.entity_count(dim),
+                ReferenceCellType::Interval => Interval {}.entity_count(dim),
+                ReferenceCellType::Triangle => Triangle {}.entity_count(dim),
+                ReferenceCellType::Quadrilateral => Quadrilateral {}.entity_count(dim),
+                ReferenceCellType::Tetrahedron => Tetrahedron {}.entity_count(dim),
+                ReferenceCellType::Hexahedron => Hexahedron {}.entity_count(dim),
+                ReferenceCellType::Prism => Prism {}.entity_count(dim),
+                ReferenceCellType::Pyramid => Pyramid {}.entity_count(dim),
             };
             for entity in 0..entity_count {
                 ndofs += e.entity_dofs(dim, entity).unwrap().len();

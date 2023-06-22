@@ -35,7 +35,9 @@ jobs:
         run:
           sudo apt-get install libopenblas-dev liblapack-dev
       - name: Style checks
-        run: cargo fmt -- --check
+        run: |
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
 
       - name: Build rust library (debug)
         run: cargo build --features "strict"
@@ -57,7 +59,7 @@ jobs:
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "strict"
+        run: cargo doc --features "strict" --no-deps
 
   run-tests-python:
     name: Run tests (Python)

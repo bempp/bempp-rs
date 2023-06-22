@@ -37,11 +37,11 @@ impl ReferenceCell for Interval {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 2]),
-            1 => Ok(vec![ReferenceCellType::Interval]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 2],
+            1 => vec![ReferenceCellType::Interval],
+            _ => vec![],
         }
     }
 
@@ -62,14 +62,14 @@ impl ReferenceCell for Interval {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 2);
                 match connected_dim {
                     0 => Ok(vec![entity_number]),
                     1 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -77,10 +77,10 @@ impl ReferenceCell for Interval {
                 match connected_dim {
                     0 => Ok(vec![0, 1]),
                     1 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }

@@ -46,13 +46,13 @@ impl ReferenceCell for Tetrahedron {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 4]),
-            1 => Ok(vec![ReferenceCellType::Interval; 6]),
-            2 => Ok(vec![ReferenceCellType::Triangle; 4]),
-            3 => Ok(vec![ReferenceCellType::Tetrahedron]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 4],
+            1 => vec![ReferenceCellType::Interval; 6],
+            2 => vec![ReferenceCellType::Triangle; 4],
+            3 => vec![ReferenceCellType::Tetrahedron],
+            _ => vec![],
         }
     }
 
@@ -73,7 +73,7 @@ impl ReferenceCell for Tetrahedron {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 4);
@@ -84,17 +84,17 @@ impl ReferenceCell for Tetrahedron {
                         1 => Ok(vec![1, 2, 5]),
                         2 => Ok(vec![0, 2, 4]),
                         3 => Ok(vec![0, 1, 3]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => match entity_number {
                         0 => Ok(vec![1, 2, 3]),
                         1 => Ok(vec![0, 2, 3]),
                         2 => Ok(vec![0, 1, 3]),
                         3 => Ok(vec![0, 1, 2]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -107,7 +107,7 @@ impl ReferenceCell for Tetrahedron {
                         3 => Ok(vec![0, 3]),
                         4 => Ok(vec![0, 2]),
                         5 => Ok(vec![0, 1]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => Ok(vec![entity_number]),
                     2 => match entity_number {
@@ -117,10 +117,10 @@ impl ReferenceCell for Tetrahedron {
                         3 => Ok(vec![1, 2]),
                         4 => Ok(vec![1, 3]),
                         5 => Ok(vec![2, 3]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -131,18 +131,18 @@ impl ReferenceCell for Tetrahedron {
                         1 => Ok(vec![0, 2, 3]),
                         2 => Ok(vec![0, 1, 3]),
                         3 => Ok(vec![0, 1, 2]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => match entity_number {
                         0 => Ok(vec![0, 1, 2]),
                         1 => Ok(vec![0, 3, 4]),
                         2 => Ok(vec![1, 3, 5]),
                         3 => Ok(vec![2, 4, 5]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![entity_number]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             3 => {
@@ -152,10 +152,10 @@ impl ReferenceCell for Tetrahedron {
                     1 => Ok(vec![0, 1, 2, 3, 4, 5]),
                     2 => Ok(vec![0, 1, 2, 3]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
@@ -199,13 +199,13 @@ impl ReferenceCell for Hexahedron {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 8]),
-            1 => Ok(vec![ReferenceCellType::Interval; 12]),
-            2 => Ok(vec![ReferenceCellType::Quadrilateral; 6]),
-            3 => Ok(vec![ReferenceCellType::Hexahedron]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 8],
+            1 => vec![ReferenceCellType::Interval; 12],
+            2 => vec![ReferenceCellType::Quadrilateral; 6],
+            3 => vec![ReferenceCellType::Hexahedron],
+            _ => vec![],
         }
     }
 
@@ -226,7 +226,7 @@ impl ReferenceCell for Hexahedron {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 8);
@@ -241,7 +241,7 @@ impl ReferenceCell for Hexahedron {
                         5 => Ok(vec![4, 8, 10]),
                         6 => Ok(vec![6, 9, 11]),
                         7 => Ok(vec![7, 10, 11]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => match entity_number {
                         0 => Ok(vec![0, 1, 2]),
@@ -252,10 +252,10 @@ impl ReferenceCell for Hexahedron {
                         5 => Ok(vec![1, 3, 5]),
                         6 => Ok(vec![2, 4, 5]),
                         7 => Ok(vec![3, 4, 5]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -274,7 +274,7 @@ impl ReferenceCell for Hexahedron {
                         9 => Ok(vec![4, 6]),
                         10 => Ok(vec![5, 7]),
                         11 => Ok(vec![6, 7]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => Ok(vec![entity_number]),
                     2 => match entity_number {
@@ -290,10 +290,10 @@ impl ReferenceCell for Hexahedron {
                         9 => Ok(vec![2, 5]),
                         10 => Ok(vec![3, 5]),
                         11 => Ok(vec![4, 5]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -306,7 +306,7 @@ impl ReferenceCell for Hexahedron {
                         3 => Ok(vec![1, 3, 5, 7]),
                         4 => Ok(vec![2, 3, 6, 7]),
                         5 => Ok(vec![4, 5, 6, 7]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => match entity_number {
                         0 => Ok(vec![0, 1, 3, 5]),
@@ -315,11 +315,11 @@ impl ReferenceCell for Hexahedron {
                         3 => Ok(vec![3, 4, 7, 10]),
                         4 => Ok(vec![5, 6, 7, 11]),
                         5 => Ok(vec![8, 9, 10, 11]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![entity_number]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             3 => {
@@ -329,10 +329,10 @@ impl ReferenceCell for Hexahedron {
                     1 => Ok(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
                     2 => Ok(vec![0, 1, 2, 3, 4, 5]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
@@ -370,19 +370,19 @@ impl ReferenceCell for Prism {
         static FACES_NV: [usize; 5] = [3, 4, 4, 4, 3];
         &FACES_NV
     }
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 6]),
-            1 => Ok(vec![ReferenceCellType::Interval; 9]),
-            2 => Ok(vec![
+            0 => vec![ReferenceCellType::Point; 6],
+            1 => vec![ReferenceCellType::Interval; 9],
+            2 => vec![
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Triangle,
-            ]),
-            3 => Ok(vec![ReferenceCellType::Prism]),
-            _ => Err(()),
+            ],
+            3 => vec![ReferenceCellType::Prism],
+            _ => vec![],
         }
     }
 
@@ -403,7 +403,7 @@ impl ReferenceCell for Prism {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 6);
@@ -416,7 +416,7 @@ impl ReferenceCell for Prism {
                         3 => Ok(vec![2, 6, 7]),
                         4 => Ok(vec![4, 6, 8]),
                         5 => Ok(vec![5, 7, 8]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => match entity_number {
                         0 => Ok(vec![0, 1, 2]),
@@ -425,10 +425,10 @@ impl ReferenceCell for Prism {
                         3 => Ok(vec![1, 2, 4]),
                         4 => Ok(vec![1, 3, 4]),
                         5 => Ok(vec![2, 3, 4]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -444,7 +444,7 @@ impl ReferenceCell for Prism {
                         6 => Ok(vec![3, 4]),
                         7 => Ok(vec![3, 5]),
                         8 => Ok(vec![4, 5]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => Ok(vec![entity_number]),
                     2 => match entity_number {
@@ -457,10 +457,10 @@ impl ReferenceCell for Prism {
                         6 => Ok(vec![1, 4]),
                         7 => Ok(vec![2, 4]),
                         8 => Ok(vec![3, 4]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -472,7 +472,7 @@ impl ReferenceCell for Prism {
                         2 => Ok(vec![0, 2, 3, 5]),
                         3 => Ok(vec![1, 2, 4, 5]),
                         4 => Ok(vec![3, 4, 5]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => match entity_number {
                         0 => Ok(vec![0, 1, 3]),
@@ -480,11 +480,11 @@ impl ReferenceCell for Prism {
                         2 => Ok(vec![1, 2, 5, 7]),
                         3 => Ok(vec![3, 4, 5, 8]),
                         4 => Ok(vec![6, 7, 8]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![entity_number]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             3 => {
@@ -494,10 +494,10 @@ impl ReferenceCell for Prism {
                     1 => Ok(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]),
                     2 => Ok(vec![0, 1, 2, 3, 4]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
@@ -534,19 +534,19 @@ impl ReferenceCell for Pyramid {
         static FACES_NV: [usize; 5] = [4, 3, 3, 3, 3];
         &FACES_NV
     }
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 5]),
-            1 => Ok(vec![ReferenceCellType::Interval; 8]),
-            2 => Ok(vec![
+            0 => vec![ReferenceCellType::Point; 5],
+            1 => vec![ReferenceCellType::Interval; 8],
+            2 => vec![
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
-            ]),
-            3 => Ok(vec![ReferenceCellType::Pyramid]),
-            _ => Err(()),
+            ],
+            3 => vec![ReferenceCellType::Pyramid],
+            _ => vec![],
         }
     }
     fn vertex_count(&self) -> usize {
@@ -566,7 +566,7 @@ impl ReferenceCell for Pyramid {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 5);
@@ -578,7 +578,7 @@ impl ReferenceCell for Pyramid {
                         2 => Ok(vec![1, 5, 6]),
                         3 => Ok(vec![3, 5, 7]),
                         4 => Ok(vec![2, 4, 6, 7]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => match entity_number {
                         0 => Ok(vec![0, 1, 2]),
@@ -586,10 +586,10 @@ impl ReferenceCell for Pyramid {
                         2 => Ok(vec![0, 2, 4]),
                         3 => Ok(vec![0, 3, 4]),
                         4 => Ok(vec![1, 2, 3, 4]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -604,7 +604,7 @@ impl ReferenceCell for Pyramid {
                         5 => Ok(vec![2, 3]),
                         6 => Ok(vec![2, 4]),
                         7 => Ok(vec![3, 4]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => Ok(vec![entity_number]),
                     2 => match entity_number {
@@ -616,10 +616,10 @@ impl ReferenceCell for Pyramid {
                         5 => Ok(vec![0, 4]),
                         6 => Ok(vec![2, 4]),
                         7 => Ok(vec![3, 4]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -631,7 +631,7 @@ impl ReferenceCell for Pyramid {
                         2 => Ok(vec![0, 2, 4]),
                         3 => Ok(vec![1, 3, 4]),
                         4 => Ok(vec![2, 3, 4]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => match entity_number {
                         0 => Ok(vec![0, 1, 3, 5]),
@@ -639,11 +639,11 @@ impl ReferenceCell for Pyramid {
                         2 => Ok(vec![1, 2, 6]),
                         3 => Ok(vec![3, 4, 7]),
                         4 => Ok(vec![5, 6, 7]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![entity_number]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             3 => {
@@ -653,10 +653,10 @@ impl ReferenceCell for Pyramid {
                     1 => Ok(vec![0, 1, 2, 3, 4, 5, 6, 7]),
                     2 => Ok(vec![0, 1, 2, 3, 4]),
                     3 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
