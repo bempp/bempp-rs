@@ -662,7 +662,7 @@ impl Topology<'_> for SerialTopology {
             let cells = &self.connectivity[self.dim()][0].borrow();
             for (i, cell_type) in self.cell_types.iter().enumerate() {
                 let ref_cell = get_reference_cell(*cell_type);
-                let ref_entities = (0..ref_cell.entity_count(dim0).unwrap())
+                let ref_entities = (0..ref_cell.entity_count(dim0))
                     .map(|x| ref_cell.connectivity(dim0, x, 0).unwrap())
                     .collect::<Vec<Vec<usize>>>();
 
@@ -700,7 +700,7 @@ impl Topology<'_> for SerialTopology {
             let mut cell_types = vec![ReferenceCellType::Point; entities0.num_rows()];
             for (i, cell_type) in self.cell_types.iter().enumerate() {
                 let ref_cell = get_reference_cell(*cell_type);
-                let etypes = ref_cell.entity_types(dim0).unwrap();
+                let etypes = ref_cell.entity_types(dim0);
 
                 let cstart = self.starts[i];
                 let cend = if i == self.starts.len() - 1 {
@@ -717,7 +717,7 @@ impl Topology<'_> for SerialTopology {
             for (ei, entity0) in entities0.iter_rows().enumerate() {
                 let entity = get_reference_cell(cell_types[ei]);
                 let mut row = vec![];
-                for i in 0..entity.entity_count(dim1).unwrap() {
+                for i in 0..entity.entity_count(dim1) {
                     let vertices = entity
                         .connectivity(dim1, i, 0)
                         .unwrap()

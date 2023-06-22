@@ -37,11 +37,11 @@ impl ReferenceCell for Interval {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 2]),
-            1 => Ok(vec![ReferenceCellType::Interval]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 2],
+            1 => vec![ReferenceCellType::Interval],
+            _ => vec![],
         }
     }
 

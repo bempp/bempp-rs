@@ -37,10 +37,10 @@ impl ReferenceCell for Point {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point],
+            _ => vec![],
         }
     }
 

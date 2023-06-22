@@ -37,18 +37,18 @@ pub trait ReferenceCell {
     fn faces_nvertices(&self) -> &[usize];
 
     /// The number of entities of dimension `dim`
-    fn entity_count(&self, dim: usize) -> Result<usize, ()> {
+    fn entity_count(&self, dim: usize) -> usize {
         match dim {
-            0 => Ok(self.vertex_count()),
-            1 => Ok(self.edge_count()),
-            2 => Ok(self.face_count()),
-            3 => Ok(self.volume_count()),
-            _ => Err(()),
+            0 => self.vertex_count(),
+            1 => self.edge_count(),
+            2 => self.face_count(),
+            3 => self.volume_count(),
+            _ => 0,
         }
     }
 
     /// The cell types of entities of dimension `dim`
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()>;
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType>;
 
     /// The number of vertices
     fn vertex_count(&self) -> usize;

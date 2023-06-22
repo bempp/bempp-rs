@@ -46,13 +46,13 @@ impl ReferenceCell for Tetrahedron {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 4]),
-            1 => Ok(vec![ReferenceCellType::Interval; 6]),
-            2 => Ok(vec![ReferenceCellType::Triangle; 4]),
-            3 => Ok(vec![ReferenceCellType::Tetrahedron]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 4],
+            1 => vec![ReferenceCellType::Interval; 6],
+            2 => vec![ReferenceCellType::Triangle; 4],
+            3 => vec![ReferenceCellType::Tetrahedron],
+            _ => vec![],
         }
     }
 
@@ -199,13 +199,13 @@ impl ReferenceCell for Hexahedron {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 8]),
-            1 => Ok(vec![ReferenceCellType::Interval; 12]),
-            2 => Ok(vec![ReferenceCellType::Quadrilateral; 6]),
-            3 => Ok(vec![ReferenceCellType::Hexahedron]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 8],
+            1 => vec![ReferenceCellType::Interval; 12],
+            2 => vec![ReferenceCellType::Quadrilateral; 6],
+            3 => vec![ReferenceCellType::Hexahedron],
+            _ => vec![],
         }
     }
 
@@ -370,19 +370,19 @@ impl ReferenceCell for Prism {
         static FACES_NV: [usize; 5] = [3, 4, 4, 4, 3];
         &FACES_NV
     }
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 6]),
-            1 => Ok(vec![ReferenceCellType::Interval; 9]),
-            2 => Ok(vec![
+            0 => vec![ReferenceCellType::Point; 6],
+            1 => vec![ReferenceCellType::Interval; 9],
+            2 => vec![
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Triangle,
-            ]),
-            3 => Ok(vec![ReferenceCellType::Prism]),
-            _ => Err(()),
+            ],
+            3 => vec![ReferenceCellType::Prism],
+            _ => vec![],
         }
     }
 
@@ -534,19 +534,19 @@ impl ReferenceCell for Pyramid {
         static FACES_NV: [usize; 5] = [4, 3, 3, 3, 3];
         &FACES_NV
     }
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 5]),
-            1 => Ok(vec![ReferenceCellType::Interval; 8]),
-            2 => Ok(vec![
+            0 => vec![ReferenceCellType::Point; 5],
+            1 => vec![ReferenceCellType::Interval; 8],
+            2 => vec![
                 ReferenceCellType::Quadrilateral,
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
-            ]),
-            3 => Ok(vec![ReferenceCellType::Pyramid]),
-            _ => Err(()),
+            ],
+            3 => vec![ReferenceCellType::Pyramid],
+            _ => vec![],
         }
     }
     fn vertex_count(&self) -> usize {

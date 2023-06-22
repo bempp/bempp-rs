@@ -5,7 +5,6 @@ use ndarray::*;
 use ndarray_linalg::SVDDC;
 use ndarray_ndimage::{pad, PadMode};
 use ndrustfft::{ndfft, ndfft_r2c, Complex, FftHandler, R2cFftHandler};
-use num::Float;
 
 use bempp_traits::{field::FieldTranslationData, kernel::Kernel};
 use bempp_tree::types::{domain::Domain, morton::MortonKey};

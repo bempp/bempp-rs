@@ -108,7 +108,7 @@ pub extern "C" fn reference_cell_container_get_entity_count(
     cell_container: Option<Box<ReferenceCellContainer>>,
 ) -> usize {
     assert!(dim < 4);
-    get_reference(cell_container).entity_count(dim).unwrap()
+    get_reference(cell_container).entity_count(dim)
 }
 
 #[no_mangle]

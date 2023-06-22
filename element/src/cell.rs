@@ -51,7 +51,7 @@ mod test {
                     }
 
                     for e_dim in 0..c.dim() + 1 {
-                        for e_n in 0..c.entity_count(e_dim).unwrap() {
+                        for e_n in 0..c.entity_count(e_dim) {
                             let e_vertices = c.connectivity(e_dim, e_n, 0).unwrap();
                             for c_dim in 0..c.dim() + 1 {
                                 let connectivity = c.connectivity(e_dim, e_n, c_dim).unwrap();

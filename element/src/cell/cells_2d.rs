@@ -40,12 +40,12 @@ impl ReferenceCell for Triangle {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 3]),
-            1 => Ok(vec![ReferenceCellType::Interval; 3]),
-            2 => Ok(vec![ReferenceCellType::Triangle]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 3],
+            1 => vec![ReferenceCellType::Interval; 3],
+            2 => vec![ReferenceCellType::Triangle],
+            _ => vec![],
         }
     }
 
@@ -142,12 +142,12 @@ impl ReferenceCell for Quadrilateral {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 4]),
-            1 => Ok(vec![ReferenceCellType::Interval; 4]),
-            2 => Ok(vec![ReferenceCellType::Quadrilateral]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 4],
+            1 => vec![ReferenceCellType::Interval; 4],
+            2 => vec![ReferenceCellType::Quadrilateral],
+            _ => vec![],
         }
     }
 
