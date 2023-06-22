@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
 permissions:
   contents: read
   pages: write
@@ -46,6 +45,9 @@ jobs:
           fi
           done
           echo "</ul></body></html>" >> target/doc/index.html
+
+      - name: Set file permissions
+        run: chmod -R 744 target/doc
 
 
       - name: Setup Pages
