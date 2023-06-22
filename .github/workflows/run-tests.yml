@@ -37,7 +37,7 @@ jobs:
       - name: Style checks
         run: |
           cargo fmt -- --check
-          cargo clippy -D warnings
+          cargo clippy -- -D warnings
 
       - name: Build rust library (debug)
         run: cargo build --features "strict"
