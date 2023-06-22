@@ -47,8 +47,9 @@ jobs:
           echo "</ul></body></html>" >> target/doc/index.html
 
       - name: Set file permissions
-        run: chmod -R 744 target/doc
-
+        run: |
+          rm target/doc/.lock
+          chmod -R 744 target/doc
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
