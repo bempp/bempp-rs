@@ -1,4 +1,6 @@
 use approx::*;
+use std::time::Instant;
+
 use bempp_bem::assembly::{assemble_dense, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
@@ -19,109 +21,331 @@ use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
 
-fn singular_kernel<'a>(result: &mut impl Array2DAccess<'a, f64>) {
+fn same_triangle_kernel_dp0<'a>(
+    result: &mut impl Array2DAccess<'a, f64>,
+    test_vertices: &impl Array2DAccess<'a, f64>,
+    trial_vertices: &impl Array2DAccess<'a, f64>,
+) {
     *result.get_mut(0, 0).unwrap() = 0.004747866583277947;
-}
 
-fn get_quadrature_rule(
-    test_celltype: ReferenceCellType,
-    trial_celltype: ReferenceCellType,
-    pairs: Vec<(usize, usize)>,
-    npoints: usize,
-) -> TestTrialNumericalQuadratureDefinition {
-    if pairs.is_empty() {
-        // Standard rules
-        let mut npoints_test = 10 * npoints * npoints;
-        for p in available_rules(test_celltype) {
-            if p >= npoints * npoints && p < npoints_test {
-                npoints_test = p;
-            }
-        }
-        let mut npoints_trial = 10 * npoints * npoints;
-        for p in available_rules(trial_celltype) {
-            if p >= npoints * npoints && p < npoints_trial {
-                npoints_trial = p;
-            }
-        }
-        let test_rule = simplex_rule(test_celltype, npoints_test).unwrap();
-        let trial_rule = simplex_rule(trial_celltype, npoints_trial).unwrap();
-        if test_rule.dim != trial_rule.dim {
-            unimplemented!("Quadrature with different dimension cells not supported");
-        }
-        if test_rule.order != trial_rule.order {
-            unimplemented!("Quadrature with different trial and test orders not supported");
-        }
-        let dim = test_rule.dim;
-        let npts = test_rule.npoints * trial_rule.npoints;
-        let mut test_points = Vec::<f64>::with_capacity(dim * npts);
-        let mut trial_points = Vec::<f64>::with_capacity(dim * npts);
-        let mut weights = Vec::<f64>::with_capacity(npts);
+    let test_points = Array2D::from_data(vec![
+        0.03522081090086451, 0.17610405450432262,
+        0.042663844023951264, 0.16666666666666669,
+        0.1741096997897534, 0.03721516561543372,
+        0.16666666666666669, 0.03522081090086453,
+        0.16666666666666669, 0.042663844023951264,
+        0.1761040545043226, 0.03522081090086453,
+        0.13144585576580214, 0.6572292788290107,
+        0.15922363354357993, 0.6220084679281462,
+        0.649786245705924, 0.1388888888888889,
+        0.6220084679281461, 0.13144585576580217,
+        0.6220084679281462, 0.15922363354357993,
+        0.6572292788290107, 0.13144585576580217,
+        0.03522081090086451, 0.17610405450432262,
+        0.037215165615433726, 0.16666666666666669,
+        0.16866102138123587, 0.042663844023951264,
+        0.16666666666666669, 0.03522081090086453,
+        0.16666666666666669, 0.03721516561543372,
+        0.1761040545043226, 0.03522081090086453,
+        0.13144585576580214, 0.6572292788290107,
+        0.13888888888888884, 0.6220084679281462,
+        0.6294515010512329, 0.15922363354357993,
+        0.6220084679281461, 0.13144585576580217,
+        0.6220084679281461, 0.1388888888888889,
+        0.6572292788290107, 0.13144585576580217,
+        0.009437387837655908, 0.20188747756753123,
+        0.037215165615433726, 0.16666666666666669,
+        0.19444444444444445, 0.016880420960742677,
+        0.16666666666666666, 0.009437387837655933,
+        0.16666666666666669, 0.03721516561543371,
+        0.2018874775675312, 0.009437387837655933,
+        0.035220810900864485, 0.7534543236939484,
+        0.13888888888888884, 0.6220084679281462,
+        0.7256765459161706, 0.0629985886786423,
+        0.6220084679281461, 0.03522081090086452,
+        0.6220084679281461, 0.1388888888888889,
+        0.7534543236939484, 0.03522081090086452,
+        0.009437387837655908, 0.20188747756753123,
+        0.01688042096074266, 0.16666666666666669,
+        0.1741096997897534, 0.03721516561543372,
+        0.16666666666666666, 0.009437387837655933,
+        0.16666666666666669, 0.016880420960742673,
+        0.2018874775675312, 0.009437387837655933,
+        0.035220810900864485, 0.7534543236939484,
+        0.06299858867864228, 0.6220084679281462,
+        0.649786245705924, 0.1388888888888889,
+        0.6220084679281461, 0.03522081090086452,
+        0.6220084679281462, 0.06299858867864229,
+        0.7534543236939484, 0.03522081090086452,
+        0.13144585576580214, 0.07987900963938499,
+        0.15922363354357996, 0.044658198738520456,
+        0.07243597651629827, 0.13888888888888887,
+        0.04465819873852045, 0.13144585576580214,
+        0.04465819873852048, 0.15922363354357993,
+        0.07987900963938499, 0.13144585576580214,
+        0.49056261216234404, 0.29811252243246883,
+        0.5942306901503684, 0.16666666666666669,
+        0.2703347446546911, 0.5183403899401218,
+        0.16666666666666663, 0.490562612162344,
+        0.16666666666666663, 0.5942306901503684,
+        0.2981125224324689, 0.490562612162344,
+        0.13144585576580214, 0.07987900963938499,
+        0.1388888888888889, 0.044658198738520456,
+        0.05210123186160723, 0.1592236335435799,
+        0.04465819873852045, 0.13144585576580214,
+        0.04465819873852045, 0.1388888888888889,
+        0.07987900963938499, 0.13144585576580214,
+        0.49056261216234404, 0.29811252243246883,
+        0.5183403899401218, 0.16666666666666669,
+        0.19444444444444453, 0.5942306901503683,
+        0.16666666666666663, 0.490562612162344,
+        0.16666666666666674, 0.5183403899401218,
+        0.2981125224324689, 0.490562612162344,
+        0.03522081090086451, 0.17610405450432262,
+        0.1388888888888889, 0.044658198738520456,
+        0.14832627672654486, 0.06299858867864229,
+        0.04465819873852046, 0.03522081090086451,
+        0.04465819873852045, 0.1388888888888889,
+        0.17610405450432262, 0.03522081090086451,
+        0.13144585576580214, 0.6572292788290107,
+        0.5183403899401218, 0.16666666666666669,
+        0.5535612008409864, 0.23511393375382647,
+        0.16666666666666666, 0.13144585576580212,
+        0.16666666666666674, 0.5183403899401218,
+        0.6572292788290107, 0.13144585576580212,
+        0.03522081090086451, 0.17610405450432262,
+        0.0629985886786423, 0.044658198738520456,
+        0.07243597651629824, 0.1388888888888889,
+        0.04465819873852046, 0.03522081090086451,
+        0.04465819873852046, 0.06299858867864229,
+        0.17610405450432262, 0.03522081090086451,
+        0.13144585576580214, 0.6572292788290107,
+        0.2351139337538265, 0.16666666666666669,
+        0.2703347446546911, 0.5183403899401218,
+        0.16666666666666666, 0.13144585576580212,
+        0.1666666666666667, 0.23511393375382647,
+        0.6572292788290107, 0.13144585576580212,
+    ], (96, 2));
+    let trial_points = Array2D::from_data(vec![
+        0.042663844023951264, 0.16666666666666669,
+        0.03522081090086451, 0.17610405450432262,
+        0.16666666666666669, 0.03522081090086453,
+        0.1741096997897534, 0.03721516561543372,
+        0.1761040545043226, 0.03522081090086453,
+        0.16666666666666669, 0.042663844023951264,
+        0.15922363354357993, 0.6220084679281462,
+        0.13144585576580214, 0.6572292788290107,
+        0.6220084679281461, 0.13144585576580217,
+        0.649786245705924, 0.1388888888888889,
+        0.6572292788290107, 0.13144585576580217,
+        0.6220084679281462, 0.15922363354357993,
+        0.037215165615433726, 0.16666666666666669,
+        0.03522081090086451, 0.17610405450432262,
+        0.16666666666666669, 0.03522081090086453,
+        0.16866102138123587, 0.042663844023951264,
+        0.1761040545043226, 0.03522081090086453,
+        0.16666666666666669, 0.03721516561543372,
+        0.13888888888888884, 0.6220084679281462,
+        0.13144585576580214, 0.6572292788290107,
+        0.6220084679281461, 0.13144585576580217,
+        0.6294515010512329, 0.15922363354357993,
+        0.6572292788290107, 0.13144585576580217,
+        0.6220084679281461, 0.1388888888888889,
+        0.037215165615433726, 0.16666666666666669,
+        0.009437387837655908, 0.20188747756753123,
+        0.16666666666666666, 0.009437387837655933,
+        0.19444444444444445, 0.016880420960742677,
+        0.2018874775675312, 0.009437387837655933,
+        0.16666666666666669, 0.03721516561543371,
+        0.13888888888888884, 0.6220084679281462,
+        0.035220810900864485, 0.7534543236939484,
+        0.6220084679281461, 0.03522081090086452,
+        0.7256765459161706, 0.0629985886786423,
+        0.7534543236939484, 0.03522081090086452,
+        0.6220084679281461, 0.1388888888888889,
+        0.01688042096074266, 0.16666666666666669,
+        0.009437387837655908, 0.20188747756753123,
+        0.16666666666666666, 0.009437387837655933,
+        0.1741096997897534, 0.03721516561543372,
+        0.2018874775675312, 0.009437387837655933,
+        0.16666666666666669, 0.016880420960742673,
+        0.06299858867864228, 0.6220084679281462,
+        0.035220810900864485, 0.7534543236939484,
+        0.6220084679281461, 0.03522081090086452,
+        0.649786245705924, 0.1388888888888889,
+        0.7534543236939484, 0.03522081090086452,
+        0.6220084679281462, 0.06299858867864229,
+        0.15922363354357996, 0.044658198738520456,
+        0.13144585576580214, 0.07987900963938499,
+        0.04465819873852045, 0.13144585576580214,
+        0.07243597651629827, 0.13888888888888887,
+        0.07987900963938499, 0.13144585576580214,
+        0.04465819873852048, 0.15922363354357993,
+        0.5942306901503684, 0.16666666666666669,
+        0.49056261216234404, 0.29811252243246883,
+        0.16666666666666663, 0.490562612162344,
+        0.2703347446546911, 0.5183403899401218,
+        0.2981125224324689, 0.490562612162344,
+        0.16666666666666663, 0.5942306901503684,
+        0.1388888888888889, 0.044658198738520456,
+        0.13144585576580214, 0.07987900963938499,
+        0.04465819873852045, 0.13144585576580214,
+        0.05210123186160723, 0.1592236335435799,
+        0.07987900963938499, 0.13144585576580214,
+        0.04465819873852045, 0.1388888888888889,
+        0.5183403899401218, 0.16666666666666669,
+        0.49056261216234404, 0.29811252243246883,
+        0.16666666666666663, 0.490562612162344,
+        0.19444444444444453, 0.5942306901503683,
+        0.2981125224324689, 0.490562612162344,
+        0.16666666666666674, 0.5183403899401218,
+        0.1388888888888889, 0.044658198738520456,
+        0.03522081090086451, 0.17610405450432262,
+        0.04465819873852046, 0.03522081090086451,
+        0.14832627672654486, 0.06299858867864229,
+        0.17610405450432262, 0.03522081090086451,
+        0.04465819873852045, 0.1388888888888889,
+        0.5183403899401218, 0.16666666666666669,
+        0.13144585576580214, 0.6572292788290107,
+        0.16666666666666666, 0.13144585576580212,
+        0.5535612008409864, 0.23511393375382647,
+        0.6572292788290107, 0.13144585576580212,
+        0.16666666666666674, 0.5183403899401218,
+        0.0629985886786423, 0.044658198738520456,
+        0.03522081090086451, 0.17610405450432262,
+        0.04465819873852046, 0.03522081090086451,
+        0.07243597651629824, 0.1388888888888889,
+        0.17610405450432262, 0.03522081090086451,
+        0.04465819873852046, 0.06299858867864229,
+        0.2351139337538265, 0.16666666666666669,
+        0.13144585576580214, 0.6572292788290107,
+        0.16666666666666666, 0.13144585576580212,
+        0.2703347446546911, 0.5183403899401218,
+        0.6572292788290107, 0.13144585576580212,
+        0.1666666666666667, 0.23511393375382647,
+    ], (96, 2));
+    let wts = vec![
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.0000055665180748960085,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.00028935185185185194,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.000020774528276762397,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.001079875812375254,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.00007753159503215358,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.004030151397649164,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0002893518518518519,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+        0.0150407297782214,
+    ];
 
-        for test_i in 0..test_rule.npoints {
-            for trial_i in 0..trial_rule.npoints {
-                for d in 0..dim {
-                    test_points.push(test_rule.points[dim * test_i + d]);
-                    trial_points.push(trial_rule.points[dim * trial_i + d]);
-                }
-                weights.push(test_rule.weights[test_i] * trial_rule.weights[trial_i]);
-            }
-        }
+    let one_over_4pi = 0.25 * std::f64::consts::FRAC_1_PI;
 
-        TestTrialNumericalQuadratureDefinition {
-            dim,
-            order: test_rule.order,
-            npoints: npts,
-            weights,
-            test_points,
-            trial_points,
-        }
-    } else {
-        // Singular rules
-        if test_celltype == ReferenceCellType::Triangle {
-            if trial_celltype != ReferenceCellType::Triangle {
-                unimplemented!("Mixed meshes not yet supported");
-            }
-            triangle_duffy(
-                &CellToCellConnectivity {
-                    connectivity_dimension: if pairs.len() == 1 {
-                        0
-                    } else if pairs.len() == 2 {
-                        1
-                    } else {
-                        2
-                    },
-                    local_indices: pairs,
-                },
-                npoints,
-            )
-            .unwrap()
-        } else {
-            if test_celltype != ReferenceCellType::Quadrilateral {
-                unimplemented!("Only triangles and quadrilaterals are currently supported");
-            }
-            if trial_celltype != ReferenceCellType::Quadrilateral {
-                unimplemented!("Mixed meshes not yet supported");
-            }
-            quadrilateral_duffy(
-                &CellToCellConnectivity {
-                    connectivity_dimension: if pairs.len() == 1 {
-                        0
-                    } else if pairs.len() == 2 {
-                        1
-                    } else {
-                        2
-                    },
-                    local_indices: pairs,
-                },
-                npoints,
-            )
-            .unwrap()
-        }
+    *result.get_mut(0, 0).unwrap() = 0.0;
+    for q in 0..96 {
+        let test_pt0 = 
+            test_vertices.get(0, 0).unwrap() + test_points.get(q, 0).unwrap() * test_vertices.get(1, 0).unwrap() + test_points.get(q, 1).unwrap() * test_vertices.get(2, 0).unwrap();
+        let test_pt1 =
+            test_vertices.get(0, 1).unwrap() + test_points.get(q, 0).unwrap() * test_vertices.get(1, 1).unwrap() + test_points.get(q, 1).unwrap() * test_vertices.get(2, 1).unwrap();
+        let trial_pt0 = 
+            trial_vertices.get(0, 0).unwrap() + trial_points.get(q, 0).unwrap() * trial_vertices.get(1, 0).unwrap() + trial_points.get(q, 1).unwrap() * trial_vertices.get(2, 0).unwrap();
+        let trial_pt1 =
+            trial_vertices.get(0, 1).unwrap() + trial_points.get(q, 0).unwrap() * trial_vertices.get(1, 1).unwrap() + trial_points.get(q, 1).unwrap() * trial_vertices.get(2, 1).unwrap();
+
+        let sum_squares = (test_pt0 - trial_pt0) * (test_pt0 - trial_pt0) + (test_pt1 - trial_pt1) * (test_pt1 - trial_pt1);
+        let distance = f64::sqrt(sum_squares);
+
+        *result.get_mut(0, 0).unwrap() += wts[q] * one_over_4pi / distance;
+        println!("{} -> {}", wts[q] * one_over_4pi / distance, result.get(0,0).unwrap());
     }
 }
 
 fn main() {
-    let grid = regular_sphere(2);
+    let grid = regular_sphere(3);
     let element = create_element(
         ElementFamily::Lagrange,
         ReferenceCellType::Triangle,
@@ -131,6 +355,71 @@ fn main() {
 
     let space = SerialFunctionSpace::new(&grid, &element);
 
+    // --------------------------------------------- //
+    // Assemble DP0, DP0 single layer Laplace kernel //
+    // --------------------------------------------- //
+    let mut matrix2 = Array2D::<f64>::new((
+        space.dofmap().global_size(),
+        space.dofmap().global_size(),
+    ));
+
+    let start = Instant::now();
+
+    // TODO: allow user to configure this
+    let npoints = 4;
+    let kernel = green::LaplaceGreenKernel {};
+
+
+    let mut local_result = Array2D::<f64>::new((1, 1));
+
+    let mut test_vertices = Array2D::<f64>::new((3, 3));
+    let mut trial_vertices = Array2D::<f64>::new((3, 3));
+
+    for test_cell in 0..grid.geometry().cell_count() {
+        let test_cell_tindex = grid.topology().index_map()[test_cell];
+        let test_cell_gindex = grid.geometry().index_map()[test_cell];
+        let test_dofs = space.dofmap().cell_dofs(test_cell_tindex).unwrap();
+        let test_cell_dofs = grid.geometry().cell_vertices(test_cell).unwrap();
+
+        for i in 0..3 {
+            for j in 0..3 {
+                *test_vertices.get_mut(i, j).unwrap() = grid.geometry().point(test_cell_dofs[i]).unwrap()[j];
+            }
+        }
+
+        // TODO: Add iterators that loop over cells with certain connectivity rather than ifs
+        for trial_cell in 0..grid.geometry().cell_count() {
+            let trial_cell_tindex = grid.topology().index_map()[trial_cell];
+            let trial_cell_gindex = grid.geometry().index_map()[trial_cell];
+            let trial_dofs = space.dofmap().cell_dofs(trial_cell_tindex).unwrap();
+            let trial_cell_dofs = grid.geometry().cell_vertices(trial_cell).unwrap();
+
+            for i in 0..3 {
+                for j in 0..3 {
+                    *trial_vertices.get_mut(i, j).unwrap() = grid.geometry().point(trial_cell_dofs[i]).unwrap()[j];
+                }
+            }
+
+            if test_cell == trial_cell {
+                same_triangle_kernel_dp0(&mut local_result, &test_vertices, &trial_vertices);
+            } else {
+                // TODO: edge adjacent kernel
+                // TODO: vertex adjacent kernel
+                // TODO: non-neighbour kernel
+
+            }
+
+            let trial_dofs = space.dofmap().cell_dofs(grid.topology().index_map()[trial_cell]).unwrap();
+            for (test_i, test_dof) in test_dofs.iter().enumerate() {
+                for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
+                    *matrix2.get_mut(*test_dof, *trial_dof).unwrap() = *local_result.get(test_i, trial_i).unwrap()
+                }
+            }
+        }
+    }
+    println!("Time taken (single layer Laplace, grid with {} cells):  {}ms", grid.topology().entity_count(2), start.elapsed().as_millis());
+
+    let start2 = Instant::now();    
     let mut matrix = Array2D::<f64>::new((
         space.dofmap().global_size(),
         space.dofmap().global_size(),
@@ -143,148 +432,14 @@ fn main() {
         &space,
         &space,
     );
+    println!("Time taken (current slow assembly, grid with {} cells): {}ms", grid.topology().entity_count(2), start2.elapsed().as_millis());
 
-
-    let mut matrix2 = Array2D::<f64>::new((
-        space.dofmap().global_size(),
-        space.dofmap().global_size(),
-    ));
-
-
-    // TODO: allow user to configure this
-    let npoints = 4;
-    let kernel = green::LaplaceGreenKernel {};
-
-
-    let grid = space.grid();
-    let c20 = grid.topology().connectivity(2, 0);
-
-    let mut local_result = Array2D::<f64>::new((1, 1));
-
-    for test_cell in 0..grid.geometry().cell_count() {
-        let test_cell_tindex = grid.topology().index_map()[test_cell];
-        let test_cell_gindex = grid.geometry().index_map()[test_cell];
-        let test_vertices = c20.row(test_cell_tindex).unwrap();
-
-        let mut npoints_test_cell = 10 * npoints * npoints;
-        for p in available_rules(grid.topology().cell_type(test_cell_tindex).unwrap()) {
-            if p >= npoints * npoints && p < npoints_test_cell {
-                npoints_test_cell = p;
-            }
-        }
-
-        singular_kernel(&mut local_result);
-
-        let dof_i = space.dofmap().cell_dofs(test_cell_tindex).unwrap()[0];
-        *matrix2.get_mut(dof_i, dof_i).unwrap() = *local_result.get(0,0).unwrap();
-
-        for trial_cell in 0..grid.geometry().cell_count() {
-            if test_cell != trial_cell {
-                let trial_cell_tindex = grid.topology().index_map()[trial_cell];
-                let trial_cell_gindex = grid.geometry().index_map()[trial_cell];
-                let trial_vertices = c20.row(trial_cell_tindex).unwrap();
-
-                let mut npoints_trial_cell = 10 * npoints * npoints;
-                for p in available_rules(grid.topology().cell_type(trial_cell_tindex).unwrap()) {
-                    if p >= npoints * npoints && p < npoints_trial_cell {
-                        npoints_trial_cell = p;
-                    }
-                }
-
-                let mut pairs = vec![];
-                for (test_i, test_v) in test_vertices.iter().enumerate() {
-                    for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                        if test_v == trial_v {
-                            pairs.push((test_i, trial_i));
-                        }
-                    }
-                }
-                let rule = get_quadrature_rule(
-                    grid.topology().cell_type(test_cell_tindex).unwrap(),
-                    grid.topology().cell_type(trial_cell_tindex).unwrap(),
-                    pairs,
-                    npoints,
-                );
-
-                let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
-                let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
-                let mut test_table =
-                    Array4D::<f64>::new(space.element().tabulate_array_shape(0, rule.npoints));
-                let mut trial_table =
-                    Array4D::<f64>::new(space.element().tabulate_array_shape(0, rule.npoints));
-
-                space
-                    .element()
-                    .tabulate(&test_points, 0, &mut test_table);
-                space
-                    .element()
-                    .tabulate(&trial_points, 0, &mut trial_table);
-
-                let mut test_jdet = vec![0.0; rule.npoints];
-                let mut trial_jdet = vec![0.0; rule.npoints];
-
-                grid.geometry().compute_jacobian_determinants(
-                    &test_points,
-                    test_cell_gindex,
-                    &mut test_jdet,
-                );
-                grid.geometry().compute_jacobian_determinants(
-                    &trial_points,
-                    trial_cell_gindex,
-                    &mut trial_jdet,
-                );
-
-                let mut test_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
-                let mut trial_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
-                let test_normals = Array2D::<f64>::new((0, 0));
-                let trial_normals = Array2D::<f64>::new((0, 0));
-
-                grid.geometry()
-                    .compute_points(&test_points, test_cell_gindex, &mut test_mapped_pts);
-                grid.geometry()
-                    .compute_points(&trial_points, trial_cell_gindex, &mut trial_mapped_pts);
-
-                for (test_i, test_dof) in space
-                    .dofmap()
-                    .cell_dofs(test_cell_tindex)
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                {
-                    for (trial_i, trial_dof) in space
-                        .dofmap()
-                        .cell_dofs(trial_cell_tindex)
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        let mut sum = 0.0;
-
-                        for index in 0..rule.npoints {
-                            sum += kernel.eval::<f64>(
-                                unsafe { test_mapped_pts.row_unchecked(index) },
-                                unsafe { trial_mapped_pts.row_unchecked(index) },
-                                unsafe { test_normals.row_unchecked(index) },
-                                unsafe { trial_normals.row_unchecked(index) },
-                            ) * 
-                                rule.weights[index]
-                                    * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
-                                    * test_jdet[index]
-                                    * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
-                                    * trial_jdet[index];
-                        }
-                        *matrix2.get_mut(*test_dof, *trial_dof).unwrap() += sum;
-                    }
-                }
-            }
-        }
-    }
-
-
+    // Check correctness
     for i in 0..space.dofmap().global_size() {
         for j in 0..space.dofmap().global_size() {
-            assert_relative_eq!(matrix.get(i, j).unwrap(), matrix2.get(i, j).unwrap());
+            if i == j {
+                assert_relative_eq!(matrix.get(i, j).unwrap(), matrix2.get(i, j).unwrap());
+            }
         }
     }
-
 }
