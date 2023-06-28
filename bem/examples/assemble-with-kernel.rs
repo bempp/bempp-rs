@@ -5,21 +5,12 @@ use bempp_bem::assembly::{assemble_dense, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
-use bempp_tools::arrays::{Array2D, Array4D};
-use bempp_traits::arrays::{Array2DAccess, Array4DAccess, AdjacencyListAccess};
+use bempp_tools::arrays::Array2D;
+use bempp_traits::arrays::{Array2DAccess, AdjacencyListAccess};
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{ElementFamily, FiniteElement};
+use bempp_traits::element::ElementFamily;
 use bempp_traits::grid::{Grid, Geometry, Topology};
-
-use bempp_bem::green;
-use bempp_bem::green::SingularKernel;
-use bempp_quadrature::simplex_rules::available_rules;
-use bempp_quadrature::types::CellToCellConnectivity;
-use bempp_quadrature::types::TestTrialNumericalQuadratureDefinition;
-use bempp_quadrature::duffy::triangle::triangle_duffy;
-use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
-use bempp_quadrature::simplex_rules::simplex_rule;
 
 fn singular_kernel_dp0<'a>(
     result: &mut impl Array2DAccess<'a, f64>,
@@ -275,7 +266,6 @@ fn main() {
     let c20 = grid.topology().connectivity(2, 0);
     for test_cell in 0..grid.geometry().cell_count() {
         let test_cell_tindex = grid.topology().index_map()[test_cell];
-        let test_cell_gindex = grid.geometry().index_map()[test_cell];
         let test_dofs = space.dofmap().cell_dofs(test_cell_tindex).unwrap();
         let test_cell_dofs = grid.geometry().cell_vertices(test_cell).unwrap();
         let test_tvertices = c20.row(test_cell_tindex).unwrap();
@@ -289,7 +279,6 @@ fn main() {
         // TODO: Add iterators that loop over cells with certain connectivity rather than ifs
         for trial_cell in 0..grid.geometry().cell_count() {
             let trial_cell_tindex = grid.topology().index_map()[trial_cell];
-            let trial_cell_gindex = grid.geometry().index_map()[trial_cell];
             let trial_dofs = space.dofmap().cell_dofs(trial_cell_tindex).unwrap();
             let trial_cell_dofs = grid.geometry().cell_vertices(trial_cell).unwrap();
             let trial_tvertices = c20.row(trial_cell_tindex).unwrap();
@@ -324,7 +313,6 @@ fn main() {
 
             }
 
-            let trial_dofs = space.dofmap().cell_dofs(grid.topology().index_map()[trial_cell]).unwrap();
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                     *matrix2.get_mut(*test_dof, *trial_dof).unwrap() = *local_result.get(test_i, trial_i).unwrap()
@@ -352,7 +340,8 @@ fn main() {
     // Check correctness
     for i in 0..space.dofmap().global_size() {
         for j in 0..space.dofmap().global_size() {
-            assert_relative_eq!(matrix.get(i, j).unwrap(), matrix2.get(i, j).unwrap(), epsilon=1e-6);
+            // epsilon is large here, as low degree quadrature rules are used by th kernel functions in this file
+            assert_relative_eq!(matrix.get(i, j).unwrap(), matrix2.get(i, j).unwrap(), epsilon=1e-2);
         }
     }
 }
