@@ -4,12 +4,13 @@ use std::time::Instant;
 use bempp_bem::assembly::{assemble_dense, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
+use bempp_grid::grid::SerialGrid;
 use bempp_grid::shapes::regular_sphere;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::ElementFamily;
+use bempp_traits::element::{ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn singular_kernel_dp0<'a>(
@@ -239,27 +240,11 @@ fn nonneighbour_kernel_dp0<'a>(
     }
 }
 
-fn main() {
-    let grid = regular_sphere(3);
-    let element = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        0,
-        true,
-    );
-
-    let space = SerialFunctionSpace::new(&grid, &element);
-
-    // --------------------------------------------- //
-    // Assemble DP0, DP0 single layer Laplace kernel //
-    // --------------------------------------------- //
-    let mut matrix2 =
-        Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
-
-    let start = Instant::now();
-
-    // TODO: allow user to configure this
-
+fn dp0_assemble<E: FiniteElement>(
+    result: &mut Array2D<f64>,
+    grid: &SerialGrid,
+    space: &SerialFunctionSpace<E>,
+) {
     let mut local_result = Array2D::<f64>::new((1, 1));
 
     let mut test_vertices = Array2D::<f64>::new((3, 3));
@@ -322,12 +307,36 @@ fn main() {
 
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
-                    *matrix2.get_mut(*test_dof, *trial_dof).unwrap() =
+                    *result.get_mut(*test_dof, *trial_dof).unwrap() =
                         *local_result.get(test_i, trial_i).unwrap()
                 }
             }
         }
     }
+}
+
+fn main() {
+    let grid = regular_sphere(3);
+    let element = create_element(
+        ElementFamily::Lagrange,
+        ReferenceCellType::Triangle,
+        0,
+        true,
+    );
+
+    let space = SerialFunctionSpace::new(&grid, &element);
+
+    // --------------------------------------------- //
+    // Assemble DP0, DP0 single layer Laplace kernel //
+    // --------------------------------------------- //
+    let mut matrix2 =
+        Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
+
+    let start = Instant::now();
+    dp0_assemble(&mut matrix2, &grid, &space);
+
+    // TODO: allow user to configure this
+
     println!(
         "Time taken (single layer Laplace, grid with {} cells):  {}ms",
         grid.topology().entity_count(2),
@@ -361,5 +370,35 @@ fn main() {
                 epsilon = 1e-2
             );
         }
+    }
+
+    println!("Timings (new)");
+    for i in 1..6 {
+        let grid = regular_sphere(i);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            true,
+        );
+
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        // --------------------------------------------- //
+        // Assemble DP0, DP0 single layer Laplace kernel //
+        // --------------------------------------------- //
+        let mut matrix =
+            Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
+
+        let start = Instant::now();
+        dp0_assemble(&mut matrix, &grid, &space);
+
+        // TODO: allow user to configure this
+
+        println!(
+            "{} {}",
+            grid.topology().entity_count(2),
+            start.elapsed().as_millis()
+        );
     }
 }
