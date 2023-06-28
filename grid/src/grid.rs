@@ -565,8 +565,20 @@ impl SerialTopology {
                     }
                 }
             }
-            self.facet_adjacent_cells.borrow_mut().push((cells[0], cells[1], pairs[0] << 6 | pairs[1] << 4 | pairs[2] << 2 | pairs[3]));
-            self.facet_adjacent_cells.borrow_mut().push((cells[1], cells[0], if pairs[1] < pairs[3] { pairs[1] << 6 | pairs[0] << 4 | pairs[3] << 2 | pairs[2] } else { pairs[3] << 6 | pairs[2] << 4 | pairs[1] << 2 | pairs[0] }));
+            self.facet_adjacent_cells.borrow_mut().push((
+                cells[0],
+                cells[1],
+                pairs[0] << 6 | pairs[1] << 4 | pairs[2] << 2 | pairs[3],
+            ));
+            self.facet_adjacent_cells.borrow_mut().push((
+                cells[1],
+                cells[0],
+                if pairs[1] < pairs[3] {
+                    pairs[1] << 6 | pairs[0] << 4 | pairs[3] << 2 | pairs[2]
+                } else {
+                    pairs[3] << 6 | pairs[2] << 4 | pairs[1] << 2 | pairs[0]
+                },
+            ));
         }
 
         // Compute cells adjacent via a ridge (ie vertex in 2D)
@@ -591,8 +603,16 @@ impl SerialTopology {
                             }
                         }
                         if n == 1 {
-                            self.ridge_adjacent_cells.borrow_mut().push((*c0, *c1, pairs[0] << 2 | pairs[1]));
-                            self.ridge_adjacent_cells.borrow_mut().push((*c1, *c0, pairs[1] << 2 | pairs[0]));
+                            self.ridge_adjacent_cells.borrow_mut().push((
+                                *c0,
+                                *c1,
+                                pairs[0] << 2 | pairs[1],
+                            ));
+                            self.ridge_adjacent_cells.borrow_mut().push((
+                                *c1,
+                                *c0,
+                                pairs[1] << 2 | pairs[0],
+                            ));
                         }
                     }
                 }
@@ -619,7 +639,7 @@ impl SerialTopology {
                         self.nonadjacent_cells.borrow_mut().push((c0, c1));
                         self.nonadjacent_cells.borrow_mut().push((c1, c0));
                     }
-                }       
+                }
             }
         }
     }

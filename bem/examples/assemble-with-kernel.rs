@@ -410,7 +410,12 @@ fn dp0_assemble<E: FiniteElement>(
             }
         }
 
-        shared_edge_kernel_dp0(&mut local_result, &test_vertices, &trial_vertices, *edge_info);
+        shared_edge_kernel_dp0(
+            &mut local_result,
+            &test_vertices,
+            &trial_vertices,
+            *edge_info,
+        );
 
         for (test_i, test_dof) in test_dofs.iter().enumerate() {
             for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
@@ -443,7 +448,12 @@ fn dp0_assemble<E: FiniteElement>(
             }
         }
 
-        shared_vertex_kernel_dp0(&mut local_result, &test_vertices, &trial_vertices, *vertex_info);
+        shared_vertex_kernel_dp0(
+            &mut local_result,
+            &test_vertices,
+            &trial_vertices,
+            *vertex_info,
+        );
 
         for (test_i, test_dof) in test_dofs.iter().enumerate() {
             for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
