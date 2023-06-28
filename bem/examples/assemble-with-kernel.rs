@@ -6,17 +6,17 @@ use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
 use bempp_tools::arrays::Array2D;
-use bempp_traits::arrays::{Array2DAccess, AdjacencyListAccess};
+use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::ElementFamily;
-use bempp_traits::grid::{Grid, Geometry, Topology};
+use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn singular_kernel_dp0<'a>(
     result: &mut impl Array2DAccess<'a, f64>,
     test_vertices: &impl Array2DAccess<'a, f64>,
     trial_vertices: &impl Array2DAccess<'a, f64>,
-    qid: usize
+    qid: usize,
 ) {
     #[rustfmt::skip]
     let test_points = match qid {
@@ -139,14 +139,14 @@ fn singular_kernel_dp0<'a>(
     let trial_a12 = trial_vertices.get(2, 2).unwrap() - trial_vertices.get(0, 2).unwrap();
 
     let test_jdet = f64::sqrt(
-        (test_a01 * test_a12 - test_a02 * test_a11).powi(2) +
-        (test_a02 * test_a10 - test_a00 * test_a12).powi(2) +
-        (test_a00 * test_a11 - test_a01 * test_a10).powi(2)
+        (test_a01 * test_a12 - test_a02 * test_a11).powi(2)
+            + (test_a02 * test_a10 - test_a00 * test_a12).powi(2)
+            + (test_a00 * test_a11 - test_a01 * test_a10).powi(2),
     );
     let trial_jdet = f64::sqrt(
-        (trial_a01 * trial_a12 - trial_a02 * trial_a11).powi(2) +
-        (trial_a02 * trial_a10 - trial_a00 * trial_a12).powi(2) +
-        (trial_a00 * trial_a11 - trial_a01 * trial_a10).powi(2)
+        (trial_a01 * trial_a12 - trial_a02 * trial_a11).powi(2)
+            + (trial_a02 * trial_a10 - trial_a00 * trial_a12).powi(2)
+            + (trial_a00 * trial_a11 - trial_a01 * trial_a10).powi(2),
     );
 
     *result.get_mut(0, 0).unwrap() = 0.0;
@@ -162,7 +162,9 @@ fn singular_kernel_dp0<'a>(
         let trial_pt1 = trial_o1 + trial_x0 * trial_a01 + trial_x1 * trial_a11;
         let trial_pt2 = trial_o2 + trial_x0 * trial_a02 + trial_x1 * trial_a12;
 
-        let sum_squares = (test_pt0 - trial_pt0).powi(2) + (test_pt1 - trial_pt1).powi(2) + (test_pt2 - trial_pt2).powi(2);
+        let sum_squares = (test_pt0 - trial_pt0).powi(2)
+            + (test_pt1 - trial_pt1).powi(2)
+            + (test_pt2 - trial_pt2).powi(2);
         let distance = f64::sqrt(sum_squares);
 
         *result.get_mut(0, 0).unwrap() += wts[q] * test_jdet * trial_jdet * one_over_4pi / distance;
@@ -174,7 +176,6 @@ fn nonneighbour_kernel_dp0<'a>(
     test_vertices: &impl Array2DAccess<'a, f64>,
     trial_vertices: &impl Array2DAccess<'a, f64>,
 ) {
-
     #[rustfmt::skip]
     let pts = Array2D::from_data(vec![0.3333333333333333, 0.3333333333333333, 0.4951734598011705, 0.4951734598011705, 0.019139415242841296, 0.019139415242841296, 0.18448501268524653, 0.18448501268524653, 0.42823482094371884, 0.42823482094371884, 0.4951734598011705, 0.009653080397658997, 0.019139415242841296, 0.9617211695143174, 0.18448501268524653, 0.6310299746295069, 0.42823482094371884, 0.14353035811256232, 0.009653080397658997, 0.4951734598011705, 0.9617211695143174, 0.019139415242841296, 0.6310299746295069, 0.18448501268524653, 0.14353035811256232, 0.42823482094371884, 0.03472362048232748, 0.13373475510086913, 0.03758272734119169, 0.3266931362813369, 0.8315416244168035, 0.03472362048232748, 0.6357241363774714, 0.03758272734119169, 0.13373475510086913, 0.8315416244168035, 0.3266931362813369, 0.6357241363774714, 0.13373475510086913, 0.03472362048232748, 0.3266931362813369, 0.03758272734119169, 0.8315416244168035, 0.13373475510086913, 0.6357241363774714, 0.3266931362813369, 0.03472362048232748, 0.8315416244168035, 0.03758272734119169, 0.6357241363774714], (25, 2));
     #[rustfmt::skip]
@@ -203,14 +204,14 @@ fn nonneighbour_kernel_dp0<'a>(
     let trial_a12 = trial_vertices.get(2, 2).unwrap() - trial_vertices.get(0, 2).unwrap();
 
     let test_jdet = f64::sqrt(
-        (test_a01 * test_a12 - test_a02 * test_a11).powi(2) +
-        (test_a02 * test_a10 - test_a00 * test_a12).powi(2) +
-        (test_a00 * test_a11 - test_a01 * test_a10).powi(2)
+        (test_a01 * test_a12 - test_a02 * test_a11).powi(2)
+            + (test_a02 * test_a10 - test_a00 * test_a12).powi(2)
+            + (test_a00 * test_a11 - test_a01 * test_a10).powi(2),
     );
     let trial_jdet = f64::sqrt(
-        (trial_a01 * trial_a12 - trial_a02 * trial_a11).powi(2) +
-        (trial_a02 * trial_a10 - trial_a00 * trial_a12).powi(2) +
-        (trial_a00 * trial_a11 - trial_a01 * trial_a10).powi(2)
+        (trial_a01 * trial_a12 - trial_a02 * trial_a11).powi(2)
+            + (trial_a02 * trial_a10 - trial_a00 * trial_a12).powi(2)
+            + (trial_a00 * trial_a11 - trial_a01 * trial_a10).powi(2),
     );
 
     *result.get_mut(0, 0).unwrap() = 0.0;
@@ -227,10 +228,13 @@ fn nonneighbour_kernel_dp0<'a>(
             let trial_pt1 = trial_o1 + trial_x0 * trial_a01 + trial_x1 * trial_a11;
             let trial_pt2 = trial_o2 + trial_x0 * trial_a02 + trial_x1 * trial_a12;
 
-            let sum_squares = (test_pt0 - trial_pt0).powi(2) + (test_pt1 - trial_pt1).powi(2) + (test_pt2 - trial_pt2).powi(2);
+            let sum_squares = (test_pt0 - trial_pt0).powi(2)
+                + (test_pt1 - trial_pt1).powi(2)
+                + (test_pt2 - trial_pt2).powi(2);
             let distance = f64::sqrt(sum_squares);
 
-            *result.get_mut(0, 0).unwrap() += wts[test_q] * wts[trial_q] * test_jdet * trial_jdet * one_over_4pi / distance;
+            *result.get_mut(0, 0).unwrap() +=
+                wts[test_q] * wts[trial_q] * test_jdet * trial_jdet * one_over_4pi / distance;
         }
     }
 }
@@ -249,10 +253,8 @@ fn main() {
     // --------------------------------------------- //
     // Assemble DP0, DP0 single layer Laplace kernel //
     // --------------------------------------------- //
-    let mut matrix2 = Array2D::<f64>::new((
-        space.dofmap().global_size(),
-        space.dofmap().global_size(),
-    ));
+    let mut matrix2 =
+        Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
 
     let start = Instant::now();
 
@@ -272,7 +274,8 @@ fn main() {
 
         for i in 0..3 {
             for j in 0..3 {
-                *test_vertices.get_mut(i, j).unwrap() = grid.geometry().point(test_cell_dofs[i]).unwrap()[j];
+                *test_vertices.get_mut(i, j).unwrap() =
+                    grid.geometry().point(test_cell_dofs[i]).unwrap()[j];
             }
         }
 
@@ -285,7 +288,8 @@ fn main() {
 
             for i in 0..3 {
                 for j in 0..3 {
-                    *trial_vertices.get_mut(i, j).unwrap() = grid.geometry().point(trial_cell_dofs[i]).unwrap()[j];
+                    *trial_vertices.get_mut(i, j).unwrap() =
+                        grid.geometry().point(trial_cell_dofs[i]).unwrap()[j];
                 }
             }
 
@@ -301,7 +305,11 @@ fn main() {
                     }
                 }
                 if pairs.len() == 2 {
-                    let qid = 1 + 6 * (pairs[0].0 + pairs[1].0) + (pairs[0].1 * pairs[0].1 * (pairs[1].1 - 1) + 7 * pairs[0].1) / 2 + pairs[1].1 * (1 - pairs[0].1) - 7;
+                    let qid = 1
+                        + 6 * (pairs[0].0 + pairs[1].0)
+                        + (pairs[0].1 * pairs[0].1 * (pairs[1].1 - 1) + 7 * pairs[0].1) / 2
+                        + pairs[1].1 * (1 - pairs[0].1)
+                        - 7;
                     singular_kernel_dp0(&mut local_result, &test_vertices, &trial_vertices, qid);
                 } else if pairs.len() == 1 {
                     let qid = 19 + 3 * pairs[0].0 + pairs[0].1;
@@ -310,23 +318,25 @@ fn main() {
                     // TODO: non-neighbour kernel
                     nonneighbour_kernel_dp0(&mut local_result, &test_vertices, &trial_vertices);
                 }
-
             }
 
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
-                    *matrix2.get_mut(*test_dof, *trial_dof).unwrap() = *local_result.get(test_i, trial_i).unwrap()
+                    *matrix2.get_mut(*test_dof, *trial_dof).unwrap() =
+                        *local_result.get(test_i, trial_i).unwrap()
                 }
             }
         }
     }
-    println!("Time taken (single layer Laplace, grid with {} cells):  {}ms", grid.topology().entity_count(2), start.elapsed().as_millis());
+    println!(
+        "Time taken (single layer Laplace, grid with {} cells):  {}ms",
+        grid.topology().entity_count(2),
+        start.elapsed().as_millis()
+    );
 
-    let start2 = Instant::now();    
-    let mut matrix = Array2D::<f64>::new((
-        space.dofmap().global_size(),
-        space.dofmap().global_size(),
-    ));
+    let start2 = Instant::now();
+    let mut matrix =
+        Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
 
     assemble_dense(
         &mut matrix,
@@ -335,13 +345,21 @@ fn main() {
         &space,
         &space,
     );
-    println!("Time taken (current slow assembly, grid with {} cells): {}ms", grid.topology().entity_count(2), start2.elapsed().as_millis());
+    println!(
+        "Time taken (current slow assembly, grid with {} cells): {}ms",
+        grid.topology().entity_count(2),
+        start2.elapsed().as_millis()
+    );
 
     // Check correctness
     for i in 0..space.dofmap().global_size() {
         for j in 0..space.dofmap().global_size() {
             // epsilon is large here, as low degree quadrature rules are used by th kernel functions in this file
-            assert_relative_eq!(matrix.get(i, j).unwrap(), matrix2.get(i, j).unwrap(), epsilon=1e-2);
+            assert_relative_eq!(
+                matrix.get(i, j).unwrap(),
+                matrix2.get(i, j).unwrap(),
+                epsilon = 1e-2
+            );
         }
     }
 }
