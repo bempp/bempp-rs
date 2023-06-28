@@ -37,6 +37,9 @@ jobs:
 
       - name: make index.html
         run: |
+          echo "<html><body>"
+          echo "<h1>Bempp-rs documentation</h1>"
+          echo "<ul>" >> target/doc/index.html
           for f in target/doc/bempp_*
           do
           if [ -d "$f" ]
