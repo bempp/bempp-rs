@@ -467,7 +467,10 @@ pub struct SerialTopology {
     index_map: Vec<usize>,
     starts: Vec<usize>,
     cell_types: Vec<ReferenceCellType>,
-    adjacent_cells: Vec<RefCell<Vec<(usize, usize)>>>,
+    facet_adjacent_cells: RefCell<Vec<(usize, usize, u8)>>,
+    ridge_adjacent_cells: RefCell<Vec<(usize, usize, u8)>>,
+    peak_adjacent_cells: RefCell<Vec<(usize, usize, u8)>>,
+    nonadjacent_cells: RefCell<Vec<(usize, usize)>>,
 }
 
 fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
@@ -520,10 +523,10 @@ impl SerialTopology {
             }
         }
 
-        let mut adjacent_cells = vec![];
-        for _ in cells.iter_rows() {
-            adjacent_cells.push(RefCell::new(vec![]));
-        }
+        let facet_adjacent_cells = RefCell::new(vec![]);
+        let ridge_adjacent_cells = RefCell::new(vec![]);
+        let peak_adjacent_cells = RefCell::new(vec![]);
+        let nonadjacent_cells = RefCell::new(vec![]);
 
         Self {
             dim,
@@ -531,34 +534,130 @@ impl SerialTopology {
             index_map,
             starts,
             cell_types: cell_types_new,
-            adjacent_cells,
+            facet_adjacent_cells,
+            ridge_adjacent_cells,
+            peak_adjacent_cells,
+            nonadjacent_cells,
         }
     }
 
     fn compute_adjacent_cells(&self) {
-        // TODO: this could be done quicker using multiplication of sparse matrices
         let tdim = self.dim();
-        self.create_connectivity(tdim, 0);
-        self.create_connectivity(0, tdim);
-        for (n, vertices) in self.connectivity(tdim, 0).iter_rows().enumerate() {
-            let mut adj: Vec<(usize, usize)> = vec![];
-            for v in vertices {
-                for c in self.connectivity(0, tdim).row(*v).unwrap() {
-                    let mut found = false;
-                    for (i, a) in adj.iter().enumerate() {
-                        if a.0 == *c {
-                            adj[i] = (*c, a.1 + 1);
-                            found = true;
-                            break;
-                        }
-                    }
-                    if !found {
-                        adj.push((*c, 1));
+        if tdim != 2 {
+            panic!("Adjacent cell computation only implemented for 2D cells.");
+        }
+        let cells_to_vertices = self.connectivity(tdim, 0);
+        // Compute cells adjacent via a facet (ie edge in 2D)
+        for cells in self.connectivity(tdim - 1, tdim).iter_rows() {
+            let tindex0 = self.index_map()[cells[0]];
+            let vertices0 = cells_to_vertices.row(tindex0).unwrap();
+            let tindex1 = self.index_map()[cells[1]];
+            let vertices1 = cells_to_vertices.row(tindex1).unwrap();
+
+            let mut pairs: Vec<u8> = vec![0, 0, 0, 0];
+            let mut n = 0;
+            for (i0, v0) in vertices0.iter().enumerate() {
+                for (i1, v1) in vertices1.iter().enumerate() {
+                    if v0 == v1 {
+                        pairs[2 * n] = i0.try_into().unwrap();
+                        pairs[2 * n + 1] = i1.try_into().unwrap();
+                        n += 1;
                     }
                 }
             }
-            *self.adjacent_cells[n].borrow_mut() = adj;
+            self.facet_adjacent_cells.borrow_mut().push((cells[0], cells[1], pairs[0] << 6 | pairs[1] << 4 | pairs[2] << 2 | pairs[3]));
+            self.facet_adjacent_cells.borrow_mut().push((cells[1], cells[0], if pairs[1] < pairs[3] { pairs[1] << 6 | pairs[0] << 4 | pairs[3] << 2 | pairs[2] } else { pairs[3] << 6 | pairs[2] << 4 | pairs[1] << 2 | pairs[0] }));
         }
+
+        // Compute cells adjacent via a ridge (ie vertex in 2D)
+        for cells in self.connectivity(tdim - 2, tdim).iter_rows() {
+            for c0 in cells {
+                let tindex0 = self.index_map()[*c0];
+                let vertices0 = cells_to_vertices.row(tindex0).unwrap();
+                for c1 in cells {
+                    if *c0 < *c1 {
+                        let tindex1 = self.index_map()[*c1];
+                        let vertices1 = cells_to_vertices.row(tindex1).unwrap();
+
+                        let mut pairs: Vec<u8> = vec![0, 0];
+                        let mut n = 0;
+                        for (i0, v0) in vertices0.iter().enumerate() {
+                            for (i1, v1) in vertices1.iter().enumerate() {
+                                if v0 == v1 {
+                                    pairs[0] = i0.try_into().unwrap();
+                                    pairs[1] = i1.try_into().unwrap();
+                                    n += 1;
+                                }
+                            }
+                        }
+                        if n == 1 {
+                            self.ridge_adjacent_cells.borrow_mut().push((*c0, *c1, pairs[0] << 2 | pairs[1]));
+                            self.ridge_adjacent_cells.borrow_mut().push((*c1, *c0, pairs[1] << 2 | pairs[0]));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Compute non-adjacent cells
+        for c0 in 0..cells_to_vertices.num_rows() {
+            let tindex0 = self.index_map()[c0];
+            let vertices0 = cells_to_vertices.row(tindex0).unwrap();
+            for c1 in 0..cells_to_vertices.num_rows() {
+                if c0 < c1 {
+                    let tindex1 = self.index_map()[c1];
+                    let vertices1 = cells_to_vertices.row(tindex1).unwrap();
+                    let mut n = 0;
+                    for v0 in vertices0 {
+                        for v1 in vertices1 {
+                            if v0 == v1 {
+                                n += 1;
+                            }
+                        }
+                    }
+                    if n == 0 {
+                        self.nonadjacent_cells.borrow_mut().push((c0, c1));
+                        self.nonadjacent_cells.borrow_mut().push((c1, c0));
+                    }
+                }       
+            }
+        }
+    }
+
+    /// TODO: document
+    /// Entries in returned vector are (cell0, cell1, local_vertex_pairs)
+    /// Facets are entities of dimension tdim - 1
+    pub fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        if self.facet_adjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.facet_adjacent_cells.borrow()
+    }
+
+    /// TODO: document
+    /// Ridges are entities of dimension tdim - 2
+    pub fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        if self.ridge_adjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.ridge_adjacent_cells.borrow()
+    }
+
+    /// TODO: document
+    /// Peaks are entities of dimension tdim - 3
+    pub fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        if self.peak_adjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.peak_adjacent_cells.borrow()
+    }
+
+    /// TODO: document
+    pub fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>> {
+        if self.nonadjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.nonadjacent_cells.borrow()
     }
 }
 
@@ -743,13 +842,6 @@ impl Topology<'_> for SerialTopology {
 
     fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
         Ownership::Owned
-    }
-
-    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>> {
-        if self.adjacent_cells[0].borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.adjacent_cells[cell].borrow()
     }
 }
 

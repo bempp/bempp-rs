@@ -122,13 +122,6 @@ pub trait Topology<'a> {
 
     /// Get the ownership of a mesh entity
     fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
-
-    /// Get the cell adjacency on the local process
-    ///
-    /// The `i`th row of the output gives the cells adjacent to the local cell with index `i`.
-    /// The entries in the output are (cell_index, number_of_shared_vertices).
-    // TODO: find a better return type for here
-    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>>;
 }
 
 pub trait Grid<'a> {
