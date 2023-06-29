@@ -1,4 +1,4 @@
-use bempp_traits::types::{c64, Scalar};
+use bempp_traits::types::c64;
 
 /// Evaluation Mode.
 ///

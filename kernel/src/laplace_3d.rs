@@ -1,9 +1,7 @@
 //! Implementation of the Laplace kernel
 use crate::traits::Kernel;
 use crate::types::{EvalType, KernelType};
-use bempp_traits::types::c64;
 use num;
-use rayon::prelude::*;
 use std::marker::PhantomData;
 
 use crate::helpers::check_dimensions_evaluate;
@@ -181,7 +179,7 @@ mod test {
     use bempp_traits::types::Scalar;
     use rlst;
     use rlst::common::tools::PrettyPrint;
-    use rlst::common::traits::{Copy, Eval, ForEach};
+    use rlst::common::traits::{Copy, Eval};
     use rlst::dense::traits::*;
 
     #[test]
