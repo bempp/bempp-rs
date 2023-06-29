@@ -38,6 +38,7 @@ jobs:
         run: |
           cargo fmt -- --check
           cargo clippy -- -D warnings
+          cargo clippy --examples -- -D warnings
 
       - name: Run unit tests
         run: cargo test --lib --features "strict"
