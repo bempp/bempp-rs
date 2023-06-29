@@ -1170,16 +1170,8 @@ mod test {
         ];
         for (i, row) in from_cl.iter().enumerate() {
             for (j, entry) in row.iter().enumerate() {
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
-                    entry.re,
-                    epsilon = 1e-4
-                );
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().im,
-                    entry.im,
-                    epsilon = 1e-4
-                );
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
             }
         }
     }
@@ -1293,16 +1285,8 @@ mod test {
 
         for (i, row) in from_cl.iter().enumerate() {
             for (j, entry) in row.iter().enumerate() {
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
-                    entry.re,
-                    epsilon = 1e-4
-                );
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().im,
-                    entry.im,
-                    epsilon = 1e-4
-                );
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
             }
         }
     }
@@ -1416,16 +1400,8 @@ mod test {
 
         for (i, row) in from_cl.iter().enumerate() {
             for (j, entry) in row.iter().enumerate() {
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
-                    entry.re,
-                    epsilon = 1e-4
-                );
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().im,
-                    entry.im,
-                    epsilon = 1e-4
-                );
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
             }
         }
     }
