@@ -3,8 +3,10 @@
 
 pub mod arrays;
 pub mod containers;
+pub mod threads;
 pub mod types;
 
 pub use arrays::*;
 pub use containers::*;
+pub use threads::*;
 pub use types::*;

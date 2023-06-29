@@ -9,6 +9,7 @@ members = [
     "quadrature",
     "tools",
     "tree",
+    "kernel",
     "traits",
 ]
 
@@ -21,5 +22,6 @@ default-members = [
     "quadrature",
     "tools",
     "tree",
+    "kernel",
     "traits",
 ]
