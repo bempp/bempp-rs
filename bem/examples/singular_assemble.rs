@@ -308,8 +308,8 @@ fn main() {
     ];
 
     println!("Laplace single layer matrix (from Bempp-cl)");
-    for i in 0..dofmap.global_size() {
-        println!("{:?}", from_cl[i]);
+    for row in &from_cl {
+        println!("{:?}", row);
     }
 
     println!("Laplace single layer matrix");
@@ -317,24 +317,24 @@ fn main() {
         println!("{:?}", matrix.row(i).unwrap());
     }
 
-    for i in 0..8 {
-        for j in 0..8 {
+    for (i, row) in from_cl.iter().enumerate() {
+        for (j, entry) in row.iter().enumerate() {
             if matrix.get(i, j).unwrap().abs() > 0.0001 {
                 println!(
                     "entry ({},{})  cl: {}  rs: {}  error: {}",
                     i,
                     j,
-                    from_cl[i][j],
+                    entry,
                     matrix.get(i, j).unwrap(),
-                    (matrix.get(i, j).unwrap() - from_cl[i][j]).abs() / from_cl[i][j]
+                    (matrix.get(i, j).unwrap() - entry).abs() / from_cl[i][j]
                 );
             }
         }
     }
-    for i in 0..8 {
-        for j in 0..8 {
+    for (i, row) in from_cl.iter().enumerate() {
+        for (j, entry) in row.iter().enumerate() {
             if matrix.get(i, j).unwrap().abs() > 0.0001 {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 0.0001);
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 0.0001);
             }
         }
     }
