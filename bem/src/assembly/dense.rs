@@ -609,9 +609,9 @@ mod test {
             ],
         ];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
             }
         }
     }
@@ -723,9 +723,9 @@ mod test {
             ],
         ];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
             }
         }
     }
@@ -837,9 +837,9 @@ mod test {
             ],
         ];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
             }
         }
     }
@@ -938,11 +938,11 @@ mod test {
 
         let perm = vec![0, 5, 2, 4, 3, 1];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
+        for (i, pi) in perm.iter().enumerate() {
+            for (j, pj) in perm.iter().enumerate() {
                 assert_relative_eq!(
                     *matrix.get(i, j).unwrap(),
-                    from_cl[perm[i]][perm[j]],
+                    from_cl[*pi][*pj],
                     epsilon = 1e-4
                 );
             }
@@ -1056,9 +1056,9 @@ mod test {
             ],
         ];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), from_cl[i][j], epsilon = 1e-4);
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
             }
         }
     }
@@ -1168,19 +1168,10 @@ mod test {
                 Complex::new(0.08742460357596939, 0.11004203436820104),
             ],
         ];
-
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
-                    from_cl[i][j].re,
-                    epsilon = 1e-4
-                );
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().im,
-                    from_cl[i][j].im,
-                    epsilon = 1e-4
-                );
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
             }
         }
     }
@@ -1292,18 +1283,10 @@ mod test {
             ],
         ];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
-                    from_cl[i][j].re,
-                    epsilon = 1e-4
-                );
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().im,
-                    from_cl[i][j].im,
-                    epsilon = 1e-4
-                );
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
             }
         }
     }
@@ -1415,18 +1398,10 @@ mod test {
             ],
         ];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().re,
-                    from_cl[i][j].re,
-                    epsilon = 1e-4
-                );
-                assert_relative_eq!(
-                    matrix.get(i, j).unwrap().im,
-                    from_cl[i][j].im,
-                    epsilon = 1e-4
-                );
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
             }
         }
     }
@@ -1502,16 +1477,16 @@ mod test {
 
         let perm = vec![0, 5, 2, 4, 3, 1];
 
-        for i in 0..ndofs {
-            for j in 0..ndofs {
+        for (i, pi) in perm.iter().enumerate() {
+            for (j, pj) in perm.iter().enumerate() {
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().re,
-                    from_cl[perm[i]][perm[j]].re,
+                    from_cl[*pi][*pj].re,
                     epsilon = 1e-3
                 );
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().im,
-                    from_cl[perm[i]][perm[j]].im,
+                    from_cl[*pi][*pj].im,
                     epsilon = 1e-3
                 );
             }

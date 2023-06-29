@@ -1023,7 +1023,7 @@ mod test {
 
     #[test]
     fn test_higher_order_grid() {
-        let s = 1.0 / (2.0 as f64).sqrt();
+        let s = 1.0 / (2.0_f64).sqrt();
         let g = SerialGrid::new(
             Array2D::from_data(
                 vec![
@@ -1148,13 +1148,13 @@ mod test {
         let mut dets = vec![0.0; points.shape().0];
         g.geometry()
             .compute_jacobian_determinants(&points, 0, &mut dets);
-        for i in 0..3 {
-            assert_relative_eq!(dets[i], 2.0 * 2.0_f64.sqrt());
+        for d in &dets {
+            assert_relative_eq!(*d, 2.0 * 2.0_f64.sqrt());
         }
         g.geometry()
             .compute_jacobian_determinants(&points, 1, &mut dets);
-        for i in 0..3 {
-            assert_relative_eq!(dets[i], 1.0);
+        for d in &dets {
+            assert_relative_eq!(*d, 1.0);
         }
 
         // Test compute_jacobian_inverses

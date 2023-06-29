@@ -646,8 +646,8 @@ mod test {
         let degree = 3;
 
         let mut p = vec![0.0; 11];
-        for i in 0..11 {
-            p[i] = i as f64 / 10.0;
+        for (i, pi) in p.iter_mut().enumerate() {
+            *pi = i as f64 / 10.0;
         }
         let points = Array2D::from_data(p, (20, 1));
 
