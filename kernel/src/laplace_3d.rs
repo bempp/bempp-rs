@@ -24,6 +24,12 @@ impl<T: Scalar> Laplace3dKernel<T> {
     }
 }
 
+impl<T: Scalar> Default for Laplace3dKernel<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Scalar + Send + Sync> Kernel for Laplace3dKernel<T>
 where
     <T as Scalar>::Real: Send + Sync,
@@ -64,7 +70,7 @@ where
         thread_pool: &rayon::ThreadPool,
     ) {
         check_dimensions_evaluate(self, eval_type, sources, targets, charges, result);
-        let ntargets = targets.len() % self.space_dimension();
+        let ntargets = targets.len() / self.space_dimension();
         let range_dim = self.range_component_count(eval_type);
 
         thread_pool.install(|| {
@@ -104,7 +110,7 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
     match eval_type {
         EvalType::Value => {
             let mut my_result = T::zero();
-            for index in 0..sources.len() {
+            for index in 0..nsources {
                 let diff_norm = ((target[0] - sources[index]) * (target[0] - sources[index])
                     + (target[1] - sources[nsources + index])
                         * (target[1] - sources[nsources + index])
@@ -132,10 +138,10 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
             let mut my_result2 = T::zero();
             let mut my_result3 = T::zero();
 
-            for index in 0..sources.len() {
+            for index in 0..nsources {
                 let diff0 = sources[index] - target[0];
                 let diff1 = sources[nsources + index] - target[1];
-                let diff2 = sources[nsources + index] - target[2];
+                let diff2 = sources[2 * nsources + index] - target[2];
                 let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
                 let inv_diff_norm = {
                     if diff_norm == zero_real {
@@ -160,20 +166,136 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
     }
 }
 
-// // Small wrapper to test compiler SIMD output for different types.
-// pub fn evaluate_laplace_one_target_wrapper(
-//     eval_type: EvalType,
-//     target: &[f32],
-//     sources: &[f32],
-//     charges: &[f32],
-//     result: &mut [f32],
-// ) {
-//     evaluate_laplace_one_target(eval_type, target, sources, charges, result);
-// }
-
 fn laplace_component_count(eval_type: EvalType) -> usize {
     match eval_type {
         EvalType::Value => 1,
         EvalType::ValueDeriv => 4,
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+    use approx::assert_relative_eq;
+    use bempp_traits::types::Scalar;
+    use rlst;
+    use rlst::common::tools::PrettyPrint;
+    use rlst::common::traits::{Copy, Eval, ForEach};
+    use rlst::dense::traits::*;
+
+    #[test]
+    fn test_laplace_3d() {
+        let eps = 1E-8;
+
+        let nsources = 5;
+        let ntargets = 3;
+
+        let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
+        let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
+        let charges = rlst::dense::rlst_rand_col_vec![f64, nsources];
+        let mut green_value = rlst::dense::rlst_rand_col_vec![f64, ntargets];
+
+        Laplace3dKernel::<f64>::default().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            charges.data(),
+            green_value.data_mut(),
+        );
+
+        for target_index in 0..ntargets {
+            let mut expected: f64 = 0.0;
+            for source_index in 0..nsources {
+                let dist = ((targets[[target_index, 0]] - sources[[source_index, 0]]).square()
+                    + (targets[[target_index, 1]] - sources[[source_index, 1]]).square()
+                    + (targets[[target_index, 2]] - sources[[source_index, 2]]).square())
+                .sqrt();
+
+                expected += charges[[source_index, 0]] * 0.25 * f64::FRAC_1_PI() / dist;
+            }
+
+            assert_relative_eq!(green_value[[target_index, 0]], expected, epsilon = 1E-12);
+        }
+
+        let mut targets_x_eps = targets.copy();
+        let mut targets_y_eps = targets.copy();
+        let mut targets_z_eps = targets.copy();
+
+        for index in 0..ntargets {
+            targets_x_eps[[index, 0]] += eps;
+            targets_y_eps[[index, 1]] += eps;
+            targets_z_eps[[index, 2]] += eps;
+        }
+
+        let mut expected = rlst::dense::rlst_mat![f64, (4, ntargets)];
+
+        Laplace3dKernel::<f64>::default().evaluate_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            charges.data(),
+            expected.data_mut(),
+        );
+
+        let mut green_value_x_eps = rlst::dense::rlst_col_vec![f64, ntargets];
+
+        Laplace3dKernel::<f64>::default().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            targets_x_eps.data(),
+            charges.data(),
+            green_value_x_eps.data_mut(),
+        );
+
+        let mut green_value_y_eps = rlst::dense::rlst_col_vec![f64, ntargets];
+
+        Laplace3dKernel::<f64>::default().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            targets_y_eps.data(),
+            charges.data(),
+            green_value_y_eps.data_mut(),
+        );
+        let mut green_value_z_eps = rlst::dense::rlst_col_vec![f64, ntargets];
+
+        Laplace3dKernel::<f64>::default().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            targets_z_eps.data(),
+            charges.data(),
+            green_value_z_eps.data_mut(),
+        );
+
+        let x_deriv = ((green_value_x_eps - &green_value) * (1.0 / eps)).eval();
+        let y_deriv = ((green_value_y_eps - &green_value) * (1.0 / eps)).eval();
+        let z_deriv = ((green_value_z_eps - &green_value) * (1.0 / eps)).eval();
+
+        for target_index in 0..ntargets {
+            assert_relative_eq!(
+                green_value[[target_index, 0]],
+                expected[[0, target_index]],
+                epsilon = 1E-12
+            );
+
+            assert_relative_eq!(
+                x_deriv[[target_index, 0]],
+                expected[[1, target_index]],
+                epsilon = 1E-5
+            );
+            assert_relative_eq!(
+                y_deriv[[target_index, 0]],
+                expected[[2, target_index]],
+                epsilon = 1E-5
+            );
+
+            assert_relative_eq!(
+                z_deriv[[target_index, 0]],
+                expected[[3, target_index]],
+                epsilon = 1E-5
+            );
+        }
+
+        green_value.pretty_print();
     }
 }

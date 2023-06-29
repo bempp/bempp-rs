@@ -29,3 +29,5 @@ rayon = "1.7"
 num = "0.4"
 num_cpus = "1"
 
+[dev-dependencies]
+rlst = {path = "../../rlst/rlst" }
