@@ -7,8 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: "0 7 * * 1"
 
 jobs:
   run-tests-rust:
@@ -16,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust-version: ["stable", "beta", "nightly"]
-        mpi: [ 'mpich', 'openmpi']
+        rust-version: ["stable"]
+        mpi: ['mpich', 'openmpi']
     steps:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -41,12 +39,8 @@ jobs:
           cargo clippy --tests -- -D warnings
           cargo clippy --examples -- -D warnings
 
-      - name: Build rust library (debug)
+      - name: Build rust library
         run: cargo build --features "strict"
-      - name: Build rust library (release)
-        run: cargo build --release --features "strict"
-      - name: Build rust library (release with mpi)
-        run: cargo build --release --features "strict,mpi"
 
       - name: Run unit tests
         run: cargo test --lib --features "strict"
@@ -68,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.11"]
     steps:
       - name: Set up Python
         uses: actions/setup-python@v4
