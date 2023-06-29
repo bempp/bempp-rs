@@ -40,6 +40,9 @@ jobs:
           cargo clippy -- -D warnings
           cargo clippy --examples -- -D warnings
 
+      - name: Build rust library
+        run: cargo build --features "strict"
+
       - name: Run unit tests
         run: cargo test --lib --features "strict"
       - name: Run unit tests (with mpi enabled)
