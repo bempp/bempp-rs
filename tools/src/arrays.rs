@@ -353,10 +353,8 @@ mod test {
         *arr.get_mut(1, 2).unwrap() = 7;
         assert_eq!(*arr.get(1, 2).unwrap(), 7);
 
-        let mut index = 0;
-        for row in arr.iter_rows() {
+        for (index, row) in arr.iter_rows().enumerate() {
             assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
-            index += 1;
         }
 
         let mut arr2 = Array2D::from_data(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3));
@@ -404,10 +402,8 @@ mod test {
         *arr.get_mut(2, 0).unwrap() = 7;
         assert_eq!(*arr.get(2, 0).unwrap(), 7);
 
-        let mut index = 0;
-        for row in arr.iter_rows() {
+        for (index, row) in arr.iter_rows().enumerate() {
             assert_eq!(*arr.get(index, 0).unwrap(), row[0]);
-            index += 1;
         }
 
         let mut arr2 = AdjacencyList::<f64>::new();

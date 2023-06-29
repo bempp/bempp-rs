@@ -64,8 +64,8 @@ mod test {
 
         // Setup a random square matrix, of dimension 'dim'
         let mut data: Vec<f64> = Vec::new();
-        let dim = 5;
-        let nvals = (dim as usize).pow(2);
+        let dim: usize = 5;
+        let nvals = dim.pow(2);
         for _ in 0..nvals {
             data.push(between.sample(&mut range))
         }
