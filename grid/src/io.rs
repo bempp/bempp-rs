@@ -74,14 +74,14 @@ pub fn export_as_gmsh(grid: &SerialGrid, fname: String) {
         let pt = grid.geometry().point(i).unwrap();
         for (n, j) in pt.iter().enumerate() {
             if n != 0 {
-                gmsh_s.push_str(&format!(" "));
+                gmsh_s.push(' ');
             }
             gmsh_s.push_str(&format!("{j}"));
         }
         for _ in grid.geometry().dim()..3 {
-            gmsh_s.push_str(&format!(" 0.0"));
+            gmsh_s.push_str(" 0.0");
         }
-        gmsh_s.push_str("\n");
+        gmsh_s.push('\n');
     }
     gmsh_s.push_str("$EndNodes\n");
     gmsh_s.push_str("$Elements\n");
@@ -110,7 +110,7 @@ pub fn export_as_gmsh(grid: &SerialGrid, fname: String) {
             for j in get_permutation_to_gmsh(element.cell_type(), element.degree()) {
                 gmsh_s.push_str(&format!(" {}", cell[j] + 1))
             }
-            gmsh_s.push_str("\n");
+            gmsh_s.push('\n');
         }
     }
     gmsh_s.push_str("$EndElements\n");

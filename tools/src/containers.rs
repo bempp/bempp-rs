@@ -66,6 +66,8 @@ impl RustyDataContainer {
         Box::new(self)
     }
 
+    /// # Safety
+    /// This function is unsafe
     pub unsafe fn to_vec<T: ConversionType>(mut self) -> Vec<T> {
         assert_eq!(self.is_owner, OWNERSHIP::Owner);
         assert_dtype::<T>(self.dtype);
@@ -109,6 +111,9 @@ impl RustyDataContainer {
 
     /// Get a representation of the data as slice.
     /// This method does not take ownership of the container associated with `ptr`.
+    ///
+    /// # Safety
+    /// This function is unsafe
     pub unsafe fn as_slice<T: ConversionType>(
         ptr: Option<Box<RustyDataContainer>>,
     ) -> &'static [T] {
@@ -119,6 +124,9 @@ impl RustyDataContainer {
 
     /// Get a representation of the data as mutable slice.
     /// This method does not take ownership of the container associated with `ptr`.
+    ///
+    /// # Safety
+    /// This function is unsafe
     pub unsafe fn as_slice_mut<T: ConversionType>(
         ptr: Option<Box<RustyDataContainer>>,
     ) -> &'static mut [T] {
@@ -148,55 +156,55 @@ pub extern "C" fn rusty_data_container_destroy(_: Option<Box<RustyDataContainer>
 /// Create a new f32 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_f32(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as f32; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_f32; nitems]).to_box()
 }
 
 /// Create a new f64 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_f64(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as f64; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_f64; nitems]).to_box()
 }
 
 /// Create a new u8 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_u8(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as u8; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_u8; nitems]).to_box()
 }
 
 /// Create a new u32 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_u32(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as u32; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_u32; nitems]).to_box()
 }
 
 /// Create a new u64 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_u64(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as u64; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_u64; nitems]).to_box()
 }
 
 /// Create a new i8 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_i8(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as i8; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_i8; nitems]).to_box()
 }
 
 /// Create a new i32 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_i32(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as i32; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_i32; nitems]).to_box()
 }
 
 /// Create a new i64 data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_i64(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as i64; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_i64; nitems]).to_box()
 }
 
 /// Create a new usize data container.
 #[no_mangle]
 pub extern "C" fn rusty_data_container_new_usize(nitems: size_t) -> Box<RustyDataContainer> {
-    RustyDataContainer::from_vec(vec![0 as usize; nitems]).to_box()
+    RustyDataContainer::from_vec(vec![0_usize; nitems]).to_box()
 }
 
 /// Get nitems

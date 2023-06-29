@@ -1,4 +1,4 @@
-use itertools::izip;
+use itertools::{izip, Itertools};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -7,8 +7,6 @@ use std::{
     ops::{Deref, DerefMut},
     vec,
 };
-
-use bempp_traits::fmm::KiFmmNode;
 
 use crate::{
     constants::{
@@ -22,6 +20,8 @@ use crate::{
         point::PointType,
     },
 };
+
+use bempp_traits::tree::MortonKeyInterface;
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
@@ -674,6 +674,148 @@ impl MortonKey {
             result
         }
     }
+
+    pub fn convolution_grid(
+        &self,
+        order: usize,
+        domain: &Domain,
+        surface: &[[f64; 3]],
+        alpha: f64,
+    ) -> Vec<[f64; 3]> {
+        // Number of convolution points along each axis
+        let n = 2 * order - 1;
+        let mut grid = vec![[0f64; 3]; n.pow(3)];
+
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    grid[i * n * n + j * n + k] = [i as f64, j as f64, k as f64]
+                }
+            }
+        }
+
+        let diameter = self
+            .diameter(domain)
+            .iter()
+            .map(|x| x * alpha)
+            .collect_vec();
+
+        // Shift and scale to embed surface grid inside convolution grid
+        // Scale
+        grid.iter_mut().for_each(|point| {
+            point.iter_mut().enumerate().for_each(|(i, value)| {
+                *value *= 1.0 / ((n - 1) as f64); // normalize
+                *value *= diameter[i]; // find diameter
+                *value *= 2.0; // convolution grid is 2x as large
+            });
+        });
+
+        // Shift
+        let sums: Vec<f64> = grid.iter().map(|point| point.iter().sum()).collect();
+        let max_index = sums
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .map(|(index, _)| index)
+            .unwrap();
+        let max_conv_point = grid[max_index];
+
+        let sums: Vec<f64> = surface.iter().map(|point| point.iter().sum()).collect();
+        let max_index = sums
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .map(|(index, _)| index)
+            .unwrap();
+        let max_surface_point = surface[max_index];
+
+        let diff = max_conv_point
+            .iter()
+            .zip(max_surface_point)
+            .map(|(a, b)| b - a)
+            .collect_vec();
+
+        grid.iter_mut().for_each(|point| {
+            point
+                .iter_mut()
+                .enumerate()
+                .for_each(|(i, value)| *value += diff[i])
+        });
+
+        grid
+    }
+
+    pub fn surface_grid(&self, order: usize) -> (Vec<[f64; 3]>, Vec<[usize; 3]>) {
+        let n_coeffs = 6 * (order - 1).pow(2) + 2;
+
+        let mut surface: Vec<[f64; 3]> = vec![[0f64; 3]; n_coeffs];
+
+        let lower = 0;
+        let upper = order - 1;
+        let mut idx = 0;
+
+        for i in 0..order {
+            for j in 0..order {
+                for k in 0..order {
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
+                    {
+                        surface[idx] = [i as f64, j as f64, k as f64];
+                        idx += 1;
+                    }
+                }
+            }
+        }
+
+        let surface_idxs = surface
+            .iter()
+            .clone()
+            .map(|&[a, b, c]| [a as usize, b as usize, c as usize])
+            .collect();
+
+        // Shift and scale surface so that it's centered at the origin and has side length of 1
+        surface.iter_mut().for_each(|point| {
+            point
+                .iter_mut()
+                .for_each(|value| *value *= 2.0 / (order as f64 - 1.0));
+        });
+
+        surface
+            .iter_mut()
+            .for_each(|point| point.iter_mut().for_each(|value| *value -= 1.0));
+
+        (surface, surface_idxs)
+    }
+
+    pub fn scale_surface(
+        &self,
+        surface: Vec<[f64; 3]>,
+        domain: &Domain,
+        alpha: f64,
+    ) -> Vec<[f64; 3]> {
+        // Translate box to specified centre, and scale
+        let scaled_diameter = self.diameter(domain);
+        let dilated_diameter = scaled_diameter.map(|d| d * alpha);
+
+        let mut scaled_surface = vec![[0f64; 3]; surface.len()];
+
+        let centre = self.centre(domain);
+
+        for i in 0..surface.len() {
+            scaled_surface[i][0] = (surface[i][0] * (dilated_diameter[0] / 2.0)) + centre[0];
+            scaled_surface[i][1] = (surface[i][1] * (dilated_diameter[1] / 2.0)) + centre[1];
+            scaled_surface[i][2] = (surface[i][2] * (dilated_diameter[2] / 2.0)) + centre[2];
+        }
+
+        scaled_surface
+    }
+
+    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<[f64; 3]> {
+        let (surface, _) = self.surface_grid(order);
+
+        self.scale_surface(surface, domain, alpha)
+    }
 }
 
 impl PartialEq for MortonKey {
@@ -691,7 +833,6 @@ impl Ord for MortonKey {
 
 impl PartialOrd for MortonKey {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        //    less_than(self, other)
         Some(self.morton.cmp(&other.morton))
     }
 }
@@ -702,82 +843,29 @@ impl Hash for MortonKey {
     }
 }
 
-impl KiFmmNode for MortonKey {
-    type Surface = Vec<[f64; 3]>;
-    type Domain = Domain;
+impl MortonKeyInterface for MortonKey {
+    type NodeIndices = MortonKeys;
 
-    fn compute_surface(&self, order: usize, alpha: f64, domain: &Self::Domain) -> Self::Surface {
-        let n_coeffs = 6 * (order - 1).pow(2) + 2;
-
-        let mut surface = vec![[0f64; 3]; n_coeffs];
-
-        surface[0] = [-1.0, -1.0, -1.0];
-
-        let mut count = 1;
-
-        // Hold x fixed
-        for i in 0..(order - 1) {
-            for j in 0..(order - 1) {
-                let i = i as f64;
-                let j = j as f64;
-                let order = order as f64;
-
-                surface[count][0] = -1.0;
-                surface[count][1] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
-                surface[count][2] = (2.0 * j - (order - 1.0)) / (order - 1.0);
-                count += 1;
-            }
+    fn children(&self) -> Self::NodeIndices {
+        MortonKeys {
+            keys: self.children(),
+            index: 0,
         }
+    }
 
-        // Hold y fixed
-        for i in 0..(order - 1) {
-            for j in 0..(order - 1) {
-                let i = i as f64;
-                let j = j as f64;
-                let order = order as f64;
+    fn parent(&self) -> Self {
+        self.parent()
+    }
 
-                surface[count][0] = (2.0 * j - (order - 1.0)) / (order - 1.0);
-                surface[count][1] = -1.0;
-                surface[count][2] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
-                count += 1;
-            }
+    fn neighbors(&self) -> Self::NodeIndices {
+        MortonKeys {
+            keys: self.neighbors(),
+            index: 0,
         }
+    }
 
-        // Hold z fixed
-        for i in 0..(order - 1) {
-            for j in 0..(order - 1) {
-                let i = i as f64;
-                let j = j as f64;
-                let order = order as f64;
-                surface[count][0] = (2.0 * (i + 1.0) - (order - 1.0)) / (order - 1.0);
-                surface[count][1] = (2.0 * j - (order - 1.0)) / (order - 1.0);
-                surface[count][2] = -1.0;
-                count += 1
-            }
-        }
-
-        // Reflect about origin, for remaining faces
-        for i in 0..(n_coeffs / 2) {
-            surface[count + i][0] = -1.0 * surface[i][0];
-            surface[count + i][1] = -1.0 * surface[i][1];
-            surface[count + i][2] = -1.0 * surface[i][2];
-        }
-
-        // Translate box to specified centre, and scale
-        let scaled_diameter = self.diameter(domain);
-        let dilated_diameter = scaled_diameter.map(|d| d * alpha);
-
-        let mut scaled_surface = vec![[0f64; 3]; n_coeffs];
-
-        let centre = self.centre(domain);
-
-        for i in 0..n_coeffs {
-            scaled_surface[i][0] = (surface[i][0] * (dilated_diameter[0] / 2.0)) + centre[0];
-            scaled_surface[i][1] = (surface[i][1] * (dilated_diameter[1] / 2.0)) + centre[1];
-            scaled_surface[i][2] = (surface[i][2] * (dilated_diameter[2] / 2.0)) + centre[2];
-        }
-
-        scaled_surface
+    fn is_adjacent(&self, other: &Self) -> bool {
+        self.is_adjacent(other)
     }
 }
 

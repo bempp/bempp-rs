@@ -40,12 +40,12 @@ impl ReferenceCell for Triangle {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 3]),
-            1 => Ok(vec![ReferenceCellType::Interval; 3]),
-            2 => Ok(vec![ReferenceCellType::Triangle]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 3],
+            1 => vec![ReferenceCellType::Interval; 3],
+            2 => vec![ReferenceCellType::Triangle],
+            _ => vec![],
         }
     }
 
@@ -66,7 +66,7 @@ impl ReferenceCell for Triangle {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 3);
@@ -76,10 +76,10 @@ impl ReferenceCell for Triangle {
                         0 => Ok(vec![1, 2]),
                         1 => Ok(vec![0, 2]),
                         2 => Ok(vec![0, 1]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
@@ -89,11 +89,11 @@ impl ReferenceCell for Triangle {
                         0 => Ok(vec![1, 2]),
                         1 => Ok(vec![0, 2]),
                         2 => Ok(vec![0, 1]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     1 => Ok(vec![entity_number]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -102,10 +102,10 @@ impl ReferenceCell for Triangle {
                     0 => Ok(vec![0, 1, 2]),
                     1 => Ok(vec![0, 1, 2]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }
@@ -142,12 +142,12 @@ impl ReferenceCell for Quadrilateral {
         &FACES_NV
     }
 
-    fn entity_types(&self, dim: usize) -> Result<Vec<ReferenceCellType>, ()> {
+    fn entity_types(&self, dim: usize) -> Vec<ReferenceCellType> {
         match dim {
-            0 => Ok(vec![ReferenceCellType::Point; 4]),
-            1 => Ok(vec![ReferenceCellType::Interval; 4]),
-            2 => Ok(vec![ReferenceCellType::Quadrilateral]),
-            _ => Err(()),
+            0 => vec![ReferenceCellType::Point; 4],
+            1 => vec![ReferenceCellType::Interval; 4],
+            2 => vec![ReferenceCellType::Quadrilateral],
+            _ => vec![],
         }
     }
 
@@ -168,7 +168,7 @@ impl ReferenceCell for Quadrilateral {
         entity_dim: usize,
         entity_number: usize,
         connected_dim: usize,
-    ) -> Result<Vec<usize>, ()> {
+    ) -> Result<Vec<usize>, InvalidConnectivity> {
         match entity_dim {
             0 => {
                 assert!(entity_number < 4);
@@ -179,21 +179,19 @@ impl ReferenceCell for Quadrilateral {
                         1 => Ok(vec![0, 2]),
                         2 => Ok(vec![1, 3]),
                         3 => Ok(vec![2, 3]),
-                        _ => Err(()),
+                        _ => Err(InvalidConnectivity),
                     },
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             1 => {
                 assert!(entity_number < 4);
                 match connected_dim {
-                    0 => Ok(self.edges()
-                        [(entity_number as usize) * 2..((entity_number as usize) + 1) * 2]
-                        .to_vec()),
+                    0 => Ok(self.edges()[entity_number * 2..(entity_number + 1) * 2].to_vec()),
                     1 => Ok(vec![entity_number]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
             2 => {
@@ -202,10 +200,10 @@ impl ReferenceCell for Quadrilateral {
                     0 => Ok(vec![0, 1, 2, 3]),
                     1 => Ok(vec![0, 1, 2, 3]),
                     2 => Ok(vec![0]),
-                    _ => Err(()),
+                    _ => Err(InvalidConnectivity),
                 }
             }
-            _ => Err(()),
+            _ => Err(InvalidConnectivity),
         }
     }
 }

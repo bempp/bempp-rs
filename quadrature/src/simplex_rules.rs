@@ -1,6 +1,6 @@
 //! Get rules on simplices.
 
-pub use bempp_element::cell::ReferenceCellType;
+pub use bempp_traits::cell::ReferenceCellType;
 
 use crate::simplex_rule_definitions::SIMPLEX_RULE_DEFINITIONS;
 use crate::types::NumericalQuadratureDefinition;
@@ -33,8 +33,8 @@ pub fn simplex_rule(
             dim,
             order: *order,
             npoints,
-            weights: weights.iter().copied().collect(),
-            points: points.iter().copied().collect(),
+            weights: weights.to_vec(),
+            points: points.to_vec(),
         })
     } else {
         Err(QuadratureError::RuleNotFound)

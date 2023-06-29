@@ -45,14 +45,14 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
             let gi = g.geometry().index_map()[i];
             let tv = g.topology().cell(ti).unwrap();
             let gv = g.geometry().cell_vertices(gi).unwrap();
-            for j in 0..3 {
-                let pt = g.geometry().point(gv[j]).unwrap();
-                for k in 0..3 {
-                    *coordinates.get_mut(tv[j], k).unwrap() = pt[k];
+            for (j, gv_j) in gv.iter().enumerate() {
+                let pt = g.geometry().point(*gv_j).unwrap();
+                for (k, pt_k) in pt.iter().enumerate() {
+                    *coordinates.get_mut(tv[j], k).unwrap() = *pt_k;
                 }
             }
 
-            for j in 0..3 {
+            for (j, tedges_j) in tedges.iter().enumerate() {
                 let vs = ref_e.connectivity(1, j, 0).unwrap();
                 let pt = (0..3)
                     .map(|k| {
@@ -63,8 +63,8 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
                     .collect::<Vec<f64>>();
 
                 let norm = (pt[0].powi(2) + pt[1].powi(2) + pt[2].powi(2)).sqrt();
-                for k in 0..3 {
-                    *coordinates.get_mut(nvertices_old + tedges[j], k).unwrap() = pt[k] / norm;
+                for (k, pt_k) in pt.iter().enumerate() {
+                    *coordinates.get_mut(nvertices_old + tedges_j, k).unwrap() = *pt_k / norm;
                 }
             }
 

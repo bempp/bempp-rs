@@ -12,7 +12,7 @@ use itertools::Itertools;
 ///
 /// Each 2-tuple in `points` represents a 2d point. The callable is applied to
 /// each point and transforms it to a new point.
-fn transform_coords(points: &mut Vec<f64>, fun: &impl Fn((f64, f64)) -> (f64, f64)) {
+fn transform_coords(points: &mut [f64], fun: &impl Fn((f64, f64)) -> (f64, f64)) {
     for (first, second) in points.iter_mut().tuples() {
         (*first, *second) = fun((*first, *second));
     }
@@ -397,7 +397,7 @@ pub fn quadrilateral_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
 ) -> Result<TestTrialNumericalQuadratureDefinition, QuadratureError> {
-    let rule = simplex_rule(bempp_element::cell::ReferenceCellType::Interval, npoints)?;
+    let rule = simplex_rule(bempp_traits::cell::ReferenceCellType::Interval, npoints)?;
 
     match connectivity.connectivity_dimension {
         // Identical triangles

@@ -3,17 +3,15 @@ use std::collections::{HashMap, HashSet};
 
 use crate::types::{
     domain::Domain,
-    node::{LeafNodes, Nodes},
+    morton::{MortonKey, MortonKeys},
     point::Points,
 };
-
-use super::morton::MortonKey;
 
 /// Local Trees (non-distributed).
 #[derive(Debug)]
 pub struct SingleNodeTree {
     /// Depth of a tree.
-    pub depth: usize,
+    pub depth: u64,
 
     /// Domain spanned by the points.
     pub domain: Domain,
@@ -22,17 +20,20 @@ pub struct SingleNodeTree {
     pub points: Points,
 
     /// The leaves that span the tree, and associated Point data.
-    pub leaves: LeafNodes,
+    pub leaves: MortonKeys,
 
     /// All nodes in tree, and associated Node data.
-    pub keys: Nodes,
+    pub keys: MortonKeys,
 
-    /// A convenent wrapper for a set of all the the raw MortonKeys associated with nodes.
+    /// Associate leaves with point indices.
+    pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
+
+    /// Associate levels with key indices.
+    pub levels_to_keys: HashMap<u64, (usize, usize)>,
+
+    /// All leaves, returned as a set.
+    pub leaves_set: HashSet<MortonKey>,
+
+    /// All keys, returned as a set.
     pub keys_set: HashSet<MortonKey>,
-
-    /// Index pointer mapping Mortonkeys of leaves to their index in the container of associated data.
-    pub leaf_to_index: HashMap<MortonKey, usize>,
-
-    /// Index pointer mapping MortonKeys of nodes to their index in the container of associated data.
-    pub key_to_index: HashMap<MortonKey, usize>,
 }

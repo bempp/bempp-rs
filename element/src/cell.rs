@@ -7,9 +7,7 @@ pub use cells_1d::*;
 pub mod cells_2d;
 pub use cells_2d::*;
 pub mod cells_3d;
-pub use bempp_traits::cell::PhysicalCell;
-pub use bempp_traits::cell::ReferenceCell;
-pub use bempp_traits::cell::ReferenceCellType;
+pub use bempp_traits::cell::{InvalidConnectivity, PhysicalCell, ReferenceCell, ReferenceCellType};
 pub use cells_3d::*;
 
 #[cfg(test)]
@@ -51,7 +49,7 @@ mod test {
                     }
 
                     for e_dim in 0..c.dim() + 1 {
-                        for e_n in 0..c.entity_count(e_dim).unwrap() {
+                        for e_n in 0..c.entity_count(e_dim) {
                             let e_vertices = c.connectivity(e_dim, e_n, 0).unwrap();
                             for c_dim in 0..c.dim() + 1 {
                                 let connectivity = c.connectivity(e_dim, e_n, c_dim).unwrap();

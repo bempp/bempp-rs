@@ -141,7 +141,7 @@ where
             }
         }
 
-        split_keys[i as usize] = global_splitters[_disp as usize]
+        split_keys[i as usize] = global_splitters[_disp]
     }
 
     split_keys.sort();
@@ -215,14 +215,10 @@ where
                 let i2 = modulo(color + k - i_, k);
 
                 for j in 0..(if i_ == 0 || i_ == k / 2 { 1 } else { 2 }) {
-                    let i = if i_ == 0 {
+                    let i = if i_ == 0 || (j + color / i_) % 2 == 0 {
                         i1
                     } else {
-                        if (j + color / i_) % 2 == 0 {
-                            i1
-                        } else {
-                            i2
-                        }
+                        i2
                     };
 
                     let partner_rank = color_size * i + new_rank;
@@ -256,14 +252,10 @@ where
                 let i2 = modulo(color + k - i_, k);
 
                 for j in 0..(if i_ == 0 || i_ == k / 2 { 1 } else { 2 }) {
-                    let i = if i_ == 0 {
+                    let i = if i_ == 0 || (j + color / i_) % 2 == 0 {
                         i1
                     } else {
-                        if (j + color / i_) % 2 == 0 {
-                            i1
-                        } else {
-                            i2
-                        }
+                        i2
                     };
                     let partner_rank = color_size * i + new_rank;
                     let partner_process = comm.process_at_rank(partner_rank);

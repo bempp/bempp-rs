@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
 permissions:
   contents: read
   pages: write
@@ -34,10 +33,13 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Build docs
-        run: cargo doc
+        run: cargo doc --no-deps
 
       - name: make index.html
         run: |
+          echo "<html><body>"
+          echo "<h1>Bempp-rs documentation</h1>"
+          echo "<ul>" >> target/doc/index.html
           for f in target/doc/bempp_*
           do
           if [ -d "$f" ]
@@ -47,6 +49,10 @@ jobs:
           done
           echo "</ul></body></html>" >> target/doc/index.html
 
+      - name: Set file permissions
+        run: |
+          rm target/doc/.lock
+          chmod -c -R +rX target/doc
 
       - name: Setup Pages
         uses: actions/configure-pages@v3

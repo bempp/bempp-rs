@@ -1,6 +1,17 @@
 //! Type definitions.
+pub use bempp_traits::cell::ReferenceCellType;
+use std::fmt;
 
-pub use bempp_element::cell::*;
+#[derive(Debug)]
+pub struct InvalidQuadrature;
+
+impl fmt::Display for InvalidQuadrature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid quadrature")
+    }
+}
+
+impl std::error::Error for InvalidQuadrature {}
 
 #[derive(Debug)]
 pub enum QuadratureError {
@@ -92,7 +103,7 @@ pub struct CellToCellConnectivity {
 /// returned with the weights and points of the rule.
 pub trait NumericalQuadratureGenerator {
     /// Return the quadrature rule for a given order.
-    fn get_rule(&self, npoints: usize) -> Result<NumericalQuadratureDefinition, ()>;
+    fn get_rule(&self, npoints: usize) -> Result<NumericalQuadratureDefinition, InvalidQuadrature>;
 }
 
 /// A trait for singular quadrature rules. These are rules that
@@ -109,5 +120,5 @@ pub trait SingularQuadratureGenerator {
         &self,
         order: usize,
         connectivity: CellToCellConnectivity,
-    ) -> Result<(NumericalQuadratureDefinition, NumericalQuadratureDefinition), ()>;
+    ) -> Result<(NumericalQuadratureDefinition, NumericalQuadratureDefinition), InvalidQuadrature>;
 }
