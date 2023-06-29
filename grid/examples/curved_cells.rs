@@ -64,7 +64,7 @@ fn main() {
             let pt = grid.geometry().point(*pti).unwrap();
             println!("  {} {} {}", pt[0], pt[1], pt[2]);
         }
-        println!("");
+        println!();
     }
 
     // Export the grid in gmsh format

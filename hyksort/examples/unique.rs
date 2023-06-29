@@ -27,8 +27,8 @@ fn main() {
     hyksort(&mut arr, k, comm.duplicate());
 
     // Test that elements are globally sorted
-    let min = arr.iter().min().unwrap().clone();
-    let max = arr.iter().max().unwrap().clone();
+    let min = *arr.iter().min().unwrap();
+    let max = *arr.iter().max().unwrap();
 
     // Gather all bounds at root
     let next_rank = if rank + 1 < size { rank + 1 } else { 0 };

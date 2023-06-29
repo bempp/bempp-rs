@@ -23,7 +23,7 @@ fn main() {
     // Print information about the first four cells
     let c20 = grid.topology().connectivity(2, 0);
     for i in 0..4 {
-        println!("");
+        println!();
 
         // Print the topological vertices of a cell
         let tcell = grid.topology().index_map()[i];
