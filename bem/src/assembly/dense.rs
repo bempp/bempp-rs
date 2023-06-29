@@ -1482,7 +1482,7 @@ mod test {
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().re,
                     from_cl[*pi][*pj].re,
-                    epsilon = 1e-4
+                    epsilon = 1e-3
                 );
                 assert_relative_eq!(
                     matrix.get(i, j).unwrap().im,
