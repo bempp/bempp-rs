@@ -16,7 +16,7 @@ fn main() {
     let mut rng = rand::thread_rng();
     let nsamples = 1000;
     let mut arr: Vec<i32> = (0..nsamples).map(|_| rng.gen_range(0..=20)).collect();
-    let mut replica = arr.iter().cloned().collect();
+    let mut replica = arr.to_vec();
     arr.append(&mut replica);
 
     // Sort
@@ -24,8 +24,8 @@ fn main() {
 
     // Test that there is no overlap between elements on each processor and that they are
     // globally sorted
-    let min = arr.iter().min().unwrap().clone();
-    let max = arr.iter().max().unwrap().clone();
+    let min = *arr.iter().min().unwrap();
+    let max = *arr.iter().max().unwrap();
     // Gather all bounds at root
 
     let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
