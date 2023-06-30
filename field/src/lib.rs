@@ -206,15 +206,22 @@ where
                 t.target
                     .compute_surface(&domain, expansion_order, self.alpha);
             // Find min target
-            let sums: Vec<f64> = target_check_surface.chunks(self.kernel.dim()).map(|point| point.iter().sum()).collect();
+            let sums: Vec<f64> = target_check_surface
+                .chunks(self.kernel.dim())
+                .map(|point| point.iter().sum())
+                .collect();
             let min_index = sums
                 .iter()
                 .enumerate()
                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .map(|(index, _)| index)
                 .unwrap();
-            let min_target = [target_check_surface[min_index*self.kernel.dim() as usize], target_check_surface[min_index*(self.kernel.dim() as usize)+1], target_check_surface[min_index*(self.kernel.dim() as usize)+2]];
-        
+            let min_target = [
+                target_check_surface[min_index * self.kernel.dim() as usize],
+                target_check_surface[min_index * (self.kernel.dim() as usize) + 1],
+                target_check_surface[min_index * (self.kernel.dim() as usize) + 2],
+            ];
+
             let kernel = self.compute_kernel(expansion_order, &conv_grid_sources, min_target);
             let m = kernel.len();
             let n = kernel[0].len();
@@ -305,13 +312,13 @@ where
             Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t
-                .source
-                .compute_surface(&domain, expansion_order, self.alpha);
+            let source_equivalent_surface =
+                t.source
+                    .compute_surface(&domain, expansion_order, self.alpha);
 
-            let target_check_surface = t
-                .target
-                .compute_surface(&domain, expansion_order, self.alpha);
+            let target_check_surface =
+                t.target
+                    .compute_surface(&domain, expansion_order, self.alpha);
 
             let mut tmp_gram = Vec::new();
             self.kernel.gram(
@@ -397,13 +404,13 @@ where
             Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t
-                .source
-                .compute_surface(&domain, expansion_order, self.alpha);
+            let source_equivalent_surface =
+                t.source
+                    .compute_surface(&domain, expansion_order, self.alpha);
 
-            let target_check_surface = t
-                .target
-                .compute_surface(&domain, expansion_order, self.alpha);
+            let target_check_surface =
+                t.target
+                    .compute_surface(&domain, expansion_order, self.alpha);
 
             let mut tmp_gram = Vec::new();
             self.kernel.gram(

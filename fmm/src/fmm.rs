@@ -74,17 +74,14 @@ where
         tree: SingleNodeTree,
         m2l: U,
     ) -> Self {
-        let upward_equivalent_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_inner);
+        let upward_equivalent_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
 
-        let upward_check_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_outer);
+        let upward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
 
-        let downward_equivalent_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_outer);
+        let downward_equivalent_surface =
+            ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
 
-        let downward_check_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_inner);
+        let downward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
 
         // Compute upward check to equivalent, and downward check to equivalent Gram matrices
         // as well as their inverses using DGESVD.
@@ -124,11 +121,11 @@ where
         let children = ROOT.children();
 
         for child in children.iter() {
-            let child_upward_equivalent_surface = child
-                .compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_upward_equivalent_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
 
-            let child_downward_check_surface = child
-                .compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_downward_check_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
 
             let mut pc2ce = Vec::new();
             kernel.gram(
@@ -226,8 +223,11 @@ where
                         .flat_map(|[x, y, z]| vec![x, y, z])
                         .collect_vec();
 
-                    let upward_check_surface = leaf
-                        .compute_surface(&fmm_arc.tree().domain, fmm_arc.order, fmm_arc.alpha_outer);
+                    let upward_check_surface = leaf.compute_surface(
+                        &fmm_arc.tree().domain,
+                        fmm_arc.order,
+                        fmm_arc.alpha_outer,
+                    );
 
                     let leaf_charges_view = ArrayView::from(leaf_charges_arc.deref());
                     let leaf_charges_slice = leaf_charges_view.as_slice().unwrap();
@@ -345,12 +345,11 @@ where
                             let source_multipole_arc =
                                 Arc::clone(self.multipoles.get(source).unwrap());
 
-                            let upward_equivalent_surface = source
-                                .compute_surface(
-                                    fmm_arc.tree().get_domain(),
-                                    fmm_arc.order(),
-                                    fmm_arc.alpha_inner,
-                                );
+                            let upward_equivalent_surface = source.compute_surface(
+                                fmm_arc.tree().get_domain(),
+                                fmm_arc.order(),
+                                fmm_arc.alpha_inner,
+                            );
 
                             let source_multipole_lock = source_multipole_arc.lock().unwrap();
                             let source_multipole_view =
@@ -405,8 +404,11 @@ where
                         .flat_map(|[x, y, z]| vec![x, y, z])
                         .collect_vec();
 
-                    let downward_equivalent_surface = leaf
-                        .compute_surface(&fmm_arc.tree().domain, fmm_arc.order, fmm_arc.alpha_outer);
+                    let downward_equivalent_surface = leaf.compute_surface(
+                        &fmm_arc.tree().domain,
+                        fmm_arc.order,
+                        fmm_arc.alpha_outer,
+                    );
 
                     let source_local_lock = source_local_arc.lock().unwrap();
                     let source_local_ref = ArrayView::from(source_local_lock.deref());
@@ -456,12 +458,11 @@ where
                             let source_charges_view = ArrayView::from(source_charges.deref());
                             let source_charges_slice = source_charges_view.as_slice().unwrap();
 
-                            let downward_check_surface = leaf
-                                .compute_surface(
-                                    &fmm_arc.tree().domain,
-                                    fmm_arc.order,
-                                    fmm_arc.alpha_inner,
-                                );
+                            let downward_check_surface = leaf.compute_surface(
+                                &fmm_arc.tree().domain,
+                                fmm_arc.order,
+                                fmm_arc.alpha_inner,
+                            );
 
                             let mut downward_check_potential =
                                 vec![0f64; downward_check_surface.len() / fmm_arc.kernel().dim()];
@@ -848,8 +849,11 @@ where
                         }
 
                         // Compute local coefficients from check potentials
-                        let check_potential =
-                            Array::from_shape_vec(target_surface_idxs.len() / fmm_arc.kernel.dim(), tmp).unwrap();
+                        let check_potential = Array::from_shape_vec(
+                            target_surface_idxs.len() / fmm_arc.kernel.dim(),
+                            tmp,
+                        )
+                        .unwrap();
 
                         // Compute local
                         let target_local_owned = self.m2l_scale(target.level())
