@@ -75,28 +75,16 @@ where
         m2l: U,
     ) -> Self {
         let upward_equivalent_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_inner)
-            .into_iter()
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
+            .compute_surface(tree.get_domain(), order, alpha_inner);
 
         let upward_check_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_outer)
-            .into_iter()
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
+            .compute_surface(tree.get_domain(), order, alpha_outer);
 
         let downward_equivalent_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_outer)
-            .into_iter()
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
+            .compute_surface(tree.get_domain(), order, alpha_outer);
 
         let downward_check_surface = ROOT
-            .compute_surface(tree.get_domain(), order, alpha_inner)
-            .into_iter()
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
+            .compute_surface(tree.get_domain(), order, alpha_inner);
 
         // Compute upward check to equivalent, and downward check to equivalent Gram matrices
         // as well as their inverses using DGESVD.
@@ -137,16 +125,10 @@ where
 
         for child in children.iter() {
             let child_upward_equivalent_surface = child
-                .compute_surface(tree.get_domain(), order, alpha_inner)
-                .into_iter()
-                .flat_map(|[x, y, z]| vec![x, y, z])
-                .collect_vec();
+                .compute_surface(tree.get_domain(), order, alpha_inner);
 
             let child_downward_check_surface = child
-                .compute_surface(tree.get_domain(), order, alpha_inner)
-                .into_iter()
-                .flat_map(|[x, y, z]| vec![x, y, z])
-                .collect_vec();
+                .compute_surface(tree.get_domain(), order, alpha_inner);
 
             let mut pc2ce = Vec::new();
             kernel.gram(
@@ -245,10 +227,7 @@ where
                         .collect_vec();
 
                     let upward_check_surface = leaf
-                        .compute_surface(&fmm_arc.tree().domain, fmm_arc.order, fmm_arc.alpha_outer)
-                        .into_iter()
-                        .flat_map(|[x, y, z]| vec![x, y, z])
-                        .collect_vec();
+                        .compute_surface(&fmm_arc.tree().domain, fmm_arc.order, fmm_arc.alpha_outer);
 
                     let leaf_charges_view = ArrayView::from(leaf_charges_arc.deref());
                     let leaf_charges_slice = leaf_charges_view.as_slice().unwrap();
@@ -371,10 +350,7 @@ where
                                     fmm_arc.tree().get_domain(),
                                     fmm_arc.order(),
                                     fmm_arc.alpha_inner,
-                                )
-                                .into_iter()
-                                .flat_map(|[x, y, z]| vec![x, y, z])
-                                .collect_vec();
+                                );
 
                             let source_multipole_lock = source_multipole_arc.lock().unwrap();
                             let source_multipole_view =
@@ -430,10 +406,7 @@ where
                         .collect_vec();
 
                     let downward_equivalent_surface = leaf
-                        .compute_surface(&fmm_arc.tree().domain, fmm_arc.order, fmm_arc.alpha_outer)
-                        .into_iter()
-                        .flat_map(|[x, y, z]| vec![x, y, z])
-                        .collect_vec();
+                        .compute_surface(&fmm_arc.tree().domain, fmm_arc.order, fmm_arc.alpha_outer);
 
                     let source_local_lock = source_local_arc.lock().unwrap();
                     let source_local_ref = ArrayView::from(source_local_lock.deref());
@@ -488,10 +461,7 @@ where
                                     &fmm_arc.tree().domain,
                                     fmm_arc.order,
                                     fmm_arc.alpha_inner,
-                                )
-                                .into_iter()
-                                .flat_map(|[x, y, z]| vec![x, y, z])
-                                .collect_vec();
+                                );
 
                             let mut downward_check_potential =
                                 vec![0f64; downward_check_surface.len() / fmm_arc.kernel().dim()];
@@ -872,14 +842,14 @@ where
                         let (_, target_surface_idxs) = target.surface_grid(fmm_arc.order);
 
                         let mut tmp = Vec::new();
-                        for index in target_surface_idxs.iter() {
+                        for index in target_surface_idxs.chunks_exact(fmm_arc.kernel.dim()) {
                             let element = check_potential[[index[0], index[1], index[2]]];
                             tmp.push(element);
                         }
 
                         // Compute local coefficients from check potentials
                         let check_potential =
-                            Array::from_shape_vec(target_surface_idxs.len(), tmp).unwrap();
+                            Array::from_shape_vec(target_surface_idxs.len() / fmm_arc.kernel.dim(), tmp).unwrap();
 
                         // Compute local
                         let target_local_owned = self.m2l_scale(target.level())
@@ -1165,25 +1135,25 @@ mod test {
 
     #[test]
     fn test_fmm() {
-        // let npoints = 10000;
-        // let points = points_fixture(npoints);
-        // let points_clone = points.clone();
-        // let depth = 4;
-        // let n_crit = 150;
+        let npoints = 100000;
+        let points = points_fixture(npoints);
+        let points_clone = points.clone();
+        let depth = 4;
+        let n_crit = 150;
 
-        // let order = 4;
-        // let alpha_inner = 1.05;
-        // let alpha_outer = 2.9;
-        // let adaptive = true;
-        // // let k = 453;
+        let order = 5;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.9;
+        let adaptive = true;
+        let k = 453;
 
-        // let kernel = LaplaceKernel::new(3, false, 3);
+        let kernel = LaplaceKernel::new(3, false, 3);
 
-        // let start = Instant::now();
-        // let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
-        // println!("Tree = {:?}ms", start.elapsed().as_millis());
+        let start = Instant::now();
+        let tree = SingleNodeTree::new(&points, adaptive, Some(n_crit), Some(depth));
+        println!("Tree = {:?}ms", start.elapsed().as_millis());
 
-        // let start = Instant::now();
+        let start = Instant::now();
 
         // let m2l_data_svd_naive = SvdFieldTranslationNaiveKiFmm::new(
         //     kernel.clone(),
@@ -1200,64 +1170,64 @@ mod test {
         //     tree.get_domain().clone(),
         //     alpha_inner,
         // );
-        // println!("SVD operators = {:?}ms", start.elapsed().as_millis());
+        println!("SVD operators = {:?}ms", start.elapsed().as_millis());
 
-        // let start = Instant::now();
-        // let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
-        //     kernel.clone(),
-        //     order,
-        //     tree.get_domain().clone(),
-        //     alpha_inner,
-        // );
-        // println!("FFT operators = {:?}ms", start.elapsed().as_millis());
+        let start = Instant::now();
+        let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
+            kernel.clone(),
+            order,
+            tree.get_domain().clone(),
+            alpha_inner,
+        );
+        println!("FFT operators = {:?}ms", start.elapsed().as_millis());
 
-        // let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
-        // let charges = Charges::new();
+        let charges = Charges::new();
 
-        // let datatree = FmmData::new(fmm, charges);
+        let datatree = FmmData::new(fmm, charges);
 
-        // datatree.run();
+        datatree.run();
 
-        // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        // let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        // let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        // let mut direct = vec![0f64; pts.len()];
-        // let all_point_coordinates = points_clone
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
+        let mut direct = vec![0f64; pts.len()];
+        let all_point_coordinates = points_clone
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-        // let leaf_coordinates = pts
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
-        // let all_charges = vec![1f64; points_clone.len()];
+        let leaf_coordinates = pts
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let all_charges = vec![1f64; points_clone.len()];
 
-        // let kernel = LaplaceKernel {
-        //     dim: 3,
-        //     is_singular: false,
-        //     value_dimension: 3,
-        // };
-        // kernel.potential(
-        //     &all_point_coordinates[..],
-        //     &all_charges[..],
-        //     &leaf_coordinates[..],
-        //     &mut direct[..],
-        // );
+        let kernel = LaplaceKernel {
+            dim: 3,
+            is_singular: false,
+            value_dimension: 3,
+        };
+        kernel.potential(
+            &all_point_coordinates[..],
+            &all_charges[..],
+            &leaf_coordinates[..],
+            &mut direct[..],
+        );
 
-        // let abs_error: f64 = potentials
-        //     .iter()
-        //     .zip(direct.iter())
-        //     .map(|(a, b)| (a - b).abs())
-        //     .sum();
-        // let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        let abs_error: f64 = potentials
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        // println!("p={:?} rel_error={:?}\n", order, rel_error);
-        // assert!(false)
+        println!("p={:?} rel_error={:?}\n", order, rel_error);
+        assert!(false)
     }
 }
