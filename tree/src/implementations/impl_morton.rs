@@ -679,12 +679,13 @@ impl MortonKey {
         &self,
         order: usize,
         domain: &Domain,
-        surface: &[[f64; 3]],
+        surface: &[f64],
         alpha: f64,
     ) -> Vec<[f64; 3]> {
         // Number of convolution points along each axis
         let n = 2 * order - 1;
-        let mut grid = vec![[0f64; 3]; n.pow(3)];
+        let dim = 3;
+        let mut grid = vec![[0f64; 3]; n.pow(dim)];
 
         for i in 0..n {
             for j in 0..n {
@@ -694,6 +695,7 @@ impl MortonKey {
             }
         }
 
+        // Dilate convolution grid
         let diameter = self
             .diameter(domain)
             .iter()
@@ -720,14 +722,14 @@ impl MortonKey {
             .unwrap();
         let max_conv_point = grid[max_index];
 
-        let sums: Vec<f64> = surface.iter().map(|point| point.iter().sum()).collect();
+        let sums: Vec<f64> = surface.chunks(dim as usize).map(|point| point.iter().sum()).collect();
         let max_index = sums
             .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(index, _)| index)
             .unwrap();
-        let max_surface_point = surface[max_index];
+        let max_surface_point = [surface[max_index*dim as usize], surface[max_index*(dim as usize)+1], surface[max_index*(dim as usize)+2]];
 
         let diff = max_conv_point
             .iter()
@@ -745,15 +747,18 @@ impl MortonKey {
         grid
     }
 
-    pub fn surface_grid(&self, order: usize) -> (Vec<[f64; 3]>, Vec<[usize; 3]>) {
+    pub fn surface_grid(&self, order: usize) -> (Vec<f64>, Vec<usize>) {
+
+        let dim = 3;
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
 
-        let mut surface: Vec<[f64; 3]> = vec![[0f64; 3]; n_coeffs];
+        let mut surface: Vec<f64> = vec![0f64; dim*n_coeffs];
 
         let lower = 0;
         let upper = order - 1;
         let mut idx = 0;
 
+        // Generate surface points on a grid scaled by the order
         for i in 0..order {
             for j in 0..order {
                 for k in 0..order {
@@ -761,57 +766,60 @@ impl MortonKey {
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
                     {
-                        surface[idx] = [i as f64, j as f64, k as f64];
+                        surface[dim*idx] = i as f64;
+                        surface[dim*idx+1] = j as f64;
+                        surface[dim*idx+2] = k as f64;
                         idx += 1;
                     }
                 }
             }
         }
 
+        // Map surface points to indices
         let surface_idxs = surface
             .iter()
             .clone()
-            .map(|&[a, b, c]| [a as usize, b as usize, c as usize])
+            .map(|&x| x as usize)
             .collect();
 
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         surface.iter_mut().for_each(|point| {
-            point
-                .iter_mut()
-                .for_each(|value| *value *= 2.0 / (order as f64 - 1.0));
+            *point *= 2.0/ (order as f64 -1.0);
         });
 
         surface
             .iter_mut()
-            .for_each(|point| point.iter_mut().for_each(|value| *value -= 1.0));
+            .for_each(|point| *point-= 1.0);
 
         (surface, surface_idxs)
     }
 
     pub fn scale_surface(
         &self,
-        surface: Vec<[f64; 3]>,
+        surface: Vec<f64>,
         domain: &Domain,
         alpha: f64,
-    ) -> Vec<[f64; 3]> {
+    ) -> Vec<f64> {
+        let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
         let dilated_diameter = scaled_diameter.map(|d| d * alpha);
 
-        let mut scaled_surface = vec![[0f64; 3]; surface.len()];
+        let mut scaled_surface = vec![0f64; surface.len()];
 
         let centre = self.centre(domain);
 
-        for i in 0..surface.len() {
-            scaled_surface[i][0] = (surface[i][0] * (dilated_diameter[0] / 2.0)) + centre[0];
-            scaled_surface[i][1] = (surface[i][1] * (dilated_diameter[1] / 2.0)) + centre[1];
-            scaled_surface[i][2] = (surface[i][2] * (dilated_diameter[2] / 2.0)) + centre[2];
+        let n = surface.len() / 3;
+        for i in 0..n {
+            scaled_surface[i*dim] = (surface[i*dim] * (dilated_diameter[0] / 2.0)) + centre[0];
+            scaled_surface[i*dim+1] = (surface[i*dim+1] * (dilated_diameter[1] / 2.0)) + centre[1];
+            scaled_surface[i*dim+2] = (surface[i*dim+2] * (dilated_diameter[2] / 2.0)) + centre[2];
         }
 
         scaled_surface
     }
 
-    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<[f64; 3]> {
+    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<f64> {
         let (surface, _) = self.surface_grid(order);
 
         self.scale_surface(surface, domain, alpha)
@@ -1663,5 +1671,115 @@ mod test {
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
         key.find_transfer_vector(&sibling);
+    }
+
+    #[test]
+    fn test_surface_grid() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let key = MortonKey::from_point(&point, &domain, 0);
+        
+        let order = 2;
+        let alpha = 1.;
+        let dim = 3;
+        let ncoeffs = 6*(order-1 as usize).pow(2) + 2;
+
+        // Test lengths
+        let surface = key.compute_surface(&domain, order, alpha);
+        assert_eq!(surface.len(), ncoeffs*dim);
+        
+        let (surface, surface_idxs) = key.surface_grid(order);
+        assert_eq!(surface.len(), ncoeffs*dim);
+        assert_eq!(surface_idxs.len(), ncoeffs*dim);
+
+        let mut expected = vec![[0usize; 3]; ncoeffs];
+        let lower = 0;
+        let upper = order -1;
+        let mut idx = 0;
+        for i in 0..order {
+            for j in 0..order {
+                for k in 0..order {
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                    || (j >= lower && k >= lower && (i == lower || i == upper))
+                    || (k >= lower && i >= lower && (j == lower || j == upper)) {
+                        expected[idx] = [i, j, k];
+                        idx += 1;
+                    }
+                }
+            }
+        }
+
+        // Test ordering.
+        for i in 0..ncoeffs {
+            let point = vec![surface_idxs[i*dim], surface_idxs[i*dim+1], surface_idxs[i*dim+2]];
+            assert_eq!(point, expected[i]);
+        }
+
+        // Test scaling
+        let level = 2;
+        let key = MortonKey::from_point(&point, &domain, level);
+        let surface = key.compute_surface(&domain, order, alpha);
+
+        let min_x = surface.iter().
+            step_by(3).fold(f64::INFINITY, |a, &b| a.min(b));
+
+        let max_x = surface.iter().
+            step_by(3).fold(0f64, |a, &b| a.max(b));
+
+        let diam_x = max_x-min_x;
+
+        let expected = key.diameter(&domain)[0];
+        assert_eq!(diam_x, expected);
+
+       // Test shifting
+        let point = [0.1, 0.2, 0.3];
+        let level = 2;
+        let key = MortonKey::from_point(&point, &domain, level);
+        let surface = key.compute_surface(&domain, order, alpha);
+        let scaled_surface = key.scale_surface(surface.clone(), &domain, alpha);
+        let expected = key.centre(&domain);
+
+        let c_x = surface.iter()
+            .step_by(3).fold(0f64, |a, &b| a+b) / (ncoeffs as f64);
+        let c_y = surface.iter()
+            .skip(1).step_by(3).fold(0f64, |a, &b| a+b) / (ncoeffs as f64);
+        let c_z = surface.iter()
+            .skip(2).step_by(3).fold(0f64, |a, &b| a+b) / (ncoeffs as f64);
+
+        let result = vec![c_x, c_y, c_z];
+        
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_convolution_grid() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let order = 3;
+        let alpha = 1.0;
+
+        let key = MortonKey::from_point(&point, &domain, 0);
+
+
+        let surface = key.compute_surface(&domain, order, alpha);
+        let conv_grid = key.convolution_grid(order, &domain, &surface, alpha);
+
+        // Test that surface grid is embedded in convolution grid
+        let surf_grid: Vec<[f64; 3]> = surface
+            .chunks_exact(3)
+            .map(|chunk| {
+                [chunk[0], chunk[1], chunk[2]]
+            })
+            .collect();
+
+        assert!(surf_grid.iter().all(|point| conv_grid.contains(point)));
+
     }
 }
