@@ -28,7 +28,7 @@ type FftM2LEntry = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
 type SvdM2lEntry =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct FftFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel + Default,
@@ -375,7 +375,6 @@ where
             // //     .slice_mut(s![.., lidx_sources..ridx_sources])
             // //     .assign(&tmp_gram);
 
-            // se2tc_fat.block_mut((0, lidx_sources), tmp_gram.shape());
             for j in 0..ncols {
                 let start_idx = j * ntransfer_vectors * nrows + i * nrows;
                 let end_idx = start_idx + nrows;
@@ -403,7 +402,6 @@ where
 
         let (mvt, nvt) = vt.shape();
         let vt = vt.block((0, 0), (right, nvt)).eval();
-        // println!("u {:?} {:?} {:?}", u.shape(), sigma_mat.shape(), vt.shape());
 
         // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
         // let u = u.unwrap().slice(s![.., left..right]).to_owned();
@@ -456,130 +454,204 @@ where
     }
 }
 
-// impl<T> FieldTranslationData<T> for SvdFieldTranslationNaiveKiFmm<T>
-// where
-//     T: Kernel + Default,
-// {
-//     type TransferVector = Vec<TransferVector>;
-//     type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
-//     type Domain = Domain;
+impl<T> FieldTranslationData<T> for SvdFieldTranslationNaiveKiFmm<T>
+where
+    T: Kernel<T = f64> + Default,
+{
+    type TransferVector = Vec<TransferVector>;
+    type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
+    type Domain = Domain;
 
-//     fn compute_transfer_vectors(&self) -> Self::TransferVector {
-//         compute_transfer_vectors()
-//     }
+    fn compute_transfer_vectors(&self) -> Self::TransferVector {
+        compute_transfer_vectors()
+    }
 
-//     fn ncoeffs(&self, expansion_order: usize) -> usize {
-//         6 * (expansion_order - 1).pow(2) + 2
-//     }
+    fn ncoeffs(&self, expansion_order: usize) -> usize {
+        6 * (expansion_order - 1).pow(2) + 2
+    }
 
-//     fn compute_m2l_operators(
-//         &self,
-//         expansion_order: usize,
-//         domain: Self::Domain,
-//     ) -> Self::M2LOperators {
-//         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
+    fn compute_m2l_operators<'a>(
+        &self,
+        expansion_order: usize,
+        domain: Self::Domain,
+    ) -> Self::M2LOperators {
+        // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
-//         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
-//         let nrows = self.ncoeffs(expansion_order);
-//         let ncols = self.ncoeffs(expansion_order);
+        // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
+        let nrows = self.ncoeffs(expansion_order);
+        let ncols = self.ncoeffs(expansion_order);
 
-//         let mut se2tc_fat: SvdM2lEntry =
-//             Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
+        // let mut se2tc_fat: SvdM2lEntry =
+        //     Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
+        let ntransfer_vectors = self.transfer_vectors.len();
+        let mut se2tc_fat = rlst_mat![f64, (nrows, ncols * ntransfer_vectors)];
 
-//         let mut se2tc_thin: SvdM2lEntry =
-//             Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
+        // let mut se2tc_thin: SvdM2lEntry =
+        //     Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
+        let mut se2tc_thin = rlst_mat![f64, (nrows * ntransfer_vectors, ncols)];
 
-//         for (i, t) in self.transfer_vectors.iter().enumerate() {
-//             let source_equivalent_surface =
-//                 t.source.compute_surface(&domain, expansion_order, self.alpha);
+        for (i, t) in self.transfer_vectors.iter().enumerate() {
+            let source_equivalent_surface =
+                t.source
+                    .compute_surface(&domain, expansion_order, self.alpha);
+            let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
+            let source_equivalent_surface = unsafe {
+                rlst_pointer_mat!['a, f64, source_equivalent_surface.as_ptr(), (nsources, self.kernel.space_dimension()), (1, nsources)]
+            };
 
-//             let target_check_surface =
-//                 t.target.compute_surface(&domain, expansion_order, self.alpha);
+            let target_check_surface =
+                t.target
+                    .compute_surface(&domain, expansion_order, self.alpha);
+            let ntargets = target_check_surface.len() / self.kernel.space_dimension();
+            let target_check_surface = unsafe {
+                rlst_pointer_mat!['a, f64, target_check_surface.as_ptr(), (ntargets, self.kernel.space_dimension()), (1, ntargets)]
+            };
 
-//             let mut tmp_gram = Vec::new();
-//             self.kernel.gram(
-//                 &source_equivalent_surface[..],
-//                 &target_check_surface[..],
-//                 &mut tmp_gram,
-//             );
+            let mut tmp_gram = rlst_mat![f64, (ntargets, nsources)];
 
-//             let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
-//             let lidx_sources = i * ncols;
-//             let ridx_sources = lidx_sources + ncols;
+            self.kernel.gram(
+                EvalType::Value,
+                source_equivalent_surface.data(),
+                target_check_surface.data(),
+                tmp_gram.data_mut(),
+            );
 
-//             se2tc_fat
-//                 .slice_mut(s![.., lidx_sources..ridx_sources])
-//                 .assign(&tmp_gram);
+            // // let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
+            let lidx_sources = i * ncols;
+            let ridx_sources = lidx_sources + ncols;
 
-//             se2tc_thin
-//                 .slice_mut(s![lidx_sources..ridx_sources, ..])
-//                 .assign(&tmp_gram);
-//         }
+            let block_size = nrows * ncols;
+            let start_idx = i * block_size;
+            let end_idx = start_idx + block_size;
+            let mut block = se2tc_fat.get_slice_mut(start_idx, end_idx);
+            block.copy_from_slice(tmp_gram.data_mut());
 
-//         let left: usize = 0;
-//         let right: usize = std::cmp::min(self.k, nrows);
+            // // se2tc_fat
+            // //     .slice_mut(s![.., lidx_sources..ridx_sources])
+            // //     .assign(&tmp_gram);
 
-//         let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+            for j in 0..ncols {
+                let start_idx = j * ntransfer_vectors * nrows + i * nrows;
+                let end_idx = start_idx + nrows;
+                let mut block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
+                let mut gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
+                block_column.copy_from_slice(gram_column);
+            }
+        }
 
-//         let u = u.unwrap().slice(s![.., left..right]).to_owned();
-//         let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
-//         let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
+        let left: usize = 0;
+        let right: usize = self.k;
+        let (sigma, u, vt) = se2tc_fat.linalg().svd(Mode::All, Mode::Slim).unwrap();
 
-//         let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        let u = u.unwrap();
+        let vt = vt.unwrap();
 
-//         let st = st.unwrap().slice(s![left..right, ..]).to_owned();
+        // Keep 'k' singular values
+        let mut sigma_mat = rlst_mat![f64, (self.k, self.k)];
+        for i in 0..self.k {
+            sigma_mat[[i, i]] = sigma[i]
+        }
 
-//         // Store compressed M2L operators
-//         let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
-//         for i in 0..self.transfer_vectors.len() {
-//             let v_lidx = i * ncols;
-//             let v_ridx = v_lidx + ncols;
-//             let vt_sub = vt.slice(s![.., v_lidx..v_ridx]);
-//             let tmp = sigma.dot(&vt_sub.dot(&st.t()));
-//             let lidx = i * self.k;
-//             let ridx = lidx + self.k;
+        let (mu, nu) = u.shape();
+        let u = u.block((0, 0), (mu, self.k)).eval();
 
-//             c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
-//         }
+        let (mvt, nvt) = vt.shape();
+        let vt = vt.block((0, 0), (right, nvt)).eval();
 
-//         (u, st, c)
-//     }
-// }
+        // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        // let u = u.unwrap().slice(s![.., left..right]).to_owned();
+        // let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
+        // let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
 
-// impl<T> SvdFieldTranslationNaiveKiFmm<T>
-// where
-//     T: Kernel + Default,
-// {
-//     pub fn new(
-//         kernel: T,
-//         k: Option<usize>,
-//         expansion_order: usize,
-//         domain: Domain,
-//         alpha: f64,
-//     ) -> Self {
-//         let mut result = SvdFieldTranslationNaiveKiFmm::default();
+        let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::All, Mode::All).unwrap();
+        let st = st.unwrap();
+        let (mst, nst) = st.shape();
+        let st_block = st.block((0, 0), (self.k, nst));
+        let s = st_block.transpose().eval();
+        let st = st.block((0, 0), (self.k, nst)).eval();
 
-//         if let Some(k) = k {
-//             // Compression rank <= number of coefficients
-//             let ncoeffs = result.ncoeffs(expansion_order);
-//             if k <= ncoeffs {
-//                 result.k = k
-//             } else {
-//                 result.k = ncoeffs;
-//             }
-//         } else {
-//             // TODO: Should be data driven if nothing is provided by the user
-//             result.k = 50;
-//         }
+        // let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        // let st = st.unwrap().slice(s![left..right, ..]).to_owned();
 
-//         result.alpha = alpha;
-//         result.kernel = kernel;
-//         result.transfer_vectors = result.compute_transfer_vectors();
-//         result.m2l = result.compute_m2l_operators(expansion_order, domain);
+        // Store compressed M2L operators
+        // let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
+        let mut c = rlst_mat![f64, (self.k, self.k * ntransfer_vectors)];
 
-//         result
-//     }
-// }
+        for i in 0..self.transfer_vectors.len() {
+            // let v_lidx = i * ncols;
+            // let v_ridx = v_lidx + ncols;
+            // let vt_sub = vt.slice(s![.., v_lidx..v_ridx]);
+
+            // let block_size = right*ncols;
+            // let start_idx = i * block_size;
+            // let end_idx = start_idx+block_size;
+            let top_left = (0, i * ncols);
+            let dim = (self.k, ncols);
+            let vt_block = vt.block(top_left, dim);
+
+            let tmp = sigma_mat.dot(&vt_block.dot(&s));
+            //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
+            //     let lidx = i * self.k;
+            //     let ridx = lidx + self.k;
+
+            let top_left = (0, i * self.k);
+            let dim = (self.k, ncols);
+            // let mut c_block =;
+            c.block_mut(top_left, dim)
+                .data_mut()
+                .copy_from_slice(tmp.data());
+
+            //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
+        }
+        (u, st, c)
+    }
+}
+
+impl<T> SvdFieldTranslationNaiveKiFmm<T>
+where
+    T: Kernel<T = f64> + Default,
+{
+    pub fn new(
+        kernel: T,
+        k: Option<usize>,
+        expansion_order: usize,
+        domain: Domain,
+        alpha: f64,
+    ) -> Self {
+        let dummy = rlst_mat![f64, (1, 1)];
+
+        // TODO: There should be a default for matrices to make code cleaner.
+        let mut result = SvdFieldTranslationNaiveKiFmm {
+            alpha,
+            k: 100,
+            kernel,
+            m2l: (
+                dummy.new_like_self().eval(),
+                dummy.new_like_self().eval(),
+                dummy.new_like_self().eval(),
+            ),
+            transfer_vectors: Vec::new(),
+        };
+
+        if let Some(k) = k {
+            // Compression rank <= number of coefficients
+            let ncoeffs = result.ncoeffs(expansion_order);
+            if k <= ncoeffs {
+                result.k = k
+            } else {
+                result.k = ncoeffs;
+            }
+        } else {
+            // TODO: Should be data driven if nothing is provided by the user
+            result.k = 50;
+        }
+
+        result.transfer_vectors = result.compute_transfer_vectors();
+        result.m2l = result.compute_m2l_operators(expansion_order, domain);
+
+        result
+    }
+}
 
 impl<T> SvdFieldTranslationKiFmm<T>
 where
