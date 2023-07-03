@@ -1,14 +1,17 @@
 extern crate proc_macro;
 use bempp_element::element::create_element;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
-use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
+use bempp_quadrature::types::CellToCellConnectivity;
 use bempp_tools::arrays::{Array2D, Array4D};
 use bempp_traits::arrays::Array4DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::ElementFamily;
 use bempp_traits::element::FiniteElement;
+use num::traits::real::Real;
+use num::Num;
 use proc_macro::TokenStream;
 use quote::quote;
+use std::fmt::Debug;
 
 use syn::{parse::Parse, parse_macro_input, Expr, Token};
 
@@ -121,9 +124,13 @@ fn parse_string(string: &Expr) -> String {
     format!("{}", quote! { #string })
 }
 
-fn format_table(name: String, table: &[f64]) -> String {
+fn format_table<T: Num + Debug>(name: String, table: &[T]) -> String {
     let mut t = String::new();
-    t += &format!("const {name}: [f64; {}] = [", table.len());
+    t += &format!(
+        "const {name}: [{}; {}] = [",
+        std::any::type_name::<T>(),
+        table.len()
+    );
     for w in table {
         t += &format!("{w:?}, ");
     }
@@ -131,10 +138,16 @@ fn format_table(name: String, table: &[f64]) -> String {
     t
 }
 
-fn format_eval_table(name: String, table: &Array4D<f64>, deriv: usize, component: usize) -> String {
+fn format_eval_table<T: Num + Debug>(
+    name: String,
+    table: &Array4D<T>,
+    deriv: usize,
+    component: usize,
+) -> String {
     let mut t = String::new();
     t += &format!(
-        "const {name}: [f64; {}] = [",
+        "const {name}: [{}; {}] = [",
+        std::any::type_name::<T>(),
         table.shape().1 * table.shape().2
     );
     for i in 0..table.shape().1 {
@@ -143,6 +156,142 @@ fn format_eval_table(name: String, table: &Array4D<f64>, deriv: usize, component
         }
     }
     t += "];\n";
+    t
+}
+
+fn linear_derivative<T: Num + Debug + Real>(
+    name: String,
+    vertices: &String,
+    gdim: usize,
+    table: &Array4D<T>,
+    deriv: usize,
+) -> String {
+    let mut code = String::new();
+    code += &format!("let {name} = (");
+    for d in 0..gdim {
+        if d > 0 {
+            code += ", ";
+        }
+        let mut started = false;
+        for f in 0..table.shape().2 {
+            let value = table.get(deriv, 0, f, 0).unwrap();
+            if value.abs() > (T::one() + T::one()).powi(-15) {
+                if (*value - T::one()).abs() > (T::one() + T::one()).powi(-15) {
+                    // value is 1
+                    if started {
+                        code += " + ";
+                    }
+                    code += &format!("{vertices}[{}]", gdim * f + d);
+                } else if (*value + T::one()).abs() > (T::one() + T::one()).powi(-15) {
+                    // value is -1
+                    code += " - ";
+                    code += &format!("{vertices}[{}]", gdim * f + d);
+                } else {
+                    if started {
+                        code += " + ";
+                    }
+                    code += &format!("{:?} * {vertices}[{}]", value, gdim * f + d);
+                }
+                started = true;
+            }
+        }
+    }
+    code += ");\n";
+    code
+}
+
+fn linear_jacobian<T: Num + Debug + Real>(
+    name: String,
+    vertices: String,
+    tdim: usize,
+    gdim: usize,
+    table: &Array4D<T>,
+    level: usize,
+) -> String {
+    let mut code = String::new();
+    if tdim == 2 && gdim == 3 {
+        code += &indent(level);
+        code += &linear_derivative("dx".to_string(), &vertices, gdim, table, 1);
+        code += &indent(level);
+        code += &linear_derivative("dy".to_string(), &vertices, gdim, table, 2);
+        code += &indent(level);
+        code += "let j = (dx.1 * dy.2 - dx.2 * dy.1, dx.2 * dy.0 - dx.0 * dy.2, dx.0 * dy.1 - dx.1 * dy.0);\n";
+        code += &indent(level);
+        code += &format!("let {name} = (j.0.powi(2) + j.1.powi(2) + j.2.powi(2)).sqrt();\n");
+    } else {
+        panic!(
+            "Jacobian computation not implemented for tdim {} and gdim {}.",
+            tdim, gdim
+        );
+    }
+    code
+}
+
+fn derivative(
+    name: String,
+    vertices: &String,
+    gdim: usize,
+    table: &String,
+    point: &String,
+    basis_count: usize,
+) -> String {
+    let mut code = String::new();
+    code += &format!("let {name} = (");
+    for d in 0..gdim {
+        if d > 0 {
+            code += ", ";
+        }
+        let mut started = false;
+        for f in 0..basis_count {
+            if started {
+                code += " + ";
+            }
+            code += &format!(
+                "{table}[{point} * {basis_count} + {f}] * {vertices}[{}]",
+                gdim * f + d
+            );
+            started = true;
+        }
+    }
+    code += ");\n";
+    code
+}
+
+fn jacobian(
+    name: String,
+    vertices: String,
+    tdim: usize,
+    gdim: usize,
+    dx: String,
+    dy: String,
+    point: String,
+    basis_count: usize,
+    level: usize,
+) -> String {
+    let mut code = String::new();
+    if tdim == 2 && gdim == 3 {
+        code += &indent(level);
+        code += &derivative("dx".to_string(), &vertices, gdim, &dx, &point, basis_count);
+        code += &indent(level);
+        code += &derivative("dy".to_string(), &vertices, gdim, &dy, &point, basis_count);
+        code += &indent(level);
+        code += "let j = (dx.1 * dy.2 - dx.2 * dy.1, dx.2 * dy.0 - dx.0 * dy.2, dx.0 * dy.1 - dx.1 * dy.0);\n";
+        code += &indent(level);
+        code += &format!("let {name} = (j.0.powi(2) + j.1.powi(2) + j.2.powi(2)).sqrt();\n");
+    } else {
+        panic!(
+            "Jacobian computation not implemented for tdim {} and gdim {}.",
+            tdim, gdim
+        );
+    }
+    code
+}
+
+fn indent(level: usize) -> String {
+    let mut t = String::new();
+    for _ in 0..level * 4 {
+        t += " ";
+    }
     t
 }
 
@@ -157,6 +306,12 @@ pub fn make_answer(_item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn generate_kernels(input: TokenStream) -> TokenStream {
+    // TODO: make these into inputs
+    type T = f64;
+    let tdim = 2;
+    let gdim = 3;
+
+    let typename = std::any::type_name::<T>().to_string();
     let es = parse_macro_input!(input as GenerationInput);
 
     let kernel_name = parse_string(&es.kernel_name);
@@ -196,19 +351,19 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     )
     .unwrap();
     let npts = quadrule.npoints;
-    let test_points = Array2D::<f64>::from_data(quadrule.test_points, (npts, 3));
-    let trial_points = Array2D::<f64>::from_data(quadrule.trial_points, (npts, 3));
+    let test_points = Array2D::<T>::from_data(quadrule.test_points, (npts, tdim));
+    let trial_points = Array2D::<T>::from_data(quadrule.trial_points, (npts, tdim));
 
-    let mut test_evals = Array4D::<f64>::new(test_element.tabulate_array_shape(1, npts));
+    let mut test_evals = Array4D::<T>::new(test_element.tabulate_array_shape(1, npts));
     test_element.tabulate(&test_points, 1, &mut test_evals);
-    let mut trial_evals = Array4D::<f64>::new(trial_element.tabulate_array_shape(1, npts));
+    let mut trial_evals = Array4D::<T>::new(trial_element.tabulate_array_shape(1, npts));
     trial_element.tabulate(&trial_points, 1, &mut trial_evals);
 
     let mut test_geometry_evals =
-        Array4D::<f64>::new(test_geometry_element.tabulate_array_shape(1, npts));
+        Array4D::<T>::new(test_geometry_element.tabulate_array_shape(1, npts));
     test_geometry_element.tabulate(&test_points, 1, &mut test_geometry_evals);
     let mut trial_geometry_evals =
-        Array4D::<f64>::new(trial_geometry_element.tabulate_array_shape(1, npts));
+        Array4D::<T>::new(trial_geometry_element.tabulate_array_shape(1, npts));
     trial_geometry_element.tabulate(&trial_points, 1, &mut trial_geometry_evals);
 
     let mut code = String::new();
@@ -216,14 +371,17 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     code += "    test_element: bempp_element::element::CiarletElement,\n";
     code += "    trial_element: bempp_element::element::CiarletElement,\n";
     code += "};\n\n";
-    code += &format!("impl _BemppKernel_{kernel_name} {{");
+    code +=
+        &format!("impl bempp_traits::bem::Kernel<{typename}> for _BemppKernel_{kernel_name} {{");
     code += "\n\n";
 
     // TODO: split this kernel generation into its own function
 
     // Write const tables
-    code += "fn same_triangle_kernel(result: &mut [f64], test_vertices: &[f64], trial_vertices: &[f64]) {\n";
+    code += &format!("fn same_triangle_kernel(result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]) {{\n");
+    code += &indent(1);
     code += &format_table("WTS".to_string(), &quadrule.weights);
+    code += &indent(1);
     code += &format_eval_table(
         "TEST_GEOMETRY_EVALS".to_string(),
         &test_geometry_evals,
@@ -231,12 +389,14 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
         0,
     );
     if test_geometry_element.degree() > 1 {
+        code += &indent(1);
         code += &format_eval_table(
             "TEST_GEOMETRY_EVALS_DX".to_string(),
             &test_geometry_evals,
             1,
             0,
         );
+        code += &indent(1);
         code += &format_eval_table(
             "TEST_GEOMETRY_EVALS_DY".to_string(),
             &test_geometry_evals,
@@ -244,6 +404,7 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
             0,
         );
     }
+    code += &indent(1);
     code += &format_eval_table(
         "TRIAL_GEOMETRY_EVALS".to_string(),
         &trial_geometry_evals,
@@ -251,12 +412,14 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
         0,
     );
     if trial_geometry_element.degree() > 1 {
+        code += &indent(1);
         code += &format_eval_table(
             "TRIAL_GEOMETRY_EVALS_DX".to_string(),
             &trial_geometry_evals,
             1,
             0,
         );
+        code += &indent(1);
         code += &format_eval_table(
             "TRIAL_GEOMETRY_EVALS_DY".to_string(),
             &trial_geometry_evals,
@@ -265,17 +428,140 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
         );
     }
     if test_element.degree() > 0 {
+        code += &indent(1);
         code += &format_eval_table("TEST_EVALS".to_string(), &test_evals, 0, 0);
     }
     if trial_element.degree() > 0 {
+        code += &indent(1);
         code += &format_eval_table("TRIAL_EVALS".to_string(), &trial_evals, 0, 0);
     }
+    code += &indent(1);
+    code += "const ONE_OVER_4PI: f64 = 0.25 * std::f64::consts::FRAC_1_PI;\n";
     code += "\n";
 
+    if test_geometry_element.degree() == 1 {
+        code += &linear_jacobian(
+            "test_jdet".to_string(),
+            "test_vertices".to_string(),
+            tdim,
+            gdim,
+            &test_geometry_evals,
+            1,
+        );
+    }
+    if trial_geometry_element.degree() == 1 {
+        code += &linear_jacobian(
+            "trial_jdet".to_string(),
+            "trial_vertices".to_string(),
+            tdim,
+            gdim,
+            &trial_geometry_evals,
+            1,
+        );
+    }
+
+    code += "\n";
+    code += &indent(1);
+    code += &format!("for i in 0..{} {{\n", test_element.dim());
+    code += &indent(2);
+    code += &format!("for j in 0..{} {{\n", trial_element.dim());
+    code += &indent(3);
+    code += &format!("result[i * {} + j] = 0.0;\n", trial_element.dim());
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(1);
+    code += "}\n";
+
+    code += &indent(1);
     code += &format!("for q in 0..{npts} {{\n");
-    code += "let mut sum_squares = 0.0;\n";
-    // TODO
-    code += "let distance = f64::sqrt(sum_squares);\n";
+    code += &indent(2);
+    code += &format!("let mut sum_squares: {typename} = 0.0;\n");
+    code += &indent(2);
+    code += &format!("for d in 0..{gdim} {{\n");
+    code += &indent(3);
+    code += "let x = ";
+    for b in 0..test_geometry_element.dim() {
+        if b == 0 {
+            code += &format!(
+                "test_vertices[d] * TEST_GEOMETRY_EVALS[q * {}]",
+                test_geometry_element.dim()
+            );
+        } else {
+            code += &format!(
+                " + test_vertices[{} + d] * TEST_GEOMETRY_EVALS[q * {} + {b}]",
+                b * gdim,
+                test_geometry_element.dim()
+            );
+        }
+    }
+    code += ";\n";
+    code += &indent(3);
+    code += "let y = ";
+    for b in 0..trial_geometry_element.dim() {
+        if b == 0 {
+            code += &format!(
+                "trial_vertices[d] * TRIAL_GEOMETRY_EVALS[q * {}]",
+                trial_geometry_element.dim()
+            );
+        } else {
+            code += &format!(
+                " + trial_vertices[{} + d] * TRIAL_GEOMETRY_EVALS[q * {} + {b}]",
+                b * gdim,
+                trial_geometry_element.dim()
+            );
+        }
+    }
+    code += ";\n";
+    code += &indent(3);
+    code += "sum_squares += (x - y).powi(2);\n";
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(2);
+    code += "let distance = sum_squares.sqrt();\n";
+    if test_geometry_element.degree() > 1 {
+        code += &jacobian(
+            "test_jdet".to_string(),
+            "test_vertices".to_string(),
+            tdim,
+            gdim,
+            "TEST_GEOMETRY_EVALS_DX".to_string(),
+            "TEST_GEOMETRY_EVALS_DY".to_string(),
+            "q".to_string(),
+            test_geometry_evals.shape().2,
+            2,
+        );
+    }
+    if trial_geometry_element.degree() > 1 {
+        code += &jacobian(
+            "trial_jdet".to_string(),
+            "trial_vertices".to_string(),
+            tdim,
+            gdim,
+            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
+            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
+            "q".to_string(),
+            trial_geometry_evals.shape().2,
+            2,
+        );
+    }
+    code += &indent(2);
+    code += &format!("for i in 0..{} {{\n", test_element.dim());
+    code += &indent(3);
+    code += &format!("for j in 0..{} {{\n", trial_element.dim());
+    code += &indent(4);
+    code += &format!("result[i * {} + j] += WTS[q]", trial_element.dim());
+    if test_element.degree() > 0 {
+        code += &format!(" * TEST_EVALS[q * {} + i]", test_element.dim());
+    }
+    if trial_element.degree() > 0 {
+        code += &format!(" * TRIAL_EVALS[q * {} + j]", trial_element.dim());
+    }
+    code += " * test_jdet * trial_jdet * ONE_OVER_4PI / distance;\n";
+    code += &indent(3);
+    code += "}\n";
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(1);
     code += "}\n";
 
     code += "}\n\n";

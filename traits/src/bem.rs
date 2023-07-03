@@ -1,5 +1,6 @@
 use crate::element::FiniteElement;
 use crate::grid::Grid;
+use num::Num;
 
 pub trait DofMap {
     /// Get the DOF numbers on the local process associated with the given entity
@@ -39,4 +40,8 @@ pub trait FunctionSpace<'a> {
     fn is_serial(&self) -> bool {
         self.dofmap().is_serial() && self.grid().is_serial()
     }
+}
+
+pub trait Kernel<T: Num> {
+    fn same_triangle_kernel(result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
 }
