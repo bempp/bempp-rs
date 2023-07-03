@@ -1,11 +1,10 @@
 // //! Traits for creating integral equation kernels.
 
-
 //! Trait for Green's function kernels
 
 use rayon::ThreadPool;
 
-use crate::types::{Scalar, c64};
+use crate::types::{c64, Scalar};
 
 /// Evaluation Mode.
 ///
@@ -88,7 +87,13 @@ pub trait Kernel {
     fn range_component_count(&self, eval_type: EvalType) -> usize;
 
     // Return a Gram matrix between the sources and targets
-    fn gram(&self, eval_type: EvalType, sources: &[<Self::T as Scalar>::Real], targets: &[<Self::T as Scalar>::Real], result: &mut [Self::T]);
+    fn gram(
+        &self,
+        eval_type: EvalType,
+        sources: &[<Self::T as Scalar>::Real],
+        targets: &[<Self::T as Scalar>::Real],
+        result: &mut [Self::T],
+    );
 
     // Scale the kernel to a given level of the associated tree, for the FMM.
     fn scale(&self, level: u64) -> f64;

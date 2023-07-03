@@ -7,19 +7,26 @@ use ndarray_ndimage::{pad, PadMode};
 use ndrustfft::{ndfft, ndfft_r2c, Complex, FftHandler, R2cFftHandler};
 
 use rlst;
-use rlst::common::traits::{NewLikeSelf, Transpose, NewLikeTranspose};
-use rlst::common::{tools::PrettyPrint, traits::{Copy, Eval}};
-use rlst::dense::{traits::*, rlst_fixed_mat, rlst_mat, rlst_pointer_mat, Shape, Dot};
-use rlst::algorithms::traits::svd::{Svd, Mode};
 use rlst::algorithms::linalg::LinAlg;
-use rlst::dense::{matrix::{Matrix}, base_matrix::{BaseMatrix}, data_container::{VectorContainer}};
+use rlst::algorithms::traits::svd::{Mode, Svd};
+use rlst::common::traits::{NewLikeSelf, NewLikeTranspose, Transpose};
+use rlst::common::{
+    tools::PrettyPrint,
+    traits::{Copy, Eval},
+};
+use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
+use rlst::dense::{rlst_fixed_mat, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape};
 
-use bempp_traits::{field::FieldTranslationData, kernel::{Kernel, EvalType, KernelType}, types::{Scalar}};
+use bempp_traits::{
+    field::FieldTranslationData,
+    kernel::{EvalType, Kernel, KernelType},
+    types::Scalar,
+};
 use bempp_tree::types::{domain::Domain, morton::MortonKey};
 
 type FftM2LEntry = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
-type SvdM2lEntry = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
-
+type SvdM2lEntry =
+    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 #[derive(Default)]
 pub struct FftFieldTranslationNaiveKiFmm<T>
@@ -214,20 +221,20 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
 //             let target_check_surface = t.target.compute_surface(&domain, expansion_order, self.alpha);
 
 //             // TODO: Remove dim
-//             let dim = 3;            
+//             let dim = 3;
 //             // Find min target
 //             let ncoeffs: usize = target_check_surface.len() / dim;
 //             let sums: Vec<_> = (0..ncoeffs)
 //                 .map(|i| target_check_surface[i] + target_check_surface[ncoeffs + i] + target_check_surface[2*ncoeffs + i])
 //                 .collect();
-    
+
 //             let min_index = sums
 //                 .iter()
 //                 .enumerate()
 //                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
 //                 .map(|(index, _)| index)
 //                 .unwrap();
-            
+
 //             let min_target = [
 //                 target_check_surface[min_index],
 //                 target_check_surface[min_index + ncoeffs],
@@ -312,7 +319,7 @@ where
         expansion_order: usize,
         domain: Self::Domain,
     ) -> Self::M2LOperators {
-    // ){
+        // ){
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -322,22 +329,29 @@ where
         // let mut se2tc_fat: SvdM2lEntry =
         //     Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
         let ntransfer_vectors = self.transfer_vectors.len();
-        let mut se2tc_fat = rlst_mat![f64, (nrows, ncols*ntransfer_vectors)];
+        let mut se2tc_fat = rlst_mat![f64, (nrows, ncols * ntransfer_vectors)];
 
         // let mut se2tc_thin: SvdM2lEntry =
         //     Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
-        let mut se2tc_thin= rlst_mat![f64, (nrows*ntransfer_vectors, ncols)];
-
+        let mut se2tc_thin = rlst_mat![f64, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t.source.compute_surface(&domain, expansion_order, self.alpha);
+            let source_equivalent_surface =
+                t.source
+                    .compute_surface(&domain, expansion_order, self.alpha);
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
-            let source_equivalent_surface = unsafe { rlst_pointer_mat!['a, f64, source_equivalent_surface.as_ptr(), (nsources, self.kernel.space_dimension()), (1, nsources)] };
-            
-            let target_check_surface = t.target.compute_surface(&domain, expansion_order, self.alpha);
+            let source_equivalent_surface = unsafe {
+                rlst_pointer_mat!['a, f64, source_equivalent_surface.as_ptr(), (nsources, self.kernel.space_dimension()), (1, nsources)]
+            };
+
+            let target_check_surface =
+                t.target
+                    .compute_surface(&domain, expansion_order, self.alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
-            let target_check_surface = unsafe { rlst_pointer_mat!['a, f64, target_check_surface.as_ptr(), (ntargets, self.kernel.space_dimension()), (1, ntargets)] };
-            
+            let target_check_surface = unsafe {
+                rlst_pointer_mat!['a, f64, target_check_surface.as_ptr(), (ntargets, self.kernel.space_dimension()), (1, ntargets)]
+            };
+
             let mut tmp_gram = rlst_mat![f64, (ntargets, nsources)];
 
             self.kernel.gram(
@@ -351,9 +365,9 @@ where
             let lidx_sources = i * ncols;
             let ridx_sources = lidx_sources + ncols;
 
-            let block_size = nrows*ncols;
+            let block_size = nrows * ncols;
             let start_idx = i * block_size;
-            let end_idx = start_idx+block_size;  
+            let end_idx = start_idx + block_size;
             let mut block = se2tc_fat.get_slice_mut(start_idx, end_idx);
             block.copy_from_slice(tmp_gram.data_mut());
 
@@ -366,12 +380,10 @@ where
                 let start_idx = j * ntransfer_vectors * nrows + i * nrows;
                 let end_idx = start_idx + nrows;
                 let mut block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
-                let mut gram_column = tmp_gram.get_slice_mut(j*ncols, j*ncols+ncols);
+                let mut gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
                 block_column.copy_from_slice(gram_column);
             }
-
         }
-
 
         let left: usize = 0;
         let right: usize = self.k;
@@ -392,7 +404,7 @@ where
         let (mvt, nvt) = vt.shape();
         let vt = vt.block((0, 0), (right, nvt)).eval();
         // println!("u {:?} {:?} {:?}", u.shape(), sigma_mat.shape(), vt.shape());
-        
+
         // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
         // let u = u.unwrap().slice(s![.., left..right]).to_owned();
         // let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
@@ -401,16 +413,16 @@ where
         let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::All, Mode::All).unwrap();
         let st = st.unwrap();
         let (mst, nst) = st.shape();
-        let st_block = st.block((0, 0), (self.k, nst));        
+        let st_block = st.block((0, 0), (self.k, nst));
         let s = st_block.transpose().eval();
-        let st = st.block((0, 0), (self.k, nst)).eval();        
+        let st = st.block((0, 0), (self.k, nst)).eval();
 
         // let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
         // let st = st.unwrap().slice(s![left..right, ..]).to_owned();
 
         // Store compressed M2L operators
         // let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
-        let mut c = rlst_mat![f64, (self.k, self.k*ntransfer_vectors)];
+        let mut c = rlst_mat![f64, (self.k, self.k * ntransfer_vectors)];
 
         for i in 0..self.transfer_vectors.len() {
             // let v_lidx = i * ncols;
@@ -419,22 +431,24 @@ where
 
             // let block_size = right*ncols;
             // let start_idx = i * block_size;
-            // let end_idx = start_idx+block_size; 
-            let top_left = (0, i*ncols);
+            // let end_idx = start_idx+block_size;
+            let top_left = (0, i * ncols);
             let dim = (self.k, ncols);
             let vt_block = vt.block(top_left, dim);
 
             let tmp = sigma_mat.dot(&vt_block.dot(&s));
-        //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
-        //     let lidx = i * self.k;
-        //     let ridx = lidx + self.k;
+            //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
+            //     let lidx = i * self.k;
+            //     let ridx = lidx + self.k;
 
-            let top_left = (0, i*self.k);
+            let top_left = (0, i * self.k);
             let dim = (self.k, ncols);
             // let mut c_block =;
-            c.block_mut(top_left, dim).data_mut().copy_from_slice(tmp.data());
-            
-        //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
+            c.block_mut(top_left, dim)
+                .data_mut()
+                .copy_from_slice(tmp.data());
+
+            //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
         }
 
         (u, st, c)
@@ -569,7 +583,7 @@ where
 
 impl<T> SvdFieldTranslationKiFmm<T>
 where
-    T: Kernel<T=f64> + Default,
+    T: Kernel<T = f64> + Default,
 {
     pub fn new(
         kernel: T,
@@ -578,16 +592,19 @@ where
         domain: Domain,
         alpha: f64,
     ) -> Self {
+        let dummy = rlst_mat![f64, (1, 1)];
 
-        let dummy = rlst_mat![f64, (1,1)];
-        
         // TODO: There should be a default for matrices to make code cleaner.
         let mut result = SvdFieldTranslationKiFmm {
             alpha,
             k: 100,
             kernel,
-            m2l: (dummy.new_like_self().eval(), dummy.new_like_self().eval(), dummy.new_like_self().eval()),
-            transfer_vectors: Vec::new()            
+            m2l: (
+                dummy.new_like_self().eval(),
+                dummy.new_like_self().eval(),
+                dummy.new_like_self().eval(),
+            ),
+            transfer_vectors: Vec::new(),
         };
 
         if let Some(k) = k {
@@ -723,19 +740,16 @@ mod test {
 
     #[test]
     fn test_svd() {
-
         let kernel = Laplace3dKernel::<f64>::default();
         let k = 100;
         let order = 2;
-        let domain = Domain {origin: [0., 0., 0.], diameter: [1., 1., 1.]};
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
         let alpha_inner = 1.05;
-        
-        let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-                kernel,
-                Some(k),
-                order,
-                domain,
-                alpha_inner,
-            );
+
+        let m2l_data_svd =
+            SvdFieldTranslationKiFmm::new(kernel, Some(k), order, domain, alpha_inner);
     }
 }

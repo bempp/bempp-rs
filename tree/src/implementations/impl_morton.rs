@@ -722,10 +722,9 @@ impl MortonKey {
             .unwrap();
         let max_conv_point = grid[max_index];
 
-
-        let ncoeffs = surface.len() /3;
+        let ncoeffs = surface.len() / 3;
         let sums: Vec<_> = (0..ncoeffs)
-            .map(|i| surface[i] + surface[ncoeffs + i] + surface[2*ncoeffs + i])
+            .map(|i| surface[i] + surface[ncoeffs + i] + surface[2 * ncoeffs + i])
             .collect();
 
         let max_index = sums
@@ -734,7 +733,7 @@ impl MortonKey {
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .map(|(index, _)| index)
             .unwrap();
-        
+
         let max_surface_point = [
             surface[max_index],
             surface[max_index + ncoeffs],
@@ -758,7 +757,7 @@ impl MortonKey {
     }
 
     /// Compute surface grid for KiFMM at this Morton key.
-    /// 
+    ///
     /// Returned in row major order, [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]
     pub fn surface_grid(&self, order: usize) -> (Vec<f64>, Vec<usize>) {
         let dim = 3;
@@ -779,8 +778,8 @@ impl MortonKey {
                         || (k >= lower && i >= lower && (j == lower || j == upper))
                     {
                         surface[idx] = i as f64;
-                        surface[ (dim-2) * n_coeffs + idx] = j as f64;
-                        surface[ (dim-1) * n_coeffs + idx] = k as f64;
+                        surface[(dim - 2) * n_coeffs + idx] = j as f64;
+                        surface[(dim - 1) * n_coeffs + idx] = k as f64;
                         idx += 1;
                     }
                 }
@@ -813,10 +812,10 @@ impl MortonKey {
         let ncoeffs = surface.len() / 3;
         for i in 0..ncoeffs {
             scaled_surface[i] = (surface[i] * (dilated_diameter[0] / 2.0)) + centre[0];
-            scaled_surface[ (dim-2) * ncoeffs + i] =
-                (surface[ (dim-2) * ncoeffs + i] * (dilated_diameter[1] / 2.0)) + centre[1];
-            scaled_surface[ (dim-1) * ncoeffs + i] =
-                (surface[ (dim-1) * ncoeffs + i] * (dilated_diameter[2] / 2.0)) + centre[2];
+            scaled_surface[(dim - 2) * ncoeffs + i] =
+                (surface[(dim - 2) * ncoeffs + i] * (dilated_diameter[1] / 2.0)) + centre[1];
+            scaled_surface[(dim - 1) * ncoeffs + i] =
+                (surface[(dim - 1) * ncoeffs + i] * (dilated_diameter[2] / 2.0)) + centre[2];
         }
 
         scaled_surface
@@ -1720,7 +1719,7 @@ mod test {
         for i in 0..ncoeffs {
             let point = vec![
                 surface_idxs[i],
-                surface_idxs[i + ncoeffs ],
+                surface_idxs[i + ncoeffs],
                 surface_idxs[i + 2 * ncoeffs],
             ];
             assert_eq!(point, expected[i]);
@@ -1736,10 +1735,7 @@ mod test {
             .take(ncoeffs)
             .fold(f64::INFINITY, |a, &b| a.min(b));
 
-        let max_x = surface
-            .iter()
-            .take(ncoeffs)
-            .fold(0f64, |a, &b| a.max(b));
+        let max_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a.max(b));
 
         let diam_x = max_x - min_x;
 
@@ -1753,20 +1749,19 @@ mod test {
         let surface = key.compute_surface(&domain, order, alpha);
         let expected = key.centre(&domain);
 
-        let c_x = surface
-            .iter()
-            .take(ncoeffs)
-            .fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
+        let c_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
         let c_y = surface
             .iter()
             .skip(ncoeffs)
             .take(ncoeffs)
-            .fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
+            .fold(0f64, |a, &b| a + b)
+            / (ncoeffs as f64);
         let c_z = surface
             .iter()
-            .skip(2*ncoeffs)
+            .skip(2 * ncoeffs)
             .take(ncoeffs)
-            .fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
+            .fold(0f64, |a, &b| a + b)
+            / (ncoeffs as f64);
 
         let result = vec![c_x, c_y, c_z];
 

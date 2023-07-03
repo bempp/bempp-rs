@@ -1,6 +1,6 @@
 use bempp_traits::{
+    kernel::{EvalType, Kernel},
     types::Scalar,
-    kernel::{EvalType, Kernel}
 };
 
 pub(crate) fn check_dimensions_evaluate<K: Kernel, T: Scalar>(
