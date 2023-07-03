@@ -257,6 +257,7 @@ fn derivative(
     code
 }
 
+#[allow(clippy::too_many_arguments)]
 fn jacobian(
     name: String,
     vertices: String,
