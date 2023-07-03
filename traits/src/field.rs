@@ -19,6 +19,7 @@ where
         &self,
         expansion_order: usize,
         domain: Self::Domain,
+    // );
     ) -> Self::M2LOperators;
 
     fn ncoeffs(&self, expansion_order: usize) -> usize;

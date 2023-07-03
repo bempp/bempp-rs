@@ -22,3 +22,4 @@ crate-type = ["lib", "cdylib"]
 cauchy="0.4.*"
 thiserror="1.*"
 num = "0.4"
+rayon = "1.7"
