@@ -1,6 +1,7 @@
 extern crate blas_src;
 
 use itertools::Itertools;
+use ndarray::AssignElem;
 // use ndarray::*;
 // use ndarray_ndimage::{pad, PadMode};
 // use ndrustfft::{ndfft, ndfft_r2c, ndifft, ndifft_r2c, Complex, FftHandler, R2cFftHandler};
@@ -12,7 +13,7 @@ use std::{
     time::Instant,
 };
 
-use rlst;
+use rlst::{self, dense::rlst_mut_pointer_mat};
 use rlst::algorithms::linalg::LinAlg;
 use rlst::algorithms::traits::svd::{Mode, Svd};
 use rlst::algorithms::traits::pseudo_inverse::Pinv;
@@ -43,13 +44,22 @@ use bempp_tree::{
 };
 
 use crate::charge::Charges;
+
+type Expansions = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+type Potentials = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+
 pub struct FmmData<T: Fmm> {
     fmm: Arc<T>,
-    multipoles: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
-    locals: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
-    potentials: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
+    multipoles: HashMap<MortonKey, Arc<Mutex<Expansions>>>,
+    locals: HashMap<MortonKey, Arc<Mutex<Expansions>>>,
+    potentials: HashMap<MortonKey, Arc<Mutex<Potentials>>>,
     points: HashMap<MortonKey, Vec<Point>>,
     charges: HashMap<MortonKey, Arc<Vec<f64>>>,
+    // multipoles: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
+    // locals: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
+    // potentials: HashMap<MortonKey, Arc<Mutex<Vec<f64>>>>,
+    // points: HashMap<MortonKey, Vec<Point>>,
+    // charges: HashMap<MortonKey, Arc<Vec<f64>>>,
 }
 
 type C2EType = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
@@ -230,45 +240,47 @@ where
     }
 }
 
-// #[allow(dead_code)]
-// impl<T, U> FmmData<KiFmm<SingleNodeTree, T, U>>
-// where
-//     T: Kernel,
-//     U: FieldTranslationData<T>,
-// {
-//     pub fn new(fmm: KiFmm<SingleNodeTree, T, U>, _charges: Charges) -> Self {
-//         let mut multipoles = HashMap::new();
-//         let mut locals = HashMap::new();
-//         let mut potentials = HashMap::new();
-//         let mut points = HashMap::new();
-//         let mut charges = HashMap::new();
+#[allow(dead_code)]
+impl<T, U> FmmData<KiFmm<SingleNodeTree, T, U>>
+where
+    T: Kernel,
+    U: FieldTranslationData<T>,
+{
+    pub fn new(fmm: KiFmm<SingleNodeTree, T, U>, _charges: Charges) -> Self {
+        let mut multipoles = HashMap::new();
+        let mut locals = HashMap::new();
+        let mut potentials = HashMap::new();
+        let mut points = HashMap::new();
+        let mut charges = HashMap::new();
 
-//         if let Some(keys) = fmm.tree().get_all_keys() {
-//             for key in keys.iter() {
-//                 multipoles.insert(*key, Arc::new(Mutex::new(Vec::new())));
-//                 locals.insert(*key, Arc::new(Mutex::new(Vec::new())));
-//                 potentials.insert(*key, Arc::new(Mutex::new(Vec::new())));
-//                 if let Some(point_data) = fmm.tree().get_points(key) {
-//                     points.insert(*key, point_data.iter().cloned().collect_vec());
+        let dummy = rlst_mat![f64, (1,1)];
 
-//                     // TODO: Replace with a global index lookup at some point
-//                     charges.insert(*key, Arc::new(vec![1.0; point_data.len()]));
-//                 }
-//             }
-//         }
+        if let Some(keys) = fmm.tree().get_all_keys() {
+            for key in keys.iter() {
+                multipoles.insert(*key, Arc::new(Mutex::new(dummy.new_like_self())));
+                locals.insert(*key, Arc::new(Mutex::new(dummy.new_like_self())));
+                potentials.insert(*key, Arc::new(Mutex::new(dummy.new_like_self())));
+                if let Some(point_data) = fmm.tree().get_points(key) {
+                    points.insert(*key, point_data.iter().cloned().collect_vec());
 
-//         let fmm = Arc::new(fmm);
+                    // TODO: Replace with a global index lookup at some point
+                    charges.insert(*key, Arc::new(vec![1.0; point_data.len()]));
+                }
+            }
+        }
 
-//         Self {
-//             fmm,
-//             multipoles,
-//             locals,
-//             potentials,
-//             points,
-//             charges,
-//         }
-//     }
-// }
+        let fmm = Arc::new(fmm);
+
+        Self {
+            fmm,
+            multipoles,
+            locals,
+            potentials,
+            points,
+            charges,
+        }
+    }
+}
 
 // impl<T, U> SourceTranslation for FmmData<KiFmm<SingleNodeTree, T, U>>
 // where
@@ -625,125 +637,166 @@ where
 //     }
 // }
 
-// impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, SvdFieldTranslationKiFmm<T>>>
-// where
-//     T: Kernel + std::marker::Sync + std::marker::Send + Default,
-// {
-//     fn m2l(&self, level: u64) {
-//         if let Some(targets) = self.fmm.tree().get_keys(level) {
-//             let mut transfer_vector_to_m2l =
-//                 HashMap::<usize, Arc<Mutex<Vec<(MortonKey, MortonKey)>>>>::new();
+impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, SvdFieldTranslationKiFmm<T>>>
+where
+    T: Kernel + std::marker::Sync + std::marker::Send + Default,
+{
+    fn m2l<'a>(&self, level: u64) {
+        if let Some(targets) = self.fmm.tree().get_keys(level) {
+            let mut transfer_vector_to_m2l =
+                HashMap::<usize, Arc<Mutex<Vec<(MortonKey, MortonKey)>>>>::new();
 
-//             for tv in self.fmm.m2l.transfer_vectors.iter() {
-//                 transfer_vector_to_m2l.insert(tv.vector, Arc::new(Mutex::new(Vec::new())));
-//             }
+            for tv in self.fmm.m2l.transfer_vectors.iter() {
+                transfer_vector_to_m2l.insert(tv.vector, Arc::new(Mutex::new(Vec::new())));
+            }
 
-//             targets.par_iter().enumerate().for_each(|(_i, &target)| {
-//                 if let Some(v_list) = self.fmm.get_v_list(&target) {
-//                     let calculated_transfer_vectors = v_list
-//                         .iter()
-//                         .map(|source| target.find_transfer_vector(source))
-//                         .collect::<Vec<usize>>();
-//                     for (transfer_vector, &source) in
-//                         calculated_transfer_vectors.iter().zip(v_list.iter())
-//                     {
-//                         let m2l_arc =
-//                             Arc::clone(transfer_vector_to_m2l.get(transfer_vector).unwrap());
-//                         let mut m2l_lock = m2l_arc.lock().unwrap();
-//                         m2l_lock.push((source, target));
-//                     }
-//                 }
-//             });
+            targets.par_iter().enumerate().for_each(|(_i, &target)| {
+                if let Some(v_list) = self.fmm.get_v_list(&target) {
+                    let calculated_transfer_vectors = v_list
+                        .iter()
+                        .map(|source| target.find_transfer_vector(source))
+                        .collect::<Vec<usize>>();
+                    for (transfer_vector, &source) in
+                        calculated_transfer_vectors.iter().zip(v_list.iter())
+                    {
+                        let m2l_arc =
+                            Arc::clone(transfer_vector_to_m2l.get(transfer_vector).unwrap());
+                        let mut m2l_lock = m2l_arc.lock().unwrap();
+                        m2l_lock.push((source, target));
+                    }
+                }
+            });
 
-//             let mut transfer_vector_to_m2l_rw_lock =
-//                 HashMap::<usize, Arc<RwLock<Vec<(MortonKey, MortonKey)>>>>::new();
+            let mut transfer_vector_to_m2l_rw_lock =
+                HashMap::<usize, Arc<RwLock<Vec<(MortonKey, MortonKey)>>>>::new();
 
-//             // Find all multipole expansions and allocate
-//             for (&transfer_vector, m2l_arc) in transfer_vector_to_m2l.iter() {
-//                 transfer_vector_to_m2l_rw_lock.insert(
-//                     transfer_vector,
-//                     Arc::new(RwLock::new(m2l_arc.lock().unwrap().clone())),
-//                 );
-//             }
+            // Find all multipole expansions and allocate
+            for (&transfer_vector, m2l_arc) in transfer_vector_to_m2l.iter() {
+                transfer_vector_to_m2l_rw_lock.insert(
+                    transfer_vector,
+                    Arc::new(RwLock::new(m2l_arc.lock().unwrap().clone())),
+                );
+            }
 
-//             transfer_vector_to_m2l_rw_lock
-//                 .par_iter()
-//                 .for_each(|(transfer_vector, m2l_arc)| {
-//                     let c_idx = self
-//                         .fmm
-//                         .m2l
-//                         .transfer_vectors
-//                         .iter()
-//                         .position(|x| x.vector == *transfer_vector)
-//                         .unwrap();
+            transfer_vector_to_m2l_rw_lock
+                .par_iter()
+                .for_each(|(transfer_vector, m2l_arc)| {
+                    let c_idx = self
+                        .fmm
+                        .m2l
+                        .transfer_vectors
+                        .iter()
+                        .position(|x| x.vector == *transfer_vector)
+                        .unwrap();
 
-//                     let c_lidx = c_idx * self.fmm.m2l.k;
-//                     let c_ridx = c_lidx + self.fmm.m2l.k;
-//                     let c_sub = self.fmm.m2l.m2l.2.slice(s![.., c_lidx..c_ridx]);
+                    let c_lidx = c_idx * self.fmm.m2l.k;
+                    let c_ridx = c_lidx + self.fmm.m2l.k;
+                    // let c_sub = self.fmm.m2l.m2l.2.slice(s![.., c_lidx..c_ridx]);
+                    
+                    let (nrows, _) = self.m2l.m2l.2.shape();
+                    let top_left = (0, c_lidx);
+                    let dim = (nrows, c_ridx);
+                    let c_sub = self.fmm.m2l.m2l.2.block(top_left, dim);
 
-//                     let m2l_rw = m2l_arc.read().unwrap();
-//                     let mut multipoles = Array2::zeros((self.fmm.m2l.k, m2l_rw.len()));
+                    let m2l_rw = m2l_arc.read().unwrap();
+                    // let mut multipoles = Array2::zeros((self.fmm.m2l.k, m2l_rw.len()));
+                    let mut multipoles = rlst_mat![f64, (self.fmm.m2l.k, m2l_rw.len())];
 
-//                     for (i, (source, _)) in m2l_rw.iter().enumerate() {
-//                         let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
-//                         let source_multipole_lock = source_multipole_arc.lock().unwrap();
-//                         let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
+                    let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+                    
+                    for (i, (source, _)) in m2l_rw.iter().enumerate() {
+                        let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
+                        let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
-//                         // Compressed multipole
-//                         let compressed_source_multipole_owned =
-//                             self.fmm.m2l.m2l.1.dot(&source_multipole_view);
+                        // Column vector
+                        let mut source_multipole_ptr = source_multipole_lock.deref().as_ptr();
+                        let source_multipole_view = unsafe { 
+                            rlst_mut_pointer_mat!['a, f64, source_multipole_ptr.as_mut_ptr(), (ncoeffs, 1), (1, ncoeffs)] 
+                        };
 
-//                         multipoles
-//                             .slice_mut(s![.., i])
-//                             .assign(&compressed_source_multipole_owned);
-//                     }
+                        // let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
 
-//                     // // Compute convolution
-//                     let compressed_check_potential_owned = c_sub.dot(&multipoles);
+                        // Compressed multipole
+                        let compressed_source_multipole_owned =
+                            self.fmm.m2l.m2l.1.dot(&source_multipole_view);
 
-//                     // Post process to find check potential
-//                     let check_potential_owned =
-//                         self.fmm.m2l.m2l.0.dot(&compressed_check_potential_owned);
+                        let first = i*self.fmm.m2l.k;
+                        let last = firsr+self.fmm.m2l.k;
 
-//                     // Compute local
-//                     let locals_owned = self.m2l_scale(level)
-//                         * self.fmm.kernel.scale(level)
-//                         * self
-//                             .fmm
-//                             .dc2e_inv
-//                             .0
-//                             .dot(&self.fmm.dc2e_inv.1.dot(&check_potential_owned));
+                        let multipole_slice = multipoles.get_slice_mut(first, last);
+                        multipole_slice.copy_from_slice(compressed_source_multipole_owned);
+                        // multipoles
+                        //     .slice_mut(s![.., i])
+                        //     .assign(&compressed_source_multipole_owned);
+                    }
 
-//                     // Assign locals
-//                     for (i, (_, target)) in m2l_rw.iter().enumerate() {
-//                         let target_local_arc = Arc::clone(self.locals.get(target).unwrap());
-//                         let mut target_local_lock = target_local_arc.lock().unwrap();
-//                         let target_local_owned = locals_owned.slice(s![.., i]);
-//                         if !target_local_lock.is_empty() {
-//                             target_local_lock
-//                                 .iter_mut()
-//                                 .zip(target_local_owned.iter())
-//                                 .for_each(|(c, m)| *c += *m);
-//                         } else {
-//                             target_local_lock.extend(target_local_owned);
-//                         }
-//                     }
-//                 });
-//         }
-//     }
+                    // // Compute convolution
+                    let compressed_check_potential_owned = c_sub.dot(&multipoles);
 
-//     fn m2l_scale(&self, level: u64) -> f64 {
-//         if level < 2 {
-//             panic!("M2L only performed on level 2 and below")
-//         }
+                    // Post process to find check potential
+                    let check_potential_owned =
+                        self.fmm.m2l.m2l.0.dot(&compressed_check_potential_owned);
 
-//         if level == 2 {
-//             1. / 2.
-//         } else {
-//             2_f64.powf((level - 3) as f64)
-//         }
-//     }
-// }
+                    // Compute local
+                    // let locals_owned = self.m2l_scale(level)
+                    //     * self.fmm.kernel.scale(level)
+                    //     * self
+                    //         .fmm
+                    //         .dc2e_inv
+                    //         .0
+                    //         .dot(&self.fmm.dc2e_inv.1.dot(&check_potential_owned));
+                    let mut locals_owned = self.fmm.dc2e_inv.dot(&check_potential_owned);
+                    
+                    for i in 0..nceoffs {
+                        locals_owned[[i, 0]] *= self.fmm.kernel.scale(level)*self.m2l_scale(level);
+                    }
+
+
+                    // Assign locals
+                    for (i, (_, target)) in m2l_rw.iter().enumerate() {
+                        let target_local_arc = Arc::clone(self.locals.get(target).unwrap());
+                        let mut target_local_lock = target_local_arc.lock().unwrap();
+
+                        // Column vector
+                        let mut target_local_ptr = target_local_lock.deref().as_mut_ptr();
+        
+                        // let target_local_view = unsafe { 
+                        //     rlst_mut_pointer_mat!['a, f64, source_multipole_ptr.as_mut_ptr(), (ncoeffs, 1), (1, ncoeffs)] 
+                        // };
+                        let first = i*self.fmm.m2l.k;
+                        let last = first+self.fmm.m2l.k;
+                        let target_local_owned = locals_owned.get_slice_mut(first, last);
+
+                        // let target_local_owned = locals_owned.slice(s![.., i]);
+                        
+                        if !target_local_lock.is_empty() {
+
+                            target_local
+                            // target_local_lock
+                            //     .iter_mut()
+                            //     .zip(target_local_owned.iter())
+                            //     .for_each(|(c, m)| *c += *m);
+
+                        } else {
+                            target_local_lock.extend(target_local_owned);
+                        }
+                    }
+                });
+        }
+    }
+
+    fn m2l_scale(&self, level: u64) -> f64 {
+        if level < 2 {
+            panic!("M2L only performed on level 2 and below")
+        }
+
+        if level == 2 {
+            1. / 2.
+        } else {
+            2_f64.powf((level - 3) as f64)
+        }
+    }
+}
 
 // impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, SvdFieldTranslationNaiveKiFmm<T>>>
 // where
@@ -960,209 +1013,209 @@ where
 //     }
 // }
 
-// impl<T, U, V> InteractionLists for KiFmm<T, U, V>
-// where
-//     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
-//     U: Kernel,
-//     V: FieldTranslationData<U>,
-// {
-//     type Tree = T;
+impl<T, U, V> InteractionLists for KiFmm<T, U, V>
+where
+    T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
+    U: Kernel,
+    V: FieldTranslationData<U>,
+{
+    type Tree = T;
 
-//     fn get_u_list(
-//         &self,
-//         key: &<Self::Tree as Tree>::NodeIndex,
-//     ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-//         let mut u_list = Vec::<MortonKey>::new();
-//         let neighbours = key.neighbors();
+    fn get_u_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        let mut u_list = Vec::<MortonKey>::new();
+        let neighbours = key.neighbors();
 
-//         // Child level
-//         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
-//             .iter()
-//             .flat_map(|n| n.children())
-//             .filter(|nc| self.tree().get_all_keys_set().contains(nc) && key.is_adjacent(nc))
-//             .collect();
+        // Child level
+        let mut neighbors_children_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| self.tree().get_all_keys_set().contains(nc) && key.is_adjacent(nc))
+            .collect();
 
-//         // Key level
-//         let mut neighbors_adj: Vec<MortonKey> = neighbours
-//             .iter()
-//             .filter(|n| self.tree().get_all_keys_set().contains(n) && key.is_adjacent(n))
-//             .cloned()
-//             .collect();
+        // Key level
+        let mut neighbors_adj: Vec<MortonKey> = neighbours
+            .iter()
+            .filter(|n| self.tree().get_all_keys_set().contains(n) && key.is_adjacent(n))
+            .cloned()
+            .collect();
 
-//         // Parent level
-//         let mut parent_neighbours_adj: Vec<MortonKey> = key
-//             .parent()
-//             .neighbors()
-//             .into_iter()
-//             .filter(|pn| self.tree().get_all_keys_set().contains(pn) && key.is_adjacent(pn))
-//             .collect();
+        // Parent level
+        let mut parent_neighbours_adj: Vec<MortonKey> = key
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.tree().get_all_keys_set().contains(pn) && key.is_adjacent(pn))
+            .collect();
 
-//         u_list.append(&mut neighbors_children_adj);
-//         u_list.append(&mut neighbors_adj);
-//         u_list.append(&mut parent_neighbours_adj);
-//         u_list.push(*key);
+        u_list.append(&mut neighbors_children_adj);
+        u_list.append(&mut neighbors_adj);
+        u_list.append(&mut parent_neighbours_adj);
+        u_list.push(*key);
 
-//         if !u_list.is_empty() {
-//             Some(MortonKeys {
-//                 keys: u_list,
-//                 index: 0,
-//             })
-//         } else {
-//             None
-//         }
-//     }
+        if !u_list.is_empty() {
+            Some(MortonKeys {
+                keys: u_list,
+                index: 0,
+            })
+        } else {
+            None
+        }
+    }
 
-//     fn get_v_list(
-//         &self,
-//         key: &<Self::Tree as Tree>::NodeIndex,
-//     ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-//         if key.level() >= 2 {
-//             let v_list = key
-//                 .parent()
-//                 .neighbors()
-//                 .iter()
-//                 .flat_map(|pn| pn.children())
-//                 .filter(|pnc| self.tree().get_all_keys_set().contains(pnc) && !key.is_adjacent(pnc))
-//                 .collect_vec();
+    fn get_v_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        if key.level() >= 2 {
+            let v_list = key
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| self.tree().get_all_keys_set().contains(pnc) && !key.is_adjacent(pnc))
+                .collect_vec();
 
-//             if !v_list.is_empty() {
-//                 return Some(MortonKeys {
-//                     keys: v_list,
-//                     index: 0,
-//                 });
-//             } else {
-//                 return None;
-//             }
-//         }
-//         None
-//     }
+            if !v_list.is_empty() {
+                return Some(MortonKeys {
+                    keys: v_list,
+                    index: 0,
+                });
+            } else {
+                return None;
+            }
+        }
+        None
+    }
 
-//     fn get_w_list(
-//         &self,
-//         key: &<Self::Tree as Tree>::NodeIndex,
-//     ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-//         // Child level
-//         let w_list = key
-//             .neighbors()
-//             .iter()
-//             .flat_map(|n| n.children())
-//             .filter(|nc| self.tree().get_all_keys_set().contains(nc) && !key.is_adjacent(nc))
-//             .collect_vec();
+    fn get_w_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        // Child level
+        let w_list = key
+            .neighbors()
+            .iter()
+            .flat_map(|n| n.children())
+            .filter(|nc| self.tree().get_all_keys_set().contains(nc) && !key.is_adjacent(nc))
+            .collect_vec();
 
-//         if !w_list.is_empty() {
-//             Some(MortonKeys {
-//                 keys: w_list,
-//                 index: 0,
-//             })
-//         } else {
-//             None
-//         }
-//     }
+        if !w_list.is_empty() {
+            Some(MortonKeys {
+                keys: w_list,
+                index: 0,
+            })
+        } else {
+            None
+        }
+    }
 
-//     fn get_x_list(
-//         &self,
-//         key: &<Self::Tree as Tree>::NodeIndex,
-//     ) -> Option<<Self::Tree as Tree>::NodeIndices> {
-//         let x_list = key
-//             .parent()
-//             .neighbors()
-//             .into_iter()
-//             .filter(|pn| self.tree.get_all_keys_set().contains(pn) && !key.is_adjacent(pn))
-//             .collect_vec();
+    fn get_x_list(
+        &self,
+        key: &<Self::Tree as Tree>::NodeIndex,
+    ) -> Option<<Self::Tree as Tree>::NodeIndices> {
+        let x_list = key
+            .parent()
+            .neighbors()
+            .into_iter()
+            .filter(|pn| self.tree.get_all_keys_set().contains(pn) && !key.is_adjacent(pn))
+            .collect_vec();
 
-//         if !x_list.is_empty() {
-//             Some(MortonKeys {
-//                 keys: x_list,
-//                 index: 0,
-//             })
-//         } else {
-//             None
-//         }
-//     }
-// }
+        if !x_list.is_empty() {
+            Some(MortonKeys {
+                keys: x_list,
+                index: 0,
+            })
+        } else {
+            None
+        }
+    }
+}
 
-// impl<T, U, V> Fmm for KiFmm<T, U, V>
-// where
-//     T: Tree,
-//     U: Kernel,
-//     V: FieldTranslationData<U>,
-// {
-//     type Tree = T;
-//     type Kernel = U;
+impl<T, U, V> Fmm for KiFmm<T, U, V>
+where
+    T: Tree,
+    U: Kernel,
+    V: FieldTranslationData<U>,
+{
+    type Tree = T;
+    type Kernel = U;
 
-//     fn order(&self) -> usize {
-//         self.order
-//     }
+    fn order(&self) -> usize {
+        self.order
+    }
 
-//     fn kernel(&self) -> &Self::Kernel {
-//         &self.kernel
-//     }
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
 
-//     fn tree(&self) -> &Self::Tree {
-//         &self.tree
-//     }
-// }
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
+    }
+}
 
-// impl<T> FmmLoop for FmmData<T>
-// where
-//     T: Fmm,
-//     FmmData<T>: SourceTranslation + TargetTranslation + FieldTranslation,
-// {
-//     fn upward_pass(&self) {
-//         // Particle to Multipole
-//         let start = Instant::now();
-//         self.p2m();
-//         println!("P2M = {:?}ms", start.elapsed().as_millis());
+impl<T> FmmLoop for FmmData<T>
+where
+    T: Fmm,
+    FmmData<T>: SourceTranslation + TargetTranslation + FieldTranslation,
+{
+    fn upward_pass(&self) {
+        // Particle to Multipole
+        let start = Instant::now();
+        self.p2m();
+        println!("P2M = {:?}ms", start.elapsed().as_millis());
 
-//         // Multipole to Multipole
-//         let depth = self.fmm.tree().get_depth();
-//         let start = Instant::now();
-//         for level in (1..=depth).rev() {
-//             self.m2m(level)
-//         }
-//         println!("M2M = {:?}ms", start.elapsed().as_millis());
-//     }
+        // Multipole to Multipole
+        let depth = self.fmm.tree().get_depth();
+        let start = Instant::now();
+        for level in (1..=depth).rev() {
+            self.m2m(level)
+        }
+        println!("M2M = {:?}ms", start.elapsed().as_millis());
+    }
 
-//     fn downward_pass(&self) {
-//         let depth = self.fmm.tree().get_depth();
-//         let mut l2l_time = 0;
-//         let mut m2l_time = 0;
-//         for level in 2..=depth {
-//             if level > 2 {
-//                 let start = Instant::now();
-//                 self.l2l(level);
-//                 l2l_time += start.elapsed().as_millis();
-//             }
+    fn downward_pass(&self) {
+        let depth = self.fmm.tree().get_depth();
+        let mut l2l_time = 0;
+        let mut m2l_time = 0;
+        for level in 2..=depth {
+            if level > 2 {
+                let start = Instant::now();
+                self.l2l(level);
+                l2l_time += start.elapsed().as_millis();
+            }
 
-//             let start = Instant::now();
-//             self.m2l(level);
-//             m2l_time += start.elapsed().as_millis();
-//         }
-//         println!("M2L = {:?}ms", m2l_time);
-//         println!("L2L = {:?}ms", l2l_time);
+            let start = Instant::now();
+            self.m2l(level);
+            m2l_time += start.elapsed().as_millis();
+        }
+        println!("M2L = {:?}ms", m2l_time);
+        println!("L2L = {:?}ms", l2l_time);
 
-//         let start = Instant::now();
-//         // Leaf level computations
-//         self.p2l();
-//         println!("P2L = {:?}ms", start.elapsed().as_millis());
+        let start = Instant::now();
+        // Leaf level computations
+        self.p2l();
+        println!("P2L = {:?}ms", start.elapsed().as_millis());
 
-//         // Sum all potential contributions
-//         let start = Instant::now();
-//         self.m2p();
-//         println!("M2P = {:?}ms", start.elapsed().as_millis());
-//         let start = Instant::now();
-//         self.p2p();
-//         println!("P2P = {:?}ms", start.elapsed().as_millis());
-//         let start = Instant::now();
-//         self.l2p();
-//         println!("L2P = {:?}ms", start.elapsed().as_millis());
-//     }
+        // Sum all potential contributions
+        let start = Instant::now();
+        self.m2p();
+        println!("M2P = {:?}ms", start.elapsed().as_millis());
+        let start = Instant::now();
+        self.p2p();
+        println!("P2P = {:?}ms", start.elapsed().as_millis());
+        let start = Instant::now();
+        self.l2p();
+        println!("L2P = {:?}ms", start.elapsed().as_millis());
+    }
 
-//     fn run(&self) {
-//         self.upward_pass();
-//         self.downward_pass();
-//     }
-// }
+    fn run(&self) {
+        self.upward_pass();
+        self.downward_pass();
+    }
+}
 
 #[allow(unused_imports)]
 mod test {
@@ -1285,9 +1338,9 @@ mod test {
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
-        fmm.m2m[0].pretty_print();
+        // fmm.m2m[0].pretty_print();
 
-        assert!(false)
+        // assert!(false)
 
     //     let charges = Charges::new();
 
