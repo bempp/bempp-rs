@@ -1,8 +1,5 @@
 use itertools::Itertools;
-use std::{
-    collections::{HashMap, HashSet},
-    time::Instant,
-};
+use std::collections::{HashMap, HashSet};
 
 use bempp_traits::tree::Tree;
 
@@ -21,7 +18,6 @@ impl SingleNodeTree {
     /// Constructor for uniform trees
     pub fn uniform_tree(points: &[PointType], &domain: &Domain, depth: u64) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
-        let start = Instant::now();
 
         // TODO: Automatically infer dimension
         let dim = 3;
@@ -72,7 +68,6 @@ impl SingleNodeTree {
                 .collect(),
             index: 0,
         };
-        println!("Tree - Encoding Time {:?}ms", start.elapsed().as_millis());
         // Assign keys to points
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
@@ -147,7 +142,6 @@ impl SingleNodeTree {
     /// Constructor for adaptive trees
     pub fn adaptive_tree(points: &[PointType], &domain: &Domain, n_crit: u64) -> SingleNodeTree {
         // Encode points at deepest level
-        let start = Instant::now();
         // let mut points: Points = points
         //     .iter()
         //     .enumerate()
@@ -180,7 +174,6 @@ impl SingleNodeTree {
 
         points.sort();
 
-        println!("Tree - Encoding Time {:?}ms", start.elapsed().as_millis());
         // Complete the region spanned by the points
         let mut complete = MortonKeys {
             keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
