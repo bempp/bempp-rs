@@ -133,7 +133,7 @@ pub fn assemble<'a, T: Scalar>(
     }
 
     // TODO: allow user to configure this
-    let npoints = 2;
+    let npoints = 4;
 
     let grid = trial_space.grid();
     let c20 = grid.topology().connectivity(2, 0);

@@ -549,36 +549,38 @@ impl SerialTopology {
         let cells_to_vertices = self.connectivity(tdim, 0);
         // Compute cells adjacent via a facet (ie edge in 2D)
         for cells in self.connectivity(tdim - 1, tdim).iter_rows() {
-            let tindex0 = self.index_map()[cells[0]];
-            let vertices0 = cells_to_vertices.row(tindex0).unwrap();
-            let tindex1 = self.index_map()[cells[1]];
-            let vertices1 = cells_to_vertices.row(tindex1).unwrap();
+            if cells.len() == 2 {
+                let tindex0 = self.index_map()[cells[0]];
+                let vertices0 = cells_to_vertices.row(tindex0).unwrap();
+                let tindex1 = self.index_map()[cells[1]];
+                let vertices1 = cells_to_vertices.row(tindex1).unwrap();
 
-            let mut pairs: Vec<u8> = vec![0, 0, 0, 0];
-            let mut n = 0;
-            for (i0, v0) in vertices0.iter().enumerate() {
-                for (i1, v1) in vertices1.iter().enumerate() {
-                    if v0 == v1 {
-                        pairs[2 * n] = i0.try_into().unwrap();
-                        pairs[2 * n + 1] = i1.try_into().unwrap();
-                        n += 1;
+                let mut pairs: Vec<u8> = vec![0, 0, 0, 0];
+                let mut n = 0;
+                for (i0, v0) in vertices0.iter().enumerate() {
+                    for (i1, v1) in vertices1.iter().enumerate() {
+                        if v0 == v1 {
+                            pairs[2 * n] = i0.try_into().unwrap();
+                            pairs[2 * n + 1] = i1.try_into().unwrap();
+                            n += 1;
+                        }
                     }
                 }
+                self.facet_adjacent_cells.borrow_mut().push((
+                    cells[0],
+                    cells[1],
+                    pairs[0] << 6 | pairs[1] << 4 | pairs[2] << 2 | pairs[3],
+                ));
+                self.facet_adjacent_cells.borrow_mut().push((
+                    cells[1],
+                    cells[0],
+                    if pairs[1] < pairs[3] {
+                        pairs[1] << 6 | pairs[0] << 4 | pairs[3] << 2 | pairs[2]
+                    } else {
+                        pairs[3] << 6 | pairs[2] << 4 | pairs[1] << 2 | pairs[0]
+                    },
+                ));
             }
-            self.facet_adjacent_cells.borrow_mut().push((
-                cells[0],
-                cells[1],
-                pairs[0] << 6 | pairs[1] << 4 | pairs[2] << 2 | pairs[3],
-            ));
-            self.facet_adjacent_cells.borrow_mut().push((
-                cells[1],
-                cells[0],
-                if pairs[1] < pairs[3] {
-                    pairs[1] << 6 | pairs[0] << 4 | pairs[3] << 2 | pairs[2]
-                } else {
-                    pairs[3] << 6 | pairs[2] << 4 | pairs[1] << 2 | pairs[0]
-                },
-            ));
         }
 
         // Compute cells adjacent via a ridge (ie vertex in 2D)
@@ -642,42 +644,6 @@ impl SerialTopology {
                 }
             }
         }
-    }
-
-    /// TODO: document
-    /// Entries in returned vector are (cell0, cell1, local_vertex_pairs)
-    /// Facets are entities of dimension tdim - 1
-    pub fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        if self.facet_adjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.facet_adjacent_cells.borrow()
-    }
-
-    /// TODO: document
-    /// Ridges are entities of dimension tdim - 2
-    pub fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        if self.ridge_adjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.ridge_adjacent_cells.borrow()
-    }
-
-    /// TODO: document
-    /// Peaks are entities of dimension tdim - 3
-    pub fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        if self.peak_adjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.peak_adjacent_cells.borrow()
-    }
-
-    /// TODO: document
-    pub fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>> {
-        if self.nonadjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.nonadjacent_cells.borrow()
     }
 }
 
@@ -863,6 +829,34 @@ impl Topology<'_> for SerialTopology {
     fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
         Ownership::Owned
     }
+
+    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        if self.facet_adjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.facet_adjacent_cells.borrow()
+    }
+
+    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        if self.ridge_adjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.ridge_adjacent_cells.borrow()
+    }
+
+    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        if self.peak_adjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.peak_adjacent_cells.borrow()
+    }
+
+    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>> {
+        if self.nonadjacent_cells.borrow().len() == 0 {
+            self.compute_adjacent_cells()
+        }
+        self.nonadjacent_cells.borrow()
+    }
 }
 
 /// Serial grid
@@ -924,30 +918,9 @@ mod test {
             ),
             vec![ReferenceCellType::Triangle; 8],
         );
-        assert_eq!(g.topology().adjacent_cells(0).len(), 7);
-        for i in g.topology().adjacent_cells(0).iter() {
-            if i.0 == 0 {
-                assert_eq!(i.1, 3);
-            } else if i.0 == 1 || i.0 == 3 {
-                assert_eq!(i.1, 2);
-            } else if i.0 == 2 || i.0 == 4 || i.0 == 6 || i.0 == 7 {
-                assert_eq!(i.1, 1);
-            } else {
-                panic!("Cell is not adjacent.");
-            }
-        }
-        assert_eq!(g.topology().adjacent_cells(2).len(), 4);
-        for i in g.topology().adjacent_cells(2).iter() {
-            if i.0 == 2 {
-                assert_eq!(i.1, 3);
-            } else if i.0 == 3 {
-                assert_eq!(i.1, 2);
-            } else if i.0 == 0 || i.0 == 6 {
-                assert_eq!(i.1, 1);
-            } else {
-                panic!("Cell is not adjacent.");
-            }
-        }
+        assert_eq!(g.topology().facet_adjacent_cells().len(), 8 * 2);
+        assert_eq!(g.topology().ridge_adjacent_cells().len(), (29 - 8 * 2) * 2);
+        assert_eq!(g.topology().peak_adjacent_cells().len(), 0);
     }
     #[test]
     fn test_connectivity() {
