@@ -42,6 +42,35 @@ pub trait FunctionSpace<'a> {
     }
 }
 
-pub trait Kernel<T: Num> {
-    fn same_triangle_kernel(result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+pub trait TriangleTriangleKernel<T: Num> {
+    fn local_shape(&self) -> (usize, usize);
+    fn same_cell_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_00_11_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_00_12_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_01_10_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_01_12_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_02_10_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_02_11_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_00_21_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_00_22_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_01_20_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_01_22_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_02_20_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_02_21_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_10_21_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_10_22_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_11_20_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_11_22_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_12_20_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_edge_12_21_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_00_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_01_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_02_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_10_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_11_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_12_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_20_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_21_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn shared_vertex_22_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
+    fn nonneighbour_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
 }

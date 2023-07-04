@@ -2,7 +2,7 @@
 proc-macro = true
 
 [package]
-name = "rs-macros"
+name = "bempp-generation"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,7 +12,10 @@ edition = "2021"
 bempp-tools = { path = "../tools" }
 bempp-traits = { path = "../traits" }
 bempp-element = { path = "../element" }
+bempp-bem = { path = "../bem" }
+bempp-grid = { path = "../grid" }
 bempp-quadrature = { path = "../quadrature" }
 quote = { version = "1.0" }
 syn = { version = "2.0.22" }
 num = "0.4"
+approx = "0.5"

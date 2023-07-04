@@ -1,7 +1,10 @@
 extern crate proc_macro;
 use bempp_element::element::create_element;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
-use bempp_quadrature::types::CellToCellConnectivity;
+use bempp_quadrature::simplex_rules::simplex_rule;
+use bempp_quadrature::types::{
+    CellToCellConnectivity, NumericalQuadratureDefinition, TestTrialNumericalQuadratureDefinition,
+};
 use bempp_tools::arrays::{Array2D, Array4D};
 use bempp_traits::arrays::Array4DAccess;
 use bempp_traits::cell::ReferenceCellType;
@@ -106,7 +109,7 @@ fn parse_cell(cell: &Expr) -> ReferenceCellType {
     let cell_str = format!("{}", quote! { #cell });
     if cell_str == "\"Triangle\"" {
         ReferenceCellType::Triangle
-    } else if cell_str == "\"Raviart-Thomas\"" {
+    } else if cell_str == "\"Quadrilateral\"" {
         ReferenceCellType::Quadrilateral
     } else {
         panic!("Unsupported cell type: {}", cell_str);
@@ -288,69 +291,21 @@ fn jacobian(
     code
 }
 
-fn indent(level: usize) -> String {
-    let mut t = String::new();
-    for _ in 0..level * 4 {
-        t += " ";
-    }
-    t
-}
-
-#[proc_macro]
-pub fn make_answer(_item: TokenStream) -> TokenStream {
-    let a = 42;
-    let kernel_id = "untitled";
-    let mut code = String::new();
-    code += &format!("fn __bempp_kernel_{kernel_id}() -> u32 {{ {a} }}");
-    code.parse().unwrap()
-}
-
-#[proc_macro]
-pub fn generate_kernels(input: TokenStream) -> TokenStream {
-    // TODO: make these into inputs
+#[allow(clippy::too_many_arguments)]
+fn singular_kernel(
+    name: String,
+    quadrule: TestTrialNumericalQuadratureDefinition,
+    test_element: &impl FiniteElement,
+    trial_element: &impl FiniteElement,
+    test_geometry_element: &impl FiniteElement,
+    trial_geometry_element: &impl FiniteElement,
+    tdim: usize,
+    gdim: usize,
+) -> String {
+    // TODO: make this into an input
     type T = f64;
-    let tdim = 2;
-    let gdim = 3;
 
     let typename = std::any::type_name::<T>().to_string();
-    let es = parse_macro_input!(input as GenerationInput);
-
-    let kernel_name = parse_string(&es.kernel_name);
-
-    let test_element = create_element(
-        parse_family(&es.test_element_family),
-        parse_cell(&es.test_element_cell),
-        parse_int(&es.test_element_degree),
-        parse_bool(&es.test_element_discontinuous),
-    );
-    let trial_element = create_element(
-        parse_family(&es.trial_element_family),
-        parse_cell(&es.trial_element_cell),
-        parse_int(&es.trial_element_degree),
-        parse_bool(&es.trial_element_discontinuous),
-    );
-    let test_geometry_element = create_element(
-        parse_family(&es.test_geometry_element_family),
-        parse_cell(&es.test_geometry_element_cell),
-        parse_int(&es.test_geometry_element_degree),
-        parse_bool(&es.test_geometry_element_discontinuous),
-    );
-    let trial_geometry_element = create_element(
-        parse_family(&es.trial_geometry_element_family),
-        parse_cell(&es.trial_geometry_element_cell),
-        parse_int(&es.trial_geometry_element_degree),
-        parse_bool(&es.trial_geometry_element_discontinuous),
-    );
-
-    // TODO: degree
-    let quadrule = triangle_duffy(
-        &CellToCellConnectivity {
-            connectivity_dimension: 2,
-            local_indices: vec![(0, 0), (1, 1), (2, 2)],
-        },
-        1,
-    )
-    .unwrap();
     let npts = quadrule.npoints;
     let test_points = Array2D::<T>::from_data(quadrule.test_points, (npts, tdim));
     let trial_points = Array2D::<T>::from_data(quadrule.trial_points, (npts, tdim));
@@ -368,18 +323,8 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     trial_geometry_element.tabulate(&trial_points, 1, &mut trial_geometry_evals);
 
     let mut code = String::new();
-    code += &format!("struct _BemppKernel_{kernel_name} {{\n");
-    code += "    test_element: bempp_element::element::CiarletElement,\n";
-    code += "    trial_element: bempp_element::element::CiarletElement,\n";
-    code += "};\n\n";
-    code +=
-        &format!("impl bempp_traits::bem::Kernel<{typename}> for _BemppKernel_{kernel_name} {{");
-    code += "\n\n";
-
-    // TODO: split this kernel generation into its own function
-
     // Write const tables
-    code += &format!("fn same_triangle_kernel(result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]) {{\n");
+    code += &format!("fn {name}(&self, result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]) {{\n");
     code += &indent(1);
     code += &format_table("WTS".to_string(), &quadrule.weights);
     code += &indent(1);
@@ -566,7 +511,385 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     code += "}\n";
 
     code += "}\n\n";
-    // END KERNEL
+    code
+}
+
+#[allow(clippy::too_many_arguments)]
+fn nonsingular_kernel(
+    name: String,
+    test_rule: NumericalQuadratureDefinition,
+    trial_rule: NumericalQuadratureDefinition,
+    test_element: &impl FiniteElement,
+    trial_element: &impl FiniteElement,
+    test_geometry_element: &impl FiniteElement,
+    trial_geometry_element: &impl FiniteElement,
+    tdim: usize,
+    gdim: usize,
+) -> String {
+    // TODO: make this into an input
+    type T = f64;
+
+    let typename = std::any::type_name::<T>().to_string();
+    let test_npts = test_rule.npoints;
+    let trial_npts = trial_rule.npoints;
+    let test_points = Array2D::<T>::from_data(test_rule.points, (test_npts, tdim));
+    let trial_points = Array2D::<T>::from_data(trial_rule.points, (trial_npts, tdim));
+
+    let mut test_evals = Array4D::<T>::new(test_element.tabulate_array_shape(1, test_npts));
+    test_element.tabulate(&test_points, 1, &mut test_evals);
+    let mut trial_evals = Array4D::<T>::new(trial_element.tabulate_array_shape(1, trial_npts));
+    trial_element.tabulate(&trial_points, 1, &mut trial_evals);
+
+    let mut test_geometry_evals =
+        Array4D::<T>::new(test_geometry_element.tabulate_array_shape(1, test_npts));
+    test_geometry_element.tabulate(&test_points, 1, &mut test_geometry_evals);
+    let mut trial_geometry_evals =
+        Array4D::<T>::new(trial_geometry_element.tabulate_array_shape(1, trial_npts));
+    trial_geometry_element.tabulate(&trial_points, 1, &mut trial_geometry_evals);
+
+    let mut code = String::new();
+    // Write const tables
+    code += &format!("fn {name}(&self, result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]) {{\n");
+    code += &indent(1);
+    code += &format_table("TEST_WTS".to_string(), &test_rule.weights);
+    code += &indent(1);
+    code += &format_table("TRIAL_WTS".to_string(), &trial_rule.weights);
+    code += &indent(1);
+    code += &format_eval_table(
+        "TEST_GEOMETRY_EVALS".to_string(),
+        &test_geometry_evals,
+        0,
+        0,
+    );
+    if test_geometry_element.degree() > 1 {
+        code += &indent(1);
+        code += &format_eval_table(
+            "TEST_GEOMETRY_EVALS_DX".to_string(),
+            &test_geometry_evals,
+            1,
+            0,
+        );
+        code += &indent(1);
+        code += &format_eval_table(
+            "TEST_GEOMETRY_EVALS_DY".to_string(),
+            &test_geometry_evals,
+            2,
+            0,
+        );
+    }
+    code += &indent(1);
+    code += &format_eval_table(
+        "TRIAL_GEOMETRY_EVALS".to_string(),
+        &trial_geometry_evals,
+        0,
+        0,
+    );
+    if trial_geometry_element.degree() > 1 {
+        code += &indent(1);
+        code += &format_eval_table(
+            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
+            &trial_geometry_evals,
+            1,
+            0,
+        );
+        code += &indent(1);
+        code += &format_eval_table(
+            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
+            &trial_geometry_evals,
+            2,
+            0,
+        );
+    }
+    if test_element.degree() > 0 {
+        code += &indent(1);
+        code += &format_eval_table("TEST_EVALS".to_string(), &test_evals, 0, 0);
+    }
+    if trial_element.degree() > 0 {
+        code += &indent(1);
+        code += &format_eval_table("TRIAL_EVALS".to_string(), &trial_evals, 0, 0);
+    }
+    code += &indent(1);
+    code += "const ONE_OVER_4PI: f64 = 0.25 * std::f64::consts::FRAC_1_PI;\n";
+    code += "\n";
+
+    if test_geometry_element.degree() == 1 {
+        code += &linear_jacobian(
+            "test_jdet".to_string(),
+            "test_vertices".to_string(),
+            tdim,
+            gdim,
+            &test_geometry_evals,
+            1,
+        );
+    }
+    if trial_geometry_element.degree() == 1 {
+        code += &linear_jacobian(
+            "trial_jdet".to_string(),
+            "trial_vertices".to_string(),
+            tdim,
+            gdim,
+            &trial_geometry_evals,
+            1,
+        );
+    }
+
+    code += "\n";
+    code += &indent(1);
+    code += &format!("for i in 0..{} {{\n", test_element.dim());
+    code += &indent(2);
+    code += &format!("for j in 0..{} {{\n", trial_element.dim());
+    code += &indent(3);
+    code += &format!("result[i * {} + j] = 0.0;\n", trial_element.dim());
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(1);
+    code += "}\n";
+
+    code += &indent(1);
+    code += &format!("for test_q in 0..{test_npts} {{\n");
+    if test_geometry_element.degree() > 1 {
+        code += &jacobian(
+            "test_jdet".to_string(),
+            "test_vertices".to_string(),
+            tdim,
+            gdim,
+            "TEST_GEOMETRY_EVALS_DX".to_string(),
+            "TEST_GEOMETRY_EVALS_DY".to_string(),
+            "test_q".to_string(),
+            test_geometry_evals.shape().2,
+            2,
+        );
+    }
+    code += &indent(2);
+    code += &format!("for trial_q in 0..{trial_npts} {{\n");
+    code += &indent(3);
+    code += &format!("let mut sum_squares: {typename} = 0.0;\n");
+    code += &indent(3);
+    code += &format!("for d in 0..{gdim} {{\n");
+    code += &indent(4);
+    code += "let x = ";
+    for b in 0..test_geometry_element.dim() {
+        if b == 0 {
+            code += &format!(
+                "test_vertices[d] * TEST_GEOMETRY_EVALS[test_q * {}]",
+                test_geometry_element.dim()
+            );
+        } else {
+            code += &format!(
+                " + test_vertices[{} + d] * TEST_GEOMETRY_EVALS[test_q * {} + {b}]",
+                b * gdim,
+                test_geometry_element.dim()
+            );
+        }
+    }
+    code += ";\n";
+    code += &indent(4);
+    code += "let y = ";
+    for b in 0..trial_geometry_element.dim() {
+        if b == 0 {
+            code += &format!(
+                "trial_vertices[d] * TRIAL_GEOMETRY_EVALS[trial_q * {}]",
+                trial_geometry_element.dim()
+            );
+        } else {
+            code += &format!(
+                " + trial_vertices[{} + d] * TRIAL_GEOMETRY_EVALS[trial_q * {} + {b}]",
+                b * gdim,
+                trial_geometry_element.dim()
+            );
+        }
+    }
+    code += ";\n";
+    code += &indent(4);
+    code += "sum_squares += (x - y).powi(2);\n";
+    code += &indent(3);
+    code += "}\n";
+    code += &indent(3);
+    code += "let distance = sum_squares.sqrt();\n";
+    if trial_geometry_element.degree() > 1 {
+        code += &jacobian(
+            "trial_jdet".to_string(),
+            "trial_vertices".to_string(),
+            tdim,
+            gdim,
+            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
+            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
+            "trial_q".to_string(),
+            trial_geometry_evals.shape().2,
+            3,
+        );
+    }
+    code += &indent(3);
+    code += &format!("for i in 0..{} {{\n", test_element.dim());
+    code += &indent(4);
+    code += &format!("for j in 0..{} {{\n", trial_element.dim());
+    code += &indent(5);
+    code += &format!(
+        "result[i * {} + j] += TEST_WTS[test_q] * TRIAL_WTS[trial_q]",
+        trial_element.dim()
+    );
+    if test_element.degree() > 0 {
+        code += &format!(" * TEST_EVALS[test_q * {} + i]", test_element.dim());
+    }
+    if trial_element.degree() > 0 {
+        code += &format!(" * TRIAL_EVALS[trial_q * {} + j]", trial_element.dim());
+    }
+    code += " * test_jdet * trial_jdet * ONE_OVER_4PI / distance;\n";
+    code += &indent(4);
+    code += "}\n";
+    code += &indent(3);
+    code += "}\n";
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(1);
+    code += "}\n";
+
+    code += "}\n\n";
+    code
+}
+
+fn indent(level: usize) -> String {
+    let mut t = String::new();
+    for _ in 0..level * 4 {
+        t += " ";
+    }
+    t
+}
+
+#[proc_macro]
+pub fn generate_kernels(input: TokenStream) -> TokenStream {
+    // TODO: make these into inputs
+    type T = f64;
+    let tdim = 2;
+    let gdim = 3;
+
+    let typename = std::any::type_name::<T>().to_string();
+    let es = parse_macro_input!(input as GenerationInput);
+
+    let kernel_name = parse_string(&es.kernel_name);
+
+    let test_element = create_element(
+        parse_family(&es.test_element_family),
+        parse_cell(&es.test_element_cell),
+        parse_int(&es.test_element_degree),
+        parse_bool(&es.test_element_discontinuous),
+    );
+    let trial_element = create_element(
+        parse_family(&es.trial_element_family),
+        parse_cell(&es.trial_element_cell),
+        parse_int(&es.trial_element_degree),
+        parse_bool(&es.trial_element_discontinuous),
+    );
+    let test_geometry_element = create_element(
+        parse_family(&es.test_geometry_element_family),
+        parse_cell(&es.test_geometry_element_cell),
+        parse_int(&es.test_geometry_element_degree),
+        parse_bool(&es.test_geometry_element_discontinuous),
+    );
+    let trial_geometry_element = create_element(
+        parse_family(&es.trial_geometry_element_family),
+        parse_cell(&es.trial_geometry_element_cell),
+        parse_int(&es.trial_geometry_element_degree),
+        parse_bool(&es.trial_geometry_element_discontinuous),
+    );
+
+    let mut code = String::new();
+    code += &format!("struct _BemppKernel_{kernel_name} {{\n");
+    code += "    test_element: bempp_element::element::CiarletElement,\n";
+    code += "    trial_element: bempp_element::element::CiarletElement,\n";
+    code += "};\n\n";
+    code +=
+        &format!("impl bempp_traits::bem::TriangleTriangleKernel<{typename}> for _BemppKernel_{kernel_name} {{");
+    code += "\n\n";
+    code += "fn local_shape(&self) -> (usize, usize) { (self.test_element.dim(), self.trial_element.dim()) }";
+
+    // TODO: quads
+    // TODO: degree
+    let quadrule = triangle_duffy(
+        &CellToCellConnectivity {
+            connectivity_dimension: 2,
+            local_indices: vec![(0, 0), (1, 1), (2, 2)],
+        },
+        1,
+    )
+    .unwrap();
+    code += &singular_kernel(
+        "same_cell_kernel".to_string(),
+        quadrule,
+        &test_element,
+        &trial_element,
+        &test_geometry_element,
+        &trial_geometry_element,
+        tdim,
+        gdim,
+    );
+
+    for i in 0..3 {
+        for j in i + 1..3 {
+            for k in 0..3 {
+                for l in 0..3 {
+                    if k != l {
+                        let quadrule = triangle_duffy(
+                            &CellToCellConnectivity {
+                                connectivity_dimension: 1,
+                                local_indices: vec![(i, k), (j, l)],
+                            },
+                            1,
+                        )
+                        .unwrap();
+                        code += &singular_kernel(
+                            format!("shared_edge_{i}{k}_{j}{l}_kernel"),
+                            quadrule,
+                            &test_element,
+                            &trial_element,
+                            &test_geometry_element,
+                            &trial_geometry_element,
+                            tdim,
+                            gdim,
+                        );
+                    }
+                }
+            }
+        }
+    }
+    for i in 0..3 {
+        for j in 0..3 {
+            let quadrule = triangle_duffy(
+                &CellToCellConnectivity {
+                    connectivity_dimension: 0,
+                    local_indices: vec![(i, j)],
+                },
+                1,
+            )
+            .unwrap();
+            code += &singular_kernel(
+                format!("shared_vertex_{i}{j}_kernel"),
+                quadrule,
+                &test_element,
+                &trial_element,
+                &test_geometry_element,
+                &trial_geometry_element,
+                tdim,
+                gdim,
+            );
+        }
+    }
+
+    // TODO: degree
+    let test_rule = simplex_rule(test_element.cell_type(), 7).unwrap();
+    let trial_rule = simplex_rule(trial_element.cell_type(), 7).unwrap();
+
+    code += &nonsingular_kernel(
+        "nonneighbour_kernel".to_string(),
+        test_rule,
+        trial_rule,
+        &test_element,
+        &trial_element,
+        &test_geometry_element,
+        &trial_geometry_element,
+        tdim,
+        gdim,
+    );
 
     code += "}\n\n";
     code += &format!("let {kernel_name} = _BemppKernel_{kernel_name} {{\n");
@@ -575,6 +898,5 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     code += &format!("    trial_element: bempp_element::element::create_element(bempp_traits::element::ElementFamily::{:?}, bempp_traits::cell::ReferenceCellType::{:?}, {}, {}),\n",
                      trial_element.family(), trial_element.cell_type(), trial_element.degree(), trial_element.discontinuous());
     code += "};";
-    println!("{}", code);
     code.parse().unwrap()
 }
