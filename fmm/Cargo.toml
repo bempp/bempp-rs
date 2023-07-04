@@ -24,6 +24,7 @@ bempp-tools = { path = "../tools" }
 bempp-tree = { path = "../tree" }
 bempp-traits = { path = "../traits" }
 bempp-field = { path = "../field" }
+bempp-kernel = { path = "../kernel" }
 approx = "0.5"
 cauchy = "0.4.*"
 itertools = "0.10"

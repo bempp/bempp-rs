@@ -1,1 +1,0 @@
-//! Helmholtz kernel implementation.

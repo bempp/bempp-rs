@@ -25,3 +25,6 @@ bempp-traits = { path = "../traits" }
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]
 strict = []
+
+[dev-dependencies]
+rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}
