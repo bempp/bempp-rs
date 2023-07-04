@@ -58,7 +58,7 @@ mod test {
     fn test_compute_bounds() {
         // Generate a set of randomly distributed points
         let mut range = StdRng::seed_from_u64(0);
-        let between = rand::distributions::Uniform::from(0.0 as f64..1.0 as f64);
+        let between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
         let mut points = Vec::new();
 
         for _ in 0..NPOINTS {

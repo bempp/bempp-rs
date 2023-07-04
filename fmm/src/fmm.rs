@@ -1165,7 +1165,6 @@ mod test {
 
     #[test]
     fn test_fmm() {
-        assert!(true);
         // let npoints = 10000;
         // let points = points_fixture(npoints);
         // let points_clone = points.clone();

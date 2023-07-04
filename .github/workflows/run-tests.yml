@@ -36,6 +36,7 @@ jobs:
         run: |
           cargo fmt -- --check
           cargo clippy -- -D warnings
+          cargo clippy --tests -- -D warnings
           cargo clippy --examples -- -D warnings
 
       - name: Build rust library

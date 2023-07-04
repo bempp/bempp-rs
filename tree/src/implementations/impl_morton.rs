@@ -951,7 +951,7 @@ mod test {
 
             for shift in 0..8 {
                 sum |= ((index & 1) << (3 * shift)) as KeyType;
-                index = index >> 1;
+                index >>= 1;
             }
 
             assert_eq!(sum, *actual);
@@ -965,7 +965,7 @@ mod test {
 
             for shift in 0..8 {
                 sum |= ((index & 1) << (3 * shift + 1)) as KeyType;
-                index = index >> 1;
+                index >>= 1;
             }
 
             assert_eq!(sum, *actual);
@@ -979,7 +979,7 @@ mod test {
 
             for shift in 0..8 {
                 sum |= ((index & 1) << (3 * shift + 2)) as KeyType;
-                index = index >> 1;
+                index >>= 1;
             }
 
             assert_eq!(sum, *actual);
@@ -1063,15 +1063,15 @@ mod test {
 
         let mut keys: Vec<MortonKey> = points
             .iter()
-            .map(|p| MortonKey::from_point(&p, &domain, DEEPEST_LEVEL))
+            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
             .collect();
 
         // Add duplicates to keys, to test ordering in terms of equality
-        let mut cpy: Vec<MortonKey> = keys.iter().cloned().collect();
+        let mut cpy: Vec<MortonKey> = keys.to_vec();
         keys.append(&mut cpy);
 
         // Add duplicates to ensure equality is also sorted
-        let mut replica = keys.iter().cloned().collect();
+        let mut replica = keys.to_vec();
         keys.append(&mut replica);
         keys.sort();
 
@@ -1147,10 +1147,8 @@ mod test {
         ancestors.sort();
 
         // Test that all ancestors found
-        let mut current_level = 0;
-        for &ancestor in &ancestors {
-            assert!(ancestor.level() == current_level);
-            current_level += 1;
+        for (current_level, &ancestor) in ancestors.iter().enumerate() {
+            assert!(ancestor.level() == current_level.try_into().unwrap());
         }
 
         // Test that the ancestors include the key at the leaf level
@@ -1484,8 +1482,8 @@ mod test {
 
         let fa = a.finest_ancestor(&b);
 
-        let min = region.iter().min().unwrap().clone();
-        let max = region.iter().max().unwrap().clone();
+        let min = *region.iter().min().unwrap();
+        let max = *region.iter().max().unwrap();
 
         // Test that bounds are satisfied
         assert!(a <= min);
