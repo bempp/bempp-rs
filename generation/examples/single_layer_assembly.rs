@@ -192,4 +192,3 @@ fn assemble<'a, E: FiniteElement>(
         }
     */
 }
-
