@@ -2,7 +2,6 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 pub mod charge;
 pub mod fmm;
-pub mod helmholtz;
 pub mod impl_charge;
-pub mod laplace;
+// pub mod laplace;
 pub mod linalg;

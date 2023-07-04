@@ -328,11 +328,11 @@ where
 
         // let mut se2tc_fat: SvdM2lEntry =
         //     Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
+        // let mut se2tc_thin: SvdM2lEntry =
+        //     Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
         let ntransfer_vectors = self.transfer_vectors.len();
         let mut se2tc_fat = rlst_mat![f64, (nrows, ncols * ntransfer_vectors)];
 
-        // let mut se2tc_thin: SvdM2lEntry =
-        //     Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
         let mut se2tc_thin = rlst_mat![f64, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
@@ -362,6 +362,9 @@ where
             );
 
             // // let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
+            // // se2tc_fat
+            // //     .slice_mut(s![.., lidx_sources..ridx_sources])
+            // //     .assign(&tmp_gram);
             let lidx_sources = i * ncols;
             let ridx_sources = lidx_sources + ncols;
 
@@ -371,9 +374,6 @@ where
             let mut block = se2tc_fat.get_slice_mut(start_idx, end_idx);
             block.copy_from_slice(tmp_gram.data_mut());
 
-            // // se2tc_fat
-            // //     .slice_mut(s![.., lidx_sources..ridx_sources])
-            // //     .assign(&tmp_gram);
 
             for j in 0..ncols {
                 let start_idx = j * ntransfer_vectors * nrows + i * nrows;
@@ -401,27 +401,29 @@ where
         let u = u.block((0, 0), (mu, self.k)).eval();
 
         let (mvt, nvt) = vt.shape();
-        let vt = vt.block((0, 0), (right, nvt)).eval();
+        let vt = vt.block((0, 0), (self.k, nvt)).eval();
 
-        // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
-        // let u = u.unwrap().slice(s![.., left..right]).to_owned();
-        // let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
-        // let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
+        // // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        // // let u = u.unwrap().slice(s![.., left..right]).to_owned();
+        // // let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
+        // // let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
+        // // let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        // // let st = st.unwrap().slice(s![left..right, ..]).to_owned();
 
-        let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::All, Mode::All).unwrap();
+        // // Store compressed M2L operators
+        // // let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
+
+        let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::Slim, Mode::All).unwrap();
         let st = st.unwrap();
         let (mst, nst) = st.shape();
         let st_block = st.block((0, 0), (self.k, nst));
-        let s = st_block.transpose().eval();
-        let st = st.block((0, 0), (self.k, nst)).eval();
-
-        // let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
-        // let st = st.unwrap().slice(s![left..right, ..]).to_owned();
-
-        // Store compressed M2L operators
-        // let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
+        let s_block = st_block.transpose().eval();
+        
         let mut c = rlst_mat![f64, (self.k, self.k * ntransfer_vectors)];
+        // println!("HERE {:?} {:?} {:?} {:?}", u.shape(), st.shape(), c.shape(), vt.shape());
 
+        // let st = s_block.transpose().eval();
+        // println!("HERE {:?} {:?} {:?} {:?}", u.shape(), sigma_mat.shape(), vt.shape(), st.shape());
         for i in 0..self.transfer_vectors.len() {
             // let v_lidx = i * ncols;
             // let v_ridx = v_lidx + ncols;
@@ -430,26 +432,28 @@ where
             // let block_size = right*ncols;
             // let start_idx = i * block_size;
             // let end_idx = start_idx+block_size;
+
+            //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
+            //     let lidx = i * self.k;
+            //     let ridx = lidx + self.k;
+            //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
             let top_left = (0, i * ncols);
             let dim = (self.k, ncols);
             let vt_block = vt.block(top_left, dim);
 
-            let tmp = sigma_mat.dot(&vt_block.dot(&s));
-            //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
-            //     let lidx = i * self.k;
-            //     let ridx = lidx + self.k;
+            let tmp = sigma_mat.dot(&vt_block.dot(&s_block));
 
             let top_left = (0, i * self.k);
-            let dim = (self.k, ncols);
-            // let mut c_block =;
+            let dim = (self.k, self.k);
+            
             c.block_mut(top_left, dim)
                 .data_mut()
                 .copy_from_slice(tmp.data());
-
-            //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
         }
 
         (u, st, c)
+        // let dummy = rlst_mat![f64, (1, 1)];
+        // (dummy.new_like_self().eval(), dummy.new_like_self().eval(), dummy.new_like_self().eval())
         // assert!(false)
     }
 }
@@ -483,11 +487,11 @@ where
 
         // let mut se2tc_fat: SvdM2lEntry =
         //     Array2::zeros((nrows, ncols * self.transfer_vectors.len()));
+        // let mut se2tc_thin: SvdM2lEntry =
+        //     Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
         let ntransfer_vectors = self.transfer_vectors.len();
         let mut se2tc_fat = rlst_mat![f64, (nrows, ncols * ntransfer_vectors)];
 
-        // let mut se2tc_thin: SvdM2lEntry =
-        //     Array2::zeros((ncols * self.transfer_vectors.len(), nrows));
         let mut se2tc_thin = rlst_mat![f64, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
@@ -517,6 +521,9 @@ where
             );
 
             // // let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
+            // // se2tc_fat
+            // //     .slice_mut(s![.., lidx_sources..ridx_sources])
+            // //     .assign(&tmp_gram);
             let lidx_sources = i * ncols;
             let ridx_sources = lidx_sources + ncols;
 
@@ -526,9 +533,6 @@ where
             let mut block = se2tc_fat.get_slice_mut(start_idx, end_idx);
             block.copy_from_slice(tmp_gram.data_mut());
 
-            // // se2tc_fat
-            // //     .slice_mut(s![.., lidx_sources..ridx_sources])
-            // //     .assign(&tmp_gram);
 
             for j in 0..ncols {
                 let start_idx = j * ntransfer_vectors * nrows + i * nrows;
@@ -556,27 +560,29 @@ where
         let u = u.block((0, 0), (mu, self.k)).eval();
 
         let (mvt, nvt) = vt.shape();
-        let vt = vt.block((0, 0), (right, nvt)).eval();
+        let vt = vt.block((0, 0), (self.k, nvt)).eval();
 
-        // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
-        // let u = u.unwrap().slice(s![.., left..right]).to_owned();
-        // let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
-        // let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
+        // // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        // // let u = u.unwrap().slice(s![.., left..right]).to_owned();
+        // // let sigma = Array2::from_diag(&sigma.slice(s![left..right]));
+        // // let vt = vt.unwrap().slice(s![left..right, ..]).to_owned();
+        // // let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
+        // // let st = st.unwrap().slice(s![left..right, ..]).to_owned();
 
-        let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::All, Mode::All).unwrap();
+        // // Store compressed M2L operators
+        // // let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
+
+        let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::Slim, Mode::All).unwrap();
         let st = st.unwrap();
         let (mst, nst) = st.shape();
         let st_block = st.block((0, 0), (self.k, nst));
-        let s = st_block.transpose().eval();
-        let st = st.block((0, 0), (self.k, nst)).eval();
-
-        // let (_r, _gamma, st) = se2tc_thin.svddc(ndarray_linalg::JobSvd::Some).unwrap();
-        // let st = st.unwrap().slice(s![left..right, ..]).to_owned();
-
-        // Store compressed M2L operators
-        // let mut c = Array2::zeros((self.k, self.k * self.transfer_vectors.len()));
+        let s_block = st_block.transpose().eval();
+        
         let mut c = rlst_mat![f64, (self.k, self.k * ntransfer_vectors)];
+        // println!("HERE {:?} {:?} {:?} {:?}", u.shape(), st.shape(), c.shape(), vt.shape());
 
+        // let st = s_block.transpose().eval();
+        // println!("HERE {:?} {:?} {:?} {:?}", u.shape(), sigma_mat.shape(), vt.shape(), st.shape());
         for i in 0..self.transfer_vectors.len() {
             // let v_lidx = i * ncols;
             // let v_ridx = v_lidx + ncols;
@@ -585,25 +591,29 @@ where
             // let block_size = right*ncols;
             // let start_idx = i * block_size;
             // let end_idx = start_idx+block_size;
+
+            //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
+            //     let lidx = i * self.k;
+            //     let ridx = lidx + self.k;
+            //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
             let top_left = (0, i * ncols);
             let dim = (self.k, ncols);
             let vt_block = vt.block(top_left, dim);
 
-            let tmp = sigma_mat.dot(&vt_block.dot(&s));
-            //     let tmp = sigma.dot(&vt_sub.dot(&st.t()));
-            //     let lidx = i * self.k;
-            //     let ridx = lidx + self.k;
+            let tmp = sigma_mat.dot(&vt_block.dot(&s_block));
 
             let top_left = (0, i * self.k);
-            let dim = (self.k, ncols);
-            // let mut c_block =;
+            let dim = (self.k, self.k);
+            
             c.block_mut(top_left, dim)
                 .data_mut()
                 .copy_from_slice(tmp.data());
-
-            //     c.slice_mut(s![.., lidx..ridx]).assign(&tmp);
         }
+
         (u, st, c)
+        // let dummy = rlst_mat![f64, (1, 1)];
+        // (dummy.new_like_self().eval(), dummy.new_like_self().eval(), dummy.new_like_self().eval())
+        // assert!(false)
     }
 }
 

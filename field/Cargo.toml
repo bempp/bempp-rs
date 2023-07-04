@@ -29,4 +29,4 @@ ndarray-linalg = { version = "*", features = ["openblas-system"] }
 ndarray-ndimage = "0.3.0"
 ndrustfft = "0.4.0"
 num = "0.4"
-rlst = {git = "https://github.com/linalg-rs/rlst.git" }
+rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}

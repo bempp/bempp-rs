@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 use crate::helpers::check_dimensions_evaluate;
 use num::traits::FloatConst;
 
+#[derive(Clone)]
 pub struct Laplace3dKernel<T: Scalar> {
     kernel_type: KernelType,
     _phantom_t: std::marker::PhantomData<T>,

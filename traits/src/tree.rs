@@ -37,7 +37,7 @@ pub trait Tree {
     type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
 
     fn new(
-        points: Self::PointSlice<'_>,
+        points: Self::PointDataSlice<'_>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
