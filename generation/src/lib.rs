@@ -377,7 +377,7 @@ fn singular_kernel(
     // Write const tables
     code += &format!("fn {name}(&self, result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]");
     if quadrules.len() > 1 {
-        code += ", qid: usize";
+        code += ", qid: u8";
     }
     code += ") {\n";
     code += &indent(1);
