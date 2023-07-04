@@ -10,24 +10,30 @@ use bempp_traits::grid::{Geometry, Grid, Topology};
 
 fn main() {
     generate_kernels!(
-        bempp_dp0_dp0_triangle_kernel,
-        "Lagrange",
-        "Triangle",
-        1,
-        false,
-        "Lagrange",
-        "Triangle",
-        1,
-        false,
-        "Lagrange",
-        "Triangle",
-        1,
-        false,
-        "Lagrange",
-        "Triangle",
-        1,
-        false
+        bem_kernel, "Lagrange", "Triangle", 0, true, "Lagrange", "Triangle", 0, true, "Lagrange",
+        "Triangle", 1, false, "Lagrange", "Triangle", 1, false
     );
+
+    let grid = regular_sphere(0);
+    let space = SerialFunctionSpace::new(&grid, &bem_kernel.test_element);
+
+    let ndofs = space.dofmap().global_size();
+
+    let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+
+    assemble(&mut matrix, &space, &space, &bem_kernel);
+
+    // Compare to result from bempp-cl
+    #[rustfmt::skip]
+    let from_cl = vec![vec![0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.08755414595678074, 0.05963897421514473, 0.04670742127454548, 0.05963897421514472], vec![0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.05963897421514472, 0.08755414595678074, 0.05963897421514473, 0.04670742127454548], vec![0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.04670742127454548, 0.05963897421514472, 0.08755414595678074, 0.05963897421514473], vec![0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.05963897421514473, 0.04670742127454548, 0.05963897421514472, 0.08755414595678074], vec![0.08755414595678074, 0.05963897421514472, 0.046707421274545476, 0.05963897421514473, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074], vec![0.05963897421514473, 0.08755414595678074, 0.05963897421514472, 0.046707421274545476, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472], vec![0.046707421274545476, 0.05963897421514473, 0.08755414595678074, 0.05963897421514472, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074], vec![0.05963897421514472, 0.046707421274545476, 0.05963897421514473, 0.08755414595678074, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487]];
+
+    for (i, row) in from_cl.iter().enumerate() {
+        for (j, entry) in row.iter().enumerate() {
+            if i == j {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            }
+        }
+    }
 }
 
 fn assemble<'a, E: FiniteElement>(
@@ -58,10 +64,9 @@ fn assemble<'a, E: FiniteElement>(
         let trial_dofs = trial_space.dofmap().cell_dofs(test_cell_tindex).unwrap();
         let test_cell_dofs = grid.geometry().cell_vertices(test_cell).unwrap();
 
-        for i in 0..3 {
-            for j in 0..3 {
-                *test_vertices.get_mut(i, j).unwrap() =
-                    grid.geometry().point(test_cell_dofs[i]).unwrap()[j];
+        for (i, dof) in test_cell_dofs.iter().enumerate() {
+            for (j, coord) in grid.geometry().point(*dof).unwrap().iter().enumerate() {
+                *test_vertices.get_mut(i, j).unwrap() = *coord;
             }
         }
 
@@ -188,31 +193,3 @@ fn assemble<'a, E: FiniteElement>(
     */
 }
 
-#[test]
-fn test_laplace_single_layer_dp0_dp0() {
-    generate_kernels!(
-        bem_kernel, "Lagrange", "Triangle", 0, true, "Lagrange", "Triangle", 0, true, "Lagrange",
-        "Triangle", 1, false, "Lagrange", "Triangle", 1, false
-    );
-
-    let grid = regular_sphere(0);
-    let space = SerialFunctionSpace::new(&grid, &bem_kernel.test_element);
-
-    let ndofs = space.dofmap().global_size();
-
-    let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
-
-    assemble(&mut matrix, &space, &space, &bem_kernel);
-
-    // Compare to result from bempp-cl
-    #[rustfmt::skip]
-    let from_cl = vec![vec![0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.08755414595678074, 0.05963897421514473, 0.04670742127454548, 0.05963897421514472], vec![0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.05963897421514472, 0.08755414595678074, 0.05963897421514473, 0.04670742127454548], vec![0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.04670742127454548, 0.05963897421514472, 0.08755414595678074, 0.05963897421514473], vec![0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.05963897421514473, 0.04670742127454548, 0.05963897421514472, 0.08755414595678074], vec![0.08755414595678074, 0.05963897421514472, 0.046707421274545476, 0.05963897421514473, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074], vec![0.05963897421514473, 0.08755414595678074, 0.05963897421514472, 0.046707421274545476, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472], vec![0.046707421274545476, 0.05963897421514473, 0.08755414595678074, 0.05963897421514472, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074], vec![0.05963897421514472, 0.046707421274545476, 0.05963897421514473, 0.08755414595678074, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487]];
-
-    for (i, row) in from_cl.iter().enumerate() {
-        for (j, entry) in row.iter().enumerate() {
-            if i == j {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
-            }
-        }
-    }
-}

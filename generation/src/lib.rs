@@ -151,7 +151,7 @@ fn format_eval_table<T: Num + Debug>(
 ) -> String {
     let mut t = String::new();
     if tables.len() == 1 {
-        for (_qid, table) in tables.iter() {
+        if let Some((_qid, table)) = tables.iter().next() {
             t += &indent(level);
             t += &format!(
                 "const {name}: [{}; {}] = [",
@@ -167,7 +167,6 @@ fn format_eval_table<T: Num + Debug>(
                 }
             }
             t += "];\n";
-            break;
         }
     } else {
         t += &indent(level);
@@ -243,7 +242,7 @@ fn linear_jacobian<T: Num + Debug + Real>(
     level: usize,
 ) -> String {
     let mut code = String::new();
-    for (_qid, table) in tables.iter() {
+    if let Some((_qid, table)) = tables.iter().next() {
         if tdim == 2 && gdim == 3 {
             code += &indent(level);
             code += &linear_derivative("dx".to_string(), &vertices, gdim, table, 1);
@@ -259,7 +258,6 @@ fn linear_jacobian<T: Num + Debug + Real>(
                 tdim, gdim
             );
         }
-        break;
     }
     code
 }
@@ -341,9 +339,8 @@ fn singular_kernel(
 
     let typename = std::any::type_name::<T>().to_string();
     let mut npts = 0;
-    for (_qid, qrule) in quadrules.iter() {
+    if let Some((_qid, qrule)) = quadrules.iter().next() {
         npts = qrule.npoints;
-        break;
     }
     let mut test_points = Array2D::<T>::new((npts, tdim));
     let mut trial_points = Array2D::<T>::new((npts, tdim));
@@ -384,9 +381,8 @@ fn singular_kernel(
     }
     code += ") {\n";
     code += &indent(1);
-    for (_qid, qrule) in quadrules.iter() {
+    if let Some((_qid, qrule)) = quadrules.iter().next() {
         code += &format_table("WTS".to_string(), &qrule.weights);
-        break;
     }
     code += &format_eval_table(
         "TEST_GEOMETRY_EVALS".to_string(),
@@ -828,6 +824,8 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     type T = f64;
     let tdim = 2;
     let gdim = 3;
+    let singular_quad_degree = 3;
+    let nonsingular_quad_degree = 7;
 
     let typename = std::any::type_name::<T>().to_string();
     let es = parse_macro_input!(input as GenerationInput);
@@ -875,9 +873,7 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     code += "fn trial_geometry_element_dim(&self) -> usize { self.trial_geometry_element.dim() }\n";
 
     // TODO: quads
-    // TODO: degree
     let mut quadrules = HashMap::new();
-
     quadrules.insert(
         0,
         triangle_duffy(
@@ -885,7 +881,7 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
                 connectivity_dimension: 2,
                 local_indices: vec![(0, 0), (1, 1), (2, 2)],
             },
-            1,
+            singular_quad_degree,
         )
         .unwrap(),
     );
@@ -913,7 +909,7 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
                                     connectivity_dimension: 1,
                                     local_indices: vec![(i, k), (j, l)],
                                 },
-                                1,
+                                singular_quad_degree,
                             )
                             .unwrap(),
                         );
@@ -923,7 +919,7 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
         }
     }
     code += &singular_kernel(
-        format!("shared_edge_kernel"),
+        "shared_edge_kernel".to_string(),
         quadrules,
         &test_element,
         &trial_element,
@@ -943,14 +939,14 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
                         connectivity_dimension: 0,
                         local_indices: vec![(i, j)],
                     },
-                    1,
+                    singular_quad_degree,
                 )
                 .unwrap(),
             );
         }
     }
     code += &singular_kernel(
-        format!("shared_vertex_kernel"),
+        "shared_vertex_kernel".to_string(),
         quadrules,
         &test_element,
         &trial_element,
@@ -960,9 +956,8 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
         gdim,
     );
 
-    // TODO: degree
-    let test_rule = simplex_rule(test_element.cell_type(), 7).unwrap();
-    let trial_rule = simplex_rule(trial_element.cell_type(), 7).unwrap();
+    let test_rule = simplex_rule(test_element.cell_type(), nonsingular_quad_degree).unwrap();
+    let trial_rule = simplex_rule(trial_element.cell_type(), nonsingular_quad_degree).unwrap();
 
     code += &nonsingular_kernel(
         "nonneighbour_kernel".to_string(),
@@ -987,6 +982,5 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     code += &format!("    trial_geometry_element: bempp_element::element::create_element(bempp_traits::element::ElementFamily::{:?}, bempp_traits::cell::ReferenceCellType::{:?}, {}, {}),\n",
                      trial_geometry_element.family(), trial_geometry_element.cell_type(), trial_geometry_element.degree(), trial_geometry_element.discontinuous());
     code += "};";
-    println!("{code}");
     code.parse().unwrap()
 }

@@ -1,7 +1,7 @@
 //! Representation of basic types
 
 // Specification of data types
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum DTYPE {
     /// 32 bit float
@@ -40,7 +40,7 @@ pub enum DTYPE {
 // pub(crate) use iterate_over_type;
 
 // Mutability Property
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum MUTABILITY {
     NotMutable = 0,
@@ -48,7 +48,7 @@ pub enum MUTABILITY {
 }
 
 // Ownership Property
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum OWNERSHIP {
     NotOwner = 0,
