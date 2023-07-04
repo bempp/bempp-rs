@@ -4,7 +4,7 @@ use bempp_generation::generate_kernels;
 use bempp_grid::shapes::regular_sphere;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::arrays::Array2DAccess;
-use bempp_traits::bem::{DofMap, FunctionSpace, TriangleTriangleKernel};
+use bempp_traits::bem::{DofMap, FunctionSpace, Kernel};
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 
@@ -34,14 +34,13 @@ fn assemble<'a, E: FiniteElement>(
     matrix: &mut impl Array2DAccess<'a, f64>,
     test_space: &SerialFunctionSpace<E>,
     trial_space: &SerialFunctionSpace<E>,
-    bem_kernel: &impl TriangleTriangleKernel<f64>,
+    bem_kernel: &impl Kernel<f64>,
 ) {
-    let mut local_result = Array2D::<f64>::new(bem_kernel.local_shape());
-
-    let mut test_vertices = Array2D::<f64>::new((3, 3));
-    let mut trial_vertices = Array2D::<f64>::new((3, 3));
-
+    let mut local_result = Array2D::<f64>::new((bem_kernel.test_element_dim(), bem_kernel.trial_element_dim()));
     let grid = test_space.grid();
+
+    let mut test_vertices = Array2D::<f64>::new((bem_kernel.test_geometry_element_dim(), grid.geometry().dim()));
+    let mut trial_vertices = Array2D::<f64>::new((bem_kernel.trial_geometry_element_dim(), grid.geometry().dim()));
 
     // Test and trial cells are equal
     for test_cell in 0..grid.geometry().cell_count() {
