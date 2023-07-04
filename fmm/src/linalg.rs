@@ -64,14 +64,13 @@ mod test {
 
         // Setup a random square matrix, of dimension 'dim'
         let mut data: Vec<f64> = Vec::new();
-        let dim = 5;
-        let nvals = (dim as usize).pow(2);
+        let dim: usize = 5;
+        let nvals = dim.pow(2);
         for _ in 0..nvals {
             data.push(between.sample(&mut range))
         }
 
         let data = Array1::from_vec(data).into_shape((dim, dim)).unwrap();
-        let data2 = data.clone();
 
         let (a, b, c) = pinv(&data);
 
@@ -81,7 +80,7 @@ mod test {
         assert_eq!(inv.nrows(), dim);
 
         // Test that the inverse is approximately correct
-        let res = inv.dot(&data2);
+        let res = inv.dot(&data);
 
         let ones = Array1::from_vec(vec![1.; dim]);
         let id = Array2::from_diag(&ones);

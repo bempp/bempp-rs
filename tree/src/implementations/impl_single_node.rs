@@ -566,7 +566,7 @@ mod test {
             .map(|node| node.level())
             .collect();
         let first = levels[0];
-        assert_eq!(false, levels.iter().all(|level| *level == first));
+        assert!(!levels.iter().all(|level| *level == first));
 
         // Test that adjacent leaves are 2:1 balanced
         for node in tree.leaves.iter() {
@@ -574,7 +574,7 @@ mod test {
                 .leaves
                 .iter()
                 .cloned()
-                .filter(|n| node.is_adjacent(&n))
+                .filter(|n| node.is_adjacent(n))
                 .map(|n| n.level())
                 .collect();
             for l in adjacent_levels.iter() {
@@ -725,7 +725,7 @@ mod test {
     #[test]
     fn test_complete_blocktree() {
         let a = ROOT.first_child();
-        let b = ROOT.children().last().unwrap().clone();
+        let b = *ROOT.children().last().unwrap();
 
         let mut seeds = MortonKeys {
             keys: vec![a, b],
