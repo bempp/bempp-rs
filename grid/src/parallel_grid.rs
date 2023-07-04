@@ -1,4 +1,5 @@
-    //! A parallel implementation of a grid
+
+//! A parallel implementation of a grid
 use crate::grid::{SerialGeometry, SerialTopology};
 use bempp_element::element::CiarletElement;
 use bempp_tools::arrays::{AdjacencyList, Array2D};
