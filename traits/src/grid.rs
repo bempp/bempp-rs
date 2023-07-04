@@ -123,12 +123,20 @@ pub trait Topology<'a> {
     /// Get the ownership of a mesh entity
     fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
 
-    /// Get the cell adjacency on the local process
-    ///
-    /// The `i`th row of the output gives the cells adjacent to the local cell with index `i`.
-    /// The entries in the output are (cell_index, number_of_shared_vertices).
-    // TODO: find a better return type for here
-    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>>;
+    /// Get pairs of cells that are adjacent via a facet (entity of dimension tdim - 1).
+    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
+    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
+
+    /// Get pairs of cells that are adjacent via a ridge (entity of dimension tdim - 2).
+    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
+    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
+
+    /// Get pairs of cells that are adjacent via a peak (entity of dimension tdim - 3).
+    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
+    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
+
+    /// Get pairs of cells that are not adjacent
+    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>>;
 }
 
 pub trait Grid<'a> {
