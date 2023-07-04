@@ -36,11 +36,20 @@ fn assemble<'a, E: FiniteElement>(
     trial_space: &SerialFunctionSpace<E>,
     bem_kernel: &impl Kernel<f64>,
 ) {
-    let mut local_result = Array2D::<f64>::new((bem_kernel.test_element_dim(), bem_kernel.trial_element_dim()));
+    let mut local_result = Array2D::<f64>::new((
+        bem_kernel.test_element_dim(),
+        bem_kernel.trial_element_dim(),
+    ));
     let grid = test_space.grid();
 
-    let mut test_vertices = Array2D::<f64>::new((bem_kernel.test_geometry_element_dim(), grid.geometry().dim()));
-    let mut trial_vertices = Array2D::<f64>::new((bem_kernel.trial_geometry_element_dim(), grid.geometry().dim()));
+    let mut test_vertices = Array2D::<f64>::new((
+        bem_kernel.test_geometry_element_dim(),
+        grid.geometry().dim(),
+    ));
+    let mut trial_vertices = Array2D::<f64>::new((
+        bem_kernel.trial_geometry_element_dim(),
+        grid.geometry().dim(),
+    ));
 
     // Test and trial cells are equal
     for test_cell in 0..grid.geometry().cell_count() {

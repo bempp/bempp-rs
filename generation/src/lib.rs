@@ -6,7 +6,7 @@ use bempp_quadrature::types::{
     CellToCellConnectivity, NumericalQuadratureDefinition, TestTrialNumericalQuadratureDefinition,
 };
 use bempp_tools::arrays::{Array2D, Array4D};
-use bempp_traits::arrays::{Array2DAccess,Array4DAccess};
+use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::ElementFamily;
 use bempp_traits::element::FiniteElement;
@@ -14,8 +14,8 @@ use num::traits::real::Real;
 use num::Num;
 use proc_macro::TokenStream;
 use quote::quote;
-use std::fmt::Debug;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use syn::{parse::Parse, parse_macro_input, Expr, Token};
 
@@ -170,7 +170,7 @@ fn format_eval_table<T: Num + Debug>(
             break;
         }
     } else {
-            t += &indent(level);
+        t += &indent(level);
         t += &format!("let {name} = match qid {{\n");
         for (qid, table) in tables.iter() {
             t += &indent(level + 1);
@@ -366,10 +366,12 @@ fn singular_kernel(
         let mut trial_eval_table = Array4D::<T>::new(trial_element.tabulate_array_shape(1, npts));
         trial_element.tabulate(&trial_points, 1, &mut trial_eval_table);
         trial_evals.insert(*qid, trial_eval_table);
-        let mut test_geometry_eval_table = Array4D::<T>::new(test_geometry_element.tabulate_array_shape(1, npts));
+        let mut test_geometry_eval_table =
+            Array4D::<T>::new(test_geometry_element.tabulate_array_shape(1, npts));
         test_geometry_element.tabulate(&test_points, 1, &mut test_geometry_eval_table);
         test_geometry_evals.insert(*qid, test_geometry_eval_table);
-        let mut trial_geometry_eval_table = Array4D::<T>::new(trial_geometry_element.tabulate_array_shape(1, npts));
+        let mut trial_geometry_eval_table =
+            Array4D::<T>::new(trial_geometry_element.tabulate_array_shape(1, npts));
         trial_geometry_element.tabulate(&trial_points, 1, &mut trial_geometry_eval_table);
         trial_geometry_evals.insert(*qid, trial_geometry_eval_table);
     }
@@ -405,27 +407,31 @@ fn singular_kernel(
             "TEST_GEOMETRY_EVALS_DY".to_string(),
             &test_geometry_evals,
             2,
-            0, 1
+            0,
+            1,
         );
     }
     code += &format_eval_table(
         "TRIAL_GEOMETRY_EVALS".to_string(),
         &trial_geometry_evals,
         0,
-        0, 1
+        0,
+        1,
     );
     if trial_geometry_element.degree() > 1 {
         code += &format_eval_table(
             "TRIAL_GEOMETRY_EVALS_DX".to_string(),
             &trial_geometry_evals,
             1,
-            0, 1
+            0,
+            1,
         );
         code += &format_eval_table(
             "TRIAL_GEOMETRY_EVALS_DY".to_string(),
             &trial_geometry_evals,
             2,
-            0, 1
+            0,
+            1,
         );
     }
     if test_element.degree() > 0 {
@@ -621,40 +627,46 @@ fn nonsingular_kernel(
         "TEST_GEOMETRY_EVALS".to_string(),
         &test_geometry_evals,
         0,
-        0, 1
+        0,
+        1,
     );
     if test_geometry_element.degree() > 1 {
         code += &format_eval_table(
             "TEST_GEOMETRY_EVALS_DX".to_string(),
             &test_geometry_evals,
             1,
-            0, 1
+            0,
+            1,
         );
         code += &format_eval_table(
             "TEST_GEOMETRY_EVALS_DY".to_string(),
             &test_geometry_evals,
             2,
-            0, 1
+            0,
+            1,
         );
     }
     code += &format_eval_table(
         "TRIAL_GEOMETRY_EVALS".to_string(),
         &trial_geometry_evals,
         0,
-        0, 1
+        0,
+        1,
     );
     if trial_geometry_element.degree() > 1 {
         code += &format_eval_table(
             "TRIAL_GEOMETRY_EVALS_DX".to_string(),
             &trial_geometry_evals,
             1,
-            0, 1
+            0,
+            1,
         );
         code += &format_eval_table(
             "TRIAL_GEOMETRY_EVALS_DY".to_string(),
             &trial_geometry_evals,
             2,
-            0, 1
+            0,
+            1,
         );
     }
     if test_element.degree() > 0 {
@@ -866,14 +878,17 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     // TODO: degree
     let mut quadrules = HashMap::new();
 
-    quadrules.insert(0, triangle_duffy(
-        &CellToCellConnectivity {
-            connectivity_dimension: 2,
-            local_indices: vec![(0, 0), (1, 1), (2, 2)],
-        },
-        1,
-    )
-    .unwrap());
+    quadrules.insert(
+        0,
+        triangle_duffy(
+            &CellToCellConnectivity {
+                connectivity_dimension: 2,
+                local_indices: vec![(0, 0), (1, 1), (2, 2)],
+            },
+            1,
+        )
+        .unwrap(),
+    );
     code += &singular_kernel(
         "same_cell_kernel".to_string(),
         quadrules,
@@ -885,21 +900,23 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
         gdim,
     );
 
-
     let mut quadrules = HashMap::new();
     for i in 0..3 {
         for j in i + 1..3 {
             for k in 0..3 {
                 for l in 0..3 {
                     if k != l {
-                        quadrules.insert(i * 64 + k * 16 + j * 4 + l, triangle_duffy(
-                            &CellToCellConnectivity {
-                                connectivity_dimension: 1,
-                                local_indices: vec![(i, k), (j, l)],
-                            },
-                            1,
-                        )
-                        .unwrap());
+                        quadrules.insert(
+                            i * 64 + k * 16 + j * 4 + l,
+                            triangle_duffy(
+                                &CellToCellConnectivity {
+                                    connectivity_dimension: 1,
+                                    local_indices: vec![(i, k), (j, l)],
+                                },
+                                1,
+                            )
+                            .unwrap(),
+                        );
                     }
                 }
             }
@@ -919,14 +936,17 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     let mut quadrules = HashMap::new();
     for i in 0..3 {
         for j in 0..3 {
-            quadrules.insert(4 * j + i, triangle_duffy(
-                &CellToCellConnectivity {
-                    connectivity_dimension: 0,
-                    local_indices: vec![(i, j)],
-                },
-                1,
-            )
-            .unwrap());
+            quadrules.insert(
+                4 * j + i,
+                triangle_duffy(
+                    &CellToCellConnectivity {
+                        connectivity_dimension: 0,
+                        local_indices: vec![(i, j)],
+                    },
+                    1,
+                )
+                .unwrap(),
+            );
         }
     }
     code += &singular_kernel(
