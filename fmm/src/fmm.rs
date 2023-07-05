@@ -2,7 +2,7 @@ extern crate blas_src;
 
 use cauchy::Scalar;
 use itertools::Itertools;
-use ndarray::AssignElem;
+// use ndarray::AssignElem;
 // use ndarray::*;
 // use ndarray_ndimage::{pad, PadMode};
 // use ndrustfft::{ndfft, ndfft_r2c, ndifft, ndifft_r2c, Complex, FftHandler, R2cFftHandler};
@@ -312,82 +312,43 @@ where
                         .map(|p| p.coordinate)
                         .flat_map(|[x, y, z]| vec![x, y, z])
                         .collect_vec();
-
                     let nsources = leaf_coordinates.len() / self.fmm.kernel.space_dimension();
+
+                    // Get into row major order
                     let leaf_coordinates = unsafe {
-                        rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (nsources, 1)]
-                    };
+                        rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                    }.eval();
 
                     let upward_check_surface = leaf.compute_surface(
                         &fmm_arc.tree().domain,
                         fmm_arc.order,
                         fmm_arc.alpha_outer,
                     );
-
                     let ntargets = upward_check_surface.len() / fmm_arc.kernel.space_dimension();
-                    let upward_check_surface = unsafe {
-                        rlst_pointer_mat!['a, f64, upward_check_surface.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (1, ntargets)]
-                    };
 
-                    // let leaf_charges_view = ArrayView::from(leaf_charges_arc.deref());
-                    // let leaf_charges_slice = leaf_charges_view.as_slice().unwrap();
-                    let n_leaf_pts = leaf_coordinates.shape().0;
-                    let leaf_charges = unsafe { rlst_pointer_mat!['a, f64, leaf_charges_arc.deref().as_ptr(), (n_leaf_pts, 1), (n_leaf_pts, 1)] };
+                    let leaf_charges = leaf_charges_arc.deref();
 
                     // Calculate check potential
-                    // let mut check_potential =
-                    //     vec![0.; upward_check_surface.len() / self.fmm.kernel.dim()];
-
                     let mut check_potential = rlst_col_vec![f64, ntargets];
 
                     fmm_arc.kernel.evaluate_st(
                         EvalType::Value,
                         leaf_coordinates.data(),
-                        upward_check_surface.data(),
-                        leaf_charges.data(),
+                        &upward_check_surface[..],
+                        &leaf_charges[..],
                         check_potential.data_mut()
                     );
 
-                    // println!("{:?}", upward_check_surface.data());
-                    // println!("{:?}", leaf_coordinates.data());
-                    // println!("{:?}", leaf_charges.data());
-                    // println!("HERE {:?}", check_potential.data());
-                    // println!();
-
-                    // fmm_arc.kernel.potential(
-                    //     &leaf_coordinates[..],
-                    //     leaf_charges_slice,
-                    //     &upward_check_surface[..],
-                    //     &mut check_potential[..],
-                    // );
-                    // let check_potential = Array1::from_vec(check_potential);
-
-                    // Calculate multipole expansion
-                    // let leaf_multipole_owned = fmm_arc.kernel.scale(leaf.level())
-                    //     * fmm_arc
-                    //         .uc2e_inv
-                    //         .0
-                    //         .dot(&fmm_arc.uc2e_inv.1.dot(&check_potential));
-                    let leaf_multipole_owned: Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic> = (
+                    let leaf_multipole_owned = (
                         fmm_arc.kernel.scale(leaf.level())
                         * fmm_arc.uc2e_inv.dot(&check_potential)
                     ).eval();
 
                     let mut leaf_multipole_lock = leaf_multipole_arc.lock().unwrap();
 
-                    // println!("target lock {:?}", target_local_lock.shape());
                     for i in 0..leaf_multipole_lock.shape().0 {
                         leaf_multipole_lock[[i, 0]] += leaf_multipole_owned[[i, 0]];
                     }
-
-                    // if !leaf_multipole_lock.is_empty() {
-                    //     leaf_multipole_lock
-                    //         .iter_mut()
-                    //         .zip(leaf_multipole_owned.iter())
-                    //         .for_each(|(c, m)| *c += *m);
-                    // } else {
-                    //     leaf_multipole_lock.extend(leaf_multipole_owned);
-                    // }
                 }
             });
         }
@@ -399,76 +360,22 @@ where
             sources.par_iter().for_each(move |&source| {
                 let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
+                let operator_index = source.siblings().iter().position(|&x| x == source).unwrap();
                 let source_multipole_arc = Arc::clone(self.multipoles.get(&source).unwrap());
-                let source_multipole_lock = source_multipole_arc.lock().unwrap();
-
                 let target_multipole_arc =
                     Arc::clone(self.multipoles.get(&source.parent()).unwrap());
                 let fmm_arc = Arc::clone(&self.fmm);
 
-                let source_multipole_ptr = source_multipole_lock.deref().data().as_ptr();
-                let source_multipole_view = unsafe {
-                    rlst_pointer_mat!['a, f64, source_multipole_ptr, (ncoeffs, 1), (1, ncoeffs)]
-                };
-
-                let operator_index = source.siblings().iter().position(|&x| x == source).unwrap();
-
-                // let source_multipole_view = rlst_col_vec![f64, ncoeffs];
-                // let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
+                let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
                 let target_multipole_owned =
-                    fmm_arc.m2m[operator_index].dot(&source_multipole_view);
+                    fmm_arc.m2m[operator_index].dot(&source_multipole_lock);
 
                 let mut target_multipole_lock = target_multipole_arc.lock().unwrap();
-
-                // target_multipole_lock.pretty_print();
-                // target_multipole_owned.pretty_print();
-                // println!("HERE {:?} {:?}", target_multipole_lock.shape(), target_multipole_owned.shape());
-
-                // println!("Attempting to sum : {:?} \n {:?} using {:?} \n", target_multipole_lock.data(), target_multipole_owned.data(), source_multipole_view.data());
 
                 for i in 0..ncoeffs {
                     target_multipole_lock[[i, 0]] += target_multipole_owned[[i, 0]];
                 }
-                // for i in 0..ncoeffs {
-                //     // println!("{:?} {:?} \n {:?} \n {:?} \n \n", target_multipole_lock[[i, 0]], target_multipole_owned[[i, 0]], target_multipole_lock.data(), target_multipole_owned.data());
-                //     [[i, 0]] = target_multipole_lock[[i, 0]] + target_multipole_owned[[i, 0]];
-                // }
-                // let mut target_multipole_lock = target_multipole_arc.lock().unwrap();
-
-                // // fmm_arc.m2m[operator_index].pretty_print();
-                // // // source_multipole_view.pretty_print();
-                // // target_multipole_owned.pretty_print();
-                // // println!("HERE");
-
-                // for i in 0..ncoeffs {
-                //     target_multipole_lock[[i, 0]] += target_multipole_owned[[i, 0]];
-                // }
-                // target_multipole_lock.pretty_print();
-                // println!("{:?} ", source.parent().anchor());
-                // if !source_multipole_lock.is_empty() {
-                //     let target_multipole_arc =
-                //         Arc::clone(self.multipoles.get(&source.parent()).unwrap());
-                //     let fmm_arc = Arc::clone(&self.fmm);
-
-                //     let operator_index =
-                //         source.siblings().iter().position(|&x| x == source).unwrap();
-
-                //     let source_multipole_view = ArrayView::from(source_multipole_lock.deref());
-
-                //     let target_multipole_owned =
-                //         fmm_arc.m2m[operator_index].dot(&source_multipole_view);
-                //     let mut target_multipole_lock = target_multipole_arc.lock().unwrap();
-
-                //     if !target_multipole_lock.is_empty() {
-                //         target_multipole_lock
-                //             .iter_mut()
-                //             .zip(target_multipole_owned.iter())
-                //             .for_each(|(c, m)| *c += *m);
-                //     } else {
-                //         target_multipole_lock.extend(target_multipole_owned);
-                //     }
-                // }
             })
         }
     }
@@ -489,19 +396,24 @@ where
 //                 let operator_index = target.siblings().iter().position(|&x| x == target).unwrap();
 
 //                 let source_local_lock = source_local_arc.lock().unwrap();
-//                 let source_local_view = ArrayView::from(source_local_lock.deref());
 
+//                 // let source_local_view = ArrayView::from(source_local_lock.deref());
+
+//                 let source_local_ptr = source_local_lock.deref().data().as_ptr();
+//                 let source_multipole_view = unsafe {
+//                     rlst_pointer_mat!['a, f64, source_multipole_ptr, (ncoeffs, 1), (1, ncoeffs)]
+//                 };
 //                 let target_local_owned = fmm.l2l[operator_index].dot(&source_local_view);
 //                 let mut target_local_lock = target_local_arc.lock().unwrap();
 
-//                 if !target_local_lock.is_empty() {
-//                     target_local_lock
-//                         .iter_mut()
-//                         .zip(target_local_owned.iter())
-//                         .for_each(|(c, m)| *c += *m);
-//                 } else {
-//                     target_local_lock.extend(target_local_owned);
-//                 }
+//                 // if !target_local_lock.is_empty() {
+//                 //     target_local_lock
+//                 //         .iter_mut()
+//                 //         .zip(target_local_owned.iter())
+//                 //         .for_each(|(c, m)| *c += *m);
+//                 // } else {
+//                 //     target_local_lock.extend(target_local_owned);
+//                 // }
 //             })
 //         }
 //     }
@@ -1497,116 +1409,116 @@ mod test {
         assert!(false)
     }
 
-    #[test]
-    fn test_fmm() {
-        let npoints = 1000;
-        //     let points = points_fixture(npoints);
-        //     let points_clone = points.clone();
-        //     let depth = 4;
-        //     let n_crit = 150;
-        let points = points_fixture(npoints, None, None);
+    // #[test]
+    // fn test_fmm() {
+    //     let npoints = 1000;
+    //     //     let points = points_fixture(npoints);
+    //     //     let points_clone = points.clone();
+    //     //     let depth = 4;
+    //     //     let n_crit = 150;
+    //     let points = points_fixture(npoints, None, None);
 
-        let order = 2;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.9;
-        let adaptive = false;
-        let k = 50;
-        let ncrit = 100;
-        let depth = 2;
-        let kernel = Laplace3dKernel::<f64>::default();
+    //     let order = 2;
+    //     let alpha_inner = 1.05;
+    //     let alpha_outer = 2.9;
+    //     let adaptive = false;
+    //     let k = 50;
+    //     let ncrit = 100;
+    //     let depth = 2;
+    //     let kernel = Laplace3dKernel::<f64>::default();
 
-        let start = Instant::now();
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth));
-        println!("Tree = {:?}ms", start.elapsed().as_millis());
+    //     let start = Instant::now();
+    //     let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth));
+    //     println!("Tree = {:?}ms", start.elapsed().as_millis());
 
-        let start = Instant::now();
+    //     let start = Instant::now();
 
-        //     // let m2l_data_svd_naive = SvdFieldTranslationNaiveKiFmm::new(
-        //     //     kernel.clone(),
-        //     //     Some(k),
-        //     //     order,
-        //     //     tree.get_domain().clone(),
-        //     //     alpha_inner,
-        //     // );
+    //     //     // let m2l_data_svd_naive = SvdFieldTranslationNaiveKiFmm::new(
+    //     //     //     kernel.clone(),
+    //     //     //     Some(k),
+    //     //     //     order,
+    //     //     //     tree.get_domain().clone(),
+    //     //     //     alpha_inner,
+    //     //     // );
 
-        let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-            kernel.clone(),
-            Some(k),
-            order,
-            tree.get_domain().clone(),
-            alpha_inner,
-        );
-        println!("SVD operators = {:?}ms", start.elapsed().as_millis());
+    //     let m2l_data_svd = SvdFieldTranslationKiFmm::new(
+    //         kernel.clone(),
+    //         Some(k),
+    //         order,
+    //         tree.get_domain().clone(),
+    //         alpha_inner,
+    //     );
+    //     println!("SVD operators = {:?}ms", start.elapsed().as_millis());
 
-        //     let start = Instant::now();
-        //     let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
-        //         kernel.clone(),
-        //         order,
-        //         tree.get_domain().clone(),
-        //         alpha_inner,
-        //     );
-        //     println!("FFT operators = {:?}ms", start.elapsed().as_millis());
+    //     //     let start = Instant::now();
+    //     //     let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
+    //     //         kernel.clone(),
+    //     //         order,
+    //     //         tree.get_domain().clone(),
+    //     //         alpha_inner,
+    //     //     );
+    //     //     println!("FFT operators = {:?}ms", start.elapsed().as_millis());
 
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
+    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
-        let charges = Charges::new();
-        let datatree = FmmData::new(fmm, charges);
-        datatree.upward_pass();
+    //     let charges = Charges::new();
+    //     let datatree = FmmData::new(fmm, charges);
+    //     datatree.upward_pass();
 
-        // let e = datatree.multipoles.get(&ROOT);
+    //     // let e = datatree.multipoles.get(&ROOT);
 
-        // println!("{:?}", );
-        // println!("e {:?}", e);
-        // e.pretty_print();
+    //     // println!("{:?}", );
+    //     // println!("e {:?}", e);
+    //     // e.pretty_print();
 
-        assert!(false);
-        // fmm.m2m[0].pretty_print();
+    //     assert!(false);
+    //     // fmm.m2m[0].pretty_print();
 
-        //     let charges = Charges::new();
+    //     //     let charges = Charges::new();
 
-        //     let datatree = FmmData::new(fmm, charges);
+    //     //     let datatree = FmmData::new(fmm, charges);
 
-        //     datatree.run();
+    //     //     datatree.run();
 
-        //     let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+    //     //     let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        //     let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        //     let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+    //     //     let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+    //     //     let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        //     let mut direct = vec![0f64; pts.len()];
-        //     let all_point_coordinates = points_clone
-        //         .iter()
-        //         .map(|p| p.coordinate)
-        //         .flat_map(|[x, y, z]| vec![x, y, z])
-        //         .collect_vec();
+    //     //     let mut direct = vec![0f64; pts.len()];
+    //     //     let all_point_coordinates = points_clone
+    //     //         .iter()
+    //     //         .map(|p| p.coordinate)
+    //     //         .flat_map(|[x, y, z]| vec![x, y, z])
+    //     //         .collect_vec();
 
-        //     let leaf_coordinates = pts
-        //         .iter()
-        //         .map(|p| p.coordinate)
-        //         .flat_map(|[x, y, z]| vec![x, y, z])
-        //         .collect_vec();
-        //     let all_charges = vec![1f64; points_clone.len()];
+    //     //     let leaf_coordinates = pts
+    //     //         .iter()
+    //     //         .map(|p| p.coordinate)
+    //     //         .flat_map(|[x, y, z]| vec![x, y, z])
+    //     //         .collect_vec();
+    //     //     let all_charges = vec![1f64; points_clone.len()];
 
-        //     let kernel = LaplaceKernel {
-        //         dim: 3,
-        //         is_singular: false,
-        //         value_dimension: 3,
-        //     };
-        //     kernel.potential(
-        //         &all_point_coordinates[..],
-        //         &all_charges[..],
-        //         &leaf_coordinates[..],
-        //         &mut direct[..],
-        //     );
+    //     //     let kernel = LaplaceKernel {
+    //     //         dim: 3,
+    //     //         is_singular: false,
+    //     //         value_dimension: 3,
+    //     //     };
+    //     //     kernel.potential(
+    //     //         &all_point_coordinates[..],
+    //     //         &all_charges[..],
+    //     //         &leaf_coordinates[..],
+    //     //         &mut direct[..],
+    //     //     );
 
-        //     let abs_error: f64 = potentials
-        //         .iter()
-        //         .zip(direct.iter())
-        //         .map(|(a, b)| (a - b).abs())
-        //         .sum();
-        //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+    //     //     let abs_error: f64 = potentials
+    //     //         .iter()
+    //     //         .zip(direct.iter())
+    //     //         .map(|(a, b)| (a - b).abs())
+    //     //         .sum();
+    //     //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        //     println!("p={:?} rel_error={:?}\n", order, rel_error);
-        //     assert!(false)
-    }
+    //     //     println!("p={:?} rel_error={:?}\n", order, rel_error);
+    //     //     assert!(false)
+    // }
 }
