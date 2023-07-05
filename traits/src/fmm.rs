@@ -40,7 +40,7 @@ pub trait Fmm {
 pub trait FmmLoop {
     fn upward_pass(&self);
 
-    // fn downward_pass(&self);
+    fn downward_pass(&self);
 
     fn run(&self);
 }
