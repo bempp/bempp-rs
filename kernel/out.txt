@@ -1,0 +1,473 @@
+; bempp_kernel::laplace_3d::simd_wrapper_evaluate
+; Function Attrs: uwtable
+define void @bempp_kernel::laplace_3d::simd_wrapper_evaluate(i1 noundef zeroext %eval_type, ptr noalias nocapture noundef nonnull readonly align 4 %target.0, i64 noundef %target.1, ptr noalias nocapture noundef nonnull readonly align 4 %sources.0, i64 noundef %sources.1, ptr noalias nocapture noundef nonnull readonly align 4 %charges.0, i64 noundef %charges.1, ptr noalias nocapture noundef nonnull writeonly align 4 %result.0, i64 noundef %result.1) unnamed_addr #0 personality ptr @rust_eh_personality {
+start:
+  tail call void @llvm.experimental.noalias.scope.decl(metadata !6)
+  tail call void @llvm.experimental.noalias.scope.decl(metadata !9)
+  tail call void @llvm.experimental.noalias.scope.decl(metadata !11)
+  tail call void @llvm.experimental.noalias.scope.decl(metadata !13)
+  %_9.i.i = icmp ugt i64 %charges.1, %sources.1
+  br i1 %_9.i.i, label %bb3.i.i, label %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit.i"
+
+bb3.i.i:                                          ; preds = %start
+; call core::slice::index::slice_end_index_len_fail
+  tail call void @core::slice::index::slice_end_index_len_fail(i64 noundef %charges.1, i64 noundef %sources.1, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc178) #10, !noalias !15
+  unreachable
+
+"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit.i": ; preds = %start
+  %_24.i = shl i64 %charges.1, 1
+  %_3.i.i = icmp ult i64 %_24.i, %charges.1
+  br i1 %_3.i.i, label %bb1.i.i, label %bb2.i.i
+
+bb2.i.i:                                          ; preds = %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit.i"
+  %_9.i38.i = icmp ugt i64 %_24.i, %sources.1
+  br i1 %_9.i38.i, label %bb3.i39.i, label %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit40.i"
+
+bb1.i.i:                                          ; preds = %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit.i"
+; call core::slice::index::slice_index_order_fail
+  tail call void @core::slice::index::slice_index_order_fail(i64 noundef %charges.1, i64 noundef %_24.i, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc180) #10, !noalias !18
+  unreachable
+
+bb3.i39.i:                                        ; preds = %bb2.i.i
+; call core::slice::index::slice_end_index_len_fail
+  tail call void @core::slice::index::slice_end_index_len_fail(i64 noundef %_24.i, i64 noundef %sources.1, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc180) #10, !noalias !18
+  unreachable
+
+"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit40.i": ; preds = %bb2.i.i
+  %0 = getelementptr inbounds float, ptr %sources.0, i64 %charges.1
+  %_32.i = mul i64 %charges.1, 3
+  %_3.i41.i = icmp ult i64 %_32.i, %_24.i
+  br i1 %_3.i41.i, label %bb1.i44.i, label %bb2.i43.i
+
+bb2.i43.i:                                        ; preds = %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit40.i"
+  %_9.i42.i = icmp ugt i64 %_32.i, %sources.1
+  br i1 %_9.i42.i, label %bb3.i46.i, label %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit47.i"
+
+bb1.i44.i:                                        ; preds = %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit40.i"
+; call core::slice::index::slice_index_order_fail
+  tail call void @core::slice::index::slice_index_order_fail(i64 noundef %_24.i, i64 noundef %_32.i, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc182) #10, !noalias !21
+  unreachable
+
+bb3.i46.i:                                        ; preds = %bb2.i43.i
+; call core::slice::index::slice_end_index_len_fail
+  tail call void @core::slice::index::slice_end_index_len_fail(i64 noundef %_32.i, i64 noundef %sources.1, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc182) #10, !noalias !21
+  unreachable
+
+"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit47.i": ; preds = %bb2.i43.i
+  %1 = getelementptr inbounds float, ptr %sources.0, i64 %_24.i
+  %.not125.i = icmp eq i64 %charges.1, 0
+  br i1 %eval_type, label %bb40.preheader.i, label %bb7.preheader.i
+
+bb7.preheader.i:                                  ; preds = %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit47.i"
+  br i1 %.not125.i, label %bb10.i, label %bb11.lr.ph.i
+
+bb11.lr.ph.i:                                     ; preds = %bb7.preheader.i
+  %_56.not.i = icmp eq i64 %target.1, 0
+  %2 = getelementptr inbounds [0 x float], ptr %target.0, i64 0, i64 1
+  %_74.i = icmp ugt i64 %target.1, 2
+  %3 = getelementptr inbounds [0 x float], ptr %target.0, i64 0, i64 2
+  br i1 %_56.not.i, label %panic24.i, label %bb11.lr.ph.split.i, !prof !24
+
+bb11.lr.ph.split.i:                               ; preds = %bb11.lr.ph.i
+  %_65.not.i = icmp eq i64 %target.1, 1
+  %_53.i = load float, ptr %target.0, align 4, !alias.scope !6, !noalias !25, !noundef !1
+  br i1 %_65.not.i, label %panic26.i, label %bb11.lr.ph.split.split.us.i, !prof !24
+
+bb11.lr.ph.split.split.us.i:                      ; preds = %bb11.lr.ph.split.i
+  %_62.us.i = load float, ptr %2, align 4, !alias.scope !6, !noalias !25, !noundef !1
+  br i1 %_74.i, label %bb11.lr.ph.split.split.us.split.us.i, label %bb14.us.i, !prof !26
+
+bb11.lr.ph.split.split.us.split.us.i:             ; preds = %bb11.lr.ph.split.split.us.i
+  %_71.us.us.i = load float, ptr %3, align 4, !alias.scope !6, !noalias !25, !noundef !1
+  %min.iters.check = icmp ult i64 %charges.1, 8
+  br i1 %min.iters.check, label %bb14.us.us.i.preheader, label %vector.ph
+
+vector.ph:                                        ; preds = %bb11.lr.ph.split.split.us.split.us.i
+  %n.vec = and i64 %charges.1, -8
+  %broadcast.splatinsert = insertelement <4 x float> poison, float %_53.i, i64 0
+  %broadcast.splat = shufflevector <4 x float> %broadcast.splatinsert, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert18 = insertelement <4 x float> poison, float %_53.i, i64 0
+  %broadcast.splat19 = shufflevector <4 x float> %broadcast.splatinsert18, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert22 = insertelement <4 x float> poison, float %_62.us.i, i64 0
+  %broadcast.splat23 = shufflevector <4 x float> %broadcast.splatinsert22, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert24 = insertelement <4 x float> poison, float %_62.us.i, i64 0
+  %broadcast.splat25 = shufflevector <4 x float> %broadcast.splatinsert24, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert28 = insertelement <4 x float> poison, float %_71.us.us.i, i64 0
+  %broadcast.splat29 = shufflevector <4 x float> %broadcast.splatinsert28, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert30 = insertelement <4 x float> poison, float %_71.us.us.i, i64 0
+  %broadcast.splat31 = shufflevector <4 x float> %broadcast.splatinsert30, <4 x float> poison, <4 x i32> zeroinitializer
+  br label %vector.body
+
+vector.body:                                      ; preds = %vector.body, %vector.ph
+  %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ]
+  %vec.phi = phi float [ 0.000000e+00, %vector.ph ], [ %39, %vector.body ]
+  %4 = getelementptr inbounds [0 x float], ptr %sources.0, i64 0, i64 %index
+  %wide.load = load <4 x float>, ptr %4, align 4, !alias.scope !9, !noalias !27
+  %5 = getelementptr inbounds float, ptr %4, i64 4
+  %wide.load17 = load <4 x float>, ptr %5, align 4, !alias.scope !9, !noalias !27
+  %6 = fsub <4 x float> %wide.load, %broadcast.splat
+  %7 = fsub <4 x float> %wide.load17, %broadcast.splat19
+  %8 = getelementptr inbounds [0 x float], ptr %0, i64 0, i64 %index
+  %wide.load20 = load <4 x float>, ptr %8, align 4, !alias.scope !9, !noalias !27
+  %9 = getelementptr inbounds float, ptr %8, i64 4
+  %wide.load21 = load <4 x float>, ptr %9, align 4, !alias.scope !9, !noalias !27
+  %10 = fsub <4 x float> %wide.load20, %broadcast.splat23
+  %11 = fsub <4 x float> %wide.load21, %broadcast.splat25
+  %12 = getelementptr inbounds [0 x float], ptr %1, i64 0, i64 %index
+  %wide.load26 = load <4 x float>, ptr %12, align 4, !alias.scope !9, !noalias !27
+  %13 = getelementptr inbounds float, ptr %12, i64 4
+  %wide.load27 = load <4 x float>, ptr %13, align 4, !alias.scope !9, !noalias !27
+  %14 = fsub <4 x float> %wide.load26, %broadcast.splat29
+  %15 = fsub <4 x float> %wide.load27, %broadcast.splat31
+  %16 = fmul <4 x float> %6, %6
+  %17 = fmul <4 x float> %7, %7
+  %18 = fmul <4 x float> %10, %10
+  %19 = fmul <4 x float> %11, %11
+  %20 = fadd <4 x float> %16, %18
+  %21 = fadd <4 x float> %17, %19
+  %22 = fmul <4 x float> %14, %14
+  %23 = fmul <4 x float> %15, %15
+  %24 = fadd <4 x float> %20, %22
+  %25 = fadd <4 x float> %21, %23
+  %26 = tail call <4 x float> @llvm.sqrt.v4f32(<4 x float> %24)
+  %27 = tail call <4 x float> @llvm.sqrt.v4f32(<4 x float> %25)
+  %28 = fcmp oeq <4 x float> %26, zeroinitializer
+  %29 = fcmp oeq <4 x float> %27, zeroinitializer
+  %30 = fdiv <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %26
+  %31 = fdiv <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %27
+  %32 = select <4 x i1> %28, <4 x float> zeroinitializer, <4 x float> %30
+  %33 = select <4 x i1> %29, <4 x float> zeroinitializer, <4 x float> %31
+  %34 = getelementptr inbounds [0 x float], ptr %charges.0, i64 0, i64 %index
+  %wide.load32 = load <4 x float>, ptr %34, align 4, !alias.scope !11, !noalias !28
+  %35 = getelementptr inbounds float, ptr %34, i64 4
+  %wide.load33 = load <4 x float>, ptr %35, align 4, !alias.scope !11, !noalias !28
+  %36 = fmul <4 x float> %wide.load32, %32
+  %37 = fmul <4 x float> %wide.load33, %33
+  %38 = tail call float @llvm.vector.reduce.fadd.v4f32(float %vec.phi, <4 x float> %36)
+  %39 = tail call float @llvm.vector.reduce.fadd.v4f32(float %38, <4 x float> %37)
+  %index.next = add nuw i64 %index, 8
+  %40 = icmp eq i64 %index.next, %n.vec
+  br i1 %40, label %middle.block, label %vector.body, !llvm.loop !29
+
+middle.block:                                     ; preds = %vector.body
+  %cmp.n = icmp eq i64 %n.vec, %charges.1
+  br i1 %cmp.n, label %bb10.loopexit.i, label %bb14.us.us.i.preheader
+
+bb14.us.us.i.preheader:                           ; preds = %bb11.lr.ph.split.split.us.split.us.i, %middle.block
+  %my_result.098.us.us.i.ph = phi float [ 0.000000e+00, %bb11.lr.ph.split.split.us.split.us.i ], [ %39, %middle.block ]
+  %iter.sroa.0.097.us.us.i.ph = phi i64 [ 0, %bb11.lr.ph.split.split.us.split.us.i ], [ %n.vec, %middle.block ]
+  br label %bb14.us.us.i
+
+bb14.us.us.i:                                     ; preds = %bb14.us.us.i.preheader, %bb14.us.us.i
+  %my_result.098.us.us.i = phi float [ %58, %bb14.us.us.i ], [ %my_result.098.us.us.i.ph, %bb14.us.us.i.preheader ]
+  %iter.sroa.0.097.us.us.i = phi i64 [ %43, %bb14.us.us.i ], [ %iter.sroa.0.097.us.us.i.ph, %bb14.us.us.i.preheader ]
+  %41 = getelementptr inbounds [0 x float], ptr %sources.0, i64 0, i64 %iter.sroa.0.097.us.us.i
+  %_49.us.us.i = load float, ptr %41, align 4, !alias.scope !9, !noalias !27, !noundef !1
+  %42 = fsub float %_49.us.us.i, %_53.i
+  %43 = add nuw i64 %iter.sroa.0.097.us.us.i, 1
+  %44 = getelementptr inbounds [0 x float], ptr %0, i64 0, i64 %iter.sroa.0.097.us.us.i
+  %_58.us.us.i = load float, ptr %44, align 4, !alias.scope !9, !noalias !27, !noundef !1
+  %45 = fsub float %_58.us.us.i, %_62.us.i
+  %46 = getelementptr inbounds [0 x float], ptr %1, i64 0, i64 %iter.sroa.0.097.us.us.i
+  %_67.us.us.i = load float, ptr %46, align 4, !alias.scope !9, !noalias !27, !noundef !1
+  %47 = fsub float %_67.us.us.i, %_71.us.us.i
+  %48 = fmul float %42, %42
+  %49 = fmul float %45, %45
+  %50 = fadd float %48, %49
+  %51 = fmul float %47, %47
+  %52 = fadd float %50, %51
+  %53 = tail call float @llvm.sqrt.f32(float %52)
+  %54 = fcmp oeq float %53, 0.000000e+00
+  %55 = fdiv float 1.000000e+00, %53
+  %inv_diff_norm.0.us.us.i = select i1 %54, float 0.000000e+00, float %55
+  %56 = getelementptr inbounds [0 x float], ptr %charges.0, i64 0, i64 %iter.sroa.0.097.us.us.i
+  %_96.us.us.i = load float, ptr %56, align 4, !alias.scope !11, !noalias !28, !noundef !1
+  %57 = fmul float %_96.us.us.i, %inv_diff_norm.0.us.us.i
+  %58 = fadd float %my_result.098.us.us.i, %57
+  %exitcond.not.i = icmp eq i64 %43, %charges.1
+  br i1 %exitcond.not.i, label %bb10.loopexit.i, label %bb14.us.us.i, !llvm.loop !31
+
+bb14.us.i:                                        ; preds = %bb11.lr.ph.split.split.us.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 2, i64 noundef 2, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc222) #10, !noalias !33
+  unreachable
+
+bb40.preheader.i:                                 ; preds = %"<core::ops::range::Range<usize> as core::slice::index::SliceIndex<[T]>>::index.exit47.i"
+  br i1 %.not125.i, label %bb43.i, label %bb44.lr.ph.i
+
+bb44.lr.ph.i:                                     ; preds = %bb40.preheader.i
+  %_128.not.i = icmp eq i64 %target.1, 0
+  %59 = getelementptr inbounds [0 x float], ptr %target.0, i64 0, i64 1
+  %_146.i = icmp ugt i64 %target.1, 2
+  %60 = getelementptr inbounds [0 x float], ptr %target.0, i64 0, i64 2
+  br i1 %_128.not.i, label %panic9.i, label %bb44.lr.ph.split.i, !prof !24
+
+bb44.lr.ph.split.i:                               ; preds = %bb44.lr.ph.i
+  %_137.not.i = icmp eq i64 %target.1, 1
+  %_125.i = load float, ptr %target.0, align 4, !alias.scope !6, !noalias !25, !noundef !1
+  br i1 %_137.not.i, label %panic11.i, label %bb44.lr.ph.split.split.us.i, !prof !24
+
+bb44.lr.ph.split.split.us.i:                      ; preds = %bb44.lr.ph.split.i
+  %_134.us.i = load float, ptr %59, align 4, !alias.scope !6, !noalias !25, !noundef !1
+  br i1 %_146.i, label %bb44.lr.ph.split.split.us.split.us.i, label %bb47.us.i, !prof !26
+
+bb44.lr.ph.split.split.us.split.us.i:             ; preds = %bb44.lr.ph.split.split.us.i
+  %_143.us.us.i = load float, ptr %60, align 4, !alias.scope !6, !noalias !25, !noundef !1
+  %min.iters.check36 = icmp ult i64 %charges.1, 8
+  br i1 %min.iters.check36, label %bb47.us.us.i.preheader, label %vector.ph37
+
+vector.ph37:                                      ; preds = %bb44.lr.ph.split.split.us.split.us.i
+  %n.vec39 = and i64 %charges.1, -8
+  %broadcast.splatinsert50 = insertelement <4 x float> poison, float %_125.i, i64 0
+  %broadcast.splat51 = shufflevector <4 x float> %broadcast.splatinsert50, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert52 = insertelement <4 x float> poison, float %_125.i, i64 0
+  %broadcast.splat53 = shufflevector <4 x float> %broadcast.splatinsert52, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert56 = insertelement <4 x float> poison, float %_134.us.i, i64 0
+  %broadcast.splat57 = shufflevector <4 x float> %broadcast.splatinsert56, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert58 = insertelement <4 x float> poison, float %_134.us.i, i64 0
+  %broadcast.splat59 = shufflevector <4 x float> %broadcast.splatinsert58, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert62 = insertelement <4 x float> poison, float %_143.us.us.i, i64 0
+  %broadcast.splat63 = shufflevector <4 x float> %broadcast.splatinsert62, <4 x float> poison, <4 x i32> zeroinitializer
+  %broadcast.splatinsert64 = insertelement <4 x float> poison, float %_143.us.us.i, i64 0
+  %broadcast.splat65 = shufflevector <4 x float> %broadcast.splatinsert64, <4 x float> poison, <4 x i32> zeroinitializer
+  br label %vector.body42
+
+vector.body42:                                    ; preds = %vector.body42, %vector.ph37
+  %index43 = phi i64 [ 0, %vector.ph37 ], [ %index.next68, %vector.body42 ]
+  %vec.phi44 = phi float [ 0.000000e+00, %vector.ph37 ], [ %112, %vector.body42 ]
+  %vec.phi45 = phi float [ 0.000000e+00, %vector.ph37 ], [ %114, %vector.body42 ]
+  %vec.phi46 = phi float [ 0.000000e+00, %vector.ph37 ], [ %116, %vector.body42 ]
+  %vec.phi47 = phi float [ 0.000000e+00, %vector.ph37 ], [ %118, %vector.body42 ]
+  %61 = getelementptr inbounds [0 x float], ptr %sources.0, i64 0, i64 %index43
+  %wide.load48 = load <4 x float>, ptr %61, align 4, !alias.scope !9, !noalias !27
+  %62 = getelementptr inbounds float, ptr %61, i64 4
+  %wide.load49 = load <4 x float>, ptr %62, align 4, !alias.scope !9, !noalias !27
+  %63 = fsub <4 x float> %wide.load48, %broadcast.splat51
+  %64 = fsub <4 x float> %wide.load49, %broadcast.splat53
+  %65 = getelementptr inbounds [0 x float], ptr %0, i64 0, i64 %index43
+  %wide.load54 = load <4 x float>, ptr %65, align 4, !alias.scope !9, !noalias !27
+  %66 = getelementptr inbounds float, ptr %65, i64 4
+  %wide.load55 = load <4 x float>, ptr %66, align 4, !alias.scope !9, !noalias !27
+  %67 = fsub <4 x float> %wide.load54, %broadcast.splat57
+  %68 = fsub <4 x float> %wide.load55, %broadcast.splat59
+  %69 = getelementptr inbounds [0 x float], ptr %1, i64 0, i64 %index43
+  %wide.load60 = load <4 x float>, ptr %69, align 4, !alias.scope !9, !noalias !27
+  %70 = getelementptr inbounds float, ptr %69, i64 4
+  %wide.load61 = load <4 x float>, ptr %70, align 4, !alias.scope !9, !noalias !27
+  %71 = fsub <4 x float> %wide.load60, %broadcast.splat63
+  %72 = fsub <4 x float> %wide.load61, %broadcast.splat65
+  %73 = fmul <4 x float> %63, %63
+  %74 = fmul <4 x float> %64, %64
+  %75 = fmul <4 x float> %67, %67
+  %76 = fmul <4 x float> %68, %68
+  %77 = fadd <4 x float> %73, %75
+  %78 = fadd <4 x float> %74, %76
+  %79 = fmul <4 x float> %71, %71
+  %80 = fmul <4 x float> %72, %72
+  %81 = fadd <4 x float> %77, %79
+  %82 = fadd <4 x float> %78, %80
+  %83 = tail call <4 x float> @llvm.sqrt.v4f32(<4 x float> %81)
+  %84 = tail call <4 x float> @llvm.sqrt.v4f32(<4 x float> %82)
+  %85 = fcmp oeq <4 x float> %83, zeroinitializer
+  %86 = fcmp oeq <4 x float> %84, zeroinitializer
+  %87 = fdiv <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %83
+  %88 = fdiv <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %84
+  %89 = select <4 x i1> %85, <4 x float> zeroinitializer, <4 x float> %87
+  %90 = select <4 x i1> %86, <4 x float> zeroinitializer, <4 x float> %88
+  %91 = fmul <4 x float> %89, %89
+  %92 = fmul <4 x float> %90, %90
+  %93 = fmul <4 x float> %89, %91
+  %94 = fmul <4 x float> %90, %92
+  %95 = getelementptr inbounds [0 x float], ptr %charges.0, i64 0, i64 %index43
+  %wide.load66 = load <4 x float>, ptr %95, align 4, !alias.scope !11, !noalias !28
+  %96 = getelementptr inbounds float, ptr %95, i64 4
+  %wide.load67 = load <4 x float>, ptr %96, align 4, !alias.scope !11, !noalias !28
+  %97 = fmul <4 x float> %wide.load66, %89
+  %98 = fmul <4 x float> %wide.load67, %90
+  %99 = fmul <4 x float> %63, %93
+  %100 = fmul <4 x float> %64, %94
+  %101 = fmul <4 x float> %wide.load66, %99
+  %102 = fmul <4 x float> %wide.load67, %100
+  %103 = fmul <4 x float> %67, %93
+  %104 = fmul <4 x float> %68, %94
+  %105 = fmul <4 x float> %wide.load66, %103
+  %106 = fmul <4 x float> %wide.load67, %104
+  %107 = fmul <4 x float> %71, %93
+  %108 = fmul <4 x float> %72, %94
+  %109 = fmul <4 x float> %wide.load66, %107
+  %110 = fmul <4 x float> %wide.load67, %108
+  %111 = tail call float @llvm.vector.reduce.fadd.v4f32(float %vec.phi44, <4 x float> %109)
+  %112 = tail call float @llvm.vector.reduce.fadd.v4f32(float %111, <4 x float> %110)
+  %113 = tail call float @llvm.vector.reduce.fadd.v4f32(float %vec.phi45, <4 x float> %105)
+  %114 = tail call float @llvm.vector.reduce.fadd.v4f32(float %113, <4 x float> %106)
+  %115 = tail call float @llvm.vector.reduce.fadd.v4f32(float %vec.phi46, <4 x float> %97)
+  %116 = tail call float @llvm.vector.reduce.fadd.v4f32(float %115, <4 x float> %98)
+  %117 = tail call float @llvm.vector.reduce.fadd.v4f32(float %vec.phi47, <4 x float> %101)
+  %118 = tail call float @llvm.vector.reduce.fadd.v4f32(float %117, <4 x float> %102)
+  %index.next68 = add nuw i64 %index43, 8
+  %119 = icmp eq i64 %index.next68, %n.vec39
+  br i1 %119, label %middle.block34, label %vector.body42, !llvm.loop !34
+
+middle.block34:                                   ; preds = %vector.body42
+  %cmp.n41 = icmp eq i64 %n.vec39, %charges.1
+  br i1 %cmp.n41, label %bb43.loopexit.i, label %bb47.us.us.i.preheader
+
+bb47.us.us.i.preheader:                           ; preds = %bb44.lr.ph.split.split.us.split.us.i, %middle.block34
+  %iter5.sroa.0.0108.us.us.i.ph = phi i64 [ 0, %bb44.lr.ph.split.split.us.split.us.i ], [ %n.vec39, %middle.block34 ]
+  %my_result3.0107.us.us.i.ph = phi float [ 0.000000e+00, %bb44.lr.ph.split.split.us.split.us.i ], [ %112, %middle.block34 ]
+  %my_result2.0106.us.us.i.ph = phi float [ 0.000000e+00, %bb44.lr.ph.split.split.us.split.us.i ], [ %114, %middle.block34 ]
+  %my_result0.0105.us.us.i.ph = phi float [ 0.000000e+00, %bb44.lr.ph.split.split.us.split.us.i ], [ %116, %middle.block34 ]
+  %my_result1.0104.us.us.i.ph = phi float [ 0.000000e+00, %bb44.lr.ph.split.split.us.split.us.i ], [ %118, %middle.block34 ]
+  br label %bb47.us.us.i
+
+bb47.us.us.i:                                     ; preds = %bb47.us.us.i.preheader, %bb47.us.us.i
+  %iter5.sroa.0.0108.us.us.i = phi i64 [ %122, %bb47.us.us.i ], [ %iter5.sroa.0.0108.us.us.i.ph, %bb47.us.us.i.preheader ]
+  %my_result3.0107.us.us.i = phi float [ %148, %bb47.us.us.i ], [ %my_result3.0107.us.us.i.ph, %bb47.us.us.i.preheader ]
+  %my_result2.0106.us.us.i = phi float [ %145, %bb47.us.us.i ], [ %my_result2.0106.us.us.i.ph, %bb47.us.us.i.preheader ]
+  %my_result0.0105.us.us.i = phi float [ %139, %bb47.us.us.i ], [ %my_result0.0105.us.us.i.ph, %bb47.us.us.i.preheader ]
+  %my_result1.0104.us.us.i = phi float [ %142, %bb47.us.us.i ], [ %my_result1.0104.us.us.i.ph, %bb47.us.us.i.preheader ]
+  %120 = getelementptr inbounds [0 x float], ptr %sources.0, i64 0, i64 %iter5.sroa.0.0108.us.us.i
+  %_121.us.us.i = load float, ptr %120, align 4, !alias.scope !9, !noalias !27, !noundef !1
+  %121 = fsub float %_121.us.us.i, %_125.i
+  %122 = add nuw i64 %iter5.sroa.0.0108.us.us.i, 1
+  %123 = getelementptr inbounds [0 x float], ptr %0, i64 0, i64 %iter5.sroa.0.0108.us.us.i
+  %_130.us.us.i = load float, ptr %123, align 4, !alias.scope !9, !noalias !27, !noundef !1
+  %124 = fsub float %_130.us.us.i, %_134.us.i
+  %125 = getelementptr inbounds [0 x float], ptr %1, i64 0, i64 %iter5.sroa.0.0108.us.us.i
+  %_139.us.us.i = load float, ptr %125, align 4, !alias.scope !9, !noalias !27, !noundef !1
+  %126 = fsub float %_139.us.us.i, %_143.us.us.i
+  %127 = fmul float %121, %121
+  %128 = fmul float %124, %124
+  %129 = fadd float %127, %128
+  %130 = fmul float %126, %126
+  %131 = fadd float %129, %130
+  %132 = tail call float @llvm.sqrt.f32(float %131)
+  %133 = fcmp oeq float %132, 0.000000e+00
+  %134 = fdiv float 1.000000e+00, %132
+  %inv_diff_norm7.0.us.us.i = select i1 %133, float 0.000000e+00, float %134
+  %135 = fmul float %inv_diff_norm7.0.us.us.i, %inv_diff_norm7.0.us.us.i
+  %136 = fmul float %inv_diff_norm7.0.us.us.i, %135
+  %137 = getelementptr inbounds [0 x float], ptr %charges.0, i64 0, i64 %iter5.sroa.0.0108.us.us.i
+  %_173.us.us.i = load float, ptr %137, align 4, !alias.scope !11, !noalias !28
+  %138 = fmul float %_173.us.us.i, %inv_diff_norm7.0.us.us.i
+  %139 = fadd float %my_result0.0105.us.us.i, %138
+  %140 = fmul float %121, %136
+  %141 = fmul float %_173.us.us.i, %140
+  %142 = fadd float %my_result1.0104.us.us.i, %141
+  %143 = fmul float %124, %136
+  %144 = fmul float %_173.us.us.i, %143
+  %145 = fadd float %my_result2.0106.us.us.i, %144
+  %146 = fmul float %126, %136
+  %147 = fmul float %_173.us.us.i, %146
+  %148 = fadd float %my_result3.0107.us.us.i, %147
+  %exitcond133.not.i = icmp eq i64 %122, %charges.1
+  br i1 %exitcond133.not.i, label %bb43.loopexit.i, label %bb47.us.us.i, !llvm.loop !35
+
+bb47.us.i:                                        ; preds = %bb44.lr.ph.split.split.us.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 2, i64 noundef 2, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc194) #10, !noalias !33
+  unreachable
+
+bb43.loopexit.i:                                  ; preds = %bb47.us.us.i, %middle.block34
+  %.lcssa15 = phi float [ %116, %middle.block34 ], [ %139, %bb47.us.us.i ]
+  %.lcssa14 = phi float [ %118, %middle.block34 ], [ %142, %bb47.us.us.i ]
+  %.lcssa13 = phi float [ %114, %middle.block34 ], [ %145, %bb47.us.us.i ]
+  %.lcssa = phi float [ %112, %middle.block34 ], [ %148, %bb47.us.us.i ]
+  %phi.bo134.i = fmul float %.lcssa15, 0x3FB45F3060000000
+  %phi.bo135.i = fmul float %.lcssa14, 0x3FB45F3060000000
+  %phi.bo136.i = fmul float %.lcssa13, 0x3FB45F3060000000
+  %phi.bo137.i = fmul float %.lcssa, 0x3FB45F3060000000
+  br label %bb43.i
+
+bb43.i:                                           ; preds = %bb43.loopexit.i, %bb40.preheader.i
+  %my_result1.0.lcssa.i = phi float [ 0.000000e+00, %bb40.preheader.i ], [ %phi.bo135.i, %bb43.loopexit.i ]
+  %my_result0.0.lcssa.i = phi float [ 0.000000e+00, %bb40.preheader.i ], [ %phi.bo134.i, %bb43.loopexit.i ]
+  %my_result2.0.lcssa.i = phi float [ 0.000000e+00, %bb40.preheader.i ], [ %phi.bo136.i, %bb43.loopexit.i ]
+  %my_result3.0.lcssa.i = phi float [ 0.000000e+00, %bb40.preheader.i ], [ %phi.bo137.i, %bb43.loopexit.i ]
+  %_213.not.i = icmp eq i64 %result.1, 0
+  br i1 %_213.not.i, label %panic18.i, label %bb82.i, !prof !24
+
+panic9.i:                                         ; preds = %bb44.lr.ph.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 0, i64 noundef 0, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc186) #10, !noalias !33
+  unreachable
+
+panic11.i:                                        ; preds = %bb44.lr.ph.split.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 1, i64 noundef 1, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc190) #10, !noalias !33
+  unreachable
+
+bb82.i:                                           ; preds = %bb43.i
+  store float %my_result0.0.lcssa.i, ptr %result.0, align 4, !alias.scope !13, !noalias !36
+  %_219.not.i = icmp eq i64 %result.1, 1
+  br i1 %_219.not.i, label %panic19.i, label %bb84.i, !prof !24
+
+panic18.i:                                        ; preds = %bb43.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 0, i64 noundef 0, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc204) #10, !noalias !33
+  unreachable
+
+bb84.i:                                           ; preds = %bb82.i
+  %149 = getelementptr inbounds [0 x float], ptr %result.0, i64 0, i64 1
+  store float %my_result1.0.lcssa.i, ptr %149, align 4, !alias.scope !13, !noalias !36
+  %_225.i = icmp ugt i64 %result.1, 2
+  br i1 %_225.i, label %bb86.i, label %panic20.i, !prof !26
+
+panic19.i:                                        ; preds = %bb82.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 1, i64 noundef 1, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc206) #10, !noalias !33
+  unreachable
+
+bb86.i:                                           ; preds = %bb84.i
+  %150 = getelementptr inbounds [0 x float], ptr %result.0, i64 0, i64 2
+  store float %my_result2.0.lcssa.i, ptr %150, align 4, !alias.scope !13, !noalias !36
+  %_231.not.i = icmp eq i64 %result.1, 3
+  br i1 %_231.not.i, label %panic21.i, label %bb88.i, !prof !24
+
+panic20.i:                                        ; preds = %bb84.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 2, i64 noundef 2, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc208) #10, !noalias !33
+  unreachable
+
+bb88.i:                                           ; preds = %bb86.i
+  %151 = getelementptr inbounds [0 x float], ptr %result.0, i64 0, i64 3
+  store float %my_result3.0.lcssa.i, ptr %151, align 4, !alias.scope !13, !noalias !36
+  br label %bempp_kernel::laplace_3d::evaluate_laplace_one_target.exit
+
+panic21.i:                                        ; preds = %bb86.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 3, i64 noundef 3, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc210) #10, !noalias !33
+  unreachable
+
+bb10.loopexit.i:                                  ; preds = %bb14.us.us.i, %middle.block
+  %.lcssa16 = phi float [ %39, %middle.block ], [ %58, %bb14.us.us.i ]
+  %phi.bo.i = fmul float %.lcssa16, 0x3FB45F3060000000
+  br label %bb10.i
+
+bb10.i:                                           ; preds = %bb10.loopexit.i, %bb7.preheader.i
+  %my_result.0.lcssa.i = phi float [ 0.000000e+00, %bb7.preheader.i ], [ %phi.bo.i, %bb10.loopexit.i ]
+  %_106.not.i = icmp eq i64 %result.1, 0
+  br i1 %_106.not.i, label %panic30.i, label %bb35.i, !prof !24
+
+panic24.i:                                        ; preds = %bb11.lr.ph.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 0, i64 noundef 0, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc214) #10, !noalias !33
+  unreachable
+
+panic26.i:                                        ; preds = %bb11.lr.ph.split.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 1, i64 noundef 1, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc218) #10, !noalias !33
+  unreachable
+
+bb35.i:                                           ; preds = %bb10.i
+  store float %my_result.0.lcssa.i, ptr %result.0, align 4, !alias.scope !13, !noalias !36
+  br label %bempp_kernel::laplace_3d::evaluate_laplace_one_target.exit
+
+panic30.i:                                        ; preds = %bb10.i
+; call core::panicking::panic_bounds_check
+  tail call void @core::panicking::panic_bounds_check(i64 noundef 0, i64 noundef 0, ptr noalias noundef nonnull readonly align 8 dereferenceable(24) @alloc226) #10, !noalias !33
+  unreachable
+
+bempp_kernel::laplace_3d::evaluate_laplace_one_target.exit: ; preds = %bb88.i, %bb35.i
+  ret void
+}
