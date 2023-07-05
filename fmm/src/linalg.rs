@@ -7,7 +7,6 @@
 // use rlst;
 // use rlst::dense::{base_matrix::BaseMatrix, VectorContainer};
 
-
 // // const F64_EPSILON: f64 = 2.220_446_049_250_313E-16f64;
 // // type D = Dim<[usize; 2]>;
 // // type Type1<T> = ArrayBase<OwnedRepr<T>, D>;
@@ -50,7 +49,7 @@
 //     let max_s = s[0];
 
 //     for s in s.iter_mut() {
-        
+
 //     }
 
 // }
@@ -76,7 +75,6 @@
 //     use rlst;
 //     use rlst::common::tools::PrettyPrint;
 //     use rlst::dense::rlst_rand_mat;
-
 
 //     #[test]
 //     fn test_pinv() {
