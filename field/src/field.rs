@@ -15,113 +15,6 @@ use crate::{
     types::{SvdFieldTranslationKiFmm, SvdM2lEntry, TransferVector},
 };
 
-// impl<T> FieldTranslationData<T> for FftFieldTranslationNaiveKiFmm<T>
-// where
-//     T: Kernel + Default,
-// {
-//     type Domain = Domain;
-//     type M2LOperators = Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>>;
-//     type TransferVector = Vec<TransferVector>;
-
-//     fn compute_m2l_operators(
-//         &self,
-//         expansion_order: usize,
-//         domain: Self::Domain,
-//     ) -> Self::M2LOperators {
-//         type TranslationType = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
-//         let mut result: Vec<TranslationType> = Vec::new();
-
-//         for t in self.transfer_vectors.iter() {
-//             let source_equivalent_surface =
-//                 t.source
-//                     .compute_surface(&domain, expansion_order, self.alpha);
-
-//             let conv_grid_sources = t.source.convolution_grid(
-//                 expansion_order,
-//                 &domain,
-//                 &source_equivalent_surface,
-//                 self.alpha,
-//             );
-
-//             let target_check_surface = t.target.compute_surface(&domain, expansion_order, self.alpha);
-
-//             // TODO: Remove dim
-//             let dim = 3;
-//             // Find min target
-//             let ncoeffs: usize = target_check_surface.len() / dim;
-//             let sums: Vec<_> = (0..ncoeffs)
-//                 .map(|i| target_check_surface[i] + target_check_surface[ncoeffs + i] + target_check_surface[2*ncoeffs + i])
-//                 .collect();
-
-//             let min_index = sums
-//                 .iter()
-//                 .enumerate()
-//                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-//                 .map(|(index, _)| index)
-//                 .unwrap();
-
-//             let min_target = [
-//                 target_check_surface[min_index],
-//                 target_check_surface[min_index + ncoeffs],
-//                 target_check_surface[min_index + 2 * ncoeffs],
-//             ];
-
-//             // TODO: Fix compute_kernel to work with new kernel
-//             let kernel = self.compute_kernel(expansion_order, &conv_grid_sources, min_target);
-//             let m = kernel.len();
-//             let n = kernel[0].len();
-//             let k = kernel[0][0].len();
-
-//             // Precompute and store the FFT of each unique kernel interaction
-//             let kernel =
-//                 Array3::from_shape_vec((m, n, k), kernel.into_iter().flatten().flatten().collect())
-//                     .unwrap();
-
-//             // Begin by calculating pad lengths along each dimension
-//             let p = 2 * m;
-//             let q = 2 * n;
-//             let r = 2 * k;
-
-//             let padding = [[0, p - m], [0, q - n], [0, r - k]];
-
-//             let padded_kernel = pad(&kernel, &padding, PadMode::Constant(0.));
-
-//             // Flip the kernel
-//             let padded_kernel = padded_kernel.slice(s![..;-1,..;-1,..;-1]).to_owned();
-//             let mut padded_kernel_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
-
-//             // Compute FFT of kernel for this transfer vector
-//             {
-//                 // 1. Init the handlers for FFTs along each axis
-//                 let mut handler_ax0 = FftHandler::<f64>::new(p);
-//                 let mut handler_ax1 = FftHandler::<f64>::new(q);
-//                 let mut handler_ax2 = R2cFftHandler::<f64>::new(r);
-
-//                 // 2. Compute the transform along each axis
-//                 let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
-//                 ndfft_r2c(&padded_kernel, &mut tmp1, &mut handler_ax2, 2);
-//                 let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
-//                 ndfft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
-//                 ndfft(&tmp2, &mut padded_kernel_hat, &mut handler_ax0, 0);
-//             }
-
-//             // Store FFT of kernel for this transfer vector
-//             {
-//                 result.push(padded_kernel_hat);
-//             }
-//         }
-
-//         result
-//     }
-
-//     fn compute_transfer_vectors(&self) -> Self::TransferVector {
-//         compute_transfer_vectors()
-//     }
-
-//     fn ncoeffs(&self, expansion_order: usize) -> usize {
-//         6 * (expansion_order - 1).pow(2) + 2
-//     }
-// }
 
 impl<T> FieldTranslationData<T> for SvdFieldTranslationKiFmm<T>
 where
@@ -234,7 +127,8 @@ where
                 .copy_from_slice(tmp.data());
         }
 
-        (u, st, c)
+        let st_block = s_block.transpose().eval();
+        (u, st_block, c)
     }
 }
 
@@ -283,6 +177,114 @@ where
         result
     }
 }
+
+// impl<T> FieldTranslationData<T> for FftFieldTranslationNaiveKiFmm<T>
+// where
+//     T: Kernel + Default,
+// {
+//     type Domain = Domain;
+//     type M2LOperators = Vec<ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>>;
+//     type TransferVector = Vec<TransferVector>;
+
+//     fn compute_m2l_operators(
+//         &self,
+//         expansion_order: usize,
+//         domain: Self::Domain,
+//     ) -> Self::M2LOperators {
+//         type TranslationType = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
+//         let mut result: Vec<TranslationType> = Vec::new();
+
+//         for t in self.transfer_vectors.iter() {
+//             let source_equivalent_surface =
+//                 t.source
+//                     .compute_surface(&domain, expansion_order, self.alpha);
+
+//             let conv_grid_sources = t.source.convolution_grid(
+//                 expansion_order,
+//                 &domain,
+//                 &source_equivalent_surface,
+//                 self.alpha,
+//             );
+
+//             let target_check_surface = t.target.compute_surface(&domain, expansion_order, self.alpha);
+
+//             // TODO: Remove dim
+//             let dim = 3;
+//             // Find min target
+//             let ncoeffs: usize = target_check_surface.len() / dim;
+//             let sums: Vec<_> = (0..ncoeffs)
+//                 .map(|i| target_check_surface[i] + target_check_surface[ncoeffs + i] + target_check_surface[2*ncoeffs + i])
+//                 .collect();
+
+//             let min_index = sums
+//                 .iter()
+//                 .enumerate()
+//                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+//                 .map(|(index, _)| index)
+//                 .unwrap();
+
+//             let min_target = [
+//                 target_check_surface[min_index],
+//                 target_check_surface[min_index + ncoeffs],
+//                 target_check_surface[min_index + 2 * ncoeffs],
+//             ];
+
+//             // TODO: Fix compute_kernel to work with new kernel
+//             let kernel = self.compute_kernel(expansion_order, &conv_grid_sources, min_target);
+//             let m = kernel.len();
+//             let n = kernel[0].len();
+//             let k = kernel[0][0].len();
+
+//             // Precompute and store the FFT of each unique kernel interaction
+//             let kernel =
+//                 Array3::from_shape_vec((m, n, k), kernel.into_iter().flatten().flatten().collect())
+//                     .unwrap();
+
+//             // Begin by calculating pad lengths along each dimension
+//             let p = 2 * m;
+//             let q = 2 * n;
+//             let r = 2 * k;
+
+//             let padding = [[0, p - m], [0, q - n], [0, r - k]];
+
+//             let padded_kernel = pad(&kernel, &padding, PadMode::Constant(0.));
+
+//             // Flip the kernel
+//             let padded_kernel = padded_kernel.slice(s![..;-1,..;-1,..;-1]).to_owned();
+//             let mut padded_kernel_hat: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
+
+//             // Compute FFT of kernel for this transfer vector
+//             {
+//                 // 1. Init the handlers for FFTs along each axis
+//                 let mut handler_ax0 = FftHandler::<f64>::new(p);
+//                 let mut handler_ax1 = FftHandler::<f64>::new(q);
+//                 let mut handler_ax2 = R2cFftHandler::<f64>::new(r);
+
+//                 // 2. Compute the transform along each axis
+//                 let mut tmp1: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
+//                 ndfft_r2c(&padded_kernel, &mut tmp1, &mut handler_ax2, 2);
+//                 let mut tmp2: Array3<Complex<f64>> = Array3::zeros((p, q, r / 2 + 1));
+//                 ndfft(&tmp1, &mut tmp2, &mut handler_ax1, 1);
+//                 ndfft(&tmp2, &mut padded_kernel_hat, &mut handler_ax0, 0);
+//             }
+
+//             // Store FFT of kernel for this transfer vector
+//             {
+//                 result.push(padded_kernel_hat);
+//             }
+//         }
+
+//         result
+//     }
+
+//     fn compute_transfer_vectors(&self) -> Self::TransferVector {
+//         compute_transfer_vectors()
+//     }
+
+//     fn ncoeffs(&self, expansion_order: usize) -> usize {
+//         6 * (expansion_order - 1).pow(2) + 2
+//     }
+// }
 
 // impl<T> FftFieldTranslationNaiveKiFmm<T>
 // where

@@ -378,6 +378,8 @@ where
             transfer_vector_to_m2l.insert(tv.vector, Arc::new(Mutex::new(Vec::new())));
         }
 
+        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+
         targets.par_iter().enumerate().for_each(|(_i, &target)| {
             if let Some(v_list) = self.fmm.get_v_list(&target) {
                 let calculated_transfer_vectors = v_list
@@ -440,7 +442,7 @@ where
                     multipole_slice.copy_from_slice(compressed_source_multipole_owned.data());
                 }
 
-                // // Compute convolution
+                // Compute convolution
                 let compressed_check_potential_owned = c_sub.dot(&multipoles);
 
                 // Post process to find check potential
@@ -464,7 +466,7 @@ where
                     let mut target_local_lock = target_local_arc.lock().unwrap();
 
                     let top_left = (0, i);
-                    let dim = (self.fmm.m2l.k, 1);
+                    let dim = (ncoeffs, 1);
                     let target_local_owned = locals_owned.block(top_left, dim);
 
                     for i in 0..target_local_lock.shape().0 {
