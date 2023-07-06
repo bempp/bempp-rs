@@ -1,3 +1,6 @@
+[features]
+strict = []
+
 [lib]
 proc-macro = true
 
@@ -19,3 +22,6 @@ quote = { version = "1.0" }
 syn = { version = "2.0.22" }
 num = "0.4"
 approx = "0.5"
+
+[build-dependencies]
+rustversion = "1.0"

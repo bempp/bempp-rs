@@ -1,3 +1,5 @@
+#![cfg_attr(nightly, feature(core_intrinsics))]
+
 use approx::*;
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_generation::generate_kernels;
@@ -7,6 +9,7 @@ use bempp_traits::arrays::Array2DAccess;
 use bempp_traits::bem::{DofMap, FunctionSpace, Kernel};
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
+use std::time::Instant;
 
 fn main() {
     generate_kernels!(
@@ -31,6 +34,24 @@ fn main() {
         for (j, entry) in row.iter().enumerate() {
             assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
         }
+    }
+
+    for i in 2..6 {
+        let grid = regular_sphere(i);
+        let space = SerialFunctionSpace::new(&grid, &bem_kernel.test_element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        let start = Instant::now();
+
+        assemble(&mut matrix, &space, &space, &bem_kernel);
+        println!(
+            "Time taken to assemble dense {} by {} matrix: {}ms",
+            grid.topology().entity_count(2),
+            grid.topology().entity_count(2),
+            start.elapsed().as_millis()
+        );
     }
 }
 
@@ -67,7 +88,6 @@ fn assemble<'a, E: FiniteElement>(
                 *test_vertices.get_mut(i, j).unwrap() = *coord;
             }
         }
-
         bem_kernel.same_cell_kernel(
             &mut local_result.data,
             &test_vertices.data,
@@ -110,7 +130,6 @@ fn assemble<'a, E: FiniteElement>(
             &trial_vertices.data,
             *edge_info,
         );
-
         for (test_i, test_dof) in test_dofs.iter().enumerate() {
             for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                 *matrix.get_mut(*test_dof, *trial_dof).unwrap() =
@@ -148,7 +167,6 @@ fn assemble<'a, E: FiniteElement>(
             &trial_vertices.data,
             *vertex_info,
         );
-
         for (test_i, test_dof) in test_dofs.iter().enumerate() {
             for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                 *matrix.get_mut(*test_dof, *trial_dof).unwrap() =
@@ -180,7 +198,11 @@ fn assemble<'a, E: FiniteElement>(
             }
         }
 
-        bem_kernel.nonneighbour_kernel(&mut local_result.data, &test_vertices.data, &trial_vertices.data);
+        bem_kernel.nonneighbour_kernel(
+            &mut local_result.data,
+            &test_vertices.data,
+            &trial_vertices.data,
+        );
         for (test_i, test_dof) in test_dofs.iter().enumerate() {
             for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                 *matrix.get_mut(*test_dof, *trial_dof).unwrap() =

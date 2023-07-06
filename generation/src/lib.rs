@@ -1,3 +1,6 @@
+//! Generation of boundary element kernels
+#![cfg_attr(feature = "strict", deny(warnings))]
+
 extern crate proc_macro;
 use bempp_element::element::create_element;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
@@ -131,7 +134,8 @@ fn parse_string(string: &Expr) -> String {
 fn format_table<T: Num + Debug>(name: String, table: &[T]) -> String {
     let mut t = String::new();
     t += &format!(
-        "const {name}: [{}; {}] = [",
+        // TODO: should this be let, const or static?
+        "let {name}: [{}; {}] = [",
         std::any::type_name::<T>(),
         table.len()
     );
@@ -154,7 +158,8 @@ fn format_eval_table<T: Num + Debug>(
         if let Some((_qid, table)) = tables.iter().next() {
             t += &indent(level);
             t += &format!(
-                "const {name}: [{}; {}] = [",
+                // TODO: should this be let, const or static?
+                "let {name}: [{}; {}] = [",
                 std::any::type_name::<T>(),
                 table.shape().1 * table.shape().2
             );
@@ -192,6 +197,54 @@ fn format_eval_table<T: Num + Debug>(
     t
 }
 
+fn format_eval_table_one<T: Num + Debug>(
+    name: String,
+    tables: &HashMap<usize, Array4D<T>>,
+    deriv: usize,
+    basis: usize,
+    component: usize,
+    level: usize,
+) -> String {
+    let mut t = String::new();
+    if tables.len() == 1 {
+        if let Some((_qid, table)) = tables.iter().next() {
+            t += &indent(level);
+            t += &format!(
+                // TODO: should this be let, const or static?
+                "let {name}: [{}; {}] = [",
+                std::any::type_name::<T>(),
+                table.shape().1
+            );
+            for i in 0..table.shape().1 {
+                if i > 0 {
+                    t += ", ";
+                }
+                t += &format!("{:?}", table.get(deriv, i, basis, component).unwrap());
+            }
+            t += "];\n";
+        }
+    } else {
+        t += &indent(level);
+        t += &format!("let {name} = match qid {{\n");
+        for (qid, table) in tables.iter() {
+            t += &indent(level + 1);
+            t += &format!("{qid} => [");
+            for i in 0..table.shape().1 {
+                if i > 0 {
+                    t += ", ";
+                }
+                t += &format!("{:?}", table.get(deriv, i, basis, component).unwrap());
+            }
+            t += "],\n";
+        }
+        t += &indent(level + 1);
+        t += "_ => { panic!(\"Unrecognised quadrature id.\"); },\n";
+        t += &indent(level);
+        t += "};\n";
+    }
+    t
+}
+
 fn linear_derivative<T: Num + Debug + Real>(
     name: String,
     vertices: &String,
@@ -200,7 +253,7 @@ fn linear_derivative<T: Num + Debug + Real>(
     deriv: usize,
 ) -> String {
     let mut code = String::new();
-    code += &format!("let {name} = (");
+    code += &format!("let {name} = [");
     for d in 0..gdim {
         if d > 0 {
             code += ", ";
@@ -229,7 +282,7 @@ fn linear_derivative<T: Num + Debug + Real>(
             }
         }
     }
-    code += ");\n";
+    code += "];\n";
     code
 }
 
@@ -249,9 +302,9 @@ fn linear_jacobian<T: Num + Debug + Real>(
             code += &indent(level);
             code += &linear_derivative("dy".to_string(), &vertices, gdim, table, 2);
             code += &indent(level);
-            code += "let j = (dx.1 * dy.2 - dx.2 * dy.1, dx.2 * dy.0 - dx.0 * dy.2, dx.0 * dy.1 - dx.1 * dy.0);\n";
+            code += "let j = [dx[1] * dy[2] - dx[2] * dy[1], dx[2] * dy[0] - dx[0] * dy[2], dx[0] * dy[1] - dx[1] * dy[0]];\n";
             code += &indent(level);
-            code += &format!("let {name} = (j.0.powi(2) + j.1.powi(2) + j.2.powi(2)).sqrt();\n");
+            code += &format!("let {name} = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n");
         } else {
             panic!(
                 "Jacobian computation not implemented for tdim {} and gdim {}.",
@@ -271,7 +324,7 @@ fn derivative(
     basis_count: usize,
 ) -> String {
     let mut code = String::new();
-    code += &format!("let {name} = (");
+    code += &format!("let {name} = [");
     for d in 0..gdim {
         if d > 0 {
             code += ", ";
@@ -288,7 +341,7 @@ fn derivative(
             started = true;
         }
     }
-    code += ");\n";
+    code += "];\n";
     code
 }
 
@@ -311,9 +364,9 @@ fn jacobian(
         code += &indent(level);
         code += &derivative("dy".to_string(), &vertices, gdim, &dy, &point, basis_count);
         code += &indent(level);
-        code += "let j = (dx.1 * dy.2 - dx.2 * dy.1, dx.2 * dy.0 - dx.0 * dy.2, dx.0 * dy.1 - dx.1 * dy.0);\n";
+        code += "let j = [dx[1] * dy[2] - dx[2] * dy[1], dx[2] * dy[0] - dx[0] * dy[2], dx[0] * dy[1] - dx[1] * dy[0];\n";
         code += &indent(level);
-        code += &format!("let {name} = (j.0.powi(2) + j.1.powi(2) + j.2.powi(2)).sqrt();\n");
+        code += &format!("let {name} = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n");
     } else {
         panic!(
             "Jacobian computation not implemented for tdim {} and gdim {}.",
@@ -321,6 +374,16 @@ fn jacobian(
         );
     }
     code
+}
+
+#[cfg(not(nightly))]
+fn fadd(a: String, b: String) -> String {
+    format!("{a} += {b};")
+}
+
+#[cfg(nightly)]
+fn fadd(a: String, b: String) -> String {
+    format!("{a} = unsafe {{ std::intrinsics::fadd_fast({a}, {b}) }};")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -374,61 +437,86 @@ fn singular_kernel(
     }
 
     let mut code = String::new();
-    // Write const tables
+    // Write tables
     code += &format!("fn {name}(&self, result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]");
     if quadrules.len() > 1 {
         code += ", qid: u8";
     }
     code += ") {\n";
     code += &indent(1);
+    code += &format!(
+        "assert_eq!(result.len(), {});\n",
+        trial_element.dim() * test_element.dim()
+    );
+    code += &indent(1);
+    code += &format!(
+        "assert_eq!(test_vertices.len(), {});\n",
+        test_geometry_element.dim() * gdim
+    );
+    code += &indent(1);
+    code += &format!(
+        "assert_eq!(trial_vertices.len(), {});\n",
+        trial_geometry_element.dim() * gdim
+    );
+    code += &indent(1);
     if let Some((_qid, qrule)) = quadrules.iter().next() {
         code += &format_table("WTS".to_string(), &qrule.weights);
     }
-    code += &format_eval_table(
-        "TEST_GEOMETRY_EVALS".to_string(),
-        &test_geometry_evals,
-        0,
-        0,
-        1,
-    );
-    if test_geometry_element.degree() > 1 {
-        code += &format_eval_table(
-            "TEST_GEOMETRY_EVALS_DX".to_string(),
+    for b in 0..test_geometry_element.dim() {
+        code += &format_eval_table_one(
+            format!("TEST_GEOMETRY_EVALS{b}"),
             &test_geometry_evals,
-            1,
+            0,
+            b,
             0,
             1,
         );
-        code += &format_eval_table(
-            "TEST_GEOMETRY_EVALS_DY".to_string(),
-            &test_geometry_evals,
-            2,
-            0,
-            1,
-        );
+        if test_geometry_element.degree() > 1 {
+            code += &format_eval_table_one(
+                format!("TEST_GEOMETRY_EVALS_DX{b}"),
+                &test_geometry_evals,
+                1,
+                b,
+                0,
+                1,
+            );
+            code += &format_eval_table_one(
+                format!("TEST_GEOMETRY_EVALS_DY{b}"),
+                &test_geometry_evals,
+                2,
+                b,
+                0,
+                1,
+            );
+        }
     }
-    code += &format_eval_table(
-        "TRIAL_GEOMETRY_EVALS".to_string(),
-        &trial_geometry_evals,
-        0,
-        0,
-        1,
-    );
-    if trial_geometry_element.degree() > 1 {
-        code += &format_eval_table(
-            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
+    for b in 0..trial_geometry_element.dim() {
+        code += &format_eval_table_one(
+            format!("TRIAL_GEOMETRY_EVALS{b}"),
             &trial_geometry_evals,
-            1,
+            0,
+            b,
             0,
             1,
         );
-        code += &format_eval_table(
-            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
-            &trial_geometry_evals,
-            2,
-            0,
-            1,
-        );
+        if trial_geometry_element.degree() > 1 {
+            code += &format_eval_table_one(
+                format!("TRIAL_GEOMETRY_EVALS_DX{b}"),
+                &trial_geometry_evals,
+                1,
+                b,
+                0,
+                1,
+            );
+            code += &format_eval_table_one(
+                format!("TRIAL_GEOMETRY_EVALS_DY{b}"),
+                &trial_geometry_evals,
+                2,
+                b,
+                0,
+                1,
+            );
+        }
     }
     if test_element.degree() > 0 {
         code += &format_eval_table("TEST_EVALS".to_string(), &test_evals, 0, 0, 1);
@@ -436,43 +524,34 @@ fn singular_kernel(
     if trial_element.degree() > 0 {
         code += &format_eval_table("TRIAL_EVALS".to_string(), &trial_evals, 0, 0, 1);
     }
-    code += &indent(1);
-    code += "const ONE_OVER_4PI: f64 = 0.25 * std::f64::consts::FRAC_1_PI;\n";
-    code += "\n";
-
-    if test_geometry_element.degree() == 1 {
-        code += &linear_jacobian(
-            "test_jdet".to_string(),
-            "test_vertices".to_string(),
-            tdim,
-            gdim,
-            &test_geometry_evals,
-            1,
-        );
-    }
-    if trial_geometry_element.degree() == 1 {
-        code += &linear_jacobian(
-            "trial_jdet".to_string(),
-            "trial_vertices".to_string(),
-            tdim,
-            gdim,
-            &trial_geometry_evals,
-            1,
-        );
-    }
 
     code += "\n";
     code += &indent(1);
-    code += &format!("for i in 0..{} {{\n", test_element.dim());
+    code += &format!(
+        "for i in 0..{} {{\n",
+        test_element.dim() * trial_element.dim()
+    );
     code += &indent(2);
-    code += &format!("for j in 0..{} {{\n", trial_element.dim());
-    code += &indent(3);
-    code += &format!("result[i * {} + j] = 0.0;\n", trial_element.dim());
-    code += &indent(2);
-    code += "}\n";
+    code += "result[i] = 0.0;\n";
     code += &indent(1);
     code += "}\n";
 
+    for b in 0..test_geometry_element.dim() {
+        code += &indent(1);
+        code += &format!(
+            "let tsv{b} = &test_vertices[{}..{}];\n",
+            b * gdim,
+            (b + 1) * gdim
+        );
+    }
+    for b in 0..trial_geometry_element.dim() {
+        code += &indent(1);
+        code += &format!(
+            "let trv{b} = &trial_vertices[{}..{}];\n",
+            b * gdim,
+            (b + 1) * gdim
+        );
+    }
     code += &indent(1);
     code += &format!("for q in 0..{npts} {{\n");
     code += &indent(2);
@@ -482,43 +561,30 @@ fn singular_kernel(
     code += &indent(3);
     code += "let x = ";
     for b in 0..test_geometry_element.dim() {
-        if b == 0 {
-            code += &format!(
-                "test_vertices[d] * TEST_GEOMETRY_EVALS[q * {}]",
-                test_geometry_element.dim()
-            );
-        } else {
-            code += &format!(
-                " + test_vertices[{} + d] * TEST_GEOMETRY_EVALS[q * {} + {b}]",
-                b * gdim,
-                test_geometry_element.dim()
-            );
+        if b > 0 {
+            code += " + ";
         }
+        code += &format!("tsv{b}[d] * TEST_GEOMETRY_EVALS{b}[q]",);
     }
     code += ";\n";
     code += &indent(3);
     code += "let y = ";
     for b in 0..trial_geometry_element.dim() {
-        if b == 0 {
-            code += &format!(
-                "trial_vertices[d] * TRIAL_GEOMETRY_EVALS[q * {}]",
-                trial_geometry_element.dim()
-            );
-        } else {
-            code += &format!(
-                " + trial_vertices[{} + d] * TRIAL_GEOMETRY_EVALS[q * {} + {b}]",
-                b * gdim,
-                trial_geometry_element.dim()
-            );
+        if b > 0 {
+            code += " + ";
         }
+        code += &format!("trv{b}[d] * TRIAL_GEOMETRY_EVALS{b}[q]",);
     }
     code += ";\n";
     code += &indent(3);
-    code += "sum_squares += (x - y).powi(2);\n";
+    code += &fadd("sum_squares".to_string(), "(x - y).powi(2)".to_string());
+    code += "\n";
     code += &indent(2);
     code += "}\n";
     code += &indent(2);
     code += "let distance = sum_squares.sqrt();\n";
+    code += &indent(2);
+    code += "let c = WTS[q] / distance;\n";
     if test_geometry_element.degree() > 1 {
         code += &jacobian(
             "test_jdet".to_string(),
@@ -545,27 +611,76 @@ fn singular_kernel(
             2,
         );
     }
-    code += &indent(2);
-    code += &format!("for i in 0..{} {{\n", test_element.dim());
-    code += &indent(3);
-    code += &format!("for j in 0..{} {{\n", trial_element.dim());
-    code += &indent(4);
-    code += &format!("result[i * {} + j] += WTS[q]", trial_element.dim());
-    if test_element.degree() > 0 {
-        code += &format!(" * TEST_EVALS[q * {} + i]", test_element.dim());
+    for i in 0..test_element.dim() {
+        for j in 0..trial_element.dim() {
+            let mut term = String::new();
+            term += "c";
+            if test_element.degree() > 0 {
+                term += &format!(" * TEST_EVALS[q * {} + i]", test_element.dim());
+            }
+            if trial_element.degree() > 0 {
+                term += &format!(" * TRIAL_EVALS[q * {} + j]", trial_element.dim());
+            }
+            if test_geometry_element.degree() > 1 {
+                term += " * test_jdet";
+            }
+            if trial_geometry_element.degree() > 1 {
+                term += " * trial_jdet";
+            }
+            code += &indent(2);
+            code += &fadd(format!("result[{}]", i * trial_element.dim() + j), term);
+            code += "\n";
+            //code += &format!("result[{}] += {term};\n", i * trial_element.dim() + j);
+        }
     }
-    if trial_element.degree() > 0 {
-        code += &format!(" * TRIAL_EVALS[q * {} + j]", trial_element.dim());
+
+    code += &indent(1);
+    code += "}\n";
+
+    if test_geometry_element.degree() == 1 {
+        code += &linear_jacobian(
+            "test_jdet".to_string(),
+            "test_vertices".to_string(),
+            tdim,
+            gdim,
+            &test_geometry_evals,
+            1,
+        );
     }
-    code += " * test_jdet * trial_jdet * ONE_OVER_4PI / distance;\n";
-    code += &indent(3);
-    code += "}\n";
+    if trial_geometry_element.degree() == 1 {
+        code += &linear_jacobian(
+            "trial_jdet".to_string(),
+            "trial_vertices".to_string(),
+            tdim,
+            gdim,
+            &trial_geometry_evals,
+            1,
+        );
+    }
+
+    code += &indent(1);
+    code += "let multiplier: f64 = 0.25 * std::f64::consts::FRAC_1_PI";
+    if test_geometry_element.degree() == 1 {
+        code += " * test_jdet";
+    }
+    if trial_geometry_element.degree() == 1 {
+        code += " * trial_jdet";
+    }
+    code += ";\n";
+
+    code += &indent(1);
+    code += &format!(
+        "for i in 0..{} {{\n",
+        test_element.dim() * trial_element.dim()
+    );
     code += &indent(2);
-    code += "}\n";
+    code += "result[i] *= multiplier;\n";
     code += &indent(1);
     code += "}\n";
 
     code += "}\n\n";
+    // If you want to see the code that this macro generates, uncomment this line
+    // println!("{code}");
     code
 }
 
@@ -612,68 +727,212 @@ fn nonsingular_kernel(
     trial_geometry_evals.insert(0, trial_geometry_table);
 
     let mut code = String::new();
-    // Write const tables
+    // Write tables
     code += &format!("fn {name}(&self, result: &mut [{typename}], test_vertices: &[{typename}], trial_vertices: &[{typename}]) {{\n");
-
+    code += &indent(1);
+    code += &format!(
+        "assert_eq!(result.len(), {});\n",
+        trial_element.dim() * test_element.dim()
+    );
+    code += &indent(1);
+    code += &format!(
+        "assert_eq!(test_vertices.len(), {});\n",
+        test_geometry_element.dim() * gdim
+    );
+    code += &indent(1);
+    code += &format!(
+        "assert_eq!(trial_vertices.len(), {});\n",
+        trial_geometry_element.dim() * gdim
+    );
     code += &indent(1);
     code += &format_table("TEST_WTS".to_string(), &test_rule.weights);
     code += &indent(1);
     code += &format_table("TRIAL_WTS".to_string(), &trial_rule.weights);
-    code += &format_eval_table(
-        "TEST_GEOMETRY_EVALS".to_string(),
-        &test_geometry_evals,
-        0,
-        0,
-        1,
-    );
-    if test_geometry_element.degree() > 1 {
-        code += &format_eval_table(
-            "TEST_GEOMETRY_EVALS_DX".to_string(),
+
+    for b in 0..test_geometry_element.dim() {
+        code += &format_eval_table_one(
+            format!("TEST_GEOMETRY_EVALS{b}"),
             &test_geometry_evals,
-            1,
+            0,
+            b,
             0,
             1,
         );
-        code += &format_eval_table(
-            "TEST_GEOMETRY_EVALS_DY".to_string(),
-            &test_geometry_evals,
-            2,
-            0,
-            1,
-        );
+        if test_geometry_element.degree() > 1 {
+            code += &format_eval_table_one(
+                format!("TEST_GEOMETRY_EVALS_DX{b}"),
+                &test_geometry_evals,
+                1,
+                b,
+                0,
+                1,
+            );
+            code += &format_eval_table_one(
+                format!("TEST_GEOMETRY_EVALS_DY{b}"),
+                &test_geometry_evals,
+                2,
+                b,
+                0,
+                1,
+            );
+        }
     }
-    code += &format_eval_table(
-        "TRIAL_GEOMETRY_EVALS".to_string(),
-        &trial_geometry_evals,
-        0,
-        0,
-        1,
-    );
-    if trial_geometry_element.degree() > 1 {
-        code += &format_eval_table(
-            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
+    for b in 0..trial_geometry_element.dim() {
+        code += &format_eval_table_one(
+            format!("TRIAL_GEOMETRY_EVALS{b}"),
             &trial_geometry_evals,
-            1,
+            0,
+            b,
             0,
             1,
         );
-        code += &format_eval_table(
-            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
-            &trial_geometry_evals,
-            2,
-            0,
-            1,
-        );
+        if trial_geometry_element.degree() > 1 {
+            code += &format_eval_table_one(
+                format!("TRIAL_GEOMETRY_EVALS_DX{b}"),
+                &trial_geometry_evals,
+                1,
+                b,
+                0,
+                1,
+            );
+            code += &format_eval_table_one(
+                format!("TRIAL_GEOMETRY_EVALS_DY{b}"),
+                &trial_geometry_evals,
+                2,
+                b,
+                0,
+                1,
+            );
+        }
     }
+
     if test_element.degree() > 0 {
         code += &format_eval_table("TEST_EVALS".to_string(), &test_evals, 0, 0, 1);
     }
     if trial_element.degree() > 0 {
         code += &format_eval_table("TRIAL_EVALS".to_string(), &trial_evals, 0, 0, 1);
     }
-    code += &indent(1);
-    code += "const ONE_OVER_4PI: f64 = 0.25 * std::f64::consts::FRAC_1_PI;\n";
     code += "\n";
+
+    code += &indent(1);
+    code += &format!(
+        "for i in 0..{} {{\n",
+        test_element.dim() * trial_element.dim()
+    );
+    code += &indent(2);
+    code += "result[i] = 0.0;\n";
+    code += &indent(1);
+    code += "}\n";
+
+    for b in 0..test_geometry_element.dim() {
+        code += &indent(1);
+        code += &format!(
+            "let tsv{b} = &test_vertices[{}..{}];\n",
+            b * gdim,
+            (b + 1) * gdim
+        );
+    }
+    for b in 0..trial_geometry_element.dim() {
+        code += &indent(1);
+        code += &format!(
+            "let trv{b} = &trial_vertices[{}..{}];\n",
+            b * gdim,
+            (b + 1) * gdim
+        );
+    }
+
+    code += &indent(1);
+    code += &format!("let mut x = [0.0; {gdim}];\n");
+    code += &indent(1);
+    code += &format!("for test_q in 0..{test_npts} {{\n");
+    if test_geometry_element.degree() > 1 {
+        code += &jacobian(
+            "test_jdet".to_string(),
+            "test_vertices".to_string(),
+            tdim,
+            gdim,
+            "TEST_GEOMETRY_EVALS_DX".to_string(),
+            "TEST_GEOMETRY_EVALS_DY".to_string(),
+            "test_q".to_string(),
+            test_geometry_element.dim(),
+            2,
+        );
+    }
+    code += &indent(2);
+    code += &format!("for d in 0..{gdim} {{\n");
+    code += &indent(3);
+    code += "x[d] = ";
+    for b in 0..test_geometry_element.dim() {
+        if b > 0 {
+            code += " + ";
+        }
+        code += &format!("tsv{b}[d] * TEST_GEOMETRY_EVALS{b}[test_q]");
+    }
+    code += ";\n";
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(2);
+    code += &format!("for trial_q in 0..{trial_npts} {{\n");
+    code += &indent(3);
+    code += "let mut sum_squares = 0.0;\n";
+    code += &indent(3);
+    code += &format!("for d in 0..{gdim} {{\n");
+    code += &indent(4);
+    code += "let y = ";
+    for b in 0..test_geometry_element.dim() {
+        if b > 0 {
+            code += " + ";
+        }
+        code += &format!("trv{b}[d] * TRIAL_GEOMETRY_EVALS{b}[trial_q]");
+    }
+    code += ";\n";
+    code += &indent(4);
+    code += &fadd("sum_squares".to_string(), "(x[d] - y).powi(2)".to_string());
+    code += "\n";
+    code += &indent(3);
+    code += "}\n";
+    code += &indent(3);
+    code += "let distance = sum_squares.sqrt();\n";
+    code += &indent(3);
+    code += "let c = TEST_WTS[test_q] * TRIAL_WTS[trial_q] / distance;\n";
+    if trial_geometry_element.degree() > 1 {
+        code += &jacobian(
+            "trial_jdet".to_string(),
+            "trial_vertices".to_string(),
+            tdim,
+            gdim,
+            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
+            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
+            "trial_q".to_string(),
+            trial_geometry_element.dim(),
+            3,
+        );
+    }
+    for i in 0..test_element.dim() {
+        for j in 0..trial_element.dim() {
+            let mut term = String::new();
+            term += "c";
+            if test_element.degree() > 0 {
+                term += &format!(" * TEST_EVALS[test_q * {} + {i}]", test_element.dim());
+            }
+            if trial_element.degree() > 0 {
+                term += &format!(" * TRIAL_EVALS[trial_q * {} + {j}]", trial_element.dim());
+            }
+            if test_geometry_element.degree() > 1 {
+                term += " * test_jdet";
+            }
+            if trial_geometry_element.degree() > 1 {
+                term += " * trial_jdet";
+            }
+            code += &indent(3);
+            code += &fadd(format!("result[{}]", i * trial_element.dim() + j), term);
+            code += "\n";
+        }
+    }
+    code += &indent(2);
+    code += "}\n";
+    code += &indent(1);
+    code += "}\n";
 
     if test_geometry_element.degree() == 1 {
         code += &linear_jacobian(
@@ -696,117 +955,29 @@ fn nonsingular_kernel(
         );
     }
 
-    code += "\n";
     code += &indent(1);
-    code += &format!("for i in 0..{} {{\n", test_element.dim());
+    code += "let multiplier: f64 = 0.25 * std::f64::consts::FRAC_1_PI";
+    if test_geometry_element.degree() == 1 {
+        code += " * test_jdet";
+    }
+    if trial_geometry_element.degree() == 1 {
+        code += " * trial_jdet";
+    }
+    code += ";\n";
+
+    code += &indent(1);
+    code += &format!(
+        "for i in 0..{} {{\n",
+        test_element.dim() * trial_element.dim()
+    );
     code += &indent(2);
-    code += &format!("for j in 0..{} {{\n", trial_element.dim());
-    code += &indent(3);
-    code += &format!("result[i * {} + j] = 0.0;\n", trial_element.dim());
-    code += &indent(2);
-    code += "}\n";
+    code += "result[i] *= multiplier;\n";
     code += &indent(1);
     code += "}\n";
 
-    code += &indent(1);
-    code += &format!("for test_q in 0..{test_npts} {{\n");
-    if test_geometry_element.degree() > 1 {
-        code += &jacobian(
-            "test_jdet".to_string(),
-            "test_vertices".to_string(),
-            tdim,
-            gdim,
-            "TEST_GEOMETRY_EVALS_DX".to_string(),
-            "TEST_GEOMETRY_EVALS_DY".to_string(),
-            "test_q".to_string(),
-            test_geometry_element.dim(),
-            2,
-        );
-    }
-    code += &indent(2);
-    code += &format!("for trial_q in 0..{trial_npts} {{\n");
-    code += &indent(3);
-    code += &format!("let mut sum_squares: {typename} = 0.0;\n");
-    code += &indent(3);
-    code += &format!("for d in 0..{gdim} {{\n");
-    code += &indent(4);
-    code += "let x = ";
-    for b in 0..test_geometry_element.dim() {
-        if b == 0 {
-            code += &format!(
-                "test_vertices[d] * TEST_GEOMETRY_EVALS[test_q * {}]",
-                test_geometry_element.dim()
-            );
-        } else {
-            code += &format!(
-                " + test_vertices[{} + d] * TEST_GEOMETRY_EVALS[test_q * {} + {b}]",
-                b * gdim,
-                test_geometry_element.dim()
-            );
-        }
-    }
-    code += ";\n";
-    code += &indent(4);
-    code += "let y = ";
-    for b in 0..trial_geometry_element.dim() {
-        if b == 0 {
-            code += &format!(
-                "trial_vertices[d] * TRIAL_GEOMETRY_EVALS[trial_q * {}]",
-                trial_geometry_element.dim()
-            );
-        } else {
-            code += &format!(
-                " + trial_vertices[{} + d] * TRIAL_GEOMETRY_EVALS[trial_q * {} + {b}]",
-                b * gdim,
-                trial_geometry_element.dim()
-            );
-        }
-    }
-    code += ";\n";
-    code += &indent(4);
-    code += "sum_squares += (x - y).powi(2);\n";
-    code += &indent(3);
-    code += "}\n";
-    code += &indent(3);
-    code += "let distance = sum_squares.sqrt();\n";
-    if trial_geometry_element.degree() > 1 {
-        code += &jacobian(
-            "trial_jdet".to_string(),
-            "trial_vertices".to_string(),
-            tdim,
-            gdim,
-            "TRIAL_GEOMETRY_EVALS_DX".to_string(),
-            "TRIAL_GEOMETRY_EVALS_DY".to_string(),
-            "trial_q".to_string(),
-            trial_geometry_element.dim(),
-            3,
-        );
-    }
-    code += &indent(3);
-    code += &format!("for i in 0..{} {{\n", test_element.dim());
-    code += &indent(4);
-    code += &format!("for j in 0..{} {{\n", trial_element.dim());
-    code += &indent(5);
-    code += &format!(
-        "result[i * {} + j] += TEST_WTS[test_q] * TRIAL_WTS[trial_q]",
-        trial_element.dim()
-    );
-    if test_element.degree() > 0 {
-        code += &format!(" * TEST_EVALS[test_q * {} + i]", test_element.dim());
-    }
-    if trial_element.degree() > 0 {
-        code += &format!(" * TRIAL_EVALS[trial_q * {} + j]", trial_element.dim());
-    }
-    code += " * test_jdet * trial_jdet * ONE_OVER_4PI / distance;\n";
-    code += &indent(4);
-    code += "}\n";
-    code += &indent(3);
-    code += "}\n";
-    code += &indent(2);
-    code += "}\n";
-    code += &indent(1);
-    code += "}\n";
     code += "}\n\n";
+    // If you want to see the code that this macro generates, uncomment this line
+    // println!("{code}");
     code
 }
 
@@ -858,6 +1029,7 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
     );
 
     let mut code = String::new();
+
     code += &format!("struct _BemppKernel_{kernel_name} {{\n");
     code += "    test_element: bempp_element::element::CiarletElement,\n";
     code += "    trial_element: bempp_element::element::CiarletElement,\n";
