@@ -12,8 +12,9 @@ use bempp_field::types::SvdFieldTranslationKiFmm;
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
-    kernel::{EvalType, Kernel},
+    kernel::{Kernel, KernelScale},
     tree::Tree,
+    types::EvalType,
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use rlst::{
@@ -25,7 +26,7 @@ use crate::types::{FmmData, KiFmm};
 
 impl<T, U> SourceTranslation for FmmData<KiFmm<SingleNodeTree, T, U>>
 where
-    T: Kernel<T = f64> + std::marker::Send + std::marker::Sync,
+    T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
 {
     fn p2m<'a>(&self) {
@@ -114,7 +115,7 @@ where
 
 impl<T, U> TargetTranslation for FmmData<KiFmm<SingleNodeTree, T, U>>
 where
-    T: Kernel<T = f64> + std::marker::Sync + std::marker::Send,
+    T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Sync + std::marker::Send,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
 {
     fn l2l(&self, level: u64) {
@@ -366,7 +367,7 @@ where
 
 impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, SvdFieldTranslationKiFmm<T>>>
 where
-    T: Kernel<T = f64> + std::marker::Sync + std::marker::Send + Default,
+    T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Sync + std::marker::Send + Default,
 {
     fn m2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else { return };

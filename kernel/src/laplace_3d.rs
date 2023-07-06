@@ -1,13 +1,12 @@
 //! Implementation of the Laplace kernel
-use bempp_traits::{
-    kernel::{EvalType, Kernel, KernelType},
-    types::Scalar,
-};
 use num;
 use std::marker::PhantomData;
 
 use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
-use bempp_traits::types::Scalar;
+use bempp_traits::{
+    kernel::{Kernel, KernelScale},
+    types::{EvalType, KernelType, Scalar},
+};
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
@@ -15,6 +14,18 @@ use rayon::prelude::*;
 pub struct Laplace3dKernel<T: Scalar> {
     kernel_type: KernelType,
     _phantom_t: std::marker::PhantomData<T>,
+}
+
+impl<T: Scalar<Real = T>> KernelScale for Laplace3dKernel<T> {
+    type T = T;
+
+    fn scale(&self, level: u64) -> Self::T {
+        let numerator = T::from(1).unwrap();
+        let denominator = T::from(2.).unwrap();
+        let power = T::from(level).unwrap();
+        let denominator = denominator.powf(power);
+        numerator / denominator
+    }
 }
 
 impl<T: Scalar> Laplace3dKernel<T> {
@@ -92,7 +103,7 @@ where
 
     fn assemble_st(
         &self,
-        eval_type: crate::types::EvalType,
+        eval_type: EvalType,
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
@@ -103,7 +114,7 @@ where
 
     fn assemble_mt(
         &self,
-        eval_type: crate::types::EvalType,
+        eval_type: EvalType,
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
@@ -132,92 +143,6 @@ where
 
     fn range_component_count(&self, eval_type: EvalType) -> usize {
         laplace_component_count(eval_type)
-    }
-
-    fn gram(
-        &self,
-        eval_type: EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
-        result: &mut [Self::T],
-    ) {
-        let ntargets = targets.len() / self.space_dimension();
-        let nsources = sources.len() / self.space_dimension();
-        for i in 0..ntargets {
-            let target = [targets[i], targets[ntargets + i], targets[2 * ntargets + i]];
-            for j in 0..nsources {
-                let source = [sources[j], sources[nsources + j], sources[2 * nsources + j]];
-                let idx = i + ntargets * j;
-
-                evaluate_laplace_one_target_one_source::<T>(
-                    eval_type,
-                    &target,
-                    &source,
-                    &mut result[idx..idx + 1],
-                );
-            }
-        }
-    }
-
-    fn scale(&self, level: u64) -> f64 {
-        1. / (2f64.powf(level as f64))
-    }
-}
-
-pub fn evaluate_laplace_one_target_one_source<T: Scalar>(
-    eval_type: EvalType,
-    target: &[<T as Scalar>::Real],
-    source: &[<T as Scalar>::Real],
-    result: &mut [T],
-) {
-    let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
-    let zero_real = <T::Real as num::Zero>::zero();
-    let one_real = <T::Real as num::One>::one();
-
-    match eval_type {
-        EvalType::Value => {
-            let diff_norm = ((target[0] - source[0]) * (target[0] - source[0])
-                + (target[1] - source[1]) * (target[1] - source[1])
-                + (target[2] - source[2]) * (target[2] - source[2]))
-                .sqrt();
-            let inv_diff_norm = {
-                if diff_norm == zero_real {
-                    zero_real
-                } else {
-                    one_real / diff_norm
-                }
-            };
-
-            let my_result = T::from(inv_diff_norm).unwrap();
-            result[0] = my_result.mul_real(m_inv_4pi)
-        }
-        EvalType::ValueDeriv => {
-            // Cannot simply use an array my_result as this is not
-            // correctly auto-vectorized.
-
-            let diff0 = source[0] - target[0];
-            let diff1 = source[1] - target[1];
-            let diff2 = source[2] - target[2];
-            let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-            let inv_diff_norm = {
-                if diff_norm == zero_real {
-                    zero_real
-                } else {
-                    one_real / diff_norm
-                }
-            };
-            let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
-
-            let my_result0 = T::from(inv_diff_norm).unwrap();
-            let my_result1 = T::from(diff0 * inv_diff_norm_cubed).unwrap();
-            let my_result2 = T::from(diff1 * inv_diff_norm_cubed).unwrap();
-            let my_result3 = T::from(diff2 * inv_diff_norm_cubed).unwrap();
-
-            result[0] = my_result0.mul_real(m_inv_4pi);
-            result[1] = my_result1.mul_real(m_inv_4pi);
-            result[2] = my_result2.mul_real(m_inv_4pi);
-            result[3] = my_result3.mul_real(m_inv_4pi);
-        }
     }
 }
 
@@ -418,10 +343,9 @@ mod test {
     use approx::assert_relative_eq;
     use bempp_traits::types::Scalar;
     use rlst;
-
     use rlst::common::traits::{Copy, Eval, Transpose};
     use rlst::dense::traits::*;
- 
+
     #[test]
     fn test_laplace_3d() {
         let eps = 1E-8;
@@ -632,53 +556,5 @@ mod test {
             targets.data(),
             green_value_deriv.data_mut(),
         );
-    }
-
-    #[test]
-    fn test_gram() {
-        let eps = 1E-12;
-
-        let nsources = 5;
-        let ntargets = 3;
-
-        let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-        let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-
-        let mut gram = rlst::dense::rlst_rand_mat![f64, (ntargets, nsources)];
-
-        let kernel = Laplace3dKernel::<f64>::default();
-
-        kernel.gram(
-            EvalType::Value,
-            sources.data(),
-            targets.data(),
-            gram.data_mut(),
-        );
-
-        for i in 0..ntargets {
-            let target = [
-                targets.data()[i],
-                targets.data()[ntargets + i],
-                targets.data()[ntargets * 2 + i],
-            ];
-
-            for j in 0..nsources {
-                let source = [
-                    sources.data()[j],
-                    sources.data()[nsources + j],
-                    sources.data()[nsources * 2 + j],
-                ];
-
-                let result = gram[[i, j]];
-                let mut expected = vec![0f64];
-                evaluate_laplace_one_target_one_source::<f64>(
-                    EvalType::Value,
-                    &target,
-                    &source,
-                    &mut expected,
-                );
-                assert_relative_eq!(expected[0], result, epsilon = eps);
-            }
-        }
     }
 }

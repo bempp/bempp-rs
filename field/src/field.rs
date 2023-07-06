@@ -7,10 +7,7 @@ use rlst::{
     dense::{rlst_mat, traits::*, Dot, Shape},
 };
 
-use bempp_traits::{
-    field::FieldTranslationData,
-    kernel::{EvalType, Kernel},
-};
+use bempp_traits::{field::FieldTranslationData, kernel::Kernel, types::EvalType};
 use bempp_tree::types::domain::Domain;
 
 use crate::{
@@ -171,12 +168,15 @@ where
 
             let mut tmp_gram = rlst_mat![f64, (ntargets, nsources)];
 
-            self.kernel.gram(
+            self.kernel.assemble_st(
                 EvalType::Value,
                 &source_equivalent_surface[..],
                 &target_check_surface[..],
                 tmp_gram.data_mut(),
             );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut tmp_gram = tmp_gram.transpose().eval();
 
             let block_size = nrows * ncols;
             let start_idx = i * block_size;

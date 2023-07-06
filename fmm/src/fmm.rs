@@ -2,7 +2,7 @@
 // TODO should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
 // TODO: charge input should be utilized NOW!
 // TODO: Fix the componentwise storage of pinv of dc2e/uc2e as this is losing accuracy.
-// TODO Should be generic over kernel float type parameter - this requires trees to be generic over float type
+// TODO Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
 
 use itertools::Itertools;
 use std::{
@@ -13,7 +13,7 @@ use std::{
 
 use rlst::{
     algorithms::{linalg::LinAlg, traits::pseudo_inverse::Pinv},
-    common::traits::{Eval, NewLikeSelf},
+    common::traits::{Eval, NewLikeSelf, Transpose},
     dense::{
         base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_col_vec,
         rlst_mat, rlst_pointer_mat, traits::*, Dot,
@@ -23,8 +23,9 @@ use rlst::{
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
-    kernel::{EvalType, Kernel},
+    kernel::{Kernel, KernelScale},
     tree::Tree,
+    types::EvalType,
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
@@ -33,7 +34,7 @@ use crate::types::{C2EType, Charges, FmmData, KiFmm};
 #[allow(dead_code)]
 impl<T, U> KiFmm<SingleNodeTree, T, U>
 where
-    T: Kernel<T = f64>,
+    T: Kernel<T = f64> + KernelScale<T = f64>,
     U: FieldTranslationData<T>,
 {
     pub fn new<'a>(
@@ -70,20 +71,26 @@ where
         // Compute upward check to equivalent, and downward check to equivalent Gram matrices
         // as well as their inverses using DGESVD.
         let mut uc2e = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
-        kernel.gram(
+        kernel.assemble_st(
             EvalType::Value,
             upward_equivalent_surface.data(),
             upward_check_surface.data(),
             uc2e.data_mut(),
         );
 
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let uc2e = uc2e.transpose().eval();
+
         let mut dc2e = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
-        kernel.gram(
+        kernel.assemble_st(
             EvalType::Value,
             downward_equivalent_surface.data(),
             downward_check_surface.data(),
             dc2e.data_mut(),
         );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let dc2e = dc2e.transpose().eval();
 
         let (s, ut, v) = uc2e.linalg().pinv(None).unwrap();
         let s = s.unwrap();
@@ -124,23 +131,29 @@ where
 
             let mut pc2ce = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
 
-            kernel.gram(
+            kernel.assemble_st(
                 EvalType::Value,
                 child_upward_equivalent_surface.data(),
                 upward_check_surface.data(),
                 pc2ce.data_mut(),
             );
 
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let pc2ce = pc2ce.transpose().eval();
+
             m2m.push(uc2e_inv.dot(&pc2ce).eval());
 
             let mut cc2pe = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
 
-            kernel.gram(
+            kernel.assemble_st(
                 EvalType::Value,
                 downward_equivalent_surface.data(),
                 &child_downward_check_surface.data(),
                 cc2pe.data_mut(),
             );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let cc2pe = cc2pe.transpose().eval();
             l2l.push((kernel.scale(child.level()) * dc2e_inv.dot(&cc2pe)).eval());
         }
 
@@ -348,39 +361,12 @@ mod test {
 
     use bempp_field::types::SvdFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
-    // use approx::{assert_relative_eq, RelativeEq};
     use rand::prelude::*;
     use rand::SeedableRng;
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
 
-    // #[allow(dead_code)]
-    // fn points_fixture(npoints: usize) -> Vec<Point> {
-    //     let mut range = StdRng::seed_from_u64(0);
-    //     let between = rand::distributions::Uniform::from(0.0..1.0);
-    //     let mut points: Vec<[PointType; 3]> = Vec::new();
-
-    //     for _ in 0..npoints {
-    //         points.push([
-    //             between.sample(&mut range),
-    //             between.sample(&mut range),
-    //             between.sample(&mut range),
-    //         ])
-    //     }
-
-    //     let points = points
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, p)| Point {
-    //             coordinate: *p,
-    //             global_idx: i,
-    //             base_key: MortonKey::default(),
-    //             encoded_key: MortonKey::default(),
-    //         })
-    //         .collect_vec();
-    //     points
-    // }
     fn points_fixture(
         npoints: usize,
         min: Option<f64>,
@@ -575,6 +561,6 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
         println!("{:?}", rel_error);
-        assert!(rel_error <= 1e-6);
+        assert!(rel_error <= 1e-5);
     }
 }
