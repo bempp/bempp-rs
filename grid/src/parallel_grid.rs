@@ -172,8 +172,20 @@ impl<'a, C: Communicator> Topology<'a> for ParallelTopology<'a, C> {
         self.ownership[dim][index]
     }
 
-    fn adjacent_cells(&self, cell: usize) -> Ref<Vec<(usize, usize)>> {
-        self.serial_topology.adjacent_cells(cell)
+    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        self.serial_topology.facet_adjacent_cells()
+    }
+
+    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        self.serial_topology.ridge_adjacent_cells()
+    }
+
+    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
+        self.serial_topology.peak_adjacent_cells()
+    }
+
+    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>> {
+        self.serial_topology.nonadjacent_cells()
     }
 }
 
