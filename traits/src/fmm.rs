@@ -1,4 +1,6 @@
 //! FMM traits
+use std::collections::HashMap;
+
 use crate::kernel::Kernel;
 use crate::tree::Tree;
 
@@ -37,12 +39,15 @@ pub trait Fmm {
     fn tree(&self) -> &Self::Tree;
 }
 
+/// Dictionary containing timings
+pub type TimeDict = HashMap<String, u128>;
+
 pub trait FmmLoop {
-    fn upward_pass(&self);
+    fn upward_pass(&self, time: Option<bool>) -> Option<TimeDict>;
 
-    fn downward_pass(&self);
+    fn downward_pass(&self, time: Option<bool>) -> Option<TimeDict>;
 
-    fn run(&self);
+    fn run(&self, time: Option<bool>) -> Option<TimeDict>;
 }
 
 pub trait InteractionLists {

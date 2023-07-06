@@ -22,6 +22,7 @@ where
         // );
     ) -> Self::M2LOperators;
 
+    // Number of coefficients for a given expansion order
     fn ncoeffs(&self, expansion_order: usize) -> usize;
 }
 

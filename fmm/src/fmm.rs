@@ -1,6 +1,8 @@
-// TODO Should be generic over kernel float type parameter - this requires trees to be generic over float type
+// TODO: Fix datatree creation, it currently instantiates number of potentials using ncoeffs, fix compression.
 // TODO should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
 // TODO: charge input should be utilized NOW!
+// TODO: Fix the componentwise storage of pinv of dc2e/uc2e as this is losing accuracy.
+// TODO Should be generic over kernel float type parameter - this requires trees to be generic over float type
 
 use itertools::Itertools;
 use std::{
@@ -20,7 +22,7 @@ use rlst::{
 
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
-    fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation},
+    fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
     kernel::{EvalType, Kernel},
     tree::Tree,
 };
@@ -230,80 +232,128 @@ where
     T: Fmm,
     FmmData<T>: SourceTranslation + FieldTranslation + TargetTranslation,
 {
-    fn upward_pass(&self) {
-        // Particle to Multipole
-        let start = Instant::now();
-        self.p2m();
-        println!("P2M = {:?}ms", start.elapsed().as_millis());
-
-        // Multipole to Multipole
-        let depth = self.fmm.tree().get_depth();
-        let start = Instant::now();
-        for level in (1..=depth).rev() {
-            self.m2m(level)
-        }
-        println!("M2M = {:?}ms", start.elapsed().as_millis());
-    }
-
-    fn downward_pass(&self) {
-        let depth = self.fmm.tree().get_depth();
-        let mut l2l_time = 0;
-        let mut m2l_time = 0;
-        for level in 2..=depth {
-            if level > 2 {
+    fn upward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
+        match time {
+            Some(true) => {
+                let mut times = TimeDict::default();
+                // Particle to Multipole
                 let start = Instant::now();
-                self.l2l(level);
-                l2l_time += start.elapsed().as_millis();
+                self.p2m();
+                times.insert("p2m".to_string(), start.elapsed().as_millis());
+
+                // Multipole to Multipole
+                let depth = self.fmm.tree().get_depth();
+                let start = Instant::now();
+                for level in (1..=depth).rev() {
+                    self.m2m(level)
+                }
+                times.insert("m2m".to_string(), start.elapsed().as_millis());
+                Some(times)
             }
+            Some(false) | None => {
+                // Particle to Multipole
+                self.p2m();
 
-            let start = Instant::now();
-            self.m2l(level);
-            m2l_time += start.elapsed().as_millis();
+                // Multipole to Multipole
+                let depth = self.fmm.tree().get_depth();
+                for level in (1..=depth).rev() {
+                    self.m2m(level)
+                }
+                None
+            }
         }
-        println!("M2L = {:?}ms", m2l_time);
-        println!("L2L = {:?}ms", l2l_time);
-
-        let start = Instant::now();
-        // Leaf level computations
-        self.p2l();
-        println!("P2L = {:?}ms", start.elapsed().as_millis());
-
-        // // Sum all potential contributions
-        let start = Instant::now();
-        self.m2p();
-        println!("M2P = {:?}ms", start.elapsed().as_millis());
-        let start = Instant::now();
-        self.p2p();
-        println!("P2P = {:?}ms", start.elapsed().as_millis());
-        let start = Instant::now();
-        self.l2p();
-        println!("L2P = {:?}ms", start.elapsed().as_millis());
     }
 
-    fn run(&self) {
-        self.upward_pass();
-        self.downward_pass();
+    fn downward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
+        let depth = self.fmm.tree().get_depth();
+
+        match time {
+            Some(true) => {
+                let mut times = TimeDict::default();
+                let mut l2l_time = 0;
+                let mut m2l_time = 0;
+
+                for level in 2..=depth {
+                    if level > 2 {
+                        let start = Instant::now();
+                        self.l2l(level);
+                        l2l_time += start.elapsed().as_millis();
+                    }
+
+                    let start = Instant::now();
+                    self.m2l(level);
+                    m2l_time += start.elapsed().as_millis();
+                }
+
+                times.insert("l2l".to_string(), l2l_time);
+                times.insert("m2l".to_string(), m2l_time);
+
+                // Leaf level computations
+                let start = Instant::now();
+                self.p2l();
+                times.insert("p2l".to_string(), start.elapsed().as_millis());
+
+                // Sum all potential contributions
+                let start = Instant::now();
+                self.m2p();
+                times.insert("m2p".to_string(), start.elapsed().as_millis());
+
+                let start = Instant::now();
+                self.p2p();
+                times.insert("p2p".to_string(), start.elapsed().as_millis());
+
+                let start = Instant::now();
+                self.l2p();
+                times.insert("l2p".to_string(), start.elapsed().as_millis());
+
+                Some(times)
+            }
+            Some(false) | None => {
+                for level in 2..=depth {
+                    if level > 2 {
+                        self.l2l(level);
+                    }
+                    self.m2l(level);
+                }
+                // Leaf level computations
+                self.p2l();
+
+                // Sum all potential contributions
+                self.m2p();
+                self.p2p();
+                self.l2p();
+
+                None
+            }
+        }
+    }
+
+    fn run(&self, time: Option<bool>) -> Option<TimeDict> {
+        let t1 = self.upward_pass(time);
+        let t2 = self.downward_pass(time);
+
+        if let (Some(mut t1), Some(t2)) = (t1, t2) {
+            t1.extend(t2);
+            Some(t1)
+        } else {
+            None
+        }
     }
 }
 
 #[allow(unused_imports)]
 #[allow(warnings)]
 mod test {
+    use super::*;
+
     use bempp_field::types::SvdFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
     // use approx::{assert_relative_eq, RelativeEq};
     use rand::prelude::*;
     use rand::SeedableRng;
 
-    // use bempp_tree::types::point::PointType;
-    // use rayon::ThreadPool;
-
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    // // use crate::laplace::LaplaceKernel;
-
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
-
-    use super::*;
 
     // #[allow(dead_code)]
     // fn points_fixture(npoints: usize) -> Vec<Point> {
@@ -458,21 +508,16 @@ mod test {
         let npoints = 1000;
         let points = points_fixture(npoints, None, None);
 
-        let order = 6;
+        let order = 5;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
-        // TODO: Have to pass this information to data tree creation!!!!
         let k = 1000;
         let ncrit = 100;
         let depth = 2;
         let kernel = Laplace3dKernel::<f64>::default();
 
-        let start = Instant::now();
         let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth));
-        println!("Tree = {:?}ms", start.elapsed().as_millis());
-
-        let start = Instant::now();
 
         let m2l_data_svd = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
@@ -481,22 +526,12 @@ mod test {
             tree.get_domain().clone(),
             alpha_inner,
         );
-        println!("SVD operators = {:?}ms", start.elapsed().as_millis());
-
-        //     let start = Instant::now();
-        //     let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
-        //         kernel.clone(),
-        //         order,
-        //         tree.get_domain().clone(),
-        //         alpha_inner,
-        //     );
-        //     println!("FFT operators = {:?}ms", start.elapsed().as_millis());
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
         let charges = Charges::new();
         let datatree = FmmData::new(fmm, charges);
-        datatree.run();
+        datatree.run(None);
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
@@ -531,17 +566,15 @@ mod test {
             &mut direct[..],
         );
 
-        println!("potentials {:?}", potentials.data());
-        println!("direct {:?}", direct);
+        let abs_error: f64 = potentials
+            .data()
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        //     let abs_error: f64 = potentials
-        //         .iter()
-        //         .zip(direct.iter())
-        //         .map(|(a, b)| (a - b).abs())
-        //         .sum();
-        //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-
-        //     println!("p={:?} rel_error={:?}\n", order, rel_error);
-        assert!(false)
+        println!("{:?}", rel_error);
+        assert!(rel_error <= 1e-6);
     }
 }

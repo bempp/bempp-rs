@@ -457,7 +457,6 @@ impl Tree for SingleNodeTree {
         depth: Option<u64>,
     ) -> SingleNodeTree {
         // TODO: Come back and reconcile a runtime point dimension detector
-        // let points = points.iter().map(|p| p.coordinate).collect_vec();
 
         let domain = Domain::from_local_points(points);
 
@@ -525,26 +524,26 @@ mod test {
     use super::*;
     use rand::prelude::*;
     use rand::SeedableRng;
-    use rlst::dense::RawAccess;
     use rlst::dense::rlst_mat;
-    use rlst::dense::{Matrix, base_matrix::BaseMatrix, VectorContainer, Dynamic};
-    
+    use rlst::dense::RawAccess;
+    use rlst::dense::{base_matrix::BaseMatrix, Dynamic, Matrix, VectorContainer};
+
     fn points_fixture(
         npoints: usize,
         min: Option<f64>,
-        max: Option<f64>
+        max: Option<f64>,
     ) -> Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>
     {
         // Generate a set of randomly distributed points
         let mut range = StdRng::seed_from_u64(0);
-        
+
         let between;
-        if let (Some(min),Some(max)) = (min, max) {
+        if let (Some(min), Some(max)) = (min, max) {
             between = rand::distributions::Uniform::from(min..max);
         } else {
             between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
         }
-        
+
         let mut points = rlst_mat![f64, (npoints, 3)];
 
         for i in 0..npoints {
@@ -654,7 +653,7 @@ mod test {
             diameter: [1.0, 1.0, 1.0],
         };
         let depth = 1;
-        
+
         let dim = 3;
 
         let mut tmp = Points::default();
@@ -669,19 +668,6 @@ mod test {
             })
         }
         let mut points = tmp;
-        // let mut points: Points = points
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, p)| {
-        //         let key = MortonKey::from_point(p, &domain, depth);
-        //         Point {
-        //             coordinate: *p,
-        //             encoded_key: key,
-        //             base_key: key,
-        //             global_idx: i,
-        //         }
-        //     })
-        //     .collect();
 
         let keys = MortonKeys {
             keys: ROOT.children(),
@@ -729,7 +715,7 @@ mod test {
         // };
         let dim = 3;
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None); 
+        let points = points_fixture(npoints, None, None);
         let mut tmp = Points::default();
         for i in 0..npoints {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];

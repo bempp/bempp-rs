@@ -254,7 +254,7 @@ where
         // TODO: There should be a default for matrices to make code cleaner.
         let mut result = SvdFieldTranslationKiFmm {
             alpha,
-            k: 100,
+            k: 0,
             kernel,
             m2l: (
                 dummy.new_like_self().eval(),
@@ -264,13 +264,13 @@ where
             transfer_vectors: Vec::new(),
         };
 
+        let ncoeffs = result.ncoeffs(expansion_order);
         if let Some(k) = k {
             // Compression rank <= number of coefficients
-            let ncoeffs = result.ncoeffs(expansion_order);
             if k <= ncoeffs {
-                result.k = k
+                result.k = k;
             } else {
-                result.k = ncoeffs;
+                result.k = ncoeffs
             }
         } else {
             // TODO: Should be data driven if nothing is provided by the user

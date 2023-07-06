@@ -67,7 +67,9 @@ mod test {
 
     use crate::types::domain::Domain;
     use rlst::common::traits::ColumnMajorIterator;
-    use rlst::dense::{base_matrix::BaseMatrix, rlst_mat, Dynamic, Matrix, VectorContainer, RawAccess};
+    use rlst::dense::{
+        base_matrix::BaseMatrix, rlst_mat, Dynamic, Matrix, RawAccess, VectorContainer,
+    };
 
     fn points_fixture(
         npoints: usize,
