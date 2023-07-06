@@ -33,9 +33,8 @@ use rlst::{
     dense::{rlst_col_vec, rlst_mut_pointer_mat},
 };
 
-use bempp_field::{
-    FftFieldTranslationNaiveKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationNaiveKiFmm,
-};
+use bempp_field::types::{SvdFieldTranslationKiFmm, SvdFieldTranslationNaiveKiFmm};
+
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, FmmLoop, InteractionLists, SourceTranslation, TargetTranslation},
@@ -1354,10 +1353,6 @@ mod test {
     #[test]
     fn test_fmm<'a>() {
         let npoints = 1000;
-        //     let points = points_fixture(npoints);
-        //     let points_clone = points.clone();
-        //     let depth = 4;
-        //     let n_crit = 150;
         let points = points_fixture(npoints, None, None);
 
         let order = 6;
@@ -1375,14 +1370,6 @@ mod test {
         println!("Tree = {:?}ms", start.elapsed().as_millis());
 
         let start = Instant::now();
-
-        //     // let m2l_data_svd_naive = SvdFieldTranslationNaiveKiFmm::new(
-        //     //     kernel.clone(),
-        //     //     Some(k),
-        //     //     order,
-        //     //     tree.get_domain().clone(),
-        //     //     alpha_inner,
-        //     // );
 
         let m2l_data_svd = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
@@ -1412,7 +1399,7 @@ mod test {
 
         let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
         let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
-    
+
         let leaf_coordinates = pts
             .iter()
             .map(|p| p.coordinate)
@@ -1426,7 +1413,6 @@ mod test {
             rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
         }.eval();
 
-
         let mut direct = vec![0f64; pts.len()];
         let all_point_coordinates = points_fixture(npoints, None, None);
 
@@ -1435,25 +1421,24 @@ mod test {
         let kernel = Laplace3dKernel::<f64>::default();
 
         kernel.evaluate_st(
-            EvalType::Value, 
-            all_point_coordinates.data(), 
-            leaf_coordinates.data(), 
-            &all_charges[..], 
-            &mut direct[..]
+            EvalType::Value,
+            all_point_coordinates.data(),
+            leaf_coordinates.data(),
+            &all_charges[..],
+            &mut direct[..],
         );
 
         println!("potentials {:?}", potentials.data());
         println!("direct {:?}", direct);
 
-    //     let abs_error: f64 = potentials
-    //         .iter()
-    //         .zip(direct.iter())
-    //         .map(|(a, b)| (a - b).abs())
-    //         .sum();
-    //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        //     let abs_error: f64 = potentials
+        //         .iter()
+        //         .zip(direct.iter())
+        //         .map(|(a, b)| (a - b).abs())
+        //         .sum();
+        //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-    //     println!("p={:?} rel_error={:?}\n", order, rel_error);
+        //     println!("p={:?} rel_error={:?}\n", order, rel_error);
         assert!(false)
-      
     }
 }

@@ -3,5 +3,3 @@
 pub mod charge;
 pub mod fmm;
 pub mod impl_charge;
-// pub mod laplace;
-pub mod linalg;
