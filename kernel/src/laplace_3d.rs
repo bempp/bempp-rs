@@ -1,6 +1,5 @@
 //! Implementation of the Laplace kernel
 use bempp_traits::{
-    fmm::Fmm,
     kernel::{EvalType, Kernel, KernelType},
     types::Scalar,
 };
@@ -136,7 +135,6 @@ pub fn evaluate_laplace_one_target_one_source<T: Scalar>(
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result = T::zero();
             let diff_norm = ((target[0] - source[0]) * (target[0] - source[0])
                 + (target[1] - source[1]) * (target[1] - source[1])
                 + (target[2] - source[2]) * (target[2] - source[2]))
@@ -149,17 +147,12 @@ pub fn evaluate_laplace_one_target_one_source<T: Scalar>(
                 }
             };
 
-            my_result += T::one().mul_real(inv_diff_norm);
+            let my_result = T::from(inv_diff_norm).unwrap();
             result[0] = my_result.mul_real(m_inv_4pi)
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
             // correctly auto-vectorized.
-
-            let mut my_result0 = T::zero();
-            let mut my_result1 = T::zero();
-            let mut my_result2 = T::zero();
-            let mut my_result3 = T::zero();
 
             let diff0 = source[0] - target[0];
             let diff1 = source[1] - target[1];
@@ -173,6 +166,11 @@ pub fn evaluate_laplace_one_target_one_source<T: Scalar>(
                 }
             };
             let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
+
+            let my_result0 = T::from(inv_diff_norm).unwrap();
+            let my_result1 = T::from(diff0 * inv_diff_norm_cubed).unwrap();
+            let my_result2 = T::from(diff1 * inv_diff_norm_cubed).unwrap();
+            let my_result3 = T::from(diff2 * inv_diff_norm_cubed).unwrap();
 
             result[0] = my_result0.mul_real(m_inv_4pi);
             result[1] = my_result1.mul_real(m_inv_4pi);

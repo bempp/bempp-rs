@@ -1,24 +1,17 @@
-use std::collections::{HashMap, HashSet};
-
-use itertools::Itertools;
-
 use rlst;
 use rlst::algorithms::linalg::LinAlg;
 use rlst::algorithms::traits::svd::{Mode, Svd};
-use rlst::common::traits::{NewLikeSelf, NewLikeTranspose, Transpose};
+use rlst::common::traits::{NewLikeSelf, Transpose};
 use rlst::common::{
-    tools::PrettyPrint,
-    traits::{Copy, Eval},
+    traits::Eval,
 };
-use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
-use rlst::dense::{rlst_fixed_mat, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape};
+use rlst::dense::{rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape};
 
 use bempp_traits::{
     field::FieldTranslationData,
-    kernel::{EvalType, Kernel, KernelType},
-    types::Scalar,
+    kernel::{EvalType, Kernel},
 };
-use bempp_tree::types::{domain::Domain, morton::MortonKey};
+use bempp_tree::types::domain::Domain;
 
 use crate::{helpers::compute_transfer_vectors, types::{TransferVector, SvdM2lEntry, SvdFieldTranslationKiFmm, SvdFieldTranslationNaiveKiFmm}};
 
@@ -188,26 +181,21 @@ where
                 tmp_gram.data_mut(),
             );
 
-            let lidx_sources = i * ncols;
-            let ridx_sources = lidx_sources + ncols;
-
             let block_size = nrows * ncols;
             let start_idx = i * block_size;
             let end_idx = start_idx + block_size;
-            let mut block = se2tc_fat.get_slice_mut(start_idx, end_idx);
+            let block = se2tc_fat.get_slice_mut(start_idx, end_idx);
             block.copy_from_slice(tmp_gram.data_mut());
 
             for j in 0..ncols {
                 let start_idx = j * ntransfer_vectors * nrows + i * nrows;
                 let end_idx = start_idx + nrows;
-                let mut block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
-                let mut gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
+                let block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
+                let gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
                 block_column.copy_from_slice(gram_column);
             }
         }
 
-        let left: usize = 0;
-        let right: usize = self.k;
         let (sigma, u, vt) = se2tc_fat.linalg().svd(Mode::All, Mode::Slim).unwrap();
 
         let u = u.unwrap();
@@ -219,10 +207,10 @@ where
             sigma_mat[[i, i]] = sigma[i]
         }
 
-        let (mu, nu) = u.shape();
+        let (mu, _) = u.shape();
         let u = u.block((0, 0), (mu, self.k)).eval();
 
-        let (mvt, nvt) = vt.shape();
+        let (_, nvt) = vt.shape();
         let vt = vt.block((0, 0), (self.k, nvt)).eval();
 
         // // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
@@ -237,7 +225,7 @@ where
 
         let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::Slim, Mode::All).unwrap();
         let st = st.unwrap();
-        let (mst, nst) = st.shape();
+        let (_, nst) = st.shape();
         let st_block = st.block((0, 0), (self.k, nst));
         let s_block = st_block.transpose().eval();
         
@@ -342,31 +330,22 @@ where
                 tmp_gram.data_mut(),
             );
 
-            // // let tmp_gram = Array::from_shape_vec((nrows, ncols), tmp_gram).unwrap();
-            // // se2tc_fat
-            // //     .slice_mut(s![.., lidx_sources..ridx_sources])
-            // //     .assign(&tmp_gram);
-            let lidx_sources = i * ncols;
-            let ridx_sources = lidx_sources + ncols;
-
             let block_size = nrows * ncols;
             let start_idx = i * block_size;
             let end_idx = start_idx + block_size;
-            let mut block = se2tc_fat.get_slice_mut(start_idx, end_idx);
+            let block = se2tc_fat.get_slice_mut(start_idx, end_idx);
             block.copy_from_slice(tmp_gram.data_mut());
 
 
             for j in 0..ncols {
                 let start_idx = j * ntransfer_vectors * nrows + i * nrows;
                 let end_idx = start_idx + nrows;
-                let mut block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
-                let mut gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
+                let block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
+                let gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
                 block_column.copy_from_slice(gram_column);
             }
         }
 
-        let left: usize = 0;
-        let right: usize = self.k;
         let (sigma, u, vt) = se2tc_fat.linalg().svd(Mode::All, Mode::Slim).unwrap();
 
         let u = u.unwrap();
@@ -378,10 +357,10 @@ where
             sigma_mat[[i, i]] = sigma[i]
         }
 
-        let (mu, nu) = u.shape();
+        let (mu, _) = u.shape();
         let u = u.block((0, 0), (mu, self.k)).eval();
 
-        let (mvt, nvt) = vt.shape();
+        let (_, nvt) = vt.shape();
         let vt = vt.block((0, 0), (self.k, nvt)).eval();
 
         // // let (u, sigma, vt) = se2tc_fat.svddc(ndarray_linalg::JobSvd::Some).unwrap();
@@ -396,7 +375,7 @@ where
 
         let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::Slim, Mode::All).unwrap();
         let st = st.unwrap();
-        let (mst, nst) = st.shape();
+        let (_, nst) = st.shape();
         let st_block = st.block((0, 0), (self.k, nst));
         let s_block = st_block.transpose().eval();
         
@@ -630,26 +609,3 @@ where
 //         result
 //     }
 // }
-
-
-
-mod test {
-
-    use super::*;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
-
-    #[test]
-    fn test_svd() {
-        let kernel = Laplace3dKernel::<f64>::default();
-        let k = 100;
-        let order = 2;
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
-        };
-        let alpha_inner = 1.05;
-
-        let m2l_data_svd =
-            SvdFieldTranslationKiFmm::new(kernel, Some(k), order, domain, alpha_inner);
-    }
-}
