@@ -29,6 +29,7 @@ where
     T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
 {
+    // TODO: Change back to multithreading over the leaves once Timo has merged trait changes to
     fn p2m<'a>(&self) {
         if let Some(leaves) = self.fmm.tree().get_leaves() {
             leaves.par_iter().for_each(move |&leaf| {
@@ -63,12 +64,14 @@ where
                     // Calculate check potential
                     let mut check_potential = rlst_col_vec![f64, ntargets];
 
-                    fmm_arc.kernel.evaluate_st(
+                    let thread_pool = bempp_tools::threads::create_pool(8);
+                    fmm_arc.kernel.evaluate_mt(
                         EvalType::Value,
                         leaf_coordinates.data(),
                         &upward_check_surface[..],
                         &leaf_charges[..],
-                        check_potential.data_mut()
+                        check_potential.data_mut(),
+                        &thread_pool
                     );
 
                     let leaf_multipole_owned = (
@@ -143,10 +146,12 @@ where
     fn m2p<'a>(&self) {
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&target| {
+
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
 
                 if let Some(points) = fmm_arc.tree().get_points(&target) {
+                    let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
+                    
                     if let Some(w_list) = fmm_arc.get_w_list(&target) {
                         for source in w_list.iter() {
                             let source_multipole_arc =
@@ -191,7 +196,8 @@ where
                         }
                     }
                 }
-            })
+            }
+)
         }
     }
 
@@ -199,10 +205,10 @@ where
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&leaf| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_potential_arc = Arc::clone(self.potentials.get(&leaf).unwrap());
                 let source_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
                 if let Some(target_points) = fmm_arc.tree().get_points(&leaf) {
+                    let target_potential_arc = Arc::clone(self.potentials.get(&leaf).unwrap());
                     // Lookup data
                     let target_coordinates = target_points
                         .iter()
@@ -305,9 +311,9 @@ where
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&target| {
                 let fmm_arc = Arc::clone(&self.fmm);
-                let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
 
                 if let Some(target_points) = fmm_arc.tree().get_points(&target) {
+                    let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
                     let target_coordinates = target_points
                         .iter()
                         .map(|p| p.coordinate)

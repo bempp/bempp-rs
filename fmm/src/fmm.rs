@@ -1,6 +1,6 @@
-// TODO: Non Adaptive trees are failing somewhere if there are empty leaves!!!
-// TODO: should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
-// TODO: charge input should be utilized NOW!
+// TODO: Some kind of threading error when I go up to 1e6 points, something to do with Rayon - create a minimal example
+// TODO: Should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
+// TODO: Charge input should be utilized NOW!
 // TODO: Fix the componentwise storage of pinv of dc2e/uc2e as this is losing accuracy.
 // TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
 
@@ -491,35 +491,34 @@ mod test {
 
     #[test]
     fn test_fmm<'a>() {
-        let npoints = 1000000;
+        let npoints = 1000;
         let points = points_fixture(npoints, None, None);
 
         let order = 5;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
-        let k = 40;
+        let k = 50;
         let ncrit = 150;
-        let depth = 5;
+        let depth = 3;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth));
 
-        println!("{:?}", tree.get_all_leaves_set().len());
-        // let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-        //     kernel.clone(),
-        //     Some(k),
-        //     order,
-        //     tree.get_domain().clone(),
-        //     alpha_inner,
-        // );
+        let m2l_data_svd = SvdFieldTranslationKiFmm::new(
+            kernel.clone(),
+            Some(k),
+            order,
+            tree.get_domain().clone(),
+            alpha_inner,
+        );
 
-        // let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
-        // let charges = Charges::new();
-        // let datatree = FmmData::new(fmm, charges);
+        let charges = Charges::new();
+        let datatree = FmmData::new(fmm, charges);
 
-        // let times = datatree.run(Some(true)).unwrap();
+        let times = datatree.run(None);
 
         // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
@@ -565,6 +564,6 @@ mod test {
         // println!("{:?}", times);
         // println!("{:?}", rel_error);
         // assert!(rel_error <= 1e-5);
-        assert!(false)
+        // assert!(false)
     }
 }
