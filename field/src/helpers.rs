@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 
-use bempp_tree::{types::{morton::MortonKey, domain::Domain}};
+use bempp_tree::types::{domain::Domain, morton::MortonKey};
 
 use crate::types::TransferVector;
 

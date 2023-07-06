@@ -1,24 +1,13 @@
 use std::{
+    collections::HashMap,
     sync::{Arc, Mutex},
-    collections::HashMap
 };
 
-use bempp_traits::{
-    field::FieldTranslationData,
-    kernel::Kernel,
-    tree::Tree,
-    fmm::{Fmm}
-};
-use bempp_tree::{
-    types::{morton::MortonKey, point::Point}
-};
+use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
+use bempp_tree::types::{morton::MortonKey, point::Point};
+use rlst::dense::traits::*;
 use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
-use rlst::dense::{traits::*};
-use rlst::{
-    self,
-};
-
-
+use rlst::{self};
 
 #[derive(Clone, Debug, Default)]
 pub struct Charge {

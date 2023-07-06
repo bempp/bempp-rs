@@ -1,4 +1,4 @@
-// TODO Should be generic over kernel float type parameter - this requires trees to be generic over float type 
+// TODO Should be generic over kernel float type parameter - this requires trees to be generic over float type
 // TODO should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
 // TODO: charge input should be utilized NOW!
 
@@ -9,30 +9,24 @@ use std::{
     time::Instant,
 };
 
-use rlst::algorithms::linalg::LinAlg;
-use rlst::algorithms::traits::pseudo_inverse::Pinv;
-use rlst::common::traits::NewLikeSelf;
-use rlst::common::traits::Eval;
-use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
-use rlst::dense::{rlst_mat, rlst_pointer_mat, traits::*, Dot};
 use rlst::{
-    self,
-    dense::rlst_col_vec,
+    algorithms::{linalg::LinAlg, traits::pseudo_inverse::Pinv},
+    common::traits::{Eval, NewLikeSelf},
+    dense::{
+        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_col_vec,
+        rlst_mat, rlst_pointer_mat, traits::*, Dot,
+    },
 };
 
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
-    fmm::{Fmm, FmmLoop,SourceTranslation, TargetTranslation},
+    fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation},
     kernel::{EvalType, Kernel},
     tree::Tree,
 };
-use bempp_tree::{
-    constants::ROOT,
-    types::single_node::SingleNodeTree,
-};
+use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{Charges, C2EType, FmmData, KiFmm};
-
+use crate::types::{C2EType, Charges, FmmData, KiFmm};
 
 #[allow(dead_code)]
 impl<T, U> KiFmm<SingleNodeTree, T, U>
@@ -295,8 +289,8 @@ where
 #[allow(unused_imports)]
 #[allow(warnings)]
 mod test {
-    use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
     use bempp_field::types::SvdFieldTranslationKiFmm;
+    use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
     // use approx::{assert_relative_eq, RelativeEq};
     use rand::prelude::*;
     use rand::SeedableRng;

@@ -1,10 +1,13 @@
-use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, Dynamic};
+use rlst::dense::{
+    base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, Dynamic,
+};
 
-use bempp_tree::types::morton::MortonKey;
 use bempp_traits::kernel::Kernel;
+use bempp_tree::types::morton::MortonKey;
 
 // type FftM2LEntry = ArrayBase<OwnedRepr<Complex<f64>>, Dim<[usize; 3]>>;
-pub type SvdM2lEntry = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type SvdM2lEntry =
+    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 // // #[derive(Default)]
 // pub struct FftFieldTranslationNaiveKiFmm<T>
@@ -28,27 +31,6 @@ pub type SvdM2lEntry = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic
 //     pub kernel: T,
 // }
 
-// #[derive(Default)]
-pub struct SvdFieldTranslationNaiveKiFmm<T>
-where
-    T: Kernel + Default,
-{
-    // Amount to dilate inner check surface by
-    pub alpha: f64,
-
-    // Compression rank, if unspecified estimated from data.
-    pub k: usize,
-
-    // Precomputed SVD compressed m2l interaction
-    pub m2l: (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry),
-
-    // Unique transfer vectors to lookup m2l unique kernel interactions
-    pub transfer_vectors: Vec<TransferVector>,
-
-    pub kernel: T,
-}
-
-// #[derive(Default)]
 pub struct SvdFieldTranslationKiFmm<T>
 where
     T: Kernel + Default,

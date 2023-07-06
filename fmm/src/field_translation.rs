@@ -1,25 +1,25 @@
 // Implementation of field translations
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock, Mutex},
-    ops::Deref
+    ops::Deref,
+    sync::{Arc, Mutex, RwLock},
 };
 
 use itertools::Itertools;
 use rayon::prelude::*;
 
-use rlst::common::{
-    traits::Eval,
-};
-use rlst::dense::{rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape};
-use rlst::{
-    self,
-    dense::rlst_col_vec,
-};
-
-use bempp_traits::{field::{FieldTranslationData, FieldTranslation}, kernel::{Kernel, EvalType}, fmm::{TargetTranslation, SourceTranslation, InteractionLists, Fmm}, tree::Tree};
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use bempp_field::types::SvdFieldTranslationKiFmm;
+use bempp_traits::{
+    field::{FieldTranslation, FieldTranslationData},
+    fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
+    kernel::{EvalType, Kernel},
+    tree::Tree,
+};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use rlst::{
+    common::traits::Eval,
+    dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape},
+};
 
 use crate::types::{FmmData, KiFmm};
 
@@ -273,7 +273,7 @@ where
                                 fmm_arc.order,
                                 fmm_arc.alpha_inner,
                             );
- 
+
                             let ntargets = downward_check_surface.len() / fmm_arc.kernel.space_dimension();
                             let mut downward_check_potential = rlst_col_vec![f64, ntargets];
 
@@ -281,8 +281,8 @@ where
                                 EvalType::Value,
                                 source_coordinates.data(),
                                 &downward_check_surface[..],
-                                &source_charges[..], 
-                                downward_check_potential.data_mut() 
+                                &source_charges[..],
+                                downward_check_potential.data_mut()
                             );
 
 
@@ -312,7 +312,7 @@ where
                         .map(|p| p.coordinate)
                         .flat_map(|[x, y, z]| vec![x, y, z])
                         .collect_vec();
-                    
+
                     let ntargets= target_coordinates.len() / self.fmm.kernel.space_dimension();
 
                     // Get into row major order
@@ -334,7 +334,7 @@ where
                                 // Get into row major order
                                 let source_coordinates = unsafe {
                                     rlst_pointer_mat!['a, f64, source_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
-                                }.eval(); 
+                                }.eval();
 
                                 let source_charges_arc =
                                     Arc::clone(self.charges.get(source).unwrap());
@@ -344,14 +344,14 @@ where
                                 fmm_arc.kernel.evaluate_st(
                                     EvalType::Value,
                                     source_coordinates.data(),
-                                    target_coordinates.data(), 
+                                    target_coordinates.data(),
                                     &source_charges_arc[..],
                                     target_potential.data_mut(),
                                 );
 
                                 let mut target_potential_lock =
                                     target_potential_arc.lock().unwrap();
-                                
+
                                 for i in 0..ntargets {
                                     target_potential_lock[[i, 0]] += target_potential[[i, 0]];
                                 }

@@ -1,8 +1,10 @@
 // Implementation of interaction lists for FMMs (single and multinode)
 use itertools::Itertools;
 
-use bempp_traits::{fmm::InteractionLists, field::FieldTranslationData, kernel::Kernel, tree::Tree};
-use bempp_tree::{types::morton::{MortonKey, MortonKeys}};
+use bempp_traits::{
+    field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
+};
+use bempp_tree::types::morton::{MortonKey, MortonKeys};
 
 use crate::types::KiFmm;
 
