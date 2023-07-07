@@ -48,7 +48,19 @@ pub trait Kernel<T: Num> {
     fn test_geometry_element_dim(&self) -> usize;
     fn trial_geometry_element_dim(&self) -> usize;
     fn same_cell_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
-    fn shared_edge_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T], qid: u8);
-    fn shared_vertex_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T], qid: u8);
+    fn shared_edge_kernel(
+        &self,
+        result: &mut [T],
+        test_vertices: &[T],
+        trial_vertices: &[T],
+        qid: u8,
+    );
+    fn shared_vertex_kernel(
+        &self,
+        result: &mut [T],
+        test_vertices: &[T],
+        trial_vertices: &[T],
+        qid: u8,
+    );
     fn nonneighbour_kernel(&self, result: &mut [T], test_vertices: &[T], trial_vertices: &[T]);
 }
