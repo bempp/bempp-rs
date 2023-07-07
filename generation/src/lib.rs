@@ -22,6 +22,21 @@ use std::fmt::Debug;
 
 use syn::{parse::Parse, parse_macro_input, Expr, Token};
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[repr(u8)]
+enum FunctionType {
+    Test = 0,
+    Trial = 1,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[repr(u8)]
+enum ValueType {
+    Value = 0,
+    DX = 1,
+    DY = 2,
+}
+
 struct GenerationInput {
     kernel_name: Expr,
     _comma0: Token![,],
@@ -589,138 +604,74 @@ impl Index for StrIndex {
         panic!("Not an integer.");
     }
 }
-fn test_vertex(v: &impl Index, d: &impl Index, gdim: usize) -> String {
+fn vertex(t: FunctionType, v: &impl Index, d: &impl Index, gdim: usize) -> String {
     if v.is_int() {
-        format!("tsv{}[{}]", v.str(), d.str())
-    } else {
-        format!("test_vertices[{} * {gdim} + {}]", v.str(), d.str())
-    }
-}
-#[cfg(features = "slice-static-tables")]
-fn test_geometry(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if v.is_int() {
-        format!("tsg{}[{}]", b.str(), p.str())
-    } else {
-        if b.is_int() {
-            format!("TEST_GEOMETRY_EVALS[{} + {}]", b.int() * npts, p.str())
-        } else {
-            format!("TEST_GEOMETRY_EVALS[{} * {npts} + {}]", b.str(), p.str())
-        }
-    }
-}
-#[cfg(not(features = "slice-static-tables"))]
-fn test_geometry(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if b.is_int() {
-        format!("TEST_GEOMETRY_EVALS[{} + {}]", b.int() * npts, p.str())
-    } else {
-        format!("TEST_GEOMETRY_EVALS[{} * {npts} + {}]", b.str(), p.str())
-    }
-}
-#[cfg(features = "slice-static-tables")]
-fn test_geometry_dx(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if v.is_int() {
-        format!("tsgx{}[{}]", b.str(), p.str())
-    } else {
-        if b.is_int() {
-            format!("TEST_GEOMETRY_EVALS_DX[{} + {}]", b.int() * npts, p.str())
-        } else {
-            format!("TEST_GEOMETRY_EVALS_DX[{} * {npts} + {}]", b.str(), p.str())
-        }
-    }
-}
-#[cfg(not(features = "slice-static-tables"))]
-fn test_geometry_dx(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if b.is_int() {
-        format!("TEST_GEOMETRY_EVALS_DX[{} + {}]", b.int() * npts, p.str())
-    } else {
-        format!("TEST_GEOMETRY_EVALS_DX[{} * {npts} + {}]", b.str(), p.str())
-    }
-}
-#[cfg(features = "slice-static-tables")]
-fn test_geometry_dy(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if v.is_int() {
-        format!("tsgy{}[{}]", b.str(), p.str())
-    } else {
-        if b.is_int() {
-            format!("TEST_GEOMETRY_EVALS_DY[{} + {}]", b.int() * npts, p.str())
-        } else {
-            format!("TEST_GEOMETRY_EVALS_DY[{} * {npts} + {}]", b.str(), p.str())
-        }
-    }
-}
-#[cfg(not(features = "slice-static-tables"))]
-fn test_geometry_dy(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if b.is_int() {
-        format!("TEST_GEOMETRY_EVALS_DY[{} + {}]", b.int() * npts, p.str())
-    } else {
-        format!("TEST_GEOMETRY_EVALS_DY[{} * {npts} + {}]", b.str(), p.str())
-    }
-}
-fn trial_vertex(v: &impl Index, d: &impl Index, gdim: usize) -> String {
-    if v.is_int() {
-        format!("trv{}[{}]", v.str(), d.str())
-    } else {
-        format!("trial_vertices[{} * {gdim} + {}]", v.str(), d.str())
-    }
-}
-#[cfg(features = "slice-static-tables")]
-fn trial_geometry(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if v.is_int() {
-        format!("trg{}[{}]", b.str(), p.str())
-    } else {
-        if b.is_int() {
-            format!("TRIAL_GEOMETRY_EVALS[{} + {}]", b.int() * npts, p.str())
-        } else {
-            format!("TRIAL_GEOMETRY_EVALS[{} * {npts} + {}]", b.str(), p.str())
-        }
-    }
-}
-#[cfg(not(features = "slice-static-tables"))]
-fn trial_geometry(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if b.is_int() {
-        format!("TRIAL_GEOMETRY_EVALS[{} + {}]", b.int() * npts, p.str())
-    } else {
-        format!("TRIAL_GEOMETRY_EVALS[{} * {npts} + {}]", b.str(), p.str())
-    }
-}
-#[cfg(features = "slice-static-tables")]
-fn trial_geometry_dx(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if v.is_int() {
-        format!("trgx{}[{}]", b.str(), p.str())
-    } else {
-        if b.is_int() {
-            format!("TRIAL_GEOMETRY_EVALS_DX[{} + {}]", b.int() * npts, p.str())
-        } else {
-            format!(
-                "TRIAL_GEOMETRY_EVALS_DX[{} * {npts} + {}]",
-                b.str(),
-                p.str()
-            )
-        }
-    }
-}
-#[cfg(not(features = "slice-static-tables"))]
-fn trial_geometry_dx(b: &impl Index, p: &impl Index, npts: usize) -> String {
-    if b.is_int() {
-        format!("TRIAL_GEOMETRY_EVALS_DX[{} + {}]", b.int() * npts, p.str())
+        format!(
+            "{}v{}[{}]",
+            match t {
+                FunctionType::Test => "ts",
+                FunctionType::Trial => "tr",
+            },
+            v.str(),
+            d.str()
+        )
     } else {
         format!(
-            "TRIAL_GEOMETRY_EVALS_DX[{} * {npts} + {}]",
-            b.str(),
-            p.str()
+            "{}_vertices[{} * {gdim} + {}]",
+            match t {
+                FunctionType::Test => "test",
+                FunctionType::Trial => "trial",
+            },
+            v.str(),
+            d.str()
         )
     }
 }
 #[cfg(features = "slice-static-tables")]
-fn trial_geometry_dy(b: &impl Index, p: &impl Index, npts: usize) -> String {
+fn geometry(t: FunctionType, v: ValueType, b: &impl Index, p: &impl Index, npts: usize) -> String {
     if v.is_int() {
-        format!("trgy{}[{}]", b.str(), p.str())
+        format!(
+            "{}g{}{}[{}]",
+            match t {
+                FunctionType::Test => "ts",
+                FunctionType::Trial => "tr",
+            },
+            match v {
+                ValueType::Value => "",
+                ValueType::DX => "x",
+                ValueType::DY => "y",
+            },
+            b.str(),
+            p.str()
+        )
     } else {
         if b.is_int() {
-            format!("TRIAL_GEOMETRY_EVALS_DY[{} + {}]", b.int() * npts, p.str())
+            format!(
+                "{}_GEOMETRY_EVALS{}[{} + {}]",
+                match t {
+                    FunctionType::Test => "TEST",
+                    FunctionType::Trial => "TRIAL",
+                },
+                match v {
+                    ValueType::Value => "",
+                    ValueType::DX => "_DX",
+                    ValueType::DY => "_DY",
+                },
+                b.int() * npts,
+                p.str()
+            )
         } else {
             format!(
-                "TRIAL_GEOMETRY_EVALS_DY[{} * {npts} + {}]",
+                "{}_GEOMETRY_EVALS{}[{} * {npts} + {}]",
+                match t {
+                    FunctionType::Test => "TEST",
+                    FunctionType::Trial => "TRIAL",
+                },
+                match v {
+                    ValueType::Value => "",
+                    ValueType::DX => "_DX",
+                    ValueType::DY => "_DY",
+                },
                 b.str(),
                 p.str()
             )
@@ -728,12 +679,34 @@ fn trial_geometry_dy(b: &impl Index, p: &impl Index, npts: usize) -> String {
     }
 }
 #[cfg(not(features = "slice-static-tables"))]
-fn trial_geometry_dy(b: &impl Index, p: &impl Index, npts: usize) -> String {
+fn geometry(t: FunctionType, v: ValueType, b: &impl Index, p: &impl Index, npts: usize) -> String {
     if b.is_int() {
-        format!("TRIAL_GEOMETRY_EVALS_DY[{} + {}]", b.int() * npts, p.str())
+        format!(
+            "{}_GEOMETRY_EVALS{}[{} + {}]",
+            match t {
+                FunctionType::Test => "TEST",
+                FunctionType::Trial => "TRIAL",
+            },
+            match v {
+                ValueType::Value => "",
+                ValueType::DX => "_DX",
+                ValueType::DY => "_DY",
+            },
+            b.int() * npts,
+            p.str()
+        )
     } else {
         format!(
-            "TRIAL_GEOMETRY_EVALS_DY[{} * {npts} + {}]",
+            "{}_GEOMETRY_EVALS{}[{} * {npts} + {}]",
+            match t {
+                FunctionType::Test => "TEST",
+                FunctionType::Trial => "TRIAL",
+            },
+            match v {
+                ValueType::Value => "",
+                ValueType::DX => "_DX",
+                ValueType::DY => "_DY",
+            },
             b.str(),
             p.str()
         )
@@ -807,7 +780,13 @@ fn linear_jacobian<T: Num + Debug + Real>(
     code
 }
 
-fn test_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) -> String {
+fn geometry_physical(
+    t: FunctionType,
+    v: ValueType,
+    point: &String,
+    gdim: usize,
+    basis_count: usize,
+) -> String {
     let mut code = String::new();
     code += "[";
     for d in 0..gdim {
@@ -818,7 +797,9 @@ fn test_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) ->
             if f > 0 {
                 code += " + ";
             }
-            code += &test_geometry_dx(
+            code += &geometry(
+                t,
+                v,
                 &IntIndex { i: f },
                 &StrIndex {
                     i: point.to_string(),
@@ -826,92 +807,15 @@ fn test_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) ->
                 basis_count,
             );
             code += " * ";
-            code += &test_vertex(&IntIndex { i: f }, &IntIndex { i: d }, gdim);
+            code += &vertex(t, &IntIndex { i: f }, &IntIndex { i: d }, gdim);
         }
     }
     code += "]";
     code
 }
 
-fn test_geometry_dy_physical(point: &String, gdim: usize, basis_count: usize) -> String {
-    let mut code = String::new();
-    code += "[";
-    for d in 0..gdim {
-        if d > 0 {
-            code += ", ";
-        }
-        for f in 0..basis_count {
-            if f > 0 {
-                code += " + ";
-            }
-            code += &test_geometry_dy(
-                &IntIndex { i: f },
-                &StrIndex {
-                    i: point.to_string(),
-                },
-                basis_count,
-            );
-            code += " * ";
-            code += &test_vertex(&IntIndex { i: f }, &IntIndex { i: d }, gdim);
-        }
-    }
-    code += "]";
-    code
-}
-
-fn trial_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) -> String {
-    let mut code = String::new();
-    code += "[";
-    for d in 0..gdim {
-        if d > 0 {
-            code += ", ";
-        }
-        for f in 0..basis_count {
-            if f > 0 {
-                code += " + ";
-            }
-            code += &trial_geometry_dx(
-                &IntIndex { i: f },
-                &StrIndex {
-                    i: point.to_string(),
-                },
-                basis_count,
-            );
-            code += " * ";
-            code += &trial_vertex(&IntIndex { i: f }, &IntIndex { i: d }, gdim);
-        }
-    }
-    code += "]";
-    code
-}
-
-fn trial_geometry_dy_physical(point: &String, gdim: usize, basis_count: usize) -> String {
-    let mut code = String::new();
-    code += "[";
-    for d in 0..gdim {
-        if d > 0 {
-            code += ", ";
-        }
-        for f in 0..basis_count {
-            if f > 0 {
-                code += " + ";
-            }
-            code += &trial_geometry_dy(
-                &IntIndex { i: f },
-                &StrIndex {
-                    i: point.to_string(),
-                },
-                basis_count,
-            );
-            code += " * ";
-            code += &trial_vertex(&IntIndex { i: f }, &IntIndex { i: d }, gdim);
-        }
-    }
-    code += "]";
-    code
-}
-
-fn test_jacobian(
+fn jacobian(
+    t: FunctionType,
     geometry_element: &impl FiniteElement,
     point: String,
     gdim: usize,
@@ -923,48 +827,22 @@ fn test_jacobian(
         if tdim == 2 && gdim == 3 {
             out += &indent(level);
             out += "dx = ";
-            out += &test_geometry_dx_physical(&point, gdim, geometry_element.dim());
+            out += &geometry_physical(t, ValueType::DX, &point, gdim, geometry_element.dim());
             out += ";\n";
             out += &indent(level);
             out += "dy = ";
-            out += &test_geometry_dy_physical(&point, gdim, geometry_element.dim());
+            out += &geometry_physical(t, ValueType::DY, &point, gdim, geometry_element.dim());
             out += ";\n";
             out += &indent(level);
             out += "let j = [dx[1] * dy[2] - dx[2] * dy[1], dx[2] * dy[0] - dx[0] * dy[2], dx[0] * dy[1] - dx[1] * dy[0]];\n";
             out += &indent(level);
-            out += "let test_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n";
-        } else {
-            panic!(
-                "Jacobian computation not implemented for tdim {} and gdim {}.",
-                tdim, gdim
+            out += &format!(
+                "let {}_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n",
+                match t {
+                    FunctionType::Test => "test",
+                    FunctionType::Trial => "trial",
+                }
             );
-        }
-    }
-    out
-}
-
-fn trial_jacobian(
-    geometry_element: &impl FiniteElement,
-    point: String,
-    gdim: usize,
-    tdim: usize,
-    level: usize,
-) -> String {
-    let mut out = String::new();
-    if geometry_element.degree() > 1 {
-        if tdim == 2 && gdim == 3 {
-            out += &indent(level);
-            out += "dx = ";
-            out += &trial_geometry_dx_physical(&point, gdim, geometry_element.dim());
-            out += ";\n";
-            out += &indent(level);
-            out += "dy = ";
-            out += &trial_geometry_dy_physical(&point, gdim, geometry_element.dim());
-            out += ";\n";
-            out += &indent(level);
-            out += "let j = [dx[1] * dy[2] - dx[2] * dy[1], dx[2] * dy[0] - dx[0] * dy[2], dx[0] * dy[1] - dx[1] * dy[0]];\n";
-            out += &indent(level);
-            out += "let trial_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n";
         } else {
             panic!(
                 "Jacobian computation not implemented for tdim {} and gdim {}.",
@@ -1090,9 +968,20 @@ fn singular_kernel(
         if b > 0 {
             code += " + ";
         }
-        code += &test_vertex(&IntIndex { i: b }, &StrIndex { i: "d".to_string() }, gdim);
+        code += &vertex(
+            FunctionType::Test,
+            &IntIndex { i: b },
+            &StrIndex { i: "d".to_string() },
+            gdim,
+        );
         code += " * ";
-        code += &test_geometry(&IntIndex { i: b }, &StrIndex { i: "q".to_string() }, npts);
+        code += &geometry(
+            FunctionType::Test,
+            ValueType::Value,
+            &IntIndex { i: b },
+            &StrIndex { i: "q".to_string() },
+            npts,
+        );
     }
     code += ";\n";
     code += &indent(3);
@@ -1101,9 +990,20 @@ fn singular_kernel(
         if b > 0 {
             code += " + ";
         }
-        code += &trial_vertex(&IntIndex { i: b }, &StrIndex { i: "d".to_string() }, gdim);
+        code += &vertex(
+            FunctionType::Trial,
+            &IntIndex { i: b },
+            &StrIndex { i: "d".to_string() },
+            gdim,
+        );
         code += " * ";
-        code += &trial_geometry(&IntIndex { i: b }, &StrIndex { i: "q".to_string() }, npts);
+        code += &geometry(
+            FunctionType::Trial,
+            ValueType::Value,
+            &IntIndex { i: b },
+            &StrIndex { i: "q".to_string() },
+            npts,
+        );
     }
     code += ";\n";
     code += &indent(3);
@@ -1116,8 +1016,22 @@ fn singular_kernel(
     code += &indent(2);
 
     // Compute jacobians
-    code += &test_jacobian(test_geometry_element, "q".to_string(), gdim, tdim, 2);
-    code += &trial_jacobian(trial_geometry_element, "q".to_string(), gdim, tdim, 2);
+    code += &jacobian(
+        FunctionType::Test,
+        test_geometry_element,
+        "q".to_string(),
+        gdim,
+        tdim,
+        2,
+    );
+    code += &jacobian(
+        FunctionType::Trial,
+        trial_geometry_element,
+        "q".to_string(),
+        gdim,
+        tdim,
+        2,
+    );
 
     code += "let c = WTS[q]";
     if test_geometry_element.degree() > 1 {
@@ -1197,9 +1111,7 @@ fn singular_kernel(
 
     code += "}\n\n";
     // If you want to see the code that this macro generates, uncomment this line
-    if name == "same_cell_kernel" {
-        println!("{code}");
-    }
+    // println!("{code}");
     code
 }
 
@@ -1291,7 +1203,14 @@ fn nonsingular_kernel(
     code += &format!("for test_q in 0..{test_npts} {{\n");
 
     if test_geometry_element.degree() > 1 {
-        code += &test_jacobian(test_geometry_element, "test_q".to_string(), gdim, tdim, 2);
+        code += &jacobian(
+            FunctionType::Test,
+            test_geometry_element,
+            "test_q".to_string(),
+            gdim,
+            tdim,
+            2,
+        );
     }
     code += &indent(2);
     code += &format!("for d in 0..{gdim} {{\n");
@@ -1301,9 +1220,16 @@ fn nonsingular_kernel(
         if b > 0 {
             code += " + ";
         }
-        code += &test_vertex(&IntIndex { i: b }, &StrIndex { i: "d".to_string() }, gdim);
+        code += &vertex(
+            FunctionType::Test,
+            &IntIndex { i: b },
+            &StrIndex { i: "d".to_string() },
+            gdim,
+        );
         code += " * ";
-        code += &test_geometry(
+        code += &geometry(
+            FunctionType::Test,
+            ValueType::Value,
             &IntIndex { i: b },
             &StrIndex {
                 i: "test_q".to_string(),
@@ -1326,9 +1252,16 @@ fn nonsingular_kernel(
         if b > 0 {
             code += " + ";
         }
-        code += &trial_vertex(&IntIndex { i: b }, &StrIndex { i: "d".to_string() }, gdim);
+        code += &vertex(
+            FunctionType::Trial,
+            &IntIndex { i: b },
+            &StrIndex { i: "d".to_string() },
+            gdim,
+        );
         code += " * ";
-        code += &trial_geometry(
+        code += &geometry(
+            FunctionType::Trial,
+            ValueType::Value,
             &IntIndex { i: b },
             &StrIndex {
                 i: "trial_q".to_string(),
@@ -1345,7 +1278,14 @@ fn nonsingular_kernel(
     code += &indent(3);
     code += "let distance = sum_squares.sqrt();\n";
     if trial_geometry_element.degree() > 1 {
-        code += &trial_jacobian(trial_geometry_element, "trial_q".to_string(), gdim, tdim, 2);
+        code += &jacobian(
+            FunctionType::Trial,
+            trial_geometry_element,
+            "trial_q".to_string(),
+            gdim,
+            tdim,
+            2,
+        );
     }
     code += &indent(3);
     code += "let c = TEST_WTS[test_q] * TRIAL_WTS[trial_q]";
@@ -1605,6 +1545,6 @@ pub fn generate_kernels(input: TokenStream) -> TokenStream {
                      trial_geometry_element.family(), trial_geometry_element.cell_type(), trial_geometry_element.degree(), trial_geometry_element.discontinuous());
     code += "};";
     // If you want to print the generated code, uncomment this line
-    println!("{code}");
+    // println!("{code}");
     code.parse().unwrap()
 }
