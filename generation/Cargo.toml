@@ -1,5 +1,6 @@
 [features]
 strict = []
+slice-static-tables = []
 
 [lib]
 proc-macro = true
