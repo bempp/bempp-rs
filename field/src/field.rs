@@ -15,7 +15,6 @@ use crate::{
     types::{SvdFieldTranslationKiFmm, SvdM2lEntry, TransferVector},
 };
 
-
 impl<T> FieldTranslationData<T> for SvdFieldTranslationKiFmm<T>
 where
     T: Kernel<T = f64> + Default,

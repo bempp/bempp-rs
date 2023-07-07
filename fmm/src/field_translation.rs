@@ -149,7 +149,6 @@ where
 
                 if let Some(points) = fmm_arc.tree().get_points(&target) {
                     let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
-                    
                     if let Some(w_list) = fmm_arc.get_w_list(&target) {
                         for source in w_list.iter() {
                             let source_multipole_arc =

@@ -3,7 +3,10 @@ use num;
 use std::marker::PhantomData;
 
 use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
-use bempp_traits::{types::{Scalar, EvalType, KernelType}, kernel::{Kernel, KernelScale}};
+use bempp_traits::{
+    kernel::{Kernel, KernelScale},
+    types::{EvalType, KernelType, Scalar},
+};
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
