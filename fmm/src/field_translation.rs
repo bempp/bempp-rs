@@ -64,14 +64,12 @@ where
                     // Calculate check potential
                     let mut check_potential = rlst_col_vec![f64, ntargets];
 
-                    let thread_pool = bempp_tools::threads::create_pool(8);
-                    fmm_arc.kernel.evaluate_mt(
+                    fmm_arc.kernel.evaluate_st(
                         EvalType::Value,
                         leaf_coordinates.data(),
                         &upward_check_surface[..],
                         &leaf_charges[..],
                         check_potential.data_mut(),
-                        &thread_pool
                     );
 
                     let leaf_multipole_owned = (

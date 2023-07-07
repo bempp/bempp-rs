@@ -3,10 +3,7 @@ use num;
 use std::marker::PhantomData;
 
 use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
-use bempp_traits::{
-    kernel::{Kernel, KernelScale},
-    types::{EvalType, KernelType, Scalar},
-};
+use bempp_traits::{types::{Scalar, EvalType, KernelType}, kernel::{Kernel, KernelScale}};
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
@@ -69,8 +66,22 @@ where
         charges: &[Self::T],
         result: &mut [Self::T],
     ) {
-        let thread_pool = bempp_tools::threads::create_pool(1);
-        self.evaluate_mt(eval_type, sources, targets, charges, result, &thread_pool);
+        check_dimensions_evaluate(self, eval_type, sources, targets, charges, result);
+        let ntargets = targets.len() / self.space_dimension();
+        let range_dim = self.range_component_count(eval_type);
+
+        result
+            .chunks_exact_mut(range_dim)
+            .enumerate()
+            .for_each(|(target_index, my_chunk)| {
+                let target = [
+                    targets[target_index],
+                    targets[ntargets + target_index],
+                    targets[2 * ntargets + target_index],
+                ];
+
+                evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
+            });
     }
 
     fn evaluate_mt(
@@ -80,25 +91,23 @@ where
         targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
-        thread_pool: &rayon::ThreadPool,
     ) {
         check_dimensions_evaluate(self, eval_type, sources, targets, charges, result);
         let ntargets = targets.len() / self.space_dimension();
         let range_dim = self.range_component_count(eval_type);
 
-        thread_pool.install(|| {
-            result.par_chunks_exact_mut(range_dim).enumerate().for_each(
-                |(target_index, my_chunk)| {
-                    let target = [
-                        targets[target_index],
-                        targets[ntargets + target_index],
-                        targets[2 * ntargets + target_index],
-                    ];
+        result
+            .par_chunks_exact_mut(range_dim)
+            .enumerate()
+            .for_each(|(target_index, my_chunk)| {
+                let target = [
+                    targets[target_index],
+                    targets[ntargets + target_index],
+                    targets[2 * ntargets + target_index],
+                ];
 
-                    evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
-                },
-            );
-        })
+                evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
+            });
     }
 
     fn assemble_st(
@@ -108,8 +117,23 @@ where
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
     ) {
-        let thread_pool = bempp_tools::threads::create_pool(1);
-        self.assemble_mt(eval_type, sources, targets, result, &thread_pool);
+        check_dimensions_assemble(self, eval_type, sources, targets, result);
+        let ntargets = targets.len() / self.space_dimension();
+        let nsources = sources.len() / self.space_dimension();
+        let range_dim = self.range_component_count(eval_type);
+
+        result
+            .chunks_exact_mut(range_dim * nsources)
+            .enumerate()
+            .for_each(|(target_index, my_chunk)| {
+                let target = [
+                    targets[target_index],
+                    targets[ntargets + target_index],
+                    targets[2 * ntargets + target_index],
+                ];
+
+                assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+            });
     }
 
     fn assemble_mt(
@@ -118,27 +142,24 @@ where
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
-        thread_pool: &rayon::ThreadPool,
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
         let ntargets = targets.len() / self.space_dimension();
         let nsources = sources.len() / self.space_dimension();
         let range_dim = self.range_component_count(eval_type);
 
-        thread_pool.install(|| {
-            result
-                .par_chunks_exact_mut(range_dim * nsources)
-                .enumerate()
-                .for_each(|(target_index, my_chunk)| {
-                    let target = [
-                        targets[target_index],
-                        targets[ntargets + target_index],
-                        targets[2 * ntargets + target_index],
-                    ];
+        result
+            .par_chunks_exact_mut(range_dim * nsources)
+            .enumerate()
+            .for_each(|(target_index, my_chunk)| {
+                let target = [
+                    targets[target_index],
+                    targets[ntargets + target_index],
+                    targets[2 * ntargets + target_index],
+                ];
 
-                    assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
-                });
-        })
+                assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+            });
     }
 
     fn range_component_count(&self, eval_type: EvalType) -> usize {

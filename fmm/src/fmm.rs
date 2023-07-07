@@ -1,8 +1,8 @@
-// TODO: Some kind of threading error when I go up to 1e6 points, something to do with Rayon - create a minimal example
 // TODO: Should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
 // TODO: Charge input should be utilized NOW!
 // TODO: Fix the componentwise storage of pinv of dc2e/uc2e as this is losing accuracy.
 // TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
+// TODO: FFT convolutions implemented in rlst
 
 use itertools::Itertools;
 use std::{
@@ -491,16 +491,16 @@ mod test {
 
     #[test]
     fn test_fmm<'a>() {
-        let npoints = 1000;
+        let npoints = 1000000;
         let points = points_fixture(npoints, None, None);
 
-        let order = 5;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
         let k = 50;
         let ncrit = 150;
-        let depth = 3;
+        let depth = 5;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth));
@@ -518,52 +518,51 @@ mod test {
         let charges = Charges::new();
         let datatree = FmmData::new(fmm, charges);
 
-        let times = datatree.run(None);
+        let times = datatree.run(Some(true));
 
-        // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        // let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        // let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        // let leaf_coordinates = pts
-        //     .iter()
-        //     .map(|p| p.coordinate)
-        //     .flat_map(|[x, y, z]| vec![x, y, z])
-        //     .collect_vec();
+        let leaf_coordinates = pts
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
 
-        // let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+        let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
-        // // Get into row major order
-        // let leaf_coordinates = unsafe {
-        //     rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
-        // }.eval();
+        // Get into row major order
+        let leaf_coordinates = unsafe {
+            rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
+        }.eval();
 
-        // let mut direct = vec![0f64; pts.len()];
-        // let all_point_coordinates = points_fixture(npoints, None, None);
+        let mut direct = vec![0f64; pts.len()];
+        let all_point_coordinates = points_fixture(npoints, None, None);
 
-        // let all_charges = vec![1f64; npoints];
+        let all_charges = vec![1f64; npoints];
 
-        // let kernel = Laplace3dKernel::<f64>::default();
+        let kernel = Laplace3dKernel::<f64>::default();
 
-        // kernel.evaluate_st(
-        //     EvalType::Value,
-        //     all_point_coordinates.data(),
-        //     leaf_coordinates.data(),
-        //     &all_charges[..],
-        //     &mut direct[..],
-        // );
+        kernel.evaluate_st(
+            EvalType::Value,
+            all_point_coordinates.data(),
+            leaf_coordinates.data(),
+            &all_charges[..],
+            &mut direct[..],
+        );
 
-        // let abs_error: f64 = potentials
-        //     .data()
-        //     .iter()
-        //     .zip(direct.iter())
-        //     .map(|(a, b)| (a - b).abs())
-        //     .sum();
-        // let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        let abs_error: f64 = potentials
+            .data()
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        // println!("{:?}", times);
-        // println!("{:?}", rel_error);
-        // assert!(rel_error <= 1e-5);
-        // assert!(false)
+        println!("{:?}", times);
+        println!("{:?}", rel_error);
+        assert!(rel_error <= 1e-5);
     }
 }

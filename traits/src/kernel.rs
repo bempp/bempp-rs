@@ -1,6 +1,7 @@
 //! Trait for Green's function kernels
-use crate::types::{EvalType, KernelType, Scalar};
-use rayon::ThreadPool;
+use crate::types::EvalType;
+use crate::types::KernelType;
+use crate::types::Scalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel {
@@ -60,7 +61,6 @@ pub trait Kernel {
         targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
-        thread_pool: &ThreadPool,
     );
 
     /// Single threaded assembly of a kernel matrix.
@@ -115,7 +115,6 @@ pub trait Kernel {
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
-        thread_pool: &ThreadPool,
     );
 
     /// Return the type of the kernel.
