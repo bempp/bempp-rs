@@ -227,10 +227,12 @@ pub fn point_to_anchor(
     domain: &Domain,
 ) -> Result<[KeyType; 3], Box<dyn Error>> {
     // Check if point is in the domain
-    let mut contained = true;
+
+    let mut contained = Vec::new();
     for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
-        contained = (o < p) && (p < o + d);
+        contained.push((o <= p) && (p <= o + d));
     }
+    let contained = contained.iter().all(|&x| x == true);
 
     match contained {
         true => {
@@ -244,7 +246,7 @@ pub fn point_to_anchor(
 
             let scaling_factor = 1 << (DEEPEST_LEVEL - level);
 
-            for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
+            for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, &side_length) {
                 *a = (((p - o) / s).floor()) as KeyType * scaling_factor;
             }
             Ok(anchor)
@@ -882,11 +884,10 @@ impl MortonKeyInterface for MortonKey {
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
+    use rlst::dense::{RawAccess, Shape};
     use std::vec;
 
-    use rand::prelude::*;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use crate::implementations::helpers::points_fixture;
 
     use super::*;
 
@@ -1059,22 +1060,17 @@ mod test {
     #[test]
     fn test_sorting() {
         let npoints = 1000;
-        let mut range = rand::thread_rng();
-        let mut points: Vec<[PointType; 3]> = Vec::new();
+        let points = points_fixture(npoints, Some(-1.), Some(1.0));
 
-        for _ in 0..npoints {
-            points.push([range.gen(), range.gen(), range.gen()]);
+        let domain = Domain::from_local_points(&points.data());
+
+        let mut keys: Vec<MortonKey> = Vec::new();
+
+        for i in 0..points.shape().0 {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+
+            keys.push(MortonKey::from_point(&point, &domain, DEEPEST_LEVEL));
         }
-
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
-        };
-
-        let mut keys: Vec<MortonKey> = points
-            .iter()
-            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
-            .collect();
 
         // Add duplicates to keys, to test ordering in terms of equality
         let mut cpy: Vec<MortonKey> = keys.to_vec();
@@ -1331,27 +1327,22 @@ mod test {
 
     #[test]
     pub fn test_morton_keys_iterator() {
-        let mut range = StdRng::seed_from_u64(0);
-        let between = rand::distributions::Uniform::from(0.0..1.0);
-        let mut points: Vec<[PointType; 3]> = Vec::new();
-
         let npoints = 1000;
-        for _ in 0..npoints {
-            points.push([
-                between.sample(&mut range),
-                between.sample(&mut range),
-                between.sample(&mut range),
-            ])
-        }
         let domain = Domain {
-            origin: [0.0, 0.0, 0.0],
-            diameter: [1.0, 1.0, 1.0],
+            origin: [-1.01, -1.01, -1.01],
+            diameter: [2.0, 2.0, 2.0],
         };
+        let min = Some(-1.01);
+        let max = Some(0.99);
 
-        let keys = points
-            .iter()
-            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
-            .collect();
+        let points = points_fixture(npoints, min, max);
+
+        let mut keys = Vec::new();
+
+        for i in 0..points.shape().0 {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+            keys.push(MortonKey::from_point(&point, &domain, DEEPEST_LEVEL))
+        }
 
         let keys = MortonKeys { keys, index: 0 };
 
@@ -1394,7 +1385,7 @@ mod test {
         }
 
         let domain = Domain {
-            origin: [-0.5, -0.5, -0.5],
+            origin: [-0.7, -0.6, -0.5],
             diameter: [1., 1., 1.],
         };
 
@@ -1417,7 +1408,7 @@ mod test {
         };
 
         // Test a point not in the domain
-        let point = [0.9, 0.9, 1.9];
+        let point = [1.9, 0.9, 0.9];
         let level = 2;
         let _anchor = point_to_anchor(&point, level, &domain);
     }
@@ -1431,7 +1422,7 @@ mod test {
         };
 
         // Test a point not in the domain
-        let point = [-0.5, -0.5, -0.5];
+        let point = [-0.51, -0.5, -0.5];
         let level = 2;
         let _anchor = point_to_anchor(&point, level, &domain);
     }
@@ -1580,7 +1571,7 @@ mod test {
     fn test_is_adjacent() {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
-            origin: [0., 0., 0.],
+            origin: [-0.1, -0.1, 0.1],
             diameter: [1., 1., 1.],
         };
 
@@ -1618,9 +1609,9 @@ mod test {
 
     #[test]
     fn test_encoding_is_always_absolute() {
-        let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
+        let point = [-0.099999, -0.099999, -0.099999];
+        let domain: Domain = Domain {
+            origin: [-0.1, -0.1, -0.1],
             diameter: [1., 1., 1.],
         };
 

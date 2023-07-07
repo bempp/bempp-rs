@@ -521,47 +521,21 @@ impl Tree for SingleNodeTree {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use rand::prelude::*;
-    use rand::SeedableRng;
-    use rlst::dense::rlst_mat;
+
     use rlst::dense::RawAccess;
-    use rlst::dense::{base_matrix::BaseMatrix, Dynamic, Matrix, VectorContainer};
 
-    fn points_fixture(
-        npoints: usize,
-        min: Option<f64>,
-        max: Option<f64>,
-    ) -> Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>
-    {
-        // Generate a set of randomly distributed points
-        let mut range = StdRng::seed_from_u64(0);
+    use crate::implementations::helpers::{points_fixture, points_fixture_col};
 
-        let between;
-        if let (Some(min), Some(max)) = (min, max) {
-            between = rand::distributions::Uniform::from(min..max);
-        } else {
-            between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
-        }
-
-        let mut points = rlst_mat![f64, (npoints, 3)];
-
-        for i in 0..npoints {
-            points[[i, 0]] = between.sample(&mut range);
-            points[[i, 1]] = between.sample(&mut range);
-            points[[i, 2]] = between.sample(&mut range);
-        }
-
-        points
-    }
+    use super::*;
 
     #[test]
     pub fn test_uniform_tree() {
-        let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
-        let depth = 3;
-        let n_crit = 150;
-        let tree = SingleNodeTree::new(points.data(), false, Some(n_crit), Some(depth));
+        let npoints = 100;
+        let depth = 2;
+
+        // Test uniformly distributed data
+        let points = points_fixture(npoints, Some(-1.0), Some(1.0));
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth));
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -575,6 +549,35 @@ mod test {
 
         // Test that max level constraint is satisfied
         assert!(first == depth);
+
+        // Test a column distribution of data
+        let points = points_fixture_col(npoints);
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth));
+
+        // Test that the tree really is uniform
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .unwrap()
+            .iter()
+            .map(|node| node.level())
+            .collect();
+        let first = levels[0];
+        assert!(levels.iter().all(|key| *key == first));
+
+        // Test that max level constraint is satisfied
+        assert!(first == depth);
+
+        let mut unique_leaves = HashSet::new();
+
+        // Test that only a subset of the leaves contain any points
+        for leaf in tree.get_all_leaves_set().iter() {
+            if let Some(points) = tree.get_points(&leaf) {
+                unique_leaves.insert(leaf.morton);
+            }
+        }
+
+        let expected = 2u64.pow(depth.try_into().unwrap()) as usize; // Number of octants at encoding level that should be filled
+        assert_eq!(unique_leaves.len(), expected);
     }
 
     #[test]
@@ -635,26 +638,12 @@ mod test {
     pub fn test_assign_nodes_to_points() {
         // Generate points in a single octant of the domain
         let npoints = 10;
-        // let mut range = StdRng::seed_from_u64(0);
-        // let between = rand::distributions::Uniform::from(0.0..0.5);
-        // let mut points: Vec<[PointType; 3]> = Vec::new();
-
-        // for _ in 0..npoints {
-        //     points.push([
-        //         between.sample(&mut range),
-        //         between.sample(&mut range),
-        //         between.sample(&mut range),
-        //     ])
-        // }
         let points = points_fixture(npoints, Some(0.), Some(0.5));
 
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
             diameter: [1.0, 1.0, 1.0],
         };
-        let depth = 1;
-
-        let dim = 3;
 
         let mut tmp = Points::default();
         for i in 0..npoints {
@@ -708,15 +697,11 @@ mod test {
             origin: [0., 0., 0.],
             diameter: [1.0, 1.0, 1.0],
         };
-        let _depth = 5;
-        // let mut points = Points {
-        //     points: points_fixture(10000, None, None).data(),
-        //     index: 0,
-        // };
-        let dim = 3;
         let npoints = 10000;
         let points = points_fixture(npoints, None, None);
+
         let mut tmp = Points::default();
+
         for i in 0..npoints {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
