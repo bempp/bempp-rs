@@ -424,6 +424,7 @@ fn set_zero(len: usize, level: usize) -> String {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 #[cfg(feature = "slice-static-tables")]
 fn take_slices(
     test_element: &impl FiniteElement,
@@ -523,14 +524,15 @@ fn take_slices(
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 #[cfg(not(feature = "slice-static-tables"))]
 fn take_slices(
-    test_element: &impl FiniteElement,
-    trial_element: &impl FiniteElement,
+    _test_element: &impl FiniteElement,
+    _trial_element: &impl FiniteElement,
     test_geometry_element: &impl FiniteElement,
     trial_geometry_element: &impl FiniteElement,
-    test_npts: usize,
-    trial_npts: usize,
+    _test_npts: usize,
+    _trial_npts: usize,
     gdim: usize,
     level: usize,
 ) -> String {
@@ -567,7 +569,7 @@ impl Index for IntIndex {
         true
     }
     fn str(&self) -> String {
-        format!("{}", self.i)
+        self.i.to_string()
     }
     fn int(&self) -> usize {
         self.i
@@ -581,7 +583,7 @@ impl Index for StrIndex {
         false
     }
     fn str(&self) -> String {
-        format!("{}", self.i)
+        self.i.to_string()
     }
     fn int(&self) -> usize {
         panic!("Not an integer.");
@@ -807,7 +809,7 @@ fn linear_jacobian<T: Num + Debug + Real>(
 
 fn test_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) -> String {
     let mut code = String::new();
-    code += &format!("[");
+    code += "[";
     for d in 0..gdim {
         if d > 0 {
             code += ", ";
@@ -833,7 +835,7 @@ fn test_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) ->
 
 fn test_geometry_dy_physical(point: &String, gdim: usize, basis_count: usize) -> String {
     let mut code = String::new();
-    code += &format!("[");
+    code += "[";
     for d in 0..gdim {
         if d > 0 {
             code += ", ";
@@ -859,7 +861,7 @@ fn test_geometry_dy_physical(point: &String, gdim: usize, basis_count: usize) ->
 
 fn trial_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) -> String {
     let mut code = String::new();
-    code += &format!("[");
+    code += "[";
     for d in 0..gdim {
         if d > 0 {
             code += ", ";
@@ -885,7 +887,7 @@ fn trial_geometry_dx_physical(point: &String, gdim: usize, basis_count: usize) -
 
 fn trial_geometry_dy_physical(point: &String, gdim: usize, basis_count: usize) -> String {
     let mut code = String::new();
-    code += &format!("[");
+    code += "[";
     for d in 0..gdim {
         if d > 0 {
             code += ", ";
@@ -930,8 +932,7 @@ fn test_jacobian(
             out += &indent(level);
             out += "let j = [dx[1] * dy[2] - dx[2] * dy[1], dx[2] * dy[0] - dx[0] * dy[2], dx[0] * dy[1] - dx[1] * dy[0]];\n";
             out += &indent(level);
-            out +=
-                &format!("let test_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n");
+            out += "let test_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n";
         } else {
             panic!(
                 "Jacobian computation not implemented for tdim {} and gdim {}.",
@@ -963,8 +964,7 @@ fn trial_jacobian(
             out += &indent(level);
             out += "let j = [dx[1] * dy[2] - dx[2] * dy[1], dx[2] * dy[0] - dx[0] * dy[2], dx[0] * dy[1] - dx[1] * dy[0]];\n";
             out += &indent(level);
-            out +=
-                &format!("let trial_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n");
+            out += "let trial_jdet = (j[0].powi(2) + j[1].powi(2) + j[2].powi(2)).sqrt();\n";
         } else {
             panic!(
                 "Jacobian computation not implemented for tdim {} and gdim {}.",
