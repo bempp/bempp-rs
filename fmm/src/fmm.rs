@@ -1,5 +1,3 @@
-// TODO: Should check what happens with rectangular distributions of points would be easier to do as a part of the above todo.
-// TODO: Charge input should be utilized NOW!
 // TODO: Fix the componentwise storage of pinv of dc2e/uc2e as this is losing accuracy.
 // TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
 // TODO: FFT convolutions implemented in rlst
@@ -16,7 +14,7 @@ use rlst::{
     common::traits::{Eval, NewLikeSelf, Transpose},
     dense::{
         base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_col_vec,
-        rlst_mat, rlst_pointer_mat, traits::*, Dot,
+        rlst_mat, rlst_pointer_mat, traits::*, Dot, global,
     },
 };
 
@@ -29,7 +27,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{C2EType, Charges, FmmData, KiFmm};
+use crate::types::{C2EType,ChargeDict, FmmData, KiFmm};
 
 #[allow(dead_code)]
 impl<T, U> KiFmm<SingleNodeTree, T, U>
@@ -178,7 +176,7 @@ where
     T: Kernel,
     U: FieldTranslationData<T>,
 {
-    pub fn new(fmm: KiFmm<SingleNodeTree, T, U>, _charges: Charges) -> Self {
+    pub fn new(fmm: KiFmm<SingleNodeTree, T, U>, global_charges: &ChargeDict) -> Self {
         let mut multipoles = HashMap::new();
         let mut locals = HashMap::new();
         let mut potentials = HashMap::new();
@@ -196,11 +194,20 @@ where
                 if let Some(point_data) = fmm.tree().get_points(key) {
                     points.insert(*key, point_data.iter().cloned().collect_vec());
 
-                    // TODO: Fragile
                     let npoints = point_data.len();
                     potentials.insert(*key, Arc::new(Mutex::new(rlst_col_vec![f64, npoints])));
-                    // TODO: Replace with a global index lookup at some point
-                    charges.insert(*key, Arc::new(vec![1.0; point_data.len()]));
+                    
+                    // Lookup indices and store with charges
+                    let mut tmp_idx = Vec::new();
+                    for point in point_data.iter() {
+                        tmp_idx.push(point.global_idx)
+                    }
+                    let mut tmp_charges = vec![0.; point_data.len()];
+                    for i in 0..tmp_idx.len() {
+                        tmp_charges[i] = *global_charges.get(&tmp_idx[i]).unwrap();
+                    }
+
+                    charges.insert(*key, Arc::new(tmp_charges));
                 }
             }
         }
@@ -490,8 +497,8 @@ mod test {
     // }
 
     #[test]
-    fn test_fmm<'a>() {
-        let npoints = 1000000;
+    fn test_fmm_svd<'a>() {
+        let npoints = 1000;
         let points = points_fixture(npoints, None, None);
 
         let order = 9;
@@ -515,8 +522,23 @@ mod test {
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
-        let charges = Charges::new();
-        let datatree = FmmData::new(fmm, charges);
+        // Form charge dict using tree.
+        let mut charge_dict: ChargeDict = HashMap::new();
+
+        let mut global_idxs = Vec::new();
+
+        for leaf in fmm.tree().get_all_leaves_set().iter() {
+            if let Some(points) = fmm.tree().get_points(&leaf) {
+                // Find global indices
+                global_idxs.extend(points.iter().map(|p| p.global_idx).collect_vec());
+            }
+        }
+
+        for &global_idx in global_idxs.iter() {
+            charge_dict.insert(global_idx, 1.0);
+        }
+
+        let datatree = FmmData::new(fmm, &charge_dict);
 
         let times = datatree.run(Some(true));
 
@@ -541,7 +563,7 @@ mod test {
         let mut direct = vec![0f64; pts.len()];
         let all_point_coordinates = points_fixture(npoints, None, None);
 
-        let all_charges = vec![1f64; npoints];
+        let all_charges = charge_dict.into_values().collect_vec();
 
         let kernel = Laplace3dKernel::<f64>::default();
 
@@ -561,8 +583,6 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        println!("{:?}", times);
-        println!("{:?}", rel_error);
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 1e-7);
     }
 }

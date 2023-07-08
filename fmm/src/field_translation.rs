@@ -45,6 +45,12 @@ where
                         .map(|p| p.coordinate)
                         .flat_map(|[x, y, z]| vec![x, y, z])
                         .collect_vec();
+
+                    let global_idxs = leaf_points
+                        .iter()
+                        .map(|p| p.global_idx)
+                        .collect_vec();
+                    
                     let nsources = leaf_coordinates.len() / self.fmm.kernel.space_dimension();
 
                     // Get into row major order

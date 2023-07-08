@@ -9,24 +9,28 @@ use rlst::dense::traits::*;
 use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
 use rlst::{self};
 
-#[derive(Clone, Debug, Default)]
-pub struct Charge {
-    /// Charge data
-    pub data: f64,
+// #[derive(Clone, Debug, Default)]
+// pub struct Charge {
+//     /// Charge data
+//     pub data: f64,
 
-    /// Global unique index.
-    pub global_idx: usize,
-}
+//     /// Global unique index.
+//     pub global_idx: usize,
+// }
 
-/// Container of **Points**.
-#[derive(Clone, Debug, Default)]
-pub struct Charges {
-    /// A vector of Charges
-    pub charges: Vec<Charge>,
+pub type Charge = f64;
+pub type GlobalIdx = usize;
+pub type ChargeDict = HashMap<GlobalIdx, Charge>;
 
-    /// index for implementing the Iterator trait.
-    pub index: usize,
-}
+// /// Container of **Points**.
+// #[derive(Clone, Debug, Default)]
+// pub struct Charges {
+//     /// A vector of Charges
+//     pub charges: Vec<Charge>,
+
+//     /// index for implementing the Iterator trait.
+//     pub index: usize,
+// }
 
 pub type Expansions =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
