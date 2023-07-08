@@ -36,11 +36,20 @@ pub trait Tree {
     // Copy of nodes
     type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
 
+    // Global indices of points
+    type GlobalIndex;
+
+    // Slice of global indices
+    type GlobalIndexSlice<'a>: IntoIterator<Item = &'a Self::GlobalIndex>
+    where
+        Self: 'a;
+
     fn new(
         points: Self::PointDataSlice<'_>,
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
+        global_idxs: Self::GlobalIndexSlice<'_>
     ) -> Self;
 
     // Get depth of tree.

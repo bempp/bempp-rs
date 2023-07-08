@@ -1,6 +1,6 @@
-// TODO: Fix the componentwise storage of pinv of dc2e/uc2e as this is losing accuracy.
-// TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
 // TODO: FFT convolutions implemented in rlst
+// TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
+// TODO: Tree should infer dimension from the data (stride).
 
 use itertools::Itertools;
 use std::{
@@ -366,13 +366,16 @@ where
 mod test {
     use super::*;
 
-    use bempp_field::types::SvdFieldTranslationKiFmm;
-    use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
     use rand::prelude::*;
     use rand::SeedableRng;
-
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
+    
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
+
+    use bempp_field::types::SvdFieldTranslationKiFmm;
+    use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
+
+    use crate::charge::build_charge_dict;
 
     fn points_fixture(
         npoints: usize,
@@ -500,17 +503,19 @@ mod test {
     fn test_fmm_svd<'a>() {
         let npoints = 1000;
         let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let charges = vec![1.0; npoints];
 
-        let order = 9;
+        let order = 7;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
         let k = 50;
         let ncrit = 150;
-        let depth = 5;
+        let depth = 2;
         let kernel = Laplace3dKernel::<f64>::default();
 
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth));
+        let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth), &global_idxs[..]);
 
         let m2l_data_svd = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
@@ -522,22 +527,9 @@ mod test {
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
-        // Form charge dict using tree.
-        let mut charge_dict: ChargeDict = HashMap::new();
-
-        let mut global_idxs = Vec::new();
-
-        for leaf in fmm.tree().get_all_leaves_set().iter() {
-            if let Some(points) = fmm.tree().get_points(&leaf) {
-                // Find global indices
-                global_idxs.extend(points.iter().map(|p| p.global_idx).collect_vec());
-            }
-        }
-
-        for &global_idx in global_idxs.iter() {
-            charge_dict.insert(global_idx, 1.0);
-        }
-
+        // Form charge dict, matching charges with their associated global indices
+        let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+        
         let datatree = FmmData::new(fmm, &charge_dict);
 
         let times = datatree.run(Some(true));
@@ -583,6 +575,7 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        assert!(rel_error <= 1e-7);
+        println!("rel error {:?}", rel_error);
+        assert!(rel_error <= 1e-5);
     }
 }

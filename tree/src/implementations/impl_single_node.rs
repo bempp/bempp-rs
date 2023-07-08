@@ -16,7 +16,7 @@ use crate::{
 
 impl SingleNodeTree {
     /// Constructor for uniform trees
-    pub fn uniform_tree(points: &[PointType], &domain: &Domain, depth: u64) -> SingleNodeTree {
+    pub fn uniform_tree(points: &[PointType], &domain: &Domain, depth: u64, global_idxs: &[usize]) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
 
         // TODO: Automatically infer dimension
@@ -32,25 +32,10 @@ impl SingleNodeTree {
                 coordinate: point,
                 base_key,
                 encoded_key,
-                global_idx: i,
+                global_idx: global_idxs[i],
             })
         }
         let mut points = tmp;
-
-        // let mut points: Points = points
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, &p)| {
-        //         let base_key = MortonKey::from_point(&p, &domain, DEEPEST_LEVEL);
-        //         let encoded_key = MortonKey::from_point(&p, &domain, depth);
-        //         Point {
-        //             coordinate: p,
-        //             base_key,
-        //             encoded_key,
-        //             global_idx: i,
-        //         }
-        //     })
-        //     .collect();
         points.sort();
 
         // Generate complete tree at specified depth
@@ -140,22 +125,8 @@ impl SingleNodeTree {
     }
 
     /// Constructor for adaptive trees
-    pub fn adaptive_tree(points: &[PointType], &domain: &Domain, n_crit: u64) -> SingleNodeTree {
+    pub fn adaptive_tree(points: &[PointType], &domain: &Domain, n_crit: u64, global_idxs: &[usize]) -> SingleNodeTree {
         // Encode points at deepest level
-        // let mut points: Points = points
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, &p)| {
-        //         let key = MortonKey::from_point(&p, &domain, DEEPEST_LEVEL);
-        //         Point {
-        //             coordinate: p,
-        //             base_key: key,
-        //             encoded_key: key,
-        //             global_idx: i,
-        //         }
-        //     })
-        //     .collect();
-        // TODO: Automatically infer dimension
         let dim = 3;
         let npoints = points.len() / dim;
 
@@ -167,7 +138,7 @@ impl SingleNodeTree {
                 coordinate: point,
                 base_key: key,
                 encoded_key: key,
-                global_idx: i,
+                global_idx: global_idxs[i],
             })
         }
         let mut points = tmp;
@@ -446,6 +417,8 @@ impl Tree for SingleNodeTree {
     type PointSlice<'a> = &'a [Point];
     type PointData = f64;
     type PointDataSlice<'a> = &'a [f64];
+    type GlobalIndex = usize;
+    type GlobalIndexSlice<'a> = &'a [usize];
 
     /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
@@ -455,6 +428,7 @@ impl Tree for SingleNodeTree {
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
+        global_idxs: Self::GlobalIndexSlice<'_>
     ) -> SingleNodeTree {
         // TODO: Come back and reconcile a runtime point dimension detector
 
@@ -464,9 +438,9 @@ impl Tree for SingleNodeTree {
         let depth = depth.unwrap_or(DEEPEST_LEVEL);
 
         if adaptive {
-            SingleNodeTree::adaptive_tree(points, &domain, n_crit)
+            SingleNodeTree::adaptive_tree(points, &domain, n_crit, &global_idxs)
         } else {
-            SingleNodeTree::uniform_tree(points, &domain, depth)
+            SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
         }
     }
 
@@ -522,7 +496,7 @@ impl Tree for SingleNodeTree {
 #[cfg(test)]
 mod test {
 
-    use rlst::dense::RawAccess;
+    use rlst::dense::{RawAccess, global};
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col};
 
@@ -535,7 +509,8 @@ mod test {
 
         // Test uniformly distributed data
         let points = points_fixture(npoints, Some(-1.0), Some(1.0));
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth));
+        let global_idxs = (0..npoints).collect_vec();
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -552,7 +527,8 @@ mod test {
 
         // Test a column distribution of data
         let points = points_fixture_col(npoints);
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth));
+        let global_idxs = (0..npoints).collect_vec();
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -584,10 +560,11 @@ mod test {
     pub fn test_adaptive_tree() {
         let npoints = 10000;
         let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
 
         let adaptive = true;
         let n_crit = 150;
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None);
+        let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None, &global_idxs);
 
         // Test that tree is not uniform
         let levels: Vec<u64> = tree
@@ -628,8 +605,9 @@ mod test {
     pub fn test_no_overlaps() {
         let npoints = 10000;
         let points = points_fixture(npoints, None, None);
-        let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4));
-        let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None);
+        let global_idxs = (0..npoints).collect_vec();
+        let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4),&global_idxs);
+        let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs);
         test_no_overlaps_helper(uniform.get_leaves().unwrap());
         test_no_overlaps_helper(adaptive.get_leaves().unwrap());
     }
@@ -781,8 +759,9 @@ mod test {
         // Uniform tree
         let npoints = 10000;
         let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth));
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
         let keys = tree.get_all_keys().unwrap();
 
@@ -812,7 +791,8 @@ mod test {
 
         // Adaptive tree
         let ncrit = 150;
-        let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None);
+        
+        let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None, &global_idxs);
         let keys = tree.get_all_keys().unwrap();
         let depth = tree.get_depth();
 
