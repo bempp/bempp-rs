@@ -1,8 +1,8 @@
 // Implementation of field translations
 use std::{
     collections::HashMap,
-    ops::Deref,
-    sync::{Arc, Mutex, RwLock},
+    ops::{Deref, Mul, DerefMut},
+    sync::{Arc, Mutex, RwLock, MutexGuard},
 };
 
 use bempp_tools::Array3D;
@@ -21,7 +21,8 @@ use bempp_traits::{
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use rlst::{
-    common::traits::{Eval, CmpWiseProduct},
+    common::traits::*,
+    common::tools::PrettyPrint,
     dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape},
 };
 
@@ -528,6 +529,7 @@ where
 
                     // Compute FFT of signal
                     let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
+                    
                     let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
                     let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
@@ -540,16 +542,19 @@ where
                     let r = 2*o;
 
                     // TODO: Look carefully how to pad upper left
-                    let padded_signal = pad3(&signal, (p-m, q-n, r-o), (p, m, o));
+                    let pad_size = (p-m, q-n, r-o);
+                    let pad_index = (p-m, q-n, r-o);
+                    let real_dim = p;
+                    let padded_signal = pad3(&signal, pad_size, pad_index);
 
                     let padded_signal_hat = rfft3(&padded_signal);
-                    let &(m, n, o) = padded_signal_hat.shape();
-                    let len_padded_signal_hat = m*n*o;
+                    let &(m_, n_, o_) = padded_signal_hat.shape();
+                    let len_padded_signal_hat = m_*n_*o_;
 
                     // 2. Compute the convolution to find the check potential
                     let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
-                    let &(m, n, o) = padded_kernel_hat.shape();
-                    let len_padded_kernel_hat= m*n*o;
+                    let &(m_, n_, o_) = padded_kernel_hat.shape();
+                    let len_padded_kernel_hat= m_*n_*o_;
 
                     // Compute Hadamard product
                     let padded_signal_hat = unsafe {
@@ -560,16 +565,52 @@ where
                         rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (1, len_padded_kernel_hat), (1,1)]
                     };
 
+                    assert_eq!(len_padded_kernel_hat, len_padded_signal_hat);
+                    
                     let check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
 
                     // 3.1 Compute iFFT to find check potentials
-                    let check_potential_hat = Array3D::from_data(check_potential_hat.data().to_vec(), (m, n, o));
-
-                    let check_potential = irfft3(&check_potential_hat, m);
-
+                    let check_potential_hat = Array3D::from_data(check_potential_hat.data().to_vec(), (m_, n_, o_));
                     
+                    let check_potential = irfft3(&check_potential_hat, real_dim);
+
+                    // Filter check potentials
+                    let mut filtered_check_potentials: Array3D<f64> = Array3D::new((m+1, n+1, o+1));
+                    for i in (p-m-1)..p {
+                        for j in (q-n-1)..q {
+                            for k in (r-o-1)..o {
+                                let i_= i - (p-m-1);
+                                let j_ = j - (q-n-1);
+                                let k_ = k - (r-o-1);
+                                *filtered_check_potentials.get_mut(i_, j_, k_).unwrap() = *check_potential.get(i, j, k).unwrap();
+                            }
+                        }
+                    }
+
+                    let (_, target_surface_idxs) = target.surface_grid(fmm_arc.order);
+                    let mut tmp = Vec::new();
+                    let ntargets = target_surface_idxs.len() / fmm_arc.kernel.space_dimension();
+                    let xs = &target_surface_idxs[0..ntargets];
+                    let ys = &target_surface_idxs[ntargets..2*ntargets];
+                    let zs = &target_surface_idxs[2*ntargets..];
+
+                    for i in 0..ntargets {
+                        let val = filtered_check_potentials.get(xs[i], ys[i], zs[i]).unwrap();
+                        tmp.push(*val);
+                    }
+
+                    let check_potential = unsafe {
+                        rlst_pointer_mat!['a, f64, tmp.as_ptr(), (ntargets, 1), (1,1)]
+                    };
+
+                    // Finally, compute local coefficients from check potential
+                    let target_local_owned = (self.m2l_scale(target.level()) 
+                        * fmm_arc.kernel.scale(target.level()) 
+                        * fmm_arc.dc2e_inv.dot(&check_potential)).eval();
 
 
+                    let mut target_local_lock = target_local_arc.lock().unwrap();
+                    *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
                 }
             }
         })

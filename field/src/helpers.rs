@@ -320,4 +320,69 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_pad3() {
+        let dim = 3;
+        // Initialise input data
+        let mut input = Array3D::new((dim, dim, dim));
+        for i in 0..dim {
+            for j in 0..dim {
+                for k in 0..dim {
+                    *input.get_mut(i, j, k).unwrap() = (i + j * dim + k * dim * dim + 1) as f64
+                }
+            }
+        }
+
+        // Test padding at edge of each axis
+        let pad_size = (2,3,4);
+        let pad_index = (0, 0, 0);
+        let padded = pad3(&input, pad_size, pad_index);
+
+        let &(m, n, o) = padded.shape();
+
+        // Check dimension
+        assert_eq!(m, dim+pad_size.0);
+        assert_eq!(n, dim+pad_size.1);
+        assert_eq!(o, dim+pad_size.2);
+
+        // Check that padding has been correctly applied
+        for i in dim..m {
+            for j in dim..n {
+                for k in dim.. o {
+                    assert_eq!(*padded.get(i, j, k).unwrap(), 0f64)
+                }
+            }
+        }
+
+        for i in 0..dim {
+            for j in 0..dim {
+                for k in 0..dim {
+                    assert_eq!(*padded.get(i, j, k).unwrap(), *input.get(i, j, k).unwrap())
+                }
+            }
+        }
+
+        // Test padding at the start of each axis
+        let pad_index = (2,2,2);
+      
+        let padded = pad3(&input, pad_size, pad_index);
+
+        // Check that padding has been correctly applied
+        for i in 0..pad_index.0 {
+            for j in 0..pad_index.1 {
+                for k in 0.. pad_index.2 {
+                    assert_eq!(*padded.get(i, j, k).unwrap(), 0f64)
+                }
+            }
+        }
+
+        for i in 0..dim {
+            for j in 0..dim {
+                for k in 0..dim {
+                    assert_eq!(*padded.get(i+pad_index.0, j+pad_index.1, k+pad_index.2).unwrap(), *input.get(i, j, k).unwrap());
+                }
+            }
+        } 
+    }
 }

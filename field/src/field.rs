@@ -375,8 +375,10 @@ where
             for j in 0..n {
                 for k in 0..n {
                     let conv_idx = i*n*n+j*n+k;
-                    let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
-                    *result.get_mut(i, j, k).unwrap() = charges[*surf_idx];
+                    if self.conv_to_surf_map.contains_key(&conv_idx) {
+                        let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
+                        *result.get_mut(i, j, k).unwrap() = charges[*surf_idx];
+                    } 
                 }
             }
         }
@@ -389,17 +391,33 @@ where
 mod test {
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use bempp_tree::types::morton::MortonKey;
 
     use super::*;
 
     #[test]
     fn test_fft() {
 
+        let order = 2;
+        let alpha = 1.05;
+        let level = 2;
         let kernel = Laplace3dKernel::<f64>::new();
-        let transfer_vectors = compute_transfer_vectors();
 
         let domain = Domain { origin: [0., 0., 0.], diameter: [1.0, 1.0, 1.0] };
-        let fft = FftFieldTranslationNaiveKiFmm::new(kernel, 2, domain, 1.05);
+        let fft = FftFieldTranslationNaiveKiFmm::new(kernel, order, domain, alpha);
 
+        let domain = Domain { origin: [0., 0., 0.], diameter: [1., 1., 1.] };
+        let key = MortonKey::from_point(&[0.5, 0.5, 0.5], &domain, level);
+        let surface_grid = key.compute_surface(&domain, order, alpha);
+        let convolution_grid = key.convolution_grid(order, &domain, &surface_grid, alpha);
+        let min_target = [0.8, 0.8, 0.8];
+
+        let k = fft.compute_kernel(order, &convolution_grid, min_target);
+
+        let &(m, n, o) = k.shape();
+
+        for i in 0..m {
+            println!("{:?}", k.get(i, 1, 1));
+        }
     }
 }
