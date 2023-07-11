@@ -546,7 +546,6 @@ where
                     let pad_size = (p-m, q-n, r-o);
                     let pad_index = (p-m, q-n, r-o);
                     let real_dim = q;
-                    
 
                     let padded_signal = pad3(&signal, pad_size, pad_index);
 
@@ -568,8 +567,6 @@ where
                         rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
                     };
 
-                    assert_eq!(len_padded_kernel_hat, len_padded_signal_hat);
-                    
                     let check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
 
                     // 3.1 Compute iFFT to find check potentials
