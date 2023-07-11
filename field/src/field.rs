@@ -265,6 +265,7 @@ where
     }
 }
 
+
 impl<T> FftFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel<T = f64> + Default,
@@ -416,8 +417,6 @@ mod test {
 
         let &(m, n, o) = k.shape();
 
-        for i in 0..m {
-            println!("{:?}", k.get(i, 1, 1));
-        }
+        assert!(false);
     }
 }

@@ -502,6 +502,7 @@ where
     }
 }
 
+
 impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, FftFieldTranslationNaiveKiFmm<T>>>
 where
     T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Sync + std::marker::Send + Default
@@ -544,7 +545,9 @@ where
                     // TODO: Look carefully how to pad upper left
                     let pad_size = (p-m, q-n, r-o);
                     let pad_index = (p-m, q-n, r-o);
-                    let real_dim = p;
+                    let real_dim = q;
+                    
+
                     let padded_signal = pad3(&signal, pad_size, pad_index);
 
                     let padded_signal_hat = rfft3(&padded_signal);
@@ -555,14 +558,14 @@ where
                     let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
                     let &(m_, n_, o_) = padded_kernel_hat.shape();
                     let len_padded_kernel_hat= m_*n_*o_;
-
+                    
                     // Compute Hadamard product
                     let padded_signal_hat = unsafe {
-                        rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (1, len_padded_signal_hat), (1,1)]
+                        rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (len_padded_signal_hat, 1), (1,1)]
                     };
                     
                     let padded_kernel_hat= unsafe {
-                        rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (1, len_padded_kernel_hat), (1,1)]
+                        rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
                     };
 
                     assert_eq!(len_padded_kernel_hat, len_padded_signal_hat);
@@ -578,7 +581,7 @@ where
                     let mut filtered_check_potentials: Array3D<f64> = Array3D::new((m+1, n+1, o+1));
                     for i in (p-m-1)..p {
                         for j in (q-n-1)..q {
-                            for k in (r-o-1)..o {
+                            for k in (r-o-1)..r {
                                 let i_= i - (p-m-1);
                                 let j_ = j - (q-n-1);
                                 let k_ = k - (r-o-1);
