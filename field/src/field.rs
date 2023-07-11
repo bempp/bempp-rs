@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use num::Complex;
 use rlst::{
@@ -7,7 +7,7 @@ use rlst::{
         traits::svd::{Mode, Svd},
     },
     common::traits::{Eval, NewLikeSelf, Transpose},
-    dense::{rlst_mat, traits::*, Dot, Shape, rlst_pointer_mat},
+    dense::{rlst_mat, traits::*, Dot, Shape},
 };
 
 use bempp_traits::{field::FieldTranslationData, kernel::Kernel, types::EvalType, arrays::Array3DAccess, fmm::Fmm};
@@ -15,7 +15,7 @@ use bempp_tree::types::domain::Domain;
 use bempp_tools::Array3D;
 
 use crate::{
-    helpers::{compute_transfer_vectors, pad3, flip3, rfft3, irfft3},
+    helpers::{compute_transfer_vectors, pad3, flip3, rfft3},
     types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, SvdM2lEntry, FftM2lEntry, TransferVector},
 };
 
@@ -185,7 +185,7 @@ where
     T: Kernel<T = f64> + Default,
 {
     type Domain = Domain;
-    type M2LOperators = Vec<Array3D<Complex<f64>>>;
+    type M2LOperators = Vec<FftM2lEntry>;
     type TransferVector = Vec<TransferVector>;
 
     fn compute_m2l_operators(
@@ -193,7 +193,7 @@ where
         expansion_order: usize,
         domain: Self::Domain,
     ) -> Self::M2LOperators {
-        let mut result: Vec<Array3D<Complex<f64>>> = Vec::new();
+        let mut result = Vec::new();
 
         for t in self.transfer_vectors.iter() {
             let source_equivalent_surface =
@@ -269,60 +269,65 @@ impl<T> FftFieldTranslationNaiveKiFmm<T>
 where
     T: Kernel<T = f64> + Default,
 {
-    // pub fn new(kernel: T, expansion_order: usize, domain: Domain, alpha: f64) -> Self {
-    //     let mut result = FftFieldTranslationNaiveKiFmm::default();
+    pub fn new(kernel: T, expansion_order: usize, domain: Domain, alpha: f64) -> Self {
 
-    //     // Create maps between surface and convolution grids
-    //     let (surf_to_conv, conv_to_surf) =
-    //         FftFieldTranslationNaiveKiFmm::<T>::compute_surf_to_conv_map(expansion_order);
-    //     result.surf_to_conv_map = surf_to_conv;
-    //     result.conv_to_surf_map = conv_to_surf;
+        let mut result = FftFieldTranslationNaiveKiFmm {
+            alpha,
+            kernel,
+            surf_to_conv_map: HashMap::default(),
+            conv_to_surf_map: HashMap::default(),
+            m2l: Vec::default(), 
+            transfer_vectors: Vec::default(),
+        };
 
-    //     result.kernel = kernel;
+        // Create maps between surface and convolution grids
+        let (surf_to_conv, conv_to_surf) =
+            FftFieldTranslationNaiveKiFmm::<T>::compute_surf_to_conv_map(expansion_order);
+        
+        result.surf_to_conv_map = surf_to_conv;
+        result.conv_to_surf_map = conv_to_surf;
+        result.transfer_vectors = result.compute_transfer_vectors();
+        result.m2l = result.compute_m2l_operators(expansion_order, domain);
 
-    //     result.alpha = alpha;
-    //     result.transfer_vectors = result.compute_transfer_vectors();
-    //     result.m2l = result.compute_m2l_operators(expansion_order, domain);
+        result
+    }
 
-    //     result
-    // }
+    pub fn compute_surf_to_conv_map(
+        expansion_order: usize,
+    ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
+        let n = 2 * expansion_order - 1;
 
-    // pub fn compute_surf_to_conv_map(
-    //     expansion_order: usize,
-    // ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
-    //     let n = 2 * expansion_order - 1;
+        // Index maps between surface and convolution grids
+        let mut surf_to_conv: HashMap<usize, usize> = HashMap::new();
+        let mut conv_to_surf: HashMap<usize, usize> = HashMap::new();
 
-    //     // Index maps between surface and convolution grids
-    //     let mut surf_to_conv: HashMap<usize, usize> = HashMap::new();
-    //     let mut conv_to_surf: HashMap<usize, usize> = HashMap::new();
+        // Initialise surface grid index
+        let mut surf_index = 0;
 
-    //     // Initialise surface grid index
-    //     let mut surf_index = 0;
+        // The boundaries of the surface grid
+        let lower = expansion_order - 1;
+        let upper = 2 * expansion_order - 2;
 
-    //     // The boundaries of the surface grid
-    //     let lower = expansion_order - 1;
-    //     let upper = 2 * expansion_order - 2;
+        // Iterate through the entire convolution grid marking the boundaries
+        // This makes the map much easier to understand and debug
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i * n * n + j * n + k;
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
+                    {
+                        surf_to_conv.insert(surf_index, conv_idx);
+                        conv_to_surf.insert(conv_idx, surf_index);
+                        surf_index += 1;
+                    }
+                }
+            }
+        }
 
-    //     // Iterate through the entire convolution grid marking the boundaries
-    //     // This makes the map much easier to understand and debug
-    //     for i in 0..n {
-    //         for j in 0..n {
-    //             for k in 0..n {
-    //                 let conv_idx = i * n * n + j * n + k;
-    //                 if (i >= lower && j >= lower && (k == lower || k == upper))
-    //                     || (j >= lower && k >= lower && (i == lower || i == upper))
-    //                     || (k >= lower && i >= lower && (j == lower || j == upper))
-    //                 {
-    //                     surf_to_conv.insert(surf_index, conv_idx);
-    //                     conv_to_surf.insert(conv_idx, surf_index);
-    //                     surf_index += 1;
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     (surf_to_conv, conv_to_surf)
-    // }
+        (surf_to_conv, conv_to_surf)
+    }
 
     pub fn compute_kernel(
         &self,
@@ -330,10 +335,8 @@ where
         convolution_grid: &[f64],
         min_target: [f64; 3],
     )  -> Array3D<f64>
-    // -> Vec<Vec<Vec<f64>>>
      {
         let n = 2 * expansion_order - 1;
-        // let mut result = vec![vec![vec![0f64; n]; n]; n];
         let mut result = Array3D::<f64>::new((n, n, n));
         let nconv = n.pow(3);
 
@@ -358,24 +361,28 @@ where
         result
     }
 
-    // pub fn compute_signal(&self, expansion_order: usize, charges: &[f64]) -> Vec<Vec<Vec<f64>>> {
-    //     let n = 2 * expansion_order - 1;
-    //     let mut result = vec![vec![vec![0f64; n]; n]; n];
+    pub fn compute_signal(
+        &self, 
+        expansion_order: usize, 
+        charges: &[f64]
+    ) 
+    -> Array3D<f64>
+    {
+        let n = 2 * expansion_order - 1;
+        let mut result = Array3D::new((n,n,n));
 
-    //     for (i, result_i) in result.iter_mut().enumerate() {
-    //         for (j, result_ij) in result_i.iter_mut().enumerate() {
-    //             for (k, result_ijk) in result_ij.iter_mut().enumerate() {
-    //                 let conv_idx = i * n * n + j * n + k;
-    //                 if self.conv_to_surf_map.contains_key(&conv_idx) {
-    //                     let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
-    //                     *result_ijk = charges[*surf_idx]
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     result
-    // }
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i*n*n+j*n+k;
+                    let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
+                    *result.get_mut(i, j, k).unwrap() = charges[*surf_idx];
+                }
+            }
+        }
+       
+        result
+    }
 }
 
 #[cfg(test)]
@@ -391,13 +398,8 @@ mod test {
         let kernel = Laplace3dKernel::<f64>::new();
         let transfer_vectors = compute_transfer_vectors();
 
-        let fft = FftFieldTranslationNaiveKiFmm  {
-            alpha: 1.05,
-            kernel,
-            transfer_vectors
-        };
-
         let domain = Domain { origin: [0., 0., 0.], diameter: [1.0, 1.0, 1.0] };
-        fft.compute_m2l_operators(2, domain);
+        let fft = FftFieldTranslationNaiveKiFmm::new(kernel, 2, domain, 1.05);
+
     }
 }

@@ -5,20 +5,23 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
+use bempp_tools::Array3D;
+use num::Complex;
 use itertools::Itertools;
 use rayon::prelude::*;
 
-use bempp_field::types::SvdFieldTranslationKiFmm;
+use bempp_field::{types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm}, helpers::{pad3, rfft3, irfft3}};
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
     kernel::{Kernel, KernelScale},
     tree::Tree,
     types::EvalType,
+    arrays::Array3DAccess
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use rlst::{
-    common::traits::Eval,
+    common::traits::{Eval, CmpWiseProduct},
     dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape},
 };
 
@@ -496,4 +499,92 @@ where
             2_f64.powf((level - 3) as f64)
         }
     }
+}
+
+impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, FftFieldTranslationNaiveKiFmm<T>>>
+where
+    T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Sync + std::marker::Send + Default
+{
+
+    fn m2l<'a>(&self, level: u64) {
+        let Some(targets) = self.fmm.tree().get_keys(level) else { return };
+        
+        targets.par_iter().for_each(move |&target| {
+            if let Some(v_list) = self.fmm.get_v_list(&target) {
+                let fmm_arc = Arc::clone(&self.fmm);
+                let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
+
+                for source in v_list.iter() {
+
+                    let transfer_vector = target.find_transfer_vector(source);
+
+                    // Locate correct precomputed FFT of kernel
+                    let k_idx = fmm_arc
+                        .m2l
+                        .transfer_vectors
+                        .iter()
+                        .position(|x| x.vector == transfer_vector)
+                        .unwrap();
+
+                    // Compute FFT of signal
+                    let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
+                    let source_multipole_lock = source_multipole_arc.lock().unwrap();
+
+                    let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
+
+                    // 1. Pad the signal
+                    let &(m, n, o) = signal.shape();
+
+                    let p = 2*m;
+                    let q = 2*n;
+                    let r = 2*o;
+
+                    // TODO: Look carefully how to pad upper left
+                    let padded_signal = pad3(&signal, (p-m, q-n, r-o), (p, m, o));
+
+                    let padded_signal_hat = rfft3(&padded_signal);
+                    let &(m, n, o) = padded_signal_hat.shape();
+                    let len_padded_signal_hat = m*n*o;
+
+                    // 2. Compute the convolution to find the check potential
+                    let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
+                    let &(m, n, o) = padded_kernel_hat.shape();
+                    let len_padded_kernel_hat= m*n*o;
+
+                    // Compute Hadamard product
+                    let padded_signal_hat = unsafe {
+                        rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (1, len_padded_signal_hat), (1,1)]
+                    };
+                    
+                    let padded_kernel_hat= unsafe {
+                        rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (1, len_padded_kernel_hat), (1,1)]
+                    };
+
+                    let check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
+
+                    // 3.1 Compute iFFT to find check potentials
+                    let check_potential_hat = Array3D::from_data(check_potential_hat.data().to_vec(), (m, n, o));
+
+                    let check_potential = irfft3(&check_potential_hat, m);
+
+                    
+
+
+                }
+            }
+        })
+    }
+
+    fn m2l_scale(&self, level: u64) -> f64 {
+        if level < 2 {
+            panic!("M2L only performed on level 2 and below")
+        }
+        if level == 2 {
+            1. / 2.
+        } else {
+            2_f64.powf((level - 3) as f64)
+        }
+    
+    }
+    
 }
