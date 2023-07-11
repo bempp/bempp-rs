@@ -1147,7 +1147,7 @@ fn singular_kernel(
             let mut term = String::new();
             term += "c";
             if test_element.degree() > 0 {
-                term += &format!(" * ");
+                term += " * ";
                 term += &function_value(
                     FunctionType::Test,
                     ValueType::Value,
@@ -1157,7 +1157,7 @@ fn singular_kernel(
                 );
             }
             if trial_element.degree() > 0 {
-                term += &format!(" * ");
+                term += " * ";
                 term += &function_value(
                     FunctionType::Trial,
                     ValueType::Value,
@@ -1416,7 +1416,7 @@ fn nonsingular_kernel(
             let mut term = String::new();
             term += "c";
             if test_element.degree() > 0 {
-                term += &format!(" * ");
+                term += " * ";
                 term += &function_value(
                     FunctionType::Test,
                     ValueType::Value,
@@ -1428,7 +1428,7 @@ fn nonsingular_kernel(
                 );
             }
             if trial_element.degree() > 0 {
-                term += &format!(" * ");
+                term += " * ";
                 term += &function_value(
                     FunctionType::Trial,
                     ValueType::Value,
