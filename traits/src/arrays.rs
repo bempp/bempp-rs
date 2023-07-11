@@ -87,6 +87,9 @@ pub trait Array3DAccess<T: Num> {
 
     /// Get the shape of the array
     fn shape(&self) -> &(usize, usize, usize);
+
+    /// Get a pointer to the raw data in the array
+    fn get_data(&self) -> &[T];
 }
 
 pub trait Array4DAccess<T: Num> {

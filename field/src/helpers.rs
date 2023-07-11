@@ -1,7 +1,11 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, usize};
 
 use itertools::Itertools;
+use realfft::{num_complex::Complex, RealFftPlanner, num_traits::Zero};
+use rustfft::{FftNum, FftPlanner};
 
+use bempp_tools::Array3D;
+use bempp_traits::arrays::Array3DAccess;
 use bempp_tree::types::{domain::Domain, morton::MortonKey};
 
 use crate::types::TransferVector;
@@ -97,4 +101,223 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     }
 
     result
+}
+
+pub fn pad3<T>(arr: &Array3D<T>, pad_size: (usize, usize, usize), pad_index: (usize, usize, usize)) -> Array3D<T>
+where
+    T: Clone+FftNum
+{
+    let &(m, n, o) = arr.shape();
+
+    let (x, y, z) = pad_index;
+    let (p, q, r) = pad_size;
+
+
+    // Check that there is enough space for pad
+    assert!(x+p <= m+p && y+q <= n+q && z+r <= o+r);
+
+    let mut padded = Array3D::new((p+m, q+n, r+o));
+
+    for i in 0..m {
+        for j in 0..n {
+            for k in 0..o {
+                *padded.get_mut(x+i, y+j, z+k).unwrap() = *arr.get(i, j, k).unwrap();
+            }
+        }
+    }
+
+    padded
+}
+
+pub fn flip3<T>(arr: &Array3D<T>) -> Array3D<T>
+where
+    T: Clone+FftNum 
+{
+    let mut flipped = Array3D::new(*arr.shape());
+    
+    let &(m, n, o) = arr.shape();
+
+    for i in 0..m {
+        for j in 0..n {
+            for k in 0..o {
+                *flipped.get_mut(i, j, k).unwrap() = *arr.get(m-i-1, n-j-1, o-k-1).unwrap();
+            }
+        }
+    } 
+
+    flipped
+}
+
+pub fn rfft3<T>(input_arr: &Array3D<T>) -> Array3D<Complex<T>>
+where
+    T: Clone + FftNum,
+{
+    let &(m, n, o) = input_arr.shape();
+
+    let m_ = m / 2 + 1;
+    let mut transformed = Array3D::<Complex<T>>::new((m_, n, o));
+
+    let mut real_planner = RealFftPlanner::<T>::new();
+    let real_fft = real_planner.plan_fft_forward(m);
+    let mut planner = FftPlanner::<T>::new();
+    let fftn = planner.plan_fft_forward(n);
+    let ffto = planner.plan_fft_forward(o);
+    let mut scratch = vec![Complex::zero(); m];
+
+    // X dimension
+    for j in 0..n {
+        for k in 0..o {
+            // Form slices
+            let mut input = Vec::new();
+            for i in 0..m {
+                input.push(*input_arr.get(i, j, k).unwrap())
+            }
+
+            let mut output = vec![Complex::zero(); m_];
+            let _ = real_fft.process_with_scratch(&mut input, &mut output, &mut scratch);
+
+            for i in 0..m_ {
+                *transformed.get_mut(i, j, k).unwrap() = output[i];
+            }
+        }
+    }
+
+    // Y dimension
+    for i in 0..m_ {
+        for k in 0..o {
+            // Form slices
+            let mut data = Vec::new();
+            for j in 0..n {
+                data.push(*transformed.get(i, j, k).unwrap())
+            }
+            let _ = fftn.process_with_scratch(&mut data, &mut scratch);
+            for j in 0..n {
+                *transformed.get_mut(i, j, k).unwrap() = data[j];
+            }
+        }
+    }
+
+    // Z dimension
+    for i in 0..m_ {
+        for j in 0..n {
+            let mut data = Vec::new();
+            for k in 0..o {
+                data.push(*transformed.get(i, j, k).unwrap())
+            }
+            let _ = ffto.process_with_scratch(&mut data, &mut scratch);
+            for k in 0..o {
+                *transformed.get_mut(i, j, k).unwrap() = data[k];
+            }
+        }
+    }
+
+    transformed
+}
+
+pub fn irfft3<T>(input_arr: &Array3D<Complex<T>>, real_dim: usize) -> Array3D<T>
+where
+    T: FftNum + Clone,
+{
+    let &(m, n, o) = input_arr.shape();
+
+    let mut transformed = Array3D::<Complex<T>>::new((real_dim, n, o));
+    let mut result = Array3D::new((real_dim, n, o));
+    let mut scratch = vec![Complex::zero(); o];
+
+    let mut real_planner = RealFftPlanner::<T>::new();
+    let real_fft = real_planner.plan_fft_inverse(real_dim);
+    let mut planner = FftPlanner::<T>::new();
+    let fftn = planner.plan_fft_inverse(n);
+    let ffto = planner.plan_fft_inverse(o);
+
+    // Z axis
+    for i in 0..m {
+        for j in 0..n {
+            let mut data = Vec::new();
+            for k in 0..o {
+                data.push(*input_arr.get(i, j, k).unwrap())
+            }
+            let _ = ffto.process_with_scratch(&mut data, &mut scratch);
+            let norm = T::one() / T::from_usize(data.len()).unwrap();
+            for k in 0..o {
+                *transformed.get_mut(i, j, k).unwrap() = data[k] * norm;
+            }
+        }
+    }
+
+    // Y axis
+    for i in 0..m {
+        for k in 0..o {
+            let mut data = Vec::new();
+            for j in 0..n {
+                data.push(*transformed.get_mut(i, j, k).unwrap());
+            }
+            let _ = fftn.process_with_scratch(&mut data, &mut scratch);
+            let norm = T::one() / T::from_usize(data.len()).unwrap();
+            for j in 0..n {
+                *transformed.get_mut(i, j, k).unwrap() = data[j] * norm;
+            }
+        }
+    }
+
+    // X axis
+    for j in 0..n {
+        for k in 0..o {
+            let mut input = Vec::new();
+            for i in 0..m {
+                input.push(*transformed.get_mut(i, j, k).unwrap());
+            }
+            let mut output = vec![T::zero(); real_dim];
+
+            let _ = real_fft.process_with_scratch(&mut input, &mut output, &mut scratch);
+            let norm = T::one() / T::from_usize(real_dim).unwrap();
+
+            for i in 0..real_dim {
+                *transformed.get_mut(i, j, k).unwrap() = Complex::from(output[i] * norm);
+            }
+        }
+    }
+
+    for i in 0..real_dim {
+        for j in 0..n {
+            for k in 0..o {
+                *result.get_mut(i, j, k).unwrap() = T::from(transformed.get(i, j, k).unwrap().re);
+            }
+        }
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use approx_eq::assert_approx_eq;
+
+    #[test]
+    fn test_rfft3() {
+        let mut input = Array3D::new((3, 3, 3));
+
+        for i in 0..3 {
+            for j in 0..3 {
+                for k in 0..3 {
+                    *input.get_mut(i, j, k).unwrap() = (i + j * 3 + k * 3 * 3 + 1) as f64
+                }
+            }
+        }
+
+        let transformed = rfft3(&input);
+
+        let result = irfft3(&transformed, 3);
+
+        for i in 0..3 {
+            for j in 0..3 {
+                for k in 0..3 {
+                    assert_approx_eq!(*result.get(i, j, k).unwrap(), *input.get(i, j, k).unwrap());
+                }
+            }
+        }
+    }
 }

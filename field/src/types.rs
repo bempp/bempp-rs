@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rlst::dense::{
     base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, Dynamic,
 };
@@ -9,27 +11,29 @@ use bempp_tree::types::morton::MortonKey;
 pub type SvdM2lEntry =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
-// // #[derive(Default)]
-// pub struct FftFieldTranslationNaiveKiFmm<T>
-// where
-//     T: Kernel + Default,
-// {
-//     // Amount to dilate inner check surface by
-//     pub alpha: f64,
+pub type FftM2lEntry = 
+    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
-//     // Maps between convolution and surface grids
-//     pub surf_to_conv_map: HashMap<usize, usize>,
-//     pub conv_to_surf_map: HashMap<usize, usize>,
+pub struct FftFieldTranslationNaiveKiFmm<T>
+where
+    T: Kernel + Default,
+{
+    // Amount to dilate inner check surface by
+    pub alpha: f64,
 
-//     // Precomputed FFT of unique kernel interactions placed on
-//     // convolution grid.
-//     pub m2l: Vec<FftM2LEntry>,
+    // // Maps between convolution and surface grids
+    // pub surf_to_conv_map: HashMap<usize, usize>,
+    // pub conv_to_surf_map: HashMap<usize, usize>,
 
-//     // Unique transfer vectors to lookup m2l unique kernel interactions
-//     pub transfer_vectors: Vec<TransferVector>,
+    // // Precomputed FFT of unique kernel interactions placed on
+    // // convolution grid.
+    // pub m2l: Vec<FftM2lEntry>,
 
-//     pub kernel: T,
-// }
+    // Unique transfer vectors to lookup m2l unique kernel interactions
+    pub transfer_vectors: Vec<TransferVector>,
+
+    pub kernel: T,
+}
 
 pub struct SvdFieldTranslationKiFmm<T>
 where

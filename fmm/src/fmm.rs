@@ -1,6 +1,7 @@
 // TODO: FFT convolutions implemented in rlst
 // TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
 // TODO: Tree should infer dimension from the data (stride).
+// TODO: Data driven SVD compression in the case the user specified no compression parameter.
 
 use itertools::Itertools;
 use std::{

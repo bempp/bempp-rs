@@ -138,6 +138,10 @@ impl<T: Num> Array3DAccess<T> for Array3D<T> {
     fn shape(&self) -> &(usize, usize, usize) {
         &self.shape
     }
+
+    fn get_data(&self) -> &[T] {
+        &self.data
+    }
 }
 
 /// A four-dimensional rectangular array
