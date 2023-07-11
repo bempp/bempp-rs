@@ -61,7 +61,6 @@ fn main() {
         1,
         false
     );
-
     generate_kernels!(
         high_order_geometry_kernel,
         "Lagrange",
@@ -81,7 +80,6 @@ fn main() {
         2,
         false
     );
-
     generate_kernels!(
         mixed_order_geometry_kernel,
         "Lagrange",

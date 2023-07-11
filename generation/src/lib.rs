@@ -1,6 +1,8 @@
 //! Generation of boundary element kernels
 #![cfg_attr(feature = "strict", deny(warnings))]
 
+// TODO: make a struct that stores all information about the kernel, then look up (eg) tables names from it
+
 extern crate proc_macro;
 use bempp_element::element::create_element;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
@@ -627,6 +629,105 @@ fn vertex(t: FunctionType, v: &impl Index, d: &impl Index, gdim: usize) -> Strin
         )
     }
 }
+
+#[cfg(features = "slice-static-tables")]
+fn function_value(
+    t: FunctionType,
+    v: ValueType,
+    b: &impl Index,
+    p: &impl Index,
+    edim: usize,
+) -> String {
+    if v.is_int() {
+        format!(
+            "{}{}{}[{}]",
+            match t {
+                FunctionType::Test => "ts",
+                FunctionType::Trial => "tr",
+            },
+            match v {
+                ValueType::Value => "",
+                ValueType::DX => "x",
+                ValueType::DY => "y",
+            },
+            b.str(),
+            p.str()
+        )
+    } else {
+        if b.is_int() {
+            format!(
+                "{}_EVALS{}[{} + {}]",
+                match t {
+                    FunctionType::Test => "TEST",
+                    FunctionType::Trial => "TRIAL",
+                },
+                match v {
+                    ValueType::Value => "",
+                    ValueType::DX => "_DX",
+                    ValueType::DY => "_DY",
+                },
+                b.int() * edim,
+                p.str()
+            )
+        } else {
+            format!(
+                "{}_EVALS{}[{} * {edim} + {}]",
+                match t {
+                    FunctionType::Test => "TEST",
+                    FunctionType::Trial => "TRIAL",
+                },
+                match v {
+                    ValueType::Value => "",
+                    ValueType::DX => "_DX",
+                    ValueType::DY => "_DY",
+                },
+                b.str(),
+                p.str()
+            )
+        }
+    }
+}
+#[cfg(not(features = "slice-static-tables"))]
+fn function_value(
+    t: FunctionType,
+    v: ValueType,
+    b: &impl Index,
+    p: &impl Index,
+    edim: usize,
+) -> String {
+    if b.is_int() {
+        format!(
+            "{}_EVALS{}[{} + {}]",
+            match t {
+                FunctionType::Test => "TEST",
+                FunctionType::Trial => "TRIAL",
+            },
+            match v {
+                ValueType::Value => "",
+                ValueType::DX => "_DX",
+                ValueType::DY => "_DY",
+            },
+            b.int() * edim,
+            p.str()
+        )
+    } else {
+        format!(
+            "{}_EVALS{}[{} * {edim} + {}]",
+            match t {
+                FunctionType::Test => "TEST",
+                FunctionType::Trial => "TRIAL",
+            },
+            match v {
+                ValueType::Value => "",
+                ValueType::DX => "_DX",
+                ValueType::DY => "_DY",
+            },
+            b.str(),
+            p.str()
+        )
+    }
+}
+
 #[cfg(features = "slice-static-tables")]
 fn geometry(t: FunctionType, v: ValueType, b: &impl Index, p: &impl Index, npts: usize) -> String {
     if v.is_int() {
@@ -826,11 +927,11 @@ fn jacobian(
     if geometry_element.degree() > 1 {
         if tdim == 2 && gdim == 3 {
             out += &indent(level);
-            out += "dx = ";
+            out += "let dx = ";
             out += &geometry_physical(t, ValueType::DX, &point, gdim, geometry_element.dim());
             out += ";\n";
             out += &indent(level);
-            out += "dy = ";
+            out += "let dy = ";
             out += &geometry_physical(t, ValueType::DY, &point, gdim, geometry_element.dim());
             out += ";\n";
             out += &indent(level);
@@ -1013,7 +1114,6 @@ fn singular_kernel(
     code += "}\n";
     code += &indent(2);
     code += "let distance = sum_squares.sqrt();\n";
-    code += &indent(2);
 
     // Compute jacobians
     code += &jacobian(
@@ -1033,6 +1133,7 @@ fn singular_kernel(
         2,
     );
 
+    code += &indent(2);
     code += "let c = WTS[q]";
     if test_geometry_element.degree() > 1 {
         code += " * test_jdet";
@@ -1046,10 +1147,24 @@ fn singular_kernel(
             let mut term = String::new();
             term += "c";
             if test_element.degree() > 0 {
-                term += &format!(" * ts{i}[q]");
+                term += &format!(" * ");
+                term += &function_value(
+                    FunctionType::Test,
+                    ValueType::Value,
+                    &IntIndex { i },
+                    &StrIndex { i: "q".to_string() },
+                    test_element.dim(),
+                );
             }
             if trial_element.degree() > 0 {
-                term += &format!(" * tr{i}[q]");
+                term += &format!(" * ");
+                term += &function_value(
+                    FunctionType::Trial,
+                    ValueType::Value,
+                    &IntIndex { i },
+                    &StrIndex { i: "q".to_string() },
+                    trial_element.dim(),
+                );
             }
             code += &indent(2);
             code += &fadd(format!("result[{}]", i * trial_element.dim() + j), term);
@@ -1301,10 +1416,28 @@ fn nonsingular_kernel(
             let mut term = String::new();
             term += "c";
             if test_element.degree() > 0 {
-                term += &format!(" * ts{i}[test_q]");
+                term += &format!(" * ");
+                term += &function_value(
+                    FunctionType::Test,
+                    ValueType::Value,
+                    &IntIndex { i },
+                    &StrIndex {
+                        i: "test_q".to_string(),
+                    },
+                    test_element.dim(),
+                );
             }
             if trial_element.degree() > 0 {
-                term += &format!(" * tr{j}[trial_q]");
+                term += &format!(" * ");
+                term += &function_value(
+                    FunctionType::Trial,
+                    ValueType::Value,
+                    &IntIndex { i },
+                    &StrIndex {
+                        i: "trial_q".to_string(),
+                    },
+                    trial_element.dim(),
+                );
             }
             code += &indent(3);
             code += &fadd(format!("result[{}]", i * trial_element.dim() + j), term);
