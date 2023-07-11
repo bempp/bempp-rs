@@ -18,8 +18,12 @@ import argparse
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--features', default=None,
                     help='feature flags to pass to the examples')
+parser.add_argument('--cargo-version', default="stable",
+                    help='cargo version to use (stable/beta/nightly')
 
-raw_features = parser.parse_args().features
+a = parser.parse_args()
+raw_features = a.features
+cargo_version = a.cargo_version
 
 features = []
 if raw_features is not None:
@@ -70,7 +74,7 @@ for file, example_name in files:
         else:
             options += f" --features \"{','.join(features)}\""
 
-    command = f"cargo {cmd} --example {example_name} --release"
+    command = f"cargo +{cargo_version} {cmd} --example {example_name} --release"
     if options is not None:
         command += f" {options}"
     if "{{NPROCESSES}}" in command:

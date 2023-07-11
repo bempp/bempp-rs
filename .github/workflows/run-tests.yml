@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust-version: ["stable"]
+        rust-version: ["stable", "nightly"]
         mpi: ['mpich', 'openmpi']
     steps:
       - name: Set up Rust
@@ -34,28 +34,28 @@ jobs:
           sudo apt-get install libopenblas-dev liblapack-dev
       - name: Style checks
         run: |
-          cargo fmt -- --check
-          cargo clippy -- -D warnings
-          cargo clippy --tests -- -D warnings
-          cargo clippy --examples -- -D warnings
+          cargo +${{ matrix.rust-version }} fmt -- --check
+          cargo +${{ matrix.rust-version }} clippy -- -D warnings
+          cargo +${{ matrix.rust-version }} clippy --tests -- -D warnings
+          cargo +${{ matrix.rust-version }} clippy --examples -- -D warnings
 
       - name: Build rust library
-        run: cargo build --features "strict"
+        run: cargo +${{ matrix.rust-version }} build --features "strict"
 
       - name: Run unit tests
-        run: cargo test --lib --features "strict"
+        run: cargo +${{ matrix.rust-version }} test --lib --features "strict"
       - name: Run unit tests (with mpi enabled)
-        run: cargo test --lib --features "mpi,strict"
+        run: cargo +${{ matrix.rust-version }} test --lib --features "mpi,strict"
       - name: Run tests
-        run: cargo test --examples --release --features "mpi,strict"
+        run: cargo +${{ matrix.rust-version }} test --examples --release --features "mpi,strict"
       - name: Run examples
         run: |
-          python3 find_examples.py
+          python3 find_examples.py --cargo-version ${{ matrix.rust-version }}
           chmod +x examples.sh
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "strict" --no-deps
+        run: cargo +${{ matrix.rust-version }} doc --features "strict" --no-deps
 
   run-tests-python:
     name: Run tests (Python)
