@@ -1,5 +1,4 @@
 // TODO: Figure out why fft is slow, probably due to a billion allocations being done
-// TODO: Change all potential assignments to be direct rather than over a loop as currently as there is a trait for this.
 // TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
 // TODO: Tree should infer dimension from the data (stride).
 // TODO: Data driven SVD compression in the case the user specified no compression parameter.
@@ -414,11 +413,11 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 7;
+        let order = 5;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
-        let k = 50;
+        let k = 1000;
         let ncrit = 150;
         let depth = 2;
         let kernel = Laplace3dKernel::<f64>::default();
@@ -441,6 +440,10 @@ mod test {
         let datatree = FmmData::new(fmm, &charge_dict);
 
         let times = datatree.run(Some(true));
+
+        // println!("SVD times {:?}", times);
+
+        // assert!(false);
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
@@ -519,6 +522,10 @@ mod test {
         let datatree = FmmData::new(fmm, &charge_dict);
 
         let times = datatree.run(Some(true));
+
+        // println!("FFT times {:?}", times);
+
+        // assert!(false);
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 

@@ -162,7 +162,7 @@ where
     let mut planner = FftPlanner::<T>::new();
     let fftn = planner.plan_fft_forward(n);
     let ffto = planner.plan_fft_forward(o);
-    let mut scratch = vec![Complex::zero(); m];
+    let mut scratch: Vec<Complex<T>> = vec![Complex::zero(); m];
 
     // X dimension
     for j in 0..n {

@@ -88,10 +88,8 @@ where
                     ).eval();
 
                     let mut leaf_multipole_lock = leaf_multipole_arc.lock().unwrap();
-
-                    for i in 0..leaf_multipole_lock.shape().0 {
-                        leaf_multipole_lock[[i, 0]] += leaf_multipole_owned[[i, 0]];
-                    }
+                    
+                    *leaf_multipole_lock.deref_mut() = (leaf_multipole_lock.deref() + leaf_multipole_owned).eval();
                 }
             });
         }
@@ -116,9 +114,7 @@ where
 
                 let mut target_multipole_lock = target_multipole_arc.lock().unwrap();
 
-                for i in 0..ncoeffs {
-                    target_multipole_lock[[i, 0]] += target_multipole_owned[[i, 0]];
-                }
+                *target_multipole_lock.deref_mut() = (target_multipole_lock.deref() + target_multipole_owned).eval();
             })
         }
     }
@@ -143,10 +139,8 @@ where
 
                 let target_local_owned = fmm.l2l[operator_index].dot(&source_local_lock);
                 let mut target_local_lock = target_local_arc.lock().unwrap();
-
-                for i in 0..ncoeffs {
-                    target_local_lock[[i, 0]] += target_local_owned[[i, 0]];
-                }
+                
+                *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
             })
         }
     }
@@ -196,10 +190,8 @@ where
                             );
 
                             let mut target_potential_lock = target_potential_arc.lock().unwrap();
-
-                            for i in 0..ntargets {
-                                target_potential_lock[[i, 0]] += target_potential[[i, 0]];
-                            }
+ 
+                            *target_potential_lock.deref_mut() = (target_potential_lock.deref() + target_potential).eval();
                         }
                     }
                 }
@@ -248,10 +240,8 @@ where
                     );
 
                     let mut target_potential_lock = target_potential_arc.lock().unwrap();
-
-                    for i in 0..ntargets {
-                        target_potential_lock[[i, 0]] += target_potential[[i, 0]];
-                    }
+                    
+                    *target_potential_lock.deref_mut() = (target_potential_lock.deref() + target_potential).eval();
                 }
             })
         }
@@ -304,9 +294,7 @@ where
 
                             let target_local_owned = (fmm_arc.kernel.scale(leaf.level()) * fmm_arc.dc2e_inv.dot(&downward_check_potential)).eval();
 
-                            for i in 0..ncoeffs {
-                                target_local_lock[[i, 0]] += target_local_owned[[i, 0]];
-                            }
+                            *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
                         }
                     }
                 }
@@ -366,9 +354,7 @@ where
                                 let mut target_potential_lock =
                                     target_potential_arc.lock().unwrap();
 
-                                for i in 0..ntargets {
-                                    target_potential_lock[[i, 0]] += target_potential[[i, 0]];
-                                }
+                                *target_potential_lock.deref_mut() = (target_potential_lock.deref() + target_potential).eval();
                             }
                         }
                     }
@@ -482,9 +468,7 @@ where
                     let dim = (ncoeffs, 1);
                     let target_local_owned = locals_owned.block(top_left, dim);
 
-                    for i in 0..target_local_lock.shape().0 {
-                        target_local_lock[[i, 0]] += target_local_owned[[i, 0]];
-                    }
+                    *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
                 }
             });
     }
@@ -533,6 +517,7 @@ where
                     
                     let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
+                    // TODO: SLOW ~ 1.5s
                     let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
 
                     // 1. Pad the signal
@@ -542,13 +527,14 @@ where
                     let q = 2*n;
                     let r = 2*o;
 
-                    // TODO: Look carefully how to pad upper left
                     let pad_size = (p-m, q-n, r-o);
                     let pad_index = (p-m, q-n, r-o);
                     let real_dim = q;
 
+                    // Also slow but not as slow as compute signal ~100ms
                     let padded_signal = pad3(&signal, pad_size, pad_index);
 
+                    // TODO: Very SLOW ~21s
                     let padded_signal_hat = rfft3(&padded_signal);
                     let &(m_, n_, o_) = padded_signal_hat.shape();
                     let len_padded_signal_hat = m_*n_*o_;
