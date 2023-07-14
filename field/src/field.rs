@@ -16,7 +16,7 @@ use bempp_tools::Array3D;
 
 use crate::{
     helpers::{compute_transfer_vectors, pad3, flip3, rfft3},
-    types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, SvdM2lEntry, FftM2lEntry, TransferVector},
+    types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm, SvdM2lEntry, FftM2lEntry, TransferVector},
 };
 
 impl<T> FieldTranslationData<T> for SvdFieldTranslationKiFmm<T>
@@ -237,9 +237,13 @@ where
             // Precompute and store the FFT of each unique kernel interaction
 
             // Begin by calculating pad lengths along each dimension
-            let p = 2 * m;
-            let q = 2 * n;
-            let r = 2 * o;
+            let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+            let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+            let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+
+            let p = p.max(4);
+            let q = q.max(4);
+            let r = r.max(4);
 
             let padded_kernel = pad3(&kernel, (p-m, q-n, r-o), (0, 0, 0));
 
@@ -387,6 +391,219 @@ where
         result
     }
 }
+
+impl<T> FieldTranslationData<T> for FftFieldTranslationKiFmm<T>
+where
+    T: Kernel<T = f64> + Default,
+{
+    type Domain = Domain;
+    type M2LOperators = Vec<FftM2lEntry>;
+    type TransferVector = Vec<TransferVector>;
+
+    fn compute_m2l_operators(
+        &self,
+        expansion_order: usize,
+        domain: Self::Domain,
+    ) -> Self::M2LOperators {
+        let mut result = Vec::new();
+
+        for t in self.transfer_vectors.iter() {
+            let source_equivalent_surface =
+                t.source
+                    .compute_surface(&domain, expansion_order, self.alpha);
+
+            let conv_grid_sources = t.source.convolution_grid(
+                expansion_order,
+                &domain,
+                &source_equivalent_surface,
+                self.alpha,
+            );
+
+            let target_check_surface = t.target.compute_surface(&domain, expansion_order, self.alpha);
+
+            // TODO: Remove dim
+            let dim = 3;
+            // Find min target
+            let ncoeffs: usize = target_check_surface.len() / dim;
+            let sums: Vec<_> = (0..ncoeffs)
+                .map(|i| target_check_surface[i] + target_check_surface[ncoeffs + i] + target_check_surface[2*ncoeffs + i])
+                .collect();
+
+            let min_index = sums
+                .iter()
+                .enumerate()
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(index, _)| index)
+                .unwrap();
+
+            let min_target = [
+                target_check_surface[min_index],
+                target_check_surface[min_index + ncoeffs],
+                target_check_surface[min_index + 2 * ncoeffs],
+            ];
+
+            let kernel = self.compute_kernel(expansion_order, &conv_grid_sources, min_target);
+
+            let &(m, n, o) = kernel.shape();
+
+            // Precompute and store the FFT of each unique kernel interaction
+
+            // Begin by calculating pad lengths along each dimension
+            let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+            let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+            let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+
+            let p = p.max(4);
+            let q = q.max(4);
+            let r = r.max(4);
+
+            let padded_kernel = pad3(&kernel, (p-m, q-n, r-o), (0, 0, 0));
+
+            // Flip the kernel
+            let padded_kernel = flip3(&padded_kernel);
+
+            // Compute FFT of kernel for this transfer vector
+            let padded_kernel_hat = rfft3(&padded_kernel);
+
+            // Store FFT of kernel for this transfer vector            
+            result.push(padded_kernel_hat)
+        }
+
+        result
+    }
+
+    fn compute_transfer_vectors(&self) -> Self::TransferVector {
+        compute_transfer_vectors()
+    }
+
+    fn ncoeffs(&self, expansion_order: usize) -> usize {
+        6 * (expansion_order - 1).pow(2) + 2
+    }
+}
+
+
+impl<T> FftFieldTranslationKiFmm<T>
+where
+    T: Kernel<T = f64> + Default,
+{
+    pub fn new(kernel: T, expansion_order: usize, domain: Domain, alpha: f64) -> Self {
+
+        let mut result = FftFieldTranslationKiFmm {
+            alpha,
+            kernel,
+            surf_to_conv_map: HashMap::default(),
+            conv_to_surf_map: HashMap::default(),
+            m2l: Vec::default(), 
+            transfer_vectors: Vec::default(),
+        };
+
+        // Create maps between surface and convolution grids
+        let (surf_to_conv, conv_to_surf) =
+        FftFieldTranslationKiFmm::<T>::compute_surf_to_conv_map(expansion_order);
+        
+        result.surf_to_conv_map = surf_to_conv;
+        result.conv_to_surf_map = conv_to_surf;
+        result.transfer_vectors = result.compute_transfer_vectors();
+        result.m2l = result.compute_m2l_operators(expansion_order, domain);
+
+        result
+    }
+
+    pub fn compute_surf_to_conv_map(
+        expansion_order: usize,
+    ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
+        let n = 2 * expansion_order - 1;
+
+        // Index maps between surface and convolution grids
+        let mut surf_to_conv: HashMap<usize, usize> = HashMap::new();
+        let mut conv_to_surf: HashMap<usize, usize> = HashMap::new();
+
+        // Initialise surface grid index
+        let mut surf_index = 0;
+
+        // The boundaries of the surface grid
+        let lower = expansion_order - 1;
+        let upper = 2 * expansion_order - 2;
+
+        // Iterate through the entire convolution grid marking the boundaries
+        // This makes the map much easier to understand and debug
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i * n * n + j * n + k;
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
+                    {
+                        surf_to_conv.insert(surf_index, conv_idx);
+                        conv_to_surf.insert(conv_idx, surf_index);
+                        surf_index += 1;
+                    }
+                }
+            }
+        }
+
+        (surf_to_conv, conv_to_surf)
+    }
+
+    pub fn compute_kernel(
+        &self,
+        expansion_order: usize,
+        convolution_grid: &[f64],
+        min_target: [f64; 3],
+    )  -> Array3D<f64>
+     {
+        let n = 2 * expansion_order - 1;
+        let mut result = Array3D::<f64>::new((n, n, n));
+        let nconv = n.pow(3);
+
+        let mut kernel_evals = vec![0f64; nconv];
+
+        self.kernel.assemble_st(
+            EvalType::Value, 
+            convolution_grid,
+            &min_target[..], 
+            &mut kernel_evals[..]
+        );
+
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i * n * n + j * n + k;
+                    *result.get_mut(i, j, k).unwrap() = kernel_evals[conv_idx];
+                }
+            }
+        } 
+
+        result
+    }
+
+    pub fn compute_signal(
+        &self, 
+        expansion_order: usize, 
+        charges: &[f64]
+    ) 
+    -> Array3D<f64>
+    {
+        let n = 2 * expansion_order - 1;
+        let mut result = Array3D::new((n,n,n));
+
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    let conv_idx = i*n*n+j*n+k;
+                    if self.conv_to_surf_map.contains_key(&conv_idx) {
+                        let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
+                        *result.get_mut(i, j, k).unwrap() = charges[*surf_idx];
+                    } 
+                }
+            }
+        }
+       
+        result
+    }
+}
+
 
 #[cfg(test)]
 mod test {

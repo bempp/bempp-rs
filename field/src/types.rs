@@ -36,6 +36,27 @@ where
     pub kernel: T,
 }
 
+pub struct FftFieldTranslationKiFmm<T>
+where
+    T: Kernel + Default,
+{
+    // Amount to dilate inner check surface by
+    pub alpha: f64,
+
+    // Maps between convolution and surface grids
+    pub surf_to_conv_map: HashMap<usize, usize>,
+    pub conv_to_surf_map: HashMap<usize, usize>,
+
+    // Precomputed FFT of unique kernel interactions placed on
+    // convolution grid.
+    pub m2l: Vec<FftM2lEntry>,
+
+    // Unique transfer vectors to lookup m2l unique kernel interactions
+    pub transfer_vectors: Vec<TransferVector>,
+
+    pub kernel: T,
+}
+
 pub struct SvdFieldTranslationKiFmm<T>
 where
     T: Kernel + Default,

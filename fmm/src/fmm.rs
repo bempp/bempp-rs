@@ -367,7 +367,7 @@ where
 mod test {
     use super::*;
 
-    use bempp_field::types::FftFieldTranslationNaiveKiFmm;
+    use bempp_field::types::{FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm};
     use rand::prelude::*;
     use rand::SeedableRng;
     
@@ -492,7 +492,7 @@ mod test {
 
     #[test]
     fn test_fmm_fft<'a>() {
-        let npoints = 1000;
+        let npoints = 10000;
         let points = points_fixture(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
@@ -502,12 +502,12 @@ mod test {
         let alpha_outer = 2.9;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 2;
+        let depth = 3;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth), &global_idxs[..]);
 
-        let m2l_data_fft = FftFieldTranslationNaiveKiFmm::new(
+        let m2l_data_fft = FftFieldTranslationKiFmm::new(
             kernel.clone(),
             order,
             tree.get_domain().clone(),
@@ -523,9 +523,8 @@ mod test {
 
         let times = datatree.run(Some(true));
 
-        // println!("FFT times {:?}", times);
+        println!("FFT times {:?}", times);
 
-        // assert!(false);
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
