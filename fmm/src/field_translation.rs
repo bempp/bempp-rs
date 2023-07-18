@@ -9,8 +9,9 @@ use bempp_tools::Array3D;
 use num::Complex;
 use itertools::Itertools;
 use rayon::prelude::*;
+use fftw::types::*;
 
-use bempp_field::{types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm}, helpers::{pad3, rfft3, irfft3}};
+use bempp_field::{types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm}, helpers::{pad3, rfft3, irfft3, rfft3_fftw, irfft3_fftw, rfft3_fftw_par_dm}};
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
@@ -523,12 +524,16 @@ where
                     // 1. Pad the signal
                     let &(m, n, o) = signal.shape();
 
-                    let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
-                    let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
-                    let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
-                    let p = p.max(4);
-                    let q = q.max(4);
-                    let r = r.max(4);
+                    // let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+                    // let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+                    // let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+                    // let p = p.max(4);
+                    // let q = q.max(4);
+                    // let r = r.max(4);
+                    
+                    let p = m + 1; 
+                    let q = n + 1;
+                    let r = o + 1;
             
                     let pad_size = (p-m, q-n, r-o);
                     let pad_index = (p-m, q-n, r-o);
@@ -619,6 +624,11 @@ where
     
 }
 
+use dashmap::DashMap;
+
+
+
+
 impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, FftFieldTranslationKiFmm<T>>>
 where
     T: Kernel<T = f64> + KernelScale<T = f64> + std::marker::Sync + std::marker::Send + Default
@@ -626,10 +636,51 @@ where
 
     fn m2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else { return };
+
+        // // Form signals to use for convolution first
+        // let n = 2*self.fmm.order -1;
+        // let mut padded_signals: DashMap<MortonKey, Array3D<f64>> = targets.iter().map(|target| (*target, Array3D::<f64>::new((n, n, n)))).collect();
+        // let mut padded_signals_hat: DashMap<MortonKey, Array3D<c64>> = targets.iter().map(|target| (*target, Array3D::<c64>::new((n, n, n/2 + 1)))).collect();
+
+        // targets.par_iter().for_each(|target| {
+        //     let fmm_arc = Arc::clone(&self.fmm);
+        //     let source_multipole_arc = Arc::clone(self.multipoles.get(target).unwrap());
+        //     let source_multipole_lock = source_multipole_arc.lock().unwrap();
+        //     let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
+            
+        //     // Pad the signal
+        //     let &(m, n, o) = signal.shape();
+
+        //     let p = m + 1;
+        //     let q = n + 1;
+        //     let r = o + 1;
+            
+        //     let pad_size = (p-m, q-n, r-o);
+        //     let pad_index = (p-m, q-n, r-o);
+        //     let real_dim = q;
+
+        //     let mut padded_signal = pad3(&signal, pad_size, pad_index);
+        //     padded_signals_hat.insert(*target, Array3D::<c64>::new((p, q, r/2 + 1)));
+        //     padded_signals.insert(*target, padded_signal);
+        // });
+
+        // // Compute FFT of signals for use in convolution
+        // let ntargets = targets.len();
+        // let key = targets[0];
+        // let shape = padded_signals.get(&key).unwrap().shape().clone();
+        // let shape = [shape.0, shape.1, shape.2];
+
+        // rfft3_fftw_par_dm(&padded_signals, &padded_signals_hat, &shape, targets);
+
+        // // Loop through padded signals and apply convolutions in all directions of transfer vector, even if there are zeros.
+
+
         
-        targets.par_iter().for_each(move |&target| {
+
+        targets.iter().for_each(move |&target| {
             if let Some(v_list) = self.fmm.get_v_list(&target) {
                 let fmm_arc = Arc::clone(&self.fmm);
+
                 let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
 
                 for source in v_list.iter() {
@@ -655,22 +706,28 @@ where
                     // 1. Pad the signal
                     let &(m, n, o) = signal.shape();
 
-                    let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
-                    let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
-                    let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
-                    let p = p.max(4);
-                    let q = q.max(4);
-                    let r = r.max(4);
+                    // let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+                    // let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+                    // let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+                    // let p = p.max(4);
+                    // let q = q.max(4);
+                    // let r = r.max(4);
+
+                    let p = m + 1;
+                    let q = n + 1;
+                    let r = o + 1;
             
                     let pad_size = (p-m, q-n, r-o);
                     let pad_index = (p-m, q-n, r-o);
                     let real_dim = q;
 
                     // Also slow but not as slow as compute signal ~100ms
-                    let padded_signal = pad3(&signal, pad_size, pad_index);
+                    let mut padded_signal = pad3(&signal, pad_size, pad_index);
 
                     // TODO: Very SLOW ~21s
-                    let padded_signal_hat = rfft3(&padded_signal);
+                    // let padded_signal_hat = rfft3(&padded_signal);
+                    let mut padded_signal_hat = Array3D::<c64>::new((p, q, r/2 + 1));
+                    rfft3_fftw(padded_signal.get_data_mut(), padded_signal_hat.get_data_mut(), &[p, q, r]);
                     let &(m_, n_, o_) = padded_signal_hat.shape();
                     let len_padded_signal_hat = m_*n_*o_;
 
@@ -688,12 +745,11 @@ where
                         rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
                     };
 
-                    let check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
-
-                    // 3.1 Compute iFFT to find check potentials
-                    let check_potential_hat = Array3D::from_data(check_potential_hat.data().to_vec(), (m_, n_, o_));
+                    let mut check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
                     
-                    let check_potential = irfft3(&check_potential_hat, real_dim);
+                    // 3.1 Compute iFFT to find check potentials
+                    let mut check_potential = Array3D::<f64>::new((p, q, r));
+                    irfft3_fftw(check_potential_hat.data_mut(), check_potential.get_data_mut(), &[p, q, r]);
 
                     // Filter check potentials
                     let mut filtered_check_potentials: Array3D<f64> = Array3D::new((m+1, n+1, o+1));
@@ -703,7 +759,7 @@ where
                                 let i_= i - (p-m-1);
                                 let j_ = j - (q-n-1);
                                 let k_ = k - (r-o-1);
-                                *filtered_check_potentials.get_mut(i_, j_, k_).unwrap() = *check_potential.get(i, j, k).unwrap();
+                                *filtered_check_potentials.get_mut(i_, j_, k_).unwrap()= *check_potential.get(i, j, k).unwrap();
                             }
                         }
                     }

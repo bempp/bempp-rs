@@ -90,6 +90,9 @@ pub trait Array3DAccess<T: Num> {
 
     /// Get a pointer to the raw data in the array
     fn get_data(&self) -> &[T];
+
+    /// Get a mut pointer to the raw data in the array
+    fn get_data_mut(&mut self) -> &mut [T];
 }
 
 pub trait Array4DAccess<T: Num> {

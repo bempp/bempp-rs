@@ -91,6 +91,7 @@ impl<'a, T: Num> Iterator for Array2DRowIterator<'a, T> {
 }
 
 /// A three-dimensional rectangular array
+#[derive(Clone)]
 pub struct Array3D<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
@@ -141,6 +142,10 @@ impl<T: Num> Array3DAccess<T> for Array3D<T> {
 
     fn get_data(&self) -> &[T] {
         &self.data
+    }
+
+    fn get_data_mut(&mut self) -> &mut [T] {
+        &mut self.data
     }
 }
 

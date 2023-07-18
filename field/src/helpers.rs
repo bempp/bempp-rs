@@ -1,8 +1,12 @@
 use std::{collections::HashSet, usize};
 
+use dashmap::DashMap;
 use itertools::Itertools;
+use num::traits::real::Real;
 use realfft::{num_complex::Complex, RealFftPlanner, num_traits::Zero};
 use rustfft::{FftNum, FftPlanner};
+use fftw::{plan::*, array::*, types::*};
+use rayon::prelude::*;
 
 use bempp_tools::Array3D;
 use bempp_traits::arrays::Array3DAccess;
@@ -147,6 +151,44 @@ where
 
     flipped
 }
+
+pub fn rfft3_fftw(mut input: &mut [f64], mut output: &mut[c64], shape: &[usize]) {
+
+    let mut plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+
+    plan.r2c(input, output);
+}
+
+pub fn rfft3_fftw_par_dm(
+    mut input: &DashMap<MortonKey, Array3D<f64>>,
+    mut output: &DashMap<MortonKey, Array3D<c64>>,
+    shape: &[usize],
+    targets: &[MortonKey]
+) {
+    let size: usize = shape.iter().product();
+    let size_d = shape.last().unwrap();
+    let size_real = (size / size_d) * (size_d / 2 + 1);
+    
+    let mut plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+
+    targets.into_par_iter().for_each(|key| {
+        plan.r2c(
+            input.get_mut(key).unwrap().get_data_mut(),
+            output.get_mut(key).unwrap().get_data_mut()
+        );
+    });
+}
+
+pub fn irfft3_fftw(mut input: &mut [c64], mut output: &mut[f64], shape: &[usize]) {
+    let size: usize = shape.iter().product(); 
+    let mut plan: C2RPlan64 = C2RPlan::aligned(shape, Flag::MEASURE).unwrap();
+    plan.c2r(input, output);
+    // Normalise
+    output 
+        .iter_mut()
+        .for_each(|value| *value *= 1.0 / (size as f64));
+}
+
 
 pub fn rfft3<T>(input_arr: &Array3D<T>) -> Array3D<Complex<T>>
 where

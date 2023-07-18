@@ -1,6 +1,7 @@
 use std::{collections::HashMap, hash::Hash};
 
 use num::Complex;
+use fftw::types::*;
 use rlst::{
     algorithms::{
         linalg::LinAlg,
@@ -15,7 +16,7 @@ use bempp_tree::types::domain::Domain;
 use bempp_tools::Array3D;
 
 use crate::{
-    helpers::{compute_transfer_vectors, pad3, flip3, rfft3},
+    helpers::{compute_transfer_vectors, pad3, flip3, rfft3, rfft3_fftw},
     types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm, SvdM2lEntry, FftM2lEntry, TransferVector},
 };
 
@@ -237,13 +238,16 @@ where
             // Precompute and store the FFT of each unique kernel interaction
 
             // Begin by calculating pad lengths along each dimension
-            let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
-            let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
-            let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+            // let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+            // let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+            // let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
 
-            let p = p.max(4);
-            let q = q.max(4);
-            let r = r.max(4);
+            // let p = p.max(4);
+            // let q = q.max(4);
+            // let r = r.max(4);
+            let p = m + 1;
+            let q = n + 1;
+            let r = o + 1;
 
             let padded_kernel = pad3(&kernel, (p-m, q-n, r-o), (0, 0, 0));
 
@@ -354,14 +358,7 @@ where
             &mut kernel_evals[..]
         );
 
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
-                    let conv_idx = i * n * n + j * n + k;
-                    *result.get_mut(i, j, k).unwrap() = kernel_evals[conv_idx];
-                }
-            }
-        } 
+        result.get_data_mut().copy_from_slice(&kernel_evals[..]);
 
         result
     }
@@ -376,18 +373,23 @@ where
         let n = 2 * expansion_order - 1;
         let mut result = Array3D::new((n,n,n));
 
+        let mut tmp = vec![0f64; n*n*n];
+
         for i in 0..n {
             for j in 0..n {
                 for k in 0..n {
-                    let conv_idx = i*n*n+j*n+k;
-                    if self.conv_to_surf_map.contains_key(&conv_idx) {
-                        let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
-                        *result.get_mut(i, j, k).unwrap() = charges[*surf_idx];
-                    } 
+                    let conv_idx = i * n * n + j * n + k;
+                    if let Some(surf_idx) = self.conv_to_surf_map.get(&conv_idx) {
+                        tmp[conv_idx] = charges[*surf_idx];
+                    } else {
+                        tmp[conv_idx] = 0f64;
+                    }
                 }
             }
         }
-       
+        
+        result.get_data_mut().copy_from_slice(&tmp[..]);
+
         result
     }
 }
@@ -449,21 +451,31 @@ where
             // Precompute and store the FFT of each unique kernel interaction
 
             // Begin by calculating pad lengths along each dimension
-            let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
-            let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
-            let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+            // let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+            // let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+            // let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
 
-            let p = p.max(4);
-            let q = q.max(4);
-            let r = r.max(4);
+            // let p = p.max(4);
+            // let q = q.max(4);
+            // let r = r.max(4);
 
+            let p = m + 1;
+            let q = n + 1;
+            let r = o + 1;
             let padded_kernel = pad3(&kernel, (p-m, q-n, r-o), (0, 0, 0));
 
             // Flip the kernel
-            let padded_kernel = flip3(&padded_kernel);
+            let mut padded_kernel = flip3(&padded_kernel);
 
             // Compute FFT of kernel for this transfer vector
-            let padded_kernel_hat = rfft3(&padded_kernel);
+            // let padded_kernel_hat = rfft3(&padded_kernel);
+            let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r/2 + 1));
+            // println!("HERE {:?}", padded_kernel_hat.shape());
+            rfft3_fftw(padded_kernel.get_data_mut(), padded_kernel_hat.get_data_mut(), &[p, q, r]);
+
+            // println!("padded_kernel {:?} {:?}", padded_kernel.get_data(), padded_kernel.shape());
+            // println!("padded_kernel_hat {:?} {:?}", padded_kernel_hat.get_data(), padded_kernel_hat.shape());
+            // break;
 
             // Store FFT of kernel for this transfer vector            
             result.push(padded_kernel_hat)
@@ -566,14 +578,7 @@ where
             &mut kernel_evals[..]
         );
 
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
-                    let conv_idx = i * n * n + j * n + k;
-                    *result.get_mut(i, j, k).unwrap() = kernel_evals[conv_idx];
-                }
-            }
-        } 
+        result.get_data_mut().copy_from_slice(&kernel_evals[..]);
 
         result
     }
@@ -588,18 +593,23 @@ where
         let n = 2 * expansion_order - 1;
         let mut result = Array3D::new((n,n,n));
 
+        let mut tmp = vec![0f64; n*n*n];
+
         for i in 0..n {
             for j in 0..n {
                 for k in 0..n {
-                    let conv_idx = i*n*n+j*n+k;
-                    if self.conv_to_surf_map.contains_key(&conv_idx) {
-                        let surf_idx = self.conv_to_surf_map.get(&conv_idx).unwrap();
-                        *result.get_mut(i, j, k).unwrap() = charges[*surf_idx];
-                    } 
+                    let conv_idx = i * n * n + j * n + k;
+                    if let Some(surf_idx) = self.conv_to_surf_map.get(&conv_idx) {
+                        tmp[conv_idx] = charges[*surf_idx];
+                    } else {
+                        tmp[conv_idx] = 0f64;
+                    }
                 }
             }
         }
-       
+        
+        result.get_data_mut().copy_from_slice(&tmp[..]);
+
         result
     }
 }
@@ -622,7 +632,7 @@ mod test {
         let kernel = Laplace3dKernel::<f64>::new();
 
         let domain = Domain { origin: [0., 0., 0.], diameter: [1.0, 1.0, 1.0] };
-        let fft = FftFieldTranslationNaiveKiFmm::new(kernel, order, domain, alpha);
+        let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         let domain = Domain { origin: [0., 0., 0.], diameter: [1., 1., 1.] };
         let key = MortonKey::from_point(&[0.5, 0.5, 0.5], &domain, level);

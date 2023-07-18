@@ -33,6 +33,10 @@ num = "0.4"
 rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}
 realfft = "3.3.0"
 rustfft = "6.1.0"
+fftw = {git = "https://github.com/skailasa/fftw.git" } 
+cauchy = "0.4.0"
+dashmap = "5.5.0"
+rayon = "1.7.0"
 
 [dev-dependencies]
 approx_eq = "0.1.8"
