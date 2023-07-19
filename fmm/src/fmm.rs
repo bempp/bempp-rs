@@ -492,17 +492,17 @@ mod test {
 
     #[test]
     fn test_fmm_fft<'a>() {
-        let npoints = 1000;
+        let npoints = 1000000;
         let points = points_fixture(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 5;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 3;
+        let depth = 5;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth), &global_idxs[..]);

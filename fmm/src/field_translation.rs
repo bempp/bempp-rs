@@ -2,7 +2,7 @@
 use std::{
     collections::HashMap,
     ops::{Deref, Mul, DerefMut},
-    sync::{Arc, Mutex, RwLock, MutexGuard},
+    sync::{Arc, Mutex, RwLock, MutexGuard}, time::Instant,
 };
 
 use bempp_tools::Array3D;
@@ -637,7 +637,10 @@ where
     fn m2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else { return };
 
-        // // Form signals to use for convolution first
+        // Form signals to use for convolution first
+
+        let start = Instant::now();
+        
         // let n = 2*self.fmm.order -1;
         // let mut padded_signals: DashMap<MortonKey, Array3D<f64>> = targets.iter().map(|target| (*target, Array3D::<f64>::new((n, n, n)))).collect();
         // let mut padded_signals_hat: DashMap<MortonKey, Array3D<c64>> = targets.iter().map(|target| (*target, Array3D::<c64>::new((n, n, n/2 + 1)))).collect();
@@ -664,133 +667,207 @@ where
         //     padded_signals.insert(*target, padded_signal);
         // });
 
-        // // Compute FFT of signals for use in convolution
+        let n = 2*self.fmm.order - 1;
+        let ntargets = targets.len();
+
+        // Pad the signal
+        let &(m, n, o) = &(n, n, n);
+
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+
+        let pad_size = (p-m, q-n, r-o);
+        let pad_index = (p-m, q-n, r-o);
+        let real_dim = q;
+
+        let mut padded_signals = Arc::new(RwLock::new(
+            rlst_mat![f64, (p*q*r, ntargets)]
+        ));
+        
+
+        targets.par_iter().enumerate().for_each(|(i, target)| {
+            let fmm_arc = Arc::clone(&self.fmm);
+            let source_multipole_arc = Arc::clone(self.multipoles.get(target).unwrap());
+            let source_multipole_lock = source_multipole_arc.lock().unwrap();
+            let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
+            
+            let mut padded_signal = pad3(&signal, pad_size, pad_index);
+            
+            let first = i * p*q*r;
+            let last = first + p*q*r;
+
+            let mut padded_signals_lock = padded_signals.write().unwrap();
+            padded_signals_lock.get_slice_mut(first, last).copy_from_slice(padded_signal.get_data());
+        });
+
+        println!("data organisation time {:?}", start.elapsed().as_millis());
+
+        // Compute FFT of signals for use in convolution
         // let ntargets = targets.len();
         // let key = targets[0];
         // let shape = padded_signals.get(&key).unwrap().shape().clone();
         // let shape = [shape.0, shape.1, shape.2];
 
+        // let start = Instant::now();
         // rfft3_fftw_par_dm(&padded_signals, &padded_signals_hat, &shape, targets);
+        // println!("FFT time {:?}", start.elapsed().as_millis());
+        // Loop through padded signals and apply convolutions in all directions of transfer vector, even if there are zeros.
 
-        // // Loop through padded signals and apply convolutions in all directions of transfer vector, even if there are zeros.
+        // (0..self.fmm.m2l.transfer_vectors.len()).into_par_iter().for_each(|k_idx| {
+        //     let fmm_arc = Arc::clone(&self.fmm);
+        //     // let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
+        //     // let &(m_, n_, o_) = padded_kernel_hat.shape();
+        //     // let len_padded_kernel_hat= m_*n_*o_;
+            
+        //     // let padded_kernel_hat= unsafe {
+        //     //     rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
+        //     // };
 
+        // });
+
+        // padded_signals_hat.par_iter().for_each(|pair| {
+        //     let source = pair.key();
+        //     let padded_signal_hat = pair.value();
+        //     let fmm_arc = Arc::clone(&self.fmm);
+            
+        //     // Compute Hadamard product
+        //     let &(m_, n_, o_) = padded_signal_hat.shape();
+        //     let len_padded_signal_hat= m_*n_*o_;
+        //     let padded_signal_hat = unsafe {
+        //         rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (len_padded_signal_hat, 1), (1,1)]
+        //     };
+
+        //     for (k_idx, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+        //             let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
+        //             let &(m_, n_, o_) = padded_kernel_hat.shape();
+        //             let len_padded_kernel_hat= m_*n_*o_;
+                    
+        //             let padded_kernel_hat= unsafe {
+        //                 rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
+        //             };
+
+        //             let mut check_potential_hat = padded_kernel_hat.cmp_wise_product(&padded_signal_hat).eval();
+                   
+        //     }
+        // })
 
         
 
-        targets.iter().for_each(move |&target| {
-            if let Some(v_list) = self.fmm.get_v_list(&target) {
-                let fmm_arc = Arc::clone(&self.fmm);
+        // targets.iter().for_each(move |&target| {
+        //     if let Some(v_list) = self.fmm.get_v_list(&target) {
+        //         let fmm_arc = Arc::clone(&self.fmm);
 
-                let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
+        //         let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
 
-                for source in v_list.iter() {
+        //         for source in v_list.iter() {
 
-                    let transfer_vector = target.find_transfer_vector(source);
+        //             let transfer_vector = target.find_transfer_vector(source);
 
-                    // Locate correct precomputed FFT of kernel
-                    let k_idx = fmm_arc
-                        .m2l
-                        .transfer_vectors
-                        .iter()
-                        .position(|x| x.vector == transfer_vector)
-                        .unwrap();
+        //             // Locate correct precomputed FFT of kernel
+        //             let k_idx = fmm_arc
+        //                 .m2l
+        //                 .transfer_vectors
+        //                 .iter()
+        //                 .position(|x| x.vector == transfer_vector)
+        //                 .unwrap();
 
-                    // Compute FFT of signal
-                    let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
+        //             // Compute FFT of signal
+        //             let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());
                     
-                    let source_multipole_lock = source_multipole_arc.lock().unwrap();
+        //             let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
-                    // TODO: SLOW ~ 1.5s
-                    let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
+        //             // TODO: SLOW ~ 1.5s
+        //             let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
 
-                    // 1. Pad the signal
-                    let &(m, n, o) = signal.shape();
+        //             // 1. Pad the signal
+        //             let &(m, n, o) = signal.shape();
 
-                    // let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
-                    // let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
-                    // let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
-                    // let p = p.max(4);
-                    // let q = q.max(4);
-                    // let r = r.max(4);
+        //             // let p = 2_f64.powf((m as f64).log2().ceil()) as usize;
+        //             // let q = 2_f64.powf((n as f64).log2().ceil()) as usize;
+        //             // let r = 2_f64.powf((o as f64).log2().ceil()) as usize;
+        //             // let p = p.max(4);
+        //             // let q = q.max(4);
+        //             // let r = r.max(4);
 
-                    let p = m + 1;
-                    let q = n + 1;
-                    let r = o + 1;
+        //             let p = m + 1;
+        //             let q = n + 1;
+        //             let r = o + 1;
             
-                    let pad_size = (p-m, q-n, r-o);
-                    let pad_index = (p-m, q-n, r-o);
-                    let real_dim = q;
+        //             let pad_size = (p-m, q-n, r-o);
+        //             let pad_index = (p-m, q-n, r-o);
+        //             let real_dim = q;
 
-                    // Also slow but not as slow as compute signal ~100ms
-                    let mut padded_signal = pad3(&signal, pad_size, pad_index);
+        //             // Also slow but not as slow as compute signal ~100ms
+        //             let mut padded_signal = pad3(&signal, pad_size, pad_index);
 
-                    // TODO: Very SLOW ~21s
-                    // let padded_signal_hat = rfft3(&padded_signal);
-                    let mut padded_signal_hat = Array3D::<c64>::new((p, q, r/2 + 1));
-                    rfft3_fftw(padded_signal.get_data_mut(), padded_signal_hat.get_data_mut(), &[p, q, r]);
-                    let &(m_, n_, o_) = padded_signal_hat.shape();
-                    let len_padded_signal_hat = m_*n_*o_;
+        //             // TODO: Very SLOW ~21s
+        //             // let padded_signal_hat = rfft3(&padded_signal);
+        //             let mut padded_signal_hat = Array3D::<c64>::new((p, q, r/2 + 1));
+        //             rfft3_fftw(padded_signal.get_data_mut(), padded_signal_hat.get_data_mut(), &[p, q, r]);
+        //             let &(m_, n_, o_) = padded_signal_hat.shape();
+        //             let len_padded_signal_hat = m_*n_*o_;
 
-                    // 2. Compute the convolution to find the check potential
-                    let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
-                    let &(m_, n_, o_) = padded_kernel_hat.shape();
-                    let len_padded_kernel_hat= m_*n_*o_;
+        //             // 2. Compute the convolution to find the check potential
+        //             let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
+        //             let &(m_, n_, o_) = padded_kernel_hat.shape();
+        //             let len_padded_kernel_hat= m_*n_*o_;
                     
-                    // Compute Hadamard product
-                    let padded_signal_hat = unsafe {
-                        rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (len_padded_signal_hat, 1), (1,1)]
-                    };
+        //             // Compute Hadamard product
+        //             let padded_signal_hat = unsafe {
+        //                 rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (len_padded_signal_hat, 1), (1,1)]
+        //             };
                     
-                    let padded_kernel_hat= unsafe {
-                        rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
-                    };
+        //             let padded_kernel_hat= unsafe {
+        //                 rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
+        //             };
 
-                    let mut check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
+        //             let mut check_potential_hat = padded_kernel_hat.cmp_wise_product(padded_signal_hat).eval();
                     
-                    // 3.1 Compute iFFT to find check potentials
-                    let mut check_potential = Array3D::<f64>::new((p, q, r));
-                    irfft3_fftw(check_potential_hat.data_mut(), check_potential.get_data_mut(), &[p, q, r]);
+        //             // 3.1 Compute iFFT to find check potentials
+        //             let mut check_potential = Array3D::<f64>::new((p, q, r));
+        //             irfft3_fftw(check_potential_hat.data_mut(), check_potential.get_data_mut(), &[p, q, r]);
 
-                    // Filter check potentials
-                    let mut filtered_check_potentials: Array3D<f64> = Array3D::new((m+1, n+1, o+1));
-                    for i in (p-m-1)..p {
-                        for j in (q-n-1)..q {
-                            for k in (r-o-1)..r {
-                                let i_= i - (p-m-1);
-                                let j_ = j - (q-n-1);
-                                let k_ = k - (r-o-1);
-                                *filtered_check_potentials.get_mut(i_, j_, k_).unwrap()= *check_potential.get(i, j, k).unwrap();
-                            }
-                        }
-                    }
+        //             // Filter check potentials
+        //             let mut filtered_check_potentials: Array3D<f64> = Array3D::new((m+1, n+1, o+1));
+        //             for i in (p-m-1)..p {
+        //                 for j in (q-n-1)..q {
+        //                     for k in (r-o-1)..r {
+        //                         let i_= i - (p-m-1);
+        //                         let j_ = j - (q-n-1);
+        //                         let k_ = k - (r-o-1);
+        //                         *filtered_check_potentials.get_mut(i_, j_, k_).unwrap()= *check_potential.get(i, j, k).unwrap();
+        //                     }
+        //                 }
+        //             }
 
-                    let (_, target_surface_idxs) = target.surface_grid(fmm_arc.order);
-                    let mut tmp = Vec::new();
-                    let ntargets = target_surface_idxs.len() / fmm_arc.kernel.space_dimension();
-                    let xs = &target_surface_idxs[0..ntargets];
-                    let ys = &target_surface_idxs[ntargets..2*ntargets];
-                    let zs = &target_surface_idxs[2*ntargets..];
+        //             let (_, target_surface_idxs) = target.surface_grid(fmm_arc.order);
+        //             let mut tmp = Vec::new();
+        //             let ntargets = target_surface_idxs.len() / fmm_arc.kernel.space_dimension();
+        //             let xs = &target_surface_idxs[0..ntargets];
+        //             let ys = &target_surface_idxs[ntargets..2*ntargets];
+        //             let zs = &target_surface_idxs[2*ntargets..];
 
-                    for i in 0..ntargets {
-                        let val = filtered_check_potentials.get(xs[i], ys[i], zs[i]).unwrap();
-                        tmp.push(*val);
-                    }
+        //             for i in 0..ntargets {
+        //                 let val = filtered_check_potentials.get(xs[i], ys[i], zs[i]).unwrap();
+        //                 tmp.push(*val);
+        //             }
 
-                    let check_potential = unsafe {
-                        rlst_pointer_mat!['a, f64, tmp.as_ptr(), (ntargets, 1), (1,1)]
-                    };
+        //             let check_potential = unsafe {
+        //                 rlst_pointer_mat!['a, f64, tmp.as_ptr(), (ntargets, 1), (1,1)]
+        //             };
 
-                    // Finally, compute local coefficients from check potential
-                    let target_local_owned = (self.m2l_scale(target.level()) 
-                        * fmm_arc.kernel.scale(target.level()) 
-                        * fmm_arc.dc2e_inv.dot(&check_potential)).eval();
+        //             // Finally, compute local coefficients from check potential
+        //             let target_local_owned = (self.m2l_scale(target.level()) 
+        //                 * fmm_arc.kernel.scale(target.level()) 
+        //                 * fmm_arc.dc2e_inv.dot(&check_potential)).eval();
 
 
-                    let mut target_local_lock = target_local_arc.lock().unwrap();
-                    *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
-                }
-            }
-        })
+        //             let mut target_local_lock = target_local_arc.lock().unwrap();
+        //             *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
+        //         }
+        //     }
+        // })
     }
 
     fn m2l_scale(&self, level: u64) -> f64 {
