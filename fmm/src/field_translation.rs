@@ -11,7 +11,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use fftw::types::*;
 
-use bempp_field::{types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm}, helpers::{pad3, rfft3, irfft3, rfft3_fftw, irfft3_fftw, rfft3_fftw_par_dm}};
+use bempp_field::{types::{SvdFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm}, helpers::{pad3, rfft3, irfft3, rfft3_fftw, irfft3_fftw, rfft3_fftw_par_dm, rfft3_fftw_par_vec}};
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
@@ -645,65 +645,28 @@ where
         // let mut padded_signals: DashMap<MortonKey, Array3D<f64>> = targets.iter().map(|target| (*target, Array3D::<f64>::new((n, n, n)))).collect();
         // let mut padded_signals_hat: DashMap<MortonKey, Array3D<c64>> = targets.iter().map(|target| (*target, Array3D::<c64>::new((n, n, n/2 + 1)))).collect();
 
+        // // Pad the signal
+        // let &(m, n, o) = &(n, n, n);
+
+        // let p = m + 1;
+        // let q = n + 1;
+        // let r = o + 1;
+        
+        // let pad_size = (p-m, q-n, r-o);
+        // let pad_index = (p-m, q-n, r-o);
+        // let real_dim = q;
+
         // targets.par_iter().for_each(|target| {
         //     let fmm_arc = Arc::clone(&self.fmm);
         //     let source_multipole_arc = Arc::clone(self.multipoles.get(target).unwrap());
         //     let source_multipole_lock = source_multipole_arc.lock().unwrap();
         //     let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
-            
-        //     // Pad the signal
-        //     let &(m, n, o) = signal.shape();
-
-        //     let p = m + 1;
-        //     let q = n + 1;
-        //     let r = o + 1;
-            
-        //     let pad_size = (p-m, q-n, r-o);
-        //     let pad_index = (p-m, q-n, r-o);
-        //     let real_dim = q;
 
         //     let mut padded_signal = pad3(&signal, pad_size, pad_index);
         //     padded_signals_hat.insert(*target, Array3D::<c64>::new((p, q, r/2 + 1)));
         //     padded_signals.insert(*target, padded_signal);
         // });
-
-        let n = 2*self.fmm.order - 1;
-        let ntargets = targets.len();
-
-        // Pad the signal
-        let &(m, n, o) = &(n, n, n);
-
-        let p = m + 1;
-        let q = n + 1;
-        let r = o + 1;
-
-        let pad_size = (p-m, q-n, r-o);
-        let pad_index = (p-m, q-n, r-o);
-        let real_dim = q;
-
-        let mut padded_signals = Arc::new(RwLock::new(
-            rlst_mat![f64, (p*q*r, ntargets)]
-        ));
-        
-
-        targets.par_iter().enumerate().for_each(|(i, target)| {
-            let fmm_arc = Arc::clone(&self.fmm);
-            let source_multipole_arc = Arc::clone(self.multipoles.get(target).unwrap());
-            let source_multipole_lock = source_multipole_arc.lock().unwrap();
-            let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
-            
-            let mut padded_signal = pad3(&signal, pad_size, pad_index);
-            
-            let first = i * p*q*r;
-            let last = first + p*q*r;
-
-            let mut padded_signals_lock = padded_signals.write().unwrap();
-            padded_signals_lock.get_slice_mut(first, last).copy_from_slice(padded_signal.get_data());
-        });
-
-        println!("data organisation time {:?}", start.elapsed().as_millis());
-
-        // Compute FFT of signals for use in convolution
+      // Compute FFT of signals for use in convolution
         // let ntargets = targets.len();
         // let key = targets[0];
         // let shape = padded_signals.get(&key).unwrap().shape().clone();
@@ -752,8 +715,45 @@ where
         //     }
         // })
 
-        
+        //////////////////////////////////
+        let n = 2*self.fmm.order - 1;
+        let ntargets = targets.len();
 
+        // Pad the signal
+        let &(m, n, o) = &(n, n, n);
+
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+        let size = p*q*r;
+        let pad_size = (p-m, q-n, r-o);
+        let pad_index = (p-m, q-n, r-o);
+        let real_dim = q;
+
+        let mut padded_signals = rlst_col_vec![f64, (size*ntargets)];
+            
+        let mut chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
+        let range = (0..chunks.len()).into_par_iter();
+        range.zip(chunks).for_each(|(i, chunk)| {
+            let fmm_arc = Arc::clone(&self.fmm);
+            let target = targets[i];
+            let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
+            let source_multipole_lock = source_multipole_arc.lock().unwrap();
+            let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
+            
+            let mut padded_signal = pad3(&signal, pad_size, pad_index);
+            
+            chunk.copy_from_slice(padded_signal.get_data());
+        });
+        println!("data organisation time {:?}", start.elapsed().as_millis());
+
+        let size_real = p*q*(r/2+1);
+        let mut padded_signals_hat = rlst_col_vec![c64, (size_real*ntargets)];
+        let start = Instant::now();
+        rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
+        println!("fft time {:?}", start.elapsed().as_millis());
+        
+        //////////////////////////
         // targets.iter().for_each(move |&target| {
         //     if let Some(v_list) = self.fmm.get_v_list(&target) {
         //         let fmm_arc = Arc::clone(&self.fmm);

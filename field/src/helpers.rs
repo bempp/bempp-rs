@@ -179,6 +179,36 @@ pub fn rfft3_fftw_par_dm(
     });
 }
 
+use rlst::dense::{
+    base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, traits::*, Dynamic,
+};
+
+pub type FftMatrixf64 =
+    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+
+pub type FftMatrixc64 =
+    Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+
+pub fn rfft3_fftw_par_vec(
+    mut input: &mut FftMatrixf64,
+    mut output: &mut FftMatrixc64,
+    shape: &[usize],
+) {
+    assert!(shape.len() == 3);
+
+    let size: usize = shape.iter().product();
+    let size_d = shape.last().unwrap();
+    let size_real = (size / size_d) * (size_d / 2 + 1);
+
+    let mut plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+    let it_inp = input.data_mut().par_chunks_exact_mut(size).into_par_iter();
+    let it_out = output.data_mut().par_chunks_exact_mut(size_real).into_par_iter();
+
+    it_inp.zip(it_out).for_each(|(inp, out)| {
+        plan.r2c(inp, out);
+    });
+}
+
 pub fn irfft3_fftw(mut input: &mut [c64], mut output: &mut[f64], shape: &[usize]) {
     let size: usize = shape.iter().product(); 
     let mut plan: C2RPlan64 = C2RPlan::aligned(shape, Flag::MEASURE).unwrap();
