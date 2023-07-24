@@ -201,8 +201,8 @@ pub fn rfft3_fftw_par_vec(
     let size_real = (size / size_d) * (size_d / 2 + 1);
 
     let mut plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
-    let it_inp = input.data_mut().par_chunks_exact_mut(size).into_par_iter();
-    let it_out = output.data_mut().par_chunks_exact_mut(size_real).into_par_iter();
+    let it_inp = input.data_mut().par_rchunks_exact_mut(size).into_par_iter();
+    let it_out = output.data_mut().par_rchunks_exact_mut(size_real).into_par_iter();
 
     it_inp.zip(it_out).for_each(|(inp, out)| {
         plan.r2c(inp, out);

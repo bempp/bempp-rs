@@ -24,7 +24,7 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use rlst::{
     common::traits::*,
     common::tools::PrettyPrint,
-    dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape},
+    dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape, rlst_rand_col_vec},
 };
 
 use crate::types::{FmmData, KiFmm};
@@ -752,6 +752,39 @@ where
         let start = Instant::now();
         rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
         println!("fft time {:?}", start.elapsed().as_millis());
+        println!("size real {:?} size {:?}", size_real, size);
+
+        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        // Compute hadamard product with kernels
+        let range = (0..self.fmm.m2l.transfer_vectors.len()).into_par_iter();
+        self.fmm.m2l.transfer_vectors.iter().take(16).par_bridge().for_each(|tv| {
+            // Locate correct precomputed FFT of kernel
+            let k_idx = self.fmm
+                .m2l
+                .transfer_vectors
+                .iter()
+                .position(|x| x.vector == tv.vector)
+                .unwrap();
+            let padded_kernel_hat = &self.fmm.m2l.m2l[k_idx];
+            let &(m_, n_, o_) = padded_kernel_hat.shape();
+            let len_padded_kernel_hat= m_*n_*o_;
+            let padded_kernel_hat= unsafe {
+                rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
+            };
+
+            let padded_kernel_hat_arc = Arc::new(padded_kernel_hat);
+
+            padded_signals_hat.data().chunks_exact(len_padded_kernel_hat).enumerate().for_each(|(i, padded_signal_hat)| {
+                let padded_signal_hat = unsafe {
+                    rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
+                };
+
+                let padded_kernel_hat_ref = Arc::clone(&padded_kernel_hat_arc);
+                
+                let check_potential = padded_signal_hat.cmp_wise_product(padded_kernel_hat_ref.deref()).eval();
+            });
+        });
+
         
         //////////////////////////
         // targets.iter().for_each(move |&target| {

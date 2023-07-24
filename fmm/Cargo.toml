@@ -40,3 +40,6 @@ rayon = "1.7"
 
 [target.aarch64-apple-darwin]
 rustflags = [  "-C", "target-feature=+neon"]
+
+[profile.release]
+lto = true
