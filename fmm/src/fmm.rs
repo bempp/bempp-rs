@@ -14,8 +14,8 @@ use rlst::{
     algorithms::{linalg::LinAlg, traits::pseudo_inverse::Pinv},
     common::traits::{Eval, NewLikeSelf, Transpose},
     dense::{
-        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_col_vec,
-        rlst_mat, rlst_pointer_mat, traits::*, Dot, global,
+        base_matrix::BaseMatrix, data_container::VectorContainer, global, matrix::Matrix,
+        rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot,
     },
 };
 
@@ -28,7 +28,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{C2EType,ChargeDict, FmmData, KiFmm};
+use crate::types::{C2EType, ChargeDict, FmmData, KiFmm};
 
 #[allow(dead_code)]
 impl<T, U> KiFmm<SingleNodeTree, T, U>
@@ -197,7 +197,7 @@ where
 
                     let npoints = point_data.len();
                     potentials.insert(*key, Arc::new(Mutex::new(rlst_col_vec![f64, npoints])));
-                    
+
                     // Lookup indices and store with charges
                     let mut tmp_idx = Vec::new();
                     for point in point_data.iter() {
@@ -367,10 +367,10 @@ where
 mod test {
     use super::*;
 
-    use bempp_field::types::{FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm};
+    use bempp_field::types::FftFieldTranslationKiFmm;
     use rand::prelude::*;
     use rand::SeedableRng;
-    
+
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
 
     use bempp_field::types::SvdFieldTranslationKiFmm;
@@ -436,7 +436,7 @@ mod test {
 
     //     // Form charge dict, matching charges with their associated global indices
     //     let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
-        
+
     //     let datatree = FmmData::new(fmm, &charge_dict);
 
     //     let times = datatree.run(Some(true));
@@ -497,7 +497,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 10;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
@@ -505,26 +505,31 @@ mod test {
         let depth = 5;
         let kernel = Laplace3dKernel::<f64>::default();
 
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth), &global_idxs[..]);
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            Some(depth),
+            &global_idxs[..],
+        );
 
         let m2l_data_fft = FftFieldTranslationKiFmm::new(
             kernel.clone(),
             order,
             tree.get_domain().clone(),
-            alpha_inner 
+            alpha_inner,
         );
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
         // Form charge dict, matching charges with their associated global indices
         let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
-        
+
         let datatree = FmmData::new(fmm, &charge_dict);
 
         let times = datatree.run(Some(true));
 
         println!("FFT times {:?}", times);
-
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
