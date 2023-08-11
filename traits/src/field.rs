@@ -8,12 +8,14 @@ where
 {
     type TransferVector;
 
+    type TransferVectorMap;
+
     type M2LOperators;
 
     type Domain;
 
     // Compute unique transfer vectors
-    fn compute_transfer_vectors(&self) -> Self::TransferVector;
+    fn compute_transfer_vectors(&self) -> (Self::TransferVector, Self::TransferVectorMap);
 
     fn compute_m2l_operators(
         &self,

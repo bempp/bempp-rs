@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use num::Complex;
 use bempp_tools::Array3D;
@@ -54,6 +54,18 @@ where
     // Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
 
+    // Map between redundant and unique transfer vectors when in checksum form
+    pub transfer_vector_map: HashMap<usize, usize>,
+
+    // Maps between multi-indices of redundant and unique transfer vectors
+    pub surf_grid_maps: Vec<HashMap<usize, usize>>,
+
+    pub inv_surf_grid_maps: Vec<HashMap<usize, usize>>,
+
+    pub conv_grid_maps: Vec<HashMap<usize, usize>>,
+
+    pub inv_conv_grid_maps: Vec<HashMap<usize, usize>>,
+
     pub kernel: T,
 }
 
@@ -78,7 +90,8 @@ where
 
 #[derive(Debug)]
 pub struct TransferVector {
-    pub vector: usize,
+    pub components: [i64; 3],
+    pub hash: usize,
     pub source: MortonKey,
     pub target: MortonKey,
 }

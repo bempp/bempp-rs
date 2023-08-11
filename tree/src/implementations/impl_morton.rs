@@ -19,6 +19,7 @@ use crate::{
         morton::{KeyType, MortonKey, MortonKeys},
         point::PointType,
     },
+    implementations::helpers::find_corners,
 };
 
 use bempp_traits::tree::MortonKeyInterface;
@@ -282,8 +283,8 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
 }
 
 impl MortonKey {
-    // Checksum encoding unique transfer vector between this key, and another. ie. the vector other->self.
-    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+
+    pub fn find_transfer_vector_components(&self, &other: &MortonKey) -> [i64; 3] {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
             panic!("Transfer vectors only computed for keys at levels deeper than 2")
@@ -304,6 +305,15 @@ impl MortonKey {
         y /= 2_i64.pow(level_diff as u32);
         z /= 2_i64.pow(level_diff as u32);
 
+        [x, y, z] 
+    }
+
+    pub fn find_transfer_vector_from_components(components: &[i64]) -> usize {
+        
+        let mut x = components[0];
+        let mut y = components[1];
+        let mut z = components[2];
+
         fn positive_map(num: &mut i64) {
             if *num < 0 {
                 *num = 2 * (-1 * *num) + 1;
@@ -321,7 +331,14 @@ impl MortonKey {
         checksum = (checksum << 16) | y;
         checksum = (checksum << 16) | z;
 
-        checksum as usize
+        checksum as usize 
+    }
+
+    // Checksum encoding unique transfer vector between this key, and another. ie. the vector other->self.
+    // The checksum encodes transfer vectors as a unique positive value.
+    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+        let tmp = self.find_transfer_vector_components(&other);
+        MortonKey::find_transfer_vector_from_components(&tmp)
     }
 
     pub fn diameter(&self, domain: &Domain) -> [f64; 3] {
@@ -681,9 +698,12 @@ impl MortonKey {
         &self,
         order: usize,
         domain: &Domain,
-        surface: &[f64],
         alpha: f64,
-    ) -> Vec<f64> {
+        conv_point: &[f64],
+        conv_point_corner_index: usize
+    ) 
+    -> (Vec<f64>, Vec<usize>) 
+    {
     // Number of convolution points along each axis
     let n = 2 * order - 1;
 
@@ -702,6 +722,9 @@ impl MortonKey {
             }
         }
     }
+    
+    // Map conv points to indices
+    let conv_idxs = grid.iter().clone().map(|&x| x as usize).collect();
 
     let diameter = self
         .diameter(domain)
@@ -717,43 +740,19 @@ impl MortonKey {
         *point *= 2.0; // convolution grid is 2x as large
     });
 
-    // Shift
-    let sums: Vec<_> = (0..ncoeffs)
-        .map(|i| grid[i] + grid[ncoeffs + i] + grid[2*ncoeffs + i])
-        .collect();    
-    let max_index = sums
-        .iter()
-        .enumerate()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-        .map(|(index, _)| index)
-        .unwrap();
-    let max_conv_point = [
-        grid[max_index],
-        grid[max_index + ncoeffs],
-        grid[max_index + 2 * ncoeffs]
+    // Shift convolution grid to align with a specified corner of surface grid
+    let corners = find_corners(&grid);
+
+    let surface_point = [
+        corners[conv_point_corner_index],
+        corners[8+conv_point_corner_index],
+        corners[16+conv_point_corner_index]
     ];
 
-    //
-    let nsurf = surface.len() / dim;
-    let sums: Vec<_> = (0..nsurf)
-        .map(|i| surface[i] + surface[nsurf + i] + surface[2*nsurf + i])
-        .collect();    
-    let max_index = sums
+    let diff = conv_point 
         .iter()
-        .enumerate()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-        .map(|(index, _)| index)
-        .unwrap();
-    let max_surface_point = [
-        surface[max_index],
-        surface[max_index + nsurf],
-        surface[max_index + 2 * nsurf]
-    ]; 
-
-    let diff = max_conv_point
-        .iter()
-        .zip(max_surface_point)
-        .map(|(a, b)| b - a)
+        .zip(surface_point)
+        .map(|(a, b)| a - b)
         .collect_vec();
 
     for i in 0..dim {
@@ -762,12 +761,12 @@ impl MortonKey {
             .for_each(|value| *value += diff[i]);
     }
 
-    grid
+    (grid, conv_idxs)
     }
 
     /// Compute surface grid for KiFMM at this Morton key.
     ///
-    /// Returned in row major order, [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]
+    /// Returned in column major order, [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]
     pub fn surface_grid(&self, order: usize) -> (Vec<f64>, Vec<usize>) {
         let dim = 3;
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
@@ -1774,14 +1773,29 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
-        let order = 2;
+        let order = 5;
         let alpha = 1.0;
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
         let surface_grid = key.compute_surface(&domain, order, alpha);
-        let conv_grid = key.convolution_grid(order, &domain, &surface_grid, alpha);
 
+        // Place convolution grid on max corner
+        let corners = find_corners(&surface_grid);
+        let ncorners = corners.len() / 3;
+        let conv_point_corner_index = 7; 
+        
+        let conv_point = vec![
+            corners[conv_point_corner_index],
+            corners[ncorners+conv_point_corner_index],
+            corners[2*ncorners+conv_point_corner_index]
+        ];
+
+        let (conv_grid, _) = key.convolution_grid(
+            order, &domain, alpha, &conv_point, conv_point_corner_index
+        );
+
+        // Test that surface grid is embedded in convolution grid
         let mut surface = Vec::new();
         let nsurf = surface_grid.len() /3 ;
         for i in 0..nsurf {
@@ -1793,6 +1807,7 @@ mod test {
                 ]
             )
         }
+
         let mut convolution  = Vec::new();
         let nconv = conv_grid.len() / 3;
         for i in 0..nconv {
@@ -1804,7 +1819,6 @@ mod test {
                 ]
             )
         }
-
         assert!(surface.iter().all(|point| convolution.contains(point)));
 
     }
