@@ -643,6 +643,32 @@ impl MortonKey {
             .collect()
     }
 
+    pub fn is_adjacent_same_level(&self, other: &MortonKey) -> bool {
+        // Calculate distance between centres of each node
+        let da = 1 << (DEEPEST_LEVEL - self.level());
+        let db = 1 << (DEEPEST_LEVEL - other.level());
+        let ra = (da as f64) * 0.5;
+        let rb = (db as f64) * 0.5;
+
+        let ca: Vec<f64> = self.anchor.iter().map(|&x| (x as f64) + ra).collect();
+        let cb: Vec<f64> = other.anchor.iter().map(|&x| (x as f64) + rb).collect();
+
+        let distance: Vec<f64> = ca.iter().zip(cb.iter()).map(|(a, b)| b - a).collect();
+
+        let min = -ra - rb;
+        let max = ra + rb;
+        let mut result = true;
+
+        for &d in distance.iter() {
+            if d > max || d < min {
+                result = false
+            }
+        }
+
+        result
+
+    }
+
     /// Check if two keys are adjacent with respect to each other
     pub fn is_adjacent(&self, other: &MortonKey) -> bool {
         let ancestors = self.ancestors();

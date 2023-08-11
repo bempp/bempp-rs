@@ -1,4 +1,4 @@
-use std::{collections::HashSet, usize, sync::{Arc, RwLock}};
+use std::{collections::HashSet, usize, sync::{Arc, RwLock, Mutex}, ops::{Deref, DerefMut}};
 
 use dashmap::DashMap;
 use itertools::Itertools;
@@ -206,6 +206,35 @@ pub fn rfft3_fftw_par_vec(
 
     it_inp.zip(it_out).for_each(|(inp, out)| {
         plan.r2c(inp, out);
+    });
+}
+
+
+pub fn rfft3_fftw_par_vec_arc_mutex(
+    mut input: &mut Vec<Arc<Mutex<Vec<f64>>>>,
+    mut output: &mut Vec<Arc<Mutex<Vec<c64>>>>,
+    shape: &[usize],
+) {
+    assert!(shape.len() == 3);
+
+    let size: usize = shape.iter().product();
+    let size_d = shape.last().unwrap();
+    let size_real = (size / size_d) * (size_d / 2 + 1);
+
+    let mut plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+
+    let n = input.len();
+
+    (0..n).into_par_iter().for_each(|i| {
+        let input_arc = Arc::clone(&input[i]);
+        let output_arc = Arc::clone(&output[i]);
+
+        let mut input_data = input_arc.lock().unwrap();
+        let mut input_data_slice = input_data.as_mut_slice();
+        let mut output_data = output_arc.lock().unwrap();
+        let mut output_data_slice = output_data.as_mut_slice();
+
+        plan.r2c(input_data_slice, output_data_slice);
     });
 }
 
