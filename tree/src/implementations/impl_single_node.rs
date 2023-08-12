@@ -111,6 +111,14 @@ impl SingleNodeTree {
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
+        // Return tree in a sorted order
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
+
+
         SingleNodeTree {
             depth,
             points,
@@ -233,6 +241,13 @@ impl SingleNodeTree {
             }
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+        // Return tree in a sorted order
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
 
         SingleNodeTree {
             depth,

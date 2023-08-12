@@ -637,85 +637,11 @@ where
     fn m2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else { return };
 
+        //////////////////////////////////
         // Form signals to use for convolution first
 
         let start = Instant::now();
 
-        // let n = 2*self.fmm.order -1;
-        // let mut padded_signals: DashMap<MortonKey, Array3D<f64>> = targets.iter().map(|target| (*target, Array3D::<f64>::new((n, n, n)))).collect();
-        // let mut padded_signals_hat: DashMap<MortonKey, Array3D<c64>> = targets.iter().map(|target| (*target, Array3D::<c64>::new((n, n, n/2 + 1)))).collect();
-
-        // // Pad the signal
-        // let &(m, n, o) = &(n, n, n);
-
-        // let p = m + 1;
-        // let q = n + 1;
-        // let r = o + 1;
-
-        // let pad_size = (p-m, q-n, r-o);
-        // let pad_index = (p-m, q-n, r-o);
-        // let real_dim = q;
-
-        // targets.par_iter().for_each(|target| {
-        //     let fmm_arc = Arc::clone(&self.fmm);
-        //     let source_multipole_arc = Arc::clone(self.multipoles.get(target).unwrap());
-        //     let source_multipole_lock = source_multipole_arc.lock().unwrap();
-        //     let signal = fmm_arc.m2l.compute_signal(fmm_arc.order, source_multipole_lock.data());
-
-        //     let mut padded_signal = pad3(&signal, pad_size, pad_index);
-        //     padded_signals_hat.insert(*target, Array3D::<c64>::new((p, q, r/2 + 1)));
-        //     padded_signals.insert(*target, padded_signal);
-        // });
-        // Compute FFT of signals for use in convolution
-        // let ntargets = targets.len();
-        // let key = targets[0];
-        // let shape = padded_signals.get(&key).unwrap().shape().clone();
-        // let shape = [shape.0, shape.1, shape.2];
-
-        // let start = Instant::now();
-        // rfft3_fftw_par_dm(&padded_signals, &padded_signals_hat, &shape, targets);
-        // println!("FFT time {:?}", start.elapsed().as_millis());
-        // Loop through padded signals and apply convolutions in all directions of transfer vector, even if there are zeros.
-
-        // (0..self.fmm.m2l.transfer_vectors.len()).into_par_iter().for_each(|k_idx| {
-        //     let fmm_arc = Arc::clone(&self.fmm);
-        //     // let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
-        //     // let &(m_, n_, o_) = padded_kernel_hat.shape();
-        //     // let len_padded_kernel_hat= m_*n_*o_;
-
-        //     // let padded_kernel_hat= unsafe {
-        //     //     rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
-        //     // };
-
-        // });
-
-        // padded_signals_hat.par_iter().for_each(|pair| {
-        //     let source = pair.key();
-        //     let padded_signal_hat = pair.value();
-        //     let fmm_arc = Arc::clone(&self.fmm);
-
-        //     // Compute Hadamard product
-        //     let &(m_, n_, o_) = padded_signal_hat.shape();
-        //     let len_padded_signal_hat= m_*n_*o_;
-        //     let padded_signal_hat = unsafe {
-        //         rlst_pointer_mat!['a, Complex<f64>, padded_signal_hat.get_data().as_ptr(), (len_padded_signal_hat, 1), (1,1)]
-        //     };
-
-        //     for (k_idx, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
-        //             let padded_kernel_hat = &fmm_arc.m2l.m2l[k_idx];
-        //             let &(m_, n_, o_) = padded_kernel_hat.shape();
-        //             let len_padded_kernel_hat= m_*n_*o_;
-
-        //             let padded_kernel_hat= unsafe {
-        //                 rlst_pointer_mat!['a, Complex<f64>, padded_kernel_hat.get_data().as_ptr(), (len_padded_kernel_hat, 1), (1,1)]
-        //             };
-
-        //             let mut check_potential_hat = padded_kernel_hat.cmp_wise_product(&padded_signal_hat).eval();
-
-        //     }
-        // })
-
-        //////////////////////////////////
         let n = 2 * self.fmm.order - 1;
         let ntargets = targets.len();
 
@@ -759,71 +685,67 @@ where
         let start = Instant::now();
         let mut global_check_potentials_hat = HashMap::new();
         for target in targets.iter() {
-            global_check_potentials_hat.insert(target, Arc::new(Mutex::new(vec![Complex::<f64>::zero(); size_real])));
+            global_check_potentials_hat.insert(*target, Arc::new(Mutex::new(vec![Complex::<f64>::zero(); size_real])));
         }
+
         println!("data inst {:?}", start.elapsed().as_millis());
 
-        let start = Instant::now();
-        padded_signals_hat
-            .data()
-            .par_chunks_exact(size_real)
-            .zip(
-                targets.into_par_iter()
-            )
-            .for_each(|(padded_signal_hat, target)| {
+        // let start = Instant::now();
+        // padded_signals_hat
+        //     .data()
+        //     .par_chunks_exact(size_real)
+        //     .zip(
+        //         targets.into_par_iter()
+        //     )
+        //     .for_each(|(padded_signal_hat, target)| {
 
-                let fmm_arc = Arc::clone(&self.fmm);
+        //         let fmm_arc = Arc::clone(&self.fmm);
+        //         let nconvolutions = fmm_arc.m2l.m2l.len();         
                 
-                // Compute Hadamard products with unique transfer vectors
-                let mut check_potential_hat = vec![Complex::<f64>::zero(); size_real*16];
+        //         // Compute Hadamard products with unique transfer vectors
+        //         let mut check_potential_hat = vec![Complex::<f64>::zero(); size_real*nconvolutions];
 
-                for i in 0..16 {
-                    let m2l_matrix = &fmm_arc.m2l.m2l[i];
-                    for j in 0..size_real {
-                        let tmp: Complex<f64> = padded_signal_hat[j]*m2l_matrix.get_data()[j];
-                        check_potential_hat[i*size_real+j] = tmp; 
-                    }
-                } 
+        //         for i in (0..nconvolutions) {
+        //             let m2l_matrix = &fmm_arc.m2l.m2l[i];
+        //             for j in 0..size_real {
+        //                 let tmp: Complex<f64> = padded_signal_hat[j]*m2l_matrix.get_data()[j];
+        //                 check_potential_hat[i*size_real+j] = tmp; 
+        //             }
+        //         } 
+        //         let v_list = target 
+        //             .parent()
+        //             .neighbors()
+        //             .iter()
+        //             .flat_map(|pn| pn.children())
+        //             .filter(|pnc| !target.is_adjacent_same_level(pnc))
+        //             .collect_vec();
 
-                let v_list = target 
-                    .parent()
-                    .neighbors()
-                    .iter()
-                    .flat_map(|pn| pn.children())
-                    // .filter(|pnc| self.tree.get_all_keys_set().contains(pnc) && !key.is_adjacent(pnc))
-                    .collect_vec();
+        //         let unique_transfer_vectors = v_list
+        //             .iter()
+        //             .map(|k| (k, k.find_transfer_vector(target)))
+        //             .map(|(k, v)| (*k, *fmm_arc.m2l.transfer_vector_map.get(&v).unwrap()))
+        //             .collect_vec();
+                
+        //         // // Scatter hadamard products to correct elements in v list (are v lists reflective??????)
+        //         // // let global_check_potentials_hat_clone = Arc::clone(&global_check_potentials_hat.get(target).unwrap());
+        //         // for (i, (source, tv)) in unique_transfer_vectors.iter().enumerate() {
+                    
+        //         //     let m2l_idx = fmm_arc
+        //         //         .m2l
+        //         //         .transfer_vectors
+        //         //         .iter()
+        //         //         .position(|x| x.hash == *tv)
+        //         //         .unwrap(); 
+        //         //     let cph = &check_potential_hat[(m2l_idx)*size_real..((m2l_idx+1)*size_real)];
 
-                let unique_transfer_vectors = v_list
-                    .iter()
-                    .map(|k| (k, k.find_transfer_vector(target)))
-                    .filter(|(k, v)| fmm_arc.m2l.transfer_vector_map.contains_key(v))
-                    .map(|(k, v)| (*k, *fmm_arc.m2l.transfer_vector_map.get(&v).unwrap()))
-                    .collect_vec();
+        //         //     // Lookup check potentials in fmm data tree, and accumulate
+        //         //     let global_check_potentials_hat_clone = Arc::clone(&global_check_potentials_hat.get(source).unwrap());
                 
-                    // // TEST COST OF SINGLE WRITE PER LEAF Lookup check potentials in fmm data tree, and accumulate
-                    // let global_check_potentials_hat_clone = Arc::clone(&global_check_potentials_hat.get(target).unwrap());
-                
-                    // global_check_potentials_hat_clone.lock().unwrap().deref_mut().iter_mut()
-                    //     .for_each(|(g)| { *g += Complex::new(1., 1.); });
-                
-                // Scatter hadamard products to correct elements in v list (are v lists reflective??????)
-                for (source, tv) in unique_transfer_vectors.iter() {
-                    let m2l_idx = fmm_arc
-                        .m2l
-                        .transfer_vectors
-                        .iter()
-                        .position(|x| x.hash == *tv)
-                        .unwrap(); 
-                    let cph = &check_potential_hat[(m2l_idx)*size_real..((m2l_idx+1)*size_real)];
-
-                    // Lookup check potentials in fmm data tree, and accumulate
-                    let global_check_potentials_hat_clone = Arc::clone(&global_check_potentials_hat.get(source).unwrap());
-                
-                    global_check_potentials_hat_clone.lock().unwrap().deref_mut().iter_mut()
-                        .zip(cph.iter())
-                        .for_each(|(g, l)| { *g += l; });
-                }
-            }); 
+        //         //     global_check_potentials_hat_clone.lock().unwrap().deref_mut().iter_mut()
+        //         //         .zip(cph.iter())
+        //         //         .for_each(|(g, l)| { *g += l; });
+        //         // }
+        //     }); 
         println!("Hadamard Time {:?}", start.elapsed().as_millis());
 
         // Perform inverse FFT on check potentials to find locals
