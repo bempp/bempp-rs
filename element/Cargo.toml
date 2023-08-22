@@ -27,3 +27,5 @@ paste = "1.*"
 libc = "0.2"
 approx = "0.5"
 rlst = {git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = {git = "https://github.com/linalg-rs/rlst.git" }
+rlst-algorithms = {git = "https://github.com/linalg-rs/rlst.git" }
