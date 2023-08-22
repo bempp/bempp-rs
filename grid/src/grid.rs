@@ -1285,7 +1285,7 @@ mod test {
             ],
         );
 
-        let pt = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 3));
+        let pt = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 2));
 
         let mut normal = Array2D::<f64>::new((1, 3));
 
