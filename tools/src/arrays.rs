@@ -22,6 +22,7 @@ impl<T: Num + Clone> Array2D<T> {
 
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize)) -> Self {
+        assert_eq!(data.len(), shape.0 * shape.1);
         Self { data, shape }
     }
 }
@@ -108,6 +109,7 @@ impl<T: Num + Clone> Array3D<T> {
     }
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize, usize)) -> Self {
+        assert_eq!(data.len(), shape.0 * shape.1 * shape.2);
         Self { data, shape }
     }
 }
@@ -158,6 +160,7 @@ impl<T: Num + Clone> Array4D<T> {
     }
     /// Create an array from a data vector
     pub fn from_data(data: Vec<T>, shape: (usize, usize, usize, usize)) -> Self {
+        assert_eq!(data.len(), shape.0 * shape.1 * shape.2 * shape.3);
         Self { data, shape }
     }
 }

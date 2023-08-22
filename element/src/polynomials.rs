@@ -649,7 +649,7 @@ mod test {
         for (i, pi) in p.iter_mut().enumerate() {
             *pi = i as f64 / 10.0;
         }
-        let points = Array2D::from_data(p, (20, 1));
+        let points = Array2D::from_data(p, (11, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
