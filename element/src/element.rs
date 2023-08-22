@@ -7,7 +7,7 @@ use bempp_traits::element::{ElementFamily, FiniteElement, MapType};
 pub mod lagrange;
 pub mod raviart_thomas;
 
-pub struct CiarletElement {
+pub struct OldCiarletElement {
     cell_type: ReferenceCellType,
     degree: usize,
     highest_degree: usize,
@@ -20,7 +20,7 @@ pub struct CiarletElement {
     entity_dofs: [AdjacencyList<usize>; 4],
 }
 
-impl FiniteElement for CiarletElement {
+impl FiniteElement for OldCiarletElement {
     fn value_size(&self) -> usize {
         self.value_size
     }
@@ -212,7 +212,7 @@ pub fn create_element(
     cell_type: ReferenceCellType,
     degree: usize,
     discontinuous: bool,
-) -> CiarletElement {
+) -> OldCiarletElement {
     match family {
         ElementFamily::Lagrange => lagrange::create(cell_type, degree, discontinuous),
         ElementFamily::RaviartThomas => raviart_thomas::create(cell_type, degree, discontinuous),

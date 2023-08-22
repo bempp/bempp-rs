@@ -1,13 +1,13 @@
 //! Lagrange elements
 
-use crate::element::CiarletElement;
+use crate::element::OldCiarletElement;
 use bempp_tools::arrays::{AdjacencyList, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, MapType};
 
 /// Create a Lagrange element
-pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> CiarletElement {
+pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> OldCiarletElement {
     if degree == 0 && !discontinuous {
         panic!("Cannot create continuous degree 0 element");
     }
@@ -153,7 +153,7 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
             }
         }
     };
-    CiarletElement {
+    OldCiarletElement {
         cell_type,
         degree,
         highest_degree: degree,

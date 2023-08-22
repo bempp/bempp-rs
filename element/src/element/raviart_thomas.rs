@@ -1,13 +1,13 @@
 //! Raviart-Thomas elements
 
-use crate::element::CiarletElement;
+use crate::element::OldCiarletElement;
 use bempp_tools::arrays::{AdjacencyList, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, MapType};
 
 /// Create a Raviart-Thomas element
-pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> CiarletElement {
+pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> OldCiarletElement {
     let coefficients = match cell_type {
         ReferenceCellType::Triangle => match degree {
             // Basis = {(-x, -y), (x-1,y), (-x, 1-y)}
@@ -66,7 +66,7 @@ pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) 
             }
         }
     };
-    CiarletElement {
+    OldCiarletElement {
         cell_type,
         degree,
         highest_degree: degree,
