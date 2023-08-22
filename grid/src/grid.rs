@@ -1,6 +1,6 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
-use bempp_element::element::{create_element, CiarletElement};
+use bempp_element::element::{create_element, OldCiarletElement};
 use bempp_tools::arrays::{AdjacencyList, Array2D, Array4D};
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
@@ -11,14 +11,14 @@ use std::cell::{Ref, RefCell};
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
-    coordinate_elements: Vec<CiarletElement>,
+    coordinate_elements: Vec<OldCiarletElement>,
     coordinates: Array2D<f64>,
     cells: AdjacencyList<usize>,
     element_changes: Vec<usize>,
     index_map: Vec<usize>,
 }
 
-fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
+fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> OldCiarletElement {
     create_element(
         ElementFamily::Lagrange,
         cell_type,
@@ -69,7 +69,7 @@ impl SerialGeometry {
     }
 
     /// TODO: document
-    pub fn coordinate_elements(&self) -> &Vec<CiarletElement> {
+    pub fn coordinate_elements(&self) -> &Vec<OldCiarletElement> {
         &self.coordinate_elements
     }
 
@@ -79,7 +79,7 @@ impl SerialGeometry {
     }
 
     /// Get the coordinate element associated with the given cell
-    pub fn element(&self, cell: usize) -> &CiarletElement {
+    pub fn element(&self, cell: usize) -> &OldCiarletElement {
         for i in 0..self.element_changes.len() - 1 {
             if cell < self.element_changes[i + 1] {
                 return &self.coordinate_elements[i - 1];
