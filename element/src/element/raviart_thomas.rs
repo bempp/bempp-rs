@@ -7,7 +7,11 @@ use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, MapType};
 
 /// Create a Raviart-Thomas element
-pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> OldCiarletElement {
+pub fn create(
+    cell_type: ReferenceCellType,
+    degree: usize,
+    discontinuous: bool,
+) -> OldCiarletElement {
     let coefficients = match cell_type {
         ReferenceCellType::Triangle => match degree {
             // Basis = {(-x, -y), (x-1,y), (-x, 1-y)}

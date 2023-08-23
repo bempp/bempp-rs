@@ -1,14 +1,14 @@
 //! Finite Element definitions
 
+use crate::cell::create_cell;
+use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
 use bempp_tools::arrays::{AdjacencyList, Array2D, Array3D};
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array3DAccess, Array4DAccess};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, FiniteElement, MapType};
-use crate::cell::create_cell;
-use crate::polynomials::{polynomial_count, tabulate_legendre_polynomials, legendre_shape};
-use rlst_dense::RandomAccessMut;
 use rlst_algorithms::linalg::LinAlg;
 use rlst_algorithms::traits::inverse::Inverse;
+use rlst_dense::RandomAccessMut;
 pub mod lagrange;
 pub mod raviart_thomas;
 
@@ -39,7 +39,6 @@ impl CiarletElement {
         discontinuous: bool,
         highest_degree: usize,
     ) -> CiarletElement {
-
         let mut dim = 0;
         for epts in &x {
             for pts in epts {
@@ -79,7 +78,9 @@ impl CiarletElement {
             }
             new_x[tdim].push(all_pts);
             new_x
-        } else { x };
+        } else {
+            x
+        };
         let new_m = if discontinuous {
             let mut new_m = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
@@ -91,7 +92,8 @@ impl CiarletElement {
                     for j in 0..mat.shape().0 {
                         for k in 0..value_size {
                             for l in 0..mat.shape().2 {
-                                *all_mat.get_mut(dn + j, k, pn + l).unwrap() = *mat.get(j, k, l).unwrap();
+                                *all_mat.get_mut(dn + j, k, pn + l).unwrap() =
+                                    *mat.get(j, k, l).unwrap();
                             }
                         }
                     }
@@ -101,7 +103,9 @@ impl CiarletElement {
             }
             new_m[tdim].push(all_mat);
             new_m
-        } else { m };
+        } else {
+            m
+        };
 
         // Compute the dual matrix
         let pdim = polynomial_count(cell_type, highest_degree);
@@ -120,7 +124,8 @@ impl CiarletElement {
                                 let mut value = d_matrix.get_mut(j, l, dof + i).unwrap();
                                 *value = 0.0;
                                 for k in 0..pts.shape().0 {
-                                    *value += *mat.get(i, j, k).unwrap() * *table.get(0, l, k).unwrap()
+                                    *value +=
+                                        *mat.get(i, j, k).unwrap() * *table.get(0, l, k).unwrap()
                                 }
                             }
                         }
@@ -153,20 +158,36 @@ impl CiarletElement {
             println!();
         }
 
-        let mut entity_dofs = [AdjacencyList::<usize>::new(), AdjacencyList::<usize>::new(), AdjacencyList::<usize>::new(), AdjacencyList::<usize>::new()];
+        let mut entity_dofs = [
+            AdjacencyList::<usize>::new(),
+            AdjacencyList::<usize>::new(),
+            AdjacencyList::<usize>::new(),
+            AdjacencyList::<usize>::new(),
+        ];
         let mut dof = 0;
-        let coefficients = Array3D::<f64>::new((0,0,0));
+        let coefficients = Array3D::<f64>::new((0, 0, 0));
         for i in 0..4 {
             for pts in &new_x[i] {
-                let dofs: Vec<usize> =(dof..dof + pts.shape().0).collect(); 
+                let dofs: Vec<usize> = (dof..dof + pts.shape().0).collect();
                 entity_dofs[i].add_row(&dofs);
                 dof += pts.shape().0;
             }
         }
-        CiarletElement { cell_type, degree, highest_degree, map_type, value_shape, value_size, family, discontinuous, dim, coefficients, entity_dofs }
+        CiarletElement {
+            cell_type,
+            degree,
+            highest_degree,
+            map_type,
+            value_shape,
+            value_size,
+            family,
+            discontinuous,
+            dim,
+            coefficients,
+            entity_dofs,
+        }
     }
 }
-
 
 impl FiniteElement for CiarletElement {
     fn value_size(&self) -> usize {
@@ -200,14 +221,27 @@ impl FiniteElement for CiarletElement {
         nderivs: usize,
         data: &mut impl Array4DAccess<f64>,
     ) {
-        let mut table = Array3D::<f64>::new(legendre_shape(self.cell_type, points, self.highest_degree, nderivs));
-        tabulate_legendre_polynomials(self.cell_type, points, self.highest_degree, nderivs, &mut table);
+        let mut table = Array3D::<f64>::new(legendre_shape(
+            self.cell_type,
+            points,
+            self.highest_degree,
+            nderivs,
+        ));
+        tabulate_legendre_polynomials(
+            self.cell_type,
+            points,
+            self.highest_degree,
+            nderivs,
+            &mut table,
+        );
         for d in 0..table.shape().0 {
             for i in 0..table.shape().1 {
                 for p in 0..points.shape().0 {
                     for j in 0..self.value_size {
                         for b in 0..self.dim {
-                            *data.get_mut(d, p, b, j).unwrap() += *self.coefficients.get(b, j, p).unwrap() * *table.get_mut(d, i, p).unwrap();
+                            *data.get_mut(d, p, b, j).unwrap() +=
+                                *self.coefficients.get(b, j, p).unwrap()
+                                    * *table.get_mut(d, i, p).unwrap();
                         }
                     }
                 }
@@ -218,7 +252,6 @@ impl FiniteElement for CiarletElement {
         self.entity_dofs[entity_dim].row(entity_number)
     }
 }
-
 
 pub struct OldCiarletElement {
     cell_type: ReferenceCellType,

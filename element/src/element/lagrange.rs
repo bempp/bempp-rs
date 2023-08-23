@@ -7,7 +7,11 @@ use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, MapType};
 
 /// Create a Lagrange element
-pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> OldCiarletElement {
+pub fn create(
+    cell_type: ReferenceCellType,
+    degree: usize,
+    discontinuous: bool,
+) -> OldCiarletElement {
     if degree == 0 && !discontinuous {
         panic!("Cannot create continuous degree 0 element");
     }

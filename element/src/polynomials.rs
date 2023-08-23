@@ -352,10 +352,10 @@ fn tabulate_legendre_polynomials_triangle<'a>(
     }
 }
 
-pub fn polynomial_count(cell_type: ReferenceCellType,degree: usize) -> usize {
+pub fn polynomial_count(cell_type: ReferenceCellType, degree: usize) -> usize {
     match cell_type {
-        ReferenceCellType::Interval => degree + 1 ,
-        ReferenceCellType::Triangle =>  (degree + 1) * (degree + 2) / 2,
+        ReferenceCellType::Interval => degree + 1,
+        ReferenceCellType::Triangle => (degree + 1) * (degree + 2) / 2,
         ReferenceCellType::Quadrilateral => (degree + 1) * (degree + 1),
         _ => {
             panic!("Unsupported cell type");
@@ -365,8 +365,8 @@ pub fn polynomial_count(cell_type: ReferenceCellType,degree: usize) -> usize {
 
 pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usize {
     match cell_type {
-        ReferenceCellType::Interval => derivatives + 1 ,
-        ReferenceCellType::Triangle =>  (derivatives + 1) * (derivatives + 2) / 2,
+        ReferenceCellType::Interval => derivatives + 1,
+        ReferenceCellType::Triangle => (derivatives + 1) * (derivatives + 2) / 2,
         ReferenceCellType::Quadrilateral => (derivatives + 1) * (derivatives + 2) / 2,
         _ => {
             panic!("Unsupported cell type");
@@ -380,7 +380,11 @@ pub fn legendre_shape<'a>(
     degree: usize,
     derivatives: usize,
 ) -> (usize, usize, usize) {
-    (derivative_count(cell_type, derivatives), polynomial_count(cell_type, degree), points.shape().0)
+    (
+        derivative_count(cell_type, derivatives),
+        polynomial_count(cell_type, degree),
+        points.shape().0,
+    )
 }
 
 /// Tabulate orthonormal polynomials

@@ -10,17 +10,16 @@ pub mod cells_3d;
 pub use bempp_traits::cell::{InvalidConnectivity, PhysicalCell, ReferenceCell, ReferenceCellType};
 pub use cells_3d::*;
 
-pub fn create_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell>
-{
+pub fn create_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
     match cell_type {
-        ReferenceCellType::Point => Box::new(Point{}),
-        ReferenceCellType::Interval => Box::new(Interval{}),
-        ReferenceCellType::Triangle => Box::new(Triangle{}),
-        ReferenceCellType::Quadrilateral => Box::new(Quadrilateral{}),
-        ReferenceCellType::Tetrahedron => Box::new(Tetrahedron{}),
-        ReferenceCellType::Hexahedron => Box::new(Hexahedron{}),
-        ReferenceCellType::Prism => Box::new(Prism{}),
-        ReferenceCellType::Pyramid => Box::new(Pyramid{}),
+        ReferenceCellType::Point => Box::new(Point {}),
+        ReferenceCellType::Interval => Box::new(Interval {}),
+        ReferenceCellType::Triangle => Box::new(Triangle {}),
+        ReferenceCellType::Quadrilateral => Box::new(Quadrilateral {}),
+        ReferenceCellType::Tetrahedron => Box::new(Tetrahedron {}),
+        ReferenceCellType::Hexahedron => Box::new(Hexahedron {}),
+        ReferenceCellType::Prism => Box::new(Prism {}),
+        ReferenceCellType::Pyramid => Box::new(Pyramid {}),
     }
 }
 
