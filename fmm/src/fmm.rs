@@ -197,7 +197,7 @@ where
 
                     let npoints = point_data.len();
                     potentials.insert(*key, Arc::new(Mutex::new(rlst_col_vec![f64, npoints])));
-                    
+
                     // Lookup indices and store with charges
                     let mut tmp_idx = Vec::new();
                     for point in point_data.iter() {
@@ -370,7 +370,7 @@ mod test {
     use bempp_field::types::{FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm};
     use rand::prelude::*;
     use rand::SeedableRng;
-    
+
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
 
     use bempp_field::types::SvdFieldTranslationKiFmm;
@@ -436,7 +436,7 @@ mod test {
 
     //     // Form charge dict, matching charges with their associated global indices
     //     let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
-        
+
     //     let datatree = FmmData::new(fmm, &charge_dict);
 
     //     let times = datatree.run(Some(true));
@@ -511,14 +511,14 @@ mod test {
             kernel.clone(),
             order,
             tree.get_domain().clone(),
-            alpha_inner 
+            alpha_inner
         );
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
         // Form charge dict, matching charges with their associated global indices
         let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
-        
+
         let datatree = FmmData::new(fmm, &charge_dict);
 
         let times = datatree.run(Some(true));

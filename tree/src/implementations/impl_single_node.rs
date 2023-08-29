@@ -111,6 +111,13 @@ impl SingleNodeTree {
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
+        // Return tree in sorted order
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
+
         SingleNodeTree {
             depth,
             points,
@@ -233,6 +240,12 @@ impl SingleNodeTree {
             }
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
 
         SingleNodeTree {
             depth,
@@ -791,7 +804,7 @@ mod test {
 
         // Adaptive tree
         let ncrit = 150;
-        
+
         let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None, &global_idxs);
         let keys = tree.get_all_keys().unwrap();
         let depth = tree.get_depth();

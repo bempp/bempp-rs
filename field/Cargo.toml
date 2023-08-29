@@ -33,7 +33,7 @@ num = "0.4"
 rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}
 realfft = "3.3.0"
 rustfft = "6.1.0"
-fftw = {git = "https://github.com/skailasa/fftw.git" } 
+fftw = {git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.0"
 dashmap = {version = "5.5.0", features=["rayon"]}
 rayon = "1.7.0"

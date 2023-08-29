@@ -643,6 +643,13 @@ impl MortonKey {
             .collect()
     }
 
+    pub fn all_neighbors(&self) -> Vec<Option<MortonKey>> {
+        DIRECTIONS
+            .iter()
+            .map(|d| self.find_key_in_direction(d))
+            .collect()
+    }
+
     pub fn is_adjacent_same_level(&self, other: &MortonKey) -> bool {
         // Calculate distance between centres of each node
         let da = 1 << (DEEPEST_LEVEL - self.level());
@@ -717,7 +724,7 @@ impl MortonKey {
     let ncoeffs = n.pow(dim as u32);
     let mut grid = vec![0f64; dim*ncoeffs];
     let mut idx = 0;
-    
+
     for i in 0..n {
         for j in 0..n {
             for k in 0..n {
@@ -746,7 +753,7 @@ impl MortonKey {
     // Shift
     let sums: Vec<_> = (0..ncoeffs)
         .map(|i| grid[i] + grid[ncoeffs + i] + grid[2*ncoeffs + i])
-        .collect();    
+        .collect();
     let max_index = sums
         .iter()
         .enumerate()
@@ -763,7 +770,7 @@ impl MortonKey {
     let nsurf = surface.len() / dim;
     let sums: Vec<_> = (0..nsurf)
         .map(|i| surface[i] + surface[nsurf + i] + surface[2*nsurf + i])
-        .collect();    
+        .collect();
     let max_index = sums
         .iter()
         .enumerate()
@@ -774,7 +781,7 @@ impl MortonKey {
         surface[max_index],
         surface[max_index + nsurf],
         surface[max_index + 2 * nsurf]
-    ]; 
+    ];
 
     let diff = max_conv_point
         .iter()
