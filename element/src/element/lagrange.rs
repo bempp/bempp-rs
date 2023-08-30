@@ -6,15 +6,15 @@ use crate::polynomials::polynomial_count;
 use bempp_tools::arrays::{AdjacencyList, Array2D, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{ElementFamily, MapType};
+use bempp_traits::element::{Continuity, ElementFamily, MapType};
 
 /// Create a Lagrange element
 pub fn create(
     cell_type: ReferenceCellType,
     degree: usize,
-    discontinuous: bool,
+    continuity: Continuity,
 ) -> OldCiarletElement {
-    if degree == 0 && !discontinuous {
+    if degree == 0 && continuity == Continuity::Continuous {
         panic!("Cannot create continuous degree 0 element");
     }
     let coefficients = match cell_type {
@@ -79,7 +79,7 @@ pub fn create(
             panic!("Cell type not supported");
         }
     };
-    let entity_dofs = if discontinuous {
+    let entity_dofs = if continuity == Continuity::Discontinuous {
         let dofs = AdjacencyList::<usize>::from_data(
             (0..coefficients.shape().0).collect(),
             vec![0, coefficients.shape().0],
@@ -166,7 +166,7 @@ pub fn create(
         map_type: MapType::Identity,
         value_size: 1,
         family: ElementFamily::Lagrange,
-        discontinuous,
+        continuity,
         dim: coefficients.shape().0,
         coefficients,
         entity_dofs,
@@ -177,7 +177,7 @@ pub fn create(
 pub fn create_new(
     cell_type: ReferenceCellType,
     degree: usize,
-    discontinuous: bool,
+    continuity: Continuity,
 ) -> CiarletElement {
     let cell = create_cell(cell_type);
     let dim = polynomial_count(cell_type, degree);
@@ -190,7 +190,7 @@ pub fn create_new(
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
     if degree == 0 {
-        if !discontinuous {
+        if continuity == Continuity::Continuous {
             panic!("Cannot create continuous degree 0 Lagrange element");
         }
         for d in 0..tdim {
@@ -299,7 +299,7 @@ pub fn create_new(
         x,
         m,
         MapType::Identity,
-        discontinuous,
+        continuity,
         degree,
     )
 }
@@ -345,7 +345,7 @@ mod test {
 
     #[test]
     fn test_oldlagrange_0_interval() {
-        let e = create(ReferenceCellType::Interval, 0, true);
+        let e = create(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
@@ -359,7 +359,7 @@ mod test {
 
     #[test]
     fn test_oldlagrange_1_interval() {
-        let e = create(ReferenceCellType::Interval, 1, false);
+        let e = create(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
@@ -377,7 +377,7 @@ mod test {
 
     #[test]
     fn test_oldlagrange_0_triangle() {
-        let e = create(ReferenceCellType::Triangle, 0, true);
+        let e = create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -394,7 +394,7 @@ mod test {
 
     #[test]
     fn test_oldlagrange_1_triangle() {
-        let e = create(ReferenceCellType::Triangle, 1, false);
+        let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -416,7 +416,11 @@ mod test {
 
     #[test]
     fn test_oldlagrange_0_quadrilateral() {
-        let e = create(ReferenceCellType::Quadrilateral, 0, true);
+        let e = create(
+            ReferenceCellType::Quadrilateral,
+            0,
+            Continuity::Discontinuous,
+        );
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -433,7 +437,7 @@ mod test {
 
     #[test]
     fn test_oldlagrange_1_quadrilateral() {
-        let e = create(ReferenceCellType::Quadrilateral, 1, false);
+        let e = create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -465,7 +469,7 @@ mod test {
 
     #[test]
     fn test_oldlagrange_2_quadrilateral() {
-        let e = create(ReferenceCellType::Quadrilateral, 2, false);
+        let e = create(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -519,7 +523,7 @@ mod test {
 
     #[test]
     fn test_lagrange_0_interval() {
-        let e = create_new(ReferenceCellType::Interval, 0, true);
+        let e = create_new(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
@@ -533,7 +537,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_interval() {
-        let e = create_new(ReferenceCellType::Interval, 1, false);
+        let e = create_new(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
         let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
@@ -551,7 +555,7 @@ mod test {
 
     #[test]
     fn test_lagrange_0_triangle() {
-        let e = create_new(ReferenceCellType::Triangle, 0, true);
+        let e = create_new(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -568,7 +572,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_triangle() {
-        let e = create_new(ReferenceCellType::Triangle, 1, false);
+        let e = create_new(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -590,46 +594,66 @@ mod test {
 
     #[test]
     fn test_lagrange_higher_degree_triangle() {
-        create_new(ReferenceCellType::Triangle, 2, false);
-        create_new(ReferenceCellType::Triangle, 3, false);
-        create_new(ReferenceCellType::Triangle, 4, false);
-        create_new(ReferenceCellType::Triangle, 5, false);
+        create_new(ReferenceCellType::Triangle, 2, Continuity::Continuous);
+        create_new(ReferenceCellType::Triangle, 3, Continuity::Continuous);
+        create_new(ReferenceCellType::Triangle, 4, Continuity::Continuous);
+        create_new(ReferenceCellType::Triangle, 5, Continuity::Continuous);
 
-        create_new(ReferenceCellType::Triangle, 2, true);
-        create_new(ReferenceCellType::Triangle, 3, true);
-        create_new(ReferenceCellType::Triangle, 4, true);
-        create_new(ReferenceCellType::Triangle, 5, true);
+        create_new(ReferenceCellType::Triangle, 2, Continuity::Discontinuous);
+        create_new(ReferenceCellType::Triangle, 3, Continuity::Discontinuous);
+        create_new(ReferenceCellType::Triangle, 4, Continuity::Discontinuous);
+        create_new(ReferenceCellType::Triangle, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_higher_degree_interval() {
-        create_new(ReferenceCellType::Interval, 2, false);
-        create_new(ReferenceCellType::Interval, 3, false);
-        create_new(ReferenceCellType::Interval, 4, false);
-        create_new(ReferenceCellType::Interval, 5, false);
+        create_new(ReferenceCellType::Interval, 2, Continuity::Continuous);
+        create_new(ReferenceCellType::Interval, 3, Continuity::Continuous);
+        create_new(ReferenceCellType::Interval, 4, Continuity::Continuous);
+        create_new(ReferenceCellType::Interval, 5, Continuity::Continuous);
 
-        create_new(ReferenceCellType::Interval, 2, true);
-        create_new(ReferenceCellType::Interval, 3, true);
-        create_new(ReferenceCellType::Interval, 4, true);
-        create_new(ReferenceCellType::Interval, 5, true);
+        create_new(ReferenceCellType::Interval, 2, Continuity::Discontinuous);
+        create_new(ReferenceCellType::Interval, 3, Continuity::Discontinuous);
+        create_new(ReferenceCellType::Interval, 4, Continuity::Discontinuous);
+        create_new(ReferenceCellType::Interval, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_higher_degree_quadrilateral() {
-        create_new(ReferenceCellType::Quadrilateral, 2, false);
-        create_new(ReferenceCellType::Quadrilateral, 3, false);
-        create_new(ReferenceCellType::Quadrilateral, 4, false);
-        create_new(ReferenceCellType::Quadrilateral, 5, false);
+        create_new(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
+        create_new(ReferenceCellType::Quadrilateral, 3, Continuity::Continuous);
+        create_new(ReferenceCellType::Quadrilateral, 4, Continuity::Continuous);
+        create_new(ReferenceCellType::Quadrilateral, 5, Continuity::Continuous);
 
-        create_new(ReferenceCellType::Quadrilateral, 2, true);
-        create_new(ReferenceCellType::Quadrilateral, 3, true);
-        create_new(ReferenceCellType::Quadrilateral, 4, true);
-        create_new(ReferenceCellType::Quadrilateral, 5, true);
+        create_new(
+            ReferenceCellType::Quadrilateral,
+            2,
+            Continuity::Discontinuous,
+        );
+        create_new(
+            ReferenceCellType::Quadrilateral,
+            3,
+            Continuity::Discontinuous,
+        );
+        create_new(
+            ReferenceCellType::Quadrilateral,
+            4,
+            Continuity::Discontinuous,
+        );
+        create_new(
+            ReferenceCellType::Quadrilateral,
+            5,
+            Continuity::Discontinuous,
+        );
     }
 
     #[test]
     fn test_lagrange_0_quadrilateral() {
-        let e = create_new(ReferenceCellType::Quadrilateral, 0, true);
+        let e = create_new(
+            ReferenceCellType::Quadrilateral,
+            0,
+            Continuity::Discontinuous,
+        );
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -646,7 +670,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_quadrilateral() {
-        let e = create_new(ReferenceCellType::Quadrilateral, 1, false);
+        let e = create_new(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(
@@ -678,7 +702,7 @@ mod test {
 
     #[test]
     fn test_lagrange_2_quadrilateral() {
-        let e = create_new(ReferenceCellType::Quadrilateral, 2, false);
+        let e = create_new(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(

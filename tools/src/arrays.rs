@@ -226,7 +226,7 @@ impl<T: Num> Array4DAccess<T> for Array4D<T> {
 /// An adjacency list stores two-dimensional data where each row may have a different number of items
 pub struct AdjacencyList<T: Num> {
     /// The data in the array, in row-major order
-    data: Vec<T>,
+    pub data: Vec<T>,
     /// The starting index of each row, plus a final entry that is the length of data
     offsets: Vec<usize>,
 }

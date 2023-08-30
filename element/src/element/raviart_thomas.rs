@@ -4,13 +4,13 @@ use crate::element::OldCiarletElement;
 use bempp_tools::arrays::{AdjacencyList, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{ElementFamily, MapType};
+use bempp_traits::element::{Continuity, ElementFamily, MapType};
 
 /// Create a Raviart-Thomas element
 pub fn create(
     cell_type: ReferenceCellType,
     degree: usize,
-    discontinuous: bool,
+    continuity: Continuity,
 ) -> OldCiarletElement {
     let coefficients = match cell_type {
         ReferenceCellType::Triangle => match degree {
@@ -30,7 +30,7 @@ pub fn create(
             panic!("Cell type not supported");
         }
     };
-    let entity_dofs = if discontinuous {
+    let entity_dofs = if continuity == Continuity::Discontinuous {
         let dofs = AdjacencyList::<usize>::from_data(
             (0..coefficients.shape().0).collect(),
             vec![0, coefficients.shape().0],
@@ -77,7 +77,7 @@ pub fn create(
         map_type: MapType::ContravariantPiola,
         value_size: 2,
         family: ElementFamily::RaviartThomas,
-        discontinuous,
+        continuity,
         dim: coefficients.shape().0,
         coefficients,
         entity_dofs,
@@ -125,7 +125,7 @@ mod test {
 
     #[test]
     fn test_raviart_thomas_1_triangle() {
-        let e = create(ReferenceCellType::Triangle, 1, false);
+        let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 2);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(

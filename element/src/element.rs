@@ -5,7 +5,7 @@ use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_pol
 use bempp_tools::arrays::{AdjacencyList, Array2D, Array3D};
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array3DAccess, Array4DAccess};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{ElementFamily, FiniteElement, MapType};
+use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
 use rlst_algorithms::linalg::LinAlg;
 use rlst_algorithms::traits::inverse::Inverse;
 use rlst_dense::{RandomAccessByRef, RandomAccessMut};
@@ -20,7 +20,7 @@ pub struct CiarletElement {
     value_shape: Vec<usize>,
     value_size: usize,
     family: ElementFamily,
-    discontinuous: bool,
+    continuity: Continuity,
     dim: usize,
     coefficients: Array3D<f64>,
     entity_dofs: [AdjacencyList<usize>; 4],
@@ -37,7 +37,7 @@ impl CiarletElement {
         x: [Vec<Array2D<f64>>; 4],
         m: [Vec<Array3D<f64>>; 4],
         map_type: MapType,
-        discontinuous: bool,
+        continuity: Continuity,
         highest_degree: usize,
     ) -> CiarletElement {
         let mut dim = 0;
@@ -65,11 +65,11 @@ impl CiarletElement {
             }
         }
 
-        let new_x = if discontinuous {
+        let new_x = if continuity == Continuity::Discontinuous {
             let mut new_x = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut all_pts = Array2D::<f64>::new((npts, tdim));
-            for (i, xi) in x.iter().enumerate() {
+            for (i, xi) in x.iter().take(tdim).enumerate() {
                 for _pts in xi {
                     new_x[i].push(Array2D::<f64>::new((0, tdim)));
                 }
@@ -89,12 +89,12 @@ impl CiarletElement {
         } else {
             x
         };
-        let new_m = if discontinuous {
+        let new_m = if continuity == Continuity::Discontinuous {
             let mut new_m = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut dn = 0;
             let mut all_mat = Array3D::<f64>::new((dim, value_size, npts));
-            for (i, mi) in m.iter().enumerate() {
+            for (i, mi) in m.iter().take(tdim).enumerate() {
                 for _mat in mi {
                     new_m[i].push(Array3D::<f64>::new((0, value_size, 0)));
                 }
@@ -194,7 +194,7 @@ impl CiarletElement {
             value_shape,
             value_size,
             family,
-            discontinuous,
+            continuity,
             dim,
             coefficients,
             entity_dofs,
@@ -227,8 +227,8 @@ impl FiniteElement for CiarletElement {
     fn family(&self) -> ElementFamily {
         self.family
     }
-    fn discontinuous(&self) -> bool {
-        self.discontinuous
+    fn continuity(&self) -> Continuity {
+        self.continuity
     }
     fn dim(&self) -> usize {
         self.dim
@@ -279,7 +279,7 @@ pub struct OldCiarletElement {
     map_type: MapType,
     value_size: usize,
     family: ElementFamily,
-    discontinuous: bool,
+    continuity: Continuity,
     dim: usize,
     coefficients: Array3D<f64>,
     entity_dofs: [AdjacencyList<usize>; 4],
@@ -305,8 +305,8 @@ impl FiniteElement for OldCiarletElement {
     fn family(&self) -> ElementFamily {
         self.family
     }
-    fn discontinuous(&self) -> bool {
-        self.discontinuous
+    fn continuity(&self) -> Continuity {
+        self.continuity
     }
     fn dim(&self) -> usize {
         self.dim
@@ -476,11 +476,11 @@ pub fn create_element(
     family: ElementFamily,
     cell_type: ReferenceCellType,
     degree: usize,
-    discontinuous: bool,
+    continuity: Continuity,
 ) -> OldCiarletElement {
     match family {
-        ElementFamily::Lagrange => lagrange::create(cell_type, degree, discontinuous),
-        ElementFamily::RaviartThomas => raviart_thomas::create(cell_type, degree, discontinuous),
+        ElementFamily::Lagrange => lagrange::create(cell_type, degree, continuity),
+        ElementFamily::RaviartThomas => raviart_thomas::create(cell_type, degree, continuity),
     }
 }
 
@@ -495,7 +495,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         assert_eq!(e.value_size(), 1);
     }
