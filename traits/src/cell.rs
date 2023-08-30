@@ -41,7 +41,7 @@ pub trait ReferenceCell {
         let vertices = self.vertices();
         let mut m = vec![0.0; dim];
         for (i, v) in vertices.iter().enumerate() {
-            m[i%dim] += v;
+            m[i % dim] += v;
         }
         for i in 0..dim {
             m[i] /= (vertices.len() / dim) as f64;
@@ -56,7 +56,7 @@ pub trait ReferenceCell {
 
     /// The faces of the cell
     ///
-    /// The first `self.faces_nvertices()[0]` components are the vertex numbers of vertices of the first face, the next `self.faces_nvertices()[1]` the second edge, and so on.
+    /// The first `self.faces_nvertices()[0]` components are the vertex numbers of vertices of the first face, the next `self.faces_nvertices()[1]` the second face, and so on.
     fn faces(&self) -> &[usize];
 
     /// The number of vertices adjacent to each face

@@ -1,9 +1,9 @@
 //! Lagrange elements
 
 use crate::element::OldCiarletElement;
-use crate::element::{CiarletElement, create_cell};
+use crate::element::{create_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_tools::arrays::{AdjacencyList, Array3D, Array2D};
+use bempp_tools::arrays::{AdjacencyList, Array2D, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, MapType};
@@ -198,13 +198,115 @@ pub fn create_new(
                 x[d].push(Array2D::<f64>::new((0, tdim)));
                 m[d].push(Array3D::<f64>::new((0, 1, 0)));
             }
-            x[tdim].push(Array2D::<f64>::from_data(cell.midpoint(), (1, tdim)));
-            m[tdim].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
         }
+        x[tdim].push(Array2D::<f64>::from_data(cell.midpoint(), (1, tdim)));
+        m[tdim].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
     } else {
-        
+        // TODO: GLL points
+        for e in 0..cell.entity_count(0) {
+            let mut pts = vec![0.0; tdim];
+            let vertex = &cell.vertices()[e * tdim..(e + 1) * tdim];
+            for i in 0..tdim {
+                pts[i] = vertex[i];
+            }
+            x[0].push(Array2D::<f64>::from_data(pts, (1, tdim)));
+            m[0].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
+        }
+        for e in 0..cell.entity_count(1) {
+            let mut pts = vec![0.0; tdim * (degree - 1)];
+            let mut ident = vec![0.0; (degree - 1).pow(2)];
+            let vn0 = cell.edges()[2 * e];
+            let vn1 = cell.edges()[2 * e + 1];
+            let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
+            let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
+            let mut n = 0;
+            for i in 1..degree {
+                ident[n * degree] = 1.0;
+                for j in 0..tdim {
+                    pts[n * tdim + j] = v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
+                }
+                n += 1;
+            }
+            x[1].push(Array2D::<f64>::from_data(pts, (degree - 1, tdim)));
+            m[1].push(Array3D::<f64>::from_data(
+                ident,
+                (degree - 1, 1, degree - 1),
+            ));
+        }
+        let mut start = 0;
+        for e in 0..cell.entity_count(2) {
+            let nvertices = cell.faces_nvertices()[e];
+            let npts = if nvertices == 3 {
+                if degree > 2 {
+                    (degree - 1) * (degree - 2) / 2
+                } else {
+                    0
+                }
+            } else if nvertices == 4 {
+                (degree - 1).pow(2)
+            } else {
+                panic!("Unsupported face type");
+            };
+            let mut pts = vec![0.0; tdim * npts];
+            let mut ident = vec![0.0; npts.pow(2)];
+
+            let vn0 = cell.faces()[start];
+            let vn1 = cell.faces()[start + 1];
+            let vn2 = cell.faces()[start + 2];
+            let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
+            let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
+            let v2 = &cell.vertices()[vn2 * tdim..(vn2 + 1) * tdim];
+
+            if nvertices == 3 {
+                // Triangle
+                let mut n = 0;
+                for i0 in 1..degree {
+                    for i1 in 1..degree - i0 {
+                        for j in 0..tdim {
+                            pts[n * tdim + j] = v0[j]
+                                + i0 as f64 / degree as f64 * (v1[j] - v0[j])
+                                + i1 as f64 / degree as f64 * (v2[j] - v0[j]);
+                        }
+                        n += 1;
+                    }
+                }
+            } else if nvertices == 4 {
+                // Quadrilateral
+                let mut n = 0;
+                for i0 in 1..degree {
+                    for i1 in 1..degree {
+                        for j in 0..tdim {
+                            pts[n * tdim + j] = v0[j]
+                                + i0 as f64 / degree as f64 * (v1[j] - v0[j])
+                                + i1 as f64 / degree as f64 * (v2[j] - v0[j]);
+                        }
+                        n += 1;
+                    }
+                }
+            } else {
+                panic!("Unsupported face type.");
+            }
+
+            for i in 0..npts {
+                ident[i * npts + i] = 1.0;
+            }
+            x[2].push(Array2D::<f64>::from_data(pts, (npts, tdim)));
+            m[2].push(Array3D::<f64>::from_data(ident, (npts, 1, npts)));
+            start += nvertices;
+        }
     }
-    CiarletElement::create(ElementFamily::Lagrange, cell_type, degree, vec![], wcoeffs, x, m, MapType::Identity, discontinuous, degree)
+    CiarletElement::create(
+        ElementFamily::Lagrange,
+        cell_type,
+        degree,
+        vec![],
+        wcoeffs,
+        x,
+        m,
+        MapType::Identity,
+        discontinuous,
+        degree,
+    )
 }
 
 #[cfg(test)]
@@ -420,8 +522,6 @@ mod test {
         check_dofs(e);
     }
 
-
-
     #[test]
     fn test_lagrange_0_interval() {
         let e = create_new(ReferenceCellType::Interval, 0, true);
@@ -491,6 +591,45 @@ mod test {
             assert_relative_eq!(*data.get(0, pt, 2, 0).unwrap(), *points.get(pt, 1).unwrap());
         }
         check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_higher_degree_triangle() {
+        create_new(ReferenceCellType::Triangle, 2, false);
+        create_new(ReferenceCellType::Triangle, 3, false);
+        create_new(ReferenceCellType::Triangle, 4, false);
+        create_new(ReferenceCellType::Triangle, 5, false);
+
+        create_new(ReferenceCellType::Triangle, 2, true);
+        create_new(ReferenceCellType::Triangle, 3, true);
+        create_new(ReferenceCellType::Triangle, 4, true);
+        create_new(ReferenceCellType::Triangle, 5, true);
+    }
+
+    #[test]
+    fn test_lagrange_higher_degree_interval() {
+        create_new(ReferenceCellType::Interval, 2, false);
+        create_new(ReferenceCellType::Interval, 3, false);
+        create_new(ReferenceCellType::Interval, 4, false);
+        create_new(ReferenceCellType::Interval, 5, false);
+
+        create_new(ReferenceCellType::Interval, 2, true);
+        create_new(ReferenceCellType::Interval, 3, true);
+        create_new(ReferenceCellType::Interval, 4, true);
+        create_new(ReferenceCellType::Interval, 5, true);
+    }
+
+    #[test]
+    fn test_lagrange_higher_degree_quadrilateral() {
+        create_new(ReferenceCellType::Quadrilateral, 2, false);
+        create_new(ReferenceCellType::Quadrilateral, 3, false);
+        create_new(ReferenceCellType::Quadrilateral, 4, false);
+        create_new(ReferenceCellType::Quadrilateral, 5, false);
+
+        create_new(ReferenceCellType::Quadrilateral, 2, true);
+        create_new(ReferenceCellType::Quadrilateral, 3, true);
+        create_new(ReferenceCellType::Quadrilateral, 4, true);
+        create_new(ReferenceCellType::Quadrilateral, 5, true);
     }
 
     #[test]

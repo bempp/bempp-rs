@@ -68,12 +68,6 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
     assert_eq!(data.shape().2, points.shape().0);
     assert_eq!(points.shape().1, 2);
 
-    for j in 0..derivatives + 1 {
-        for i in 0..derivatives + 1 - j {
-            println!("{i} {j} {}", tri_index(i, j));
-        }
-    }
-
     for i in 0..data.shape().2 {
         *data
             .get_mut(tri_index(0, 0), quad_index(0, 0, degree), i)
@@ -471,7 +465,6 @@ mod test {
                     product +=
                         data.get(0, i, k).unwrap() * data.get(0, j, k).unwrap() * rule.weights[k];
                 }
-                println!("{i} {j} {product}");
             }
         }
         for i in 0..data.shape().1 {
@@ -567,7 +560,6 @@ mod test {
         let mut index = 0;
         for i in 0..10 {
             for j in 0..10 - i {
-                println!("{index}");
                 p[6 * index] = i as f64 / 10.0;
                 p[6 * index + 1] = j as f64 / 10.0;
                 p[6 * index + 2] = p[6 * index] + epsilon;
