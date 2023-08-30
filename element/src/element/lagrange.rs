@@ -1,7 +1,9 @@
 //! Lagrange elements
 
 use crate::element::OldCiarletElement;
-use bempp_tools::arrays::{AdjacencyList, Array3D};
+use crate::element::{CiarletElement, create_cell};
+use crate::polynomials::polynomial_count;
+use bempp_tools::arrays::{AdjacencyList, Array3D, Array2D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, MapType};
@@ -171,6 +173,40 @@ pub fn create(
     }
 }
 
+/// Create a Lagrange element
+pub fn create_new(
+    cell_type: ReferenceCellType,
+    degree: usize,
+    discontinuous: bool,
+) -> CiarletElement {
+    let cell = create_cell(cell_type);
+    let dim = polynomial_count(cell_type, degree);
+    let tdim = cell.dim();
+    let mut wcoeffs = Array3D::<f64>::new((dim, 1, dim));
+    for i in 0..dim {
+        *wcoeffs.get_mut(i, 0, i).unwrap() = 1.0;
+    }
+
+    let mut x = [vec![], vec![], vec![], vec![]];
+    let mut m = [vec![], vec![], vec![], vec![]];
+    if degree == 0 {
+        if !discontinuous {
+            panic!("Cannot create continuous degree 0 Lagrange element");
+        }
+        for d in 0..tdim {
+            for _e in 0..cell.entity_count(d) {
+                x[d].push(Array2D::<f64>::new((0, tdim)));
+                m[d].push(Array3D::<f64>::new((0, 1, 0)));
+            }
+            x[tdim].push(Array2D::<f64>::from_data(cell.midpoint(), (1, tdim)));
+            m[tdim].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
+        }
+    } else {
+        
+    }
+    CiarletElement::create(ElementFamily::Lagrange, cell_type, degree, vec![], wcoeffs, x, m, MapType::Identity, discontinuous, degree)
+}
+
 #[cfg(test)]
 mod test {
     use crate::cell::*;
@@ -211,7 +247,7 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_0_interval() {
+    fn test_oldlagrange_0_interval() {
         let e = create(ReferenceCellType::Interval, 0, true);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
@@ -225,7 +261,7 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_1_interval() {
+    fn test_oldlagrange_1_interval() {
         let e = create(ReferenceCellType::Interval, 1, false);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
@@ -243,7 +279,7 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_0_triangle() {
+    fn test_oldlagrange_0_triangle() {
         let e = create(ReferenceCellType::Triangle, 0, true);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
@@ -260,7 +296,7 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_1_triangle() {
+    fn test_oldlagrange_1_triangle() {
         let e = create(ReferenceCellType::Triangle, 1, false);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
@@ -282,7 +318,7 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_0_quadrilateral() {
+    fn test_oldlagrange_0_quadrilateral() {
         let e = create(ReferenceCellType::Quadrilateral, 0, true);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
@@ -299,7 +335,7 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_1_quadrilateral() {
+    fn test_oldlagrange_1_quadrilateral() {
         let e = create(ReferenceCellType::Quadrilateral, 1, false);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
@@ -331,8 +367,184 @@ mod test {
     }
 
     #[test]
-    fn test_lagrange_2_quadrilateral() {
+    fn test_oldlagrange_2_quadrilateral() {
         let e = create(ReferenceCellType::Quadrilateral, 2, false);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            let x = *points.get(pt, 0).unwrap();
+            let y = *points.get(pt, 1).unwrap();
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 1, 0).unwrap(),
+                x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 2, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 3, 0).unwrap(),
+                x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 4, 0).unwrap(),
+                4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 5, 0).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 6, 0).unwrap(),
+                x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 7, 0).unwrap(),
+                4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0)
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 8, 0).unwrap(),
+                4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y)
+            );
+        }
+        check_dofs(e);
+    }
+
+
+
+    #[test]
+    fn test_lagrange_0_interval() {
+        let e = create_new(ReferenceCellType::Interval, 0, true);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
+        let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..4 {
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), 1.0);
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_1_interval() {
+        let e = create_new(ReferenceCellType::Interval, 1, false);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
+        let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..4 {
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                1.0 - *points.get(pt, 0).unwrap()
+            );
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get(pt, 0).unwrap());
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_0_triangle() {
+        let e = create_new(ReferenceCellType::Triangle, 0, true);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), 1.0);
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_1_triangle() {
+        let e = create_new(ReferenceCellType::Triangle, 1, false);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                1.0 - *points.get(pt, 0).unwrap() - *points.get(pt, 1).unwrap()
+            );
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get(pt, 0).unwrap());
+            assert_relative_eq!(*data.get(0, pt, 2, 0).unwrap(), *points.get(pt, 1).unwrap());
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_0_quadrilateral() {
+        let e = create_new(ReferenceCellType::Quadrilateral, 0, true);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(*data.get(0, pt, 0, 0).unwrap(), 1.0);
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_1_quadrilateral() {
+        let e = create_new(ReferenceCellType::Quadrilateral, 1, false);
+        assert_eq!(e.value_size(), 1);
+        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let points = Array2D::from_data(
+            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            (6, 2),
+        );
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(
+                *data.get(0, pt, 0, 0).unwrap(),
+                (1.0 - *points.get(pt, 0).unwrap()) * (1.0 - *points.get(pt, 1).unwrap())
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 1, 0).unwrap(),
+                *points.get(pt, 0).unwrap() * (1.0 - *points.get(pt, 1).unwrap())
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 2, 0).unwrap(),
+                (1.0 - *points.get(pt, 0).unwrap()) * *points.get(pt, 1).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get(0, pt, 3, 0).unwrap(),
+                *points.get(pt, 0).unwrap() * *points.get(pt, 1).unwrap()
+            );
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_2_quadrilateral() {
+        let e = create_new(ReferenceCellType::Quadrilateral, 2, false);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(

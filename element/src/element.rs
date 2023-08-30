@@ -8,7 +8,7 @@ use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{ElementFamily, FiniteElement, MapType};
 use rlst_algorithms::linalg::LinAlg;
 use rlst_algorithms::traits::inverse::Inverse;
-use rlst_dense::RandomAccessMut;
+use rlst_dense::{RandomAccessMut, RandomAccessByRef};
 pub mod lagrange;
 pub mod raviart_thomas;
 
@@ -40,9 +40,11 @@ impl CiarletElement {
         highest_degree: usize,
     ) -> CiarletElement {
         let mut dim = 0;
-        for epts in &x {
-            for pts in epts {
-                dim += pts.shape().0;
+        let mut npts = 0;
+        for emats in &m {
+            for mat in emats {
+                dim += mat.shape().0;
+                npts += mat.shape().2;
             }
         }
         let cell = create_cell(cell_type);
@@ -64,8 +66,8 @@ impl CiarletElement {
         let new_x = if discontinuous {
             let mut new_x = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
-            let mut all_pts = Array2D::<f64>::new((dim, tdim));
-            for i in 0..tdim {
+            let mut all_pts = Array2D::<f64>::new((npts, tdim));
+            for i in 0..tdim + 1 {
                 for pts in &x[i] {
                     new_x[i].push(Array2D::<f64>::new((0, tdim)));
                     for j in 0..pts.shape().0 {
@@ -85,8 +87,8 @@ impl CiarletElement {
             let mut new_m = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut dn = 0;
-            let mut all_mat = Array3D::<f64>::new((dim, value_size, new_x[tdim][0].shape().0));
-            for i in 0..tdim {
+            let mut all_mat = Array3D::<f64>::new((dim, value_size, npts));
+            for i in 0..tdim + 1 {
                 for mat in &m[i] {
                     new_m[i].push(Array3D::<f64>::new((0, value_size, 0)));
                     for j in 0..mat.shape().0 {
@@ -121,11 +123,11 @@ impl CiarletElement {
                     for i in 0..mat.shape().0 {
                         for j in 0..value_size {
                             for l in 0..pdim {
-                                let mut value = d_matrix.get_mut(j, l, dof + i).unwrap();
+                                let value = d_matrix.get_mut(j, l, dof + i).unwrap();
                                 *value = 0.0;
                                 for k in 0..pts.shape().0 {
                                     *value +=
-                                        *mat.get(i, j, k).unwrap() * *table.get(0, l, k).unwrap()
+                                        *mat.get(i, j, k).unwrap() * *table.get(0, l, k).unwrap();
                                 }
                             }
                         }
@@ -139,7 +141,7 @@ impl CiarletElement {
 
         for i in 0..dim {
             for j in 0..dim {
-                let mut entry = dual_matrix.get_mut(i, j).unwrap();
+                let entry = dual_matrix.get_mut(i, j).unwrap();
                 *entry = 0.0;
                 for k in 0..value_size {
                     for l in 0..pdim {
@@ -150,12 +152,13 @@ impl CiarletElement {
         }
 
         let inverse = dual_matrix.linalg().inverse().unwrap();
-
+        let mut coefficients = Array3D::<f64>::new((dim, value_size, dim / value_size));
         for i in 0..dim {
-            for j in 0..dim {
-                println!("{}", inverse.get(i, j));
+            for j in 0..value_size {
+                for k in 0..dim / value_size {
+                    *coefficients.get_mut(i, j, k).unwrap() = *inverse.get(i,  j * dim / value_size + k).unwrap()
+                }
             }
-            println!();
         }
 
         let mut entity_dofs = [
@@ -165,7 +168,6 @@ impl CiarletElement {
             AdjacencyList::<usize>::new(),
         ];
         let mut dof = 0;
-        let coefficients = Array3D::<f64>::new((0, 0, 0));
         for i in 0..4 {
             for pts in &new_x[i] {
                 let dofs: Vec<usize> = (dof..dof + pts.shape().0).collect();
@@ -187,6 +189,12 @@ impl CiarletElement {
             entity_dofs,
         }
     }
+
+    // TODO: move this to the FiniteElement trait
+    pub fn value_shape(&self) -> &Vec<usize> {
+        &self.value_shape
+    }
+
 }
 
 impl FiniteElement for CiarletElement {
@@ -235,13 +243,17 @@ impl FiniteElement for CiarletElement {
             &mut table,
         );
         for d in 0..table.shape().0 {
-            for i in 0..table.shape().1 {
-                for p in 0..points.shape().0 {
-                    for j in 0..self.value_size {
-                        for b in 0..self.dim {
-                            *data.get_mut(d, p, b, j).unwrap() +=
-                                *self.coefficients.get(b, j, p).unwrap()
+            for p in 0..points.shape().0 {
+                for j in 0..self.value_size {
+                    for b in 0..self.dim {
+                        let value = data.get_mut(d, p, b, j).unwrap();
+                        *value = 0.0;
+                        for i in 0..table.shape().1 {
+                            *value +=
+                                *self.coefficients.get(b, j, i).unwrap()
                                     * *table.get_mut(d, i, p).unwrap();
+                            println!("data({d}, {p}, {b}, {j}) += {} * {}", *self.coefficients.get(b, j, i).unwrap(), *table.get_mut(d, i, p).unwrap());
+                            println!("value = {}", *value);
                         }
                     }
                 }
