@@ -123,8 +123,8 @@ impl MortonKeys {
         let end_val = vec![*b];
         self.keys = start_val
             .into_iter()
-            .chain(completion.into_iter())
-            .chain(end_val.into_iter())
+            .chain(completion)
+            .chain(end_val)
             .collect();
     }
 
