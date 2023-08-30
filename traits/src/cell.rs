@@ -43,8 +43,8 @@ pub trait ReferenceCell {
         for (i, v) in vertices.iter().enumerate() {
             m[i % dim] += v;
         }
-        for i in 0..dim {
-            m[i] /= (vertices.len() / dim) as f64;
+        for mi in m.iter_mut() {
+            *mi /= (vertices.len() / dim) as f64;
         }
         m
     }

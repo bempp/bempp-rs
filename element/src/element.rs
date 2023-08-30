@@ -27,6 +27,7 @@ pub struct CiarletElement {
 }
 
 impl CiarletElement {
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         family: ElementFamily,
         cell_type: ReferenceCellType,
@@ -68,13 +69,13 @@ impl CiarletElement {
             let mut new_x = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut all_pts = Array2D::<f64>::new((npts, tdim));
-            for i in 0..tdim {
-                for _pts in &x[i] {
+            for (i, xi) in x.iter().enumerate() {
+                for _pts in xi {
                     new_x[i].push(Array2D::<f64>::new((0, tdim)));
                 }
             }
-            for i in 0..tdim + 1 {
-                for pts in &x[i] {
+            for xi in x.iter() {
+                for pts in xi {
                     for j in 0..pts.shape().0 {
                         for k in 0..tdim {
                             *all_pts.get_mut(pn + j, k).unwrap() = *pts.get(j, k).unwrap();
@@ -93,13 +94,13 @@ impl CiarletElement {
             let mut pn = 0;
             let mut dn = 0;
             let mut all_mat = Array3D::<f64>::new((dim, value_size, npts));
-            for i in 0..tdim {
-                for _mat in &m[i] {
+            for (i, mi) in m.iter().enumerate() {
+                for _mat in mi {
                     new_m[i].push(Array3D::<f64>::new((0, value_size, 0)));
                 }
             }
-            for i in 0..tdim + 1 {
-                for mat in &m[i] {
+            for mi in m.iter() {
+                for mat in mi {
                     for j in 0..mat.shape().0 {
                         for k in 0..value_size {
                             for l in 0..mat.shape().2 {

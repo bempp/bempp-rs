@@ -205,10 +205,7 @@ pub fn create_new(
         // TODO: GLL points
         for e in 0..cell.entity_count(0) {
             let mut pts = vec![0.0; tdim];
-            let vertex = &cell.vertices()[e * tdim..(e + 1) * tdim];
-            for i in 0..tdim {
-                pts[i] = vertex[i];
-            }
+            pts.copy_from_slice(&cell.vertices()[e * tdim..(e + 1) * tdim]);
             x[0].push(Array2D::<f64>::from_data(pts, (1, tdim)));
             m[0].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
         }
@@ -219,13 +216,11 @@ pub fn create_new(
             let vn1 = cell.edges()[2 * e + 1];
             let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
             let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
-            let mut n = 0;
             for i in 1..degree {
-                ident[n * degree] = 1.0;
+                ident[(i - 1) * degree] = 1.0;
                 for j in 0..tdim {
-                    pts[n * tdim + j] = v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
+                    pts[(i - 1) * tdim + j] = v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
                 }
-                n += 1;
             }
             x[1].push(Array2D::<f64>::from_data(pts, (degree - 1, tdim)));
             m[1].push(Array3D::<f64>::from_data(
