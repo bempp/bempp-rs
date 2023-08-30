@@ -499,7 +499,7 @@ mod test {
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::ElementFamily;
+    use bempp_traits::element::{Continuity, ElementFamily};
     use num::complex::Complex;
 
     #[test]
@@ -509,7 +509,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -623,7 +623,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -737,7 +737,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -851,7 +851,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -874,7 +874,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -956,7 +956,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -1069,7 +1069,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -1183,7 +1183,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -1298,7 +1298,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
@@ -1413,7 +1413,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 

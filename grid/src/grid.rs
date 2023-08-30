@@ -4,7 +4,7 @@ use bempp_element::element::{create_element, OldCiarletElement};
 use bempp_tools::arrays::{AdjacencyList, Array2D, Array4D};
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::element::{ElementFamily, FiniteElement};
+use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use std::cell::{Ref, RefCell};
@@ -29,7 +29,7 @@ fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> OldCiarletEle
                 panic!("Unsupported cell type (for now)");
             }
         },
-        false,
+        Continuity::Continuous,
     )
 }
 
