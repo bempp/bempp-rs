@@ -465,15 +465,6 @@ mod test {
                     product +=
                         data.get(0, i, k).unwrap() * data.get(0, j, k).unwrap() * rule.weights[k];
                 }
-            }
-        }
-        for i in 0..data.shape().1 {
-            for j in 0..data.shape().1 {
-                let mut product = 0.0;
-                for k in 0..rule.npoints {
-                    product +=
-                        data.get(0, i, k).unwrap() * data.get(0, j, k).unwrap() * rule.weights[k];
-                }
                 if i == j {
                     assert_relative_eq!(product, 1.0, epsilon = 1e-12);
                 } else {
