@@ -1,8 +1,9 @@
 //! Raviart-Thomas elements
 
-use crate::element::CiarletElement;
 use crate::element::OldCiarletElement;
-use bempp_tools::arrays::{AdjacencyList, Array3D};
+use crate::element::{create_cell, CiarletElement};
+use crate::polynomials::polynomial_count;
+use bempp_tools::arrays::{AdjacencyList, Array2D, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
@@ -114,8 +115,11 @@ pub fn create_new(
     // norm(x**2 + y**2)
     // sqrt(70)/30
 
-    *wcoeffs.get_mut(0, 0, 0) = 1.0;
-    *wcoeffs.get_mut(1, 1, 0) = 1.0;
+    *wcoeffs.get_mut(0, 0, 0).unwrap() = 1.0;
+    *wcoeffs.get_mut(1, 1, 0).unwrap() = 1.0;
+    *wcoeffs.get_mut(2, 0, 1).unwrap() = -0.5 / f64::sqrt(2.0);
+    *wcoeffs.get_mut(2, 0, 2).unwrap() = 0.5 * f64::sqrt(1.5);
+    *wcoeffs.get_mut(2, 1, 1).unwrap() = 1.0 / f64::sqrt(2.0);
 
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
@@ -124,7 +128,7 @@ pub fn create_new(
         m[0].push(Array3D::<f64>::new((0, 2, 0)));
     }
 
-    for _e in 0..cell.entity_count(1) {
+    for e in 0..cell.entity_count(1) {
         let mut pts = vec![0.0; tdim];
         let mut mat = vec![0.0; 2];
         let vn0 = cell.edges()[2 * e];
@@ -134,6 +138,8 @@ pub fn create_new(
         for i in 0..tdim {
             pts[i] = (v0[i] + v1[i]) / 2.0;
         }
+        mat[0] = v0[1] - v1[1];
+        mat[1] = v1[0] - v0[0];
         x[1].push(Array2D::<f64>::from_data(pts, (1, tdim)));
         m[1].push(Array3D::<f64>::from_data(mat, (1, 2, 1)));
     }
@@ -143,28 +149,8 @@ pub fn create_new(
         m[2].push(Array3D::<f64>::new((0, 2, 0)));
     }
 
-
-    let coefficients = match cell_type {
-        ReferenceCellType::Triangle => match degree {
-            // Basis = {(-x, -y), (x-1,y), (-x, 1-y)}
-            1 => Array3D::from_data(
-                vec![
-                    0.0, -1.0, 0.0, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0,
-                    1.0, 0.0, -1.0,
-                ],
-                (3, 2, 3),
-            ),
-            _ => {
-                panic!("Degree not supported");
-            }
-        },
-        _ => {
-            panic!("Cell type not supported");
-        }
-    };
-
     CiarletElement::create(
-        ElementFamily::RaviartThomas
+        ElementFamily::RaviartThomas,
         cell_type,
         degree,
         vec![2],
@@ -174,7 +160,7 @@ pub fn create_new(
         MapType::ContravariantPiola,
         continuity,
         degree,
-    }
+    )
 }
 
 #[cfg(test)]

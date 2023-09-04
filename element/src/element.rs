@@ -162,12 +162,15 @@ impl CiarletElement {
         }
 
         let inverse = dual_matrix.linalg().inverse().unwrap();
-        let mut coefficients = Array3D::<f64>::new((dim, value_size, dim / value_size));
+
+        let mut coefficients = Array3D::<f64>::new((dim, value_size, pdim));
         for i in 0..dim {
-            for j in 0..value_size {
-                for k in 0..dim / value_size {
-                    *coefficients.get_mut(i, j, k).unwrap() =
-                        *inverse.get(i, j * dim / value_size + k).unwrap()
+            for l in 0..pdim {
+                for j in 0..value_size {
+                    for k in 0..pdim {
+                        *coefficients.get_mut(i, j, k).unwrap() +=
+                            *inverse.get(i, l).unwrap() * *wcoeffs.get(l, j, k).unwrap()
+                    }
                 }
             }
         }
@@ -252,6 +255,7 @@ impl FiniteElement for CiarletElement {
             nderivs,
             &mut table,
         );
+
         for d in 0..table.shape().0 {
             for p in 0..points.shape().0 {
                 for j in 0..self.value_size {
