@@ -125,7 +125,7 @@ mod test {
     use bempp_traits::arrays::Array2DAccess;
     use bempp_traits::bem::DofMap;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::ElementFamily;
+    use bempp_traits::element::{Continuity, ElementFamily};
     use num::complex::Complex;
 
     #[test]
@@ -135,13 +135,13 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let element1 = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
@@ -186,13 +186,13 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let element1 = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);

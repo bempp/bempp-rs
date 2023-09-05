@@ -4,7 +4,7 @@ use bempp_element::element::{create_element, CiarletElement};
 use bempp_tools::arrays::{AdjacencyList, Array2D, Array4D};
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::element::{ElementFamily, FiniteElement};
+use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use std::cell::{Ref, RefCell};
@@ -29,7 +29,7 @@ fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElemen
                 panic!("Unsupported cell type (for now)");
             }
         },
-        false,
+        Continuity::Continuous,
     )
 }
 
@@ -1181,52 +1181,148 @@ mod test {
         let mut physical_points = Array2D::new((points.shape().0, 3));
         g.geometry()
             .compute_points(&points, 0, &mut physical_points);
-        assert_relative_eq!(*physical_points.get(0, 0).unwrap(), 2.4);
-        assert_relative_eq!(*physical_points.get(0, 1).unwrap(), 2.0);
-        assert_relative_eq!(*physical_points.get(0, 2).unwrap(), 0.0);
-        assert_relative_eq!(*physical_points.get(1, 0).unwrap(), 4.5);
-        assert_relative_eq!(*physical_points.get(1, 1).unwrap(), 2.5);
-        assert_relative_eq!(*physical_points.get(1, 2).unwrap(), 0.5);
-        assert_relative_eq!(*physical_points.get(2, 0).unwrap(), 11.0 / 3.0);
-        assert_relative_eq!(*physical_points.get(2, 1).unwrap(), 7.0 / 3.0);
-        assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0 / 3.0);
-        assert_relative_eq!(*physical_points.get(3, 0).unwrap(), 3.2);
-        assert_relative_eq!(*physical_points.get(3, 1).unwrap(), 2.3);
-        assert_relative_eq!(*physical_points.get(3, 2).unwrap(), 0.3);
+        assert_relative_eq!(
+            *physical_points.get(0, 0).unwrap(),
+            2.4,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(0, 1).unwrap(),
+            2.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(0, 2).unwrap(),
+            0.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(1, 0).unwrap(),
+            4.5,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(1, 1).unwrap(),
+            2.5,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(1, 2).unwrap(),
+            0.5,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(2, 0).unwrap(),
+            11.0 / 3.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(2, 1).unwrap(),
+            7.0 / 3.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(2, 2).unwrap(),
+            1.0 / 3.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(3, 0).unwrap(),
+            3.2,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(3, 1).unwrap(),
+            2.3,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(3, 2).unwrap(),
+            0.3,
+            max_relative = 1e-14
+        );
         g.geometry()
             .compute_points(&points, 1, &mut physical_points);
-        assert_relative_eq!(*physical_points.get(0, 0).unwrap(), -0.2);
-        assert_relative_eq!(*physical_points.get(0, 1).unwrap(), 0.0);
-        assert_relative_eq!(*physical_points.get(0, 2).unwrap(), 1.0);
-        assert_relative_eq!(*physical_points.get(1, 0).unwrap(), -0.5);
-        assert_relative_eq!(*physical_points.get(1, 1).unwrap(), -0.5);
-        assert_relative_eq!(*physical_points.get(1, 2).unwrap(), 1.0);
-        assert_relative_eq!(*physical_points.get(2, 0).unwrap(), -1.0 / 3.0);
-        assert_relative_eq!(*physical_points.get(2, 1).unwrap(), -1.0 / 3.0);
-        assert_relative_eq!(*physical_points.get(2, 2).unwrap(), 1.0);
-        assert_relative_eq!(*physical_points.get(3, 0).unwrap(), -0.15);
-        assert_relative_eq!(*physical_points.get(3, 1).unwrap(), -0.3);
-        assert_relative_eq!(*physical_points.get(3, 2).unwrap(), 1.0);
+        assert_relative_eq!(
+            *physical_points.get(0, 0).unwrap(),
+            -0.2,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(0, 1).unwrap(),
+            0.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(0, 2).unwrap(),
+            1.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(1, 0).unwrap(),
+            -0.5,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(1, 1).unwrap(),
+            -0.5,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(1, 2).unwrap(),
+            1.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(2, 0).unwrap(),
+            -1.0 / 3.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(2, 1).unwrap(),
+            -1.0 / 3.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(2, 2).unwrap(),
+            1.0,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(3, 0).unwrap(),
+            -0.15,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(3, 1).unwrap(),
+            -0.3,
+            max_relative = 1e-14
+        );
+        assert_relative_eq!(
+            *physical_points.get(3, 2).unwrap(),
+            1.0,
+            max_relative = 1e-14
+        );
 
         // Test compute_jacobians
         let mut jacobians = Array2D::new((points.shape().0, 6));
         g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
-            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0);
-            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 3.0);
-            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0);
-            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 1.0);
-            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0);
-            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0);
+            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 3.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0, max_relative = 1e-14);
         }
         g.geometry().compute_jacobians(&points, 1, &mut jacobians);
         for i in 0..3 {
-            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), -1.0);
-            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0);
-            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0);
-            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), -1.0);
-            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0);
-            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 0.0);
+            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 0.0, max_relative = 1e-14);
         }
 
         // test compute_jacobian_determinants
@@ -1234,12 +1330,12 @@ mod test {
         g.geometry()
             .compute_jacobian_determinants(&points, 0, &mut dets);
         for d in &dets {
-            assert_relative_eq!(*d, 2.0 * 2.0_f64.sqrt());
+            assert_relative_eq!(*d, 2.0 * 2.0_f64.sqrt(), max_relative = 1e-14);
         }
         g.geometry()
             .compute_jacobian_determinants(&points, 1, &mut dets);
         for d in &dets {
-            assert_relative_eq!(*d, 1.0);
+            assert_relative_eq!(*d, 1.0, max_relative = 1e-14);
         }
 
         // Test compute_jacobian_inverses
@@ -1247,22 +1343,22 @@ mod test {
         g.geometry()
             .compute_jacobian_inverses(&points, 0, &mut jinvs);
         for i in 0..3 {
-            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), 0.5);
-            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), -0.75);
-            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), -0.75);
-            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0);
-            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), 0.5);
-            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.5);
+            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), 0.5, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), -0.75, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), -0.75, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), 0.5, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.5, max_relative = 1e-14);
         }
         g.geometry()
             .compute_jacobian_inverses(&points, 1, &mut jinvs);
         for i in 0..3 {
-            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), -1.0);
-            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), 0.0);
-            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), 0.0);
-            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0);
-            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), -1.0);
-            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.0);
+            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.0, max_relative = 1e-14);
         }
     }
 

@@ -11,6 +11,13 @@ pub enum ElementFamily {
     RaviartThomas = 1,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[repr(u8)]
+pub enum Continuity {
+    Continuous = 0,
+    Discontinuous = 1,
+}
+
 /// The map type used by an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -53,8 +60,11 @@ pub trait FiniteElement {
     /// The number of basis functions
     fn dim(&self) -> usize;
 
-    /// Is the element discontinuous between cells?
-    fn discontinuous(&self) -> bool;
+    /// Type of continuity between cells
+    fn continuity(&self) -> Continuity;
+
+    /// The value shape
+    fn value_shape(&self) -> &[usize];
 
     /// The value size
     fn value_size(&self) -> usize;

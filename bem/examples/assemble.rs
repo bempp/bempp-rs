@@ -6,7 +6,7 @@ use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::ElementFamily;
+use bempp_traits::element::{Continuity, ElementFamily};
 use num::complex::Complex;
 
 fn main() {
@@ -17,13 +17,13 @@ fn main() {
         ElementFamily::Lagrange,
         ReferenceCellType::Triangle,
         0,
-        true,
+        Continuity::Discontinuous,
     );
     let element1 = create_element(
         ElementFamily::Lagrange,
         ReferenceCellType::Triangle,
         1,
-        true,
+        Continuity::Discontinuous,
     );
 
     let space0 = SerialFunctionSpace::new(&grid, &element0);

@@ -123,8 +123,8 @@ impl MortonKeys {
         let end_val = vec![*b];
         self.keys = start_val
             .into_iter()
-            .chain(completion.into_iter())
-            .chain(end_val.into_iter())
+            .chain(completion)
+            .chain(end_val)
             .collect();
     }
 
@@ -901,7 +901,7 @@ mod test {
                 }
             }
             false => {
-                let x = vec![
+                let x = [
                     a.anchor[0] ^ b.anchor[0],
                     a.anchor[1] ^ b.anchor[1],
                     a.anchor[2] ^ b.anchor[2],
@@ -1526,8 +1526,8 @@ mod test {
         let end_val = vec![b];
         complete = start_val
             .into_iter()
-            .chain(complete.into_iter())
-            .chain(end_val.into_iter())
+            .chain(complete)
+            .chain(end_val)
             .collect();
         let mut tree = MortonKeys {
             keys: complete,

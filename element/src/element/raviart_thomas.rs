@@ -1,83 +1,87 @@
 //! Raviart-Thomas elements
 
-use crate::element::CiarletElement;
-use bempp_tools::arrays::{AdjacencyList, Array3D};
+use crate::element::{create_cell, CiarletElement};
+use crate::polynomials::polynomial_count;
+use bempp_tools::arrays::{Array2D, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{ElementFamily, MapType};
+use bempp_traits::element::{Continuity, ElementFamily, MapType};
 
 /// Create a Raviart-Thomas element
-pub fn create(cell_type: ReferenceCellType, degree: usize, discontinuous: bool) -> CiarletElement {
-    let coefficients = match cell_type {
-        ReferenceCellType::Triangle => match degree {
-            // Basis = {(-x, -y), (x-1,y), (-x, 1-y)}
-            1 => Array3D::from_data(
-                vec![
-                    0.0, -1.0, 0.0, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0,
-                    1.0, 0.0, -1.0,
-                ],
-                (3, 2, 3),
-            ),
-            _ => {
-                panic!("Degree not supported");
-            }
-        },
-        _ => {
-            panic!("Cell type not supported");
+pub fn create(
+    cell_type: ReferenceCellType,
+    degree: usize,
+    continuity: Continuity,
+) -> CiarletElement {
+    if cell_type != ReferenceCellType::Triangle && cell_type != ReferenceCellType::Quadrilateral {
+        panic!("Unsupported cell type");
+    }
+
+    if cell_type != ReferenceCellType::Triangle {
+        panic!("RT elements on quadrilaterals not implemented yet");
+    }
+    if degree != 1 {
+        panic!("Degree > 1 RT elements not implemented yet");
+    }
+
+    let cell = create_cell(cell_type);
+    let pdim = polynomial_count(cell_type, degree);
+    let tdim = cell.dim();
+    let edim = tdim * polynomial_count(cell_type, degree - 1) + degree;
+
+    let mut wcoeffs = Array3D::<f64>::new((edim, tdim, pdim));
+
+    // [sqrt(2), 6*y - 2, 4*sqrt(3)*(x + y/2 - 1/2)]
+
+    // norm(x**2 + y**2)
+    // sqrt(70)/30
+
+    *wcoeffs.get_mut(0, 0, 0).unwrap() = 1.0;
+    *wcoeffs.get_mut(1, 1, 0).unwrap() = 1.0;
+    *wcoeffs.get_mut(2, 0, 1).unwrap() = -0.5 / f64::sqrt(2.0);
+    *wcoeffs.get_mut(2, 0, 2).unwrap() = 0.5 * f64::sqrt(1.5);
+    *wcoeffs.get_mut(2, 1, 1).unwrap() = 1.0 / f64::sqrt(2.0);
+
+    let mut x = [vec![], vec![], vec![], vec![]];
+    let mut m = [vec![], vec![], vec![], vec![]];
+    for _e in 0..cell.entity_count(0) {
+        x[0].push(Array2D::<f64>::new((0, tdim)));
+        m[0].push(Array3D::<f64>::new((0, 2, 0)));
+    }
+
+    for e in 0..cell.entity_count(1) {
+        let mut pts = vec![0.0; tdim];
+        let mut mat = vec![0.0; 2];
+        let vn0 = cell.edges()[2 * e];
+        let vn1 = cell.edges()[2 * e + 1];
+        let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
+        let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
+        for i in 0..tdim {
+            pts[i] = (v0[i] + v1[i]) / 2.0;
         }
-    };
-    let entity_dofs = if discontinuous {
-        let dofs = AdjacencyList::<usize>::from_data(
-            (0..coefficients.shape().0).collect(),
-            vec![0, coefficients.shape().0],
-        );
-        match cell_type {
-            ReferenceCellType::Triangle => [
-                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
-                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
-                dofs,
-                AdjacencyList::<usize>::new(),
-            ],
-            ReferenceCellType::Quadrilateral => [
-                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
-                AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0, 0]),
-                dofs,
-                AdjacencyList::<usize>::new(),
-            ],
-            _ => {
-                panic!("Cell type not supported");
-            }
-        }
-    } else {
-        match cell_type {
-            ReferenceCellType::Triangle => match degree {
-                1 => [
-                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0, 0, 0]),
-                    AdjacencyList::<usize>::from_data(vec![0, 1, 2], vec![0, 1, 2, 3]),
-                    AdjacencyList::<usize>::from_data(vec![], vec![0, 0]),
-                    AdjacencyList::<usize>::new(),
-                ],
-                _ => {
-                    panic!("Degree not supported");
-                }
-            },
-            _ => {
-                panic!("Cell type not supported");
-            }
-        }
-    };
-    CiarletElement {
+        mat[0] = v0[1] - v1[1];
+        mat[1] = v1[0] - v0[0];
+        x[1].push(Array2D::<f64>::from_data(pts, (1, tdim)));
+        m[1].push(Array3D::<f64>::from_data(mat, (1, 2, 1)));
+    }
+
+    for _e in 0..cell.entity_count(2) {
+        x[2].push(Array2D::<f64>::new((0, tdim)));
+        m[2].push(Array3D::<f64>::new((0, 2, 0)));
+    }
+
+    CiarletElement::create(
+        ElementFamily::RaviartThomas,
         cell_type,
         degree,
-        highest_degree: degree,
-        map_type: MapType::ContravariantPiola,
-        value_size: 2,
-        family: ElementFamily::RaviartThomas,
-        discontinuous,
-        dim: coefficients.shape().0,
-        coefficients,
-        entity_dofs,
-    }
+        vec![2],
+        wcoeffs,
+        x,
+        m,
+        MapType::ContravariantPiola,
+        continuity,
+        degree,
+    )
 }
 
 #[cfg(test)]
@@ -121,7 +125,7 @@ mod test {
 
     #[test]
     fn test_raviart_thomas_1_triangle() {
-        let e = create(ReferenceCellType::Triangle, 1, false);
+        let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 2);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = Array2D::from_data(

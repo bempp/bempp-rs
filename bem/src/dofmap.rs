@@ -92,7 +92,7 @@ mod test {
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::ElementFamily;
+    use bempp_traits::element::{Continuity, ElementFamily};
 
     #[test]
     fn test_dofmap_lagrange0() {
@@ -101,7 +101,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
@@ -118,7 +118,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
@@ -132,7 +132,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             2,
-            false,
+            Continuity::Continuous,
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
