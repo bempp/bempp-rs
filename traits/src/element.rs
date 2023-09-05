@@ -63,6 +63,9 @@ pub trait FiniteElement {
     /// Type of continuity between cells
     fn continuity(&self) -> Continuity;
 
+    /// The value shape
+    fn value_shape(&self) -> &[usize];
+
     /// The value size
     fn value_size(&self) -> usize;
 

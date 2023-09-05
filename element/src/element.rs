@@ -24,18 +24,21 @@ pub struct CiarletElement {
     dim: usize,
     coefficients: Array3D<f64>,
     entity_dofs: [AdjacencyList<usize>; 4],
+    interpolation_points: [Vec<Array2D<f64>>; 4],
+    interpolation_weights: [Vec<Array3D<f64>>; 4],
 }
 
 impl CiarletElement {
+    /// Create a Ciarlet element
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         family: ElementFamily,
         cell_type: ReferenceCellType,
         degree: usize,
         value_shape: Vec<usize>,
-        wcoeffs: Array3D<f64>,
-        x: [Vec<Array2D<f64>>; 4],
-        m: [Vec<Array3D<f64>>; 4],
+        polynomial_coeffs: Array3D<f64>,
+        interpolation_points: [Vec<Array2D<f64>>; 4],
+        interpolation_weights: [Vec<Array3D<f64>>; 4],
         map_type: MapType,
         continuity: Continuity,
         highest_degree: usize,
@@ -43,7 +46,7 @@ impl CiarletElement {
         let mut dim = 0;
         let mut npts = 0;
 
-        for emats in &m {
+        for emats in &interpolation_weights {
             for mat in emats {
                 dim += mat.shape().0;
                 npts += mat.shape().2;
@@ -57,7 +60,7 @@ impl CiarletElement {
             value_size *= *i;
         }
 
-        for matrices in &m {
+        for matrices in &interpolation_weights {
             for mat in matrices {
                 if mat.shape().1 != value_size {
                     panic!("Incompatible value size");
@@ -65,17 +68,17 @@ impl CiarletElement {
             }
         }
 
-        let new_x = if continuity == Continuity::Discontinuous {
-            let mut new_x = [vec![], vec![], vec![], vec![]];
+        let new_pts = if continuity == Continuity::Discontinuous {
+            let mut new_pts = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut all_pts = Array2D::<f64>::new((npts, tdim));
-            for (i, xi) in x.iter().take(tdim).enumerate() {
-                for _pts in xi {
-                    new_x[i].push(Array2D::<f64>::new((0, tdim)));
+            for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
+                for _pts in pts_i {
+                    new_pts[i].push(Array2D::<f64>::new((0, tdim)));
                 }
             }
-            for xi in x.iter() {
-                for pts in xi {
+            for pts_i in interpolation_points.iter() {
+                for pts in pts_i {
                     for j in 0..pts.shape().0 {
                         for k in 0..tdim {
                             *all_pts.get_mut(pn + j, k).unwrap() = *pts.get(j, k).unwrap();
@@ -84,22 +87,22 @@ impl CiarletElement {
                     pn += pts.shape().0;
                 }
             }
-            new_x[tdim].push(all_pts);
-            new_x
+            new_pts[tdim].push(all_pts);
+            new_pts
         } else {
-            x
+            interpolation_points
         };
-        let new_m = if continuity == Continuity::Discontinuous {
-            let mut new_m = [vec![], vec![], vec![], vec![]];
+        let new_wts = if continuity == Continuity::Discontinuous {
+            let mut new_wts = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut dn = 0;
             let mut all_mat = Array3D::<f64>::new((dim, value_size, npts));
-            for (i, mi) in m.iter().take(tdim).enumerate() {
+            for (i, mi) in interpolation_weights.iter().take(tdim).enumerate() {
                 for _mat in mi {
-                    new_m[i].push(Array3D::<f64>::new((0, value_size, 0)));
+                    new_wts[i].push(Array3D::<f64>::new((0, value_size, 0)));
                 }
             }
-            for mi in m.iter() {
+            for mi in interpolation_weights.iter() {
                 for mat in mi {
                     for j in 0..mat.shape().0 {
                         for k in 0..value_size {
@@ -113,10 +116,10 @@ impl CiarletElement {
                     pn += mat.shape().2;
                 }
             }
-            new_m[tdim].push(all_mat);
-            new_m
+            new_wts[tdim].push(all_mat);
+            new_wts
         } else {
-            m
+            interpolation_weights
         };
 
         // Compute the dual matrix
@@ -125,11 +128,11 @@ impl CiarletElement {
 
         let mut dof = 0;
         for d in 0..4 {
-            for (e, pts) in new_x[d].iter().enumerate() {
+            for (e, pts) in new_pts[d].iter().enumerate() {
                 if pts.shape().0 > 0 {
                     let mut table = Array3D::<f64>::new((1, pdim, pts.shape().0));
                     tabulate_legendre_polynomials(cell_type, pts, highest_degree, 0, &mut table);
-                    let mat = &new_m[d][e];
+                    let mat = &new_wts[d][e];
                     for i in 0..mat.shape().0 {
                         for j in 0..value_size {
                             for l in 0..pdim {
@@ -155,7 +158,8 @@ impl CiarletElement {
                 *entry = 0.0;
                 for k in 0..value_size {
                     for l in 0..pdim {
-                        *entry += *wcoeffs.get(i, k, l).unwrap() * *d_matrix.get(k, l, j).unwrap();
+                        *entry += *polynomial_coeffs.get(i, k, l).unwrap()
+                            * *d_matrix.get(k, l, j).unwrap();
                     }
                 }
             }
@@ -169,7 +173,7 @@ impl CiarletElement {
                 for j in 0..value_size {
                     for k in 0..pdim {
                         *coefficients.get_mut(i, j, k).unwrap() +=
-                            *inverse.get(i, l).unwrap() * *wcoeffs.get(l, j, k).unwrap()
+                            *inverse.get(i, l).unwrap() * *polynomial_coeffs.get(l, j, k).unwrap()
                     }
                 }
             }
@@ -183,7 +187,7 @@ impl CiarletElement {
         ];
         let mut dof = 0;
         for i in 0..4 {
-            for pts in &new_x[i] {
+            for pts in &new_pts[i] {
                 let dofs: Vec<usize> = (dof..dof + pts.shape().0).collect();
                 entity_dofs[i].add_row(&dofs);
                 dof += pts.shape().0;
@@ -201,16 +205,16 @@ impl CiarletElement {
             dim,
             coefficients,
             entity_dofs,
+            interpolation_points: new_pts,
+            interpolation_weights: new_wts,
         }
-    }
-
-    // TODO: move this to the FiniteElement trait
-    pub fn value_shape(&self) -> &Vec<usize> {
-        &self.value_shape
     }
 }
 
 impl FiniteElement for CiarletElement {
+    fn value_shape(&self) -> &[usize] {
+        &self.value_shape
+    }
     fn value_size(&self) -> usize {
         self.value_size
     }
