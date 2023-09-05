@@ -24,8 +24,8 @@ pub struct CiarletElement {
     dim: usize,
     coefficients: Array3D<f64>,
     entity_dofs: [AdjacencyList<usize>; 4],
-    interpolation_points: [Vec<Array2D<f64>>; 4],
-    interpolation_weights: [Vec<Array3D<f64>>; 4],
+    // interpolation_points: [Vec<Array2D<f64>>; 4],
+    // interpolation_weights: [Vec<Array3D<f64>>; 4],
 }
 
 impl CiarletElement {
@@ -205,8 +205,8 @@ impl CiarletElement {
             dim,
             coefficients,
             entity_dofs,
-            interpolation_points: new_pts,
-            interpolation_weights: new_wts,
+            // interpolation_points: new_pts,
+            // interpolation_weights: new_wts,
         }
     }
 }
