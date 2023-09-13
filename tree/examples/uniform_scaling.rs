@@ -75,21 +75,19 @@ fn main() {
     let s = Instant::now();
     let tree = MultiNodeTree::new(&comm, &points[..], adaptive, n_crit, depth, k, &global_idxs[..]);
     let time = s.elapsed();
-    let nleaves = tree.leaves.len();
     let mut sum = 0;
+
 
     if rank == 0 {
         world
             .process_at_rank(0)
-            .reduce_into_root(&nleaves, &mut sum, SystemOperation::sum());
+            .reduce_into_root(&n_points, &mut sum, SystemOperation::sum());
 
         println!("{:?}, {:?}, {:?}", size, sum, time)
 
     } else {
         world
             .process_at_rank(0)
-            .reduce_into(&nleaves, SystemOperation::sum())
+            .reduce_into(&n_points, SystemOperation::sum())
     }
-
-
 }
