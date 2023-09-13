@@ -1,101 +1,98 @@
-// // ? mpirun -n {{NPROCESSES}} --features "mpi"
+// ? mpirun -n {{NPROCESSES}} --features "mpi"
 
-// use std::time::Instant;
+use std::time::Instant;
 
-// use mpi::collective::SystemOperation;
-// use rand::prelude::*;
-// use rand::SeedableRng;
+use mpi::collective::SystemOperation;
+use rand::prelude::*;
+use rand::SeedableRng;
 
-// use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
+use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
-// use bempp_traits::tree::Tree;
+use bempp_traits::tree::Tree;
 
-// use rlst::{
-//     dense::
-//         base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_col_vec,
-//         rlst_mat, rlst_pointer_mat, traits::*, Dot
-// };
-
-// use bempp_tree::types::{
-//     domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
-// };
-
-// fn points_fixture(
-//     npoints: usize,
-//     min: Option<f64>,
-//     max: Option<f64>,
-// ) -> Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>
-// {
-//     // Generate a set of randomly distributed points
-//     let mut range = StdRng::seed_from_u64(0);
-
-//     let between;
-//     if let (Some(min), Some(max)) = (min, max) {
-//         between = rand::distributions::Uniform::from(min..max);
-//     } else {
-//         between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
-//     }
-
-//     let mut points = rlst_mat![f64, (npoints, 3)];
-
-//     for i in 0..npoints {
-//         points[[i, 0]] = between.sample(&mut range);
-//         points[[i, 1]] = between.sample(&mut range);
-//         points[[i, 2]] = between.sample(&mut range);
-//     }
-
-//     points
-// }
+use bempp_tree::types::{
+    domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
+};
 
 
-// fn main() {
-//     // Setup an MPI environment
-//     let universe: Universe = mpi::initialize().unwrap();
-//     let world = universe.world();
-//     let comm = world.duplicate();
-//     let rank = world.rank();
-//     let size = world.size();
+pub fn points_fixture(
+    npoints: usize,
+    min: Option<f64>,
+    max: Option<f64>,
+) -> Vec<f64>
+{
+    // Generate a set of randomly distributed points
+    let mut range = StdRng::seed_from_u64(0);
 
-//     // Setup tree parameters
-//     let adaptive = false;
+    let between;
+    if let (Some(min), Some(max)) = (min, max) {
+        between = rand::distributions::Uniform::from(min..max);
+    } else {
+        between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
+    }
 
-//     let depth: u64 = std::env::var("DEPTH").unwrap().parse().unwrap_or(5);
-//     let n_crit: Option<_> = None;
-//     let k = 4;
-//     let n_max = 32;
-//     let n = n_max/(size as u64);
+    // let mut points = rlst_mat![f64, (npoints, 3)];
+    let mut points = Vec::new();
 
-//     let depth = Some(depth);
+    for i in 0..npoints {
+        let mut tmp = Vec::new();
+        for _ in 0..3 {
+            tmp.push(between.sample(&mut range))
+        }
+        points.append(&mut tmp)
+    }
 
+    points
+}
 
-//     let n_points = n*1000000;
+fn main() {
+    // Setup an MPI environment
+    let universe: Universe = mpi::initialize().unwrap();
+    let world = universe.world();
+    let comm = world.duplicate();
+    let rank = world.rank();
+    let size = world.size();
 
-//     // Generate some random test data local to each process
-//     let points = points_fixture(n_points, None, None);
-//     let global_idxs: Vec<_> = (0..n_points).collect();
+    // Setup tree parameters
+    let adaptive = false;
 
-//     // Calculate the global domain
-//     let domain = Domain::from_global_points(points.data(), &comm);
+    let depth: u64 = std::env::var("DEPTH").unwrap().parse().unwrap_or(5);
+    let n_crit: Option<_> = None;
+    let k = 4;
+    let n_max = 32;
+    let n = n_max/(size as u64);
 
-//     // Create a uniform tree
-//     let s = Instant::now();
-//     let tree = MultiNodeTree::new(&comm, &points.data(), adaptive, n_crit, depth, k, &global_idxs);
-//     let time = Instant::now().elapsed();
-//     let nleaves = tree.leaves.len();
-//     let mut sum = 0;
-
-//     if rank == 0 {
-//         world
-//             .process_at_rank(0)
-//             .reduce_into_root(&nleaves, &mut sum, SystemOperation::sum());
-
-//         println!("{:?}, {:?}, {:?}", size, sum, time)
-
-//     } else {
-//         world
-//             .process_at_rank(root_rank)
-//             .reduce_into(&nleaves, SystemOperation::sum())
-//     }
+    let depth = Some(depth);
 
 
-// }
+    let n_points = n*1000000;
+
+    // Generate some random test data local to each process
+    let points = points_fixture(n_points, None, None);
+    let global_idxs: Vec<_> = (0..n_points).collect();
+
+    // Calculate the global domain
+    let domain = Domain::from_global_points(points.data(), &comm);
+
+    // Create a uniform tree
+    let s = Instant::now();
+    let tree = MultiNodeTree::new(&comm, &points[..], adaptive, n_crit, depth, k, &global_idxs);
+    let time = Instant::now().elapsed();
+    let nleaves = tree.leaves.len();
+    let mut sum = 0;
+
+    if rank == 0 {
+        world
+            .process_at_rank(0)
+            .reduce_into_root(&nleaves, &mut sum, SystemOperation::sum());
+
+        println!("{:?}, {:?}, {:?}", size, sum, time)
+
+    } else {
+        world
+            .process_at_rank(root_rank)
+            .reduce_into(&nleaves, SystemOperation::sum())
+    }
+
+
+}
