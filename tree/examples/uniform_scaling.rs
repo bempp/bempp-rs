@@ -56,28 +56,25 @@ fn main() {
     // Setup tree parameters
     let adaptive = false;
 
-    let depth: u64 = std::env::var("DEPTH").unwrap().parse().unwrap_or(5);
+    let depth: u64 = 5;
     let n_crit: Option<_> = None;
-    let k = 4;
-    let n_max = 32;
-    let n = n_max/(size as u64);
+    let k = 2;
 
     let depth = Some(depth);
 
-
-    let n_points = n*1000000;
+    let n_points = 1000000;
 
     // Generate some random test data local to each process
     let points = points_fixture(n_points, None, None);
-    let global_idxs: Vec<_> = (0..n_points).collect();
+    let global_idxs: Vec<usize> = (0..n_points).collect();
 
     // Calculate the global domain
-    let domain = Domain::from_global_points(points.data(), &comm);
+    let domain = Domain::from_global_points(&points[..], &comm);
 
     // Create a uniform tree
     let s = Instant::now();
-    let tree = MultiNodeTree::new(&comm, &points[..], adaptive, n_crit, depth, k, &global_idxs);
-    let time = Instant::now().elapsed();
+    let tree = MultiNodeTree::new(&comm, &points[..], adaptive, n_crit, depth, k, &global_idxs[..]);
+    let time = s.elapsed();
     let nleaves = tree.leaves.len();
     let mut sum = 0;
 
@@ -90,7 +87,7 @@ fn main() {
 
     } else {
         world
-            .process_at_rank(root_rank)
+            .process_at_rank(0)
             .reduce_into(&nleaves, SystemOperation::sum())
     }
 

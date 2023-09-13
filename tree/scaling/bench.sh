@@ -16,4 +16,4 @@
 #$ -wd /home/ucapska/Scratch
 
 # Run the job
-gerun $HOME/bempp-rs/target/release/exaples/uniform_scaling
+gerun $HOME/bempp-rs/target/release/examples/uniform_scaling
