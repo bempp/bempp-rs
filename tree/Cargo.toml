@@ -21,7 +21,7 @@ memoffset = "0.6"
 rand = "0.8.*"
 hyksort = { path = "../hyksort", optional = true }
 bempp-traits = { path = "../traits" }
-rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}
+# rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}
 
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]
