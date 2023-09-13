@@ -44,14 +44,6 @@ pub trait Tree {
     where
         Self: 'a;
 
-    fn new(
-        points: Self::PointDataSlice<'_>,
-        adaptive: bool,
-        n_crit: Option<u64>,
-        depth: Option<u64>,
-        global_idxs: Self::GlobalIndexSlice<'_>
-    ) -> Self;
-
     // Get depth of tree.
     fn get_depth(&self) -> u64;
 

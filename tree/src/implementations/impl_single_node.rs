@@ -241,6 +241,7 @@ impl SingleNodeTree {
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
+        // Return tree in sorted order
         for l in 0..=depth {
             let &(l, r) = levels_to_keys.get(&l).unwrap();
             let subset = &mut keys[l..r];
@@ -419,29 +420,16 @@ impl SingleNodeTree {
 
         unmapped
     }
-}
-
-impl Tree for SingleNodeTree {
-    type Domain = Domain;
-    type NodeIndex = MortonKey;
-    type NodeIndexSlice<'a> = &'a [MortonKey];
-    type NodeIndices = MortonKeys;
-    type Point = Point;
-    type PointSlice<'a> = &'a [Point];
-    type PointData = f64;
-    type PointDataSlice<'a> = &'a [f64];
-    type GlobalIndex = usize;
-    type GlobalIndexSlice<'a> = &'a [usize];
 
     /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
     /// user defined maximum leaf maximum occupancy n_crit.
-    fn new(
-        points: Self::PointDataSlice<'_>,
+    pub fn new(
+        points: &[PointType],
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
-        global_idxs: Self::GlobalIndexSlice<'_>
+        global_idxs: &[usize]
     ) -> SingleNodeTree {
         // TODO: Come back and reconcile a runtime point dimension detector
 
@@ -456,6 +444,19 @@ impl Tree for SingleNodeTree {
             SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
         }
     }
+}
+
+impl Tree for SingleNodeTree {
+    type Domain = Domain;
+    type NodeIndex = MortonKey;
+    type NodeIndexSlice<'a> = &'a [MortonKey];
+    type NodeIndices = MortonKeys;
+    type Point = Point;
+    type PointSlice<'a> = &'a [Point];
+    type PointData = f64;
+    type PointDataSlice<'a> = &'a [f64];
+    type GlobalIndex = usize;
+    type GlobalIndexSlice<'a> = &'a [usize];
 
     fn get_depth(&self) -> u64 {
         self.depth
