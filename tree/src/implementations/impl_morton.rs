@@ -87,8 +87,7 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
     let mut minimal_tree: Vec<MortonKey> = Vec::new();
     let mut work_list: Vec<MortonKey> = a.finest_ancestor(b).children().into_iter().collect();
 
-    while !work_list.is_empty() {
-        let current_item = work_list.pop().unwrap();
+    while let Some(current_item) = work_list.pop() {
         if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item) {
             minimal_tree.push(current_item);
         } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item)) {
@@ -124,8 +123,8 @@ impl MortonKeys {
         let end_val = vec![*b];
         self.keys = start_val
             .into_iter()
-            .chain(completion.into_iter())
-            .chain(end_val.into_iter())
+            .chain(completion)
+            .chain(end_val)
             .collect();
     }
 
@@ -902,7 +901,7 @@ mod test {
                 }
             }
             false => {
-                let x = vec![
+                let x = [
                     a.anchor[0] ^ b.anchor[0],
                     a.anchor[1] ^ b.anchor[1],
                     a.anchor[2] ^ b.anchor[2],
@@ -1527,8 +1526,8 @@ mod test {
         let end_val = vec![b];
         complete = start_val
             .into_iter()
-            .chain(complete.into_iter())
-            .chain(end_val.into_iter())
+            .chain(complete)
+            .chain(end_val)
             .collect();
         let mut tree = MortonKeys {
             keys: complete,

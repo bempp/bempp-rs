@@ -35,6 +35,20 @@ pub trait ReferenceCell {
     /// The first dim components represent the first vertex, the next dim the second vertex, and so on.
     fn vertices(&self) -> &[f64];
 
+    /// Ths midpoint of the cell
+    fn midpoint(&self) -> Vec<f64> {
+        let dim = self.dim();
+        let vertices = self.vertices();
+        let mut m = vec![0.0; dim];
+        for (i, v) in vertices.iter().enumerate() {
+            m[i % dim] += v;
+        }
+        for mi in m.iter_mut() {
+            *mi /= (vertices.len() / dim) as f64;
+        }
+        m
+    }
+
     /// The edges of the cell
     ///
     /// The first 2 components are the vertex numbers of the endpoints of the first edge, the next 2 the second edge, and so on.
@@ -42,7 +56,7 @@ pub trait ReferenceCell {
 
     /// The faces of the cell
     ///
-    /// The first `self.faces_nvertices()[0]` components are the vertex numbers of vertices of the first face, the next `self.faces_nvertices()[1]` the second edge, and so on.
+    /// The first `self.faces_nvertices()[0]` components are the vertex numbers of vertices of the first face, the next `self.faces_nvertices()[1]` the second face, and so on.
     fn faces(&self) -> &[usize];
 
     /// The number of vertices adjacent to each face

@@ -68,12 +68,6 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
     assert_eq!(data.shape().2, points.shape().0);
     assert_eq!(points.shape().1, 2);
 
-    for j in 0..derivatives + 1 {
-        for i in 0..derivatives + 1 - j {
-            println!("{i} {j} {}", tri_index(i, j));
-        }
-    }
-
     for i in 0..data.shape().2 {
         *data
             .get_mut(tri_index(0, 0), quad_index(0, 0, degree), i)
@@ -352,28 +346,39 @@ fn tabulate_legendre_polynomials_triangle<'a>(
     }
 }
 
+pub fn polynomial_count(cell_type: ReferenceCellType, degree: usize) -> usize {
+    match cell_type {
+        ReferenceCellType::Interval => degree + 1,
+        ReferenceCellType::Triangle => (degree + 1) * (degree + 2) / 2,
+        ReferenceCellType::Quadrilateral => (degree + 1) * (degree + 1),
+        _ => {
+            panic!("Unsupported cell type");
+        }
+    }
+}
+
+pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usize {
+    match cell_type {
+        ReferenceCellType::Interval => derivatives + 1,
+        ReferenceCellType::Triangle => (derivatives + 1) * (derivatives + 2) / 2,
+        ReferenceCellType::Quadrilateral => (derivatives + 1) * (derivatives + 2) / 2,
+        _ => {
+            panic!("Unsupported cell type");
+        }
+    }
+}
+
 pub fn legendre_shape<'a>(
     cell_type: ReferenceCellType,
     points: &impl Array2DAccess<'a, f64>,
     degree: usize,
     derivatives: usize,
 ) -> (usize, usize, usize) {
-    match cell_type {
-        ReferenceCellType::Interval => (derivatives + 1, degree + 1, points.shape().0),
-        ReferenceCellType::Triangle => (
-            (derivatives + 1) * (derivatives + 2) / 2,
-            (degree + 1) * (degree + 2) / 2,
-            points.shape().0,
-        ),
-        ReferenceCellType::Quadrilateral => (
-            (derivatives + 1) * (derivatives + 2) / 2,
-            (degree + 1) * (degree + 1),
-            points.shape().0,
-        ),
-        _ => {
-            panic!("Unsupported cell type");
-        }
-    }
+    (
+        derivative_count(cell_type, derivatives),
+        polynomial_count(cell_type, degree),
+        points.shape().0,
+    )
 }
 
 /// Tabulate orthonormal polynomials
@@ -453,16 +458,6 @@ mod test {
         ));
         tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 0, &mut data);
 
-        for i in 0..data.shape().1 {
-            for j in 0..data.shape().1 {
-                let mut product = 0.0;
-                for k in 0..rule.npoints {
-                    product +=
-                        data.get(0, i, k).unwrap() * data.get(0, j, k).unwrap() * rule.weights[k];
-                }
-                println!("{i} {j} {product}");
-            }
-        }
         for i in 0..data.shape().1 {
             for j in 0..data.shape().1 {
                 let mut product = 0.0;
@@ -556,7 +551,6 @@ mod test {
         let mut index = 0;
         for i in 0..10 {
             for j in 0..10 - i {
-                println!("{index}");
                 p[6 * index] = i as f64 / 10.0;
                 p[6 * index + 1] = j as f64 / 10.0;
                 p[6 * index + 2] = p[6 * index] + epsilon;
@@ -649,7 +643,7 @@ mod test {
         for (i, pi) in p.iter_mut().enumerate() {
             *pi = i as f64 / 10.0;
         }
-        let points = Array2D::from_data(p, (20, 1));
+        let points = Array2D::from_data(p, (11, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,

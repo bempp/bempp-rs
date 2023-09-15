@@ -578,7 +578,7 @@ mod test {
 
             let singular_rule = triangle_duffy(&connectivity, npoints).unwrap();
 
-            let points = vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+            let points = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
 
             let mut sum = 0.0;
 

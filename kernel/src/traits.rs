@@ -3,8 +3,6 @@ use crate::types::EvalType;
 use crate::types::KernelType;
 use bempp_traits::types::Scalar;
 
-use rayon::ThreadPool;
-
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel {
     type T: Scalar;
@@ -63,7 +61,6 @@ pub trait Kernel {
         targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
-        thread_pool: &ThreadPool,
     );
 
     /// Single threaded assembly of a kernel matrix.
@@ -118,7 +115,6 @@ pub trait Kernel {
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
-        thread_pool: &ThreadPool,
     );
 
     /// Return the type of the kernel.
