@@ -2,6 +2,7 @@
 
 use std::time::Instant;
 
+use bempp_tree::types::single_node::SingleNodeTree;
 use mpi::collective::SystemOperation;
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -57,7 +58,7 @@ fn main() {
     let adaptive = false;
 
     let depth: u64 = 5;
-    let n_crit: Option<_> = None;
+    let n_crit= Some(150);
     let k = 2;
 
     let depth = Some(depth);
@@ -68,15 +69,16 @@ fn main() {
     let points = points_fixture(n_points, None, None);
     let global_idxs: Vec<usize> = (0..n_points).collect();
 
-    // Calculate the global domain
-    let domain = Domain::from_global_points(&points[..], &comm);
+    // // Calculate the global domain
+    // let domain = Domain::from_global_points(&points[..], &comm);
+    let domain = Domain::from_local_points(&points[..]);
 
     // Create a uniform tree
     let s = Instant::now();
-    let tree = MultiNodeTree::new(&comm, &points[..], adaptive, n_crit, depth, k, &global_idxs[..]);
+    // let tree = MultiNodeTree::new(&comm, &points[..], adaptive, n_crit, depth, k, &global_idxs[..]);
+    let tree = SingleNodeTree::new(&points[..], adaptive, n_crit, depth, &global_idxs[..]);
     let time = s.elapsed();
     let mut sum = 0;
-
 
     if rank == 0 {
         world

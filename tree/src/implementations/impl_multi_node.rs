@@ -218,9 +218,8 @@ impl MultiNodeTree {
         locally_balanced.balance();
         locally_balanced.linearize();
 
-        // 8. Find new maps between points and locally balanced tree
+        // // 8. Find new maps between points and locally balanced tree
         let unmapped = SingleNodeTree::assign_nodes_to_points(&locally_balanced, &mut points);
-
 
         // 9. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();

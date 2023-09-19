@@ -424,7 +424,7 @@ impl SingleNodeTree {
     /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
     /// user defined maximum leaf maximum occupancy n_crit.
-    fn new(
+    pub fn new(
         points: &[PointType],
         adaptive: bool,
         n_crit: Option<u64>,
