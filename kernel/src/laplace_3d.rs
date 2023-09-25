@@ -353,9 +353,9 @@ mod test {
     use approx::assert_relative_eq;
     use bempp_traits::types::Scalar;
     use rlst;
-    use rlst_dense;
     use rlst::common::traits::{Copy, Eval, Transpose};
     use rlst::dense::traits::*;
+    use rlst_dense;
 
     #[test]
     fn test_laplace_3d() {
