@@ -150,7 +150,7 @@ impl CiarletElement {
             }
         }
 
-        let mut dual_matrix = rlst_dense::rlst_mat![f64, (dim, dim)];
+        let mut dual_matrix = rlst_dense::rlst_dynamic_mat!(f64, (dim, dim));
 
         for i in 0..dim {
             for j in 0..dim {
