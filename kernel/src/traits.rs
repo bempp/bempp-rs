@@ -25,6 +25,7 @@ pub trait Kernel {
     /// The following code gives an example of how to use it together with the [rlst] dense matrix type.
     /// ```
     /// use rlst::dense::*;
+    /// use rlst_dense;
     /// use bempp_kernel::traits::*;
     /// use bempp_kernel::laplace_3d::Laplace3dKernel;
     /// use bempp_kernel::types::*;
@@ -34,7 +35,7 @@ pub trait Kernel {
     /// let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
     /// let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
     /// let charges = rlst::dense::rlst_col_vec![f64, nsources];
-    /// let mut interactions = rlst::dense::rlst_mat![f64, (4, ntargets)];
+    /// let mut interactions = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
     ///
     /// Laplace3dKernel::<f64>::new().evaluate_st(EvalType::ValueDeriv, sources.data(), targets.data(), charges.data(), interactions.data_mut());
     ///
@@ -80,6 +81,7 @@ pub trait Kernel {
     /// The following code gives an example of how to use it together with the [rlst] dense matrix type.
     /// ```
     /// use rlst::dense::*;
+    /// use rlst_dense;
     /// use bempp_kernel::traits::*;
     /// use bempp_kernel::laplace_3d::Laplace3dKernel;
     /// use bempp_kernel::types::*;
@@ -88,7 +90,7 @@ pub trait Kernel {
     ///
     /// let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
     /// let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-    /// let mut interactions = rlst::dense::rlst_mat![f64, (nsources, 4 * ntargets)];
+    /// let mut interactions = rlst_dense::rlst_dynamic_mat![f64, (nsources, 4 * ntargets)];
     ///
     /// Laplace3dKernel::<f64>::new().assemble_st(EvalType::ValueDeriv, sources.data(), targets.data(), interactions.data_mut());
     ///

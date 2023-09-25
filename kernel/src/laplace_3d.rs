@@ -353,6 +353,7 @@ mod test {
     use approx::assert_relative_eq;
     use bempp_traits::types::Scalar;
     use rlst;
+    use rlst_dense;
     use rlst::common::traits::{Copy, Eval, Transpose};
     use rlst::dense::traits::*;
 
@@ -400,7 +401,7 @@ mod test {
             targets_z_eps[[index, 2]] += eps;
         }
 
-        let mut expected = rlst::dense::rlst_mat![f64, (4, ntargets)];
+        let mut expected = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::ValueDeriv,
@@ -476,7 +477,7 @@ mod test {
 
         let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
         let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-        let mut green_value = rlst::dense::rlst_mat![f64, (nsources, ntargets)];
+        let mut green_value = rlst_dense::rlst_dynamic_mat!(f64, (nsources, ntargets));
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::Value,
@@ -512,7 +513,7 @@ mod test {
             }
         }
 
-        let mut green_value_deriv = rlst::dense::rlst_mat![f64, (nsources, 4 * ntargets)];
+        let mut green_value_deriv = rlst_dense::rlst_dynamic_mat!(f64, (nsources, 4 * ntargets));
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,
@@ -527,7 +528,7 @@ mod test {
 
         for charge_index in 0..nsources {
             let mut charges = rlst::dense::rlst_col_vec![f64, nsources];
-            let mut expected = rlst::dense::rlst_mat![f64, (4, ntargets)];
+            let mut expected = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
 
             charges[[charge_index, 0]] = 1.0;
 
@@ -558,7 +559,7 @@ mod test {
 
         let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
         let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-        let mut green_value_deriv = rlst::dense::rlst_mat![f64, (nsources, 4 * ntargets)];
+        let mut green_value_deriv = rlst_dense::rlst_dynamic_mat!(f64, (nsources, 4 * ntargets));
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,
