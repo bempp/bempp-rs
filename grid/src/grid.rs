@@ -541,39 +541,6 @@ impl SerialTopology {
         }
     }
 
-    pub fn compute_cell_colouring(&self) -> Vec<Vec<usize>> {
-        let mut colouring: Vec<Vec<usize>> = vec![];
-        let cell_vertices = self.connectivity(self.dim, 0);
-        for i in 0..self.entity_count(self.dim) {
-            let vs = cell_vertices.row(i).unwrap();
-            let mut c = 0;
-            while c < colouring.len() {
-                let mut found = false;
-                for cell in &colouring[c] {
-                    let cell_vs = cell_vertices.row(*cell).unwrap();
-                    for v in vs {
-                        if cell_vs.contains(v) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if found {
-                        break;
-                    }
-                }
-                if !found {
-                    colouring[c].push(i);
-                    break;
-                }
-                c += 1;
-            }
-            if c == colouring.len() {
-                colouring.push(vec![i]);
-            }
-        }
-        colouring
-    }
-
     fn compute_adjacent_cells(&self) {
         let tdim = self.dim();
         if tdim != 2 {
@@ -1509,42 +1476,5 @@ mod test {
             f64::sqrt(1.0 / 5.0),
             epsilon = 1e-12
         );
-    }
-
-    #[test]
-    fn test_colouring() {
-        let g = regular_sphere(2);
-        let colouring = g.topology().compute_cell_colouring();
-        let c20 = g.topology().connectivity(2, 0);
-        let mut n = 0;
-        for i in &colouring {
-            n += i.len()
-        }
-        assert_eq!(n, g.topology().entity_count(2));
-        for (i, ci) in colouring.iter().enumerate() {
-            for (j, cj) in colouring.iter().enumerate() {
-                if i != j {
-                    for cell0 in ci {
-                        for cell1 in cj {
-                            assert!(cell0 != cell1);
-                        }
-                    }
-                }
-            }
-        }
-        for ci in colouring {
-            println!("{}", ci.len());
-            for cell0 in &ci {
-                for cell1 in &ci {
-                    if cell0 != cell1 {
-                        for v0 in c20.row(*cell0).unwrap() {
-                            for v1 in c20.row(*cell1).unwrap() {
-                                assert!(v0 != v1);
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }
