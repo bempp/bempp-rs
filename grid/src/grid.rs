@@ -898,7 +898,6 @@ impl Grid<'_> for SerialGrid {
 #[cfg(test)]
 mod test {
     use crate::grid::*;
-    use crate::shapes::regular_sphere;
     use approx::*;
 
     #[test]
