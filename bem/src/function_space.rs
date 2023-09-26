@@ -24,7 +24,7 @@ impl<'a, E: FiniteElement> SerialFunctionSpace<'a, E> {
     pub fn compute_cell_colouring(&self) -> Vec<Vec<usize>> {
         let mut colouring: Vec<Vec<usize>> = vec![];
         let mut edim = 0;
-        while self.element.entity_dofs(edim, 0).unwrap().len() == 0 {
+        while self.element.entity_dofs(edim, 0).unwrap().is_empty() {
             edim += 1;
         }
         let cell_entities = self
