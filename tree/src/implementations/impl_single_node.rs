@@ -15,8 +15,20 @@ use crate::{
 };
 
 impl SingleNodeTree {
-    /// Constructor for uniform trees
-    pub fn uniform_tree(points: &[PointType], &domain: &Domain, depth: u64, global_idxs: &[usize]) -> SingleNodeTree {
+    /// Constructor for uniform trees on a single node refined to a user defined depth.
+    /// Returns a SingleNodeTree, with the leaves in sorted order.
+    ///
+    /// # Arguments
+    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `depth` - The maximum depth of the tree, defines the level of recursion.
+    /// * `global_idxs` - A slice of indices to uniquely identify the points.
+    pub fn uniform_tree(
+        points: &[PointType],
+        domain: &Domain,
+        depth: u64,
+        global_idxs: &[usize],
+    ) -> SingleNodeTree {
         // Encode points at deepest level, and map to specified depth
 
         // TODO: Automatically infer dimension
@@ -121,7 +133,7 @@ impl SingleNodeTree {
         SingleNodeTree {
             depth,
             points,
-            domain,
+            domain: *domain,
             leaves,
             keys,
             leaves_to_points,
@@ -131,8 +143,21 @@ impl SingleNodeTree {
         }
     }
 
-    /// Constructor for adaptive trees
-    pub fn adaptive_tree(points: &[PointType], &domain: &Domain, n_crit: u64, global_idxs: &[usize]) -> SingleNodeTree {
+    /// Constructor for adaptive trees. Returns a balanced adaptive SingleNodeTree, with the level of recursion
+    /// defined by a user defined value for `n_crit`, specifying the maximum number of points in a leaf box. Returns the
+    /// leaves in sorted order.
+    ///
+    /// # Arguments
+    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `n_crit` - The maximum number of points per leaf node.
+    /// * `global_idxs` - A slice of indices to uniquely identify the points.
+    pub fn adaptive_tree(
+        points: &[PointType],
+        domain: &Domain,
+        n_crit: u64,
+        global_idxs: &[usize],
+    ) -> SingleNodeTree {
         // Encode points at deepest level
         let dim = 3;
         let npoints = points.len() / dim;
@@ -251,7 +276,7 @@ impl SingleNodeTree {
         SingleNodeTree {
             depth,
             points,
-            domain,
+            domain: *domain,
             leaves,
             keys,
             leaves_to_points,
@@ -261,6 +286,42 @@ impl SingleNodeTree {
         }
     }
 
+    /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
+    /// by a user defined maximum `depth`, if an adaptive tree is created it is specified by only by the
+    /// user defined maximum leaf maximum occupancy `n_crit`.
+    ///
+    /// # Arguments
+    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `adaptive` - If `true`, creates an adaptive tree with level of recursion defined by `n_crit`, if `false` creates a uniform tree
+    /// with recursion level defined by `depth`.
+    /// * `n_crit` - The maximum number of points per leaf node.
+    /// * `depth` - The maximum depth of the tree, defines the level of recursion.
+    /// * `global_idxs` - A slice of indices to uniquely identify the points.
+    pub fn new(
+        points: &[PointType],
+        adaptive: bool,
+        n_crit: Option<u64>,
+        depth: Option<u64>,
+        global_idxs: &[usize],
+    ) -> SingleNodeTree {
+        // TODO: Come back and reconcile a runtime point dimension detector
+        let domain = Domain::from_local_points(points);
+
+        let n_crit = n_crit.unwrap_or(NCRIT);
+        let depth = depth.unwrap_or(DEEPEST_LEVEL);
+
+        if adaptive {
+            SingleNodeTree::adaptive_tree(points, &domain, n_crit, &global_idxs)
+        } else {
+            SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
+        }
+    }
+
+    /// Complete the minimal tree between a set of `seed` octants in some domain. Computed
+    /// in place.
+    ///
+    /// # Arguments
+    /// * `seeds` - A mutable reference to a container of `seed' octants, with gaps between them.
     pub fn complete_blocktree(seeds: &mut MortonKeys) -> MortonKeys {
         let ffc_root = ROOT.finest_first_child();
         let min = seeds.iter().min().unwrap();
@@ -303,6 +364,11 @@ impl SingleNodeTree {
         blocktree
     }
 
+    /// Seeds are defined as the coarsest boxes in a set of non-uniform leaf boxes.
+    /// Returns an owned vector of seeds in sorted order.
+    ///
+    /// # Arguments
+    /// * `leaves` - A reference to a container of Morton Keys containing the leaf boxes.
     pub fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
         let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
 
@@ -319,7 +385,13 @@ impl SingleNodeTree {
         seeds
     }
 
-    /// Split tree coarse blocks by counting how many particles they contain.
+    /// Split tree coarse blocks by counting how many particles they contain until they satisfy
+    /// a constrants specified by `n_crit` for the maximum number of particles that they can contain.
+    ///
+    /// # Arguments
+    /// * `points` - A mutable reference to a container of points.
+    /// * `blocktree` - An owned container of the `blocktree`, created by completing the space between seeds.
+    /// * `n_crit` - The maximum number of points per leaf node.
     pub fn split_blocks(
         points: &mut Points,
         mut blocktree: MortonKeys,
@@ -389,6 +461,10 @@ impl SingleNodeTree {
 
     /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
     /// Return any keys that are unmapped.
+    ///
+    /// # Arguments
+    /// * `nodes` - A reference to a container of MortonKeys.
+    /// * `points` - A mutable reference to a container of points.
     pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points) -> MortonKeys {
         let mut map: HashMap<MortonKey, bool> = HashMap::new();
         for node in nodes.iter() {
@@ -419,30 +495,6 @@ impl SingleNodeTree {
         }
 
         unmapped
-    }
-
-    /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
-    /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
-    /// user defined maximum leaf maximum occupancy n_crit.
-    pub fn new(
-        points: &[PointType],
-        adaptive: bool,
-        n_crit: Option<u64>,
-        depth: Option<u64>,
-        global_idxs: &[usize]
-    ) -> SingleNodeTree {
-        // TODO: Come back and reconcile a runtime point dimension detector
-
-        let domain = Domain::from_local_points(points);
-
-        let n_crit = n_crit.unwrap_or(NCRIT);
-        let depth = depth.unwrap_or(DEEPEST_LEVEL);
-
-        if adaptive {
-            SingleNodeTree::adaptive_tree(points, &domain, n_crit, &global_idxs)
-        } else {
-            SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
-        }
     }
 }
 
@@ -510,326 +562,326 @@ impl Tree for SingleNodeTree {
 #[cfg(test)]
 mod test {
 
-    // use rlst::dense::{RawAccess, global};
+    use rlst::dense::RawAccess;
 
-    // use crate::implementations::helpers::{points_fixture, points_fixture_col};
+    use crate::implementations::helpers::{points_fixture, points_fixture_col};
 
-    // use super::*;
+    use super::*;
 
-    // #[test]
-    // pub fn test_uniform_tree() {
-    //     let npoints = 100;
-    //     let depth = 2;
+    #[test]
+    pub fn test_uniform_tree() {
+        let npoints = 100;
+        let depth = 2;
 
-    //     // Test uniformly distributed data
-    //     let points = points_fixture(npoints, Some(-1.0), Some(1.0));
-    //     let global_idxs = (0..npoints).collect_vec();
-    //     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
+        // Test uniformly distributed data
+        let points = points_fixture(npoints, Some(-1.0), Some(1.0));
+        let global_idxs = (0..npoints).collect_vec();
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
-    //     // Test that the tree really is uniform
-    //     let levels: Vec<u64> = tree
-    //         .get_leaves()
-    //         .unwrap()
-    //         .iter()
-    //         .map(|node| node.level())
-    //         .collect();
-    //     let first = levels[0];
-    //     assert!(levels.iter().all(|key| *key == first));
+        // Test that the tree really is uniform
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .unwrap()
+            .iter()
+            .map(|node| node.level())
+            .collect();
+        let first = levels[0];
+        assert!(levels.iter().all(|key| *key == first));
 
-    //     // Test that max level constraint is satisfied
-    //     assert!(first == depth);
+        // Test that max level constraint is satisfied
+        assert!(first == depth);
 
-    //     // Test a column distribution of data
-    //     let points = points_fixture_col(npoints);
-    //     let global_idxs = (0..npoints).collect_vec();
-    //     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
+        // Test a column distribution of data
+        let points = points_fixture_col(npoints);
+        let global_idxs = (0..npoints).collect_vec();
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
-    //     // Test that the tree really is uniform
-    //     let levels: Vec<u64> = tree
-    //         .get_leaves()
-    //         .unwrap()
-    //         .iter()
-    //         .map(|node| node.level())
-    //         .collect();
-    //     let first = levels[0];
-    //     assert!(levels.iter().all(|key| *key == first));
+        // Test that the tree really is uniform
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .unwrap()
+            .iter()
+            .map(|node| node.level())
+            .collect();
+        let first = levels[0];
+        assert!(levels.iter().all(|key| *key == first));
 
-    //     // Test that max level constraint is satisfied
-    //     assert!(first == depth);
+        // Test that max level constraint is satisfied
+        assert!(first == depth);
 
-    //     let mut unique_leaves = HashSet::new();
+        let mut unique_leaves = HashSet::new();
 
-    //     // Test that only a subset of the leaves contain any points
-    //     for leaf in tree.get_all_leaves_set().iter() {
-    //         if let Some(points) = tree.get_points(&leaf) {
-    //             unique_leaves.insert(leaf.morton);
-    //         }
-    //     }
+        // Test that only a subset of the leaves contain any points
+        for leaf in tree.get_all_leaves_set().iter() {
+            if let Some(_points) = tree.get_points(&leaf) {
+                unique_leaves.insert(leaf.morton);
+            }
+        }
 
-    //     let expected = 2u64.pow(depth.try_into().unwrap()) as usize; // Number of octants at encoding level that should be filled
-    //     assert_eq!(unique_leaves.len(), expected);
-    // }
+        let expected = 2u64.pow(depth.try_into().unwrap()) as usize; // Number of octants at encoding level that should be filled
+        assert_eq!(unique_leaves.len(), expected);
+    }
 
-    // #[test]
-    // pub fn test_adaptive_tree() {
-    //     let npoints = 10000;
-    //     let points = points_fixture(npoints, None, None);
-    //     let global_idxs = (0..npoints).collect_vec();
+    #[test]
+    pub fn test_adaptive_tree() {
+        let npoints = 10000;
+        let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
 
-    //     let adaptive = true;
-    //     let n_crit = 150;
-    //     let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None, &global_idxs);
+        let adaptive = true;
+        let n_crit = 150;
+        let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None, &global_idxs);
 
-    //     // Test that tree is not uniform
-    //     let levels: Vec<u64> = tree
-    //         .get_leaves()
-    //         .unwrap()
-    //         .iter()
-    //         .map(|node| node.level())
-    //         .collect();
-    //     let first = levels[0];
-    //     assert!(!levels.iter().all(|level| *level == first));
+        // Test that tree is not uniform
+        let levels: Vec<u64> = tree
+            .get_leaves()
+            .unwrap()
+            .iter()
+            .map(|node| node.level())
+            .collect();
+        let first = levels[0];
+        assert!(!levels.iter().all(|level| *level == first));
 
-    //     // Test that adjacent leaves are 2:1 balanced
-    //     for node in tree.leaves.iter() {
-    //         let adjacent_levels: Vec<u64> = tree
-    //             .leaves
-    //             .iter()
-    //             .cloned()
-    //             .filter(|n| node.is_adjacent(n))
-    //             .map(|n| n.level())
-    //             .collect();
-    //         for l in adjacent_levels.iter() {
-    //             assert!(l.abs_diff(node.level()) <= 1);
-    //         }
-    //     }
-    // }
+        // Test that adjacent leaves are 2:1 balanced
+        for node in tree.leaves.iter() {
+            let adjacent_levels: Vec<u64> = tree
+                .leaves
+                .iter()
+                .cloned()
+                .filter(|n| node.is_adjacent(n))
+                .map(|n| n.level())
+                .collect();
+            for l in adjacent_levels.iter() {
+                assert!(l.abs_diff(node.level()) <= 1);
+            }
+        }
+    }
 
-    // pub fn test_no_overlaps_helper(nodes: &[MortonKey]) {
-    //     let key_set: HashSet<MortonKey> = nodes.iter().cloned().collect();
+    pub fn test_no_overlaps_helper(nodes: &[MortonKey]) {
+        let key_set: HashSet<MortonKey> = nodes.iter().cloned().collect();
 
-    //     for node in key_set.iter() {
-    //         let ancestors = node.ancestors();
-    //         let int: Vec<&MortonKey> = key_set.intersection(&ancestors).collect();
-    //         assert!(int.len() == 1);
-    //     }
-    // }
+        for node in key_set.iter() {
+            let ancestors = node.ancestors();
+            let int: Vec<&MortonKey> = key_set.intersection(&ancestors).collect();
+            assert!(int.len() == 1);
+        }
+    }
 
-    // #[test]
-    // pub fn test_no_overlaps() {
-    //     let npoints = 10000;
-    //     let points = points_fixture(npoints, None, None);
-    //     let global_idxs = (0..npoints).collect_vec();
-    //     let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4),&global_idxs);
-    //     let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs);
-    //     test_no_overlaps_helper(uniform.get_leaves().unwrap());
-    //     test_no_overlaps_helper(adaptive.get_leaves().unwrap());
-    // }
+    #[test]
+    pub fn test_no_overlaps() {
+        let npoints = 10000;
+        let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4), &global_idxs);
+        let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs);
+        test_no_overlaps_helper(uniform.get_leaves().unwrap());
+        test_no_overlaps_helper(adaptive.get_leaves().unwrap());
+    }
 
-    // #[test]
-    // pub fn test_assign_nodes_to_points() {
-    //     // Generate points in a single octant of the domain
-    //     let npoints = 10;
-    //     let points = points_fixture(npoints, Some(0.), Some(0.5));
+    #[test]
+    pub fn test_assign_nodes_to_points() {
+        // Generate points in a single octant of the domain
+        let npoints = 10;
+        let points = points_fixture(npoints, Some(0.), Some(0.5));
 
-    //     let domain = Domain {
-    //         origin: [0.0, 0.0, 0.0],
-    //         diameter: [1.0, 1.0, 1.0],
-    //     };
+        let domain = Domain {
+            origin: [0.0, 0.0, 0.0],
+            diameter: [1.0, 1.0, 1.0],
+        };
 
-    //     let mut tmp = Points::default();
-    //     for i in 0..npoints {
-    //         let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
-    //         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-    //         tmp.points.push(Point {
-    //             coordinate: point,
-    //             base_key: key,
-    //             encoded_key: key,
-    //             global_idx: i,
-    //         })
-    //     }
-    //     let mut points = tmp;
+        let mut tmp = Points::default();
+        for i in 0..npoints {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            tmp.points.push(Point {
+                coordinate: point,
+                base_key: key,
+                encoded_key: key,
+                global_idx: i,
+            })
+        }
+        let mut points = tmp;
 
-    //     let keys = MortonKeys {
-    //         keys: ROOT.children(),
-    //         index: 0,
-    //     };
+        let keys = MortonKeys {
+            keys: ROOT.children(),
+            index: 0,
+        };
 
-    //     SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
+        SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
 
-    //     let leaves_to_points = points
-    //         .points
-    //         .iter()
-    //         .enumerate()
-    //         .fold(
-    //             (HashMap::new(), 0, points.points[0].clone()),
-    //             |(mut leaves_to_points, curr_idx, curr), (i, point)| {
-    //                 if point.encoded_key != curr.encoded_key {
-    //                     leaves_to_points.insert(curr.encoded_key, (curr_idx, i + 1));
+        let leaves_to_points = points
+            .points
+            .iter()
+            .enumerate()
+            .fold(
+                (HashMap::new(), 0, points.points[0].clone()),
+                |(mut leaves_to_points, curr_idx, curr), (i, point)| {
+                    if point.encoded_key != curr.encoded_key {
+                        leaves_to_points.insert(curr.encoded_key, (curr_idx, i + 1));
 
-    //                     (leaves_to_points, i + 1, point.clone())
-    //                 } else {
-    //                     (leaves_to_points, curr_idx, curr)
-    //                 }
-    //             },
-    //         )
-    //         .0;
+                        (leaves_to_points, i + 1, point.clone())
+                    } else {
+                        (leaves_to_points, curr_idx, curr)
+                    }
+                },
+            )
+            .0;
 
-    //     // Test that a single octant contains all the points
-    //     for (_, (l, r)) in leaves_to_points.iter() {
-    //         if (r - l) > 0 {
-    //             assert!((r - l) == npoints);
-    //         }
-    //     }
-    // }
+        // Test that a single octant contains all the points
+        for (_, (l, r)) in leaves_to_points.iter() {
+            if (r - l) > 0 {
+                assert!((r - l) == npoints);
+            }
+        }
+    }
 
-    // #[test]
-    // pub fn test_split_blocks() {
-    //     let domain = Domain {
-    //         origin: [0., 0., 0.],
-    //         diameter: [1.0, 1.0, 1.0],
-    //     };
-    //     let npoints = 10000;
-    //     let points = points_fixture(npoints, None, None);
+    #[test]
+    pub fn test_split_blocks() {
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1.0, 1.0, 1.0],
+        };
+        let npoints = 10000;
+        let points = points_fixture(npoints, None, None);
 
-    //     let mut tmp = Points::default();
+        let mut tmp = Points::default();
 
-    //     for i in 0..npoints {
-    //         let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
-    //         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-    //         tmp.points.push(Point {
-    //             coordinate: point,
-    //             base_key: key,
-    //             encoded_key: key,
-    //             global_idx: i,
-    //         })
-    //     }
-    //     let mut points = tmp;
+        for i in 0..npoints {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            tmp.points.push(Point {
+                coordinate: point,
+                base_key: key,
+                encoded_key: key,
+                global_idx: i,
+            })
+        }
+        let mut points = tmp;
 
-    //     let n_crit = 15;
+        let n_crit = 15;
 
-    //     // Test case where blocks span the entire domain
-    //     let blocktree = MortonKeys {
-    //         keys: vec![ROOT],
-    //         index: 0,
-    //     };
+        // Test case where blocks span the entire domain
+        let blocktree = MortonKeys {
+            keys: vec![ROOT],
+            index: 0,
+        };
 
-    //     SingleNodeTree::split_blocks(&mut points, blocktree, n_crit);
-    //     let split_blocktree = MortonKeys {
-    //         keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
-    //         index: 0,
-    //     };
+        SingleNodeTree::split_blocks(&mut points, blocktree, n_crit);
+        let split_blocktree = MortonKeys {
+            keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
+            index: 0,
+        };
 
-    //     test_no_overlaps_helper(&split_blocktree);
+        test_no_overlaps_helper(&split_blocktree);
 
-    //     // Test case where the blocktree only partially covers the area
-    //     let mut children = ROOT.children();
-    //     children.sort();
+        // Test case where the blocktree only partially covers the area
+        let mut children = ROOT.children();
+        children.sort();
 
-    //     let a = children[0];
-    //     let b = children[6];
+        let a = children[0];
+        let b = children[6];
 
-    //     let mut seeds = MortonKeys {
-    //         keys: vec![a, b],
-    //         index: 0,
-    //     };
+        let mut seeds = MortonKeys {
+            keys: vec![a, b],
+            index: 0,
+        };
 
-    //     let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
-    //     SingleNodeTree::split_blocks(&mut points, blocktree, 25);
-    //     let split_blocktree = MortonKeys {
-    //         keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
-    //         index: 0,
-    //     };
-    //     test_no_overlaps_helper(&split_blocktree);
-    // }
+        SingleNodeTree::split_blocks(&mut points, blocktree, 25);
+        let split_blocktree = MortonKeys {
+            keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
+            index: 0,
+        };
+        test_no_overlaps_helper(&split_blocktree);
+    }
 
-    // #[test]
-    // fn test_complete_blocktree() {
-    //     let a = ROOT.first_child();
-    //     let b = *ROOT.children().last().unwrap();
+    #[test]
+    fn test_complete_blocktree() {
+        let a = ROOT.first_child();
+        let b = *ROOT.children().last().unwrap();
 
-    //     let mut seeds = MortonKeys {
-    //         keys: vec![a, b],
-    //         index: 0,
-    //     };
+        let mut seeds = MortonKeys {
+            keys: vec![a, b],
+            index: 0,
+        };
 
-    //     let mut blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let mut blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
 
-    //     blocktree.sort();
+        blocktree.sort();
 
-    //     let mut children = ROOT.children();
-    //     children.sort();
-    //     // Test that the blocktree is completed
-    //     assert_eq!(blocktree.len(), 8);
+        let mut children = ROOT.children();
+        children.sort();
+        // Test that the blocktree is completed
+        assert_eq!(blocktree.len(), 8);
 
-    //     for (a, b) in children.iter().zip(blocktree.iter()) {
-    //         assert_eq!(a, b)
-    //     }
-    // }
+        for (a, b) in children.iter().zip(blocktree.iter()) {
+            assert_eq!(a, b)
+        }
+    }
 
-    // #[test]
-    // pub fn test_levels_to_keys() {
-    //     // Uniform tree
-    //     let npoints = 10000;
-    //     let points = points_fixture(npoints, None, None);
-    //     let global_idxs = (0..npoints).collect_vec();
-    //     let depth = 3;
-    //     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
+    #[test]
+    pub fn test_levels_to_keys() {
+        // Uniform tree
+        let npoints = 10000;
+        let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let depth = 3;
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
-    //     let keys = tree.get_all_keys().unwrap();
+        let keys = tree.get_all_keys().unwrap();
 
-    //     let depth = tree.get_depth();
+        let depth = tree.get_depth();
 
-    //     let mut tot = 0;
-    //     for level in (0..=depth).rev() {
-    //         // Get keys at this level
-    //         if let Some(tmp) = tree.get_keys(level) {
-    //             tot += tmp.len();
-    //         }
-    //     }
-    //     assert_eq!(tot, keys.len());
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+            // Get keys at this level
+            if let Some(tmp) = tree.get_keys(level) {
+                tot += tmp.len();
+            }
+        }
+        assert_eq!(tot, keys.len());
 
-    //     let mut tot = 0;
-    //     for level in (0..=depth).rev() {
-    //         // Get all points at this level
-    //         if let Some(nodes) = tree.get_keys(level) {
-    //             for node in nodes.iter() {
-    //                 if let Some(points) = tree.get_points(node) {
-    //                     tot += points.len()
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     assert_eq!(tot, npoints as usize);
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+            // Get all points at this level
+            if let Some(nodes) = tree.get_keys(level) {
+                for node in nodes.iter() {
+                    if let Some(points) = tree.get_points(node) {
+                        tot += points.len()
+                    }
+                }
+            }
+        }
+        assert_eq!(tot, npoints as usize);
 
-    //     // Adaptive tree
-    //     let ncrit = 150;
+        // Adaptive tree
+        let ncrit = 150;
 
-    //     let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None, &global_idxs);
-    //     let keys = tree.get_all_keys().unwrap();
-    //     let depth = tree.get_depth();
+        let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None, &global_idxs);
+        let keys = tree.get_all_keys().unwrap();
+        let depth = tree.get_depth();
 
-    //     let mut tot = 0;
-    //     for level in (0..=depth).rev() {
-    //         // Get keys at this level
-    //         if let Some(tmp) = tree.get_keys(level) {
-    //             tot += tmp.len();
-    //         }
-    //     }
-    //     assert_eq!(tot, keys.len());
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+            // Get keys at this level
+            if let Some(tmp) = tree.get_keys(level) {
+                tot += tmp.len();
+            }
+        }
+        assert_eq!(tot, keys.len());
 
-    //     let mut tot = 0;
-    //     for level in (0..=depth).rev() {
-    //         // Get all points at this level
-    //         if let Some(nodes) = tree.get_keys(level) {
-    //             for node in nodes.iter() {
-    //                 if let Some(points) = tree.get_points(node) {
-    //                     tot += points.len()
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     assert_eq!(tot, npoints as usize);
-    // }
+        let mut tot = 0;
+        for level in (0..=depth).rev() {
+            // Get all points at this level
+            if let Some(nodes) = tree.get_keys(level) {
+                for node in nodes.iter() {
+                    if let Some(points) = tree.get_points(node) {
+                        tot += points.len()
+                    }
+                }
+            }
+        }
+        assert_eq!(tot, npoints as usize);
+    }
 }

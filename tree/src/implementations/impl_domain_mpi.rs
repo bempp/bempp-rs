@@ -26,7 +26,12 @@ unsafe impl Equivalence for Domain {
 }
 
 impl Domain {
-    /// Compute the points domain over all nodes.
+    /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
+    /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
+    ///
+    /// # Arguments
+    /// * `local_points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `comm` - An MPI (User) communicator over which the domain is defined.
     pub fn from_global_points(local_points: &[PointType], comm: &UserCommunicator) -> Domain {
         let size = comm.size();
 

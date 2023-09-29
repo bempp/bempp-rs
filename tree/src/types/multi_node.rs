@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::types::{
     domain::Domain,
     morton::{KeyType, MortonKey, MortonKeys},
-    point::{Point, Points},
+    point::Points,
 };
 
 /// Concrete distributed multi-node tree.

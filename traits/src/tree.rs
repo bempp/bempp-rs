@@ -75,6 +75,7 @@ pub trait Tree {
     fn is_node(&self, key: &Self::NodeIndex) -> bool;
 }
 
+/// A minimal interface for Morton Key like nodes.
 pub trait MortonKeyInterface
 where
     Self: Hash + Eq,

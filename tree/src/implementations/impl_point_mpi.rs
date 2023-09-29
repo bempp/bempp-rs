@@ -18,7 +18,6 @@ unsafe impl Equivalence for Point {
                 offset_of!(Point, global_idx) as Address,
                 offset_of!(Point, base_key) as Address,
                 offset_of!(Point, encoded_key) as Address,
-
             ],
             &[
                 UncommittedUserDatatype::contiguous(3, &PointType::equivalent_datatype()).as_ref(),

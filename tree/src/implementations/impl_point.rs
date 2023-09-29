@@ -71,7 +71,6 @@ impl FromIterator<Point> for Points {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use rand::prelude::*;

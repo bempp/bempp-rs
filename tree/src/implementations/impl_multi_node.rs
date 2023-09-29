@@ -1,36 +1,36 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Count, Rank};
+use mpi::{topology::UserCommunicator, traits::*, Rank};
 
 use hyksort::hyksort;
 
 use bempp_traits::tree::Tree;
 
 use crate::{
-    constants::{DEEPEST_LEVEL, K, LEVEL_SIZE, NCRIT, ROOT, LEVEL_DISPLACEMENT},
-    implementations::{
-        impl_morton::{complete_region, encode_anchor},
-        mpi_helpers::all_to_allv_sparse,
-    },
+    constants::{DEEPEST_LEVEL, NCRIT, ROOT},
+    implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
         multi_node::MultiNodeTree,
+        point::{Point, PointType, Points},
         single_node::SingleNodeTree,
-        point::{Point, PointType, Points, self},
     },
 };
 
 impl MultiNodeTree {
     /// Constructor for uniform trees
+    ///
+    /// # Arguments
+    /// * `world` -
     pub fn uniform_tree(
         world: &UserCommunicator,
         k: i32,
         points: &[PointType],
         domain: &Domain,
         depth: u64,
-        global_idxs: &[usize]
+        global_idxs: &[usize],
     ) -> MultiNodeTree {
         // Encode points at deepest level, and map to specified depth.
         let dim = 3;
@@ -62,17 +62,25 @@ impl MultiNodeTree {
 
         // Find leaves within ths processor's range
         let leaves = MortonKeys {
-                keys: (min.anchor[0]..max.anchor[0])
-                    .step_by(diameter)
-                    .flat_map(|i| (min.anchor[1]..max.anchor[1]).step_by(diameter).map(move |j| (i, j)))
-                    .flat_map(|(i, j)| (min.anchor[2]..max.anchor[2]).step_by(diameter).map(move |k| [i, j, k]))
-                    .map(|anchor| {
-                        let morton = encode_anchor(&anchor, depth);
-                        MortonKey { anchor, morton }
-                    })
-                    .collect(),
-                index: 0,
-            };
+            keys: (min.anchor[0]..max.anchor[0])
+                .step_by(diameter)
+                .flat_map(|i| {
+                    (min.anchor[1]..max.anchor[1])
+                        .step_by(diameter)
+                        .map(move |j| (i, j))
+                })
+                .flat_map(|(i, j)| {
+                    (min.anchor[2]..max.anchor[2])
+                        .step_by(diameter)
+                        .map(move |k| [i, j, k])
+                })
+                .map(|anchor| {
+                    let morton = encode_anchor(&anchor, depth);
+                    MortonKey { anchor, morton }
+                })
+                .collect(),
+            index: 0,
+        };
 
         // 3. Assign keys to points
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
@@ -165,9 +173,8 @@ impl MultiNodeTree {
         points: &[PointType],
         domain: &Domain,
         n_crit: u64,
-        global_idxs: &[usize]
-     )  -> MultiNodeTree
-     {
+        global_idxs: &[usize],
+    ) -> MultiNodeTree {
         // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
         let dim = 3;
         let npoints = points.len() / dim;
@@ -208,10 +215,12 @@ impl MultiNodeTree {
         let blocktree = MultiNodeTree::complete_blocktree(world, &mut seeds);
 
         // 5.ii any data below the min seed sent to partner process
-        let mut points = MultiNodeTree::transfer_points_to_blocktree(world, &points.points[..], &blocktree);
+        let mut points =
+            MultiNodeTree::transfer_points_to_blocktree(world, &points.points[..], &blocktree);
 
         // 6. Split blocks based on ncrit constraint
-        let mut locally_balanced = SingleNodeTree::split_blocks(&mut points, blocktree, n_crit as usize);
+        let mut locally_balanced =
+            SingleNodeTree::split_blocks(&mut points, blocktree, n_crit as usize);
 
         // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
         locally_balanced.sort();
@@ -219,7 +228,7 @@ impl MultiNodeTree {
         locally_balanced.linearize();
 
         // // 8. Find new maps between points and locally balanced tree
-        let unmapped = SingleNodeTree::assign_nodes_to_points(&locally_balanced, &mut points);
+        let _unmapped = SingleNodeTree::assign_nodes_to_points(&locally_balanced, &mut points);
 
         // 9. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();
@@ -252,7 +261,7 @@ impl MultiNodeTree {
         let unmapped = SingleNodeTree::assign_nodes_to_points(&globally_balanced, &mut points);
 
         // Add unmapped leaves
-        let globaly_balanced = MortonKeys {
+        let globally_balanced = MortonKeys {
             keys: leaves_to_points
                 .keys()
                 .cloned()
@@ -339,10 +348,9 @@ impl MultiNodeTree {
             levels_to_keys,
             leaves_set,
             keys_set,
-            range
+            range,
         }
     }
-
 
     /// Create a new multi-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
@@ -354,7 +362,7 @@ impl MultiNodeTree {
         n_crit: Option<u64>,
         depth: Option<u64>,
         k: i32,
-        global_idxs: &[usize]
+        global_idxs: &[usize],
     ) -> MultiNodeTree {
         // TODO: Come back and reconcile a runtime point dimension detector
 
@@ -458,7 +466,11 @@ impl MultiNodeTree {
         let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
 
         if rank > 0 {
-            let msg: Vec<_> = points.iter().filter(|&p| p.encoded_key < *min).cloned().collect_vec();
+            let msg: Vec<_> = points
+                .iter()
+                .filter(|&p| p.encoded_key < *min)
+                .cloned()
+                .collect_vec();
 
             let msg_size: Rank = msg.len() as Rank;
             world.process_at_rank(prev_rank).send(&msg_size);
@@ -476,13 +488,17 @@ impl MultiNodeTree {
         }
 
         // Filter out local points that's been sent to partner
-        received_points = points.iter().filter(|&p| p.encoded_key >= *min).cloned().collect();
+        received_points = points
+            .iter()
+            .filter(|&p| p.encoded_key >= *min)
+            .cloned()
+            .collect();
 
         received_points.sort();
 
         Points {
             points: received_points,
-            index: 0
+            index: 0,
         }
     }
 }
@@ -547,7 +563,6 @@ impl Tree for MultiNodeTree {
         self.keys_set.contains(key)
     }
 }
-
 
 // // Helper function for creating locally essential trees.
 // fn let_helper(tree: &mut MultiNodeTree) {

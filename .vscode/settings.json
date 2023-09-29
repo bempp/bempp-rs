@@ -5,5 +5,8 @@
         "./tree/Cargo.toml",
         "./tree/Cargo.toml",
         "./tree/Cargo.toml"
+    ],
+    "rust-analyzer.cargo.features": [
+        "mpi"
     ]
 }
