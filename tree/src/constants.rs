@@ -8,6 +8,8 @@ pub const NCRIT: u64 = 150;
 
 pub const DEEPEST_LEVEL: KeyType = 16;
 
+pub const DEFAULT_LEVEL: KeyType = 3;
+
 pub const LEVEL_SIZE: KeyType = 65536;
 
 pub const ROOT: MortonKey = MortonKey {

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use bempp_traits::tree::Tree;
 
 use crate::{
-    constants::{DEEPEST_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
+    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
@@ -308,7 +308,7 @@ impl SingleNodeTree {
         let domain = Domain::from_local_points(points);
 
         let n_crit = n_crit.unwrap_or(NCRIT);
-        let depth = depth.unwrap_or(DEEPEST_LEVEL);
+        let depth = depth.unwrap_or(DEFAULT_LEVEL);
 
         if adaptive {
             SingleNodeTree::adaptive_tree(points, &domain, n_crit, &global_idxs)
