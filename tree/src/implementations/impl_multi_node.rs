@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-use mpi::{topology::UserCommunicator, traits::*, Rank, collective::SystemOperation};
+use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Rank};
 
 use hyksort::hyksort;
 
@@ -11,7 +11,7 @@ use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, NCRIT, ROOT},
     implementations::{
         impl_morton::{complete_region, encode_anchor},
-        mpi_helpers::all_to_allv_sparse
+        mpi_helpers::all_to_allv_sparse,
     },
     types::{
         domain::Domain,
@@ -567,11 +567,9 @@ impl Tree for MultiNodeTree {
     }
 }
 
-
 impl MultiNodeTree {
-
     /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
-    /// 
+    ///
     /// The idea is to communicate the required point and octant data across the distributed tree prior
     /// to the running of the upward pass so that multipole expansions can be constructed independently
     /// on each processor at the leaf level, and for the final potential evaluation each process already
@@ -585,7 +583,7 @@ impl MultiNodeTree {
 
         self.world.all_gather_into(&self.range, &mut ranges);
 
-        // Calculate users for each key in local tree 
+        // Calculate users for each key in local tree
         let mut users: Vec<Vec<Rank>> = Vec::new();
         let mut key_packet_destinations = vec![0 as Rank; size as usize];
         let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
@@ -640,7 +638,8 @@ impl MultiNodeTree {
                             key_packet_destinations[rank as usize] = 1
                         }
 
-                        if leaf_packet_destinations[rank as usize] == 0 && self.leaves_set.contains(key)
+                        if leaf_packet_destinations[rank as usize] == 0
+                            && self.leaves_set.contains(key)
                         {
                             leaf_packet_destinations[rank as usize] = 1;
                         }
@@ -693,7 +692,8 @@ impl MultiNodeTree {
 
         // Form packets for each send
         for &rank in key_packet_destinations.iter() {
-            let key_packet: Vec<MortonKey> = self.keys_set 
+            let key_packet: Vec<MortonKey> = self
+                .keys_set
                 .iter()
                 .zip(users.iter())
                 .filter(|(_, user)| user.contains(&rank))
@@ -711,7 +711,7 @@ impl MultiNodeTree {
                     .intersection(&self.leaves_set)
                     .cloned()
                     .collect();
-                
+
                 let point_packet: Vec<Point> = leaf_packet
                     .iter()
                     .map(|leaf| self.get_points(leaf).unwrap().to_vec())
@@ -773,12 +773,20 @@ impl MultiNodeTree {
             levels_to_keys: HashMap::default(),
             leaves_set: received_leaves.iter().cloned().collect(),
             keys_set: received_keys.iter().cloned().collect(),
-            points: Points{ points: received_points, index: 0},
-            leaves: MortonKeys { keys: received_leaves, index: 0 },
-            keys: MortonKeys { keys: received_keys, index: 0 },
+            points: Points {
+                points: received_points,
+                index: 0,
+            },
+            leaves: MortonKeys {
+                keys: received_leaves,
+                index: 0,
+            },
+            keys: MortonKeys {
+                keys: received_keys,
+                index: 0,
+            },
         };
 
-        
         locally_essential_tree
     }
 }
