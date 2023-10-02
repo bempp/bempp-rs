@@ -4,6 +4,7 @@ use num::Num;
 use std::clone::Clone;
 
 /// A two-dimensional rectangular array
+#[derive(Clone)]
 pub struct Array2D<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
