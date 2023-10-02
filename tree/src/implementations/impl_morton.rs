@@ -19,6 +19,7 @@ use crate::{
         morton::{KeyType, MortonKey, MortonKeys},
         point::PointType,
     },
+    implementations::helpers::find_corners,
 };
 
 use bempp_traits::tree::MortonKeyInterface;
@@ -724,98 +725,83 @@ impl MortonKey {
     /// Compute the convolution grid centered at a given MortonKey and its respective surface grid. This method is used
     /// in the FFT sparsification of the Multipole to Local translation operator for Fast Multipole Methods constructed
     /// on regular grids, such as the kiFMM or bbFMM. Returns an owned vector corresponding to the coordinates of the
-    /// convolution grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// convolution grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N], as well as a 
+    /// vector of grid indices.
     ///
     /// # Arguments
-    /// * `order` - The order of expansions used in constructing the surface grid
+    /// * `order` - the order of expansions used in constructing the surface grid
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
-    /// * `surface` - The surface grid as a slice (defined as coordinates in column major order).`
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    /// * `conv_point` - The point the kernel evaluations to be placed on the convolution grid are being evaluated against.
+    /// * `conv_point_corner_index` - The index of the corner of the target surface that the conv point lies on.
     pub fn convolution_grid(
         &self,
         order: usize,
         domain: &Domain,
-        surface: &[f64],
         alpha: f64,
-    ) -> Vec<f64> {
-        // Number of convolution points along each axis
-        let n = 2 * order - 1;
+        conv_point: &[f64],
+        conv_point_corner_index: usize
+    ) 
+    -> (Vec<f64>, Vec<usize>) 
+    {
+    // Number of convolution points along each axis
+    let n = 2 * order - 1;
 
-        let dim: usize = 3;
-        let ncoeffs = n.pow(dim as u32);
-        let mut grid = vec![0f64; dim * ncoeffs];
-        let mut idx = 0;
-
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
-                    grid[idx] = i as f64;
-                    grid[(dim - 2) * ncoeffs + idx] = j as f64;
-                    grid[(dim - 1) * ncoeffs + idx] = k as f64;
-                    idx += 1;
-                }
+    let dim: usize = 3;
+    let ncoeffs = n.pow(dim as u32);
+    let mut grid = vec![0f64; dim*ncoeffs];
+    let mut idx = 0;
+    
+    for i in 0..n {
+        for j in 0..n {
+            for k in 0..n {
+                grid[idx] = i as f64;
+                grid[(dim - 2) * ncoeffs + idx] = j as f64;
+                grid[(dim - 1) * ncoeffs + idx] = k as f64;
+                idx += 1;
             }
         }
+    }
+    
+    // Map conv points to indices
+    let conv_idxs = grid.iter().clone().map(|&x| x as usize).collect();
 
-        let diameter = self
-            .diameter(domain)
-            .iter()
-            .map(|x| x * alpha)
-            .collect_vec();
+    let diameter = self
+        .diameter(domain)
+        .iter()
+        .map(|x| x * alpha)
+        .collect_vec();
 
-        // Shift and scale to embed surface grid inside convolution grid
-        // Scale
-        grid.iter_mut().for_each(|point| {
-            *point *= 1.0 / ((n - 1) as f64); // normalize
-            *point *= diameter[0]; // find diameter
-            *point *= 2.0; // convolution grid is 2x as large
-        });
+    // Shift and scale to embed surface grid inside convolution grid
+    // Scale
+    grid.iter_mut().for_each(|point| {
+        *point *= 1.0 / ((n - 1) as f64); // normalize
+        *point *= diameter[0]; // find diameter
+        *point *= 2.0; // convolution grid is 2x as large
+    });
 
-        // Shift
-        let sums: Vec<_> = (0..ncoeffs)
-            .map(|i| grid[i] + grid[ncoeffs + i] + grid[2 * ncoeffs + i])
-            .collect();
-        let max_index = sums
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .map(|(index, _)| index)
-            .unwrap();
-        let max_conv_point = [
-            grid[max_index],
-            grid[max_index + ncoeffs],
-            grid[max_index + 2 * ncoeffs],
-        ];
+    // Shift convolution grid to align with a specified corner of surface grid
+    let corners = find_corners(&grid);
 
-        let nsurf = surface.len() / dim;
-        let sums: Vec<_> = (0..nsurf)
-            .map(|i| surface[i] + surface[nsurf + i] + surface[2 * nsurf + i])
-            .collect();
-        let max_index = sums
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .map(|(index, _)| index)
-            .unwrap();
-        let max_surface_point = [
-            surface[max_index],
-            surface[max_index + nsurf],
-            surface[max_index + 2 * nsurf],
-        ];
+    let surface_point = [
+        corners[conv_point_corner_index],
+        corners[8+conv_point_corner_index],
+        corners[16+conv_point_corner_index]
+    ];
 
-        let diff = max_conv_point
-            .iter()
-            .zip(max_surface_point)
-            .map(|(a, b)| b - a)
-            .collect_vec();
+    let diff = conv_point 
+        .iter()
+        .zip(surface_point)
+        .map(|(a, b)| a - b)
+        .collect_vec();
 
-        for i in 0..dim {
-            grid[i * ncoeffs..(i + 1) * ncoeffs]
-                .iter_mut()
-                .for_each(|value| *value += diff[i]);
-        }
+    for i in 0..dim {
+        grid[i*ncoeffs..(i+1)*ncoeffs]
+            .iter_mut()
+            .for_each(|value| *value += diff[i]);
+    }
 
-        grid
+    (grid, conv_idxs)
     }
 
     /// Compute surface grid for a given expansion order. Used in the discretisation of Fast Multipole
@@ -852,6 +838,7 @@ impl MortonKey {
                 }
             }
         }
+
 
         // Map surface points to indices
         let surface_idxs = surface.iter().clone().map(|&x| x as usize).collect();
@@ -1847,29 +1834,53 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
-        let order = 2;
+        let order = 5;
         let alpha = 1.0;
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
         let surface_grid = key.compute_surface(&domain, order, alpha);
-        let conv_grid = key.convolution_grid(order, &domain, &surface_grid, alpha);
 
+        // Place convolution grid on max corner
+        let corners = find_corners(&surface_grid);
+        let ncorners = corners.len() / 3;
+        let conv_point_corner_index = 7; 
+        
+        let conv_point = vec![
+            corners[conv_point_corner_index],
+            corners[ncorners+conv_point_corner_index],
+            corners[2*ncorners+conv_point_corner_index]
+        ];
+
+        let (conv_grid, _) = key.convolution_grid(
+            order, &domain, alpha, &conv_point, conv_point_corner_index
+        );
+
+        // Test that surface grid is embedded in convolution grid
         let mut surface = Vec::new();
-        let nsurf = surface_grid.len() / 3;
+        let nsurf = surface_grid.len() /3 ;
         for i in 0..nsurf {
-            surface.push([
-                surface_grid[i],
-                surface_grid[i + nsurf],
-                surface_grid[i + 2 * nsurf],
-            ])
+            surface.push(
+                [
+                    surface_grid[i],
+                    surface_grid[i+nsurf],
+                    surface_grid[i+2*nsurf]
+                ]
+            )
         }
-        let mut convolution = Vec::new();
+
+        let mut convolution  = Vec::new();
         let nconv = conv_grid.len() / 3;
         for i in 0..nconv {
-            convolution.push([conv_grid[i], conv_grid[i + nconv], conv_grid[i + 2 * nconv]])
+            convolution.push(
+                [
+                    conv_grid[i],
+                    conv_grid[i+nconv],
+                    conv_grid[i+2*nconv],
+                ]
+            )
         }
-
         assert!(surface.iter().all(|point| convolution.contains(point)));
+
     }
 }
