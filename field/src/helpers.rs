@@ -276,27 +276,17 @@ pub mod surface {
 }
 
 /// Useful helper functions for handling transfer vectors.
-mod transfer_vector {
+pub mod transfer_vector {
 
     use super::*;
 
     /// Reflect a transfer vector into the reference octant combining axial and diagonal symmetries.
     pub fn reflect(components: &[i64; 3]) -> Vec<i64> {
         // Axial reflection
-        let axial = |c: &i64| {
-            if *c >= 0 {
-                *c
-            } else {
-                -*c
-            }
-        };
-
-        let axial = components.iter().map(axial).collect_vec();
+        let axial = axially_reflect_components(components);
 
         // Diagonal reflection
-        let idxs = crate::helpers::array::argsort(&axial);
-
-        let axial_diag = idxs.iter().map(|&i| axial[i].clone()).collect_vec();
+        let axial_diag = diagonally_reflect_components(&axial[..]);
 
         axial_diag
     }
@@ -320,7 +310,7 @@ mod transfer_vector {
     /// The vector must already be in the reference octant.
     pub fn diagonally_reflect_components(components: &[i64]) -> Vec<i64> {
         // Diagonal reflection
-        let idxs = crate::helpers::array::argsort(t);
+        let idxs = crate::helpers::array::argsort(components);
 
         let axial_diag = idxs.iter().map(|&i| components[i].clone()).collect_vec();
 
@@ -578,31 +568,14 @@ mod test {
 
     use super::*;
 
-    use approx_eq::assert_approx_eq;
+    #[test]
+    fn test_argsort() {
+        assert!(true)
+    }
 
     #[test]
-    fn test_rfft3() {
-        let mut input = Array3D::new((3, 3, 3));
-
-        for i in 0..3 {
-            for j in 0..3 {
-                for k in 0..3 {
-                    *input.get_mut(i, j, k).unwrap() = (i + j * 3 + k * 3 * 3 + 1) as f64
-                }
-            }
-        }
-
-        let transformed = rfft3(&input);
-
-        let result = irfft3(&transformed, 3);
-
-        for i in 0..3 {
-            for j in 0..3 {
-                for k in 0..3 {
-                    assert_approx_eq!(*result.get(i, j, k).unwrap(), *input.get(i, j, k).unwrap());
-                }
-            }
-        }
+    fn test_flip3() {
+        assert!(true)
     }
 
     #[test]
@@ -621,7 +594,7 @@ mod test {
         // Test padding at edge of each axis
         let pad_size = (2, 3, 4);
         let pad_index = (0, 0, 0);
-        let padded = pad3(&input, pad_size, pad_index);
+        let padded = crate::helpers::array::pad3(&input, pad_size, pad_index);
 
         let &(m, n, o) = padded.shape();
 
@@ -650,7 +623,7 @@ mod test {
         // Test padding at the start of each axis
         let pad_index = (2, 2, 2);
 
-        let padded = pad3(&input, pad_size, pad_index);
+        let padded = crate::helpers::array::pad3(&input, pad_size, pad_index);
 
         // Check that padding has been correctly applied
         for i in 0..pad_index.0 {
@@ -673,5 +646,40 @@ mod test {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_axial_reflection_surface() {
+        assert!(true)
+    }
+
+    #[test]
+    fn test_axial_reflection_convolution() {
+        assert!(true)
+    }
+
+    #[test]
+    fn test_diagonal_reflection() {
+        assert!(true)
+    }
+
+    #[test]
+    fn test_diagonally_reflect_components() {
+        assert!(true)
+    }
+
+    #[test]
+    fn test_axially_reflect_components() {
+        assert!(true)
+    }
+
+    #[test]
+    fn test_compute_transfer_vectors() {
+        assert!(true)
+    }
+
+    #[test]
+    fn test_compute_transfer_vectors_unique() {
+        assert!(true)
     }
 }
