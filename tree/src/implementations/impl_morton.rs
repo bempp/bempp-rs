@@ -309,18 +309,22 @@ impl MortonKey {
         }
     }
 
-    /// Construct a `MortonKey` associated with the box that encloses the point on the deepest level
+    /// Construct a `MortonKey` associated with the box that encloses the point on the deepest level.
+    /// 
+    /// # Arguments
+    /// * `point` - Cartesian coordinate for a given point.
+    /// * `domain` - Domain associated with a given tree encoding.
+    /// * `level` - level of octree on which to find the encoding.
     pub fn from_point(point: &[PointType; 3], domain: &Domain, level: u64) -> Self {
         let anchor = point_to_anchor(point, level, domain).unwrap();
         MortonKey::from_anchor(&anchor, level)
     }
 
-    /// Checksum encoding unique transfer vector between this key, and another.
-    /// ie. the vector other->self returned as an unsigned integer.
-    ///
+    /// Find the transfer vector between two Morton keys in component form.
+    /// 
     /// # Arguments
     /// * `other` - A Morton Key with which to calcualte a transfer vector to.
-    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+    pub fn find_transfer_vector_components(&self, &other: &MortonKey) -> [i64; 3] {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
             panic!("Transfer vectors only computed for keys at levels deeper than 2")
@@ -341,6 +345,19 @@ impl MortonKey {
         y /= 2_i64.pow(level_diff as u32);
         z /= 2_i64.pow(level_diff as u32);
 
+        [x, y, z] 
+    }
+
+    /// Subroutine for converting components of a transfer vector into a unique, positive, checksum.
+    /// 
+    /// # Arguments
+    /// * `components` - A three vector corresponding to a transfer vector.
+    pub fn find_transfer_vector_from_components(components: &[i64]) -> usize {
+        
+        let mut x = components[0];
+        let mut y = components[1];
+        let mut z = components[2];
+
         fn positive_map(num: &mut i64) {
             if *num < 0 {
                 *num = 2 * (-1 * *num) + 1;
@@ -358,7 +375,17 @@ impl MortonKey {
         checksum = (checksum << 16) | y;
         checksum = (checksum << 16) | z;
 
-        checksum as usize
+        checksum as usize 
+    }
+
+    /// Checksum encoding unique transfer vector between this key, and another.
+    /// ie. the vector other->self returned as an unsigned integer.
+    ///
+    /// # Arguments
+    /// * `other` - A Morton Key with which to calcualte a transfer vector to.
+    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+        let tmp = self.find_transfer_vector_components(&other);
+        MortonKey::find_transfer_vector_from_components(&tmp)
     }
 
     /// The physical diameter of a box specified by this Morton Key, calculated with respect to
