@@ -1,5 +1,5 @@
-pub mod dense;
 pub mod batched;
+pub mod dense;
 use crate::green;
 use crate::green::Scalar;
 use bempp_tools::arrays::Array2D;

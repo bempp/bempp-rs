@@ -143,23 +143,10 @@ pub fn assemble<'a, T: Scalar>(
         let test_cell_gindex = grid.geometry().index_map()[test_cell];
         let test_vertices = c20.row(test_cell_tindex).unwrap();
 
-        let mut npoints_test_cell = 10 * npoints * npoints;
-        for p in available_rules(grid.topology().cell_type(test_cell_tindex).unwrap()) {
-            if p >= npoints * npoints && p < npoints_test_cell {
-                npoints_test_cell = p;
-            }
-        }
         for trial_cell in 0..grid.geometry().cell_count() {
             let trial_cell_tindex = grid.topology().index_map()[trial_cell];
             let trial_cell_gindex = grid.geometry().index_map()[trial_cell];
             let trial_vertices = c20.row(trial_cell_tindex).unwrap();
-
-            let mut npoints_trial_cell = 10 * npoints * npoints;
-            for p in available_rules(grid.topology().cell_type(trial_cell_tindex).unwrap()) {
-                if p >= npoints * npoints && p < npoints_trial_cell {
-                    npoints_trial_cell = p;
-                }
-            }
 
             let mut pairs = vec![];
             for (test_i, test_v) in test_vertices.iter().enumerate() {
@@ -292,23 +279,10 @@ pub fn curl_curl_assemble<'a, T: Scalar>(
         let test_cell_gindex = grid.geometry().index_map()[test_cell];
         let test_vertices = c20.row(test_cell_tindex).unwrap();
 
-        let mut npoints_test_cell = 10 * npoints * npoints;
-        for p in available_rules(grid.topology().cell_type(test_cell_tindex).unwrap()) {
-            if p >= npoints * npoints && p < npoints_test_cell {
-                npoints_test_cell = p;
-            }
-        }
         for trial_cell in 0..grid.geometry().cell_count() {
             let trial_cell_tindex = grid.topology().index_map()[trial_cell];
             let trial_cell_gindex = grid.geometry().index_map()[trial_cell];
             let trial_vertices = c20.row(trial_cell_tindex).unwrap();
-
-            let mut npoints_trial_cell = 10 * npoints * npoints;
-            for p in available_rules(grid.topology().cell_type(trial_cell_tindex).unwrap()) {
-                if p >= npoints * npoints && p < npoints_trial_cell {
-                    npoints_trial_cell = p;
-                }
-            }
 
             let mut pairs = vec![];
             for (test_i, test_v) in test_vertices.iter().enumerate() {
