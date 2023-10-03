@@ -1,3 +1,4 @@
+//! Types for storing field translation data.
 use std::collections::HashMap;
 
 use bempp_tools::Array3D;

@@ -1,3 +1,4 @@
+//! Implementation of traits for field translations via the FFT and SVD.
 use std::collections::HashMap;
 
 use fftw::types::*;
@@ -21,12 +22,10 @@ use bempp_tree::{
 };
 
 use crate::{
-    helpers::{
-        array::{flip3, pad3},
-        compute_transfer_vectors, compute_transfer_vectors_unique,
-        fft::rfft3_fftw,
-        surface::{axial_reflection_convolution, axial_reflection_surface, diagonal_reflection},
-    },
+    array::{flip3, pad3},
+    fft::rfft3_fftw,
+    surface::{axial_reflection_convolution, axial_reflection_surface, diagonal_reflection},
+    transfer_vector::{compute_transfer_vectors, compute_transfer_vectors_unique},
     types::{
         FftFieldTranslationKiFmm, FftM2lEntry, SvdFieldTranslationKiFmm, SvdM2lEntry,
         TransferVector,
