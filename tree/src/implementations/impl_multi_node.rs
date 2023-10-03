@@ -23,10 +23,15 @@ use crate::{
 };
 
 impl MultiNodeTree {
-    /// Constructor for uniform trees
+    /// Constructor for uniform trees.
     ///
     /// # Arguments
-    /// * `world` -
+    /// * `world` - A global communicator for the tree.
+    /// * `k` - Size of subcommunicator used in Hyksort. Must be a power of 2.
+    /// * `points` - Cartesian point data in column major order.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `depth` - The maximum depth of recursion for the tree.
+    /// * `global_idxs` - Globally unique indices for point data.
     pub fn uniform_tree(
         world: &UserCommunicator,
         k: i32,
@@ -170,6 +175,15 @@ impl MultiNodeTree {
     }
 
     /// Constructor for adaptive tree.
+    ///
+    /// # Arguments
+    /// * `world` - A global communicator for the tree.
+    /// * `k` - Size of subcommunicator used in Hyksort. Must be a power of 2.
+    /// * `points` - Cartesian point data in column major order.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `depth` - The maximum depth of recursion for the tree.
+    /// * `n_crit` - Maximum number of particles in a leaf node.
+    /// * `global_idxs` - Globally unique indices for point data.
     pub fn adaptive_tree(
         world: &UserCommunicator,
         k: i32,
@@ -358,6 +372,14 @@ impl MultiNodeTree {
     /// Create a new multi-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
     /// user defined maximum leaf maximum occupancy n_crit.
+    ///
+    /// # Arguments
+    /// * `world` - A global communicator for the tree.
+    /// * `k` - Size of subcommunicator used in Hyksort. Must be a power of 2.
+    /// * `points` - Cartesian point data in column major order.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `n_crit` - Maximum number of particles in a leaf node.
+    /// * `global_idxs` - Globally unique indices for point data.
     pub fn new(
         world: &UserCommunicator,
         points: &[PointType],
@@ -381,7 +403,11 @@ impl MultiNodeTree {
         }
     }
 
-    /// Complete a distributed block tree from the seed octants, algorithm 4 in [1] (parallel).
+    /// Complete a minimal distributed block tree from the seed octants.
+    ///
+    /// # Arguments
+    /// * `world` - A global communicator for the tree.
+    /// * `seeds` - A set of seed octants.
     fn complete_blocktree(world: &UserCommunicator, seeds: &mut MortonKeys) -> MortonKeys {
         let rank = world.rank();
         let size = world.size();
@@ -452,7 +478,12 @@ impl MultiNodeTree {
         complete
     }
 
-    // Transfer points to correct processor based on the coarse distributed blocktree.
+    /// Transfer points to correct processor based on the coarse distributed blocktree.
+    ///
+    /// # Arguments
+    /// * `world` - A global communicator for the tree.
+    /// * `points` - Cartesian point data in column major order.
+    /// * `blocktree` - A minimal spanning blocktree.
     fn transfer_points_to_blocktree(
         world: &UserCommunicator,
         points: &[Point],

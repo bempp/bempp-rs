@@ -14,8 +14,8 @@ use rlst::{
     algorithms::{linalg::LinAlg, traits::pseudo_inverse::Pinv},
     common::traits::{Eval, NewLikeSelf, Transpose},
     dense::{
-        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_col_vec,
-        rlst_mat, rlst_pointer_mat, traits::*, Dot, global,
+        base_matrix::BaseMatrix, data_container::VectorContainer, global, matrix::Matrix,
+        rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot,
     },
 };
 
@@ -28,7 +28,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{C2EType,ChargeDict, FmmData, KiFmm};
+use crate::types::{C2EType, ChargeDict, FmmData, KiFmm};
 
 #[allow(dead_code)]
 impl<T, U> KiFmm<SingleNodeTree, T, U>
@@ -367,7 +367,7 @@ where
 mod test {
     use super::*;
 
-    use bempp_field::types::{FftFieldTranslationNaiveKiFmm, FftFieldTranslationKiFmm};
+    use bempp_field::types::{FftFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm};
     use rand::prelude::*;
     use rand::SeedableRng;
 
@@ -505,13 +505,19 @@ mod test {
         let depth = 5;
         let kernel = Laplace3dKernel::<f64>::default();
 
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth), &global_idxs[..]);
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            Some(depth),
+            &global_idxs[..],
+        );
 
         let m2l_data_fft = FftFieldTranslationKiFmm::new(
             kernel.clone(),
             order,
             tree.get_domain().clone(),
-            alpha_inner
+            alpha_inner,
         );
 
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
@@ -524,7 +530,6 @@ mod test {
         let times = datatree.run(Some(true));
 
         println!("FFT times {:?}", times);
-
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 

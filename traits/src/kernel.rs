@@ -135,9 +135,15 @@ pub trait Kernel {
     fn range_component_count(&self, eval_type: EvalType) -> usize;
 }
 
-// Scaling required by the FMM to apply kernel to each octree level.
+/// Scaling required by the FMM to apply kernel to each octree level.
 pub trait KernelScale {
+    /// The kernel is generic over data type.
     type T: Scalar<Real = Self::T>;
 
+    /// # Warning
+    /// Scaling by level is kernel dependent, only applicable to homogenous kernels, staged to be deprecated
+    ///
+    /// # Arguments
+    /// * `level` - Level of octree at which the kernel is being applied.
     fn scale(&self, level: u64) -> Self::T;
 }
