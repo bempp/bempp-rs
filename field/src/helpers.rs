@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    usize,
+    usize, 
 };
 
 use fftw::{plan::*, types::*};
@@ -214,6 +214,11 @@ pub mod surface {
         transfer_vector: &[i64],
         order: usize,
     ) -> Vec<usize> {
+        // Only valid transfer vectors are three vectors
+        assert!(transfer_vector.len() == 3);
+        // Order must be greater than 1
+        assert!(order > 1);
+
         fn helper(m: usize, t: i64, order: usize) -> usize {
             if t >= 0 {
                 return m;
@@ -243,6 +248,10 @@ pub mod surface {
         transfer_vector: &[i64],
         order: usize,
     ) -> Vec<usize> {
+        // Only valid transfer vectors are three vectors
+        assert!(transfer_vector.len() == 3);
+        // Order must be greater than 1
+        assert!(order > 1);
         fn helper(m: usize, t: i64, order: usize) -> usize {
             if t >= 0 {
                 return m;
@@ -267,6 +276,9 @@ pub mod surface {
     /// * `multi_index` - A three vector describing a convolution grid point.
     /// * `transfer_vector` - A three vector describing an associated transfer vector with this surface.
     pub fn diagonal_reflection(multi_index: &[usize], transfer_vector: &[i64]) -> Vec<usize> {
+        // Only valid transfer vectors are three vectors
+        assert!(transfer_vector.len() == 3);
+        
         let idxs = crate::helpers::array::argsort(transfer_vector);
 
         let res = idxs.iter().map(|&i| multi_index[i]).collect_vec();
@@ -281,7 +293,13 @@ pub mod transfer_vector {
     use super::*;
 
     /// Reflect a transfer vector into the reference octant combining axial and diagonal symmetries.
+    /// 
+    /// # Arguments
+    /// * `components` - The transfer vector in component form.
     pub fn reflect(components: &[i64; 3]) -> Vec<i64> {
+        // Only three vectors valid for transfer vector
+        assert!(components.len() == 3);
+        
         // Axial reflection
         let axial = axially_reflect_components(components);
 
@@ -292,7 +310,11 @@ pub mod transfer_vector {
     }
 
     /// Apply axial reflections to Transfer Vector components to get into reference octant.
+    /// 
+    /// # Arguments
+    /// * `components` - The transfer vector in component form.
     pub fn axially_reflect_components(components: &[i64]) -> Vec<i64> {
+
         // Axial reflection
         let axial = |c: &i64| {
             if *c >= 0 {
@@ -308,7 +330,14 @@ pub mod transfer_vector {
 
     /// Apply diagonal reference to Transfer Vector components to get into reference cone.
     /// The vector must already be in the reference octant.
+    /// 
+    /// # Arguments
+    /// * `components` - The transfer vector in component form.
     pub fn diagonally_reflect_components(components: &[i64]) -> Vec<i64> {
+        
+        // Only three vectors valid for transfer vector
+        assert!(components.len() == 3);
+        
         // Diagonal reflection
         let idxs = crate::helpers::array::argsort(components);
 
@@ -320,8 +349,9 @@ pub mod transfer_vector {
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
 /// There are at most 316 such interactions, corresponding to unique `transfer vectors'. Here we compute all of them
-/// with respect to level 3 of an associated octree (this is the first level in which they all exist).
-pub fn compute_transfer_vectors() -> Vec<TransferVector> {
+/// with respect to level 3 of an associated octree (this is the first level in which they all exist). The returned map
+/// is somewhat redundant, as it simply maps each unique transfer vector to itself.
+pub fn compute_transfer_vectors() -> (Vec<TransferVector>, HashMap<usize, usize>) {
     let point = [0.5, 0.5, 0.5];
     let domain = Domain {
         origin: [0., 0., 0.],
@@ -372,6 +402,7 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
         targets.extend(&mut tmp_targets.iter().cloned());
     }
 
+    // Filter for unique transfer vectors, and their corresponding index
     let mut unique_transfer_vectors = Vec::new();
     let mut unique_indices = HashSet::new();
 
@@ -382,6 +413,7 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
         }
     }
 
+    // Identify sources/targets which correspond to unique transfer vectors.
     let unique_sources: Vec<MortonKey> = sources
         .iter()
         .enumerate()
@@ -397,6 +429,7 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
         .collect_vec();
 
     let mut result = Vec::<TransferVector>::new();
+    let mut map = HashMap::new();
 
     for ((t, s), v) in unique_targets
         .into_iter()
@@ -410,10 +443,12 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
             hash: v,
             source: s,
             target: t,
-        })
+        });
+
+        map.insert(v, v);
     }
 
-    result
+    (result, map)
 }
 
 /// Though there are at most 316 unique transfer vectors for homogenous, translationally invariant, kernels
@@ -531,7 +566,6 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
 
     // For each unique transfer vector find representative source/target pair for calculating
     // FMM matrices
-
     let mut result = Vec::<TransferVector>::new();
 
     let mut checked = HashSet::new();
@@ -556,26 +590,48 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
         }
     }
 
-    // Also need to store mappings between surface/conv grid multi-indices
-    // for the reduced set of sources and targets I've taken that correspond
-    // to unique transfer vectors.
-
     (result, axial_diag_map)
 }
 
 #[cfg(test)]
 mod test {
 
-    use super::*;
+    use super::{*, array::*, surface::*, transfer_vector::*};
 
     #[test]
     fn test_argsort() {
-        assert!(true)
+        
+        // Test unique elements
+        let arr = vec![5, 2, 1, 3, 6];
+        let expected: Vec<usize> = vec![2, 1, 3, 0, 4];
+
+        let result = argsort(&arr);
+        assert_eq!(expected, result);
+
+        // Test duplicate elements
+        let arr = vec![5,1,2,3,5];
+        let expected: Vec<usize> = vec![1, 2, 3, 0, 4];
+
+        let result = argsort(&arr);
+        assert_eq!(expected, result);
     }
 
     #[test]
     fn test_flip3() {
-        assert!(true)
+        
+        let n = 2;
+        let mut arr: Array3D<usize> = Array3D::new((n,n,n));
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    *arr.get_mut(i, j, k).unwrap() = i+j*n+k*n*n;
+                }
+            }
+        }
+        let expected = vec![7, 3, 5, 1, 6, 2, 4, 0];
+        let result = flip3(&arr).get_data().to_vec();
+        assert_eq!(result, expected);
+
     }
 
     #[test]
@@ -650,36 +706,141 @@ mod test {
 
     #[test]
     fn test_axial_reflection_surface() {
-        assert!(true)
+
+        // Test when transfer vector has only positive components
+        let multi_index = &[1, 2, 3];
+        let transfer_vector = &[1, 2, 3];
+        let order = 4;
+        
+        let expected = vec![1, 2, 3];
+        let result = axial_reflection_surface(multi_index, transfer_vector, order);
+        assert_eq!(result, expected);
+    
+        // Test when transfer vector has all negative components
+        let multi_index = &[1, 2, 3];
+        let transfer_vector = &[-1, -2, -3];
+        let order = 4;
+
+        let expected = vec![4, 3, 2];
+        let result = axial_reflection_surface(multi_index, transfer_vector, order);
+        assert_eq!(result, expected);
+
+        // Test a mixed component transfer vector
+        let multi_index = &[1, 2, 3];
+        let transfer_vector = &[1, -2, 3];
+        let order = 4;
+
+        let expected = vec![1, 3, 3];
+        let result = axial_reflection_surface(multi_index, transfer_vector, order);
+        assert_eq!(result, expected);
     }
 
     #[test]
     fn test_axial_reflection_convolution() {
-        assert!(true)
+        
+        // Test when transfer vector has only positive components
+        let multi_index = &[1, 2, 3];
+        let transfer_vector = &[1, 2, 3];
+        let order = 4;
+        
+        let expected = vec![1, 2, 3];
+        let result = axial_reflection_convolution(multi_index, transfer_vector, order);
+        assert_eq!(result, expected);
+    
+        // Test when transfer vector has all negative components
+        let multi_index = &[1, 2, 3];
+        let transfer_vector = &[-1, -2, -3];
+        let order = 4;
+
+        let expected = vec![6, 5, 4];
+        let result = axial_reflection_convolution(multi_index, transfer_vector, order);
+        assert_eq!(result, expected);
+
+        // Test a mixed component transfer vector
+        let multi_index = &[1, 2, 3];
+        let transfer_vector = &[1, -2, 3];
+        let order = 4;
+
+        let expected = vec![1, 5, 3];
+        let result = axial_reflection_convolution(multi_index, transfer_vector, order);
+        assert_eq!(result, expected);
+        
     }
 
     #[test]
     fn test_diagonal_reflection() {
-        assert!(true)
+        let multi_index = [2, 1, 3];
+        let transfer_vector = [3i64, 1i64, 2i64];
+        let result = diagonal_reflection(&multi_index, &transfer_vector);
+
+        // Given the sorting of the transfer_vector, we expect the multi_index to be rearranged as [1, 3, 2]
+        assert_eq!(result, vec![1, 3, 2]);
     }
 
     #[test]
     fn test_diagonally_reflect_components() {
-        assert!(true)
+        // Test with mixed values
+        let components1 = [3i64, 1i64, 2i64];
+        let reflected1 = diagonally_reflect_components(&components1);
+        assert_eq!(reflected1, vec![1i64, 2i64, 3i64]);
+
+        // Test with all the same values (repeated numbers)
+        let components2 = [2i64, 2i64, 2i64];
+        let reflected2 = diagonally_reflect_components(&components2);
+        assert_eq!(reflected2, vec![2i64, 2i64, 2i64]);
+
+        // Test negative values since the vector is assumed to be in the reference octant.
+        let components3 = [-1i64, -2i64, -3i64];
+        let reflected3 = diagonally_reflect_components(&components3);
+        assert_eq!(reflected3, vec![-3i64, -2i64, -1i64]);
     }
 
     #[test]
     fn test_axially_reflect_components() {
-        assert!(true)
+        // Mixed components in transfer vector.
+        let components = [-1i64, 2i64, -3i64];
+        let reflected = axially_reflect_components(&components);
+        assert_eq!(reflected, vec![1i64, 2i64, 3i64]);
+
+        // Positive components in transfer vector.
+        let components = [1i64, 2i64, 3i64];
+        let reflected = axially_reflect_components(&components);
+        assert_eq!(reflected, vec![1i64, 2i64, 3i64]);
+
+        // Negative components in transfer vector
+        let components = [-1i64, -2i64, -3i64];
+        let reflected = axially_reflect_components(&components);
+        assert_eq!(reflected, vec![1i64, 2i64, 3i64]);
+
     }
 
     #[test]
     fn test_compute_transfer_vectors() {
-        assert!(true)
+        
+        let (tv, map) = compute_transfer_vectors();
+
+        // Check that there are 316 unique transfer vectors
+        assert_eq!(tv.len(), 316);
+        
+        // Check that the map has 316 unique keys, that map to 316 unique values
+        let keys = map.keys().collect_vec();
+        let values: HashSet<usize> = map.values().cloned().collect();
+        assert_eq!(keys.len(), 316);
+        assert_eq!(values.len(), 316);
+
     }
 
     #[test]
     fn test_compute_transfer_vectors_unique() {
-        assert!(true)
+        let (tv, map) = compute_transfer_vectors_unique();
+
+        assert_eq!(tv.len(), 16);
+
+        // Check that the map has 316 unique keys, that map to 16 unique values
+        let keys = map.keys().collect_vec();
+        let values: HashSet<usize> = map.values().cloned().collect();
+        assert_eq!(keys.len(), 316);
+        assert_eq!(values.len(), 16);
+
     }
 }

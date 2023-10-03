@@ -16,7 +16,7 @@ pub type SvdM2lEntry =
 /// Simple alias for an Array3D<Complexf64>
 pub type FftM2lEntry = Array3D<Complex<f64>>;
 
-/// A type to store the M2L field translation meta-data for an FFT based sparsification.
+/// A type to store the M2L field translation meta-data for an FFT based sparsification in the kernel independent FMM.
 pub struct FftFieldTranslationKiFmm<T>
 where
     T: Kernel + Default,
@@ -55,7 +55,7 @@ where
     pub kernel: T,
 }
 
-/// A type to store the M2L field translation meta-data for an SVD based sparsification.
+/// A type to store the M2L field translation meta-data for an SVD based sparsification in the kernel independent FMM.
 pub struct SvdFieldTranslationKiFmm<T>
 where
     T: Kernel + Default,
