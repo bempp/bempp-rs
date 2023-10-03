@@ -6,7 +6,7 @@ use crate::green::{
 };
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
-use bempp_quadrature::simplex_rules::{available_rules, simplex_rule};
+use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use bempp_tools::arrays::{Array2D, Array4D};
 use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
@@ -68,6 +68,7 @@ fn get_quadrature_rule(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn assemble_part<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
     output: &mut Array2D<T>,
     kernel: &impl SingularKernel,
@@ -283,9 +284,9 @@ pub fn assemble<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
                         kernel,
                         needs_trial_normal,
                         needs_test_normal,
-                        &trial_space,
+                        trial_space,
                         trial_cells[thread],
-                        &test_space,
+                        test_space,
                         test_cells[thread],
                     );
 
@@ -322,7 +323,7 @@ pub fn assemble<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
                     }
                 }
             }
-            if pairs.len() > 0 {
+            if !pairs.is_empty() {
                 let rule = get_quadrature_rule(
                     grid.topology().cell_type(test_cell_tindex).unwrap(),
                     grid.topology().cell_type(trial_cell_tindex).unwrap(),
