@@ -1,8 +1,4 @@
-// TODO: Figure out why fft is slow, probably due to a billion allocations being done
-// TODO: Should be generic over kernel/kernel scale float type parameter - this requires trees to be generic over float type
-// TODO: Tree should infer dimension from the data (stride).
-// TODO: Data driven SVD compression in the case the user specified no compression parameter.
-
+//! Implementation of constructors for FMMs as well as the implementation of FmmData, Fmm traits.
 use itertools::Itertools;
 use std::{
     collections::HashMap,
@@ -30,12 +26,22 @@ use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
 use crate::types::{C2EType, ChargeDict, FmmData, KiFmm};
 
-#[allow(dead_code)]
+/// Implementation of constructor for single node KiFMM
 impl<T, U> KiFmm<SingleNodeTree, T, U>
 where
     T: Kernel<T = f64> + KernelScale<T = f64>,
     U: FieldTranslationData<T>,
 {
+    /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
+    /// the associated single node octree, and the associated kernel function.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `alpha_inner` - The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    /// * `alpha_order` - The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    /// * `kernel` - The kernel function for this FMM.
+    /// * `tree` - The type of tree associated with this FMM, can be single or multi node.
+    /// * `m2l` - The M2L operator matrices, as well as metadata associated with this FMM.
     pub fn new<'a>(
         order: usize,
         alpha_inner: f64,
@@ -171,12 +177,17 @@ where
     }
 }
 
-#[allow(dead_code)]
+/// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U> FmmData<KiFmm<SingleNodeTree, T, U>>
 where
     T: Kernel,
     U: FieldTranslationData<T>,
 {
+    /// Constructor fo the KiFMM's associated FmmData on a single node.
+    ///
+    /// # Arguments
+    /// `fmm` - A single node KiFMM object.
+    /// `global_charges` - The charge data associated to the point data via unique global indices.
     pub fn new(fmm: KiFmm<SingleNodeTree, T, U>, global_charges: &ChargeDict) -> Self {
         let mut multipoles = HashMap::new();
         let mut locals = HashMap::new();
@@ -362,133 +373,119 @@ where
     }
 }
 
-#[allow(unused_imports)]
-#[allow(warnings)]
 mod test {
     use super::*;
 
-    use bempp_field::types::{FftFieldTranslationKiFmm, FftFieldTranslationNaiveKiFmm};
     use rand::prelude::*;
     use rand::SeedableRng;
+    use std::env;
 
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
 
-    use bempp_field::types::SvdFieldTranslationKiFmm;
-    use bempp_kernel::laplace_3d::evaluate_laplace_one_target;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
+    use bempp_kernel::laplace_3d::{evaluate_laplace_one_target, Laplace3dKernel};
+    use bempp_tree::implementations::helpers::points_fixture;
 
     use crate::charge::build_charge_dict;
 
-    fn points_fixture(
-        npoints: usize,
-        min: Option<f64>,
-        max: Option<f64>,
-    ) -> Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>
-    {
-        // Generate a set of randomly distributed points
-        let mut range = StdRng::seed_from_u64(0);
+    #[test]
+    fn test_fmm_svd<'a>() {
+        // Set OMP threads to avoid thrashing during matrix-matrix products in M2L.
+        env::set_var("OMP_NUM_THREADS", "1");
 
-        let between;
-        if let (Some(min), Some(max)) = (min, max) {
-            between = rand::distributions::Uniform::from(min..max);
-        } else {
-            between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
-        }
+        // Generate a set of point data
+        let npoints = 10000;
+        let points = points_fixture(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let charges = vec![1.0; npoints];
 
-        let mut points = rlst_mat![f64, (npoints, 3)];
+        // Setup a FMM experiment
+        let order = 8;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.9;
+        let adaptive = false;
+        let k = 1000;
+        let ncrit = 150;
+        let depth = 3;
 
-        for i in 0..npoints {
-            points[[i, 0]] = between.sample(&mut range);
-            points[[i, 1]] = between.sample(&mut range);
-            points[[i, 2]] = between.sample(&mut range);
-        }
+        // Create a kernel
+        let kernel = Laplace3dKernel::<f64>::default();
 
-        points
+        // Create a tree
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            Some(depth),
+            &global_idxs[..],
+        );
+
+        // Precompute the M2L data
+        let m2l_data_svd = SvdFieldTranslationKiFmm::new(
+            kernel.clone(),
+            Some(k),
+            order,
+            tree.get_domain().clone(),
+            alpha_inner,
+        );
+
+        // Create an FMM
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
+
+        // Form charge dict, matching charges with their associated global indices
+        let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+
+        // Associate data with the FMM
+        let datatree = FmmData::new(fmm, &charge_dict);
+
+        // Run the experiment
+        let times = datatree.run(Some(true));
+
+        // Test that direct computation is close to the FMM.
+        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+
+        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+
+        let leaf_coordinates = pts
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+
+        let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+
+        // Get into row major order
+        let leaf_coordinates = unsafe {
+            rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
+        }.eval();
+
+        let mut direct = vec![0f64; pts.len()];
+        let all_point_coordinates = points_fixture(npoints, None, None);
+
+        let all_charges = charge_dict.into_values().collect_vec();
+
+        let kernel = Laplace3dKernel::<f64>::default();
+
+        kernel.evaluate_st(
+            EvalType::Value,
+            all_point_coordinates.data(),
+            leaf_coordinates.data(),
+            &all_charges[..],
+            &mut direct[..],
+        );
+
+        let abs_error: f64 = potentials
+            .data()
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+
+        println!("{:?}", rel_error);
+        assert!(rel_error <= 1e-6);
     }
-
-    // #[test]
-    // fn test_fmm_svd<'a>() {
-    //     let npoints = 1000;
-    //     let points = points_fixture(npoints, None, None);
-    //     let global_idxs = (0..npoints).collect_vec();
-    //     let charges = vec![1.0; npoints];
-
-    //     let order = 2;
-    //     let alpha_inner = 1.05;
-    //     let alpha_outer = 2.9;
-    //     let adaptive = false;
-    //     let k = 1000;
-    //     let ncrit = 150;
-    //     let depth = 2;
-    //     let kernel = Laplace3dKernel::<f64>::default();
-
-    //     let tree = SingleNodeTree::new(points.data(), adaptive, Some(ncrit), Some(depth), &global_idxs[..]);
-
-    //     let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-    //         kernel.clone(),
-    //         Some(k),
-    //         order,
-    //         tree.get_domain().clone(),
-    //         alpha_inner,
-    //     );
-
-    //     let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
-
-    //     // Form charge dict, matching charges with their associated global indices
-    //     let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
-
-    //     let datatree = FmmData::new(fmm, &charge_dict);
-
-    //     let times = datatree.run(Some(true));
-
-    //     // println!("SVD times {:?}", times);
-
-    //     // assert!(false);
-
-    //     let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
-
-    //     let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-    //     let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
-
-    //     let leaf_coordinates = pts
-    //         .iter()
-    //         .map(|p| p.coordinate)
-    //         .flat_map(|[x, y, z]| vec![x, y, z])
-    //         .collect_vec();
-
-    //     let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
-
-    //     // Get into row major order
-    //     let leaf_coordinates = unsafe {
-    //         rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
-    //     }.eval();
-
-    //     let mut direct = vec![0f64; pts.len()];
-    //     let all_point_coordinates = points_fixture(npoints, None, None);
-
-    //     let all_charges = charge_dict.into_values().collect_vec();
-
-    //     let kernel = Laplace3dKernel::<f64>::default();
-
-    //     kernel.evaluate_st(
-    //         EvalType::Value,
-    //         all_point_coordinates.data(),
-    //         leaf_coordinates.data(),
-    //         &all_charges[..],
-    //         &mut direct[..],
-    //     );
-
-    //     let abs_error: f64 = potentials
-    //         .data()
-    //         .iter()
-    //         .zip(direct.iter())
-    //         .map(|(a, b)| (a - b).abs())
-    //         .sum();
-    //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-
-    //     println!("rel error {:?}", rel_error);
-    //     assert!(rel_error <= 1e-5);
-    // }
 
     #[test]
     fn test_fmm_fft<'a>() {

@@ -1,4 +1,4 @@
-// Implementation of interaction lists for FMMs (single and multinode)
+//! Implementation of interaction lists for FMMs (single and multi node)
 use itertools::Itertools;
 
 use bempp_traits::{
