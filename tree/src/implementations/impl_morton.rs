@@ -1152,7 +1152,7 @@ mod test {
         let npoints = 1000;
         let points = points_fixture(npoints, Some(-1.), Some(1.0));
 
-        let domain = Domain::from_local_points(&points.data());
+        let domain = Domain::from_local_points(points.data());
 
         let mut keys: Vec<MortonKey> = Vec::new();
 
@@ -1768,7 +1768,7 @@ mod test {
         let order = 2;
         let alpha = 1.;
         let dim = 3;
-        let ncoeffs = 6 * (order - 1 as usize).pow(2) + 2;
+        let ncoeffs = 6 * (order - 1_usize).pow(2) + 2;
 
         // Test lengths
         let surface = key.compute_surface(&domain, order, alpha);

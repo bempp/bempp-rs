@@ -1,17 +1,21 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
+#![allow(unused_imports)]
 
 use bempp_traits::tree::Tree;
 use itertools::Itertools;
 
+#[cfg(feature = "mpi")]
 use mpi::{environment::Universe, traits::*};
 
 use rlst::common::traits::accessors::RawAccess;
-
 use bempp_tree::implementations::helpers::points_fixture;
+
+#[cfg(feature = "mpi")]
 use bempp_tree::types::multi_node::MultiNodeTree;
 
 /// Test that the near field boxes are contained either locally, or in the received boxes
 /// from the locally essential tree.
+#[cfg(feature = "mpi")]
 fn test_near_field(tree: &MultiNodeTree) {
     // Create locally essential tree
     let locally_essential_tree = tree.create_let();
@@ -26,6 +30,7 @@ fn test_near_field(tree: &MultiNodeTree) {
     }
 }
 
+#[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
     let universe: Universe = mpi::initialize().unwrap();
@@ -58,3 +63,6 @@ fn main() {
         println!("\t ... test_near_field passed on uniform tree");
     }
 }
+
+#[cfg(not(feature = "mpi"))]
+fn main() {}

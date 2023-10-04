@@ -613,7 +613,7 @@ mod test {
 
         // Test that only a subset of the leaves contain any points
         for leaf in tree.get_all_leaves_set().iter() {
-            if let Some(_points) = tree.get_points(&leaf) {
+            if let Some(_points) = tree.get_points(leaf) {
                 unique_leaves.insert(leaf.morton);
             }
         }
@@ -714,12 +714,12 @@ mod test {
             .iter()
             .enumerate()
             .fold(
-                (HashMap::new(), 0, points.points[0].clone()),
+                (HashMap::new(), 0, points.points[0]),
                 |(mut leaves_to_points, curr_idx, curr), (i, point)| {
                     if point.encoded_key != curr.encoded_key {
                         leaves_to_points.insert(curr.encoded_key, (curr_idx, i + 1));
 
-                        (leaves_to_points, i + 1, point.clone())
+                        (leaves_to_points, i + 1, *point)
                     } else {
                         (leaves_to_points, curr_idx, curr)
                     }
@@ -853,7 +853,7 @@ mod test {
                 }
             }
         }
-        assert_eq!(tot, npoints as usize);
+        assert_eq!(tot, npoints);
 
         // Adaptive tree
         let ncrit = 150;
@@ -882,6 +882,6 @@ mod test {
                 }
             }
         }
-        assert_eq!(tot, npoints as usize);
+        assert_eq!(tot, npoints);
     }
 }

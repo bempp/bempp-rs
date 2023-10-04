@@ -664,7 +664,7 @@ mod test {
         // Test that the rank cutoff has been taken correctly (k unspecified)
         let k = None;
         let default_k = 50;
-        let svd = SvdFieldTranslationKiFmm::new(kernel.clone(), k, order, domain, alpha);
+        let svd = SvdFieldTranslationKiFmm::new(kernel, k, order, domain, alpha);
         let m2l = svd.compute_m2l_operators(order, domain);
         assert_eq!(m2l.st_block.shape(), (default_k, svd.ncoeffs(order)));
         assert_eq!(m2l.c.shape(), (default_k, default_k * ntransfer_vectors));

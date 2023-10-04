@@ -53,7 +53,7 @@ mod test {
     use super::*;
 
     fn test_compute_bounds(points: PointsMat) {
-        let domain = Domain::from_local_points(&points.data());
+        let domain = Domain::from_local_points(points.data());
 
         // Test that the domain remains cubic
         assert!(domain.diameter.iter().all(|&x| x == domain.diameter[0]));

@@ -181,8 +181,6 @@ pub fn map_corners_to_surface(order: usize) -> (HashMap<usize, usize>, HashMap<u
 mod test {
 
     use super::find_corners;
-    use crate::implementations::helpers::map_corners_to_surface;
-    use crate::types::domain::Domain;
     use crate::types::morton::MortonKey;
 
     #[test]

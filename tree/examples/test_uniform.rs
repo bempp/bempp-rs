@@ -1,14 +1,19 @@
 // ? mpirun -n {{NPROCESSES}} --features "mpi"
+#![allow(unused_imports)]
+
+#[cfg(feature = "mpi")]
 use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use bempp_traits::tree::Tree;
 
+#[cfg(feature = "mpi")]
 use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
 
 use bempp_tree::implementations::helpers::points_fixture;
 use rlst::dense::RawAccess;
 
 /// Test that the leaves on separate nodes do not overlap.
+#[cfg(feature = "mpi")]
 fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
     // Communicate bounds from each process
     let max = tree.get_all_leaves_set().iter().max().unwrap();
@@ -42,6 +47,7 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 }
 
 /// Test that the globally defined domain contains all the points at a given node.
+#[cfg(feature = "mpi")]
 fn test_global_bounds(world: &UserCommunicator) {
     let npoints = 10000;
     let points = points_fixture(npoints, None, None);
@@ -62,6 +68,7 @@ fn test_global_bounds(world: &UserCommunicator) {
     }
 }
 
+#[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
     let universe: Universe = mpi::initialize().unwrap();
@@ -91,3 +98,6 @@ fn main() {
         println!("\t ... test_no_overlaps passed on uniform tree");
     }
 }
+
+#[cfg(not(feature = "mpi"))]
+fn main() {}

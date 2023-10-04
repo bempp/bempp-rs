@@ -47,8 +47,8 @@ impl MultiNodeTree {
         let mut tmp = Points::default();
         for i in 0..npoints {
             let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
-            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, &domain, depth);
+            let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(&point, domain, depth);
             tmp.points.push(Point {
                 coordinate: point,
                 base_key,
@@ -66,7 +66,7 @@ impl MultiNodeTree {
         let min = points.points.iter().min().unwrap().encoded_key;
         let max = points.points.iter().max().unwrap().encoded_key;
 
-        let diameter = 1 << (DEEPEST_LEVEL - depth as u64);
+        let diameter = 1 << (DEEPEST_LEVEL - depth);
 
         // Find leaves within ths processor's range
         let leaves = MortonKeys {
@@ -97,14 +97,14 @@ impl MultiNodeTree {
         points.sort();
 
         let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0].clone();
+        let mut curr = points.points[0];
         let mut curr_idx = 0;
 
         for (i, point) in points.points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
-                curr = point.clone();
+                curr = *point;
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
@@ -199,7 +199,7 @@ impl MultiNodeTree {
         let mut tmp = Points::default();
         for i in 0..npoints {
             let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
-            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
             tmp.points.push(Point {
                 coordinate: point,
                 base_key: key,
@@ -262,14 +262,14 @@ impl MultiNodeTree {
         points.sort();
 
         let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0].clone();
+        let mut curr = points.points[0];
         let mut curr_idx = 0;
 
         for (i, point) in points.points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
-                curr = point.clone();
+                curr = *point;
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
@@ -303,14 +303,14 @@ impl MultiNodeTree {
 
         // Create maps between points and globally balanced tree
         let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0].clone();
+        let mut curr = points.points[0];
         let mut curr_idx = 0;
 
         for (i, point) in points.points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
-                curr = point.clone();
+                curr = *point;
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
@@ -391,7 +391,7 @@ impl MultiNodeTree {
     ) -> MultiNodeTree {
         // TODO: Come back and reconcile a runtime point dimension detector
 
-        let domain = Domain::from_global_points(points, &world);
+        let domain = Domain::from_global_points(points, world);
 
         let n_crit = n_crit.unwrap_or(NCRIT);
         let depth = depth.unwrap_or(DEFAULT_LEVEL);
@@ -399,7 +399,7 @@ impl MultiNodeTree {
         if adaptive {
             MultiNodeTree::adaptive_tree(world, k, points, &domain, n_crit, global_idxs)
         } else {
-            MultiNodeTree::uniform_tree(world, k, points, &domain, depth, &global_idxs)
+            MultiNodeTree::uniform_tree(world, k, points, &domain, depth, global_idxs)
         }
     }
 
@@ -637,28 +637,25 @@ impl MultiNodeTree {
                             colleagues_parent.iter().max(),
                         );
 
-                        match (cp_min, cp_max) {
-                            (Some(cp_min), Some(cp_max)) => {
-                                if (cp_min >= &min) && (cp_max <= &max)
-                                    || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
-                                    || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
-                                    || (cp_min <= &min) && (cp_max >= &max)
+                        if let (Some(cp_min), Some(cp_max)) = (cp_min, cp_max) {
+                            if (cp_min >= &min) && (cp_max <= &max)
+                                || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
+                                || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
+                                || (cp_min <= &min) && (cp_max >= &max)
+                            {
+                                user_tmp.push(rank);
+
+                                // Mark ranks as users of keys/leaves from this process
+                                if key_packet_destinations[rank as usize] == 0 {
+                                    key_packet_destinations[rank as usize] = 1
+                                }
+
+                                if leaf_packet_destinations[rank as usize] == 0
+                                    && self.leaves_set.contains(key)
                                 {
-                                    user_tmp.push(rank);
-
-                                    // Mark ranks as users of keys/leaves from this process
-                                    if key_packet_destinations[rank as usize] == 0 {
-                                        key_packet_destinations[rank as usize] = 1
-                                    }
-
-                                    if leaf_packet_destinations[rank as usize] == 0
-                                        && self.leaves_set.contains(key)
-                                    {
-                                        leaf_packet_destinations[rank as usize] = 1;
-                                    }
+                                    leaf_packet_destinations[rank as usize] = 1;
                                 }
                             }
-                            _ => (),
                         }
                     }
                     // If the key is at level one its parent is the root node, so by definition
@@ -732,7 +729,7 @@ impl MultiNodeTree {
                 .collect();
             let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
 
-            if key_packet.len() > 0 {
+            if !key_packet.is_empty() {
                 key_packets.push(key_packet);
                 key_packet_destinations_filt.push(rank);
             }
@@ -745,11 +742,10 @@ impl MultiNodeTree {
 
                 let point_packet: Vec<Point> = leaf_packet
                     .iter()
-                    .map(|leaf| self.get_points(leaf).unwrap().to_vec())
-                    .flatten()
+                    .flat_map(|leaf| self.get_points(leaf).unwrap().to_vec())
                     .collect();
 
-                if leaf_packet.len() > 0 {
+                if !leaf_packet.is_empty() {
                     leaf_packets.push(leaf_packet);
                     point_packets.push(point_packet);
                     leaf_packet_destinations_filt.push(rank);
@@ -783,14 +779,14 @@ impl MultiNodeTree {
         received_points.sort();
 
         let mut leaves_to_points = HashMap::new();
-        let mut curr = received_points[0].clone();
+        let mut curr = received_points[0];
         let mut curr_idx = 0;
 
         for (i, point) in received_points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
-                curr = point.clone();
+                curr = *point;
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, received_points.len()));
@@ -799,8 +795,8 @@ impl MultiNodeTree {
             range: self.range,
             world: self.world.duplicate(),
             depth: self.depth,
-            domain: self.domain.clone(),
-            leaves_to_points: leaves_to_points,
+            domain: self.domain,
+            leaves_to_points,
             levels_to_keys: HashMap::default(),
             leaves_set: received_leaves.iter().cloned().collect(),
             keys_set: received_keys.iter().cloned().collect(),
