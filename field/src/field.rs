@@ -159,7 +159,7 @@ where
             alpha,
             k: 0,
             kernel,
-            m2l: SvdM2lOperatorData::default(),
+            operator_data: SvdM2lOperatorData::default(),
             transfer_vectors: Vec::new(),
         };
 
@@ -176,7 +176,7 @@ where
         }
 
         (result.transfer_vectors, _) = result.compute_transfer_vectors();
-        result.m2l = result.compute_m2l_operators(order, domain);
+        result.operator_data = result.compute_m2l_operators(order, domain);
 
         result
     }
@@ -194,7 +194,12 @@ where
     type TransferVectorMap = HashMap<usize, usize>;
 
     fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
-        let mut result = Vec::new();
+        // let mut result = Vec::new();
+
+        let n = 2 * order - 1;
+        let n_p = n + 1;
+        let size_real = n_p * n_p * (n_p / 2 + 1);
+        let mut kernel_data = rlst_mat![c64, (self.transfer_vectors.len() * size_real, 1)];
 
         let mut surface_maps = Vec::new();
         let mut inv_surface_maps = Vec::new();
@@ -204,7 +209,7 @@ where
         // Create a map between corner indices and surface indices
         let (map_corner_to_surface, inv_map_corner_to_surface) = map_corners_to_surface(order);
 
-        for t in self.transfer_vectors.iter() {
+        for (t_idx, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
             let nsources = source_equivalent_surface.len() / 3;
 
@@ -412,7 +417,8 @@ where
             );
 
             // Store FFT of kernel for this transfer vector
-            result.push(padded_reflected_kernel_hat);
+            kernel_data.data_mut()[t_idx * size_real..(t_idx + 1) * size_real]
+                .copy_from_slice(padded_reflected_kernel_hat.get_data());
 
             // Save surface and convolution maps
             surface_maps.push(map_surface);
@@ -422,7 +428,7 @@ where
         }
 
         FftM2lOperatorData {
-            m2l: result,
+            kernel_data,
             surface_map: surface_maps,
             inv_surface_map: inv_surface_maps,
             conv_map: conv_maps,
@@ -456,7 +462,7 @@ where
             kernel,
             surf_to_conv_map: HashMap::default(),
             conv_to_surf_map: HashMap::default(),
-            m2l: FftM2lOperatorData::default(),
+            operator_data: FftM2lOperatorData::default(),
             transfer_vectors: Vec::default(),
             transfer_vector_map: HashMap::default(),
         };
@@ -469,7 +475,7 @@ where
         result.conv_to_surf_map = conv_to_surf;
         (result.transfer_vectors, result.transfer_vector_map) = result.compute_transfer_vectors();
 
-        result.m2l = result.compute_m2l_operators(order, domain);
+        result.operator_data = result.compute_m2l_operators(order, domain);
 
         result
     }
@@ -687,6 +693,11 @@ mod test {
         let m2l = fft.compute_m2l_operators(order, domain);
 
         // Test that the number of precomputed kernel interactions matches the number of transfer vectors
-        assert_eq!(m2l.m2l.len(), 16);
+        let n = 2 * order - 1;
+        let n_p = n + 1;
+        let size_real = n_p * n_p * (n_p / 2 + 1);
+        let shp = m2l.kernel_data.shape();
+        let expected = shp.0 / size_real;
+        assert_eq!(expected, 16);
     }
 }

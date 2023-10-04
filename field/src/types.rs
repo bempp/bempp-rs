@@ -1,8 +1,8 @@
 //! Types for storing field translation data.
 use std::collections::HashMap;
 
-use bempp_tools::Array3D;
-use num::Complex;
+use cauchy::c64;
+
 use rlst::{
     common::traits::{Eval, NewLikeSelf},
     dense::{
@@ -18,7 +18,9 @@ pub type SvdM2lEntry =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 /// Simple alias for an Array3D<Complexf64>
-pub type FftM2lEntry = Array3D<Complex<f64>>;
+// pub type FftM2lEntry = Array3D<Complex<f64>>;
+pub type FftM2lEntry =
+    Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 /// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
 pub struct FftFieldTranslationKiFmm<T>
@@ -35,7 +37,7 @@ where
     pub conv_to_surf_map: HashMap<usize, usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
-    pub m2l: FftM2lOperatorData,
+    pub operator_data: FftM2lOperatorData,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
@@ -59,7 +61,7 @@ where
     pub k: usize,
 
     /// Precomputed data required for SVD compressed M2L interaction.
-    pub m2l: SvdM2lOperatorData,
+    pub operator_data: SvdM2lOperatorData,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions.
     pub transfer_vectors: Vec<TransferVector>,
@@ -85,10 +87,9 @@ pub struct TransferVector {
 }
 
 /// Container to store precomputed data required for FFT field translations.
-#[derive(Default)]
 pub struct FftM2lOperatorData {
     /// The FFT of unique kernel evaluations for each transfer vector
-    pub m2l: Vec<FftM2lEntry>,
+    pub kernel_data: FftM2lEntry,
 
     /// Map between surface grid indices on unreflected/reflected surfaces.
     /// Each index in the Vec corresponds to an un-reflected transfer vector.
@@ -131,6 +132,20 @@ impl Default for SvdM2lOperatorData {
             u: tmp.new_like_self().eval(),
             st_block: tmp.new_like_self().eval(),
             c: tmp.new_like_self().eval(),
+        }
+    }
+}
+
+impl Default for FftM2lOperatorData {
+    fn default() -> Self {
+        let tmp = rlst_mat![c64, (1, 1)];
+
+        FftM2lOperatorData {
+            kernel_data: tmp.new_like_self().eval(),
+            surface_map: Vec::default(),
+            inv_surface_map: Vec::default(),
+            conv_map: Vec::default(),
+            inv_conv_map: Vec::default(),
         }
     }
 }
