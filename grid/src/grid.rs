@@ -7,6 +7,7 @@ use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
+use std::ptr;
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -798,6 +799,13 @@ impl Grid<'_> for SerialGrid {
         true
     }
 }
+
+impl PartialEq for SerialGrid {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self, other)
+    }
+}
+impl Eq for SerialGrid {}
 
 #[cfg(test)]
 mod test {

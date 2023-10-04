@@ -77,7 +77,7 @@ struct RawData2D<T: Scalar> {
 unsafe impl<T: Scalar> Sync for RawData2D<T> {}
 
 #[allow(clippy::too_many_arguments)]
-fn assemble_part<'a, T: Scalar + Clone + Copy>(
+fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
     output: &RawData2D<T>,
     kernel: &impl SingularKernel,
     needs_trial_normal: bool,
@@ -226,33 +226,11 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
     }
 
     // TODO: make these configurable
-    let blocksize = 32;
-
-    let mut test_cells: Vec<&[usize]> = vec![&[]];
-    let mut trial_cells: Vec<&[usize]> = vec![&[]];
+    let blocksize = 128;
 
     // Size of this might not be known at compile time
     // let test_dofs_per_cell = 1;
     // let trial_dofs_per_cell = 1;
-
-    let test_colouring = test_space.compute_cell_colouring();
-    let trial_colouring = trial_space.compute_cell_colouring();
-    for test_c in &test_colouring {
-        let mut test_start = 0;
-        while test_start < test_c.len() {
-            let test_end = if test_start + blocksize < test_c.len() { test_start + blocksize } else { test_c.len() };
-            for trial_c in &trial_colouring {
-                let mut trial_start = 0;
-                while trial_start < trial_c.len() {
-                    let trial_end = if trial_start + blocksize < trial_c.len() { trial_start + blocksize } else { trial_c.len() };
-                    test_cells.push(&test_c[test_start..test_end]);
-                    trial_cells.push(&trial_c[trial_start..trial_end]);
-                    trial_start = trial_end;
-                }
-            }
-            test_start = test_end
-        }
-    }
 
     // TODO: allow user to configure this
     let npoints = 16;
@@ -280,28 +258,54 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
         .element()
         .tabulate(&qpoints, 0, &mut trial_table);
 
+    let test_colouring = test_space.compute_cell_colouring();
+    let trial_colouring = trial_space.compute_cell_colouring();
+    for test_c in &test_colouring {
+        for trial_c in &trial_colouring {
+            let mut test_cells: Vec<&[usize]> = vec![&[]];
+            let mut trial_cells: Vec<&[usize]> = vec![&[]];
 
-    let numthreads = test_cells.len();
-    let output_data = RawData2D { data: output.data.as_mut_ptr(), shape: *output.shape() };
-    let r: usize = (0..numthreads).into_par_iter().map(&|t| {
-        assemble_part(
-            &output_data,
-            kernel,
-            needs_trial_normal,
-            needs_test_normal,
-            trial_space,
-            trial_cells[t],
-            test_space,
-            test_cells[t],
-            &qpoints, &qweights,
-            &qpoints, &qweights,
-            &trial_table,
-            &test_table,
-        )
-    }).sum();
-    assert_eq!(r, numthreads);
+            let mut test_start = 0;
+            while test_start < test_c.len() {
+                let test_end = if test_start + blocksize < test_c.len() { test_start + blocksize } else { test_c.len() };
 
-    return;
+                let mut trial_start = 0;
+                while trial_start < trial_c.len() {
+                    let trial_end = if trial_start + blocksize < trial_c.len() { trial_start + blocksize } else { trial_c.len() };
+                    test_cells.push(&test_c[test_start..test_end]);
+                    trial_cells.push(&trial_c[trial_start..trial_end]);
+                    trial_start = trial_end;
+                }
+                test_start = test_end
+            }
+
+            let numthreads = test_cells.len();
+            let output_data = RawData2D { data: output.data.as_mut_ptr(), shape: *output.shape() };
+            let r: usize = (0..numthreads).into_par_iter().map(&|t| {
+                assemble_batch_nonadjacent(
+                    &output_data,
+                    kernel,
+                    needs_trial_normal,
+                    needs_test_normal,
+                    trial_space,
+                    trial_cells[t],
+                    test_space,
+                    test_cells[t],
+                    &qpoints, &qweights,
+                    &qpoints, &qweights,
+                    &trial_table,
+                    &test_table,
+                )
+            }).sum();
+            assert_eq!(r, numthreads);
+        }
+    }
+
+    if test_space.grid() != trial_space.grid() {
+        // If the test and trial grids are different, there are no neighbouring triangles
+        return;
+    }
+
 
     let test_c20 = test_space.grid().topology().connectivity(2, 0);
     let trial_c20 = trial_space.grid().topology().connectivity(2, 0);
