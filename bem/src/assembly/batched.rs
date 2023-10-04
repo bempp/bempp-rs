@@ -306,25 +306,28 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
         return;
     }
 
-
-    let test_c20 = test_space.grid().topology().connectivity(2, 0);
-    let trial_c20 = trial_space.grid().topology().connectivity(2, 0);
-
     // TODO: allow user to configure this
     let npoints = 4;
 
-    let grid = trial_space.grid();
+    let grid = test_space.grid();
+    let c20 = grid.topology().connectivity(2, 0);
 
+    // Loop through colours
+        // loop through cells
+            // Find pairs
+            // if pairs.len() > 0
+                // Add to block for that pair
+        // assemble singular blocks for each pair
 
     for (vertex, cells) in grid.topology().connectivity(0, 2).iter_rows().enumerate() {
         for test_cell in cells {
             let test_cell_tindex = grid.topology().index_map()[*test_cell];
             let test_cell_gindex = grid.geometry().index_map()[*test_cell];
-            let test_vertices = test_c20.row(test_cell_tindex).unwrap();
+            let test_vertices = c20.row(test_cell_tindex).unwrap();
             for trial_cell in cells {
                 let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
                 let trial_cell_gindex = grid.geometry().index_map()[*trial_cell];
-                let trial_vertices = trial_c20.row(trial_cell_tindex).unwrap();
+                let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
                 let mut ismin = true;
                 let mut pairs = vec![];
