@@ -1,3 +1,4 @@
+//! Constructor for a single node Domain.
 use crate::types::{domain::Domain, point::PointType};
 
 impl Domain {

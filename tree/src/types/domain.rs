@@ -1,4 +1,4 @@
-//! Data structures and methods for defining the computational domain.
+//! Data structures for defining the computational domain.
 
 use crate::types::point::PointType;
 

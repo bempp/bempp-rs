@@ -1,3 +1,5 @@
+//! Implementations of methods for data structures specified in the `types` crate.
+
 pub mod helpers;
 pub mod impl_domain;
 pub mod impl_morton;

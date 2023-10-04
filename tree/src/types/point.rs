@@ -1,4 +1,4 @@
-//! Data structures and methods for Cartesian Points in 3D.
+//! Data structures for Cartesian Points in 3D.
 use crate::types::morton::MortonKey;
 
 pub type PointType = f64;

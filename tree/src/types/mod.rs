@@ -1,4 +1,4 @@
-//! # Type declaration
+//! Type declarations for Morton Keys, Single and Multinode Trees, Cartesian points, and Single and Multinode domains.
 pub mod domain;
 pub mod morton;
 #[cfg(feature = "mpi")]

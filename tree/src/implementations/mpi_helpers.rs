@@ -1,4 +1,4 @@
-/// Helper Routines for MPI functionality
+//! Helper Routines for MPI functionality
 use mpi::{
     datatype::Equivalence,
     topology::{Communicator, UserCommunicator},

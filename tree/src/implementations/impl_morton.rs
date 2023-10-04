@@ -1,3 +1,4 @@
+//! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
 use itertools::{izip, Itertools};
 use std::{
     cmp::Ordering,

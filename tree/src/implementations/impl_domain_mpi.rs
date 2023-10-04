@@ -1,3 +1,4 @@
+//! Implementation of an equivalent MPI type for a Domain object, and constructor for distributed Domains.
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},

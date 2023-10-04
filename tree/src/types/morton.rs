@@ -1,4 +1,4 @@
-//! Data structures and methods for Morton Keys.
+//! Data structures for Morton Keys.
 pub type KeyType = u64;
 
 #[repr(C)]

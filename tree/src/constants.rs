@@ -2,21 +2,28 @@
 
 use crate::types::morton::{KeyType, MortonKey};
 
+/// Default value chosen for subcommunicator size in Hyksort, must be a power of 2.
 pub const K: i32 = 2;
 
+/// Default value chosen for maximum number of particles per leaf in adaptive trees.
 pub const NCRIT: u64 = 150;
 
+/// Maximum possible level of octree recursion, by definition.
 pub const DEEPEST_LEVEL: KeyType = 16;
 
+/// The default level of recursion chosen in adaptive octrees.
 pub const DEFAULT_LEVEL: KeyType = 3;
 
+/// The 'size' of each level in terms of octants along each axis, at the maximum depth of recursion.
 pub const LEVEL_SIZE: KeyType = 65536;
 
+/// The root node of any octree.
 pub const ROOT: MortonKey = MortonKey {
     anchor: [0, 0, 0],
     morton: 0,
 };
 
+/// Transfer vectors in component form to nearest octant neighbours.
 pub const DIRECTIONS: [[i64; 3]; 26] = [
     [-1, -1, -1],
     [-1, -1, 0],
@@ -46,6 +53,7 @@ pub const DIRECTIONS: [[i64; 3]; 26] = [
     [1, 1, 1],
 ];
 
+/// Lookup tables for encoding 'z' position in a Morton encoding from Cartesian coordinates.
 pub const Z_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
     0x00000200, 0x00000201, 0x00000208, 0x00000209, 0x00000240, 0x00000241, 0x00000248, 0x00000249,
@@ -81,6 +89,7 @@ pub const Z_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00249200, 0x00249201, 0x00249208, 0x00249209, 0x00249240, 0x00249241, 0x00249248, 0x00249249,
 ];
 
+/// Lookup tables for encoding 'y' position in a Morton encoding from Cartesian coordinates.
 pub const Y_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000002, 0x00000010, 0x00000012, 0x00000080, 0x00000082, 0x00000090, 0x00000092,
     0x00000400, 0x00000402, 0x00000410, 0x00000412, 0x00000480, 0x00000482, 0x00000490, 0x00000492,
@@ -116,6 +125,7 @@ pub const Y_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00492400, 0x00492402, 0x00492410, 0x00492412, 0x00492480, 0x00492482, 0x00492490, 0x00492492,
 ];
 
+/// Lookup tables for encoding 'x' position in a Morton encoding from Cartesian coordinates.
 pub const X_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00000000, 0x00000004, 0x00000020, 0x00000024, 0x00000100, 0x00000104, 0x00000120, 0x00000124,
     0x00000800, 0x00000804, 0x00000820, 0x00000824, 0x00000900, 0x00000904, 0x00000920, 0x00000924,
@@ -151,6 +161,7 @@ pub const X_LOOKUP_ENCODE: [KeyType; 256] = [
     0x00924800, 0x00924804, 0x00924820, 0x00924824, 0x00924900, 0x00924904, 0x00924920, 0x00924924,
 ];
 
+/// Lookup tables for decoding 'z' position in a Morton encoding from Cartesian coordinates.
 pub const Z_LOOKUP_DECODE: [KeyType; 512] = [
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
@@ -170,6 +181,7 @@ pub const Z_LOOKUP_DECODE: [KeyType; 512] = [
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
 ];
 
+/// Lookup tables for decoding 'y' position in a Morton encoding from Cartesian coordinates.
 pub const Y_LOOKUP_DECODE: [KeyType; 512] = [
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
@@ -189,6 +201,7 @@ pub const Y_LOOKUP_DECODE: [KeyType; 512] = [
     4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7, 6, 6, 7, 7,
 ];
 
+/// Lookup tables for decoding 'x' position in a Morton encoding from Cartesian coordinates.
 pub const X_LOOKUP_DECODE: [KeyType; 512] = [
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3,
@@ -208,15 +221,17 @@ pub const X_LOOKUP_DECODE: [KeyType; 512] = [
     6, 6, 6, 6, 7, 7, 7, 7, 6, 6, 6, 6, 7, 7, 7, 7, 6, 6, 6, 6, 7, 7, 7, 7, 6, 6, 6, 6, 7, 7, 7, 7,
 ];
 
-// Number of bits used for Level information.
+/// Number of bits used for Level information.
 pub const LEVEL_DISPLACEMENT: usize = 15;
 
-// Mask for the last 15 bits.
+/// Mask for the last 15 bits.
 pub const LEVEL_MASK: KeyType = 0x7FFF;
 
-// Mask for lowest order byte.
+/// Mask for lowest order byte.
 pub const BYTE_MASK: KeyType = 0xFF;
+
+/// Number of bits in a byte.
 pub const BYTE_DISPLACEMENT: KeyType = 8;
 
-// Mask encapsulating a bit.
+/// Mask encapsulating a bit.
 pub const NINE_BIT_MASK: KeyType = 0x1FF;

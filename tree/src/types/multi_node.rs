@@ -1,4 +1,4 @@
-//! Data structures and methods to create distributed octrees with MPI.
+//! Data structures to create distributed octrees with MPI.
 use mpi::topology::UserCommunicator;
 
 use std::collections::{HashMap, HashSet};

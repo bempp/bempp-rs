@@ -1,3 +1,4 @@
+//! Implementation of constructors for single node trees.
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 

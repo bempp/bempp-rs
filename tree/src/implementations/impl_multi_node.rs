@@ -1,3 +1,4 @@
+//! Implementation of constructors for multi node trees from distributed point data.
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 

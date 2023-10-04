@@ -1,3 +1,4 @@
+//! Implementation of an equivalent MPI type for Morton keys.
 use crate::types::morton::{KeyType, MortonKey};
 use memoffset::offset_of;
 use mpi::{

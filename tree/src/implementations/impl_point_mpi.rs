@@ -1,3 +1,4 @@
+//! Implementation of an equivalent MPI type for point data.
 use crate::types::{
     morton::{KeyType, MortonKey},
     point::{Point, PointType},

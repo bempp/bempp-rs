@@ -1,3 +1,6 @@
+//! Helper functions used in testing tree implementations, specifically test point generators, 
+//! as well as helpers for handling surfaces that discretise a box corresponding to a Morton key.
+
 use std::collections::HashMap;
 
 use rand::prelude::*;
@@ -7,6 +10,7 @@ use rlst::dense::{base_matrix::BaseMatrix, rlst_mat, Dynamic, Matrix, VectorCont
 
 use crate::types::morton::MortonKey;
 
+/// Alias for an rlst container for point data.
 pub type PointsMat =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
@@ -38,7 +42,7 @@ pub fn points_fixture(npoints: usize, min: Option<f64>, max: Option<f64>) -> Poi
     points
 }
 
-//. Points fixture for testing, uniformly samples in the bounds [[0, 1), [0, 1), [0, 500)] for the x, y, and z
+///. Points fixture for testing, uniformly samples in the bounds [[0, 1), [0, 1), [0, 500)] for the x, y, and z
 /// axes respectively.
 ///
 /// # Arguments
@@ -66,7 +70,7 @@ pub fn points_fixture_col(npoints: usize) -> PointsMat {
 /// are expected in column major order [x_1, x_2...x_N, y_1, y_2....y_N, z_1, z_2...z_N]
 ///
 /// # Arguements:
-/// * `coordinates`
+/// * `coordinates` - points on the surface of a box.
 pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
     let n = coordinates.len() / 3;
 
