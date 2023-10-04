@@ -38,8 +38,8 @@ impl SingleNodeTree {
         let mut tmp = Points::default();
         for i in 0..npoints {
             let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
-            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, &domain, depth);
+            let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(&point, domain, depth);
             tmp.points.push(Point {
                 coordinate: point,
                 base_key,
@@ -72,14 +72,14 @@ impl SingleNodeTree {
         points.sort();
 
         let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0].clone();
+        let mut curr = points.points[0];
         let mut curr_idx = 0;
 
         for (i, point) in points.points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
-                curr = point.clone();
+                curr = *point;
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
@@ -165,7 +165,7 @@ impl SingleNodeTree {
         let mut tmp = Points::default();
         for i in 0..npoints {
             let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
-            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
             tmp.points.push(Point {
                 coordinate: point,
                 base_key: key,
@@ -207,14 +207,14 @@ impl SingleNodeTree {
         points.sort();
 
         let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0].clone();
+        let mut curr = points.points[0];
         let mut curr_idx = 0;
 
         for (i, point) in points.points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
-                curr = point.clone();
+                curr = *point;
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
@@ -311,9 +311,9 @@ impl SingleNodeTree {
         let depth = depth.unwrap_or(DEFAULT_LEVEL);
 
         if adaptive {
-            SingleNodeTree::adaptive_tree(points, &domain, n_crit, &global_idxs)
+            SingleNodeTree::adaptive_tree(points, &domain, n_crit, global_idxs)
         } else {
-            SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
+            SingleNodeTree::uniform_tree(points, &domain, depth, global_idxs)
         }
     }
 
@@ -409,12 +409,12 @@ impl SingleNodeTree {
                 .iter()
                 .enumerate()
                 .fold(
-                    (HashMap::new(), 0, points.points[0].clone()),
+                    (HashMap::new(), 0, points.points[0]),
                     |(mut blocks_to_points, curr_idx, curr), (i, point)| {
                         if point.encoded_key != curr.encoded_key {
                             blocks_to_points.insert(curr.encoded_key, (curr_idx, i));
 
-                            (blocks_to_points, i, point.clone())
+                            (blocks_to_points, i, *point)
                         } else {
                             (blocks_to_points, curr_idx, curr)
                         }

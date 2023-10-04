@@ -74,36 +74,35 @@ pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
     let ys = coordinates[n..].iter().take(n);
     let zs = coordinates[2 * n..].iter().take(n);
 
-    let x_min = xs
+    let x_min = *xs
         .clone()
         .min_by(|&a, &b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        .clone();
-    let x_max = xs
+        .unwrap();
+
+    let x_max = *xs
         .clone()
         .max_by(|&a, &b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        .clone();
-    let y_min = ys
+        .unwrap();
+
+    let y_min = *ys
         .clone()
         .min_by(|&a, &b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        .clone();
-    let y_max = ys
+        .unwrap();
+
+    let y_max = *ys
         .clone()
         .max_by(|&a, &b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        .clone();
-    let z_min = zs
+        .unwrap();
+
+    let z_min = *zs
         .clone()
         .min_by(|&a, &b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        .clone();
-    let z_max = zs
+        .unwrap();
+
+    let z_max = *zs
         .clone()
         .max_by(|&a, &b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        .clone();
+        .unwrap();
 
     // Returned in column major order
     let corners = vec![

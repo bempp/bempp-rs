@@ -242,7 +242,7 @@ pub fn point_to_anchor(
     for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
         contained.push((o <= p) && (p <= o + d));
     }
-    let contained = contained.iter().all(|&x| x == true);
+    let contained = contained.iter().all(|&x| x);
 
     match contained {
         true => {

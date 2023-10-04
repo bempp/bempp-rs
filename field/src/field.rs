@@ -355,7 +355,7 @@ where
             }
 
             // Find reflected convolution grid
-            let &conv_point_index_reflected = map_surface.get(&conv_point_index).unwrap();
+            let &conv_point_index_reflected = map_surface.get(conv_point_index).unwrap();
             let conv_point_reflected = [
                 source_equivalent_surface[conv_point_index_reflected],
                 source_equivalent_surface[nsources + conv_point_index_reflected],
@@ -578,7 +578,7 @@ where
                     self.kernel.evaluate_st(
                         EvalType::Value,
                         &conv_point[..],
-                        &target_pt[..],
+                        target_pt,
                         &[1.0],
                         &mut res[..],
                     );
@@ -637,12 +637,38 @@ mod test {
             diameter: [1., 1., 1.],
         };
         let alpha = 1.05;
-        let k = 100;
-
-        let svd = SvdFieldTranslationKiFmm::new(kernel, Some(k), order, domain, alpha);
+        let k = 60;
+        let ntransfer_vectors = 316;
+        let svd = SvdFieldTranslationKiFmm::new(kernel.clone(), Some(k), order, domain, alpha);
         let m2l = svd.compute_m2l_operators(order, domain);
 
-        assert!(true)
+        // Test that the rank cutoff has been taken correctly (k < ncoeffs)
+        assert_eq!(m2l.st_block.shape(), (k, svd.ncoeffs(order)));
+        assert_eq!(m2l.c.shape(), (k, k * ntransfer_vectors));
+        assert_eq!(m2l.u.shape(), (svd.ncoeffs(order), k));
+
+        // Test that the rank cutoff has been taken correctly (k > ncoeffs)
+        let k = 100;
+        let svd = SvdFieldTranslationKiFmm::new(kernel.clone(), Some(k), order, domain, alpha);
+        let m2l = svd.compute_m2l_operators(order, domain);
+        assert_eq!(
+            m2l.st_block.shape(),
+            (svd.ncoeffs(order), svd.ncoeffs(order))
+        );
+        assert_eq!(
+            m2l.c.shape(),
+            (svd.ncoeffs(order), svd.ncoeffs(order) * ntransfer_vectors)
+        );
+        assert_eq!(m2l.u.shape(), (svd.ncoeffs(order), svd.ncoeffs(order)));
+
+        // Test that the rank cutoff has been taken correctly (k unspecified)
+        let k = None;
+        let default_k = 50;
+        let svd = SvdFieldTranslationKiFmm::new(kernel.clone(), k, order, domain, alpha);
+        let m2l = svd.compute_m2l_operators(order, domain);
+        assert_eq!(m2l.st_block.shape(), (default_k, svd.ncoeffs(order)));
+        assert_eq!(m2l.c.shape(), (default_k, default_k * ntransfer_vectors));
+        assert_eq!(m2l.u.shape(), (svd.ncoeffs(order), default_k));
     }
 
     #[test]
@@ -658,14 +684,9 @@ mod test {
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Create a random point in the middle of the domain
-        let pt = [0.5f64, 0.5f64, 0.5f64];
-        let key = MortonKey::from_point(&pt, &domain, 3);
-        let target_pt = [1.0, 1.0, 1.0];
-        let target_pt_index = 7;
-
         let m2l = fft.compute_m2l_operators(order, domain);
 
-        // fft.compute_kernel(order, convolution_grid, target_pt);
-        // assert!(true)
+        // Test that the number of precomputed kernel interactions matches the number of transfer vectors
+        assert_eq!(m2l.m2l.len(), 16);
     }
 }

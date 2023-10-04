@@ -18,9 +18,7 @@ pub fn reflect(components: &[i64; 3]) -> Vec<i64> {
     let axial = axially_reflect_components(components);
 
     // Diagonal reflection
-    let axial_diag = diagonally_reflect_components(&axial[..]);
-
-    axial_diag
+    diagonally_reflect_components(&axial[..])
 }
 
 /// Apply axial reflections to Transfer Vector components to get into reference octant.
@@ -53,7 +51,7 @@ pub fn diagonally_reflect_components(components: &[i64]) -> Vec<i64> {
     // Diagonal reflection
     let idxs = argsort(components);
 
-    let axial_diag = idxs.iter().map(|&i| components[i].clone()).collect_vec();
+    let axial_diag = idxs.iter().map(|&i| components[i]).collect_vec();
 
     axial_diag
 }
@@ -268,9 +266,9 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
         let t_checksum = MortonKey::find_transfer_vector_from_components(t);
         let t_rot_checksum = MortonKey::find_transfer_vector_from_components(&t_refl[..]);
 
-        axial_diag_map.insert(t_checksum, t_rot_checksum.clone());
+        axial_diag_map.insert(t_checksum, t_rot_checksum);
         axial_diag_map_component.insert(t, t_refl.clone());
-        unique_reflected_transfer_vectors.insert(t_rot_checksum.clone());
+        unique_reflected_transfer_vectors.insert(t_rot_checksum);
 
         reflected_transfer_vectors.push(t_refl);
     }

@@ -22,9 +22,9 @@ pub fn axial_reflection_surface(
 
     fn helper(m: usize, t: i64, order: usize) -> usize {
         if t >= 0 {
-            return m;
+            m
         } else {
-            return order - (m - 1);
+            order - (m - 1)
         }
     }
 
@@ -55,9 +55,9 @@ pub fn axial_reflection_convolution(
     assert!(order > 1);
     fn helper(m: usize, t: i64, order: usize) -> usize {
         if t >= 0 {
-            return m;
+            m
         } else {
-            return 2 * (order - 1) - (m - 1);
+            2 * (order - 1) - (m - 1)
         }
     }
 
