@@ -7,7 +7,7 @@ use rlst::{
         linalg::LinAlg,
         traits::svd::{Mode, Svd},
     },
-    common::traits::{Eval, NewLikeSelf, Transpose},
+    common::traits::{Eval, Transpose},
     dense::{rlst_mat, Dot, RawAccess, RawAccessMut, Shape},
 };
 
@@ -27,7 +27,7 @@ use crate::{
     surface::{axial_reflection_convolution, axial_reflection_surface, diagonal_reflection},
     transfer_vector::{compute_transfer_vectors, compute_transfer_vectors_unique},
     types::{
-        FftFieldTranslationKiFmm, FftM2lEntry, SvdFieldTranslationKiFmm, SvdM2lEntry,
+        FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm, SvdM2lOperatorData,
         TransferVector,
     },
 };
@@ -38,27 +38,23 @@ where
 {
     type TransferVector = Vec<TransferVector>;
     type TransferVectorMap = HashMap<usize, usize>;
-    type M2LOperators = (SvdM2lEntry, SvdM2lEntry, SvdM2lEntry);
+    type M2LOperators = SvdM2lOperatorData;
     type Domain = Domain;
 
     fn compute_transfer_vectors(&self) -> (Self::TransferVector, Self::TransferVectorMap) {
         compute_transfer_vectors()
     }
 
-    fn ncoeffs(&self, expansion_order: usize) -> usize {
-        6 * (expansion_order - 1).pow(2) + 2
+    fn ncoeffs(&self, order: usize) -> usize {
+        6 * (order - 1).pow(2) + 2
     }
 
-    fn compute_m2l_operators<'a>(
-        &self,
-        expansion_order: usize,
-        domain: Self::Domain,
-    ) -> Self::M2LOperators {
+    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
-        let nrows = self.ncoeffs(expansion_order);
-        let ncols = self.ncoeffs(expansion_order);
+        let nrows = self.ncoeffs(order);
+        let ncols = self.ncoeffs(order);
 
         let ntransfer_vectors = self.transfer_vectors.len();
         let mut se2tc_fat = rlst_mat![f64, (nrows, ncols * ntransfer_vectors)];
@@ -66,14 +62,10 @@ where
         let mut se2tc_thin = rlst_mat![f64, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface =
-                t.source
-                    .compute_surface(&domain, expansion_order, self.alpha);
+            let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
-            let target_check_surface =
-                t.target
-                    .compute_surface(&domain, expansion_order, self.alpha);
+            let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
             let mut tmp_gram = rlst_mat![f64, (ntargets, nsources)];
@@ -145,7 +137,8 @@ where
         }
 
         let st_block = s_block.transpose().eval();
-        (u, st_block, c)
+
+        SvdM2lOperatorData { u, st_block, c }
     }
 }
 
@@ -153,29 +146,24 @@ impl<T> SvdFieldTranslationKiFmm<T>
 where
     T: Kernel<T = f64> + Default,
 {
-    pub fn new(
-        kernel: T,
-        k: Option<usize>,
-        expansion_order: usize,
-        domain: Domain,
-        alpha: f64,
-    ) -> Self {
-        let dummy = rlst_mat![f64, (1, 1)];
-
-        // TODO: There should be a default for matrices to make code cleaner.
+    /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
+    ///
+    /// # Arguments
+    /// * `kernel` - The kernel being used, only compatible with homogenous, translationally invariant kernels.
+    /// * `k` - The maximum rank to be used in SVD compression for the translation operators, if none is specified will be taken as  max({50, max_column_rank})
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    pub fn new(kernel: T, k: Option<usize>, order: usize, domain: Domain, alpha: f64) -> Self {
         let mut result = SvdFieldTranslationKiFmm {
             alpha,
             k: 0,
             kernel,
-            m2l: (
-                dummy.new_like_self().eval(),
-                dummy.new_like_self().eval(),
-                dummy.new_like_self().eval(),
-            ),
+            m2l: SvdM2lOperatorData::default(),
             transfer_vectors: Vec::new(),
         };
 
-        let ncoeffs = result.ncoeffs(expansion_order);
+        let ncoeffs = result.ncoeffs(order);
         if let Some(k) = k {
             // Compression rank <= number of coefficients
             if k <= ncoeffs {
@@ -187,8 +175,8 @@ where
             result.k = 50;
         }
 
-        // result.transfer_vectors = result.compute_transfer_vectors();
-        result.m2l = result.compute_m2l_operators(expansion_order, domain);
+        (result.transfer_vectors, _) = result.compute_transfer_vectors();
+        result.m2l = result.compute_m2l_operators(order, domain);
 
         result
     }
@@ -199,21 +187,13 @@ where
     T: Kernel<T = f64> + Default,
 {
     type Domain = Domain;
-    type M2LOperators = (
-        Vec<FftM2lEntry>,           // M2L matrices
-        Vec<HashMap<usize, usize>>, // Surface to Reflected Map
-        Vec<HashMap<usize, usize>>, // Inverse Surface to Reflected Map
-        Vec<HashMap<usize, usize>>, // Conv Grid to Reflected Map
-        Vec<HashMap<usize, usize>>, // Inverse Conv Grid to Reflected Map
-    );
+
+    type M2LOperators = FftM2lOperatorData;
+
     type TransferVector = Vec<TransferVector>;
     type TransferVectorMap = HashMap<usize, usize>;
 
-    fn compute_m2l_operators(
-        &self,
-        expansion_order: usize,
-        domain: Self::Domain,
-    ) -> Self::M2LOperators {
+    fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
         let mut result = Vec::new();
 
         let mut surface_maps = Vec::new();
@@ -222,17 +202,14 @@ where
         let mut inv_conv_maps = Vec::new();
 
         // Create a map between corner indices and surface indices
-        let (map_corner_to_surface, inv_map_corner_to_surface) =
-            map_corners_to_surface(expansion_order);
+        let (map_corner_to_surface, inv_map_corner_to_surface) = map_corners_to_surface(order);
 
         for t in self.transfer_vectors.iter() {
-            let source_equivalent_surface =
-                t.source
-                    .compute_surface(&domain, expansion_order, self.alpha);
+            let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
             let nsources = source_equivalent_surface.len() / 3;
 
             // Find multi-index after axial reflections
-            let (_, source_multi_index) = MortonKey::surface_grid(expansion_order);
+            let (_, source_multi_index) = MortonKey::surface_grid(order);
 
             let mut source_multi_index_axial = vec![0usize; source_multi_index.len()];
 
@@ -243,7 +220,7 @@ where
                     source_multi_index[2 * nsources + i],
                 ];
 
-                let m_refl = axial_reflection_surface(&m[..], &t.components[..], expansion_order);
+                let m_refl = axial_reflection_surface(&m[..], &t.components[..], order);
 
                 source_multi_index_axial[i] = m_refl[0];
                 source_multi_index_axial[nsources + i] = m_refl[1];
@@ -294,7 +271,7 @@ where
                 }
             }
 
-            // Find convolution grid
+            // Find convolution grid, and calculate kernel evaluations wrt to last corner.
             let conv_point_corner_index = 7;
             let corners = find_corners(&source_equivalent_surface[..]);
             let conv_point = [
@@ -307,7 +284,7 @@ where
                 .unwrap();
 
             let (_conv_grid_sources, conv_grid_multi_index) = t.source.convolution_grid(
-                expansion_order,
+                order,
                 &domain,
                 self.alpha,
                 &conv_point[..],
@@ -326,8 +303,7 @@ where
                     conv_grid_multi_index[2 * nconv + i],
                 ];
 
-                let m_refl =
-                    axial_reflection_convolution(&m[..], &t.components[..], expansion_order);
+                let m_refl = axial_reflection_convolution(&m[..], &t.components[..], order);
 
                 conv_grid_multi_index_axial[i] = m_refl[0];
                 conv_grid_multi_index_axial[nconv + i] = m_refl[1];
@@ -390,7 +366,7 @@ where
                 .unwrap();
 
             let (conv_grid_reflected, _) = t.source.convolution_grid(
-                expansion_order,
+                order,
                 &domain,
                 self.alpha,
                 &conv_point_reflected[..],
@@ -398,9 +374,7 @@ where
             );
 
             // Compute target check surface
-            let target_check_surface =
-                t.target
-                    .compute_surface(&domain, expansion_order, self.alpha);
+            let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
             let ntargets = target_check_surface.len() / 3;
 
             // Find target with which to calculate kernel wrt
@@ -412,7 +386,7 @@ where
             ];
 
             let reflected_kernel = self.compute_kernel_reflected(
-                expansion_order,
+                order,
                 &conv_grid_reflected[..],
                 &map_conv,
                 &kernel_point[..],
@@ -447,21 +421,21 @@ where
             inv_conv_maps.push(inv_map_conv);
         }
 
-        (
-            result,
-            surface_maps,
-            inv_surface_maps,
-            conv_maps,
-            inv_conv_maps,
-        )
+        FftM2lOperatorData {
+            m2l: result,
+            surface_map: surface_maps,
+            inv_surface_map: inv_surface_maps,
+            conv_map: conv_maps,
+            inv_conv_map: inv_conv_maps,
+        }
     }
 
     fn compute_transfer_vectors(&self) -> (Self::TransferVector, Self::TransferVectorMap) {
         compute_transfer_vectors_unique()
     }
 
-    fn ncoeffs(&self, expansion_order: usize) -> usize {
-        6 * (expansion_order - 1).pow(2) + 2
+    fn ncoeffs(&self, order: usize) -> usize {
+        6 * (order - 1).pow(2) + 2
     }
 }
 
@@ -469,43 +443,45 @@ impl<T> FftFieldTranslationKiFmm<T>
 where
     T: Kernel<T = f64> + Default,
 {
-    pub fn new(kernel: T, expansion_order: usize, domain: Domain, alpha: f64) -> Self {
+    /// Constructor for FFT field translation struct for the kernel independent FMM (KiFMM).
+    ///
+    /// # Arguments
+    /// * `kernel` - The kernel being used, only compatible with homogenous, translationally invariant kernels.
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    pub fn new(kernel: T, order: usize, domain: Domain, alpha: f64) -> Self {
         let mut result = FftFieldTranslationKiFmm {
             alpha,
             kernel,
             surf_to_conv_map: HashMap::default(),
             conv_to_surf_map: HashMap::default(),
-            m2l: Vec::default(),
+            m2l: FftM2lOperatorData::default(),
             transfer_vectors: Vec::default(),
             transfer_vector_map: HashMap::default(),
-            surf_grid_maps: Vec::default(),
-            inv_surf_grid_maps: Vec::default(),
-            conv_grid_maps: Vec::new(),
-            inv_conv_grid_maps: Vec::new(),
         };
 
         // Create maps between surface and convolution grids
         let (surf_to_conv, conv_to_surf) =
-            FftFieldTranslationKiFmm::<T>::compute_surf_to_conv_map(expansion_order);
+            FftFieldTranslationKiFmm::<T>::compute_surf_to_conv_map(order);
 
         result.surf_to_conv_map = surf_to_conv;
         result.conv_to_surf_map = conv_to_surf;
         (result.transfer_vectors, result.transfer_vector_map) = result.compute_transfer_vectors();
-        let (m2l, surface_maps, inv_surface_maps, conv_maps, inv_conv_maps) =
-            result.compute_m2l_operators(expansion_order, domain);
-        result.m2l = m2l;
-        result.surf_grid_maps = surface_maps;
-        result.inv_surf_grid_maps = inv_surface_maps;
-        result.conv_grid_maps = conv_maps;
-        result.inv_conv_grid_maps = inv_conv_maps;
+
+        result.m2l = result.compute_m2l_operators(order, domain);
 
         result
     }
 
+    /// Compute map between convolution grid indices and surface indices, return mapping and inverse mapping.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
     pub fn compute_surf_to_conv_map(
-        expansion_order: usize,
+        order: usize,
     ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
-        let n = 2 * expansion_order - 1;
+        let n = 2 * order - 1;
 
         // Index maps between surface and convolution grids
         let mut surf_to_conv: HashMap<usize, usize> = HashMap::new();
@@ -515,8 +491,8 @@ where
         let mut surf_index = 0;
 
         // The boundaries of the surface grid
-        let lower = expansion_order - 1;
-        let upper = 2 * expansion_order - 2;
+        let lower = order - 1;
+        let upper = 2 * order - 2;
 
         // Iterate through the entire convolution grid marking the boundaries
         // This makes the map much easier to understand and debug
@@ -539,13 +515,19 @@ where
         (surf_to_conv, conv_to_surf)
     }
 
+    /// Computes the unique kernel evaluations and places them on a convolution grid on the source box wrt to a given target point on the target box surface grid.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in row major order.
+    /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn compute_kernel(
         &self,
-        expansion_order: usize,
+        order: usize,
         convolution_grid: &[f64],
-        min_target: [f64; 3],
+        target_pt: [f64; 3],
     ) -> Array3D<f64> {
-        let n = 2 * expansion_order - 1;
+        let n = 2 * order - 1;
         let mut result = Array3D::<f64>::new((n, n, n));
         let nconv = n.pow(3);
 
@@ -554,7 +536,7 @@ where
         self.kernel.assemble_st(
             EvalType::Value,
             convolution_grid,
-            &min_target[..],
+            &target_pt[..],
             &mut kernel_evals[..],
         );
 
@@ -563,14 +545,22 @@ where
         result
     }
 
+    /// Computes the unique kernel evaluations and places them on a reflected convolution grid on the source box wrt to a given target point on the target box surface grid.
+    /// Reflections identify the target/source boxes with a unique transfer vector in the reference octant.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `convolution_grid_reflected` - Cartesian coordinates of points on the reflected convolution grid at a source box, expected in row major order.
+    /// * `convolution_map` - The map between the indices of a convolution grid, and its reflected equivalent.
+    /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn compute_kernel_reflected(
         &self,
-        expansion_order: usize,
+        order: usize,
         convolution_grid_reflected: &[f64],
         convolution_map: &HashMap<usize, usize>,
-        kernel_point: &[f64],
+        target_pt: &[f64],
     ) -> Array3D<f64> {
-        let n = 2 * expansion_order - 1;
+        let n = 2 * order - 1;
         let nconv = n.pow(3);
         let mut result = Array3D::<f64>::new((n, n, n));
 
@@ -588,7 +578,7 @@ where
                     self.kernel.evaluate_st(
                         EvalType::Value,
                         &conv_point[..],
-                        &kernel_point[..],
+                        &target_pt[..],
                         &[1.0],
                         &mut res[..],
                     );
@@ -601,8 +591,13 @@ where
         result
     }
 
-    pub fn compute_signal(&self, expansion_order: usize, charges: &[f64]) -> Array3D<f64> {
-        let n = 2 * expansion_order - 1;
+    /// Place charge data on the convolution grid.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `charges` - A vector of charges.
+    pub fn compute_signal(&self, order: usize, charges: &[f64]) -> Array3D<f64> {
+        let n = 2 * order - 1;
         let mut result = Array3D::new((n, n, n));
 
         let mut tmp = vec![0f64; n * n * n];
@@ -631,13 +626,46 @@ mod test {
 
     use super::*;
 
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
+
     #[test]
     pub fn test_svd_field_translation() {
+        let kernel = Laplace3dKernel::new();
+        let order = 5;
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let alpha = 1.05;
+        let k = 100;
+
+        let svd = SvdFieldTranslationKiFmm::new(kernel, Some(k), order, domain, alpha);
+        let m2l = svd.compute_m2l_operators(order, domain);
+
         assert!(true)
     }
 
     #[test]
     pub fn test_fft_field_translation() {
-        assert!(true)
+        let kernel = Laplace3dKernel::new();
+        let order = 5;
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let alpha = 1.05;
+
+        let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
+
+        // Create a random point in the middle of the domain
+        let pt = [0.5f64, 0.5f64, 0.5f64];
+        let key = MortonKey::from_point(&pt, &domain, 3);
+        let target_pt = [1.0, 1.0, 1.0];
+        let target_pt_index = 7;
+
+        let m2l = fft.compute_m2l_operators(order, domain);
+
+        // fft.compute_kernel(order, convolution_grid, target_pt);
+        // assert!(true)
     }
 }
