@@ -71,7 +71,7 @@ fn get_quadrature_rule(
 
 struct RawData2D<T: Scalar> {
     pub data: *mut T,
-    pub shape: (usize, usize),    
+    pub shape: (usize, usize),
 }
 
 unsafe impl<T: Scalar> Sync for RawData2D<T> {}
@@ -87,9 +87,9 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
     test_space: &SerialFunctionSpace<'a>,
     test_cells: &[usize],
     trial_points: &Array2D<f64>,
-    trial_weights: &Vec<f64>,
+    trial_weights: &[f64],
     test_points: &Array2D<f64>,
-    test_weights: &Vec<f64>,
+    test_weights: &[f64],
     trial_table: &Array4D<f64>,
     test_table: &Array4D<f64>,
 ) -> usize {
@@ -164,16 +164,16 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
                 {
                     let mut sum = T::zero();
 
-                    for test_index in 0..test_points.shape().0 {
-                        for trial_index in 0..trial_points.shape().0 {
+                    for (test_index, test_wt) in test_weights.iter().enumerate() {
+                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
                             sum += kernel.eval::<T>(
                                 unsafe { test_mapped_pts.row_unchecked(test_index) },
                                 unsafe { trial_mapped_pts.row_unchecked(trial_index) },
                                 unsafe { test_normals.row_unchecked(test_index) },
                                 unsafe { trial_normals.row_unchecked(trial_index) },
                             ) * T::from_f64(
-                                test_weights[test_index]
-                                    * trial_weights[trial_index]
+                                test_wt
+                                    * trial_wt
                                     * unsafe { test_table.get_unchecked(0, test_index, test_i, 0) }
                                     * test_jdet[test_index]
                                     * unsafe {
@@ -193,7 +193,11 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
                     }
                     if !neighbour {
                         unsafe {
-                            *output.data.offset((*test_dof + output.shape.0 * *trial_dof).try_into().unwrap()) += sum;
+                            *output.data.offset(
+                                (*test_dof + output.shape.0 * *trial_dof)
+                                    .try_into()
+                                    .unwrap(),
+                            ) += sum;
                         }
                     }
                 }
@@ -245,9 +249,7 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
             .element()
             .tabulate_array_shape(0, qpoints.shape().0),
     );
-    test_space
-        .element()
-        .tabulate(&qpoints, 0, &mut test_table);
+    test_space.element().tabulate(&qpoints, 0, &mut test_table);
 
     let mut trial_table = Array4D::<f64>::new(
         trial_space
@@ -267,11 +269,19 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
 
             let mut test_start = 0;
             while test_start < test_c.len() {
-                let test_end = if test_start + blocksize < test_c.len() { test_start + blocksize } else { test_c.len() };
+                let test_end = if test_start + blocksize < test_c.len() {
+                    test_start + blocksize
+                } else {
+                    test_c.len()
+                };
 
                 let mut trial_start = 0;
                 while trial_start < trial_c.len() {
-                    let trial_end = if trial_start + blocksize < trial_c.len() { trial_start + blocksize } else { trial_c.len() };
+                    let trial_end = if trial_start + blocksize < trial_c.len() {
+                        trial_start + blocksize
+                    } else {
+                        trial_c.len()
+                    };
                     test_cells.push(&test_c[test_start..test_end]);
                     trial_cells.push(&trial_c[trial_start..trial_end]);
                     trial_start = trial_end;
@@ -280,23 +290,31 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
             }
 
             let numthreads = test_cells.len();
-            let output_data = RawData2D { data: output.data.as_mut_ptr(), shape: *output.shape() };
-            let r: usize = (0..numthreads).into_par_iter().map(&|t| {
-                assemble_batch_nonadjacent(
-                    &output_data,
-                    kernel,
-                    needs_trial_normal,
-                    needs_test_normal,
-                    trial_space,
-                    trial_cells[t],
-                    test_space,
-                    test_cells[t],
-                    &qpoints, &qweights,
-                    &qpoints, &qweights,
-                    &trial_table,
-                    &test_table,
-                )
-            }).sum();
+            let output_data = RawData2D {
+                data: output.data.as_mut_ptr(),
+                shape: *output.shape(),
+            };
+            let r: usize = (0..numthreads)
+                .into_par_iter()
+                .map(&|t| {
+                    assemble_batch_nonadjacent(
+                        &output_data,
+                        kernel,
+                        needs_trial_normal,
+                        needs_test_normal,
+                        trial_space,
+                        trial_cells[t],
+                        test_space,
+                        test_cells[t],
+                        &qpoints,
+                        &qweights,
+                        &qpoints,
+                        &qweights,
+                        &trial_table,
+                        &test_table,
+                    )
+                })
+                .sum();
             assert_eq!(r, numthreads);
         }
     }
@@ -313,11 +331,11 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
     let c20 = grid.topology().connectivity(2, 0);
 
     // Loop through colours
-        // loop through cells
-            // Find pairs
-            // if pairs.len() > 0
-                // Add to block for that pair
-        // assemble singular blocks for each pair
+    // loop through cells
+    // Find pairs
+    // if pairs.len() > 0
+    // Add to block for that pair
+    // assemble singular blocks for each pair
 
     for (vertex, cells) in grid.topology().connectivity(0, 2).iter_rows().enumerate() {
         for test_cell in cells {
@@ -341,7 +359,9 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
                             pairs.push((test_i, trial_i));
                         }
                     }
-                    if !ismin { break; }
+                    if !ismin {
+                        break;
+                    }
                 }
                 if ismin {
                     let rule = get_quadrature_rule(
@@ -353,8 +373,9 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
 
                     let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
                     let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
-                    let mut test_table =
-                        Array4D::<f64>::new(test_space.element().tabulate_array_shape(0, rule.npoints));
+                    let mut test_table = Array4D::<f64>::new(
+                        test_space.element().tabulate_array_shape(0, rule.npoints),
+                    );
                     let mut trial_table = Array4D::<f64>::new(
                         trial_space.element().tabulate_array_shape(0, rule.npoints),
                     );
@@ -436,7 +457,9 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
                                     rule.weights[index]
                                         * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                                         * test_jdet[index]
-                                        * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
+                                        * unsafe {
+                                            trial_table.get_unchecked(0, index, trial_i, 0)
+                                        }
                                         * trial_jdet[index],
                                 );
                             }

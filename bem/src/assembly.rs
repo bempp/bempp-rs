@@ -1,8 +1,8 @@
 pub mod batched;
 pub mod dense;
+use crate::function_space::SerialFunctionSpace;
 use crate::green;
 use crate::green::Scalar;
-use crate::function_space::SerialFunctionSpace;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::FunctionSpace;
 

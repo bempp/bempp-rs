@@ -480,8 +480,7 @@ fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
     }
 }
 
-unsafe impl Sync for SerialTopology {
-}
+unsafe impl Sync for SerialTopology {}
 
 impl SerialTopology {
     pub fn new(cells: &AdjacencyList<usize>, cell_types: &[ReferenceCellType]) -> Self {
@@ -526,7 +525,7 @@ impl SerialTopology {
         }
 
         // dim1 == 0
-        for dim0 in 0..dim {
+        for dim0 in 1..dim {
             let mut cty = AdjacencyList::<usize>::new();
             let cells = &connectivity[dim][0];
             for (i, cell_type) in cell_types_new.iter().enumerate() {
@@ -561,7 +560,7 @@ impl SerialTopology {
             connectivity[dim0][0] = cty;
         }
 
-        // dim0 == dim1
+        // dim0 == dim1 == 0
         let mut nvertices = 0;
         let mut cty = AdjacencyList::<usize>::new();
         let cells = &connectivity[dim][0];
@@ -576,13 +575,15 @@ impl SerialTopology {
             cty.add_row(&[i]);
         }
         connectivity[0][0] = cty;
-        for dim0 in 1..dim + 1 {
-            for i in 0..connectivity[dim0][0].num_rows() {
-                connectivity[dim0][dim0].add_row(&[i]);
+
+        // dim0 == dim1
+        for (dim0, c) in connectivity.iter_mut().enumerate().skip(1) {
+            for i in 0..c[0].num_rows() {
+                c[dim0].add_row(&[i]);
             }
         }
 
-        // dim0 = dim
+        // dim0 == dim
         for dim1 in 1..dim + 1 {
             let mut cty = AdjacencyList::<usize>::new();
             let entities0 = &connectivity[dim][0];
@@ -599,8 +600,8 @@ impl SerialTopology {
                 } else {
                     starts[i + 1]
                 };
-                for c in cstart..cend {
-                    sub_cell_types[c] = etypes[0];
+                for t in sub_cell_types.iter_mut().skip(cstart).take(cend) {
+                    *t = etypes[0];
                 }
             }
             for (ei, entity0) in entities0.iter_rows().enumerate() {
@@ -645,7 +646,8 @@ impl SerialTopology {
                         starts[i + 1]
                     };
                     for c in cstart..cend {
-                        for (e, t) in izip!(unsafe { cell_to_entities0.row_unchecked(c) }, &etypes) {
+                        for (e, t) in izip!(unsafe { cell_to_entities0.row_unchecked(c) }, &etypes)
+                        {
                             sub_cell_types[*e] = *t;
                         }
                     }
@@ -677,10 +679,7 @@ impl SerialTopology {
         for dim1 in 1..dim + 1 {
             for dim0 in 0..dim1 {
                 let mut data = vec![vec![]; connectivity[dim0][0].num_rows()];
-                for (i, row) in connectivity[dim1][dim0]
-                    .iter_rows()
-                    .enumerate()
-                {
+                for (i, row) in connectivity[dim1][dim0].iter_rows().enumerate() {
                     for v in row {
                         data[*v].push(i);
                     }
@@ -732,7 +731,7 @@ impl Topology<'_> for SerialTopology {
     }
     fn cell(&self, index: usize) -> Option<&[usize]> {
         if index < self.entity_count(self.dim) {
-            Some(unsafe { &self.connectivity(self.dim, 0).row_unchecked(index) })
+            Some(unsafe { self.connectivity(self.dim, 0).row_unchecked(index) })
         } else {
             None
         }
