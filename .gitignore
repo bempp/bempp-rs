@@ -19,4 +19,4 @@ examples.sh
 _*.msh
 *.btr
 
-vscode/*
+.vscode/
