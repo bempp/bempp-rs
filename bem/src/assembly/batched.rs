@@ -14,6 +14,7 @@ use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
+use rayon::prelude::*;
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -68,17 +69,25 @@ fn get_quadrature_rule(
     }
 }
 
+struct RawData2D<T: Scalar> {
+    pub data: *mut T,
+    pub shape: (usize, usize),    
+}
+
+unsafe impl<T: Scalar> Sync for RawData2D<T> {}
+
 #[allow(clippy::too_many_arguments)]
-fn assemble_part<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
-    output: &mut Array2D<T>,
+fn assemble_part<'a, T: Scalar + Clone + Copy>(
+    output: &RawData2D<T>,
     kernel: &impl SingularKernel,
     needs_trial_normal: bool,
     needs_test_normal: bool,
-    trial_space: &SerialFunctionSpace<'a, E>,
+    trial_space: &SerialFunctionSpace<'a>,
     trial_cells: &[usize],
-    test_space: &SerialFunctionSpace<'a, E>,
+    test_space: &SerialFunctionSpace<'a>,
     test_cells: &[usize],
-) {
+    
+) -> usize {
     // TODO: allow user to configure this
     let npoints = 16;
 
@@ -88,15 +97,17 @@ fn assemble_part<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
 
     let test_points = Array2D::from_data(test_rule.points, (test_rule.npoints, 2));
     let trial_points = Array2D::from_data(trial_rule.points, (trial_rule.npoints, 2));
+    let test_weights = test_rule.weights;
+    let trial_weights = trial_rule.weights;
     let mut test_table = Array4D::<f64>::new(
         test_space
             .element()
-            .tabulate_array_shape(0, test_rule.npoints),
+            .tabulate_array_shape(0, test_points.shape().0),
     );
     let mut trial_table = Array4D::<f64>::new(
         trial_space
             .element()
-            .tabulate_array_shape(0, test_rule.npoints),
+            .tabulate_array_shape(0, test_points.shape().0),
     );
 
     test_space
@@ -112,12 +123,12 @@ fn assemble_part<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut test_jdet = vec![0.0; test_rule.npoints];
-    let mut trial_jdet = vec![0.0; trial_rule.npoints];
-    let mut test_mapped_pts = Array2D::<f64>::new((test_rule.npoints, 3));
-    let mut trial_mapped_pts = Array2D::<f64>::new((trial_rule.npoints, 3));
-    let mut test_normals = Array2D::<f64>::new((test_rule.npoints, 3));
-    let mut trial_normals = Array2D::<f64>::new((trial_rule.npoints, 3));
+    let mut test_jdet = vec![0.0; test_points.shape().0];
+    let mut trial_jdet = vec![0.0; trial_points.shape().0];
+    let mut test_mapped_pts = Array2D::<f64>::new((test_points.shape().0, 3));
+    let mut trial_mapped_pts = Array2D::<f64>::new((trial_points.shape().0, 3));
+    let mut test_normals = Array2D::<f64>::new((test_points.shape().0, 3));
+    let mut trial_normals = Array2D::<f64>::new((trial_points.shape().0, 3));
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
@@ -177,16 +188,16 @@ fn assemble_part<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
                 {
                     let mut sum = T::zero();
 
-                    for test_index in 0..test_rule.npoints {
-                        for trial_index in 0..trial_rule.npoints {
+                    for test_index in 0..test_points.shape().0 {
+                        for trial_index in 0..trial_points.shape().0 {
                             sum += kernel.eval::<T>(
                                 unsafe { test_mapped_pts.row_unchecked(test_index) },
                                 unsafe { trial_mapped_pts.row_unchecked(trial_index) },
                                 unsafe { test_normals.row_unchecked(test_index) },
                                 unsafe { trial_normals.row_unchecked(trial_index) },
                             ) * T::from_f64(
-                                test_rule.weights[test_index]
-                                    * trial_rule.weights[trial_index]
+                                test_weights[test_index]
+                                    * trial_weights[trial_index]
                                     * unsafe { test_table.get_unchecked(0, test_index, test_i, 0) }
                                     * test_jdet[test_index]
                                     * unsafe {
@@ -205,21 +216,24 @@ fn assemble_part<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
                         }
                     }
                     if !neighbour {
-                        *output.get_mut(*test_dof, *trial_dof).unwrap() += sum;
+                        unsafe {
+                            *output.data.offset((*test_dof + output.shape.0 * *trial_dof).try_into().unwrap()) += sum;
+                        }
                     }
                 }
             }
         }
     }
+    1
 }
 
-pub fn assemble<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
+pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
     output: &mut Array2D<T>,
     kernel: &impl SingularKernel,
     needs_trial_normal: bool,
     needs_test_normal: bool,
-    trial_space: &SerialFunctionSpace<'a, E>,
-    test_space: &SerialFunctionSpace<'a, E>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
 ) {
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
@@ -236,13 +250,10 @@ pub fn assemble<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
     }
 
     // TODO: make these configurable
-    let numthreads = 4;
     let blocksize = 32;
 
-    // TODO: make one of these in each Rayon thread?
-    // TODO: these values can be known at compile time?
-    let mut test_cells: Vec<&[usize]> = vec![&[]; numthreads];
-    let mut trial_cells: Vec<&[usize]> = vec![&[]; numthreads];
+    let mut test_cells: Vec<&[usize]> = vec![&[]];
+    let mut trial_cells: Vec<&[usize]> = vec![&[]];
 
     // Size of this might not be known at compile time
     // let test_dofs_per_cell = 1;
@@ -250,70 +261,56 @@ pub fn assemble<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
 
     let test_colouring = test_space.compute_cell_colouring();
     let trial_colouring = trial_space.compute_cell_colouring();
-    let mut thread = 0;
     for test_c in &test_colouring {
         let mut test_start = 0;
         while test_start < test_c.len() {
+            let test_end = if test_start + blocksize < test_c.len() { test_start + blocksize } else { test_c.len() };
             for trial_c in &trial_colouring {
                 let mut trial_start = 0;
                 while trial_start < trial_c.len() {
-                    test_cells[thread] = &test_c[test_start..test_start + blocksize];
-                    trial_cells[thread] = &trial_c[trial_start..trial_start + blocksize];
-
-                    println!(
-                        "{} -> {}:{} [{}] {}:{} [{}]",
-                        thread,
-                        test_start,
-                        if test_start + blocksize <= test_c.len() {
-                            test_start + blocksize
-                        } else {
-                            test_c.len()
-                        },
-                        test_cells[thread].len(),
-                        trial_start,
-                        if trial_start + blocksize <= trial_c.len() {
-                            trial_start + blocksize
-                        } else {
-                            trial_c.len()
-                        },
-                        trial_cells[thread].len()
-                    );
-
-                    assemble_part(
-                        output,
-                        kernel,
-                        needs_trial_normal,
-                        needs_test_normal,
-                        trial_space,
-                        trial_cells[thread],
-                        test_space,
-                        test_cells[thread],
-                    );
-
-                    thread += 1;
-                    thread %= numthreads;
-                    trial_start += blocksize;
+                    let trial_end = if trial_start + blocksize < trial_c.len() { trial_start + blocksize } else { trial_c.len() };
+                    test_cells.push(&test_c[test_start..test_end]);
+                    trial_cells.push(&trial_c[trial_start..trial_end]);
+                    trial_start = trial_end;
                 }
             }
-            test_start += blocksize
+            test_start = test_end
         }
     }
+
+    let numthreads = test_cells.len();
+    let output_data = RawData2D { data: output.data.as_mut_ptr(), shape: *output.shape() };
+    let r: usize = (0..numthreads).into_par_iter().map(&|t| {
+        assemble_part(
+            &output_data,
+            kernel,
+            needs_trial_normal,
+            needs_test_normal,
+            trial_space,
+            trial_cells[t],
+            test_space,
+            test_cells[t],
+        )
+    }).sum();
+    assert_eq!(r, numthreads);
+
+    let test_c20 = test_space.grid().topology().connectivity(2, 0);
+    let trial_c20 = trial_space.grid().topology().connectivity(2, 0);
 
     // TODO: allow user to configure this
     let npoints = 4;
 
     let grid = trial_space.grid();
-    let c20 = grid.topology().connectivity(2, 0);
 
     for test_cell in 0..grid.geometry().cell_count() {
         let test_cell_tindex = grid.topology().index_map()[test_cell];
         let test_cell_gindex = grid.geometry().index_map()[test_cell];
-        let test_vertices = c20.row(test_cell_tindex).unwrap();
+        let test_vertices = test_c20.row(test_cell_tindex).unwrap();
 
         for trial_cell in 0..grid.geometry().cell_count() {
             let trial_cell_tindex = grid.topology().index_map()[trial_cell];
             let trial_cell_gindex = grid.geometry().index_map()[trial_cell];
-            let trial_vertices = c20.row(trial_cell_tindex).unwrap();
+            let trial_vertices = trial_c20.row(trial_cell_tindex).unwrap();
 
             let mut pairs = vec![];
             for (test_i, test_v) in test_vertices.iter().enumerate() {
@@ -323,6 +320,7 @@ pub fn assemble<'a, T: Scalar + Clone + Copy, E: FiniteElement>(
                     }
                 }
             }
+
             if !pairs.is_empty() {
                 let rule = get_quadrature_rule(
                     grid.topology().cell_type(test_cell_tindex).unwrap(),
@@ -474,6 +472,14 @@ mod test {
             &space,
         );
 
+        /*for i in 0..matrix.shape().0 {
+            for j in 0..matrix.shape().1 {
+                println!("{} {}",
+                    *matrix.get(i, j).unwrap(),
+                    *dmat.get(i, j).unwrap(),
+                );
+            }
+        }*/
         for i in 0..matrix.shape().0 {
             for j in 0..matrix.shape().1 {
                 assert_relative_eq!(

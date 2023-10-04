@@ -1,18 +1,19 @@
 use crate::dofmap::SerialDofMap;
+use bempp_element::element::CiarletElement;
 use bempp_grid::grid::SerialGrid;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Grid, Topology};
 
-pub struct SerialFunctionSpace<'a, E: FiniteElement> {
+pub struct SerialFunctionSpace<'a> {
     grid: &'a SerialGrid,
-    element: &'a E,
+    element: &'a CiarletElement,
     dofmap: SerialDofMap,
 }
 
-impl<'a, E: FiniteElement> SerialFunctionSpace<'a, E> {
-    pub fn new(grid: &'a SerialGrid, element: &'a E) -> Self {
+impl<'a> SerialFunctionSpace<'a> {
+    pub fn new(grid: &'a SerialGrid, element: &'a CiarletElement) -> Self {
         let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
@@ -66,10 +67,10 @@ impl<'a, E: FiniteElement> SerialFunctionSpace<'a, E> {
     }
 }
 
-impl<'a, E: FiniteElement> FunctionSpace<'a> for SerialFunctionSpace<'a, E> {
+impl<'a> FunctionSpace<'a> for SerialFunctionSpace<'a> {
     type DofMap = SerialDofMap;
     type Grid = SerialGrid;
-    type FiniteElement = E;
+    type FiniteElement = CiarletElement;
 
     fn dofmap(&self) -> &Self::DofMap {
         &self.dofmap
@@ -77,7 +78,7 @@ impl<'a, E: FiniteElement> FunctionSpace<'a> for SerialFunctionSpace<'a, E> {
     fn grid(&self) -> &Self::Grid {
         self.grid
     }
-    fn element(&self) -> &E {
+    fn element(&self) -> &CiarletElement {
         self.element
     }
 }

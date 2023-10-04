@@ -97,7 +97,7 @@ impl Scalar for Complex<f64> {
     }
 }
 
-pub trait SingularKernel {
+pub trait SingularKernel: Sync {
     fn eval<T: Scalar>(&self, x: &[f64], y: &[f64], nx: &[f64], ny: &[f64]) -> T;
 }
 

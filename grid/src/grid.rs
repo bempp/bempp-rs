@@ -7,7 +7,6 @@ use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
-use std::cell::{Ref, RefCell};
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -463,14 +462,10 @@ impl Geometry for SerialGeometry {
 /// Topology of a serial grid
 pub struct SerialTopology {
     dim: usize,
-    connectivity: Vec<Vec<RefCell<AdjacencyList<usize>>>>,
+    connectivity: Vec<Vec<AdjacencyList<usize>>>,
     index_map: Vec<usize>,
     starts: Vec<usize>,
     cell_types: Vec<ReferenceCellType>,
-    facet_adjacent_cells: RefCell<Vec<(usize, usize, u8)>>,
-    ridge_adjacent_cells: RefCell<Vec<(usize, usize, u8)>>,
-    peak_adjacent_cells: RefCell<Vec<(usize, usize, u8)>>,
-    nonadjacent_cells: RefCell<Vec<(usize, usize)>>,
 }
 
 fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
@@ -484,6 +479,9 @@ fn get_reference_cell(cell_type: ReferenceCellType) -> Box<dyn ReferenceCell> {
     }
 }
 
+unsafe impl Sync for SerialTopology {
+}
+
 impl SerialTopology {
     pub fn new(cells: &AdjacencyList<usize>, cell_types: &[ReferenceCellType]) -> Self {
         let mut index_map = vec![];
@@ -491,19 +489,22 @@ impl SerialTopology {
         let mut starts = vec![];
         let mut cell_types_new = vec![];
         let dim = get_reference_cell(cell_types[0]).dim();
+
         let mut connectivity = vec![];
         for i in 0..dim + 1 {
             connectivity.push(vec![]);
             for _j in 0..dim + 1 {
-                connectivity[i].push(RefCell::new(AdjacencyList::<usize>::new()));
+                connectivity[i].push(AdjacencyList::<usize>::new());
             }
         }
+
+        // dim0 = dim, dim1 = 0
         for c in cell_types {
             if dim != get_reference_cell(*c).dim() {
                 panic!("Grids with cells of mixed topological dimension not supported.");
             }
             if !cell_types_new.contains(c) {
-                starts.push(connectivity[dim][0].borrow().num_rows());
+                starts.push(connectivity[dim][0].num_rows());
                 cell_types_new.push(*c);
                 let n = get_reference_cell(*c).vertex_count();
                 for (i, cell) in cells.iter_rows().enumerate() {
@@ -517,16 +518,177 @@ impl SerialTopology {
                             }
                             row.push(vertices.iter().position(|&r| r == *v).unwrap());
                         }
-                        connectivity[dim][0].borrow_mut().add_row(&row);
+                        connectivity[dim][0].add_row(&row);
                     }
                 }
             }
         }
 
-        let facet_adjacent_cells = RefCell::new(vec![]);
-        let ridge_adjacent_cells = RefCell::new(vec![]);
-        let peak_adjacent_cells = RefCell::new(vec![]);
-        let nonadjacent_cells = RefCell::new(vec![]);
+        // dim1 == 0
+        for dim0 in 0..dim {
+            let mut cty = AdjacencyList::<usize>::new();
+            let cells = &connectivity[dim][0];
+            for (i, cell_type) in cell_types_new.iter().enumerate() {
+                let ref_cell = get_reference_cell(*cell_type);
+                let ref_entities = (0..ref_cell.entity_count(dim0))
+                    .map(|x| ref_cell.connectivity(dim0, x, 0).unwrap())
+                    .collect::<Vec<Vec<usize>>>();
+
+                let cstart = starts[i];
+                let cend = if i == starts.len() - 1 {
+                    connectivity[2][0].num_rows()
+                } else {
+                    starts[i + 1]
+                };
+                for c in cstart..cend {
+                    let cell = unsafe { cells.row_unchecked(c) };
+                    for e in &ref_entities {
+                        let vertices = e.iter().map(|x| cell[*x]).collect::<Vec<usize>>();
+                        let mut found = false;
+                        for entity in connectivity[dim0][0].iter_rows() {
+                            if all_equal(entity, &vertices) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            cty.add_row(&vertices);
+                        }
+                    }
+                }
+            }
+            connectivity[dim0][0] = cty;
+        }
+
+        // dim0 == dim1
+        let mut nvertices = 0;
+        let mut cty = AdjacencyList::<usize>::new();
+        let cells = &connectivity[dim][0];
+        for cell in cells.iter_rows() {
+            for j in cell {
+                if *j >= nvertices {
+                    nvertices = *j + 1;
+                }
+            }
+        }
+        for i in 0..nvertices {
+            cty.add_row(&[i]);
+        }
+        connectivity[0][0] = cty;
+        for dim0 in 1..dim + 1 {
+            for i in 0..connectivity[dim0][0].num_rows() {
+                connectivity[dim0][dim0].add_row(&[i]);
+            }
+        }
+
+        // dim0 = dim
+        for dim1 in 1..dim + 1 {
+            let mut cty = AdjacencyList::<usize>::new();
+            let entities0 = &connectivity[dim][0];
+            let entities1 = &connectivity[dim1][0];
+
+            let mut sub_cell_types = vec![ReferenceCellType::Point; entities0.num_rows()];
+            for (i, cell_type) in cell_types_new.iter().enumerate() {
+                let ref_cell = get_reference_cell(*cell_type);
+                let etypes = ref_cell.entity_types(dim);
+
+                let cstart = starts[i];
+                let cend = if i == starts.len() - 1 {
+                    connectivity[2][0].num_rows()
+                } else {
+                    starts[i + 1]
+                };
+                for c in cstart..cend {
+                    sub_cell_types[c] = etypes[0];
+                }
+            }
+            for (ei, entity0) in entities0.iter_rows().enumerate() {
+                let entity = get_reference_cell(sub_cell_types[ei]);
+                let mut row = vec![];
+                for i in 0..entity.entity_count(dim1) {
+                    let vertices = entity
+                        .connectivity(dim1, i, 0)
+                        .unwrap()
+                        .iter()
+                        .map(|x| entity0[*x])
+                        .collect::<Vec<usize>>();
+                    for (j, entity1) in entities1.iter_rows().enumerate() {
+                        if all_equal(&vertices, entity1) {
+                            row.push(j);
+                            break;
+                        }
+                    }
+                }
+                cty.add_row(&row);
+            }
+            connectivity[dim][dim1] = cty
+        }
+
+        // dim1 < dim0
+        for dim1 in 1..dim + 1 {
+            for dim0 in dim1 + 1..dim {
+                let mut cty = AdjacencyList::<usize>::new();
+                let entities0 = &connectivity[dim0][0];
+                let entities1 = &connectivity[dim1][0];
+                let cell_to_entities0 = &connectivity[dim][dim0];
+
+                let mut sub_cell_types = vec![ReferenceCellType::Point; entities0.num_rows()];
+                for (i, cell_type) in cell_types_new.iter().enumerate() {
+                    let ref_cell = get_reference_cell(*cell_type);
+                    let etypes = ref_cell.entity_types(dim0);
+
+                    let cstart = starts[i];
+                    let cend = if i == starts.len() - 1 {
+                        connectivity[2][0].num_rows()
+                    } else {
+                        starts[i + 1]
+                    };
+                    for c in cstart..cend {
+                        for (e, t) in izip!(unsafe { cell_to_entities0.row_unchecked(c) }, &etypes) {
+                            sub_cell_types[*e] = *t;
+                        }
+                    }
+                }
+                for (ei, entity0) in entities0.iter_rows().enumerate() {
+                    let entity = get_reference_cell(sub_cell_types[ei]);
+                    let mut row = vec![];
+                    for i in 0..entity.entity_count(dim1) {
+                        let vertices = entity
+                            .connectivity(dim1, i, 0)
+                            .unwrap()
+                            .iter()
+                            .map(|x| entity0[*x])
+                            .collect::<Vec<usize>>();
+                        for (j, entity1) in entities1.iter_rows().enumerate() {
+                            if all_equal(&vertices, entity1) {
+                                row.push(j);
+                                break;
+                            }
+                        }
+                    }
+                    cty.add_row(&row);
+                }
+                connectivity[dim0][dim1] = cty;
+            }
+        }
+
+        // dim1 > dim0
+        for dim1 in 1..dim + 1 {
+            for dim0 in 0..dim1 {
+                let mut data = vec![vec![]; connectivity[dim0][0].num_rows()];
+                for (i, row) in connectivity[dim1][dim0]
+                    .iter_rows()
+                    .enumerate()
+                {
+                    for v in row {
+                        data[*v].push(i);
+                    }
+                }
+                for row in data {
+                    connectivity[dim0][dim1].add_row(&row);
+                }
+            }
+        }
 
         Self {
             dim,
@@ -534,115 +696,6 @@ impl SerialTopology {
             index_map,
             starts,
             cell_types: cell_types_new,
-            facet_adjacent_cells,
-            ridge_adjacent_cells,
-            peak_adjacent_cells,
-            nonadjacent_cells,
-        }
-    }
-
-    fn compute_adjacent_cells(&self) {
-        let tdim = self.dim();
-        if tdim != 2 {
-            panic!("Adjacent cell computation only implemented for 2D cells.");
-        }
-        let cells_to_vertices = self.connectivity(tdim, 0);
-        // Compute cells adjacent via a facet (ie edge in 2D)
-        for cells in self.connectivity(tdim - 1, tdim).iter_rows() {
-            if cells.len() == 2 {
-                let tindex0 = self.index_map()[cells[0]];
-                let vertices0 = cells_to_vertices.row(tindex0).unwrap();
-                let tindex1 = self.index_map()[cells[1]];
-                let vertices1 = cells_to_vertices.row(tindex1).unwrap();
-
-                let mut pairs: Vec<u8> = vec![0, 0, 0, 0];
-                let mut n = 0;
-                for (i0, v0) in vertices0.iter().enumerate() {
-                    for (i1, v1) in vertices1.iter().enumerate() {
-                        if v0 == v1 {
-                            pairs[2 * n] = i0.try_into().unwrap();
-                            pairs[2 * n + 1] = i1.try_into().unwrap();
-                            n += 1;
-                        }
-                    }
-                }
-                self.facet_adjacent_cells.borrow_mut().push((
-                    cells[0],
-                    cells[1],
-                    pairs[0] << 6 | pairs[1] << 4 | pairs[2] << 2 | pairs[3],
-                ));
-                self.facet_adjacent_cells.borrow_mut().push((
-                    cells[1],
-                    cells[0],
-                    if pairs[1] < pairs[3] {
-                        pairs[1] << 6 | pairs[0] << 4 | pairs[3] << 2 | pairs[2]
-                    } else {
-                        pairs[3] << 6 | pairs[2] << 4 | pairs[1] << 2 | pairs[0]
-                    },
-                ));
-            }
-        }
-
-        // Compute cells adjacent via a ridge (ie vertex in 2D)
-        for cells in self.connectivity(tdim - 2, tdim).iter_rows() {
-            for c0 in cells {
-                let tindex0 = self.index_map()[*c0];
-                let vertices0 = cells_to_vertices.row(tindex0).unwrap();
-                for c1 in cells {
-                    if *c0 < *c1 {
-                        let tindex1 = self.index_map()[*c1];
-                        let vertices1 = cells_to_vertices.row(tindex1).unwrap();
-
-                        let mut pairs: Vec<u8> = vec![0, 0];
-                        let mut n = 0;
-                        for (i0, v0) in vertices0.iter().enumerate() {
-                            for (i1, v1) in vertices1.iter().enumerate() {
-                                if v0 == v1 {
-                                    pairs[0] = i0.try_into().unwrap();
-                                    pairs[1] = i1.try_into().unwrap();
-                                    n += 1;
-                                }
-                            }
-                        }
-                        if n == 1 {
-                            self.ridge_adjacent_cells.borrow_mut().push((
-                                *c0,
-                                *c1,
-                                pairs[0] << 2 | pairs[1],
-                            ));
-                            self.ridge_adjacent_cells.borrow_mut().push((
-                                *c1,
-                                *c0,
-                                pairs[1] << 2 | pairs[0],
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-
-        // Compute non-adjacent cells
-        for c0 in 0..cells_to_vertices.num_rows() {
-            let tindex0 = self.index_map()[c0];
-            let vertices0 = cells_to_vertices.row(tindex0).unwrap();
-            for c1 in 0..cells_to_vertices.num_rows() {
-                if c0 < c1 {
-                    let tindex1 = self.index_map()[c1];
-                    let vertices1 = cells_to_vertices.row(tindex1).unwrap();
-                    let mut n = 0;
-                    for v0 in vertices0 {
-                        for v1 in vertices1 {
-                            if v0 == v1 {
-                                n += 1;
-                            }
-                        }
-                    }
-                    if n == 0 {
-                        self.nonadjacent_cells.borrow_mut().push((c0, c1));
-                        self.nonadjacent_cells.borrow_mut().push((c1, c0));
-                    }
-                }
-            }
         }
     }
 }
@@ -676,11 +729,9 @@ impl Topology<'_> for SerialTopology {
     fn entity_count(&self, dim: usize) -> usize {
         self.connectivity(dim, 0).num_rows()
     }
-    fn cell(&self, index: usize) -> Option<Ref<[usize]>> {
+    fn cell(&self, index: usize) -> Option<&[usize]> {
         if index < self.entity_count(self.dim) {
-            Some(Ref::map(self.connectivity(self.dim, 0), |x| unsafe {
-                x.row_unchecked(index)
-            }))
+            Some(unsafe { &self.connectivity(self.dim, 0).row_unchecked(index) })
         } else {
             None
         }
@@ -688,7 +739,7 @@ impl Topology<'_> for SerialTopology {
     fn cell_type(&self, index: usize) -> Option<ReferenceCellType> {
         for (i, start) in self.starts.iter().enumerate() {
             let end = if i == self.starts.len() - 1 {
-                self.connectivity[2][0].borrow().num_rows()
+                self.connectivity[2][0].num_rows()
             } else {
                 self.starts[i + 1]
             };
@@ -698,164 +749,16 @@ impl Topology<'_> for SerialTopology {
         }
         None
     }
-    fn create_connectivity(&self, dim0: usize, dim1: usize) {
+
+    fn connectivity(&self, dim0: usize, dim1: usize) -> &Self::Connectivity {
         if dim0 > self.dim() || dim1 > self.dim() {
             panic!("Dimension of connectivity should be higher than the topological dimension");
         }
-
-        if self.connectivity[dim0][dim1].borrow().num_rows() > 0 {
-            return;
-        }
-
-        if dim0 < dim1 {
-            self.create_connectivity(dim0, 0);
-            self.create_connectivity(dim1, dim0);
-            let mut data = vec![vec![]; self.connectivity[dim0][0].borrow().num_rows()];
-            for (i, row) in self.connectivity[dim1][dim0]
-                .borrow()
-                .iter_rows()
-                .enumerate()
-            {
-                for v in row {
-                    data[*v].push(i);
-                }
-            }
-            for row in data {
-                self.connectivity[dim0][dim1].borrow_mut().add_row(&row);
-            }
-        } else if dim0 == dim1 {
-            if dim0 == 0 {
-                let mut nvertices = 0;
-                let cells = &self.connectivity[self.dim()][0].borrow();
-                for cell in cells.iter_rows() {
-                    for j in cell {
-                        if *j >= nvertices {
-                            nvertices = *j + 1;
-                        }
-                    }
-                }
-                for i in 0..nvertices {
-                    self.connectivity[0][0].borrow_mut().add_row(&[i]);
-                }
-            } else {
-                self.create_connectivity(dim0, 0);
-                for i in 0..self.connectivity[dim0][0].borrow().num_rows() {
-                    self.connectivity[dim0][dim0].borrow_mut().add_row(&[i]);
-                }
-            }
-        } else if dim1 == 0 {
-            let cells = &self.connectivity[self.dim()][0].borrow();
-            for (i, cell_type) in self.cell_types.iter().enumerate() {
-                let ref_cell = get_reference_cell(*cell_type);
-                let ref_entities = (0..ref_cell.entity_count(dim0))
-                    .map(|x| ref_cell.connectivity(dim0, x, 0).unwrap())
-                    .collect::<Vec<Vec<usize>>>();
-
-                let cstart = self.starts[i];
-                let cend = if i == self.starts.len() - 1 {
-                    self.connectivity[2][0].borrow().num_rows()
-                } else {
-                    self.starts[i + 1]
-                };
-                for c in cstart..cend {
-                    let cell = unsafe { cells.row_unchecked(c) };
-                    for e in &ref_entities {
-                        let vertices = e.iter().map(|x| cell[*x]).collect::<Vec<usize>>();
-                        let mut found = false;
-                        for entity in self.connectivity[dim0][0].borrow().iter_rows() {
-                            if all_equal(entity, &vertices) {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if !found {
-                            self.connectivity[dim0][0].borrow_mut().add_row(&vertices);
-                        }
-                    }
-                }
-            }
-        } else {
-            self.create_connectivity(dim0, 0);
-            self.create_connectivity(dim1, 0);
-            self.create_connectivity(self.dim(), dim0);
-            let entities0 = &self.connectivity[dim0][0].borrow();
-            let entities1 = &self.connectivity[dim1][0].borrow();
-            let cell_to_entities0 = &self.connectivity[self.dim()][dim0].borrow();
-
-            let mut cell_types = vec![ReferenceCellType::Point; entities0.num_rows()];
-            for (i, cell_type) in self.cell_types.iter().enumerate() {
-                let ref_cell = get_reference_cell(*cell_type);
-                let etypes = ref_cell.entity_types(dim0);
-
-                let cstart = self.starts[i];
-                let cend = if i == self.starts.len() - 1 {
-                    self.connectivity[2][0].borrow().num_rows()
-                } else {
-                    self.starts[i + 1]
-                };
-                for c in cstart..cend {
-                    for (e, t) in izip!(unsafe { cell_to_entities0.row_unchecked(c) }, &etypes) {
-                        cell_types[*e] = *t;
-                    }
-                }
-            }
-            for (ei, entity0) in entities0.iter_rows().enumerate() {
-                let entity = get_reference_cell(cell_types[ei]);
-                let mut row = vec![];
-                for i in 0..entity.entity_count(dim1) {
-                    let vertices = entity
-                        .connectivity(dim1, i, 0)
-                        .unwrap()
-                        .iter()
-                        .map(|x| entity0[*x])
-                        .collect::<Vec<usize>>();
-                    for (j, entity1) in entities1.iter_rows().enumerate() {
-                        if all_equal(&vertices, entity1) {
-                            row.push(j);
-                            break;
-                        }
-                    }
-                }
-                self.connectivity[dim0][dim1].borrow_mut().add_row(&row);
-            }
-        }
-    }
-
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity> {
-        self.create_connectivity(dim0, dim1);
-        self.connectivity[dim0][dim1].borrow()
+        &self.connectivity[dim0][dim1]
     }
 
     fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
         Ownership::Owned
-    }
-
-    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        if self.facet_adjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.facet_adjacent_cells.borrow()
-    }
-
-    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        if self.ridge_adjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.ridge_adjacent_cells.borrow()
-    }
-
-    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        if self.peak_adjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.peak_adjacent_cells.borrow()
-    }
-
-    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>> {
-        if self.nonadjacent_cells.borrow().len() == 0 {
-            self.compute_adjacent_cells()
-        }
-        self.nonadjacent_cells.borrow()
     }
 }
 
@@ -871,8 +774,9 @@ impl SerialGrid {
         cells: AdjacencyList<usize>,
         cell_types: Vec<ReferenceCellType>,
     ) -> Self {
+        let topology = SerialTopology::new(&cells, &cell_types);
         Self {
-            topology: SerialTopology::new(&cells, &cell_types),
+            topology,
             geometry: SerialGeometry::new(coordinates, &cells, &cell_types),
         }
     }
@@ -900,28 +804,6 @@ mod test {
     use crate::grid::*;
     use approx::*;
 
-    #[test]
-    fn test_adjacent_cells() {
-        let g = SerialGrid::new(
-            Array2D::from_data(
-                vec![
-                    0.0, 0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 0.0, 2.0, 1.0, 2.0,
-                    2.0, 2.0,
-                ],
-                (9, 2),
-            ),
-            AdjacencyList::from_data(
-                vec![
-                    0, 1, 4, 0, 4, 3, 1, 2, 5, 1, 5, 4, 3, 4, 7, 3, 7, 6, 4, 5, 8, 4, 8, 7,
-                ],
-                vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
-            ),
-            vec![ReferenceCellType::Triangle; 8],
-        );
-        assert_eq!(g.topology().facet_adjacent_cells().len(), 8 * 2);
-        assert_eq!(g.topology().ridge_adjacent_cells().len(), (29 - 8 * 2) * 2);
-        assert_eq!(g.topology().peak_adjacent_cells().len(), 0);
-    }
     #[test]
     fn test_connectivity() {
         let g = SerialGrid::new(
