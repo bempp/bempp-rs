@@ -6,7 +6,6 @@ use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
-use std::cell::Ref;
 
 /// Geometry of a parallel grid
 pub struct ParallelGeometry<'a, C: Communicator> {
@@ -151,17 +150,14 @@ impl<'a, C: Communicator> Topology<'a> for ParallelTopology<'a, C> {
     fn entity_count(&self, dim: usize) -> usize {
         self.serial_topology.entity_count(dim)
     }
-    fn cell(&self, index: usize) -> Option<Ref<[usize]>> {
+    fn cell(&self, index: usize) -> Option<&[usize]> {
         self.serial_topology.cell(index)
     }
     fn cell_type(&self, index: usize) -> Option<ReferenceCellType> {
         self.serial_topology.cell_type(index)
     }
-    fn create_connectivity(&self, dim0: usize, dim1: usize) {
-        self.serial_topology.create_connectivity(dim0, dim1)
-    }
 
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity> {
+    fn connectivity(&self, dim0: usize, dim1: usize) -> &Self::Connectivity {
         self.serial_topology.connectivity(dim0, dim1)
     }
 
@@ -170,22 +166,6 @@ impl<'a, C: Communicator> Topology<'a> for ParallelTopology<'a, C> {
             panic!("Entity ownership for these entities not implemented yet");
         }
         self.ownership[dim][index]
-    }
-
-    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        self.serial_topology.facet_adjacent_cells()
-    }
-
-    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        self.serial_topology.ridge_adjacent_cells()
-    }
-
-    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>> {
-        self.serial_topology.peak_adjacent_cells()
-    }
-
-    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>> {
-        self.serial_topology.nonadjacent_cells()
     }
 }
 
