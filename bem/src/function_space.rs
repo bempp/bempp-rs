@@ -36,7 +36,7 @@ impl<'a, E: FiniteElement> SerialFunctionSpace<'a, E> {
             .topology()
             .entity_count(self.grid.topology().dim())
         {
-            let i_t = self.index_map()[i];
+            let i_t = self.grid.topology().index_map()[i];
             let vs = cell_entities.row(i_t).unwrap();
             let mut c = 0;
             while c < colouring.len() {
