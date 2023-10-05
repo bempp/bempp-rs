@@ -1,4 +1,4 @@
-//! Helper functions used in testing tree implementations, specifically test point generators, 
+//! Helper functions used in testing tree implementations, specifically test point generators,
 //! as well as helpers for handling surfaces that discretise a box corresponding to a Morton key.
 
 use std::collections::HashMap;
@@ -184,7 +184,7 @@ pub fn map_corners_to_surface(order: usize) -> (HashMap<usize, usize>, HashMap<u
 #[cfg(test)]
 mod test {
 
-    use super::find_corners;
+    use super::*;
     use crate::types::morton::MortonKey;
 
     #[test]

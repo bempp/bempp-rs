@@ -759,14 +759,14 @@ impl MortonKey {
     /// * `order` - the order of expansions used in constructing the surface grid
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    /// * `conv_point` - The point the kernel evaluations to be placed on the convolution grid are being evaluated against.
-    /// * `conv_point_corner_index` - The index of the corner of the target surface that the conv point lies on.
+    /// * `conv_point` - The corner point on the surface grid against which the surface and  convolution grids are aligned.
+    /// * `conv_point_corner_index` - The index of the corner of the surface grid that the conv point lies on.
     pub fn convolution_grid(
         &self,
         order: usize,
         domain: &Domain,
         alpha: f64,
-        conv_point: &[f64],
+        conv_point_corner: &[f64],
         conv_point_corner_index: usize,
     ) -> (Vec<f64>, Vec<usize>) {
         // Number of convolution points along each axis
@@ -814,7 +814,7 @@ impl MortonKey {
             corners[16 + conv_point_corner_index],
         ];
 
-        let diff = conv_point
+        let diff = conv_point_corner
             .iter()
             .zip(surface_point)
             .map(|(a, b)| a - b)

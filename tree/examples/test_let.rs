@@ -7,8 +7,8 @@ use itertools::Itertools;
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, traits::*};
 
-use rlst::common::traits::accessors::RawAccess;
 use bempp_tree::implementations::helpers::points_fixture;
+use rlst::common::traits::accessors::RawAccess;
 
 #[cfg(feature = "mpi")]
 use bempp_tree::types::multi_node::MultiNodeTree;

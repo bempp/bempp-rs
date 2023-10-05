@@ -1,6 +1,7 @@
 //! Types for storing field translation data.
 use std::collections::HashMap;
 
+use bempp_tools::Array3D;
 use cauchy::c64;
 
 use rlst::{
@@ -19,8 +20,8 @@ pub type SvdM2lEntry =
 
 /// Simple alias for an Array3D<Complexf64>
 // pub type FftM2lEntry = Array3D<Complex<f64>>;
-pub type FftM2lEntry =
-    Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type FftM2lEntry = HashMap<usize, Array3D<c64>>;
+// Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 /// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
 pub struct FftFieldTranslationKiFmm<T>
@@ -141,7 +142,7 @@ impl Default for FftM2lOperatorData {
         let tmp = rlst_mat![c64, (1, 1)];
 
         FftM2lOperatorData {
-            kernel_data: tmp.new_like_self().eval(),
+            kernel_data: HashMap::new(),
             surface_map: Vec::default(),
             inv_surface_map: Vec::default(),
             conv_map: Vec::default(),

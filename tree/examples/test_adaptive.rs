@@ -106,5 +106,4 @@ fn main() {
 }
 
 #[cfg(not(feature = "mpi"))]
-fn main() {
-}
+fn main() {}

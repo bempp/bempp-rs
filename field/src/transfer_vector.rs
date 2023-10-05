@@ -187,8 +187,10 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
     // Keep only unique keys
     let keys: Vec<&MortonKey> = keys.iter().unique().collect();
 
+    // Transfer vectors in component form
     let mut transfer_vectors_component: Vec<[i64; 3]> = Vec::new();
 
+    // Sources and targets that correspond to each transfer vector
     let mut targets: Vec<MortonKey> = Vec::new();
     let mut sources: Vec<MortonKey> = Vec::new();
 
@@ -258,17 +260,15 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
     // Create a map between the original transfer vectors and the reduced set.
     let mut axial_diag_map = HashMap::new();
     let mut axial_diag_map_component = HashMap::new();
-    let mut unique_reflected_transfer_vectors = HashSet::new();
 
     for t in unique_transfer_vectors_component.iter() {
         let t_refl = reflect(t);
         // Get into checksum for ease of lookup
         let t_checksum = MortonKey::find_transfer_vector_from_components(t);
-        let t_rot_checksum = MortonKey::find_transfer_vector_from_components(&t_refl[..]);
+        let t_refl_checksum = MortonKey::find_transfer_vector_from_components(&t_refl[..]);
 
-        axial_diag_map.insert(t_checksum, t_rot_checksum);
+        axial_diag_map.insert(t_checksum, t_refl_checksum);
         axial_diag_map_component.insert(t, t_refl.clone());
-        unique_reflected_transfer_vectors.insert(t_rot_checksum);
 
         reflected_transfer_vectors.push(t_refl);
     }
@@ -304,6 +304,10 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
 
 #[cfg(test)]
 pub mod test {
+
+    use bempp_tree::types::domain;
+
+    use crate::surface::*;
 
     use super::*;
 
@@ -341,5 +345,18 @@ pub mod test {
         let components = [-1i64, -2i64, -3i64];
         let reflected = axially_reflect_components(&components);
         assert_eq!(reflected, vec![1i64, 2i64, 3i64]);
+    }
+
+    #[test]
+    fn test_compute_transfer_vectors_unique() {
+        let (transfer_vectors, map) = compute_transfer_vectors_unique();
+
+        // Test that there are 16 unique transfer vectors
+        assert_eq!(transfer_vectors.len(), 16);
+
+        // Test that mappings exist for all original 316 transfer vectors
+        assert_eq!(map.keys().len(), 316);
+        let mapped: HashSet<usize> = map.values().cloned().collect();
+        assert_eq!(mapped.len(), 16)
     }
 }

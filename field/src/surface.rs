@@ -15,8 +15,9 @@ pub fn axial_reflection_surface(
     transfer_vector: &[i64],
     order: usize,
 ) -> Vec<usize> {
-    // Only valid transfer vectors are three vectors
+    // Only valid transfer vectors and surface multi indices are three vectors
     assert!(transfer_vector.len() == 3);
+    assert!(multi_index.len() == 3);
     // Order must be greater than 1
     assert!(order > 1);
 
@@ -57,7 +58,7 @@ pub fn axial_reflection_convolution(
         if t >= 0 {
             m
         } else {
-            2 * (order - 1) - (m - 1)
+            (2 * order - 1) - (m - 1)
         }
     }
 

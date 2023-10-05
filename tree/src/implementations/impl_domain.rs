@@ -43,6 +43,18 @@ impl Domain {
 
         Domain { origin, diameter }
     }
+
+    /// Construct a domain a user specified origin and diameter.
+    ///
+    /// # Arguments
+    /// * `origin` - The point from which to construct a cuboid domain.
+    /// * `diameter` - The diameter along each axis of the domain.
+    pub fn new(origin: &[f64; 3], diameter: &[f64; 3]) -> Self {
+        Domain {
+            origin: *origin,
+            diameter: *diameter,
+        }
+    }
 }
 
 #[cfg(test)]
