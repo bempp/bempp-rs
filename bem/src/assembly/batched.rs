@@ -19,7 +19,7 @@ use rayon::prelude::*;
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
     trial_celltype: ReferenceCellType,
-    pairs: Vec<(usize, usize)>,
+    pairs: &[(usize, usize)],
     npoints: usize,
 ) -> TestTrialNumericalQuadratureDefinition {
     if pairs.is_empty() {
@@ -39,7 +39,7 @@ fn get_quadrature_rule(
                     } else {
                         2
                     },
-                    local_indices: pairs,
+                    local_indices: pairs.to_vec(),
                 },
                 npoints,
             )
@@ -60,7 +60,7 @@ fn get_quadrature_rule(
                     } else {
                         2
                     },
-                    local_indices: pairs,
+                    local_indices: pairs.to_vec(),
                 },
                 npoints,
             )
@@ -75,6 +75,103 @@ struct RawData2D<T: Scalar> {
 }
 
 unsafe impl<T: Scalar> Sync for RawData2D<T> {}
+
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_singular<'a, T: Scalar + Clone + Copy>(
+    output: &RawData2D<T>,
+    kernel: &impl SingularKernel,
+    needs_trial_normal: bool,
+    needs_test_normal: bool,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+    cell_pairs: &[(usize, usize)],
+    trial_points: &Array2D<f64>,
+    test_points: &Array2D<f64>,
+    weights: &[f64],
+    trial_table: &Array4D<f64>,
+    test_table: &Array4D<f64>,
+) -> usize {
+    let grid = test_space.grid();
+
+    // Memory assignment to be moved elsewhere as passed into here mutable?
+    let mut test_jdet = vec![0.0; test_points.shape().0];
+    let mut trial_jdet = vec![0.0; trial_points.shape().0];
+    let mut test_mapped_pts = Array2D::<f64>::new((test_points.shape().0, 3));
+    let mut trial_mapped_pts = Array2D::<f64>::new((trial_points.shape().0, 3));
+    let mut test_normals = Array2D::<f64>::new((test_points.shape().0, 3));
+    let mut trial_normals = Array2D::<f64>::new((trial_points.shape().0, 3));
+
+    for (test_cell, trial_cell) in cell_pairs {
+        let test_cell_tindex = grid.topology().index_map()[*test_cell];
+        let test_cell_gindex = grid.geometry().index_map()[*test_cell];
+        let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
+        let trial_cell_gindex = grid.geometry().index_map()[*trial_cell];
+
+        grid.geometry().compute_jacobian_determinants(
+            test_points,
+            test_cell_gindex,
+            &mut test_jdet,
+        );
+        grid.geometry()
+            .compute_points(test_points, test_cell_gindex, &mut test_mapped_pts);
+        if needs_test_normal {
+            grid.geometry()
+                .compute_normals(test_points, test_cell_gindex, &mut test_normals);
+        }
+
+        grid.geometry().compute_jacobian_determinants(
+            trial_points,
+            trial_cell_gindex,
+            &mut trial_jdet,
+        );
+        grid.geometry()
+            .compute_points(trial_points, trial_cell_gindex, &mut trial_mapped_pts);
+        if needs_trial_normal {
+            grid.geometry()
+                .compute_normals(trial_points, trial_cell_gindex, &mut trial_normals);
+        }
+
+        for (test_i, test_dof) in test_space
+            .dofmap()
+            .cell_dofs(test_cell_tindex)
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            for (trial_i, trial_dof) in trial_space
+                .dofmap()
+                .cell_dofs(trial_cell_tindex)
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
+                let mut sum = T::zero();
+
+                for (index, wt) in weights.iter().enumerate() {
+                    sum += kernel.eval::<T>(
+                        unsafe { test_mapped_pts.row_unchecked(index) },
+                        unsafe { trial_mapped_pts.row_unchecked(index) },
+                        unsafe { test_normals.row_unchecked(index) },
+                        unsafe { trial_normals.row_unchecked(index) },
+                    ) * T::from_f64(
+                        wt * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
+                            * test_jdet[index]
+                            * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
+                            * trial_jdet[index],
+                    );
+                }
+                unsafe {
+                    *output.data.offset(
+                        (*test_dof + output.shape.0 * *trial_dof)
+                            .try_into()
+                            .unwrap(),
+                    ) += sum;
+                }
+            }
+        }
+    }
+    1
+}
 
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
@@ -264,8 +361,8 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
     let trial_colouring = trial_space.compute_cell_colouring();
     for test_c in &test_colouring {
         for trial_c in &trial_colouring {
-            let mut test_cells: Vec<&[usize]> = vec![&[]];
-            let mut trial_cells: Vec<&[usize]> = vec![&[]];
+            let mut test_cells: Vec<&[usize]> = vec![];
+            let mut trial_cells: Vec<&[usize]> = vec![];
 
             let mut test_start = 0;
             while test_start < test_c.len() {
@@ -330,143 +427,125 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
     let grid = test_space.grid();
     let c20 = grid.topology().connectivity(2, 0);
 
-    // Loop through colours
-    // loop through cells
-    // Find pairs
-    // if pairs.len() > 0
-    // Add to block for that pair
-    // assemble singular blocks for each pair
-
-    for (vertex, cells) in grid.topology().connectivity(0, 2).iter_rows().enumerate() {
-        for test_cell in cells {
-            let test_cell_tindex = grid.topology().index_map()[*test_cell];
-            let test_cell_gindex = grid.geometry().index_map()[*test_cell];
-            let test_vertices = c20.row(test_cell_tindex).unwrap();
-            for trial_cell in cells {
-                let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
-                let trial_cell_gindex = grid.geometry().index_map()[*trial_cell];
-                let trial_vertices = c20.row(trial_cell_tindex).unwrap();
-
-                let mut ismin = true;
-                let mut pairs = vec![];
-                for (test_i, test_v) in test_vertices.iter().enumerate() {
-                    for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                        if test_v == trial_v {
-                            if *test_v < vertex {
-                                ismin = false;
-                                break;
-                            }
-                            pairs.push((test_i, trial_i));
-                        }
-                    }
-                    if !ismin {
-                        break;
+    let mut possible_pairs = vec![];
+    // Vertex-adjacent
+    for i in 0..3 {
+        for j in 0..3 {
+            possible_pairs.push(vec![(i, j)]);
+        }
+    }
+    // edge-adjacent
+    for i in 0..3 {
+        for j in i + 1..3 {
+            for k in 0..3 {
+                for l in 0..3 {
+                    if k != l {
+                        possible_pairs.push(vec![(i, k), (j, l)]);
                     }
                 }
-                if ismin {
-                    let rule = get_quadrature_rule(
-                        grid.topology().cell_type(test_cell_tindex).unwrap(),
-                        grid.topology().cell_type(trial_cell_tindex).unwrap(),
-                        pairs,
-                        npoints,
-                    );
+            }
+        }
+    }
+    // Same cell
+    possible_pairs.push(vec![(0, 0), (1, 1), (2, 2)]);
 
-                    let test_points = Array2D::from_data(rule.test_points, (rule.npoints, 2));
-                    let trial_points = Array2D::from_data(rule.trial_points, (rule.npoints, 2));
-                    let mut test_table = Array4D::<f64>::new(
-                        test_space.element().tabulate_array_shape(0, rule.npoints),
-                    );
-                    let mut trial_table = Array4D::<f64>::new(
-                        trial_space.element().tabulate_array_shape(0, rule.npoints),
-                    );
+    let mut qweights = vec![];
+    let mut trial_points = vec![];
+    let mut test_points = vec![];
+    let mut trial_tables = vec![];
+    let mut test_tables = vec![];
+    for pairs in &possible_pairs {
+        let qrule = get_quadrature_rule(
+            ReferenceCellType::Triangle,
+            ReferenceCellType::Triangle,
+            pairs,
+            npoints,
+        );
 
-                    test_space
-                        .element()
-                        .tabulate(&test_points, 0, &mut test_table);
-                    trial_space
-                        .element()
-                        .tabulate(&trial_points, 0, &mut trial_table);
+        let points = Array2D::from_data(qrule.trial_points, (qrule.npoints, 2));
+        let mut table = Array4D::<f64>::new(
+            trial_space
+                .element()
+                .tabulate_array_shape(0, points.shape().0),
+        );
+        trial_space.element().tabulate(&points, 0, &mut table);
+        trial_points.push(points);
+        trial_tables.push(table);
 
-                    let mut test_jdet = vec![0.0; rule.npoints];
-                    let mut trial_jdet = vec![0.0; rule.npoints];
+        let points = Array2D::from_data(qrule.test_points, (qrule.npoints, 2));
+        let mut table = Array4D::<f64>::new(
+            test_space
+                .element()
+                .tabulate_array_shape(0, points.shape().0),
+        );
+        test_space.element().tabulate(&points, 0, &mut table);
+        test_points.push(points);
+        test_tables.push(table);
+        qweights.push(qrule.weights);
+    }
 
-                    grid.geometry().compute_jacobian_determinants(
-                        &test_points,
-                        test_cell_gindex,
-                        &mut test_jdet,
-                    );
-                    grid.geometry().compute_jacobian_determinants(
-                        &trial_points,
-                        trial_cell_gindex,
-                        &mut trial_jdet,
-                    );
+    for test_c in &test_colouring {
+        for trial_c in &trial_colouring {
+            let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
+            for test_cell in test_c {
+                let test_cell_tindex = grid.topology().index_map()[*test_cell];
+                let test_vertices = c20.row(test_cell_tindex).unwrap();
+                for trial_cell in trial_c {
+                    let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
+                    let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
-                    let mut test_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
-                    let mut trial_mapped_pts = Array2D::<f64>::new((rule.npoints, 3));
-                    let mut test_normals = Array2D::<f64>::new((rule.npoints, 3));
-                    let mut trial_normals = Array2D::<f64>::new((rule.npoints, 3));
-
-                    grid.geometry().compute_points(
-                        &test_points,
-                        test_cell_gindex,
-                        &mut test_mapped_pts,
-                    );
-                    grid.geometry().compute_points(
-                        &trial_points,
-                        trial_cell_gindex,
-                        &mut trial_mapped_pts,
-                    );
-                    if needs_test_normal {
-                        grid.geometry().compute_normals(
-                            &test_points,
-                            test_cell_gindex,
-                            &mut test_normals,
-                        );
-                    }
-                    if needs_trial_normal {
-                        grid.geometry().compute_normals(
-                            &trial_points,
-                            trial_cell_gindex,
-                            &mut trial_normals,
-                        );
-                    }
-
-                    for (test_i, test_dof) in test_space
-                        .dofmap()
-                        .cell_dofs(test_cell_tindex)
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        for (trial_i, trial_dof) in trial_space
-                            .dofmap()
-                            .cell_dofs(trial_cell_tindex)
-                            .unwrap()
-                            .iter()
-                            .enumerate()
-                        {
-                            let mut sum = T::zero();
-
-                            for index in 0..rule.npoints {
-                                sum += kernel.eval::<T>(
-                                    unsafe { test_mapped_pts.row_unchecked(index) },
-                                    unsafe { trial_mapped_pts.row_unchecked(index) },
-                                    unsafe { test_normals.row_unchecked(index) },
-                                    unsafe { trial_normals.row_unchecked(index) },
-                                ) * T::from_f64(
-                                    rule.weights[index]
-                                        * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
-                                        * test_jdet[index]
-                                        * unsafe {
-                                            trial_table.get_unchecked(0, index, trial_i, 0)
-                                        }
-                                        * trial_jdet[index],
-                                );
+                    let mut pairs = vec![];
+                    for (test_i, test_v) in test_vertices.iter().enumerate() {
+                        for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                            if test_v == trial_v {
+                                pairs.push((test_i, trial_i));
                             }
-                            *output.get_mut(*test_dof, *trial_dof).unwrap() += sum;
                         }
                     }
+                    if !pairs.is_empty() {
+                        cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
+                            .push((*trial_cell, *test_cell))
+                    }
                 }
+            }
+            for (i, cells) in cell_pairs.iter().enumerate() {
+                let mut start = 0;
+                let mut cell_blocks = vec![];
+                while start < cells.len() {
+                    let end = if start + blocksize < cells.len() {
+                        start + blocksize
+                    } else {
+                        cells.len()
+                    };
+                    cell_blocks.push(&cells[start..end]);
+                    start = end;
+                }
+
+                let numthreads = cell_blocks.len();
+                let output_data = RawData2D {
+                    data: output.data.as_mut_ptr(),
+                    shape: *output.shape(),
+                };
+                let r: usize = (0..numthreads)
+                    .into_par_iter()
+                    .map(&|t| {
+                        assemble_batch_singular(
+                            &output_data,
+                            kernel,
+                            needs_trial_normal,
+                            needs_test_normal,
+                            trial_space,
+                            test_space,
+                            cell_blocks[t],
+                            &trial_points[i],
+                            &test_points[i],
+                            &qweights[i],
+                            &trial_tables[i],
+                            &test_tables[i],
+                        )
+                    })
+                    .sum();
+                assert_eq!(r, numthreads);
             }
         }
     }
@@ -484,8 +563,9 @@ mod test {
     use bempp_traits::element::{Continuity, ElementFamily};
     // use num::complex::Complex;
 
+    #[cfg_attr(debug_assertions, ignore)]
     #[test]
-    fn test_laplace_single_layer_dp0_dp0() {
+    fn test_laplace_single_layer_dp0_dp0_larger() {
         let grid = regular_sphere(2);
         let element = create_element(
             ElementFamily::Lagrange,
@@ -531,6 +611,50 @@ mod test {
                     *matrix.get(i, j).unwrap(),
                     *dmat.get(i, j).unwrap(),
                     epsilon = 1e-4
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_laplace_single_layer_dp0_dp0_smaller() {
+        let grid = regular_sphere(1);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            &green::LaplaceGreenKernel {},
+            false,
+            false,
+            &space,
+            &space,
+        );
+
+        let mut dmat = Array2D::<f64>::new((ndofs, ndofs));
+        dense::assemble(
+            &mut dmat,
+            &green::LaplaceGreenKernel {},
+            false,
+            false,
+            &space,
+            &space,
+        );
+
+        for i in 0..matrix.shape().0 {
+            for j in 0..matrix.shape().1 {
+                assert_relative_eq!(
+                    *matrix.get(i, j).unwrap(),
+                    *dmat.get(i, j).unwrap(),
+                    epsilon = 1e-3
                 );
             }
         }
