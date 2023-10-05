@@ -357,6 +357,11 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
         .element()
         .tabulate(&qpoints, 0, &mut trial_table);
 
+    let output_raw = RawData2D {
+        data: output.data.as_mut_ptr(),
+        shape: *output.shape(),
+    };
+
     let test_colouring = test_space.compute_cell_colouring();
     let trial_colouring = trial_space.compute_cell_colouring();
     for test_c in &test_colouring {
@@ -387,15 +392,11 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
             }
 
             let numthreads = test_cells.len();
-            let output_data = RawData2D {
-                data: output.data.as_mut_ptr(),
-                shape: *output.shape(),
-            };
             let r: usize = (0..numthreads)
                 .into_par_iter()
                 .map(&|t| {
                     assemble_batch_nonadjacent(
-                        &output_data,
+                        &output_raw,
                         kernel,
                         needs_trial_normal,
                         needs_test_normal,
@@ -522,15 +523,11 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
                 }
 
                 let numthreads = cell_blocks.len();
-                let output_data = RawData2D {
-                    data: output.data.as_mut_ptr(),
-                    shape: *output.shape(),
-                };
                 let r: usize = (0..numthreads)
                     .into_par_iter()
                     .map(&|t| {
                         assemble_batch_singular(
-                            &output_data,
+                            &output_raw,
                             kernel,
                             needs_trial_normal,
                             needs_test_normal,
