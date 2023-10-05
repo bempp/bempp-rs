@@ -545,7 +545,7 @@ impl SerialTopology {
                     for e in &ref_entities {
                         let vertices = e.iter().map(|x| cell[*x]).collect::<Vec<usize>>();
                         let mut found = false;
-                        for entity in connectivity[dim0][0].iter_rows() {
+                        for entity in cty.iter_rows() {
                             if all_equal(entity, &vertices) {
                                 found = true;
                                 break;
