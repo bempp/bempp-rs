@@ -305,10 +305,6 @@ pub fn compute_transfer_vectors_unique() -> (Vec<TransferVector>, HashMap<usize,
 #[cfg(test)]
 pub mod test {
 
-    use bempp_tree::types::domain;
-
-    use crate::surface::*;
-
     use super::*;
 
     #[test]

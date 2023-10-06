@@ -376,8 +376,6 @@ where
 mod test {
     use super::*;
 
-    use rand::prelude::*;
-    use rand::SeedableRng;
     use std::env;
 
     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
@@ -528,48 +526,50 @@ mod test {
 
         println!("FFT times {:?}", times);
 
-        let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
+        assert!(false);
 
-        let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
-        let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
+        // let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
-        let leaf_coordinates = pts
-            .iter()
-            .map(|p| p.coordinate)
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
+        // let potentials = datatree.potentials.get(&leaf).unwrap().lock().unwrap();
+        // let pts = datatree.fmm.tree().get_points(&leaf).unwrap();
 
-        let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+        // let leaf_coordinates = pts
+        //     .iter()
+        //     .map(|p| p.coordinate)
+        //     .flat_map(|[x, y, z]| vec![x, y, z])
+        //     .collect_vec();
+
+        // let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
         // Get into row major order
-        let leaf_coordinates = unsafe {
-            rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
-        }.eval();
+        // let leaf_coordinates = unsafe {
+        //     rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
+        // }.eval();
 
-        let mut direct = vec![0f64; pts.len()];
-        let all_point_coordinates = points_fixture(npoints, None, None);
+        // let mut direct = vec![0f64; pts.len()];
+        // let all_point_coordinates = points_fixture(npoints, None, None);
 
-        let all_charges = charge_dict.into_values().collect_vec();
+        // let all_charges = charge_dict.into_values().collect_vec();
 
-        let kernel = Laplace3dKernel::<f64>::default();
+        // let kernel = Laplace3dKernel::<f64>::default();
 
-        kernel.evaluate_st(
-            EvalType::Value,
-            all_point_coordinates.data(),
-            leaf_coordinates.data(),
-            &all_charges[..],
-            &mut direct[..],
-        );
+        // kernel.evaluate_st(
+        //     EvalType::Value,
+        //     all_point_coordinates.data(),
+        //     leaf_coordinates.data(),
+        //     &all_charges[..],
+        //     &mut direct[..],
+        // );
 
-        let abs_error: f64 = potentials
-            .data()
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        // let abs_error: f64 = potentials
+        //     .data()
+        //     .iter()
+        //     .zip(direct.iter())
+        //     .map(|(a, b)| (a - b).abs())
+        //     .sum();
+        // let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        println!("rel error {:?}", rel_error);
-        assert!(rel_error <= 1e-10);
+        // println!("rel error {:?}", rel_error);
+        // assert!(rel_error <= 1e-10);
     }
 }

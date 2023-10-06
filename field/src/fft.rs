@@ -32,7 +32,7 @@ pub fn rfft3_fftw(input: &mut [f64], output: &mut [c64], shape: &[usize]) {
 /// # Arguments
 /// * `input` - Input slice of complex data, corresponding to an FFT of a 3D array stored in column major order.
 /// * `output` - Output slice.
-/// * `shape` - Shape of input data.
+/// * `shape` - Shape of output data.
 pub fn irfft3_fftw(input: &mut [c64], output: &mut [f64], shape: &[usize]) {
     assert!(shape.len() == 3);
     let size: usize = shape.iter().product();

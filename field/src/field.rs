@@ -198,15 +198,10 @@ where
     type TransferVectorMap = HashMap<usize, usize>;
 
     fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
-        // let mut result = Vec::new();
 
-        let n = 2 * order - 1;
-        let n_p = n + 1;
-        let size_real = n_p * n_p * (n_p / 2 + 1);
-        // let mut kernel_data = rlst_mat![c64, (self.transfer_vectors.len() * size_real, 1)];
         let mut kernel_data = HashMap::new();
 
-        let mut surface_maps = Vec::new();
+        let mut surface_maps = HashMap::new();
         let mut inv_surface_maps = Vec::new();
         let mut conv_maps = Vec::new();
         let mut inv_conv_maps = Vec::new();
@@ -220,7 +215,7 @@ where
         // Store a set of considered vectors, to avoid redundant computations
         let mut considered = HashSet::new();
 
-        for (t_idx, t) in transfer_vectors.iter().enumerate() {
+        for t in transfer_vectors.iter() {
             // Find transfer vector after it's been reflected in reference octant
             let axial_transfer_vector = axially_reflect_components(&t.components);
             // Find transfer vector after reflection into reference cone
@@ -229,6 +224,50 @@ where
             // Compute reflected checksum
             let t_refl =
                 MortonKey::find_transfer_vector_from_components(&diag_axial_transfer_vector);
+
+            // Find multi-index after axial reflections
+            let (_, source_multi_index) = MortonKey::surface_grid(order);
+
+            // TODO Replace one based indexing from messner
+            let source_multi_index = source_multi_index.iter().map(|e| e + 1).collect_vec();
+
+            // Find multi-indices after axial reflection
+            let mut source_multi_index_axial = vec![0usize; source_multi_index.len()];
+
+            let nsources = 6*(order-1).pow(2) + 2;
+
+            for i in 0..nsources {
+                let m = [
+                    source_multi_index[i],
+                    source_multi_index[nsources + i],
+                    source_multi_index[2 * nsources + i],
+                ];
+                let m_refl = axial_reflection_surface(&m[..], &t.components[..], order);
+
+                source_multi_index_axial[i] = m_refl[0];
+                source_multi_index_axial[nsources + i] = m_refl[1];
+                source_multi_index_axial[2 * nsources + i] = m_refl[2];
+            }
+
+            // Find multi-index after diagonal and axial reflections
+            let mut source_multi_index_axial_diag = vec![0usize; source_multi_index.len()];
+
+            for i in 0..nsources {
+                let m = [
+                    source_multi_index_axial[i],
+                    source_multi_index_axial[nsources + i],
+                    source_multi_index_axial[2 * nsources + i],
+                ];
+
+                let m_refl = diagonal_reflection(&m, &axial_transfer_vector);
+
+                source_multi_index_axial_diag[i] = m_refl[0];
+                source_multi_index_axial_diag[nsources + i] = m_refl[1];
+                source_multi_index_axial_diag[2 * nsources + i] = m_refl[2];
+            }
+
+            let source_multi_index_axial_diag = source_multi_index_axial_diag.iter().map(|e| e -1 ).collect_vec();
+            surface_maps.insert(t.hash, source_multi_index_axial_diag);
 
             if !considered.contains(&t_refl) {
                 // Add reflected checksum to checked set.
@@ -320,7 +359,7 @@ where
                     .get(&conv_point_corner_index)
                     .unwrap();
 
-                let (_, mut conv_grid_multi_index) = t.source.convolution_grid(
+                let (_, conv_grid_multi_index) = t.source.convolution_grid(
                     order,
                     &domain,
                     self.alpha,
@@ -368,7 +407,7 @@ where
                     conv_grid_multi_index_axial_diag[2 * nconv + i] = m_refl[2];
                 }
 
-                // Find map between conv multi-indices before/after reflection?
+                // Find map between conv multi-indices before/after reflection
                 let mut map_conv = HashMap::new();
                 let mut inv_map_conv = HashMap::new();
 
@@ -379,11 +418,7 @@ where
                         conv_grid_multi_index[2 * nconv + i],
                     ];
 
-                    let mut mapped = false;
-                    let mut counter = 0;
-
                     for j in 0..nconv {
-                        counter += 1;
 
                         let reflected = [
                             conv_grid_multi_index_axial_diag[j],
@@ -397,78 +432,129 @@ where
                         {
                             map_conv.insert(i, j);
                             inv_map_conv.insert(j, i);
-                            mapped = true;
                         }
                     }
                 }
 
                 // Find reflected conv point, used to find the reflected convolution grid
-                let &conv_point_index_reflected = map_surface.get(conv_point_index).unwrap();
-                let conv_point_reflected = [
-                    source_equivalent_surface[conv_point_index_reflected],
-                    source_equivalent_surface[nsources + conv_point_index_reflected],
-                    source_equivalent_surface[2 * nsources + conv_point_index_reflected],
-                ];
-                let &conv_point_corner_index_reflected = map_corner_to_surface
-                    .get(&conv_point_index_reflected)
-                    .unwrap();
+                // let &conv_point_index_reflected = map_surface.get(conv_point_index).unwrap();
+                // let conv_point_reflected = [
+                //     source_equivalent_surface[conv_point_index_reflected],
+                //     source_equivalent_surface[nsources + conv_point_index_reflected],
+                //     source_equivalent_surface[2 * nsources + conv_point_index_reflected],
+                // ];
+                // let &conv_point_corner_index_reflected = map_corner_to_surface
+                //     .get(&conv_point_index_reflected)
+                //     .unwrap();
 
-                let (conv_grid_reflected, _) = t.source.convolution_grid(
-                    order,
-                    &domain,
-                    self.alpha,
-                    &conv_point_reflected[..],
-                    conv_point_corner_index_reflected,
+                // let (conv_grid_reflected, _) = t.source.convolution_grid(
+                //     order,
+                //     &domain,
+                //     self.alpha,
+                //     &conv_point_reflected[..],
+                //     conv_point_corner_index_reflected,
+                // );
+                let (conv_grid, _) = t.source.convolution_grid(
+                    order, &domain, 
+                    self.alpha, 
+                    &conv_point_corner, 
+                    conv_point_corner_index
                 );
 
                 // Find the kernel point
                 let kernel_point_corner_index = 0;
-                let corners = find_corners(&&target_check_surface[..]);
 
-                let kernel_point_index = inv_map_corner_to_surface
+                let &kernel_point_index = inv_map_corner_to_surface
                     .get(&kernel_point_corner_index)
                     .unwrap();
 
-                let &kernel_point_index_reflected = map_surface.get(kernel_point_index).unwrap();
-                let kernel_point_reflected = [
-                    target_check_surface[kernel_point_index_reflected],
-                    target_check_surface[ntargets + kernel_point_index_reflected],
-                    target_check_surface[2 * ntargets + kernel_point_index_reflected],
+                let kernel_point = [
+                    target_check_surface[kernel_point_index],
+                    target_check_surface[ntargets + kernel_point_index],
+                    target_check_surface[2 * ntargets + kernel_point_index],
                 ];
+                // let &kernel_point_index_reflected = map_surface.get(kernel_point_index).unwrap();
+
+                // let kernel_point_reflected = [
+                //     target_check_surface[kernel_point_index_reflected],
+                //     target_check_surface[ntargets + kernel_point_index_reflected],
+                //     target_check_surface[2 * ntargets + kernel_point_index_reflected],
+                // ];
 
                 // Compute the reflected kernel. TODO Test
-                let reflected_kernel = self.compute_kernel_reflected(
-                    order,
-                    &conv_grid_reflected[..],
-                    &map_conv,
-                    &kernel_point_reflected[..],
-                );
-                let &(m, n, o) = reflected_kernel.shape();
-
-                // Precompute and store the FFT of each unique kernel interaction
+                let kernel = self.compute_kernel(order, &conv_grid, kernel_point);
+                
+                let &(m, n, o) = kernel.shape();
                 let p = m + 1;
                 let q = n + 1;
                 let r = o + 1;
-                let size_real = p * q * (r / 2 + 1);
-                let padded_reflected_kernel =
-                    pad3(&reflected_kernel, (p - m, q - n, r - o), (0, 0, 0));
-
-                // Flip the kernel
-                let mut padded_reflected_kernel = flip3(&padded_reflected_kernel);
+                let padded_kernel=
+                    pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
+                
+                let mut padded_kernel = flip3(&padded_kernel);
 
                 // Compute FFT of kernel for this transfer vector
-                let mut padded_reflected_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+                let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
                 rfft3_fftw(
-                    padded_reflected_kernel.get_data_mut(),
-                    padded_reflected_kernel_hat.get_data_mut(),
+                    padded_kernel.get_data_mut(),
+                    padded_kernel_hat.get_data_mut(),
                     &[p, q, r],
                 );
 
                 // Store FFT of kernel for this transfer vector
-                kernel_data.insert(t_refl, padded_reflected_kernel_hat);
+                kernel_data.insert(t_refl, padded_kernel_hat);
+                
+               /// 
+                // let reflected_kernel = self.compute_kernel_reflected(
+                //     order,
+                //     &conv_grid_reflected[..],
+                //     &map_conv,
+                //     &kernel_point_reflected[..]
+                // );
+                // let &(m, n, o) = reflected_kernel.shape();
+
+                // // Precompute and store the FFT of each unique kernel interaction
+                // let p = m + 1;
+                // let q = n + 1;
+                // let r = o + 1;
+                // let padded_reflected_kernel =
+                //     pad3(&reflected_kernel, (p - m, q - n, r - o), (0, 0, 0));
+
+                // // Flip the kernel
+                // let mut padded_reflected_kernel = flip3(&padded_reflected_kernel);
+
+                // // Compute FFT of kernel for this transfer vector
+                // let mut padded_reflected_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+                // rfft3_fftw(
+                //     padded_reflected_kernel.get_data_mut(),
+                //     padded_reflected_kernel_hat.get_data_mut(),
+                //     &[p, q, r],
+                // );
+
+                // // Store FFT of kernel for this transfer vector
+                // kernel_data.insert(t_refl, padded_reflected_kernel_hat);
 
                 // Save surface and convolution maps
-                surface_maps.push(map_surface);
+                // let source_multi_index_axial_diag = source_multi_index_axial_diag.iter().map(|e| e-1).collect_vec();
+                // let source_multi_index_axial= source_multi_index_axial.iter().map(|e| e-1).collect_vec();
+                // let source_multi_index= source_multi_index.iter().map(|e| e-1).collect_vec();
+                // if t_refl == 131076 {
+                //     let tmp = axial_reflection_surface(&[2, 2, 2], &t.components[..], order);
+                //     let tmp = diagonal_reflection(&tmp[..], &axial_transfer_vector);
+                //     println!("t {:?} {:?}", t.components, diag_axial_transfer_vector);
+                //     println!("HERE {:?}", tmp);
+                //     // println!("HERE {:?}", source_multi_index_axial_diag[0]);
+                //     // println!("reflected");
+                //     println!("{:?}", &source_multi_index_axial_diag[..8]);
+                //     println!("{:?}", &source_multi_index_axial_diag[8..16]);
+                //     println!("{:?}", &source_multi_index_axial_diag[16..]);
+                //     // println!("unreflected");
+                //     // println!("{:?}", &source_multi_index[..8]);
+                //     // println!("{:?}", &source_multi_index[8..16]);
+                //     // println!("{:?}", &source_multi_index[16..]);
+                //     // println!("")
+                // }
+                // surface_maps.insert(t_refl, source_multi_index_axial_diag);
                 inv_surface_maps.push(inv_map_surface);
                 conv_maps.push(map_conv);
                 inv_conv_maps.push(inv_map_conv);
@@ -680,9 +766,12 @@ where
 #[cfg(test)]
 mod test {
 
+    use crate::{transfer_vector, fft::irfft3_fftw};
+
     use super::*;
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use num::traits::sign;
 
     #[test]
     pub fn test_svd_field_translation() {
@@ -749,7 +838,7 @@ mod test {
     #[test]
     fn test_fft() {
         let kernel = Laplace3dKernel::new();
-        let order = 2;
+        let order: usize = 5;
 
         let domain = Domain {
             origin: [0., 0., 0.],
@@ -757,11 +846,116 @@ mod test {
         };
         let alpha = 1.05;
 
+        // Some random expansion data
+        let ncoeffs = 6 * (order - 1).pow(2) + 2;
+        let multipole = vec![1f64; ncoeffs];
+
+        // Create field translation object
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
-        // Create a random point in the middle of the domain
+        // Place charges on the convolution grid
+        let signal = fft.compute_signal(order, &multipole);
+
+        // Compute all M2L operators
         let m2l = fft.compute_m2l_operators(order, domain);
 
-        // assert!(false);
+        // Pick a random source/target pair
+        // let idx = 29;
+        let idx = 153;
+        let (all_transfer_vectors, _) = compute_transfer_vectors();
+
+        let transfer_vector = &all_transfer_vectors[idx];
+        let unique_transfer_vector = fft.transfer_vector_map.get(&transfer_vector.hash).unwrap();
+
+        let tmp = axially_reflect_components(&transfer_vector.components);
+        let tmp = diagonally_reflect_components(&tmp);
+
+        println!("tv {:?} unique tv {:?} {:?}={:?}", transfer_vector.components, tmp, MortonKey::find_transfer_vector_from_components(&tmp), unique_transfer_vector);
+
+        // Find source and target surfaces
+        let sources = transfer_vector.source.compute_surface(&domain, order, alpha);
+        let targets = transfer_vector.target.compute_surface(&domain, order, alpha);
+
+        // Get direct evaluations for testing
+        let mut direct = vec![0f64; ncoeffs];
+        fft.kernel.evaluate_st(EvalType::Value, &sources[..], &targets[..], &multipole[..], &mut direct[..]);
+
+        // Evaluate FFT based convolution with reflections
+        // Lookup appropriate FFT of Kernel matrix from precomputatoins
+        let padded_kernel_hat = m2l.kernel_data.get(&unique_transfer_vector).unwrap();
+
+        // Compute fft of signal
+        let &(m, n, o) = signal.shape();
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+        let pad_size = (p-m, q-n, r-o);
+        let pad_index = (p-m, q-n, r-o);
+        let mut padded_signal = pad3(&signal, pad_size, pad_index);
+        let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+
+        rfft3_fftw(padded_signal.get_data_mut(), padded_signal_hat.get_data_mut(), &[p, q, r]);
+        
+        // Compute convolution
+        let hadamard_product = padded_signal_hat.get_data().iter().zip(
+            padded_kernel_hat.get_data().iter()
+        ).map(|(a, b)| a*b).collect_vec();
+
+        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r/2+1));
+
+        let mut potentials_reflected = Array3D::new((p, q, r));
+        irfft3_fftw(hadamard_product.get_data_mut(), potentials_reflected.get_data_mut(), &[p, q, r]);
+
+       // Filter potentials
+        // Filter check potentials
+        let mut filtered_check_potentials: Array3D<f64> = Array3D::new((p, q, r));
+        for i in (p-m-1)..p {
+            for j in (q-n-1)..q {
+                for k in (r-o-1)..r {
+                    let i_= i - (p-m-1);
+                    let j_ = j - (q-n-1);
+                    let k_: usize = k - (r-o-1);
+
+                    *filtered_check_potentials.get_mut(i_, j_, k_).unwrap() = *potentials_reflected.get(k, j, i).unwrap();
+                }
+            }
+        } 
+
+        // let (_, surface_multi_index) = MortonKey::surface_grid(order);
+        let surface_multi_index = m2l.surface_map.get(&transfer_vector.hash).unwrap();
+        let mut tmp = Vec::new();
+        let ntargets = surface_multi_index.len() / 3;
+        let xs = &surface_multi_index[0..ntargets];
+        let ys = &surface_multi_index[ntargets..2*ntargets];
+        let zs = &surface_multi_index[2*ntargets..];
+
+        for i in 0..ntargets {
+            let val = filtered_check_potentials.get(xs[i], ys[i], zs[i]).unwrap();
+            // println!("HERE {:?} {:?} {:?} {:?}", xs[i], ys[i], zs[i], val);
+            tmp.push(*val);
+        }
+
+        // println!(" {:?}", padded_signal.shape());
+        // println!("potentials {:?}", filtered_check_potentials.get(1,2,3));
+
+        // println!(" FOO BAR {:?}", filtered_check_potentials.get_data());
+
+        println!("potentials {:?}", tmp);
+        println!("direct {:?}", direct);
+
+        let abs_error: f64 = tmp 
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+
+        println!("{:?}", rel_error);
+
+        // println!("sources {:?}", sources);
+        // println!("targets {:?}", targets);
+
+        assert!(rel_error < 1e-15);
+        
     }
 }

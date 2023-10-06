@@ -18,6 +18,8 @@ categories = ["mathematics", "science"]
 [lib]
 name = "bempp_fmm"
 crate-type = ["lib", "cdylib"]
+bench = false
+
 
 [dependencies]
 bempp-tools = { path = "../tools" }
@@ -36,6 +38,13 @@ num = "0.4"
 rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse" }
 fftw = {git = "https://github.com/skailasa/fftw.git" } 
 rayon = "1.7"
+
+[dev.dependencies]
+criterion = "0.5.1" 
+
+[[bench]]
+name = "fft_fmm"
+harness = false
 
 [target.aarch64-apple-darwin]
 rustflags = [  "-C", "target-feature=+neon"]

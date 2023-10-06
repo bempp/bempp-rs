@@ -88,13 +88,14 @@ pub struct TransferVector {
 }
 
 /// Container to store precomputed data required for FFT field translations.
+#[derive(Default)]
 pub struct FftM2lOperatorData {
     /// The FFT of unique kernel evaluations for each transfer vector
     pub kernel_data: FftM2lEntry,
 
     /// Map between surface grid indices on unreflected/reflected surfaces.
     /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    pub surface_map: Vec<HashMap<usize, usize>>,
+    pub surface_map: HashMap<usize, Vec<usize>>,
 
     /// Inverse map between surface grid indices on unreflected/reflected surfaces.
     /// Each index in the Vec corresponds to an un-reflected transfer vector.
@@ -133,20 +134,6 @@ impl Default for SvdM2lOperatorData {
             u: tmp.new_like_self().eval(),
             st_block: tmp.new_like_self().eval(),
             c: tmp.new_like_self().eval(),
-        }
-    }
-}
-
-impl Default for FftM2lOperatorData {
-    fn default() -> Self {
-        let tmp = rlst_mat![c64, (1, 1)];
-
-        FftM2lOperatorData {
-            kernel_data: HashMap::new(),
-            surface_map: Vec::default(),
-            inv_surface_map: Vec::default(),
-            conv_map: Vec::default(),
-            inv_conv_map: Vec::default(),
         }
     }
 }
