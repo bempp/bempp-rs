@@ -352,6 +352,7 @@ pub fn assemble<'a>(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn assemble_nonsingular<'a>(
     output: &mut Array2D<f64>,
     kernel: &impl Kernel<T = f64>,
@@ -459,6 +460,7 @@ pub fn assemble_nonsingular<'a>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn assemble_singular<'a>(
     output: &mut Array2D<f64>,
     kernel: &impl Kernel<T = f64>,
