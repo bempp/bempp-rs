@@ -2,7 +2,6 @@
 
 use crate::arrays::{AdjacencyListAccess, Array2DAccess};
 use crate::cell::ReferenceCellType;
-use std::cell::Ref;
 
 /// The ownership of a mesh entity
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -98,45 +97,16 @@ pub trait Topology<'a> {
     fn entity_count(&self, dim: usize) -> usize;
 
     /// The indices of the vertices that from cell with index `index`
-    fn cell(&self, index: usize) -> Option<Ref<[usize]>>;
+    fn cell(&self, index: usize) -> Option<&[usize]>;
 
     /// The indices of the vertices that from cell with index `index`
     fn cell_type(&self, index: usize) -> Option<ReferenceCellType>;
 
-    /// Create the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    ///
-    /// If this function is called multiple times, it will do nothing after the first call
-    fn create_connectivity(&self, dim0: usize, dim1: usize);
-
-    /// Create the connectivity information for all dimensions
-    fn create_connectivity_all(&self) {
-        for dim0 in 0..self.dim() {
-            for dim1 in 0..self.dim() {
-                self.create_connectivity(dim0, dim1);
-            }
-        }
-    }
-
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity>;
+    fn connectivity(&self, dim0: usize, dim1: usize) -> &Self::Connectivity;
 
     /// Get the ownership of a mesh entity
     fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
-
-    /// Get pairs of cells that are adjacent via a facet (entity of dimension tdim - 1).
-    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
-    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
-
-    /// Get pairs of cells that are adjacent via a ridge (entity of dimension tdim - 2).
-    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
-    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
-
-    /// Get pairs of cells that are adjacent via a peak (entity of dimension tdim - 3).
-    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
-    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
-
-    /// Get pairs of cells that are not adjacent
-    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>>;
 }
 
 pub trait Grid<'a> {
