@@ -31,3 +31,11 @@ itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
 num = "0.4"
 rayon = "1.7"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "assembly_benchmark"
+harness = false
+

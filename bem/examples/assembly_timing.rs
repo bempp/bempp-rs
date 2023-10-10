@@ -1,5 +1,3 @@
-// TODO: use Criterion to benchmark properly
-
 use bempp_bem::assembly::{assemble_batched, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;

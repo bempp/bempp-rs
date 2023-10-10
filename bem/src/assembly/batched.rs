@@ -13,7 +13,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use std::time::Instant;
+//use std::time::Instant;
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -334,7 +334,7 @@ pub fn assemble<'a>(
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
 ) {
-    let now = Instant::now();
+    // let now = Instant::now();
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
     // if *trial_space.grid() != *test_space.grid() {
@@ -440,8 +440,8 @@ pub fn assemble<'a>(
         }
     }
 
-    println!("Non-adjacent terms: {}ms", now.elapsed().as_millis());
-    let now = Instant::now();
+    // println!("Non-adjacent terms: {}ms", now.elapsed().as_millis());
+    // let now = Instant::now();
 
     if test_space.grid() != trial_space.grid() {
         // If the test and trial grids are different, there are no neighbouring triangles
@@ -572,7 +572,7 @@ pub fn assemble<'a>(
             }
         }
     }
-    println!("Singular terms: {}ms", now.elapsed().as_millis());
+    // println!("Singular terms: {}ms", now.elapsed().as_millis());
 }
 #[cfg(test)]
 mod test {
