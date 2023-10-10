@@ -11,7 +11,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 pub fn assembly_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("assembly");
-    group.sample_size(10);
+    group.sample_size(20);
 
     for i in 3..5 {
         let grid = regular_sphere(i);

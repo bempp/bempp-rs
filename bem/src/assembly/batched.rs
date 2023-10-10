@@ -149,11 +149,10 @@ fn assemble_batch_singular<'a>(
                 let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    kernel.evaluate_st(
+                    kernel.assemble_st(
                         EvalType::Value,
                         test_mapped_pts.row(index).unwrap(),
                         trial_mapped_pts.row(index).unwrap(),
-                        &[1.0],
                         &mut k,
                     );
                     sum += k[0]
@@ -202,14 +201,12 @@ fn assemble_batch_nonadjacent<'a>(
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut test_jdet = vec![0.0; test_points.shape().0];
     let mut trial_jdet = vec![0.0; trial_points.shape().0];
-    let mut test_mapped_pts = Array2D::<f64>::new((test_points.shape().0, 3));
-    let mut trial_mapped_pts = Array2D::<f64>::new((trial_points.shape().0, 3));
     let mut test_normals = Array2D::<f64>::new((test_points.shape().0, 3));
     let mut trial_normals = Array2D::<f64>::new((trial_points.shape().0, 3));
 
     // TODO: remove transposing, and put points in this shape to start with
-    let mut test_mapped_pts_t = Array2D::<f64>::new((3, test_points.shape().0));
-    let mut trial_mapped_pts_t = Array2D::<f64>::new((3, trial_points.shape().0));
+    let mut test_mapped_pts = Array2D::<f64>::new((3, test_points.shape().0));
+    let mut trial_mapped_pts = Array2D::<f64>::new((3, trial_points.shape().0));
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
@@ -223,12 +220,8 @@ fn assemble_batch_nonadjacent<'a>(
         );
         test_grid
             .geometry()
-            .compute_points(test_points, test_cell_gindex, &mut test_mapped_pts);
-        for i in 0..3 {
-            for j in 0..test_points.shape().0 {
-                *test_mapped_pts_t.get_mut(i, j).unwrap() = *test_mapped_pts.get(j, i).unwrap();
-            }
-        }
+            .compute_points_transpose(test_points, test_cell_gindex, &mut test_mapped_pts);
+
         if needs_test_normal {
             test_grid
                 .geometry()
@@ -245,17 +238,11 @@ fn assemble_batch_nonadjacent<'a>(
                 trial_cell_gindex,
                 &mut trial_jdet,
             );
-            trial_grid.geometry().compute_points(
+            trial_grid.geometry().compute_points_transpose(
                 trial_points,
                 trial_cell_gindex,
                 &mut trial_mapped_pts,
             );
-            for i in 0..3 {
-                for j in 0..trial_points.shape().0 {
-                    *trial_mapped_pts_t.get_mut(i, j).unwrap() =
-                        *trial_mapped_pts.get(j, i).unwrap();
-                }
-            }
             if needs_trial_normal {
                 trial_grid.geometry().compute_normals(
                     trial_points,
@@ -266,8 +253,8 @@ fn assemble_batch_nonadjacent<'a>(
 
             kernel.assemble_st(
                 EvalType::Value,
-                &test_mapped_pts_t.data,
-                &trial_mapped_pts_t.data,
+                &test_mapped_pts.data,
+                &trial_mapped_pts.data,
                 &mut k,
             );
 

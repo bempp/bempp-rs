@@ -41,6 +41,15 @@ pub trait Geometry {
         physical_points: &mut impl Array2DAccess<'a, f64>,
     );
 
+    /// Compute the physical coordinates of a set of points in a given cell,
+    /// with return in transposed arrangement
+    fn compute_points_transpose<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        physical_points: &mut impl Array2DAccess<'a, f64>,
+    );
+
     /// Compute the normals to a set of points in a given cell
     fn compute_normals<'a>(
         &self,

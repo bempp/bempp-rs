@@ -70,6 +70,15 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         self.serial_geometry
             .compute_points(points, cell, physical_points)
     }
+    fn compute_points_transpose<'b>(
+        &self,
+        points: &impl Array2DAccess<'b, f64>,
+        cell: usize,
+        physical_points_transpose: &mut impl Array2DAccess<'b, f64>,
+    ) {
+        self.serial_geometry
+            .compute_points(points, cell, physical_points)
+    }
     fn compute_normals<'b>(
         &self,
         points: &impl Array2DAccess<'b, f64>,

@@ -149,6 +149,44 @@ impl Geometry for SerialGeometry {
             }
         }
     }
+    fn compute_points_transpose<'a>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        physical_points: &mut impl Array2DAccess<'a, f64>,
+    ) {
+        let gdim = self.dim();
+        if gdim != physical_points.shape().0 {
+            panic!("physical_points has wrong number of rows.");
+        }
+        if points.shape().0 != physical_points.shape().1 {
+            panic!("physical_points has wrong number of columns.");
+        }
+        let element = self.element(cell);
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(0, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        element.tabulate(points, 0, &mut data);
+        for i in 0..physical_points.shape().0 {
+            for p in 0..points.shape().0 {
+                unsafe {
+                    *physical_points.get_unchecked_mut(i, p) = 0.0;
+                }
+            }
+        }
+        for i in 0..data.shape().2 {
+            let pt = unsafe {
+                self.coordinates
+                    .row_unchecked(*self.cells.get_unchecked(cell, i))
+            };
+            for p in 0..points.shape().0 {
+                for (j, pt_j) in pt.iter().enumerate() {
+                    unsafe {
+                        *physical_points.get_unchecked_mut(j, p) +=
+                            *pt_j * data.get_unchecked(0, p, i, 0);
+                    }
+                }
+            }
+        }
+    }
     fn compute_normals<'a>(
         &self,
         points: &impl Array2DAccess<'a, f64>,
