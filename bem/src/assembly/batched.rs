@@ -218,9 +218,11 @@ fn assemble_batch_nonadjacent<'a>(
             test_cell_gindex,
             &mut test_jdet,
         );
-        test_grid
-            .geometry()
-            .compute_points_transpose(test_points, test_cell_gindex, &mut test_mapped_pts);
+        test_grid.geometry().compute_points_transpose(
+            test_points,
+            test_cell_gindex,
+            &mut test_mapped_pts,
+        );
 
         if needs_test_normal {
             test_grid
