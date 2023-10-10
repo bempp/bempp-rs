@@ -5,6 +5,7 @@ use crate::green;
 use crate::green::Scalar;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::FunctionSpace;
+use bempp_kernel::laplace_3d;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -116,9 +117,9 @@ pub fn assemble_dense<'a, T: Scalar>(
 }
 
 /// Assemble an operator into a dense matrix using batched parallelisation
-pub fn assemble_batched<'a, T: Scalar + Copy + Sync>(
+pub fn assemble_batched<'a>(
     // TODO: ouput should be `&mut impl ArrayAccess2D` once such a trait exists
-    output: &mut Array2D<T>,
+    output: &mut Array2D<f64>,
     operator: BoundaryOperator,
     pde: PDEType,
     trial_space: &SerialFunctionSpace<'a>,
@@ -129,78 +130,20 @@ pub fn assemble_batched<'a, T: Scalar + Copy + Sync>(
             BoundaryOperator::SingleLayer => {
                 batched::assemble(
                     output,
-                    &green::LaplaceGreenKernel {},
+                    &laplace_3d::Laplace3dKernel::new(),
                     false,
                     false,
                     trial_space,
                     test_space,
                 );
             }
-            BoundaryOperator::DoubleLayer => {
-                batched::assemble(
-                    output,
-                    &green::LaplaceGreenDyKernel {},
-                    false,
-                    true,
-                    trial_space,
-                    test_space,
-                );
-            }
-            BoundaryOperator::AdjointDoubleLayer => {
-                batched::assemble(
-                    output,
-                    &green::LaplaceGreenDxKernel {},
-                    true,
-                    false,
-                    trial_space,
-                    test_space,
-                );
-            }
-            //BoundaryOperator::Hypersingular => {
-            //    batched::laplace_hypersingular_assemble(output, trial_space, test_space);
-            //}
             _ => {
                 panic!("Invalid operator");
             }
         },
-        PDEType::Helmholtz(k) => match operator {
-            BoundaryOperator::SingleLayer => {
-                batched::assemble(
-                    output,
-                    &green::HelmholtzGreenKernel { k },
-                    false,
-                    false,
-                    trial_space,
-                    test_space,
-                );
-            }
-            BoundaryOperator::DoubleLayer => {
-                batched::assemble(
-                    output,
-                    &green::HelmholtzGreenDyKernel { k },
-                    false,
-                    true,
-                    trial_space,
-                    test_space,
-                );
-            }
-            BoundaryOperator::AdjointDoubleLayer => {
-                batched::assemble(
-                    output,
-                    &green::HelmholtzGreenDxKernel { k },
-                    true,
-                    false,
-                    trial_space,
-                    test_space,
-                );
-            }
-            //BoundaryOperator::Hypersingular => {
-            //    batched::helmholtz_hypersingular_assemble(output, trial_space, test_space, k);
-            //}
-            _ => {
-                panic!("Invalid operator");
-            }
-        },
+        _ => {
+            panic!("Invalid PDE");
+        }
     };
 }
 

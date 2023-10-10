@@ -1,3 +1,5 @@
+// TODO: use Criterion to benchmark properly
+
 use bempp_bem::assembly::{assemble_batched, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
@@ -22,7 +24,9 @@ fn main() {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = Array2D::<Complex<f64>>::new((
+        println!("{}", space.dofmap().global_size());
+//        let mut matrix = Array2D::<Complex<f64>>::new((
+        let mut matrix = Array2D::<f64>::new((
             space.dofmap().global_size(),
             space.dofmap().global_size(),
         ));
@@ -30,15 +34,14 @@ fn main() {
         assemble_batched(
             &mut matrix,
             BoundaryOperator::SingleLayer,
-            PDEType::Helmholtz(5.0),
+            PDEType::Laplace,
             &space,
             &space,
         );
 
         println!(
-            "{} {}",
-            space.dofmap().global_size(),
+            "Total time: {}",
             now.elapsed().as_millis()
-        )
+        );
     }
 }

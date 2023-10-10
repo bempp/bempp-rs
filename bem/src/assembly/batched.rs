@@ -1,9 +1,4 @@
 use crate::function_space::SerialFunctionSpace;
-use crate::green::{
-    //HelmholtzGreenHypersingularTermKernel, HelmholtzGreenKernel, LaplaceGreenKernel,
-    Scalar,
-    SingularKernel,
-};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -14,7 +9,13 @@ use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
+use bempp_kernel::traits::Kernel;
+use bempp_kernel::types::EvalType;
+use bempp_traits::types::Scalar;
+use bempp_kernel::laplace_3d::Laplace3dKernel;
 use rayon::prelude::*;
+use std::time::Instant;
+
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -76,10 +77,11 @@ struct RawData2D<T: Scalar> {
 
 unsafe impl<T: Scalar> Sync for RawData2D<T> {}
 
+// TODO: use T not f64
 #[allow(clippy::too_many_arguments)]
-fn assemble_batch_singular<'a, T: Scalar + Clone + Copy>(
-    output: &RawData2D<T>,
-    kernel: &impl SingularKernel,
+fn assemble_batch_singular<'a>(
+    output: &RawData2D<f64>,
+    kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
@@ -92,6 +94,7 @@ fn assemble_batch_singular<'a, T: Scalar + Clone + Copy>(
     test_table: &Array4D<f64>,
 ) -> usize {
     let grid = test_space.grid();
+    let mut k = vec![0.0];
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut test_jdet = vec![0.0; test_points.shape().0];
@@ -145,19 +148,21 @@ fn assemble_batch_singular<'a, T: Scalar + Clone + Copy>(
                 .iter()
                 .enumerate()
             {
-                let mut sum = T::zero();
+                let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    sum += kernel.eval::<T>(
-                        unsafe { test_mapped_pts.row_unchecked(index) },
-                        unsafe { trial_mapped_pts.row_unchecked(index) },
-                        unsafe { test_normals.row_unchecked(index) },
-                        unsafe { trial_normals.row_unchecked(index) },
-                    ) * T::from_f64(
+                    kernel.evaluate_st(
+                        EvalType::Value,
+                        test_mapped_pts.row(index).unwrap(),
+                        trial_mapped_pts.row(index).unwrap(),
+                        &[1.0],
+                        &mut k,
+                    );
+                    sum +=  k[0] * (
                         wt * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                             * test_jdet[index]
                             * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
-                            * trial_jdet[index],
+                            * trial_jdet[index]
                     );
                 }
                 unsafe {
@@ -174,9 +179,9 @@ fn assemble_batch_singular<'a, T: Scalar + Clone + Copy>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
-    output: &RawData2D<T>,
-    kernel: &impl SingularKernel,
+fn assemble_batch_nonadjacent<'a>(
+    output: &RawData2D<f64>,
+    kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
@@ -194,6 +199,7 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
     let test_c20 = test_grid.topology().connectivity(2, 0);
     let trial_grid = trial_space.grid();
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
+    let mut k = vec![0.0; test_weights.len() * trial_weights.len()];
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut test_jdet = vec![0.0; test_points.shape().0];
@@ -202,6 +208,10 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
     let mut trial_mapped_pts = Array2D::<f64>::new((trial_points.shape().0, 3));
     let mut test_normals = Array2D::<f64>::new((test_points.shape().0, 3));
     let mut trial_normals = Array2D::<f64>::new((trial_points.shape().0, 3));
+
+    // TODO: remove transposing, and put points in this shape to start with
+    let mut test_mapped_pts_t = Array2D::<f64>::new((3, test_points.shape().0));
+    let mut trial_mapped_pts_t = Array2D::<f64>::new((3, trial_points.shape().0));
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
@@ -216,6 +226,11 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
         test_grid
             .geometry()
             .compute_points(test_points, test_cell_gindex, &mut test_mapped_pts);
+        for i in 0..3 {
+            for j in 0..test_points.shape().0 {
+                *test_mapped_pts_t.get_mut(i, j).unwrap() = *test_mapped_pts.get(j, i).unwrap();
+            }
+        }
         if needs_test_normal {
             test_grid
                 .geometry()
@@ -237,6 +252,11 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
                 trial_cell_gindex,
                 &mut trial_mapped_pts,
             );
+            for i in 0..3 {
+                for j in 0..trial_points.shape().0 {
+                    *trial_mapped_pts_t.get_mut(i, j).unwrap() = *trial_mapped_pts.get(j, i).unwrap();
+                }
+            }
             if needs_trial_normal {
                 trial_grid.geometry().compute_normals(
                     trial_points,
@@ -244,6 +264,13 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
                     &mut trial_normals,
                 );
             }
+
+            kernel.assemble_st(
+                EvalType::Value,
+                &test_mapped_pts_t.data,
+                &trial_mapped_pts_t.data,
+                &mut k,
+            );
 
             for (test_i, test_dof) in test_space
                 .dofmap()
@@ -259,16 +286,11 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
                     .iter()
                     .enumerate()
                 {
-                    let mut sum = T::zero();
+                    let mut sum = 0.0;
 
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
                         for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                            sum += kernel.eval::<T>(
-                                unsafe { test_mapped_pts.row_unchecked(test_index) },
-                                unsafe { trial_mapped_pts.row_unchecked(trial_index) },
-                                unsafe { test_normals.row_unchecked(test_index) },
-                                unsafe { trial_normals.row_unchecked(trial_index) },
-                            ) * T::from_f64(
+                            sum += k[test_index * trial_weights.len() + trial_index] * (
                                 test_wt
                                     * trial_wt
                                     * unsafe { test_table.get_unchecked(0, test_index, test_i, 0) }
@@ -276,7 +298,7 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
                                     * unsafe {
                                         trial_table.get_unchecked(0, trial_index, trial_i, 0)
                                     }
-                                    * trial_jdet[test_index],
+                                    * trial_jdet[test_index]
                             );
                         }
                     }
@@ -304,14 +326,15 @@ fn assemble_batch_nonadjacent<'a, T: Scalar + Clone + Copy>(
     1
 }
 
-pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
-    output: &mut Array2D<T>,
-    kernel: &impl SingularKernel,
+pub fn assemble<'a>(
+    output: &mut Array2D<f64>,
+    kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
 ) {
+    let now = Instant::now();
     // Note: currently assumes that the two grids are the same
     // TODO: implement == and != for grids, then add:
     // if *trial_space.grid() != *test_space.grid() {
@@ -416,6 +439,9 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
             assert_eq!(r, numthreads);
         }
     }
+
+    println!("Non-adjacent terms: {}ms", now.elapsed().as_millis());
+    let now = Instant::now();
 
     if test_space.grid() != trial_space.grid() {
         // If the test and trial grids are different, there are no neighbouring triangles
@@ -546,13 +572,14 @@ pub fn assemble<'a, T: Scalar + Clone + Copy + Sync>(
             }
         }
     }
+    println!("Singular terms: {}ms", now.elapsed().as_millis());
 }
 #[cfg(test)]
 mod test {
     use crate::assembly::batched::*;
+    use crate::green;
     use crate::assembly::dense;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green;
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
@@ -577,7 +604,7 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            &green::LaplaceGreenKernel {},
+            &Laplace3dKernel::new(),
             false,
             false,
             &space,
@@ -629,7 +656,7 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            &green::LaplaceGreenKernel {},
+            &Laplace3dKernel::new(),
             false,
             false,
             &space,
