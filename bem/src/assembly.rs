@@ -3,9 +3,9 @@ pub mod dense;
 use crate::function_space::SerialFunctionSpace;
 use crate::green;
 use crate::green::Scalar;
+use bempp_kernel::laplace_3d;
 use bempp_tools::arrays::Array2D;
 use bempp_traits::bem::FunctionSpace;
-use bempp_kernel::laplace_3d;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]

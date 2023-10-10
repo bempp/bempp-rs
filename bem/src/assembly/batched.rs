@@ -1,4 +1,6 @@
 use crate::function_space::SerialFunctionSpace;
+use bempp_kernel::traits::Kernel;
+use bempp_kernel::types::EvalType;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -9,13 +11,9 @@ use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
-use bempp_kernel::traits::Kernel;
-use bempp_kernel::types::EvalType;
 use bempp_traits::types::Scalar;
-use bempp_kernel::laplace_3d::Laplace3dKernel;
 use rayon::prelude::*;
 use std::time::Instant;
-
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -158,12 +156,12 @@ fn assemble_batch_singular<'a>(
                         &[1.0],
                         &mut k,
                     );
-                    sum +=  k[0] * (
-                        wt * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
+                    sum += k[0]
+                        * (wt
+                            * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
                             * test_jdet[index]
                             * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
-                            * trial_jdet[index]
-                    );
+                            * trial_jdet[index]);
                 }
                 unsafe {
                     *output.data.offset(
@@ -254,7 +252,8 @@ fn assemble_batch_nonadjacent<'a>(
             );
             for i in 0..3 {
                 for j in 0..trial_points.shape().0 {
-                    *trial_mapped_pts_t.get_mut(i, j).unwrap() = *trial_mapped_pts.get(j, i).unwrap();
+                    *trial_mapped_pts_t.get_mut(i, j).unwrap() =
+                        *trial_mapped_pts.get(j, i).unwrap();
                 }
             }
             if needs_trial_normal {
@@ -290,16 +289,17 @@ fn assemble_batch_nonadjacent<'a>(
 
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
                         for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                            sum += k[test_index * trial_weights.len() + trial_index] * (
-                                test_wt
+                            sum += k[test_index * trial_weights.len() + trial_index]
+                                * (test_wt
                                     * trial_wt
-                                    * unsafe { test_table.get_unchecked(0, test_index, test_i, 0) }
+                                    * unsafe {
+                                        test_table.get_unchecked(0, test_index, test_i, 0)
+                                    }
                                     * test_jdet[test_index]
                                     * unsafe {
                                         trial_table.get_unchecked(0, trial_index, trial_i, 0)
                                     }
-                                    * trial_jdet[test_index]
-                            );
+                                    * trial_jdet[test_index]);
                         }
                     }
                     // TODO: should we write into a result array, then copy into output after this loop?
@@ -577,12 +577,13 @@ pub fn assemble<'a>(
 #[cfg(test)]
 mod test {
     use crate::assembly::batched::*;
-    use crate::green;
     use crate::assembly::dense;
     use crate::function_space::SerialFunctionSpace;
+    use crate::green;
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::{Continuity, ElementFamily};
     // use num::complex::Complex;

@@ -9,7 +9,7 @@ use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily};
-use num::complex::Complex;
+// use num::complex::Complex;
 use std::time::Instant;
 
 fn main() {
@@ -25,11 +25,9 @@ fn main() {
 
         let space = SerialFunctionSpace::new(&grid, &element);
         println!("{}", space.dofmap().global_size());
-//        let mut matrix = Array2D::<Complex<f64>>::new((
-        let mut matrix = Array2D::<f64>::new((
-            space.dofmap().global_size(),
-            space.dofmap().global_size(),
-        ));
+        //        let mut matrix = Array2D::<Complex<f64>>::new((
+        let mut matrix =
+            Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
 
         assemble_batched(
             &mut matrix,
@@ -39,9 +37,6 @@ fn main() {
             &space,
         );
 
-        println!(
-            "Total time: {}",
-            now.elapsed().as_millis()
-        );
+        println!("Total time: {}", now.elapsed().as_millis());
     }
 }
