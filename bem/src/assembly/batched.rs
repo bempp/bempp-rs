@@ -323,12 +323,46 @@ pub fn assemble<'a>(
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
 ) {
-    // let now = Instant::now();
-    // Note: currently assumes that the two grids are the same
-    // TODO: implement == and != for grids, then add:
-    // if *trial_space.grid() != *test_space.grid() {
-    //    unimplemented!("Assembling operators with spaces on different grids not yet supported");
-    // }
+    let test_colouring = test_space.compute_cell_colouring();
+    let trial_colouring = trial_space.compute_cell_colouring();
+    // TODO: make these configurable
+    let blocksize = 128;
+
+    assemble_nonsingular(
+        output,
+        kernel,
+        needs_trial_normal,
+        needs_test_normal,
+        trial_space,
+        test_space,
+        &trial_colouring,
+        &test_colouring,
+        blocksize,
+    );
+    assemble_singular(
+        output,
+        kernel,
+        needs_trial_normal,
+        needs_test_normal,
+        trial_space,
+        test_space,
+        &trial_colouring,
+        &test_colouring,
+        blocksize,
+    );
+}
+
+pub fn assemble_nonsingular<'a>(
+    output: &mut Array2D<f64>,
+    kernel: &impl Kernel<T = f64>,
+    needs_trial_normal: bool,
+    needs_test_normal: bool,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+    trial_colouring: &Vec<Vec<usize>>,
+    test_colouring: &Vec<Vec<usize>>,
+    blocksize: usize,
+) {
     if !trial_space.is_serial() || !test_space.is_serial() {
         panic!("Dense assemble can only be used for function spaces stored in serial");
     }
@@ -337,9 +371,6 @@ pub fn assemble<'a>(
     {
         panic!("Matrix has wrong shape");
     }
-
-    // TODO: make these configurable
-    let blocksize = 128;
 
     // Size of this might not be known at compile time
     // let test_dofs_per_cell = 1;
@@ -374,10 +405,8 @@ pub fn assemble<'a>(
         shape: *output.shape(),
     };
 
-    let test_colouring = test_space.compute_cell_colouring();
-    let trial_colouring = trial_space.compute_cell_colouring();
-    for test_c in &test_colouring {
-        for trial_c in &trial_colouring {
+    for test_c in test_colouring {
+        for trial_c in trial_colouring {
             let mut test_cells: Vec<&[usize]> = vec![];
             let mut trial_cells: Vec<&[usize]> = vec![];
 
@@ -428,17 +457,47 @@ pub fn assemble<'a>(
             assert_eq!(r, numthreads);
         }
     }
+}
 
-    // println!("Non-adjacent terms: {}ms", now.elapsed().as_millis());
-    // let now = Instant::now();
-
+pub fn assemble_singular<'a>(
+    output: &mut Array2D<f64>,
+    kernel: &impl Kernel<T = f64>,
+    needs_trial_normal: bool,
+    needs_test_normal: bool,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+    trial_colouring: &Vec<Vec<usize>>,
+    test_colouring: &Vec<Vec<usize>>,
+    blocksize: usize,
+) {
     if test_space.grid() != trial_space.grid() {
         // If the test and trial grids are different, there are no neighbouring triangles
         return;
     }
 
+    if !trial_space.is_serial() || !test_space.is_serial() {
+        panic!("Dense assemble can only be used for function spaces stored in serial");
+    }
+    if output.shape().0 != test_space.dofmap().global_size()
+        || output.shape().1 != trial_space.dofmap().global_size()
+    {
+        panic!("Matrix has wrong shape");
+    }
+
+    // Size of this might not be known at compile time
+    // let test_dofs_per_cell = 1;
+    // let trial_dofs_per_cell = 1;
+
+    // println!("Non-adjacent terms: {}ms", now.elapsed().as_millis());
+    // let now = Instant::now();
+
     // TODO: allow user to configure this
     let npoints = 4;
+
+    let output_raw = RawData2D {
+        data: output.data.as_mut_ptr(),
+        shape: *output.shape(),
+    };
 
     let grid = test_space.grid();
     let c20 = grid.topology().connectivity(2, 0);
@@ -500,8 +559,8 @@ pub fn assemble<'a>(
         qweights.push(qrule.weights);
     }
 
-    for test_c in &test_colouring {
-        for trial_c in &trial_colouring {
+    for test_c in test_colouring {
+        for trial_c in trial_colouring {
             let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
             for test_cell in test_c {
                 let test_cell_tindex = grid.topology().index_map()[*test_cell];
