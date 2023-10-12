@@ -89,6 +89,9 @@ pub struct TransferVector {
 type PermutationMatrix =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
+/// Type alias for a the permuted multi-indices corresponding to unique transfer vectors (column major order)
+type PermutedMultiIndices = Vec<usize>;
+
 /// Container to store precomputed data required for FFT field translations.
 #[derive(Default)]
 pub struct FftM2lOperatorData {
@@ -99,7 +102,7 @@ pub struct FftM2lOperatorData {
     pub permutation_matrices: HashMap<usize, PermutationMatrix>,
 
     /// The multi-indices of the reflected surfaces, indexed by transfer vector
-    pub permuted_multi_indices: HashMap<usize, Vec<usize>>,
+    pub permuted_multi_indices: HashMap<usize, PermutedMultiIndices>,
 }
 
 /// Container to store precomputed data required for SVD field translations.
