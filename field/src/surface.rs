@@ -95,27 +95,26 @@ pub mod test {
 
     #[test]
     fn test_axial_reflection_surface() {
-         // Test Case 1: Positive transfer vector should leave multi_index unchanged
-         let multi_index = &[2, 2, 2];
-         let transfer_vector = &[1, 1, 1];
-         let order = 4;
-         let result = axial_reflection_surface(multi_index, transfer_vector, order);
-         assert_eq!(result, vec![2, 2, 2]);
- 
-         // Test Case 2: Negative transfer vector should reflect multi_index about the order
-         let multi_index = &[2, 2, 2];
-         let transfer_vector = &[-1, -1, -1];
-         let order = 4;
-         let result = axial_reflection_surface(multi_index, transfer_vector, order);
-         assert_eq!(result, vec![1, 1, 1]);
- 
-         // Test Case 3: Mixed transfer vector
-         let multi_index = &[2, 2, 2];
-         let transfer_vector = &[-1, 1, -1];
-         let order = 4;
-         let result = axial_reflection_surface(multi_index, transfer_vector, order);
-         assert_eq!(result, vec![1, 2, 1]);
+        // Test Case 1: Positive transfer vector should leave multi_index unchanged
+        let multi_index = &[2, 2, 2];
+        let transfer_vector = &[1, 1, 1];
+        let order = 4;
+        let result = axial_reflection_surface(multi_index, transfer_vector, order);
+        assert_eq!(result, vec![2, 2, 2]);
 
+        // Test Case 2: Negative transfer vector should reflect multi_index about the order
+        let multi_index = &[2, 2, 2];
+        let transfer_vector = &[-1, -1, -1];
+        let order = 4;
+        let result = axial_reflection_surface(multi_index, transfer_vector, order);
+        assert_eq!(result, vec![1, 1, 1]);
+
+        // Test Case 3: Mixed transfer vector
+        let multi_index = &[2, 2, 2];
+        let transfer_vector = &[-1, 1, -1];
+        let order = 4;
+        let result = axial_reflection_surface(multi_index, transfer_vector, order);
+        assert_eq!(result, vec![1, 2, 1]);
     }
 
     #[test]
@@ -140,7 +139,6 @@ pub mod test {
         let order = 4;
         let result = axial_reflection_convolution(multi_index, transfer_vector, order);
         assert_eq!(result, vec![4, 2, 4]);
-
     }
 
     #[test]

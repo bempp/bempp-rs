@@ -1,5 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use std::{collections::{HashMap, HashSet}, hash::Hash};
+use std::collections::{HashMap, HashSet};
 
 use fftw::types::*;
 use itertools::Itertools;
@@ -9,7 +9,7 @@ use rlst::{
         traits::svd::{Mode, Svd},
     },
     common::traits::{Eval, Transpose},
-    dense::{rlst_mat, Dot, RawAccess, RawAccessMut, Shape, RandomAccessMut},
+    dense::{rlst_mat, Dot, RandomAccessMut, RawAccess, RawAccessMut, Shape},
 };
 
 use bempp_tools::Array3D;
@@ -17,15 +17,13 @@ use bempp_traits::{
     arrays::Array3DAccess, field::FieldTranslationData, kernel::Kernel, types::EvalType,
 };
 use bempp_tree::{
-    implementations::helpers::{find_corners, map_corners_to_surface},
-    types::domain::Domain,
-    types::morton::MortonKey,
+    implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
 
 use crate::{
     array::{flip3, pad3},
     fft::rfft3_fftw,
-    surface::{axial_reflection_convolution, axial_reflection_surface, diagonal_reflection},
+    surface::{axial_reflection_surface, diagonal_reflection},
     transfer_vector::{
         axially_reflect_components, compute_transfer_vectors, compute_transfer_vectors_unique,
         diagonally_reflect_components,
@@ -198,15 +196,10 @@ where
     type TransferVectorMap = HashMap<usize, usize>;
 
     fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
-
         let mut kernel_data = HashMap::new();
 
-        let mut surface_maps = HashMap::new();
-        // let mut inv_surface_maps = Vec::new();
-        let mut surface_multi_indices = HashMap::new();
-
-        // Create a map between corner indices and surface indices
-        // let (map_corner_to_surface, inv_map_corner_to_surface) = map_corners_to_surface(order);
+        let mut permutation_matrices = HashMap::new();
+        let mut permuted_multi_indices = HashMap::new();
 
         // Calculate all transfer vectors (316)
         let (transfer_vectors, _) = compute_transfer_vectors();
@@ -227,13 +220,10 @@ where
             // Find multi-index after axial reflections
             let (_, source_multi_index) = MortonKey::surface_grid(order);
 
-            // TODO Replace one based indexing from messner
-            // let source_multi_index = source_multi_index.iter().map(|e| e + 1).collect_vec();
-
             // Find multi-indices after axial reflection
             let mut source_multi_index_axial = vec![0usize; source_multi_index.len()];
 
-            let nsources = 6*(order-1).pow(2) + 2;
+            let nsources = 6 * (order - 1).pow(2) + 2;
 
             for i in 0..nsources {
                 let m = [
@@ -266,9 +256,6 @@ where
             }
 
             // Need a map between between reflected/unreflected surfaces multiindices in terms of linear index
-            // let mut map_surface = HashMap::new();
-            let mut inv_map_surface = HashMap::new();
-
             let mut map_surface = rlst_mat![f64, (nsources, nsources)];
 
             for i in 0..nsources {
@@ -290,14 +277,13 @@ where
                     {
                         // map_surface.insert(i, j);
                         *map_surface.get_mut(i, j).unwrap() = 1.0;
-                        inv_map_surface.insert(j, i);
                     }
                 }
             }
 
             // let source_multi_index_axial_diag = source_multi_index_axial_diag.iter().map(|e| e -1 ).collect_vec();
-            surface_maps.insert(t.hash, map_surface);
-            surface_multi_indices.insert(t.hash, source_multi_index_axial_diag);
+            permutation_matrices.insert(t.hash, map_surface);
+            permuted_multi_indices.insert(t.hash, source_multi_index_axial_diag);
 
             if !considered.contains(&t_refl) {
                 // Add reflected checksum to checked set.
@@ -308,13 +294,10 @@ where
                     t.source.compute_surface(&domain, order, self.alpha);
                 let nsources = source_equivalent_surface.len() / 3;
 
-                let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
                 let ntargets = source_equivalent_surface.len() / 3;
 
                 // Find multi-index after axial reflections
                 let (_, source_multi_index) = MortonKey::surface_grid(order);
-
-                // TODO Replace one based indexing from messner
 
                 // Find multi-indices after axial reflection
                 let mut source_multi_index_axial = vec![0usize; source_multi_index.len()];
@@ -349,19 +332,19 @@ where
                     source_multi_index_axial_diag[2 * nsources + i] = m_refl[2];
                 }
 
-
                 // Find representative source/target pair
                 let r_idx = transfer_vectors
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, t)| if t.hash == t_refl  { Some(i)} else { None })
+                    .filter_map(|(i, t)| if t.hash == t_refl { Some(i) } else { None })
                     .collect_vec();
                 let r_idx = r_idx[0];
                 let r_t = &transfer_vectors[r_idx];
 
-                let r_source_equivalent_surface = r_t.source.compute_surface(&domain, order, self.alpha);
+                let r_source_equivalent_surface =
+                    r_t.source.compute_surface(&domain, order, self.alpha);
                 let r_target_check_surface = r_t.target.compute_surface(&domain, order, self.alpha);
-                
+
                 // Find the representative convolution point, i.e. furthest corner.
                 let r_conv_point_corner_index = 7;
                 let r_corners = find_corners(&r_source_equivalent_surface[..]);
@@ -370,15 +353,16 @@ where
                     r_corners[8 + r_conv_point_corner_index],
                     r_corners[16 + r_conv_point_corner_index],
                 ];
-    
+
                 let (r_conv_grid, _) = t.source.convolution_grid(
-                    order, &domain, 
-                    self.alpha, 
-                    &r_conv_point_corner, 
-                    r_conv_point_corner_index
+                    order,
+                    &domain,
+                    self.alpha,
+                    &r_conv_point_corner,
+                    r_conv_point_corner_index,
                 );
 
-                // Compute representative kernel 
+                // Compute representative kernel
                 let r_kernel_point_index = 0;
                 let r_kernel_point = [
                     r_target_check_surface[r_kernel_point_index],
@@ -392,9 +376,8 @@ where
                 let p = m + 1;
                 let q = n + 1;
                 let r = o + 1;
-                let r_padded_kernel=
-                    pad3(&r_kernel, (p - m, q - n, r - o), (0, 0, 0));
-                
+                let r_padded_kernel = pad3(&r_kernel, (p - m, q - n, r - o), (0, 0, 0));
+
                 let mut r_padded_kernel = flip3(&r_padded_kernel);
 
                 // Compute FFT of kernel for this transfer vector
@@ -407,7 +390,6 @@ where
 
                 // Store FFT of kernel for this transfer vector
                 kernel_data.insert(t_refl, r_padded_kernel_hat);
-
             }
         }
 
@@ -415,9 +397,8 @@ where
 
         FftM2lOperatorData {
             kernel_data,
-            surface_map: surface_maps,
-            surface_multi_indices: surface_multi_indices   
-            // inv_surface_map: inv_surface_maps,
+            permutation_matrices,
+            permuted_multi_indices,
         }
     }
 
@@ -489,7 +470,7 @@ where
         for k in 0..n {
             for j in 0..n {
                 for i in 0..n {
-                    let conv_index = i+n*j+n*n*k;
+                    let conv_index = i + n * j + n * n * k;
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
@@ -568,18 +549,14 @@ where
 
 #[cfg(test)]
 mod test {
-
-    use std::ops::Mul;
-
-    use crate::{transfer_vector, fft::irfft3_fftw};
+    use crate::fft::irfft3_fftw;
 
     use super::*;
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use num::traits::sign;
 
     #[test]
-    pub fn test_svd_field_translation() {
+    pub fn test_svd_operator_data() {
         let kernel = Laplace3dKernel::new();
         let order = 5;
         let domain = Domain {
@@ -622,7 +599,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_fft_field_translation() {
+    pub fn test_fft_operator_data() {
         let kernel = Laplace3dKernel::new();
         let order = 5;
         let domain = Domain {
@@ -641,7 +618,7 @@ mod test {
     }
 
     #[test]
-    fn test_fft() {
+    fn test_fft_field_translation() {
         let kernel = Laplace3dKernel::new();
         let order: usize = 3;
 
@@ -672,47 +649,66 @@ mod test {
 
         let transfer_vector = &all_transfer_vectors[idx];
         let unique_transfer_vector = fft.transfer_vector_map.get(&transfer_vector.hash).unwrap();
-        
+
         // Place charges on the convolution grid
-        let surface_map = fft.operator_data.surface_map.get(&transfer_vector.hash).unwrap();
-        
+        let surface_map = fft
+            .operator_data
+            .permutation_matrices
+            .get(&transfer_vector.hash)
+            .unwrap();
+
         let r_multipole = surface_map.dot(&multipole).eval();
 
         // println!("HERE {:?} {:?}", multipole.data(), r_multipole.data());
-                        
+
         // Compute FFT of the representative signal
         let r_signal = fft.compute_signal(order, r_multipole.data());
         let &(m, n, o) = r_signal.shape();
         let p = m + 1;
         let q = n + 1;
         let r = o + 1;
-        let pad_size = (p-m, q-n, r-o);
-        let pad_index = (p-m, q-n, r-o);
+        let pad_size = (p - m, q - n, r - o);
+        let pad_index = (p - m, q - n, r - o);
         let mut r_padded_signal = pad3(&r_signal, pad_size, pad_index);
         let mut r_padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
 
-        rfft3_fftw(r_padded_signal.get_data_mut(), r_padded_signal_hat.get_data_mut(), &[p, q, r]);
-        
+        rfft3_fftw(
+            r_padded_signal.get_data_mut(),
+            r_padded_signal_hat.get_data_mut(),
+            &[p, q, r],
+        );
+
         // Lookup appropriate FFT of Kernel matrix from precomputatoins
-        let r_padded_kernel_hat = m2l.kernel_data.get(&unique_transfer_vector).unwrap();
-    
+        let r_padded_kernel_hat = m2l.kernel_data.get(unique_transfer_vector).unwrap();
+
         // Compute convolution
-        let hadamard_product = r_padded_signal_hat.get_data().iter().zip(
-            r_padded_kernel_hat.get_data().iter()
-        ).map(|(a, b)| a*b).collect_vec();
-        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r/2+1));
+        let hadamard_product = r_padded_signal_hat
+            .get_data()
+            .iter()
+            .zip(r_padded_kernel_hat.get_data().iter())
+            .map(|(a, b)| a * b)
+            .collect_vec();
+        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
 
         let mut r_potentials = Array3D::new((p, q, r));
-        irfft3_fftw(hadamard_product.get_data_mut(), r_potentials.get_data_mut(), &[p, q, r]);
+        irfft3_fftw(
+            hadamard_product.get_data_mut(),
+            r_potentials.get_data_mut(),
+            &[p, q, r],
+        );
 
         // Unpermute the coefficients
-        let surface_multi_index_axial_diag = fft.operator_data.surface_multi_indices.get(&transfer_vector.hash).unwrap();
+        let surface_multi_index_axial_diag = fft
+            .operator_data
+            .permuted_multi_indices
+            .get(&transfer_vector.hash)
+            .unwrap();
 
         let mut tmp = Vec::new();
         let ntargets = surface_multi_index_axial_diag.len() / 3;
         let xs = &surface_multi_index_axial_diag[0..ntargets];
-        let ys = &surface_multi_index_axial_diag[ntargets..2*ntargets];
-        let zs = &surface_multi_index_axial_diag[2*ntargets..];
+        let ys = &surface_multi_index_axial_diag[ntargets..2 * ntargets];
+        let zs = &surface_multi_index_axial_diag[2 * ntargets..];
 
         for i in 0..ntargets {
             let val = r_potentials.get(zs[i], ys[i], xs[i]).unwrap();
@@ -720,25 +716,30 @@ mod test {
         }
 
         // Find source and target surfaces
-        let sources = transfer_vector.source.compute_surface(&domain, order, alpha);
-        let targets = transfer_vector.target.compute_surface(&domain, order, alpha);
+        let sources = transfer_vector
+            .source
+            .compute_surface(&domain, order, alpha);
+        let targets = transfer_vector
+            .target
+            .compute_surface(&domain, order, alpha);
 
         // Get direct evaluations for testing
         let mut direct = vec![0f64; ncoeffs];
-        fft.kernel.evaluate_st(EvalType::Value, &sources[..], &targets[..], multipole.data(), &mut direct[..]);
+        fft.kernel.evaluate_st(
+            EvalType::Value,
+            &sources[..],
+            &targets[..],
+            multipole.data(),
+            &mut direct[..],
+        );
 
-        println!("potentials {:?}", tmp);
-        println!("direct {:?}", direct);
-
-        let abs_error: f64 = tmp 
+        let abs_error: f64 = tmp
             .iter()
             .zip(direct.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-
         assert!(rel_error < 1e-15);
-
     }
 }

@@ -18,10 +18,8 @@ use bempp_tree::types::morton::MortonKey;
 pub type SvdM2lEntry =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
-/// Simple alias for an Array3D<Complexf64>
-// pub type FftM2lEntry = Array3D<Complex<f64>>;
-pub type FftM2lEntry = HashMap<usize, Array3D<c64>>;
-// Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+/// Type alias for pre-computed FFT of green's function evaluations corresponding a given transfer vector.
+pub type FftKernelData = HashMap<usize, Array3D<c64>>;
 
 /// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
 pub struct FftFieldTranslationKiFmm<T>
@@ -87,24 +85,21 @@ pub struct TransferVector {
     pub target: MortonKey,
 }
 
-type SurfaceMap = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+/// Type alias for a surface permutation map
+type PermutationMatrix =
+    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 /// Container to store precomputed data required for FFT field translations.
 #[derive(Default)]
 pub struct FftM2lOperatorData {
     /// The FFT of unique kernel evaluations for each transfer vector
-    pub kernel_data: FftM2lEntry,
+    pub kernel_data: FftKernelData,
 
-    /// Map between surface grid indices on unreflected/reflected surfaces.
-    /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    pub surface_map: HashMap<usize, SurfaceMap>,
+    /// The permutation matrix between unreflected/reflected surface indices, indexed by transfer vector
+    pub permutation_matrices: HashMap<usize, PermutationMatrix>,
 
-    /// Inverse map between surface grid indices on unreflected/reflected surfaces.
-    /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    // pub inv_surface_map: Vec<HashMap<usize, usize>>,
-
-    pub surface_multi_indices: HashMap<usize, Vec<usize>>
-
+    /// The multi-indices of the reflected surfaces, indexed by transfer vector
+    pub permuted_multi_indices: HashMap<usize, Vec<usize>>,
 }
 
 /// Container to store precomputed data required for SVD field translations.

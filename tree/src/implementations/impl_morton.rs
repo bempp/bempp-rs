@@ -779,10 +779,10 @@ impl MortonKey {
         for k in 0..n {
             for j in 0..n {
                 for i in 0..n {
-                    let conv_index = i+j*n+k*n*n;
+                    let conv_index = i + j * n + k * n * n;
                     grid[conv_index] = i as f64;
-                    grid[(dim-2) * ncoeffs + conv_index] = j as f64;
-                    grid[(dim-1) * ncoeffs + conv_index] = k as f64;
+                    grid[(dim - 2) * ncoeffs + conv_index] = j as f64;
+                    grid[(dim - 1) * ncoeffs + conv_index] = k as f64;
                 }
             }
         }
@@ -877,7 +877,7 @@ impl MortonKey {
 
         (surface, surface_idxs)
     }
-    
+
     /// Compute a surface grid centered at this Morton Key, used in the discretisation of Fast Multipole
     /// Methods which require a regular grid, such as the kiFMM or bbFMM.
     ///
