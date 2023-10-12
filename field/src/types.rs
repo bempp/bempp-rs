@@ -87,6 +87,8 @@ pub struct TransferVector {
     pub target: MortonKey,
 }
 
+type SurfaceMap = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+
 /// Container to store precomputed data required for FFT field translations.
 #[derive(Default)]
 pub struct FftM2lOperatorData {
@@ -95,19 +97,14 @@ pub struct FftM2lOperatorData {
 
     /// Map between surface grid indices on unreflected/reflected surfaces.
     /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    pub surface_map: HashMap<usize, Vec<usize>>,
+    pub surface_map: HashMap<usize, SurfaceMap>,
 
     /// Inverse map between surface grid indices on unreflected/reflected surfaces.
     /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    pub inv_surface_map: Vec<HashMap<usize, usize>>,
+    // pub inv_surface_map: Vec<HashMap<usize, usize>>,
 
-    /// Map between convolution grid indices on unreflected/reflected surfaces.
-    /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    pub conv_map: Vec<HashMap<usize, usize>>,
+    pub surface_multi_indices: HashMap<usize, Vec<usize>>
 
-    /// Inverse map between convolution grid indices on unreflected/reflected surfaces.
-    /// Each index in the Vec corresponds to an un-reflected transfer vector.
-    pub inv_conv_map: Vec<HashMap<usize, usize>>,
 }
 
 /// Container to store precomputed data required for SVD field translations.

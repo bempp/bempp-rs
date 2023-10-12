@@ -775,15 +775,14 @@ impl MortonKey {
         let dim: usize = 3;
         let ncoeffs = n.pow(dim as u32);
         let mut grid = vec![0f64; dim * ncoeffs];
-        let mut idx = 0;
 
-        for i in 0..n {
+        for k in 0..n {
             for j in 0..n {
-                for k in 0..n {
-                    grid[idx] = i as f64;
-                    grid[(dim - 2) * ncoeffs + idx] = j as f64;
-                    grid[(dim - 1) * ncoeffs + idx] = k as f64;
-                    idx += 1;
+                for i in 0..n {
+                    let conv_index = i+j*n+k*n*n;
+                    grid[conv_index] = i as f64;
+                    grid[(dim-2) * ncoeffs + conv_index] = j as f64;
+                    grid[(dim-1) * ncoeffs + conv_index] = k as f64;
                 }
             }
         }
@@ -841,16 +840,19 @@ impl MortonKey {
         let dim = 3;
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
 
+        // Implicitly in column major order
         let mut surface: Vec<f64> = vec![0f64; dim * n_coeffs];
 
+        // Bounds of the surface grid
         let lower = 0;
         let upper = order - 1;
+
+        // Orders the surface grid, implicitly column major
         let mut idx = 0;
 
-        // Generate surface points on a grid scaled by the order
-        for i in 0..order {
+        for k in 0..order {
             for j in 0..order {
-                for k in 0..order {
+                for i in 0..order {
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
@@ -864,9 +866,8 @@ impl MortonKey {
             }
         }
 
-        // Map surface points to indices
+        // Map surface points to multi-indices
         let surface_idxs = surface.iter().clone().map(|&x| x as usize).collect();
-
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         surface.iter_mut().for_each(|point| {
             *point *= 2.0 / (order as f64 - 1.0);
@@ -876,7 +877,7 @@ impl MortonKey {
 
         (surface, surface_idxs)
     }
-
+    
     /// Compute a surface grid centered at this Morton Key, used in the discretisation of Fast Multipole
     /// Methods which require a regular grid, such as the kiFMM or bbFMM.
     ///
@@ -1783,9 +1784,9 @@ mod test {
         let lower = 0;
         let upper = order - 1;
         let mut idx = 0;
-        for i in 0..order {
+        for k in 0..order {
             for j in 0..order {
-                for k in 0..order {
+                for i in 0..order {
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))

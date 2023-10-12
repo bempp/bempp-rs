@@ -110,8 +110,9 @@ pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
 
     // Returned in column major order
     let corners = vec![
-        x_min, x_min, x_min, x_min, x_max, x_max, x_max, x_max, y_min, y_min, y_max, y_max, y_min,
-        y_min, y_max, y_max, z_min, z_max, z_min, z_max, z_min, z_max, z_min, z_max,
+        x_min, x_max, x_min, x_max, x_min, x_max, x_min, x_max,
+        y_min, y_min, y_max, y_max, y_min, y_min, y_max, y_max,
+        z_min, z_min, z_min, z_min, z_max, z_max, z_max, z_max
     ];
 
     corners
@@ -128,30 +129,9 @@ pub fn map_corners_to_surface(order: usize) -> (HashMap<usize, usize>, HashMap<u
     let nsurf = surface_multindex.len() / 3;
     let ncorners = 8;
     let corners_multindex = vec![
-        0,
-        0,
-        0,
-        0,
-        order - 1,
-        order - 1,
-        order - 1,
-        order - 1,
-        0,
-        0,
-        order - 1,
-        order - 1,
-        0,
-        0,
-        order - 1,
-        order - 1,
-        0,
-        order - 1,
-        0,
-        order - 1,
-        0,
-        order - 1,
-        0,
-        order - 1,
+        0, order-1, 0, order-1, 0, order-1, 0, order-1,
+        0, 0, order-1, order-1,  0, 0, order-1, order-1,
+        0, 0, 0, 0, order-1, order-1, order-1, order-1, 
     ];
 
     let mut _map = HashMap::new();
