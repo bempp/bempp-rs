@@ -50,15 +50,29 @@ pub fn hadamard_product_sibling(
 
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 pub mod aarch64 {
+
     use super::*;
     use std::arch::aarch64::*;
 
+    /// Compute Hadamard product between the Fourier transform of a set of coefficients corresponding to the coefficients of 8
+    /// octree siblings, and the 16 unique sets of kernel evaluations corresponding to unique field translation expected when using
+    /// translationally invariant, homogenous kernels that have been reflected into the reference cone. In this implementation we use
+    /// explicit Neon SIMD intrinsics to implement the Complex multiplication kernel at the centre of the Hadamard product function.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `sibling_coefficients` - A set of Fourier transforms of the multipole coefficients arranged on a convolution grid for
+    ///  a set of siblings, arranged in Morton order.
+    /// * `kernel_evaluations` - The set of 16 unique kernel evaluations corresponding to unique transfer vectors in the reference cone for
+    /// translationally invariant and homogenous kernels.
+    /// * `result` - Mutable vector to store results
     pub fn hadamard_product_simd_neon(
-        expansion_order: usize,
-        sibling_set: &Vec<Arc<Mutex<Vec<Complex64>>>>,
-        kernel_data: &RwLock<Vec<Complex64>>,
-    ) -> Vec<Complex64> {
-        let n = 2 * expansion_order - 1;
+        order: usize,
+        sibling_coefficients: &[Complex64],
+        kernel_evaluations: &[Complex64],
+        result: &mut [Complex64],
+    ) {
+        let n = 2 * order - 1;
         let &(m, n, o) = &(n, n, n);
 
         let p = m + 1;
@@ -66,26 +80,19 @@ pub mod aarch64 {
         let r = o + 1;
         let size_real = p * q * (r / 2 + 1);
 
-        let res = vec![Complex64::zero(); size_real * 16 * 8];
-
         for i in 0..16 {
-            let m2l_matrix_offset = i * size_real;
+            // Load each kernel matrix into cache, the most expensive operation
+            let offset_i = i * size_real;
+            let kernel = &kernel_evaluations[offset_i..offset_i + size_real];
 
-            // Loading this into cache is the most expensive operation.
-            let m2l_matrix =
-                &kernel_data.read().unwrap()[m2l_matrix_offset..m2l_matrix_offset + size_real];
-
-            // Instead of storing in a temporary buffer to scatter later, there should be a way of directly
-            // loading the ifft data structure into a SIMD register here and directly saving the convolutions
-            // as they are computed and already held in SIMD registers. Then we will have a very similar memory
-            // access pattern to PVFMM and should not have to do the scatter operation as an additional step.
-            for k in 0..8 {
-                let signal = sibling_set[k].lock().unwrap();
+            for j in 0..8 {
+                let offset_j = j * size_real;
+                let signal = &sibling_coefficients[offset_j..offset_j + size_real];
 
                 let chunks = size_real;
 
-                for j in 0..chunks {
-                    let simd_index = j;
+                for k in 0..chunks {
+                    let simd_index = k;
                     unsafe {
                         let complex_ref = &signal[simd_index];
                         let tuple_ptr: *const (f64, f64) =
@@ -93,13 +100,13 @@ pub mod aarch64 {
                         let ptr = tuple_ptr as *const f64;
                         let signal_chunk = vld1q_f64(ptr);
 
-                        let complex_ref = &m2l_matrix[simd_index];
+                        let complex_ref = &kernel[simd_index];
                         let tuple_ptr: *const (f64, f64) =
                             complex_ref as *const _ as *const (f64, f64);
                         let ptr = tuple_ptr as *const f64;
                         let kernel_chunk = vld1q_f64(ptr);
 
-                        let complex_ref = &res[simd_index];
+                        let complex_ref = &result[simd_index];
                         let tuple_ptr: *const (f64, f64) =
                             complex_ref as *const _ as *const (f64, f64);
                         let ptr = tuple_ptr as *const f64;
@@ -110,20 +117,24 @@ pub mod aarch64 {
                         let tmp = vaddq_f64(product, res_chunk);
 
                         // Save
-                        let complex_ref = &res[simd_index];
+                        let complex_ref = &result[simd_index];
                         let tuple_ptr: *const (f64, f64) =
                             complex_ref as *const _ as *const (f64, f64);
-                        let ptr = tuple_ptr as *mut f64;
+                        let ptr: *mut f64 = tuple_ptr as *mut f64;
 
                         vst1q_f64(ptr, tmp)
                     }
                 }
             }
         }
-
-        res
     }
 
+    /// Kernel for multiplication of complex numbers, each lane contains a single complex number in the form [[a, b]] where the number is a+ib.
+    ///
+    /// # Arguments
+    /// * `a_ra` - [[a, b]], corresponding to a+ib
+    /// * `b_ra` - [[c, d]], corresponding to b+id
+    ///
     pub fn hadamard_product_kernel_neon(a_ra: float64x2_t, b_ra: float64x2_t) -> float64x2_t {
         unsafe {
             // Extract real parts [a1, a1]
@@ -142,9 +153,7 @@ pub mod aarch64 {
             let real = vsub_f64(vget_low_f64(real_mul), vget_high_f64(imag_mul));
             let imag = vadd_f64(vget_high_f64(real_mul), vget_low_f64(imag_mul));
 
-            let result = vcombine_f64(real, imag);
-
-            result
+            vcombine_f64(real, imag)
         }
     }
 }
@@ -154,15 +163,24 @@ pub mod x86 {
     use super::*;
     use std::arch::x86_64::*;
 
-    // Compute the Hadamard product of a sibling set of FFT coefficients (i.e. the multipole expansions)
-    // With all 16 unique Green kernels corresponding to the unique convolutions.
-    // This function uses explicit SIMD to fetch and compute the component wise product of the complex
-    // numbers corresponding to the FFT outputs.
+    /// Compute Hadamard product between the Fourier transform of a set of coefficients corresponding to the coefficients of 8
+    /// octree siblings, and the 16 unique sets of kernel evaluations corresponding to unique field translation expected when using
+    /// translationally invariant, homogenous kernels that have been reflected into the reference cone. In this implementation we use
+    /// explicit AVX2 SIMD intrinsics to implement the Complex multiplication kernel at the centre of the Hadamard product function.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `sibling_coefficients` - A set of Fourier transforms of the multipole coefficients arranged on a convolution grid for
+    ///  a set of siblings, arranged in Morton order.
+    /// * `kernel_evaluations` - The set of 16 unique kernel evaluations corresponding to unique transfer vectors in the reference cone for
+    /// translationally invariant and homogenous kernels.
+    /// * `result` - Mutable vector to store results
     pub fn hadamard_product_simd(
         expansion_order: usize,
-        sibling_set: &Vec<Arc<Mutex<Vec<Complex64>>>>,
-        kernel_data: &RwLock<Vec<Complex64>>,
-    ) -> Vec<Complex64> {
+        sibling_coefficients: &[Complex64],
+        kernel_evaluations: &[Complex64],
+        result: &mut [Complex64],
+    ) {
         let n = 2 * expansion_order - 1;
         let &(m, n, o) = &(n, n, n);
 
@@ -171,28 +189,19 @@ pub mod x86 {
         let r = o + 1;
         let size_real = p * q * (r / 2 + 1);
 
-        let mut res = vec![Complex64::zero(); size_real * 16 * 8];
-
         for i in 0..16 {
-            let m2l_matrix_offset = i * size_real;
+            let offset_i = i * size_real;
+            let kernel = &kernel_evaluations[offset_i..offset_i + size_real];
 
-            // Loading this into cache is the most expensive operation.
-            let m2l_matrix =
-                &kernel_data.read().unwrap()[m2l_matrix_offset..m2l_matrix_offset + size_real];
-
-            // Instead of storing in a temporary buffer to scatter later, there should be a way of directly
-            // loading the ifft data structure into a SIMD register here and directly saving the convolutions
-            // as they are computed and already held in SIMD registers. Then we will have a very similar memory
-            // access pattern to PVFMM and should not have to do the scatter operation as an additional step.
-            for k in 0..8 {
-                let signal = sibling_set[k].lock().unwrap();
-                let res_offset = k * size_real * 16 + i * size_real;
+            for j in 0..8 {
+                let offset_j = j * size_real;
+                let signal = &sibling_coefficients[offset_j..offset_j + size_real];
 
                 let chunk_size = 2;
                 let chunks = size_real / chunk_size;
 
-                for j in 0..chunks {
-                    let simd_index = j * chunk_size;
+                for k in 0..chunks {
+                    let simd_index = k * chunk_size;
                     unsafe {
                         let complex_ref = &signal[simd_index];
                         let tuple_ptr: *const (f64, f64) =
@@ -206,7 +215,7 @@ pub mod x86 {
                         let ptr = tuple_ptr as *const f64;
                         let kernel_chunk = _mm256_loadu_pd(ptr);
 
-                        let complex_ref = &res[simd_index];
+                        let complex_ref = &result[simd_index];
                         let tuple_ptr: *const (f64, f64) =
                             complex_ref as *const _ as *const (f64, f64);
                         let ptr = tuple_ptr as *const f64;
@@ -217,7 +226,7 @@ pub mod x86 {
                         let tmp = _mm256_add_pd(product, res_chunk);
 
                         // Save
-                        let complex_ref = &res[simd_index];
+                        let complex_ref = &result[simd_index];
                         let tuple_ptr: *const (f64, f64) =
                             complex_ref as *const _ as *const (f64, f64);
                         let ptr = tuple_ptr as *mut f64;
@@ -229,16 +238,17 @@ pub mod x86 {
                 // Handle remainder
                 let start_remainder = chunks * chunk_size;
                 for j in start_remainder..size_real {
-                    res[res_offset + j] += signal[j] * m2l_matrix[j];
+                    result[res_offset + j] += signal[j] * m2l_matrix[j];
                 }
             }
         }
-
-        res
     }
 
-    // The SIMD kernel for computing the component wise product of two complex numbers loaded into
-    // SIMD registers a and b respectively. Optimised for AVX 2 256-bit wide registers
+    /// Kernel for multiplication of complex numbers, each lane contains a two complex number in the form [[a, b, c, d]] where the numbers are a+ib, c+id.
+    ///
+    /// # Arguments
+    /// * `a_ra` - [[a, b, c, d]], corresponding to a+ib, c+id
+    /// * `b_ra` - [[e, f, g, h]], corresponding to e+if, g+ih
     pub fn hadamard_product_kernel_avx2(a_ra: __m256d, b_ra: __m256d) -> __m256d {
         unsafe {
             // Extract real parts [a1, a1, a2, a2]

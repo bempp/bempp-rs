@@ -1,6 +1,8 @@
 [features]
 # Treat warnings as a build error.
 strict = []
+avx = []
+neon = []
 
 [package]
 name = "bempp-field"
@@ -34,3 +36,13 @@ rayon = "1.7.0"
 
 [dev-dependencies]
 approx_eq = "0.1.8"
+criterion = { version = "0.4", features=["html_reports"] }
+
+[[bench]]
+name = "hadamard"
+harness = false
+
+[[bench]]
+name = "hadamard_neon"
+harness = false
+required-features = ["neon"] 

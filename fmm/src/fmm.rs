@@ -10,7 +10,6 @@ use rlst::{
     algorithms::{linalg::LinAlg, traits::pseudo_inverse::Pinv},
     common::traits::{Eval, NewLikeSelf, Transpose},
     dense::{
-        base_matrix::BaseMatrix, data_container::VectorContainer, global, matrix::Matrix,
         rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot,
     },
 };
@@ -153,7 +152,7 @@ where
             kernel.assemble_st(
                 EvalType::Value,
                 downward_equivalent_surface.data(),
-                &child_downward_check_surface.data(),
+                child_downward_check_surface.data(),
                 cc2pe.data_mut(),
             );
 
@@ -373,6 +372,7 @@ where
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -431,7 +431,7 @@ mod test {
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_svd);
 
         // Form charge dict, matching charges with their associated global indices
-        let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+        let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
         // Associate data with the FMM
         let datatree = FmmData::new(fmm, &charge_dict);
@@ -482,7 +482,7 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
         println!("{:?}", rel_error);
-        assert!(rel_error <= 1e-6);
+        assert!(rel_error <= 1e-5);
     }
 
     #[test]

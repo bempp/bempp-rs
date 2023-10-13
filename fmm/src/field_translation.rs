@@ -1,7 +1,6 @@
 //! Implementation of field translations for each FMM.
 use std::{
     collections::HashMap,
-    hash::Hash,
     ops::{Deref, DerefMut, Mul},
     sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Instant,
@@ -17,8 +16,8 @@ use rayon::prelude::*;
 use bempp_field::{
     array::pad3,
     fft::{irfft3_fftw, irfft3_fftw_par_vec, rfft3_fftw, rfft3_fftw_par_vec},
-    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
     hadamard::hadamard_product_sibling,
+    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
 };
 
 use bempp_traits::{
@@ -43,12 +42,6 @@ use crate::{
     types::{FmmData, KiFmm},
 };
 
-type FftMatrixc64 = rlst::dense::Matrix<
-    c64,
-    rlst::dense::base_matrix::BaseMatrix<c64, rlst::dense::VectorContainer<c64>, Dynamic, Dynamic>,
-    Dynamic,
-    Dynamic,
->;
 
 impl<T, U> SourceTranslation for FmmData<KiFmm<SingleNodeTree, T, U>>
 where
@@ -607,24 +600,22 @@ where
                     })
                     .collect_vec();
 
-                    // Get all halo data
-                    for &pnc in parent_neigbors_children.iter() {
-                        if pnc != sentinel {
-                            halo_data.push(Some(Arc::clone(
-                                global_check_potentials_hat.get(&pnc).unwrap(),
-                            )))
-                        } else {
-                            halo_data.push(None)
-                        }
+                // Get all halo data
+                for &pnc in parent_neigbors_children.iter() {
+                    if pnc != sentinel {
+                        halo_data.push(Some(Arc::clone(
+                            global_check_potentials_hat.get(&pnc).unwrap(),
+                        )))
+                    } else {
+                        halo_data.push(None)
                     }
+                }
 
-                    // Compute Hadamard products and scatter to halo
-                    let mut tmp = rlst_mat![c64, (16*8*size_real, 1)];
-                    hadamard_product_sibling(self.fmm.order, sibling_signals, kernel_data.data(), tmp.data_mut());
+                // Compute Hadamard products and scatter to halo
+                // let mut tmp = rlst_mat![c64, (16 * 8 * size_real, 1)];
+                // hadamard_product_sibling(self.fmm.order, sibling_signals, kernel_data.data(), tmp.data_mut());
 
-                    // println!("HERE {:?} {:?} {:?}", tmp.data()[0], sibling_signals[0], kernel_data.data()[0]);
-
-
+                // println!("HERE {:?} {:?} {:?}", tmp.data()[0], sibling_signals[0], kernel_data.data()[0]);
             });
 
         println!("hadamard products {:?}", start.elapsed());
