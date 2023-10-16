@@ -68,7 +68,7 @@ fn get_quadrature_rule(
     }
 }
 
-struct RawData2D<T: Scalar> {
+pub struct RawData2D<T: Scalar> {
     pub data: *mut T,
     pub shape: (usize, usize),
 }
@@ -176,7 +176,7 @@ fn assemble_batch_singular<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn assemble_batch_nonadjacent<'a>(
+fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
     output: &RawData2D<f64>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
@@ -196,17 +196,14 @@ fn assemble_batch_nonadjacent<'a>(
     let test_c20 = test_grid.topology().connectivity(2, 0);
     let trial_grid = trial_space.grid();
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
-    let mut k = vec![0.0; test_weights.len() * trial_weights.len()];
 
-    // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut test_jdet = vec![0.0; test_points.shape().0];
-    let mut trial_jdet = vec![0.0; trial_points.shape().0];
-    let mut test_normals = Array2D::<f64>::new((test_points.shape().0, 3));
-    let mut trial_normals = Array2D::<f64>::new((trial_points.shape().0, 3));
-
-    // TODO: remove transposing, and put points in this shape to start with
-    let mut test_mapped_pts = Array2D::<f64>::new((3, test_points.shape().0));
-    let mut trial_mapped_pts = Array2D::<f64>::new((3, trial_points.shape().0));
+    let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
+    let mut test_jdet = vec![0.0; NPTS_TEST];
+    let mut trial_jdet = vec![0.0; NPTS_TRIAL];
+    let mut test_normals = Array2D::<f64>::new((NPTS_TEST, 3));
+    let mut trial_normals = Array2D::<f64>::new((NPTS_TRIAL, 3));
+    let mut test_mapped_pts = Array2D::<f64>::new((3, NPTS_TEST));
+    let mut trial_mapped_pts = Array2D::<f64>::new((3, NPTS_TRIAL));
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
@@ -328,7 +325,7 @@ pub fn assemble<'a>(
     // TODO: make these configurable
     let blocksize = 128;
 
-    assemble_nonsingular(
+    assemble_nonsingular::<16, 16>(
         output,
         kernel,
         needs_trial_normal,
@@ -352,8 +349,7 @@ pub fn assemble<'a>(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn assemble_nonsingular<'a>(
+pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
     output: &mut Array2D<f64>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
@@ -377,29 +373,29 @@ pub fn assemble_nonsingular<'a>(
     // let test_dofs_per_cell = 1;
     // let trial_dofs_per_cell = 1;
 
-    // TODO: allow user to configure this
-    let npoints = 16;
-
     // TODO: pass cell types into this function
-    let qrule = simplex_rule(ReferenceCellType::Triangle, npoints).unwrap();
-    let qpoints = Array2D::from_data(qrule.points, (qrule.npoints, 2));
-    let qweights = qrule.weights;
+    let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
+    let qpoints_test = Array2D::from_data(qrule_test.points, (NPTS_TEST, 2));
+    let qweights_test = qrule_test.weights;
+    let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
+    let qpoints_trial = Array2D::from_data(qrule_trial.points, (NPTS_TRIAL, 2));
+    let qweights_trial = qrule_trial.weights;
 
     let mut test_table = Array4D::<f64>::new(
         test_space
             .element()
-            .tabulate_array_shape(0, qpoints.shape().0),
+            .tabulate_array_shape(0, NPTS_TEST),
     );
-    test_space.element().tabulate(&qpoints, 0, &mut test_table);
+    test_space.element().tabulate(&qpoints_test, 0, &mut test_table);
 
     let mut trial_table = Array4D::<f64>::new(
         trial_space
             .element()
-            .tabulate_array_shape(0, qpoints.shape().0),
+            .tabulate_array_shape(0, NPTS_TRIAL),
     );
     trial_space
         .element()
-        .tabulate(&qpoints, 0, &mut trial_table);
+        .tabulate(&qpoints_test, 0, &mut trial_table);
 
     let output_raw = RawData2D {
         data: output.data.as_mut_ptr(),
@@ -437,7 +433,7 @@ pub fn assemble_nonsingular<'a>(
             let r: usize = (0..numthreads)
                 .into_par_iter()
                 .map(&|t| {
-                    assemble_batch_nonadjacent(
+                    assemble_batch_nonadjacent::<NPTS_TEST, NPTS_TRIAL>(
                         &output_raw,
                         kernel,
                         needs_trial_normal,
@@ -446,10 +442,10 @@ pub fn assemble_nonsingular<'a>(
                         trial_cells[t],
                         test_space,
                         test_cells[t],
-                        &qpoints,
-                        &qweights,
-                        &qpoints,
-                        &qweights,
+                        &qpoints_trial,
+                        &qweights_trial,
+                        &qpoints_test,
+                        &qweights_test,
                         &trial_table,
                         &test_table,
                     )
@@ -489,9 +485,6 @@ pub fn assemble_singular<'a>(
     // Size of this might not be known at compile time
     // let test_dofs_per_cell = 1;
     // let trial_dofs_per_cell = 1;
-
-    // println!("Non-adjacent terms: {}ms", now.elapsed().as_millis());
-    // let now = Instant::now();
 
     // TODO: allow user to configure this
     let npoints = 4;
@@ -622,7 +615,6 @@ pub fn assemble_singular<'a>(
             }
         }
     }
-    // println!("Singular terms: {}ms", now.elapsed().as_millis());
 }
 #[cfg(test)]
 mod test {
@@ -636,7 +628,6 @@ mod test {
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::{Continuity, ElementFamily};
-    // use num::complex::Complex;
 
     #[cfg_attr(debug_assertions, ignore)]
     #[test]
@@ -672,14 +663,6 @@ mod test {
             &space,
         );
 
-        /*for i in 0..matrix.shape().0 {
-            for j in 0..matrix.shape().1 {
-                println!("{} {}",
-                    *matrix.get(i, j).unwrap(),
-                    *dmat.get(i, j).unwrap(),
-                );
-            }
-        }*/
         for i in 0..matrix.shape().0 {
             for j in 0..matrix.shape().1 {
                 assert_relative_eq!(
