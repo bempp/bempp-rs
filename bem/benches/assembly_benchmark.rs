@@ -68,6 +68,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
 
         let colouring = space.compute_cell_colouring();
 
+        /*
         group.bench_function(
             &format!(
                 "Assembly of singular terms of {}x{} matrix",
@@ -90,6 +91,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 })
             },
         );
+        */
         group.bench_function(
             &format!(
                 "Assembly of non-singular terms of {}x{} matrix",
@@ -98,7 +100,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    batched::assemble_nonsingular(
+                    batched::assemble_nonsingular::<16, 16>(
                         &mut matrix,
                         &laplace_3d::Laplace3dKernel::new(),
                         false,
@@ -116,5 +118,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, full_assembly_benchmark, assembly_parts_benchmark);
+// criterion_group!(benches, full_assembly_benchmark, assembly_parts_benchmark);
+criterion_group!(benches, assembly_parts_benchmark);
 criterion_main!(benches);

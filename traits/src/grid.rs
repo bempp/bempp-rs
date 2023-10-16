@@ -2,6 +2,7 @@
 
 use crate::arrays::{AdjacencyListAccess, Array2DAccess};
 use crate::cell::ReferenceCellType;
+use rlst_common::traits::{RandomAccessMut, Shape};
 
 /// The ownership of a mesh entity
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -48,6 +49,15 @@ pub trait Geometry {
         points: &impl Array2DAccess<'a, f64>,
         cell: usize,
         physical_points: &mut impl Array2DAccess<'a, f64>,
+    );
+
+    /// Compute the physical coordinates of a set of points in a given cell,
+    /// with return in transposed arrangement
+    fn compute_points_transpose_rlst<'a, T: RandomAccessMut<Item = f64> + Shape>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        physical_points: &mut T,
     );
 
     /// Compute the normals to a set of points in a given cell

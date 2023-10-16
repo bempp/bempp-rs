@@ -13,6 +13,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
+use rlst_dense::RawAccess;
 //use std::time::Instant;
 
 fn get_quadrature_rule(
@@ -202,23 +203,26 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut trial_jdet = vec![0.0; NPTS_TRIAL];
     let mut test_normals = Array2D::<f64>::new((NPTS_TEST, 3));
     let mut trial_normals = Array2D::<f64>::new((NPTS_TRIAL, 3));
-    let mut test_mapped_pts = Array2D::<f64>::new((3, NPTS_TEST));
-    let mut trial_mapped_pts = Array2D::<f64>::new((3, NPTS_TRIAL));
+
+    // let mut rlst_test_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
+    // let mut rlst_trial_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
+    let mut rlst_test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (3, NPTS_TEST)];
+    let mut rlst_trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (3, NPTS_TRIAL)];
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
         let test_cell_gindex = test_grid.geometry().index_map()[*test_cell];
-        let test_vertices = test_c20.row(test_cell_tindex).unwrap();
+        let test_vertices = unsafe { test_c20.row_unchecked(test_cell_tindex) };
 
         test_grid.geometry().compute_jacobian_determinants(
             test_points,
             test_cell_gindex,
             &mut test_jdet,
         );
-        test_grid.geometry().compute_points_transpose(
+        test_grid.geometry().compute_points_transpose_rlst(
             test_points,
             test_cell_gindex,
-            &mut test_mapped_pts,
+            &mut rlst_test_mapped_pts,
         );
 
         if needs_test_normal {
@@ -230,17 +234,17 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         for trial_cell in trial_cells {
             let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
             let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
-            let trial_vertices = trial_c20.row(trial_cell_tindex).unwrap();
+            let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
 
             trial_grid.geometry().compute_jacobian_determinants(
                 trial_points,
                 trial_cell_gindex,
                 &mut trial_jdet,
             );
-            trial_grid.geometry().compute_points_transpose(
+            trial_grid.geometry().compute_points_transpose_rlst(
                 trial_points,
                 trial_cell_gindex,
-                &mut trial_mapped_pts,
+                &mut rlst_trial_mapped_pts,
             );
             if needs_trial_normal {
                 trial_grid.geometry().compute_normals(
@@ -252,8 +256,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
             kernel.assemble_st(
                 EvalType::Value,
-                &test_mapped_pts.data,
-                &trial_mapped_pts.data,
+                &rlst_test_mapped_pts.data(),
+                &rlst_trial_mapped_pts.data(),
                 &mut k,
             );
 
