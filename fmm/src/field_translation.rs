@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     ops::{Deref, DerefMut, Mul},
     sync::{Arc, Mutex, MutexGuard, RwLock},
-    time::Instant,
+    time::Instant, cell::RefCell,
 };
 
 use bempp_tools::Array3D;
@@ -24,7 +24,7 @@ use bempp_traits::{
     arrays::Array3DAccess,
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
-    kernel::{Kernel, KernelScale},
+    kernel::{Kernel, KernelScale, self},
     tree::Tree,
     types::EvalType,
 };
@@ -550,6 +550,7 @@ where
 
             chunk.copy_from_slice(padded_signal.get_data());
         });
+
         println!("data organisation time {:?}", start.elapsed().as_millis());
 
         let mut padded_signals_hat = rlst_col_vec![c64, size_real * ntargets];
@@ -559,64 +560,152 @@ where
 
         // Compute Hadamard product
         let start = Instant::now();
-        let mut global_check_potentials_hat = HashMap::new();
-        for target in targets.iter() {
-            global_check_potentials_hat.insert(
-                *target,
-                Arc::new(Mutex::new(vec![Complex::<f64>::zero(); size_real])),
-            );
-        }
+        // let mut global_check_potentials_hat = HashMap::new();
+        // for target in targets.iter() {
+        //     global_check_potentials_hat.insert(
+        //         *target,
+        //         Arc::new(Mutex::new(vec![Complex::<f64>::zero(); size_real])),
+        //     );
+        // }
+
+
+
 
         println!("data inst {:?}", start.elapsed().as_millis());
 
         let start = Instant::now();
-
         let kernel_data = &self.fmm.m2l.operator_data.kernel_data;
 
-        let nsiblings = 8;
-        targets
-            .par_chunks_exact(nsiblings)
-            .zip(
-                padded_signals_hat
-                    .data()
-                    .par_chunks_exact(nsiblings * size_real),
-            )
-            .for_each(|(siblings, sibling_signals)| {
-                let mut halo_data = Vec::new();
 
-                let parent = siblings[0].parent();
+        let ntargets = targets.len();
+        let mut global_check_potentials = vec![Complex::<f64>::zero(); size_real*ntargets];
 
-                let sentinel = MortonKey::default();
 
-                let parent_neigbors_children = parent
-                    .all_neighbors()
-                    .iter()
-                    .flat_map(|p| {
-                        if let Some(p) = p {
-                            p.children()
-                        } else {
-                            vec![sentinel; 8]
-                        }
-                    })
-                    .collect_vec();
+        (0..size_real).into_par_iter().zip(global_check_potentials.par_chunks_exact_mut(ntargets)).for_each(|(freq, check_potential_chunk)| {
 
-                // Get all halo data
-                for &pnc in parent_neigbors_children.iter() {
-                    if pnc != sentinel {
-                        halo_data.push(Some(Arc::clone(
-                            global_check_potentials_hat.get(&pnc).unwrap(),
-                        )))
-                    } else {
-                        halo_data.push(None)
+            // Extract frequency component of signal
+            let padded_signal_freq = every_kth(padded_signals_hat.data(), freq, size_real);
+
+            // Compute the Hadamard products over frequency chunks
+            padded_signal_freq.chunks_exact(8).zip(targets.chunks_exact(8)).for_each(|(frequency_chunk, target_chunk)| {
+                let parent = target_chunk[0].parent();
+                let parent_neighbours = parent.neighbors();
+                let parent_neighbours_children = parent_neighbours.iter().map(|pn| pn.children()).collect_vec();
+
+                // For each halo position
+                for (i, pnc) in parent_neighbours_children.iter().enumerate() {
+
+                    // Find accumulation points of check potentials
+                    check_potential_chunk[i] = Complex::<f64>::zero();
+
+                    // For the current frequency, load the kernel chunk
+                    let kernel_offset = 64*freq;
+                    let kernel_chunk = &kernel_data[i][kernel_offset..kernel_offset+64];
+
+                    // Compute hadamard products, and scatter to appropriate locations
+                    // let mut result = vec![Complex::<f64>::zero(); 64];
+
+                    // For each convolution in the halo
+                    for (j, child) in pnc.iter().enumerate() {
+                        let kernel_chunk_chunk = &kernel_chunk[j*8..(j+1)*8];
+                        let tmp = kernel_chunk_chunk
+                            .iter()
+                            .zip(padded_signal_freq.iter())
+                            .map(|(a, &b)| a*b).collect_vec();
+                        // result[j*8..(j+1)*8].copy_from_slice(&tmp[..]);
+                        // check_chunk.iter_mut().zip(tmp.iter()).for_each(|(c, t)| *c += t);
                     }
+
+                    // Check which positions are accumulated to, this is algebraically defined for each halo position
+                    // A subset of 'result' will be saved to check potential chunk
+
                 }
+            });
+        });
+
+
+        // let nsiblings = 8;
+        // padded_signals_hat.data().par_chunks_exact(size_real*nsiblings).for_each(|sibling_set| {
+
+        //     let nconvolutions = 189;
+        //     // let nsiblings = 8;
+
+        //     let mut result = rlst_mat![c64, (nconvolutions * nsiblings * size_real, 1)];
+
+        //     hadamard_product_sibling(self.fmm.order, sibling_set, &&kernel_data[..], result.data_mut());
+
+        // });
+
+
+        // Iterate through sibling sets at a time, and compute hadamad products with halo items
+
+        // println!("HERE foo {:?}", kernel_data[0].len());
+
+        // for i in 0..kernel_data.len() {
+        //     // println!("HERE {:?}", i);
+
+        //     // Load a set of convolutions into memory
+        //     let kernel_set = &kernel_data[i];
+
+        //     // Compute hadamard products for each sibling set in targets in parallel, for this given kernel
+        //     // set
+        //     padded_signals_hat.data().par_chunks_exact(size_real*8).for_each(|sibling_set| {
+
+        //         let nconvolutions = 64;
+        //         let nsiblings = 8;
+
+        //         let mut result = rlst_mat![c64, (nconvolutions * nsiblings * size_real, 1)];
+
+        //         hadamard_product_sibling(self.fmm.order, sibling_set, &kernel_set[..], result.data_mut());
+
+        //     })
+
+        // }
+
+        // let nsiblings = 8;
+        // targets
+        //     .par_chunks_exact(nsiblings)
+        //     .zip(
+        //         padded_signals_hat
+        //             .data()
+        //             .par_chunks_exact(nsiblings * size_real),
+        //     )
+        //     .for_each(|(siblings, sibling_signals)| {
+        //         let mut halo_data = Vec::new();
+
+        //         let parent = siblings[0].parent();
+
+        //         let sentinel = MortonKey::default();
+
+        //         let parent_neigbors_children = parent
+        //             .all_neighbors()
+        //             .iter()
+        //             .flat_map(|p| {
+        //                 if let Some(p) = p {
+        //                     p.children()
+        //                 } else {
+        //                     vec![sentinel; 8]
+        //                 }
+        //             })
+        //             .collect_vec();
+
+        //         // Get all halo data
+        //         for &pnc in parent_neigbors_children.iter() {
+        //             if pnc != sentinel {
+        //                 halo_data.push(Some(Arc::clone(
+        //                     global_check_potentials_hat.get(&pnc).unwrap(),
+        //                 )))
+        //             } else {
+        //                 halo_data.push(None)
+        //             }
+        //         }
 
                 // Compute Hadamard products and scatter to halo
                 // let mut tmp = rlst_mat![c64, (16 * 8 * size_real, 1)];
                 // hadamard_product_sibling(self.fmm.order, sibling_signals, kernel_data.data(), tmp.data_mut());
 
                 // println!("HERE {:?} {:?} {:?}", tmp.data()[0], sibling_signals[0], kernel_data.data()[0]);
-            });
+            // });
 
         println!("hadamard products {:?}", start.elapsed());
     }
@@ -631,4 +720,38 @@ where
             2_f64.powf((level - 3) as f64)
         }
     }
+}
+
+fn every_kth_mut<T>(slice: &mut [T], offset: usize, k: usize) -> Vec<&mut T> {
+    if k == 0 {
+        return Vec::new();
+    }
+
+    let mut result = Vec::new();
+    // Start at the offset
+    let mut remainder = &mut slice[offset..];
+
+    while remainder.len() >= k {
+        let (front, back) = remainder.split_at_mut(k);
+        result.push(&mut front[k.saturating_sub(1)]);  // Using saturating_sub to prevent underflow
+        remainder = back;
+    }
+    result
+}
+
+fn every_kth<T>(slice: &[T], offset: usize, k: usize) -> Vec<&T> {
+    if k == 0 {
+        return Vec::new();
+    }
+
+    let mut result = Vec::new();
+    // Start at the offset
+    let mut remainder = &slice[offset..];
+
+    while remainder.len() >= k {
+        let (front, back) = remainder.split_at(k);
+        result.push(&front[k.saturating_sub(1)]);  // Using saturating_sub to prevent underflow
+        remainder = back;
+    }
+    result
 }
