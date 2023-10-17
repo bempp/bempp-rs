@@ -13,7 +13,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_dense::RawAccess;
+use rlst_dense::{RawAccess, UnsafeRandomAccessMut};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -208,6 +208,35 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut rlst_test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
     let mut rlst_trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TRIAL, 3)];
 
+    let test_element = test_grid.geometry().element(test_cells[0]);
+
+    let mut test_data = Array4D::<f64>::new(test_element.tabulate_array_shape(0, NPTS_TEST));
+    test_element.tabulate(test_points, 0, &mut test_data);
+    let gdim = test_grid.geometry().dim();
+
+    // TODO: move this to grid.get_compute_points_function(test_points)
+    let test_compute_points = |cell: usize, pts: &mut rlst_dense::Matrix<f64, rlst_dense::base_matrix::BaseMatrix<f64, rlst_dense::VectorContainer<f64>, rlst_dense::Dynamic>, rlst_dense::Dynamic>| {
+        for p in 0..NPTS_TEST {
+            for i in 0..gdim {
+                unsafe {
+                    *pts.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        let vertices = test_grid.geometry().cell_vertices(cell).unwrap();
+        for (i, n) in vertices.iter().enumerate() {
+            let pt = test_grid.geometry().point(*n).unwrap();
+            for p in 0..NPTS_TEST {
+                for (j, pt_j) in pt.iter().enumerate() {
+                    unsafe {
+                        *pts.get_unchecked_mut(p, j) +=
+                            *pt_j * *test_data.get_unchecked(0, p, i, 0);
+                    }
+                }
+            }
+        }
+    };
+
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
         let test_cell_gindex = test_grid.geometry().index_map()[*test_cell];
@@ -218,11 +247,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
             test_cell_gindex,
             &mut test_jdet,
         );
-        test_grid.geometry().compute_points_rlst(
-            test_points,
-            test_cell_gindex,
-            &mut rlst_test_mapped_pts,
-        );
+        test_compute_points(test_cell_gindex, &mut rlst_test_mapped_pts);
 
         if needs_test_normal {
             test_grid
