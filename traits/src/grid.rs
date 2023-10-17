@@ -60,6 +60,14 @@ pub trait Geometry {
         physical_points: &mut T,
     );
 
+    /// Compute the physical coordinates of a set of points in a given cell
+    fn compute_points_rlst<'a, T: RandomAccessMut<Item = f64> + Shape>(
+        &self,
+        points: &impl Array2DAccess<'a, f64>,
+        cell: usize,
+        physical_points: &mut T,
+    );
+
     /// Compute the normals to a set of points in a given cell
     fn compute_normals<'a>(
         &self,

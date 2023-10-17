@@ -14,7 +14,6 @@ use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
 use rlst_dense::RawAccess;
-//use std::time::Instant;
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -206,8 +205,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
     // let mut rlst_test_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
     // let mut rlst_trial_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
-    let mut rlst_test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (3, NPTS_TEST)];
-    let mut rlst_trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (3, NPTS_TRIAL)];
+    let mut rlst_test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
+    let mut rlst_trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TRIAL, 3)];
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
@@ -219,7 +218,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
             test_cell_gindex,
             &mut test_jdet,
         );
-        test_grid.geometry().compute_points_transpose_rlst(
+        test_grid.geometry().compute_points_rlst(
             test_points,
             test_cell_gindex,
             &mut rlst_test_mapped_pts,
@@ -241,7 +240,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                 trial_cell_gindex,
                 &mut trial_jdet,
             );
-            trial_grid.geometry().compute_points_transpose_rlst(
+            trial_grid.geometry().compute_points_rlst(
                 trial_points,
                 trial_cell_gindex,
                 &mut rlst_trial_mapped_pts,
@@ -256,8 +255,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
             kernel.assemble_st(
                 EvalType::Value,
-                &rlst_test_mapped_pts.data(),
-                &rlst_trial_mapped_pts.data(),
+                rlst_test_mapped_pts.data(),
+                rlst_trial_mapped_pts.data(),
                 &mut k,
             );
 
@@ -353,6 +352,7 @@ pub fn assemble<'a>(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
     output: &mut Array2D<f64>,
     kernel: &impl Kernel<T = f64>,
@@ -385,18 +385,14 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
     let qpoints_trial = Array2D::from_data(qrule_trial.points, (NPTS_TRIAL, 2));
     let qweights_trial = qrule_trial.weights;
 
-    let mut test_table = Array4D::<f64>::new(
-        test_space
-            .element()
-            .tabulate_array_shape(0, NPTS_TEST),
-    );
-    test_space.element().tabulate(&qpoints_test, 0, &mut test_table);
+    let mut test_table =
+        Array4D::<f64>::new(test_space.element().tabulate_array_shape(0, NPTS_TEST));
+    test_space
+        .element()
+        .tabulate(&qpoints_test, 0, &mut test_table);
 
-    let mut trial_table = Array4D::<f64>::new(
-        trial_space
-            .element()
-            .tabulate_array_shape(0, NPTS_TRIAL),
-    );
+    let mut trial_table =
+        Array4D::<f64>::new(trial_space.element().tabulate_array_shape(0, NPTS_TRIAL));
     trial_space
         .element()
         .tabulate(&qpoints_test, 0, &mut trial_table);
