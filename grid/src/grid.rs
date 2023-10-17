@@ -112,6 +112,40 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
+
+    fn get_compute_points_function<T: RandomAccessMut<Item = f64> + Shape>(
+        &self,
+        element: &impl FiniteElement,
+        points: &T,
+    ) -> Box<dyn Fn(usize, &mut T)> {
+        let npts = points.shape().0;
+        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
+        element.tabulate_rlst(points, 0, &mut table);
+        let gdim = self.dim();
+
+        Box::new(|cell: usize, pts: &mut T| {
+            for p in 0..npts {
+                for i in 0..gdim {
+                    unsafe {
+                        *pts.get_unchecked_mut(p, i) = 0.0;
+                    }
+                }
+            }
+            let vertices = self.cell_vertices(cell).unwrap();
+            for (i, n) in vertices.iter().enumerate() {
+                let pt = self.point(*n).unwrap();
+                for p in 0..points.shape().0 {
+                    for (j, pt_j) in pt.iter().enumerate() {
+                        unsafe {
+                            *pts.get_unchecked_mut(p, j) +=
+                                *pt_j * *table.get_unchecked(0, p, i, 0);
+                        }
+                    }
+                }
+            }
+        })
+    }
+
     fn compute_points<'a>(
         &self,
         points: &impl Array2DAccess<'a, f64>,

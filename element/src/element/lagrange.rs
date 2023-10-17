@@ -2,7 +2,7 @@
 
 use crate::element::{create_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_tools::arrays::{Array2D, Array3D};
+use bempp_tools::arrays::{to_matrix, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
@@ -29,18 +29,18 @@ pub fn create(
         }
         for d in 0..tdim {
             for _e in 0..cell.entity_count(d) {
-                x[d].push(Array2D::<f64>::new((0, tdim)));
+                x[d].push(to_matrix(&[], (0, tdim)));
                 m[d].push(Array3D::<f64>::new((0, 1, 0)));
             }
         }
-        x[tdim].push(Array2D::<f64>::from_data(cell.midpoint(), (1, tdim)));
+        x[tdim].push(to_matrix(&cell.midpoint(), (1, tdim)));
         m[tdim].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
     } else {
         // TODO: GLL points
         for e in 0..cell.entity_count(0) {
             let mut pts = vec![0.0; tdim];
             pts.copy_from_slice(&cell.vertices()[e * tdim..(e + 1) * tdim]);
-            x[0].push(Array2D::<f64>::from_data(pts, (1, tdim)));
+            x[0].push(to_matrix(&pts, (1, tdim)));
             m[0].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
         }
         for e in 0..cell.entity_count(1) {
@@ -56,7 +56,7 @@ pub fn create(
                     pts[(i - 1) * tdim + j] = v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
                 }
             }
-            x[1].push(Array2D::<f64>::from_data(pts, (degree - 1, tdim)));
+            x[1].push(to_matrix(&pts, (degree - 1, tdim)));
             m[1].push(Array3D::<f64>::from_data(
                 ident,
                 (degree - 1, 1, degree - 1),
@@ -119,7 +119,7 @@ pub fn create(
             for i in 0..npts {
                 ident[i * npts + i] = 1.0;
             }
-            x[2].push(Array2D::<f64>::from_data(pts, (npts, tdim)));
+            x[2].push(to_matrix(&pts, (npts, tdim)));
             m[2].push(Array3D::<f64>::from_data(ident, (npts, 1, npts)));
             start += nvertices;
         }
@@ -143,9 +143,10 @@ mod test {
     use crate::cell::*;
     use crate::element::lagrange::*;
     use approx::*;
-    use bempp_tools::arrays::{Array2D, Array4D};
-    use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
+    use bempp_tools::arrays::Array4D;
+    use bempp_traits::arrays::Array4DAccess;
     use bempp_traits::element::FiniteElement;
+    use rlst_dense::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -182,7 +183,7 @@ mod test {
         let e = create(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
-        let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
+        let points = to_matrix(&vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -196,7 +197,7 @@ mod test {
         let e = create(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
-        let points = Array2D::from_data(vec![0.0, 0.2, 0.4, 1.0], (4, 1));
+        let points = to_matrix(&vec![0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -214,8 +215,8 @@ mod test {
         let e = create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
-        let points = Array2D::from_data(
-            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+        let points = to_matrix(
+            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -231,8 +232,8 @@ mod test {
         let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
-        let points = Array2D::from_data(
-            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+        let points = to_matrix(
+            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -312,8 +313,8 @@ mod test {
         );
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
-        let points = Array2D::from_data(
-            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+        let points = to_matrix(
+            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -329,8 +330,8 @@ mod test {
         let e = create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
-        let points = Array2D::from_data(
-            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+        let points = to_matrix(
+            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -361,8 +362,8 @@ mod test {
         let e = create(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
-        let points = Array2D::from_data(
-            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+        let points = to_matrix(
+            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);

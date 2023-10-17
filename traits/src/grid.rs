@@ -1,8 +1,9 @@
 //! Geometry and topology definitions
 
-use crate::arrays::{AdjacencyListAccess, Array2DAccess};
+use crate::arrays::AdjacencyListAccess;
 use crate::cell::ReferenceCellType;
-use rlst_common::traits::{RandomAccessMut, Shape};
+use crate::element::FiniteElement;
+use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// The ownership of a mesh entity
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -35,63 +36,57 @@ pub trait Geometry {
     fn index_map(&self) -> &[usize];
 
     /// Compute the physical coordinates of a set of points in a given cell
-    fn compute_points<'a>(
+    fn get_compute_points_function<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
-        cell: usize,
-        physical_points: &mut impl Array2DAccess<'a, f64>,
-    );
-
-    /// Compute the physical coordinates of a set of points in a given cell,
-    /// with return in transposed arrangement
-    fn compute_points_transpose<'a>(
-        &self,
-        points: &impl Array2DAccess<'a, f64>,
-        cell: usize,
-        physical_points: &mut impl Array2DAccess<'a, f64>,
-    );
-
-    /// Compute the physical coordinates of a set of points in a given cell,
-    /// with return in transposed arrangement
-    fn compute_points_transpose_rlst<'a, T: RandomAccessMut<Item = f64> + Shape>(
-        &self,
-        points: &impl Array2DAccess<'a, f64>,
-        cell: usize,
-        physical_points: &mut T,
-    );
+        element: &impl FiniteElement,
+        points: &T,
+    ) -> Box<dyn Fn(usize, &mut TMut)>;
 
     /// Compute the physical coordinates of a set of points in a given cell
-    fn compute_points_rlst<'a, T: RandomAccessMut<Item = f64> + Shape>(
+    fn compute_points<
+        'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        physical_points: &mut T,
+        physical_points: &mut TMut,
     );
 
     /// Compute the normals to a set of points in a given cell
-    fn compute_normals<'a>(
+    fn compute_normals<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        normals: &mut impl Array2DAccess<'a, f64>,
+        normals: &mut TMut,
     );
 
     /// Evaluate the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobians<'a>(
+    fn compute_jacobians<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        jacobians: &mut impl Array2DAccess<'a, f64>,
+        jacobians: &mut TMut,
     );
 
     /// Evaluate the determinand of the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_determinants<'a>(
+    fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
         jacobian_determinants: &mut [f64],
     );
@@ -99,11 +94,14 @@ pub trait Geometry {
     /// Evaluate the jacobian inverse at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_inverses<'a>(
+    fn compute_jacobian_inverses<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        jacobian_inverses: &mut impl Array2DAccess<'a, f64>,
+        jacobian_inverses: &mut TMut,
     );
 }
 

@@ -215,7 +215,16 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let gdim = test_grid.geometry().dim();
 
     // TODO: move this to grid.get_compute_points_function(test_points)
-    let test_compute_points = |cell: usize, pts: &mut rlst_dense::Matrix<f64, rlst_dense::base_matrix::BaseMatrix<f64, rlst_dense::VectorContainer<f64>, rlst_dense::Dynamic>, rlst_dense::Dynamic>| {
+    let test_compute_points = |cell: usize,
+                               pts: &mut rlst_dense::Matrix<
+        f64,
+        rlst_dense::base_matrix::BaseMatrix<
+            f64,
+            rlst_dense::VectorContainer<f64>,
+            rlst_dense::Dynamic,
+        >,
+        rlst_dense::Dynamic,
+    >| {
         for p in 0..NPTS_TEST {
             for i in 0..gdim {
                 unsafe {
@@ -454,8 +463,8 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
                 test_start = test_end
             }
 
-            let numthreads = test_cells.len();
-            let r: usize = (0..numthreads)
+            let numtasks = test_cells.len();
+            let r: usize = (0..numtasks)
                 .into_par_iter()
                 .map(&|t| {
                     assemble_batch_nonadjacent::<NPTS_TEST, NPTS_TRIAL>(
@@ -476,7 +485,7 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
                     )
                 })
                 .sum();
-            assert_eq!(r, numthreads);
+            assert_eq!(r, numtasks);
         }
     }
 }
@@ -616,8 +625,8 @@ pub fn assemble_singular<'a>(
                     start = end;
                 }
 
-                let numthreads = cell_blocks.len();
-                let r: usize = (0..numthreads)
+                let numtasks = cell_blocks.len();
+                let r: usize = (0..numtasks)
                     .into_par_iter()
                     .map(&|t| {
                         assemble_batch_singular(
@@ -636,7 +645,7 @@ pub fn assemble_singular<'a>(
                         )
                     })
                     .sum();
-                assert_eq!(r, numthreads);
+                assert_eq!(r, numtasks);
             }
         }
     }
