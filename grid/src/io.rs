@@ -123,7 +123,7 @@ mod test {
     use crate::grid::SerialGrid;
     use crate::io::*;
     use crate::shapes::regular_sphere;
-    use bempp_tools::arrays::{AdjacencyList, Array2D};
+    use bempp_tools::arrays::{to_matrix, AdjacencyList};
     use bempp_traits::cell::ReferenceCellType;
 
     #[test]
@@ -135,8 +135,8 @@ mod test {
     #[test]
     fn test_gmsh_output_quads() {
         let g = SerialGrid::new(
-            Array2D::from_data(
-                vec![
+            to_matrix(
+                &vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
                     1.0, 1.0,
                 ],
@@ -154,8 +154,8 @@ mod test {
     #[test]
     fn test_gmsh_output_mixed_cell_type() {
         let g = SerialGrid::new(
-            Array2D::from_data(
-                vec![
+            to_matrix(
+                &vec![
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
                     1.0, 1.0,
                 ],

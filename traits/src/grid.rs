@@ -2,7 +2,7 @@
 
 use crate::arrays::AdjacencyListAccess;
 use crate::cell::ReferenceCellType;
-use crate::element::FiniteElement;
+// use crate::element::FiniteElement;
 use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// The ownership of a mesh entity
@@ -20,8 +20,8 @@ pub trait Geometry {
     /// The geometric dimension
     fn dim(&self) -> usize;
 
-    /// Get the point with the index `i`
-    fn point(&self, i: usize) -> Option<&[f64]>;
+    /// Get the coordinates of a point
+    fn point(&self, index: usize) -> Option<Vec<f64>>; // TODO: Make this Option<&[f64]>
 
     /// The number of points stored in the geometry
     fn point_count(&self) -> usize;
@@ -35,21 +35,21 @@ pub trait Geometry {
     /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
 
-    /// Compute the physical coordinates of a set of points in a given cell
-    fn get_compute_points_function<
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessMut<Item = f64> + Shape,
-    >(
-        &self,
-        element: &impl FiniteElement,
-        points: &T,
-    ) -> Box<dyn Fn(usize, &mut TMut)>;
-
+    /*
+        /// Compute the physical coordinates of a set of points in a given cell
+        fn get_compute_points_function<
+            T: RandomAccessByRef<Item = f64> + Shape,
+            TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+        >(
+            &self,
+            element: &impl FiniteElement,
+            points: &T,
+        ) -> Box<dyn Fn(usize, &mut TMut)>;
+    */
     /// Compute the physical coordinates of a set of points in a given cell
     fn compute_points<
-        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessMut<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
         &self,
         points: &T,
@@ -60,7 +60,7 @@ pub trait Geometry {
     /// Compute the normals to a set of points in a given cell
     fn compute_normals<
         T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessMut<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
         &self,
         points: &T,
@@ -73,7 +73,7 @@ pub trait Geometry {
     /// The input points should be given using coordinates on the reference element
     fn compute_jacobians<
         T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessMut<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
         &self,
         points: &T,
@@ -96,7 +96,7 @@ pub trait Geometry {
     /// The input points should be given using coordinates on the reference element
     fn compute_jacobian_inverses<
         T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessMut<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
         &self,
         points: &T,

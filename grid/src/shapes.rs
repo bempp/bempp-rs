@@ -2,10 +2,11 @@
 
 use crate::grid::SerialGrid;
 use bempp_element::cell::Triangle;
-use bempp_tools::arrays::{AdjacencyList, Array2D};
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
+use bempp_tools::arrays::{to_matrix, AdjacencyList};
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::grid::{Geometry, Grid, Topology};
+use rlst_dense::{RandomAccessByRef, RandomAccessMut};
 
 /// Create a regular sphere
 ///
@@ -14,8 +15,8 @@ use bempp_traits::grid::{Geometry, Grid, Topology};
 /// each edge). The new points are then scaled so that they are a distance of 1 from the origin.
 pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
     let mut g = SerialGrid::new(
-        Array2D::from_data(
-            vec![
+        to_matrix(
+            &[
                 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
                 0.0, -1.0,
             ],
@@ -34,7 +35,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         let nvertices_old = g.topology().entity_count(0);
         let ncells_old = g.topology().entity_count(2);
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
-        let mut coordinates = Array2D::<f64>::new((nvertices, 3));
+        let mut coordinates = to_matrix(&vec![0.0; nvertices * 3], (nvertices, 3));
         let mut cells = AdjacencyList::<usize>::new();
 
         for i in 0..ncells_old {
@@ -108,10 +109,10 @@ mod test {
     fn test_normal_is_outward() {
         for i in 0..3 {
             let g = regular_sphere(i);
-            let points = Array2D::from_data(vec![1.0 / 3.0, 1.0 / 3.0], (1, 2));
+            let points = to_matrix(&vec![1.0 / 3.0, 1.0 / 3.0], (1, 2));
 
-            let mut mapped_pt = Array2D::<f64>::new((1, 3));
-            let mut normal = Array2D::<f64>::new((1, 3));
+            let mut mapped_pt = to_matrix(&vec![0.0; 3], (1, 3));
+            let mut normal = to_matrix(&vec![0.0; 3], (1, 3));
 
             for i in 0..g.geometry().cell_count() {
                 g.geometry().compute_points(&points, i, &mut mapped_pt);

@@ -12,9 +12,9 @@ pub type Mat<T> = rlst_dense::Matrix<
 
 pub fn to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
     let mut mat = rlst_dynamic_mat![T, shape];
-    for i in 0..shape.0 * shape.1 {
+    for (i, d) in data.iter().enumerate() {
         unsafe {
-            *mat.get_unchecked_mut(i / shape.1, i % shape.1) = data[i];
+            *mat.get_unchecked_mut(i / shape.1, i % shape.1) = *d;
         }
     }
     mat
