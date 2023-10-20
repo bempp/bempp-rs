@@ -1,0 +1,300 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/sri/Github/bempp-rs/fmm/Cargo.toml
+workspace: /home/sri/Github/bempp-rs/Cargo.toml
+warning: some crates are on edition 2021 which defaults to `resolver = "2"`, but virtual workspaces default to `resolver = "1"`
+note: to keep the current resolver, specify `workspace.resolver = "1"` in the workspace root's manifest
+note: to use the edition 2021 resolver, specify `workspace.resolver = "2"` in the workspace root's manifest
+warning: /home/sri/Github/bempp-rs/fmm/Cargo.toml: unused manifest key: dev
+warning: /home/sri/Github/bempp-rs/fmm/Cargo.toml: unused manifest key: target.aarch64-apple-darwin.rustflags
+warning: unused imports: `RandomAccessMut`, `rlst_col_vec`
+  --> field/src/field.rs:14:28
+   |
+14 |     dense::{rlst_mat, Dot, RandomAccessMut, RawAccess, RawAccessMut, Shape, rlst_col_vec},
+   |                            ^^^^^^^^^^^^^^^                                  ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `axial_reflection_surface`, `axially_reflect_components`, `diagonal_reflection`, `diagonally_reflect_components`, `flip3`, `self`
+  --> field/src/field.rs:26:13
+   |
+26 |     array::{flip3, pad3},
+   |             ^^^^^
+27 |     fft::rfft3_fftw,
+28 |     surface::{axial_reflection_surface, diagonal_reflection},
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+29 |     transfer_vector::{
+30 |         axially_reflect_components, compute_transfer_vectors, compute_transfer_vectors_unique,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |         diagonally_reflect_components, self,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^
+
+warning: unused import: `bempp_tools::Array3D`
+ --> field/src/types.rs:4:5
+  |
+4 | use bempp_tools::Array3D;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `j`
+   --> field/src/field.rs:236:18
+    |
+236 |             for (j, sibling) in siblings.iter().enumerate() {
+    |                  ^ help: if this is intentional, prefix it with an underscore: `_j`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `k`
+   --> field/src/field.rs:237:22
+    |
+237 |                 for (k, halo_child) in halo_child_set.iter().enumerate() {
+    |                      ^ help: if this is intentional, prefix it with an underscore: `_k`
+
+warning: unused variable: `size`
+   --> field/src/field.rs:320:25
+    |
+320 |                     let size = p * p * p;
+    |                         ^^^^ help: if this is intentional, prefix it with an underscore: `_size`
+
+warning: unused variable: `tmp`
+   --> field/src/field.rs:346:21
+    |
+346 |                 let tmp = kernel_data[i][j].get_data();
+    |                     ^^^ help: if this is intentional, prefix it with an underscore: `_tmp`
+
+warning: unused variable: `domain`
+   --> field/src/field.rs:200:51
+    |
+200 |     fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
+    |                                                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_domain`
+
+warning: type alias `PermutationMatrix` is never used
+  --> field/src/types.rs:91:6
+   |
+91 | type PermutationMatrix =
+   |      ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: type alias `PermutedMultiIndices` is never used
+  --> field/src/types.rs:95:6
+   |
+95 | type PermutedMultiIndices = Vec<usize>;
+   |      ^^^^^^^^^^^^^^^^^^^^
+
+warning: `bempp-field` (lib) generated 10 warnings (run `cargo fix --lib -p bempp-field` to apply 8 suggestions)
+   Compiling bempp-fmm v0.1.0 (/home/sri/Github/bempp-rs/fmm)
+warning: unused imports: `Mul`, `MutexGuard`, `cell::RefCell`
+ --> fmm/src/field_translation.rs:4:28
+  |
+4 |     ops::{Deref, DerefMut, Mul},
+  |                            ^^^
+5 |     sync::{Arc, Mutex, MutexGuard, RwLock},
+  |                        ^^^^^^^^^^
+6 |     time::Instant, cell::RefCell,
+  |                    ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `bempp_tools::Array3D`
+ --> fmm/src/field_translation.rs:9:5
+  |
+9 | use bempp_tools::Array3D;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `num::Zero`
+  --> fmm/src/field_translation.rs:12:5
+   |
+12 | use num::Zero;
+   |     ^^^^^^^^^
+
+warning: unused imports: `Complex`, `FromPrimitive`
+  --> fmm/src/field_translation.rs:13:11
+   |
+13 | use num::{Complex, FromPrimitive};
+   |           ^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused imports: `hadamard::hadamard_product_sibling`, `irfft3_fftw`, `rfft3_fftw`
+  --> fmm/src/field_translation.rs:18:11
+   |
+18 |     fft::{irfft3_fftw, irfft3_fftw_par_vec, rfft3_fftw, rfft3_fftw_par_vec},
+   |           ^^^^^^^^^^^                       ^^^^^^^^^^
+19 |     hadamard::hadamard_product_sibling,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `self`
+  --> fmm/src/field_translation.rs:27:35
+   |
+27 |     kernel::{Kernel, KernelScale, self},
+   |                                   ^^^^
+
+warning: unused import: `constants::ROOT`
+  --> fmm/src/field_translation.rs:31:75
+   |
+31 | use bempp_tree::{types::{morton::MortonKey, single_node::SingleNodeTree}, constants::ROOT};
+   |                                                                           ^^^^^^^^^^^^^^^
+
+warning: unused imports: `common::tools::PrettyPrint`, `global`, `rlst_rand_col_vec`
+  --> fmm/src/field_translation.rs:33:5
+   |
+33 |     common::tools::PrettyPrint,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+36 |         global, rlst_col_vec, rlst_mat, rlst_pointer_mat, rlst_rand_col_vec, traits::*, Dot, Shape,
+   |         ^^^^^^                                            ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `constants::CACHE_SIZE`
+  --> fmm/src/field_translation.rs:41:5
+   |
+41 |     constants::CACHE_SIZE,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around pattern
+   --> fmm/src/field_translation.rs:650:24
+    |
+650 |             .for_each(|(freq)| {
+    |                        ^    ^
+    |
+    = note: `#[warn(unused_parens)]` on by default
+help: remove these parentheses
+    |
+650 -             .for_each(|(freq)| {
+650 +             .for_each(|freq| {
+    |
+
+warning: unused imports: `common::traits::ColumnMajorIterator`, `dense::rlst_rand_mat`
+   --> fmm/src/fmm.rs:381:16
+    |
+381 |     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `evaluate_laplace_one_target`
+   --> fmm/src/fmm.rs:384:36
+    |
+384 |     use bempp_kernel::laplace_3d::{evaluate_laplace_one_target, Laplace3dKernel};
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `MortonKeyInterface`
+  --> fmm/src/field_translation.rs:28:18
+   |
+28 |     tree::{Tree, MortonKeyInterface},
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `global_idxs`
+  --> fmm/src/field_translation.rs:68:25
+   |
+68 |                     let global_idxs = leaf_points
+   |                         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_global_idxs`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `real_dim`
+   --> fmm/src/field_translation.rs:544:13
+    |
+544 |         let real_dim = q;
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_real_dim`
+
+warning: unused variable: `start`
+   --> fmm/src/field_translation.rs:579:13
+    |
+579 |         let start = Instant::now();
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_start`
+
+warning: unused variable: `target`
+   --> fmm/src/field_translation.rs:552:17
+    |
+552 |             let target = targets[i];
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_target`
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:566:17
+    |
+566 |             let mut padded_signal = pad3(&signal, pad_size, pad_index);
+    |                 ----^^^^^^^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:693:37
+    |
+693 | ...                   let mut save_locations = &check_potential_freq[(displacements[i][0] as usize)..(displacements[i][7] as usize)];
+    |                           ----^^^^^^^^^^^^^^
+    |                           |
+    |                           help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:547:13
+    |
+547 |         let mut chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `times`
+   --> fmm/src/fmm.rs:440:13
+    |
+440 |         let times = datatree.run(Some(true));
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_times`
+
+warning: variable does not need to be mutable
+   --> fmm/src/fmm.rs:521:13
+    |
+521 |         let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+    |             ----^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: function `every_kth_mut` is never used
+   --> fmm/src/field_translation.rs:787:4
+    |
+787 | fn every_kth_mut<T>(slice: &mut [T], offset: usize, k: usize) -> Vec<&mut T> {
+    |    ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `every_kth` is never used
+   --> fmm/src/field_translation.rs:804:4
+    |
+804 | fn every_kth<T>(slice: &[T], offset: usize, k: usize) -> Vec<&T> {
+    |    ^^^^^^^^^
+
+warning: `bempp-fmm` (lib test) generated 24 warnings (run `cargo fix --lib -p bempp-fmm --tests` to apply 21 suggestions)
+    Finished release [optimized] target(s) in 2.25s
+     Running unittests src/lib.rs (/home/sri/Github/bempp-rs/target/release/deps/bempp_fmm-5b810e6b2c4bc72e)
+
+running 1 test
+test fmm::test::test_fmm_fft ... FAILED
+
+failures:
+
+---- fmm::test::test_fmm_fft stdout ----
+data organisation time 0
+fft time 0
+data inst 0
+displacements 8, 26 8
+hadamard products 342.427µs
+ifft time 3
+check potentials 61.83850035206394
+tst pot [35.99628212637268, 41.00950287501959, 41.00950287501959, 48.04219188403566, 41.00950287501958, 48.04219188403567, 48.04219188403569, 58.26769249349775]
+local time 0
+data organisation time 0
+fft time 0
+data inst 0
+displacements 64, 26 8
+hadamard products 4.003218ms
+ifft time 0
+check potentials 61.83850035206394
+tst pot [71.99256425274535, 82.01900575003918, 82.01900575003918, 96.08438376807132, 82.01900575003916, 96.08438376807132, 96.08438376807138, 116.5353849869955]
+local time 0
+FFT times Some({"m2l": 8, "l2p": 0, "m2m": 0, "m2p": 0, "p2m": 1, "l2l": 0, "p2p": 6, "p2l": 0})
+thread 'fmm::test::test_fmm_fft' panicked at fmm/src/fmm.rs:529:9:
+assertion failed: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    fmm::test::test_fmm_fft
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.18s
+
+error: test failed, to rerun pass `--lib`

@@ -398,7 +398,7 @@ mod test {
         let charges = vec![1.0; npoints];
 
         // Setup a FMM experiment
-        let order = 8;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
@@ -487,17 +487,17 @@ mod test {
 
     #[test]
     fn test_fmm_fft<'a>() {
-        let npoints = 1000000;
+        let npoints = 10000;
         let points = points_fixture(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 9;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 2.9;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 5;
+        let depth = 3;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(

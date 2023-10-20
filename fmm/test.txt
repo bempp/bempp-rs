@@ -1,0 +1,385 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/sri/Github/bempp-rs/fmm/Cargo.toml
+workspace: /home/sri/Github/bempp-rs/Cargo.toml
+warning: some crates are on edition 2021 which defaults to `resolver = "2"`, but virtual workspaces default to `resolver = "1"`
+note: to keep the current resolver, specify `workspace.resolver = "1"` in the workspace root's manifest
+note: to use the edition 2021 resolver, specify `workspace.resolver = "2"` in the workspace root's manifest
+warning: /home/sri/Github/bempp-rs/fmm/Cargo.toml: unused manifest key: dev
+warning: /home/sri/Github/bempp-rs/fmm/Cargo.toml: unused manifest key: target.aarch64-apple-darwin.rustflags
+warning: unused imports: `RandomAccessMut`, `rlst_col_vec`
+  --> field/src/field.rs:14:28
+   |
+14 |     dense::{rlst_mat, Dot, RandomAccessMut, RawAccess, RawAccessMut, Shape, rlst_col_vec},
+   |                            ^^^^^^^^^^^^^^^                                  ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `axial_reflection_surface`, `axially_reflect_components`, `diagonal_reflection`, `diagonally_reflect_components`, `self`
+  --> field/src/field.rs:28:15
+   |
+28 |     surface::{axial_reflection_surface, diagonal_reflection},
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+29 |     transfer_vector::{
+30 |         axially_reflect_components, compute_transfer_vectors, compute_transfer_vectors_unique,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |         diagonally_reflect_components, self,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^
+
+warning: unused import: `bempp_tools::Array3D`
+ --> field/src/types.rs:4:5
+  |
+4 | use bempp_tools::Array3D;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `j`
+   --> field/src/field.rs:237:18
+    |
+237 |             for (j, sibling) in siblings.iter().enumerate() {
+    |                  ^ help: if this is intentional, prefix it with an underscore: `_j`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `k`
+   --> field/src/field.rs:238:22
+    |
+238 |                 for (k, halo_child) in halo_child_set.iter().enumerate() {
+    |                      ^ help: if this is intentional, prefix it with an underscore: `_k`
+
+warning: unused variable: `target`
+   --> field/src/field.rs:264:21
+    |
+264 |                 let target = targets[i][j];
+    |                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_target`
+
+warning: unused variable: `source`
+   --> field/src/field.rs:265:21
+    |
+265 |                 let source = sources[i][j];
+    |                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_source`
+
+warning: type alias `PermutationMatrix` is never used
+  --> field/src/types.rs:92:6
+   |
+92 | type PermutationMatrix =
+   |      ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: type alias `PermutedMultiIndices` is never used
+  --> field/src/types.rs:96:6
+   |
+96 | type PermutedMultiIndices = Vec<usize>;
+   |      ^^^^^^^^^^^^^^^^^^^^
+
+warning: `bempp-field` (lib) generated 9 warnings (run `cargo fix --lib -p bempp-field` to apply 7 suggestions)
+   Compiling bempp-fmm v0.1.0 (/home/sri/Github/bempp-rs/fmm)
+warning: unused imports: `HashSet`, `Mul`, `MutexGuard`, `cell::RefCell`
+ --> fmm/src/field_translation.rs:3:28
+  |
+3 |     collections::{HashMap, HashSet},
+  |                            ^^^^^^^
+4 |     ops::{Deref, DerefMut, Mul},
+  |                            ^^^
+5 |     sync::{Arc, Mutex, MutexGuard, RwLock},
+  |                        ^^^^^^^^^^
+6 |     time::Instant, cell::RefCell,
+  |                    ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `FromPrimitive`
+  --> fmm/src/field_translation.rs:13:20
+   |
+13 | use num::{Complex, FromPrimitive};
+   |                    ^^^^^^^^^^^^^
+
+warning: unused import: `hadamard::hadamard_product_sibling`
+  --> fmm/src/field_translation.rs:19:5
+   |
+19 |     hadamard::hadamard_product_sibling,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `self`
+  --> fmm/src/field_translation.rs:27:35
+   |
+27 |     kernel::{Kernel, KernelScale, self},
+   |                                   ^^^^
+
+warning: unused import: `constants::ROOT`
+  --> fmm/src/field_translation.rs:31:75
+   |
+31 | use bempp_tree::{types::{morton::MortonKey, single_node::SingleNodeTree}, constants::ROOT, implementations::helpers::find_corners};
+   |                                                                           ^^^^^^^^^^^^^^^
+
+warning: unused imports: `common::tools::PrettyPrint`, `global`, `rlst_rand_col_vec`
+  --> fmm/src/field_translation.rs:33:5
+   |
+33 |     common::tools::PrettyPrint,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+36 |         global, rlst_col_vec, rlst_mat, rlst_pointer_mat, rlst_rand_col_vec, traits::*, Dot, Shape,
+   |         ^^^^^^                                            ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `constants::CACHE_SIZE`
+  --> fmm/src/field_translation.rs:41:5
+   |
+41 |     constants::CACHE_SIZE,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around pattern
+   --> fmm/src/field_translation.rs:671:24
+    |
+671 |             .for_each(|(freq)| {
+    |                        ^    ^
+    |
+    = note: `#[warn(unused_parens)]` on by default
+help: remove these parentheses
+    |
+671 -             .for_each(|(freq)| {
+671 +             .for_each(|freq| {
+    |
+
+warning: unnecessary parentheses around assigned value
+   --> fmm/src/field_translation.rs:747:62
+    |
+747 | ...                   *sav.raw +=  (scale * ker * *sig.raw);
+    |                                    ^                      ^
+    |
+help: remove these parentheses
+    |
+747 -                                                 *sav.raw +=  (scale * ker * *sig.raw);
+747 +                                                 *sav.raw +=  scale * ker * *sig.raw;
+    |
+
+warning: unused doc comment
+   --> fmm/src/field_translation.rs:774:9
+    |
+774 |           /// TEST CODE TO BE REMOVED
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+775 | /         if level == 3 {
+776 | |
+777 | |             let mut full_v_lists = Vec::new();
+778 | |             for (i, tgt) in targets.iter().enumerate() {
+...   |
+949 | |             // println!("fft pot {:?}", tmp)
+950 | |         }
+    | |_________- rustdoc does not generate documentation for expressions
+    |
+    = help: use `//` for a plain comment
+    = note: `#[warn(unused_doc_comments)]` on by default
+
+warning: unused imports: `common::traits::ColumnMajorIterator`, `dense::rlst_rand_mat`
+   --> fmm/src/fmm.rs:381:16
+    |
+381 |     use rlst::{common::traits::ColumnMajorIterator, dense::rlst_rand_mat};
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `evaluate_laplace_one_target`
+   --> fmm/src/fmm.rs:384:36
+    |
+384 |     use bempp_kernel::laplace_3d::{evaluate_laplace_one_target, Laplace3dKernel};
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `MortonKeyInterface`
+  --> fmm/src/field_translation.rs:28:18
+   |
+28 |     tree::{Tree, MortonKeyInterface},
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `global_idxs`
+  --> fmm/src/field_translation.rs:68:25
+   |
+68 |                     let global_idxs = leaf_points
+   |                         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_global_idxs`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `tgt_idx`
+   --> fmm/src/field_translation.rs:801:17
+    |
+801 |             let tgt_idx = 0;
+    |                 ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_tgt_idx`
+
+warning: unused variable: `multi_indices`
+   --> fmm/src/field_translation.rs:958:17
+    |
+958 |         let (_, multi_indices) = MortonKey::surface_grid(self.fmm.order);
+    |                 ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_multi_indices`
+
+warning: unused variable: `check_potentials`
+   --> fmm/src/field_translation.rs:959:13
+    |
+959 |         let check_potentials = global_check_potentials.data().chunks_exact(size).map(|chunk| {
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_check_potentials`
+
+warning: unused variable: `target`
+   --> fmm/src/field_translation.rs:558:17
+    |
+558 |             let target = targets[i];
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_target`
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:567:17
+    |
+567 |             let mut source_multipole_lock = vec![1 as f64; ncoeffs];
+    |                 ----^^^^^^^^^^^^^^^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:574:17
+    |
+574 |             let mut padded_signal = pad3(&signal, pad_size, pad_index);
+    |                 ----^^^^^^^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:553:13
+    |
+553 |         let mut chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:779:21
+    |
+779 |                 let mut v_list: Vec<MortonKey> = tgt
+    |                     ----^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> fmm/src/field_translation.rs:809:17
+    |
+809 |             let mut v_list: Vec<MortonKey> = tgt
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: unused variable: `times`
+   --> fmm/src/fmm.rs:440:13
+    |
+440 |         let times = datatree.run(Some(true));
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_times`
+
+warning: variable does not need to be mutable
+   --> fmm/src/fmm.rs:521:13
+    |
+521 |         let mut charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+    |             ----^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: `bempp-fmm` (lib test) generated 25 warnings (run `cargo fix --lib -p bempp-fmm --tests` to apply 23 suggestions)
+    Finished release [optimized] target(s) in 2.36s
+     Running unittests src/lib.rs (/home/sri/Github/bempp-rs/target/release/deps/bempp_fmm-5b810e6b2c4bc72e)
+
+running 1 test
+test fmm::test::test_fmm_fft ... FAILED
+
+failures:
+
+---- fmm::test::test_fmm_fft stdout ----
+HALO 26
+data organisation time 0
+fft time 0
+data inst 0
+displacements 8, 26 8
+sibling idx 0 SIBLING SIGNAL CHUNK [Complex { re: 0.0, im: 0.0 }, Complex { re: 1.0, im: 0.0 }, Complex { re: 2.0, im: 0.0 }, Complex { re: 3.0, im: 0.0 }, Complex { re: 4.0, im: 0.0 }, Complex { re: 5.0, im: 0.0 }, Complex { re: 6.0, im: 0.0 }, Complex { re: 7.0, im: 0.0 }]
+sibling idx 8 SIBLING SIGNAL CHUNK [Complex { re: 8.0, im: 0.0 }, Complex { re: 9.0, im: 0.0 }, Complex { re: 10.0, im: 0.0 }, Complex { re: 11.0, im: 0.0 }, Complex { re: 12.0, im: 0.0 }, Complex { re: 13.0, im: 0.0 }, Complex { re: 14.0, im: 0.0 }, Complex { re: 15.0, im: 0.0 }]
+sibling idx 16 SIBLING SIGNAL CHUNK [Complex { re: 16.0, im: 0.0 }, Complex { re: 17.0, im: 0.0 }, Complex { re: 18.0, im: 0.0 }, Complex { re: 19.0, im: 0.0 }, Complex { re: 20.0, im: 0.0 }, Complex { re: 21.0, im: 0.0 }, Complex { re: 22.0, im: 0.0 }, Complex { re: 23.0, im: 0.0 }]
+sibling idx 24 SIBLING SIGNAL CHUNK [Complex { re: 24.0, im: 0.0 }, Complex { re: 25.0, im: 0.0 }, Complex { re: 26.0, im: 0.0 }, Complex { re: 27.0, im: 0.0 }, Complex { re: 28.0, im: 0.0 }, Complex { re: 29.0, im: 0.0 }, Complex { re: 30.0, im: 0.0 }, Complex { re: 31.0, im: 0.0 }]
+sibling idx 32 SIBLING SIGNAL CHUNK [Complex { re: 32.0, im: 0.0 }, Complex { re: 33.0, im: 0.0 }, Complex { re: 34.0, im: 0.0 }, Complex { re: 35.0, im: 0.0 }, Complex { re: 36.0, im: 0.0 }, Complex { re: 37.0, im: 0.0 }, Complex { re: 38.0, im: 0.0 }, Complex { re: 39.0, im: 0.0 }]
+sibling idx 40 SIBLING SIGNAL CHUNK [Complex { re: 40.0, im: 0.0 }, Complex { re: 41.0, im: 0.0 }, Complex { re: 42.0, im: 0.0 }, Complex { re: 43.0, im: 0.0 }, Complex { re: 44.0, im: 0.0 }, Complex { re: 45.0, im: 0.0 }, Complex { re: 46.0, im: 0.0 }, Complex { re: 47.0, im: 0.0 }]
+sibling idx 48 SIBLING SIGNAL CHUNK [Complex { re: 48.0, im: 0.0 }, Complex { re: 49.0, im: 0.0 }, Complex { re: 50.0, im: 0.0 }, Complex { re: 51.0, im: 0.0 }, Complex { re: 52.0, im: 0.0 }, Complex { re: 53.0, im: 0.0 }, Complex { re: 54.0, im: 0.0 }, Complex { re: 55.0, im: 0.0 }]
+sibling idx 56 SIBLING SIGNAL CHUNK [Complex { re: 56.0, im: 0.0 }, Complex { re: 57.0, im: 0.0 }, Complex { re: 58.0, im: 0.0 }, Complex { re: 59.0, im: 0.0 }, Complex { re: 60.0, im: 0.0 }, Complex { re: 61.0, im: 0.0 }, Complex { re: 62.0, im: 0.0 }, Complex { re: 63.0, im: 0.0 }]
+hadamard products 275.661µs
+ifft time 3
+local time 0
+data organisation time 0
+fft time 0
+data inst 0
+displacements 64, 26 8
+sibling idx 0 SIBLING SIGNAL CHUNK [Complex { re: 0.0, im: 0.0 }, Complex { re: 1.0, im: 0.0 }, Complex { re: 2.0, im: 0.0 }, Complex { re: 3.0, im: 0.0 }, Complex { re: 4.0, im: 0.0 }, Complex { re: 5.0, im: 0.0 }, Complex { re: 6.0, im: 0.0 }, Complex { re: 7.0, im: 0.0 }]
+sibling idx 8 SIBLING SIGNAL CHUNK [Complex { re: 8.0, im: 0.0 }, Complex { re: 9.0, im: 0.0 }, Complex { re: 10.0, im: 0.0 }, Complex { re: 11.0, im: 0.0 }, Complex { re: 12.0, im: 0.0 }, Complex { re: 13.0, im: 0.0 }, Complex { re: 14.0, im: 0.0 }, Complex { re: 15.0, im: 0.0 }]
+sibling idx 16 SIBLING SIGNAL CHUNK [Complex { re: 16.0, im: 0.0 }, Complex { re: 17.0, im: 0.0 }, Complex { re: 18.0, im: 0.0 }, Complex { re: 19.0, im: 0.0 }, Complex { re: 20.0, im: 0.0 }, Complex { re: 21.0, im: 0.0 }, Complex { re: 22.0, im: 0.0 }, Complex { re: 23.0, im: 0.0 }]
+sibling idx 24 SIBLING SIGNAL CHUNK [Complex { re: 24.0, im: 0.0 }, Complex { re: 25.0, im: 0.0 }, Complex { re: 26.0, im: 0.0 }, Complex { re: 27.0, im: 0.0 }, Complex { re: 28.0, im: 0.0 }, Complex { re: 29.0, im: 0.0 }, Complex { re: 30.0, im: 0.0 }, Complex { re: 31.0, im: 0.0 }]
+sibling idx 32 SIBLING SIGNAL CHUNK [Complex { re: 32.0, im: 0.0 }, Complex { re: 33.0, im: 0.0 }, Complex { re: 34.0, im: 0.0 }, Complex { re: 35.0, im: 0.0 }, Complex { re: 36.0, im: 0.0 }, Complex { re: 37.0, im: 0.0 }, Complex { re: 38.0, im: 0.0 }, Complex { re: 39.0, im: 0.0 }]
+sibling idx 40 SIBLING SIGNAL CHUNK [Complex { re: 40.0, im: 0.0 }, Complex { re: 41.0, im: 0.0 }, Complex { re: 42.0, im: 0.0 }, Complex { re: 43.0, im: 0.0 }, Complex { re: 44.0, im: 0.0 }, Complex { re: 45.0, im: 0.0 }, Complex { re: 46.0, im: 0.0 }, Complex { re: 47.0, im: 0.0 }]
+sibling idx 48 SIBLING SIGNAL CHUNK [Complex { re: 48.0, im: 0.0 }, Complex { re: 49.0, im: 0.0 }, Complex { re: 50.0, im: 0.0 }, Complex { re: 51.0, im: 0.0 }, Complex { re: 52.0, im: 0.0 }, Complex { re: 53.0, im: 0.0 }, Complex { re: 54.0, im: 0.0 }, Complex { re: 55.0, im: 0.0 }]
+sibling idx 56 SIBLING SIGNAL CHUNK [Complex { re: 56.0, im: 0.0 }, Complex { re: 57.0, im: 0.0 }, Complex { re: 58.0, im: 0.0 }, Complex { re: 59.0, im: 0.0 }, Complex { re: 60.0, im: 0.0 }, Complex { re: 61.0, im: 0.0 }, Complex { re: 62.0, im: 0.0 }, Complex { re: 63.0, im: 0.0 }]
+sibling idx 64 SIBLING SIGNAL CHUNK [Complex { re: 64.0, im: 0.0 }, Complex { re: 65.0, im: 0.0 }, Complex { re: 66.0, im: 0.0 }, Complex { re: 67.0, im: 0.0 }, Complex { re: 68.0, im: 0.0 }, Complex { re: 69.0, im: 0.0 }, Complex { re: 70.0, im: 0.0 }, Complex { re: 71.0, im: 0.0 }]
+sibling idx 72 SIBLING SIGNAL CHUNK [Complex { re: 72.0, im: 0.0 }, Complex { re: 73.0, im: 0.0 }, Complex { re: 74.0, im: 0.0 }, Complex { re: 75.0, im: 0.0 }, Complex { re: 76.0, im: 0.0 }, Complex { re: 77.0, im: 0.0 }, Complex { re: 78.0, im: 0.0 }, Complex { re: 79.0, im: 0.0 }]
+sibling idx 80 SIBLING SIGNAL CHUNK [Complex { re: 80.0, im: 0.0 }, Complex { re: 81.0, im: 0.0 }, Complex { re: 82.0, im: 0.0 }, Complex { re: 83.0, im: 0.0 }, Complex { re: 84.0, im: 0.0 }, Complex { re: 85.0, im: 0.0 }, Complex { re: 86.0, im: 0.0 }, Complex { re: 87.0, im: 0.0 }]
+sibling idx 88 SIBLING SIGNAL CHUNK [Complex { re: 88.0, im: 0.0 }, Complex { re: 89.0, im: 0.0 }, Complex { re: 90.0, im: 0.0 }, Complex { re: 91.0, im: 0.0 }, Complex { re: 92.0, im: 0.0 }, Complex { re: 93.0, im: 0.0 }, Complex { re: 94.0, im: 0.0 }, Complex { re: 95.0, im: 0.0 }]
+sibling idx 96 SIBLING SIGNAL CHUNK [Complex { re: 96.0, im: 0.0 }, Complex { re: 97.0, im: 0.0 }, Complex { re: 98.0, im: 0.0 }, Complex { re: 99.0, im: 0.0 }, Complex { re: 100.0, im: 0.0 }, Complex { re: 101.0, im: 0.0 }, Complex { re: 102.0, im: 0.0 }, Complex { re: 103.0, im: 0.0 }]
+sibling idx 104 SIBLING SIGNAL CHUNK [Complex { re: 104.0, im: 0.0 }, Complex { re: 105.0, im: 0.0 }, Complex { re: 106.0, im: 0.0 }, Complex { re: 107.0, im: 0.0 }, Complex { re: 108.0, im: 0.0 }, Complex { re: 109.0, im: 0.0 }, Complex { re: 110.0, im: 0.0 }, Complex { re: 111.0, im: 0.0 }]
+sibling idx 112 SIBLING SIGNAL CHUNK [Complex { re: 112.0, im: 0.0 }, Complex { re: 113.0, im: 0.0 }, Complex { re: 114.0, im: 0.0 }, Complex { re: 115.0, im: 0.0 }, Complex { re: 116.0, im: 0.0 }, Complex { re: 117.0, im: 0.0 }, Complex { re: 118.0, im: 0.0 }, Complex { re: 119.0, im: 0.0 }]
+sibling idx 120 SIBLING SIGNAL CHUNK [Complex { re: 120.0, im: 0.0 }, Complex { re: 121.0, im: 0.0 }, Complex { re: 122.0, im: 0.0 }, Complex { re: 123.0, im: 0.0 }, Complex { re: 124.0, im: 0.0 }, Complex { re: 125.0, im: 0.0 }, Complex { re: 126.0, im: 0.0 }, Complex { re: 127.0, im: 0.0 }]
+sibling idx 128 SIBLING SIGNAL CHUNK [Complex { re: 128.0, im: 0.0 }, Complex { re: 129.0, im: 0.0 }, Complex { re: 130.0, im: 0.0 }, Complex { re: 131.0, im: 0.0 }, Complex { re: 132.0, im: 0.0 }, Complex { re: 133.0, im: 0.0 }, Complex { re: 134.0, im: 0.0 }, Complex { re: 135.0, im: 0.0 }]
+sibling idx 136 SIBLING SIGNAL CHUNK [Complex { re: 136.0, im: 0.0 }, Complex { re: 137.0, im: 0.0 }, Complex { re: 138.0, im: 0.0 }, Complex { re: 139.0, im: 0.0 }, Complex { re: 140.0, im: 0.0 }, Complex { re: 141.0, im: 0.0 }, Complex { re: 142.0, im: 0.0 }, Complex { re: 143.0, im: 0.0 }]
+sibling idx 144 SIBLING SIGNAL CHUNK [Complex { re: 144.0, im: 0.0 }, Complex { re: 145.0, im: 0.0 }, Complex { re: 146.0, im: 0.0 }, Complex { re: 147.0, im: 0.0 }, Complex { re: 148.0, im: 0.0 }, Complex { re: 149.0, im: 0.0 }, Complex { re: 150.0, im: 0.0 }, Complex { re: 151.0, im: 0.0 }]
+sibling idx 152 SIBLING SIGNAL CHUNK [Complex { re: 152.0, im: 0.0 }, Complex { re: 153.0, im: 0.0 }, Complex { re: 154.0, im: 0.0 }, Complex { re: 155.0, im: 0.0 }, Complex { re: 156.0, im: 0.0 }, Complex { re: 157.0, im: 0.0 }, Complex { re: 158.0, im: 0.0 }, Complex { re: 159.0, im: 0.0 }]
+sibling idx 160 SIBLING SIGNAL CHUNK [Complex { re: 160.0, im: 0.0 }, Complex { re: 161.0, im: 0.0 }, Complex { re: 162.0, im: 0.0 }, Complex { re: 163.0, im: 0.0 }, Complex { re: 164.0, im: 0.0 }, Complex { re: 165.0, im: 0.0 }, Complex { re: 166.0, im: 0.0 }, Complex { re: 167.0, im: 0.0 }]
+sibling idx 168 SIBLING SIGNAL CHUNK [Complex { re: 168.0, im: 0.0 }, Complex { re: 169.0, im: 0.0 }, Complex { re: 170.0, im: 0.0 }, Complex { re: 171.0, im: 0.0 }, Complex { re: 172.0, im: 0.0 }, Complex { re: 173.0, im: 0.0 }, Complex { re: 174.0, im: 0.0 }, Complex { re: 175.0, im: 0.0 }]
+sibling idx 176 SIBLING SIGNAL CHUNK [Complex { re: 176.0, im: 0.0 }, Complex { re: 177.0, im: 0.0 }, Complex { re: 178.0, im: 0.0 }, Complex { re: 179.0, im: 0.0 }, Complex { re: 180.0, im: 0.0 }, Complex { re: 181.0, im: 0.0 }, Complex { re: 182.0, im: 0.0 }, Complex { re: 183.0, im: 0.0 }]
+sibling idx 184 SIBLING SIGNAL CHUNK [Complex { re: 184.0, im: 0.0 }, Complex { re: 185.0, im: 0.0 }, Complex { re: 186.0, im: 0.0 }, Complex { re: 187.0, im: 0.0 }, Complex { re: 188.0, im: 0.0 }, Complex { re: 189.0, im: 0.0 }, Complex { re: 190.0, im: 0.0 }, Complex { re: 191.0, im: 0.0 }]
+sibling idx 192 SIBLING SIGNAL CHUNK [Complex { re: 192.0, im: 0.0 }, Complex { re: 193.0, im: 0.0 }, Complex { re: 194.0, im: 0.0 }, Complex { re: 195.0, im: 0.0 }, Complex { re: 196.0, im: 0.0 }, Complex { re: 197.0, im: 0.0 }, Complex { re: 198.0, im: 0.0 }, Complex { re: 199.0, im: 0.0 }]
+sibling idx 200 SIBLING SIGNAL CHUNK [Complex { re: 200.0, im: 0.0 }, Complex { re: 201.0, im: 0.0 }, Complex { re: 202.0, im: 0.0 }, Complex { re: 203.0, im: 0.0 }, Complex { re: 204.0, im: 0.0 }, Complex { re: 205.0, im: 0.0 }, Complex { re: 206.0, im: 0.0 }, Complex { re: 207.0, im: 0.0 }]
+sibling idx 208 SIBLING SIGNAL CHUNK [Complex { re: 208.0, im: 0.0 }, Complex { re: 209.0, im: 0.0 }, Complex { re: 210.0, im: 0.0 }, Complex { re: 211.0, im: 0.0 }, Complex { re: 212.0, im: 0.0 }, Complex { re: 213.0, im: 0.0 }, Complex { re: 214.0, im: 0.0 }, Complex { re: 215.0, im: 0.0 }]
+sibling idx 216 SIBLING SIGNAL CHUNK [Complex { re: 216.0, im: 0.0 }, Complex { re: 217.0, im: 0.0 }, Complex { re: 218.0, im: 0.0 }, Complex { re: 219.0, im: 0.0 }, Complex { re: 220.0, im: 0.0 }, Complex { re: 221.0, im: 0.0 }, Complex { re: 222.0, im: 0.0 }, Complex { re: 223.0, im: 0.0 }]
+sibling idx 224 SIBLING SIGNAL CHUNK [Complex { re: 224.0, im: 0.0 }, Complex { re: 225.0, im: 0.0 }, Complex { re: 226.0, im: 0.0 }, Complex { re: 227.0, im: 0.0 }, Complex { re: 228.0, im: 0.0 }, Complex { re: 229.0, im: 0.0 }, Complex { re: 230.0, im: 0.0 }, Complex { re: 231.0, im: 0.0 }]
+sibling idx 232 SIBLING SIGNAL CHUNK [Complex { re: 232.0, im: 0.0 }, Complex { re: 233.0, im: 0.0 }, Complex { re: 234.0, im: 0.0 }, Complex { re: 235.0, im: 0.0 }, Complex { re: 236.0, im: 0.0 }, Complex { re: 237.0, im: 0.0 }, Complex { re: 238.0, im: 0.0 }, Complex { re: 239.0, im: 0.0 }]
+sibling idx 240 SIBLING SIGNAL CHUNK [Complex { re: 240.0, im: 0.0 }, Complex { re: 241.0, im: 0.0 }, Complex { re: 242.0, im: 0.0 }, Complex { re: 243.0, im: 0.0 }, Complex { re: 244.0, im: 0.0 }, Complex { re: 245.0, im: 0.0 }, Complex { re: 246.0, im: 0.0 }, Complex { re: 247.0, im: 0.0 }]
+sibling idx 248 SIBLING SIGNAL CHUNK [Complex { re: 248.0, im: 0.0 }, Complex { re: 249.0, im: 0.0 }, Complex { re: 250.0, im: 0.0 }, Complex { re: 251.0, im: 0.0 }, Complex { re: 252.0, im: 0.0 }, Complex { re: 253.0, im: 0.0 }, Complex { re: 254.0, im: 0.0 }, Complex { re: 255.0, im: 0.0 }]
+sibling idx 256 SIBLING SIGNAL CHUNK [Complex { re: 256.0, im: 0.0 }, Complex { re: 257.0, im: 0.0 }, Complex { re: 258.0, im: 0.0 }, Complex { re: 259.0, im: 0.0 }, Complex { re: 260.0, im: 0.0 }, Complex { re: 261.0, im: 0.0 }, Complex { re: 262.0, im: 0.0 }, Complex { re: 263.0, im: 0.0 }]
+sibling idx 264 SIBLING SIGNAL CHUNK [Complex { re: 264.0, im: 0.0 }, Complex { re: 265.0, im: 0.0 }, Complex { re: 266.0, im: 0.0 }, Complex { re: 267.0, im: 0.0 }, Complex { re: 268.0, im: 0.0 }, Complex { re: 269.0, im: 0.0 }, Complex { re: 270.0, im: 0.0 }, Complex { re: 271.0, im: 0.0 }]
+sibling idx 272 SIBLING SIGNAL CHUNK [Complex { re: 272.0, im: 0.0 }, Complex { re: 273.0, im: 0.0 }, Complex { re: 274.0, im: 0.0 }, Complex { re: 275.0, im: 0.0 }, Complex { re: 276.0, im: 0.0 }, Complex { re: 277.0, im: 0.0 }, Complex { re: 278.0, im: 0.0 }, Complex { re: 279.0, im: 0.0 }]
+sibling idx 280 SIBLING SIGNAL CHUNK [Complex { re: 280.0, im: 0.0 }, Complex { re: 281.0, im: 0.0 }, Complex { re: 282.0, im: 0.0 }, Complex { re: 283.0, im: 0.0 }, Complex { re: 284.0, im: 0.0 }, Complex { re: 285.0, im: 0.0 }, Complex { re: 286.0, im: 0.0 }, Complex { re: 287.0, im: 0.0 }]
+sibling idx 288 SIBLING SIGNAL CHUNK [Complex { re: 288.0, im: 0.0 }, Complex { re: 289.0, im: 0.0 }, Complex { re: 290.0, im: 0.0 }, Complex { re: 291.0, im: 0.0 }, Complex { re: 292.0, im: 0.0 }, Complex { re: 293.0, im: 0.0 }, Complex { re: 294.0, im: 0.0 }, Complex { re: 295.0, im: 0.0 }]
+sibling idx 296 SIBLING SIGNAL CHUNK [Complex { re: 296.0, im: 0.0 }, Complex { re: 297.0, im: 0.0 }, Complex { re: 298.0, im: 0.0 }, Complex { re: 299.0, im: 0.0 }, Complex { re: 300.0, im: 0.0 }, Complex { re: 301.0, im: 0.0 }, Complex { re: 302.0, im: 0.0 }, Complex { re: 303.0, im: 0.0 }]
+sibling idx 304 SIBLING SIGNAL CHUNK [Complex { re: 304.0, im: 0.0 }, Complex { re: 305.0, im: 0.0 }, Complex { re: 306.0, im: 0.0 }, Complex { re: 307.0, im: 0.0 }, Complex { re: 308.0, im: 0.0 }, Complex { re: 309.0, im: 0.0 }, Complex { re: 310.0, im: 0.0 }, Complex { re: 311.0, im: 0.0 }]
+sibling idx 312 SIBLING SIGNAL CHUNK [Complex { re: 312.0, im: 0.0 }, Complex { re: 313.0, im: 0.0 }, Complex { re: 314.0, im: 0.0 }, Complex { re: 315.0, im: 0.0 }, Complex { re: 316.0, im: 0.0 }, Complex { re: 317.0, im: 0.0 }, Complex { re: 318.0, im: 0.0 }, Complex { re: 319.0, im: 0.0 }]
+sibling idx 320 SIBLING SIGNAL CHUNK [Complex { re: 320.0, im: 0.0 }, Complex { re: 321.0, im: 0.0 }, Complex { re: 322.0, im: 0.0 }, Complex { re: 323.0, im: 0.0 }, Complex { re: 324.0, im: 0.0 }, Complex { re: 325.0, im: 0.0 }, Complex { re: 326.0, im: 0.0 }, Complex { re: 327.0, im: 0.0 }]
+sibling idx 328 SIBLING SIGNAL CHUNK [Complex { re: 328.0, im: 0.0 }, Complex { re: 329.0, im: 0.0 }, Complex { re: 330.0, im: 0.0 }, Complex { re: 331.0, im: 0.0 }, Complex { re: 332.0, im: 0.0 }, Complex { re: 333.0, im: 0.0 }, Complex { re: 334.0, im: 0.0 }, Complex { re: 335.0, im: 0.0 }]
+sibling idx 336 SIBLING SIGNAL CHUNK [Complex { re: 336.0, im: 0.0 }, Complex { re: 337.0, im: 0.0 }, Complex { re: 338.0, im: 0.0 }, Complex { re: 339.0, im: 0.0 }, Complex { re: 340.0, im: 0.0 }, Complex { re: 341.0, im: 0.0 }, Complex { re: 342.0, im: 0.0 }, Complex { re: 343.0, im: 0.0 }]
+sibling idx 344 SIBLING SIGNAL CHUNK [Complex { re: 344.0, im: 0.0 }, Complex { re: 345.0, im: 0.0 }, Complex { re: 346.0, im: 0.0 }, Complex { re: 347.0, im: 0.0 }, Complex { re: 348.0, im: 0.0 }, Complex { re: 349.0, im: 0.0 }, Complex { re: 350.0, im: 0.0 }, Complex { re: 351.0, im: 0.0 }]
+sibling idx 352 SIBLING SIGNAL CHUNK [Complex { re: 352.0, im: 0.0 }, Complex { re: 353.0, im: 0.0 }, Complex { re: 354.0, im: 0.0 }, Complex { re: 355.0, im: 0.0 }, Complex { re: 356.0, im: 0.0 }, Complex { re: 357.0, im: 0.0 }, Complex { re: 358.0, im: 0.0 }, Complex { re: 359.0, im: 0.0 }]
+sibling idx 360 SIBLING SIGNAL CHUNK [Complex { re: 360.0, im: 0.0 }, Complex { re: 361.0, im: 0.0 }, Complex { re: 362.0, im: 0.0 }, Complex { re: 363.0, im: 0.0 }, Complex { re: 364.0, im: 0.0 }, Complex { re: 365.0, im: 0.0 }, Complex { re: 366.0, im: 0.0 }, Complex { re: 367.0, im: 0.0 }]
+sibling idx 368 SIBLING SIGNAL CHUNK [Complex { re: 368.0, im: 0.0 }, Complex { re: 369.0, im: 0.0 }, Complex { re: 370.0, im: 0.0 }, Complex { re: 371.0, im: 0.0 }, Complex { re: 372.0, im: 0.0 }, Complex { re: 373.0, im: 0.0 }, Complex { re: 374.0, im: 0.0 }, Complex { re: 375.0, im: 0.0 }]
+sibling idx 376 SIBLING SIGNAL CHUNK [Complex { re: 376.0, im: 0.0 }, Complex { re: 377.0, im: 0.0 }, Complex { re: 378.0, im: 0.0 }, Complex { re: 379.0, im: 0.0 }, Complex { re: 380.0, im: 0.0 }, Complex { re: 381.0, im: 0.0 }, Complex { re: 382.0, im: 0.0 }, Complex { re: 383.0, im: 0.0 }]
+sibling idx 384 SIBLING SIGNAL CHUNK [Complex { re: 384.0, im: 0.0 }, Complex { re: 385.0, im: 0.0 }, Complex { re: 386.0, im: 0.0 }, Complex { re: 387.0, im: 0.0 }, Complex { re: 388.0, im: 0.0 }, Complex { re: 389.0, im: 0.0 }, Complex { re: 390.0, im: 0.0 }, Complex { re: 391.0, im: 0.0 }]
+sibling idx 392 SIBLING SIGNAL CHUNK [Complex { re: 392.0, im: 0.0 }, Complex { re: 393.0, im: 0.0 }, Complex { re: 394.0, im: 0.0 }, Complex { re: 395.0, im: 0.0 }, Complex { re: 396.0, im: 0.0 }, Complex { re: 397.0, im: 0.0 }, Complex { re: 398.0, im: 0.0 }, Complex { re: 399.0, im: 0.0 }]
+sibling idx 400 SIBLING SIGNAL CHUNK [Complex { re: 400.0, im: 0.0 }, Complex { re: 401.0, im: 0.0 }, Complex { re: 402.0, im: 0.0 }, Complex { re: 403.0, im: 0.0 }, Complex { re: 404.0, im: 0.0 }, Complex { re: 405.0, im: 0.0 }, Complex { re: 406.0, im: 0.0 }, Complex { re: 407.0, im: 0.0 }]
+sibling idx 408 SIBLING SIGNAL CHUNK [Complex { re: 408.0, im: 0.0 }, Complex { re: 409.0, im: 0.0 }, Complex { re: 410.0, im: 0.0 }, Complex { re: 411.0, im: 0.0 }, Complex { re: 412.0, im: 0.0 }, Complex { re: 413.0, im: 0.0 }, Complex { re: 414.0, im: 0.0 }, Complex { re: 415.0, im: 0.0 }]
+sibling idx 416 SIBLING SIGNAL CHUNK [Complex { re: 416.0, im: 0.0 }, Complex { re: 417.0, im: 0.0 }, Complex { re: 418.0, im: 0.0 }, Complex { re: 419.0, im: 0.0 }, Complex { re: 420.0, im: 0.0 }, Complex { re: 421.0, im: 0.0 }, Complex { re: 422.0, im: 0.0 }, Complex { re: 423.0, im: 0.0 }]
+sibling idx 424 SIBLING SIGNAL CHUNK [Complex { re: 424.0, im: 0.0 }, Complex { re: 425.0, im: 0.0 }, Complex { re: 426.0, im: 0.0 }, Complex { re: 427.0, im: 0.0 }, Complex { re: 428.0, im: 0.0 }, Complex { re: 429.0, im: 0.0 }, Complex { re: 430.0, im: 0.0 }, Complex { re: 431.0, im: 0.0 }]
+sibling idx 432 SIBLING SIGNAL CHUNK [Complex { re: 432.0, im: 0.0 }, Complex { re: 433.0, im: 0.0 }, Complex { re: 434.0, im: 0.0 }, Complex { re: 435.0, im: 0.0 }, Complex { re: 436.0, im: 0.0 }, Complex { re: 437.0, im: 0.0 }, Complex { re: 438.0, im: 0.0 }, Complex { re: 439.0, im: 0.0 }]
+sibling idx 440 SIBLING SIGNAL CHUNK [Complex { re: 440.0, im: 0.0 }, Complex { re: 441.0, im: 0.0 }, Complex { re: 442.0, im: 0.0 }, Complex { re: 443.0, im: 0.0 }, Complex { re: 444.0, im: 0.0 }, Complex { re: 445.0, im: 0.0 }, Complex { re: 446.0, im: 0.0 }, Complex { re: 447.0, im: 0.0 }]
+sibling idx 448 SIBLING SIGNAL CHUNK [Complex { re: 448.0, im: 0.0 }, Complex { re: 449.0, im: 0.0 }, Complex { re: 450.0, im: 0.0 }, Complex { re: 451.0, im: 0.0 }, Complex { re: 452.0, im: 0.0 }, Complex { re: 453.0, im: 0.0 }, Complex { re: 454.0, im: 0.0 }, Complex { re: 455.0, im: 0.0 }]
+sibling idx 456 SIBLING SIGNAL CHUNK [Complex { re: 456.0, im: 0.0 }, Complex { re: 457.0, im: 0.0 }, Complex { re: 458.0, im: 0.0 }, Complex { re: 459.0, im: 0.0 }, Complex { re: 460.0, im: 0.0 }, Complex { re: 461.0, im: 0.0 }, Complex { re: 462.0, im: 0.0 }, Complex { re: 463.0, im: 0.0 }]
+sibling idx 464 SIBLING SIGNAL CHUNK [Complex { re: 464.0, im: 0.0 }, Complex { re: 465.0, im: 0.0 }, Complex { re: 466.0, im: 0.0 }, Complex { re: 467.0, im: 0.0 }, Complex { re: 468.0, im: 0.0 }, Complex { re: 469.0, im: 0.0 }, Complex { re: 470.0, im: 0.0 }, Complex { re: 471.0, im: 0.0 }]
+sibling idx 472 SIBLING SIGNAL CHUNK [Complex { re: 472.0, im: 0.0 }, Complex { re: 473.0, im: 0.0 }, Complex { re: 474.0, im: 0.0 }, Complex { re: 475.0, im: 0.0 }, Complex { re: 476.0, im: 0.0 }, Complex { re: 477.0, im: 0.0 }, Complex { re: 478.0, im: 0.0 }, Complex { re: 479.0, im: 0.0 }]
+sibling idx 480 SIBLING SIGNAL CHUNK [Complex { re: 480.0, im: 0.0 }, Complex { re: 481.0, im: 0.0 }, Complex { re: 482.0, im: 0.0 }, Complex { re: 483.0, im: 0.0 }, Complex { re: 484.0, im: 0.0 }, Complex { re: 485.0, im: 0.0 }, Complex { re: 486.0, im: 0.0 }, Complex { re: 487.0, im: 0.0 }]
+sibling idx 488 SIBLING SIGNAL CHUNK [Complex { re: 488.0, im: 0.0 }, Complex { re: 489.0, im: 0.0 }, Complex { re: 490.0, im: 0.0 }, Complex { re: 491.0, im: 0.0 }, Complex { re: 492.0, im: 0.0 }, Complex { re: 493.0, im: 0.0 }, Complex { re: 494.0, im: 0.0 }, Complex { re: 495.0, im: 0.0 }]
+sibling idx 496 SIBLING SIGNAL CHUNK [Complex { re: 496.0, im: 0.0 }, Complex { re: 497.0, im: 0.0 }, Complex { re: 498.0, im: 0.0 }, Complex { re: 499.0, im: 0.0 }, Complex { re: 500.0, im: 0.0 }, Complex { re: 501.0, im: 0.0 }, Complex { re: 502.0, im: 0.0 }, Complex { re: 503.0, im: 0.0 }]
+sibling idx 504 SIBLING SIGNAL CHUNK [Complex { re: 504.0, im: 0.0 }, Complex { re: 505.0, im: 0.0 }, Complex { re: 506.0, im: 0.0 }, Complex { re: 507.0, im: 0.0 }, Complex { re: 508.0, im: 0.0 }, Complex { re: 509.0, im: 0.0 }, Complex { re: 510.0, im: 0.0 }, Complex { re: 511.0, im: 0.0 }]
+hadamard products 1.862888ms
+ifft time 0
+local time 0
+FFT times Some({"m2m": 0, "l2l": 0, "p2l": 0, "p2m": 1, "p2p": 5, "l2p": 0, "m2p": 0, "m2l": 35})
+thread 'fmm::test::test_fmm_fft' panicked at fmm/src/fmm.rs:529:9:
+assertion failed: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    fmm::test::test_fmm_fft
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.25s
+
+error: test failed, to rerun pass `--lib`

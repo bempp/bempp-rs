@@ -1,6 +1,6 @@
 //! Implementation of field translations for each FMM.
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ops::{Deref, DerefMut, Mul},
     sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Instant, cell::RefCell,
@@ -14,7 +14,7 @@ use num::{Complex, FromPrimitive};
 use rayon::prelude::*;
 
 use bempp_field::{
-    array::pad3,
+    array::{pad3, flip3},
     fft::{irfft3_fftw, irfft3_fftw_par_vec, rfft3_fftw, rfft3_fftw_par_vec},
     hadamard::hadamard_product_sibling,
     types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
@@ -25,10 +25,10 @@ use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
     kernel::{Kernel, KernelScale, self},
-    tree::Tree,
+    tree::{Tree, MortonKeyInterface},
     types::EvalType,
 };
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_tree::{types::{morton::MortonKey, single_node::SingleNodeTree}, constants::ROOT, implementations::helpers::find_corners};
 use rlst::{
     common::tools::PrettyPrint,
     common::traits::*,
@@ -473,6 +473,8 @@ where
                     .dot(&compressed_check_potential_owned)
                     .eval();
 
+                // println!("check potential svd {:?}", check_potential_owned.data());
+
                 // Compute local
                 let locals_owned = (self.fmm.dc2e_inv.dot(&check_potential_owned)
                     * self.fmm.kernel.scale(level)
@@ -507,6 +509,21 @@ where
     }
 }
 
+
+#[derive(Clone, Debug, Copy)]
+struct SendPtrMut<T> {
+    raw: *mut T
+}
+
+unsafe impl<T> Sync for SendPtrMut<T> {}
+
+#[derive(Clone, Debug, Copy)]
+struct SendPtr<T> {
+    raw: *const T
+}
+
+unsafe impl<T> Sync for SendPtr<T> {}
+
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
 impl<T> FieldTranslation for FmmData<KiFmm<SingleNodeTree, T, FftFieldTranslationKiFmm<T>>>
 where
@@ -531,7 +548,6 @@ where
         let size_real = p * q * (r / 2 + 1);
         let pad_size = (p - m, q - n, r - o);
         let pad_index = (p - m, q - n, r - o);
-        let real_dim = q;
         let mut padded_signals = rlst_col_vec![f64, size * ntargets];
 
         let mut chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
@@ -540,11 +556,20 @@ where
         range.zip(chunks).for_each(|(i, chunk)| {
             let fmm_arc = Arc::clone(&self.fmm);
             let target = targets[i];
-            let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
-            let source_multipole_lock = source_multipole_arc.lock().unwrap();
+            // let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
+            // let source_multipole_lock = source_multipole_arc.lock().unwrap();
+            // let signal = fmm_arc
+            //     .m2l
+            //     .compute_signal(fmm_arc.order, source_multipole_lock.data());
+
+            // TO REMOVE
+            let ncoeffs =  6*(self.fmm.order-1).pow(2) + 2;
+            let mut source_multipole_lock = vec![1 as f64; ncoeffs];
+
+
             let signal = fmm_arc
                 .m2l
-                .compute_signal(fmm_arc.order, source_multipole_lock.data());
+                .compute_signal(fmm_arc.order, &source_multipole_lock);
 
             let mut padded_signal = pad3(&signal, pad_size, pad_index);
 
@@ -553,161 +578,409 @@ where
 
         println!("data organisation time {:?}", start.elapsed().as_millis());
 
-        let mut padded_signals_hat = rlst_col_vec![c64, size_real * ntargets];
         let start = Instant::now();
+        let mut padded_signals_hat = rlst_col_vec![c64, size_real * ntargets];
         rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
         println!("fft time {:?}", start.elapsed().as_millis());
 
-        // Compute Hadamard product
-        let start = Instant::now();
-        // let mut global_check_potentials_hat = HashMap::new();
-        // for target in targets.iter() {
-        //     global_check_potentials_hat.insert(
-        //         *target,
-        //         Arc::new(Mutex::new(vec![Complex::<f64>::zero(); size_real])),
-        //     );
-        // }
+        // TO REMOVE (fill with unique identifiers for each target)
+        let mut padded_signals_hat = rlst_col_vec![c64, size_real*ntargets];
+        for i in 0..ntargets {
+            let tmp =  vec![Complex::new(i as f64, 0 as f64); size_real];
+            padded_signals_hat.data_mut()[i*size_real..(i+1)*size_real].copy_from_slice(&tmp);
+        }
 
-
-
-
-        println!("data inst {:?}", start.elapsed().as_millis());
 
         let start = Instant::now();
-        let kernel_data = &self.fmm.m2l.operator_data.kernel_data;
-
-
+        let kernel_data = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         let ntargets = targets.len();
-        let mut global_check_potentials = vec![Complex::<f64>::zero(); size_real*ntargets];
+        let mut global_check_potentials_hat = rlst_col_vec![c64, size_real*ntargets];
+        let mut global_check_potentials = rlst_col_vec![f64, size*ntargets];
 
+        // Get check potentials in frequency order
+        let mut global_check_potentials_hat_freq = vec![Vec::new(); size_real];
 
-        (0..size_real).into_par_iter().zip(global_check_potentials.par_chunks_exact_mut(ntargets)).for_each(|(freq, check_potential_chunk)| {
-
-            // Extract frequency component of signal
-            let padded_signal_freq = every_kth(padded_signals_hat.data(), freq, size_real);
-
-            // Compute the Hadamard products over frequency chunks
-            padded_signal_freq.chunks_exact(8).zip(targets.chunks_exact(8)).for_each(|(frequency_chunk, target_chunk)| {
-                let parent = target_chunk[0].parent();
-                let parent_neighbours = parent.neighbors();
-                let parent_neighbours_children = parent_neighbours.iter().map(|pn| pn.children()).collect_vec();
-
-                // For each halo position
-                for (i, pnc) in parent_neighbours_children.iter().enumerate() {
-
-                    // Find accumulation points of check potentials
-                    check_potential_chunk[i] = Complex::<f64>::zero();
-
-                    // For the current frequency, load the kernel chunk
-                    let kernel_offset = 64*freq;
-                    let kernel_chunk = &kernel_data[i][kernel_offset..kernel_offset+64];
-
-                    // Compute hadamard products, and scatter to appropriate locations
-                    // let mut result = vec![Complex::<f64>::zero(); 64];
-
-                    // For each convolution in the halo
-                    for (j, child) in pnc.iter().enumerate() {
-                        let kernel_chunk_chunk = &kernel_chunk[j*8..(j+1)*8];
-                        let tmp = kernel_chunk_chunk
-                            .iter()
-                            .zip(padded_signal_freq.iter())
-                            .map(|(a, &b)| a*b).collect_vec();
-                        // result[j*8..(j+1)*8].copy_from_slice(&tmp[..]);
-                        // check_chunk.iter_mut().zip(tmp.iter()).for_each(|(c, t)| *c += t);
-                    }
-
-                    // Check which positions are accumulated to, this is algebraically defined for each halo position
-                    // A subset of 'result' will be saved to check potential chunk
-
+        unsafe {
+            let ptr = global_check_potentials_hat.get_pointer_mut();
+            for i in 0..size_real {
+                for j in 0..ntargets {
+                    let raw = ptr.offset((j*size_real+i).try_into().unwrap());
+                    let send_ptr = SendPtrMut{raw};
+                    global_check_potentials_hat_freq[i].push(send_ptr);
                 }
-            });
+            }
+        }
+
+        // Get signals into frequency order
+        let mut padded_signals_hat_freq = vec![Vec::new(); size_real];
+        unsafe {
+            let ptr = padded_signals_hat.get_pointer();
+            for i in 0..size_real {
+                for j in 0..ntargets {
+                    let raw = ptr.offset((j*size_real+i).try_into().unwrap());
+                    let send_ptr = SendPtr{raw};
+                    padded_signals_hat_freq[i].push(send_ptr);
+                }
+            }
+        }
+
+        // Create a map between targets and index positions in vec of len 'ntargets'
+        let mut target_map = HashMap::new();
+
+        for (i, t) in targets.iter().enumerate() {
+            target_map.insert(t, i);
+        }
+
+        // Find all the displacements used for saving results
+        let mut all_displacements = Vec::new();
+        targets.chunks_exact(8).for_each(|sibling_chunk| {
+            // not in Morton order (refer to sort method when called on 'neighbours')
+            let parent_neighbours: Vec<Option<MortonKey>> = sibling_chunk[0].parent().all_neighbors();
+
+            let displacements = parent_neighbours.iter().map(|pn| {
+                let mut tmp = Vec::new();
+                if let Some(pn) = pn {
+                    if self.fmm.tree.keys_set.contains(pn) {
+                        for child in pn.children() {
+                            tmp.push(*target_map.get(&child).unwrap() as i64)
+                        }
+                    } else {
+                        for _ in 0..8 {
+                            tmp.push(-1 as i64)
+                        }
+                    }
+                } else {
+                    for _ in 0..8 {
+                        tmp.push(-1 as i64)
+                    }
+                }
+                tmp
+            })
+            .collect_vec();
+            all_displacements.push(displacements);
         });
 
+        println!("data inst {:?}", start.elapsed().as_millis());
+        println!("displacements {:?}, {:?} {:?}", all_displacements.len(), all_displacements[0].len(), all_displacements[0][0].len());
 
-        // let nsiblings = 8;
-        // padded_signals_hat.data().par_chunks_exact(size_real*nsiblings).for_each(|sibling_set| {
+        let scale = self.m2l_scale(level);
 
-        //     let nconvolutions = 189;
-        //     // let nsiblings = 8;
+        (0..size_real)
+            .into_par_iter()
+            // .into_iter()
+            .for_each(|(freq)| {
 
-        //     let mut result = rlst_mat![c64, (nconvolutions * nsiblings * size_real, 1)];
+            // Extract frequency component of signal (ntargets long)
+            let padded_signal_freq = &padded_signals_hat_freq[freq];
 
-        //     hadamard_product_sibling(self.fmm.order, sibling_set, &&kernel_data[..], result.data_mut());
+            // Extract frequency components of save locations (ntargets long)
+            let check_potential_freq = &global_check_potentials_hat_freq[freq];
 
-        // });
+            // println!("ntargets {:?}={:?}={:?} freq {:?}", targets.len(), padded_signal_freq.len(), check_potential_freq.len(), freq);
 
+            // Iterate over sets of siblings
+            padded_signal_freq
+                    .chunks_exact(8)
+                    .enumerate()
+                    .for_each(|(sibling_idx, signal_sibling_chunk)| {
 
-        // Iterate through sibling sets at a time, and compute hadamad products with halo items
+                        // if sibling_idx == 1 {
+                        //     unsafe {
+                        //         println!("freq {:?} kernel chunk {:?}", freq, signal_sibling_chunk.iter().map(|s| *s.raw).collect_vec());
+                        //     }
+                        // }
+                        // Index locations of save locations for this sibling set.
+                        let displacements = &all_displacements[sibling_idx];
 
-        // println!("HERE foo {:?}", kernel_data[0].len());
+                        // if freq == 0 && sibling_idx == 1 {
+                        //     // println!("displacements {:?}", displacements.iter().map(|d| d[0]).collect_vec());
+                        //     println!("displacements {:?}", displacements);
+                        //     println!("parent neighbours {:?}", targets[sibling_idx*8].parent().all_neighbors());
+                        //     println!("siblings {:?}", targets[sibling_idx*8].parent().neighbors().len());
+                        //     println!("")
+                        // }
 
-        // for i in 0..kernel_data.len() {
-        //     // println!("HERE {:?}", i);
+                        if freq == 0 {
+                            unsafe {
+                                println!("sibling idx {:?} SIBLING SIGNAL CHUNK {:?}", sibling_idx*8, signal_sibling_chunk.iter().map(|s| *s.raw).collect_vec())
+                            }
 
-        //     // Load a set of convolutions into memory
-        //     let kernel_set = &kernel_data[i];
+                        }
 
-        //     // Compute hadamard products for each sibling set in targets in parallel, for this given kernel
-        //     // set
-        //     padded_signals_hat.data().par_chunks_exact(size_real*8).for_each(|sibling_set| {
+                        // For each halo position
+                        for i in 0..26 {
 
-        //         let nconvolutions = 64;
-        //         let nsiblings = 8;
+                            // For the current frequency, load the kernel chunk, for the current halo position
+                            let frequency_offset = 64*freq;
 
-        //         let mut result = rlst_mat![c64, (nconvolutions * nsiblings * size_real, 1)];
+                            // Find the kernel evaluations for the set of siblings in this halo position
+                            // expected to be in order [s1, ..., s8, s1, ..., s8, ....] for each halo child position
+                            let kernel_chunk = &kernel_data[i][frequency_offset..frequency_offset+64];
 
-        //         hadamard_product_sibling(self.fmm.order, sibling_set, &kernel_set[..], result.data_mut());
+                            // if sibling_idx == 15 {
+                            //     // unsafe {
+                            //     //     println!("halo pos {:?} freq {:?} kernel chunk {:?}", i, freq, kernel_chunk.iter().map(|s| *s).collect_vec());
+                            //     // }
+                            //         println!("displacements [{:?}] {:?}", i, displacements[i])
+                            // }
 
-        //     })
+                            // println!("HERE frq = {:?} i={:?} {:?}", freq, i, kernel_chunk);
 
-        // }
+                            // Grab the displacements
+                            if displacements[i][0] > -1 {
 
-        // let nsiblings = 8;
-        // targets
-        //     .par_chunks_exact(nsiblings)
-        //     .zip(
-        //         padded_signals_hat
-        //             .data()
-        //             .par_chunks_exact(nsiblings * size_real),
-        //     )
-        //     .for_each(|(siblings, sibling_signals)| {
-        //         let mut halo_data = Vec::new();
+                                let save_locations = &check_potential_freq[(displacements[i][0] as usize)..=(displacements[i][7] as usize)];
 
-        //         let parent = siblings[0].parent();
+                                // For each possible convolution in this halo position
+                                for j in 0..8 {
 
-        //         let sentinel = MortonKey::default();
+                                    // I want this to be of form [s1,..,s8] for this freq
+                                    let kernel_chunk_chunk = &kernel_chunk[j*8..(j+1)*8];
 
-        //         let parent_neigbors_children = parent
-        //             .all_neighbors()
-        //             .iter()
-        //             .flat_map(|p| {
-        //                 if let Some(p) = p {
-        //                     p.children()
-        //                 } else {
-        //                     vec![sentinel; 8]
-        //                 }
-        //             })
-        //             .collect_vec();
+                                    // if freq == 1 && sibling_idx == 0 {
+                                    //     println!("KERNEL CHUNK j={:?} {:?}", j, kernel_chunk_chunk);
+                                    // }
 
-        //         // Get all halo data
-        //         for &pnc in parent_neigbors_children.iter() {
-        //             if pnc != sentinel {
-        //                 halo_data.push(Some(Arc::clone(
-        //                     global_check_potentials_hat.get(&pnc).unwrap(),
-        //                 )))
-        //             } else {
-        //                 halo_data.push(None)
-        //             }
-        //         }
+                                    unsafe {
+                                        save_locations.iter().zip(kernel_chunk_chunk.iter()).zip(signal_sibling_chunk.iter())
+                                            .for_each(|((sav, ker), &sig)| {
+                                                *sav.raw +=  (scale * ker * *sig.raw);
+                                            });
+                                    }
+                                }
 
-                // Compute Hadamard products and scatter to halo
-                // let mut tmp = rlst_mat![c64, (16 * 8 * size_real, 1)];
-                // hadamard_product_sibling(self.fmm.order, sibling_signals, kernel_data.data(), tmp.data_mut());
-
-                // println!("HERE {:?} {:?} {:?}", tmp.data()[0], sibling_signals[0], kernel_data.data()[0]);
-            // });
+                            }
+                        }
+                    });
+        });
 
         println!("hadamard products {:?}", start.elapsed());
+
+        //// TEST CODE
+        // if level == 3 {
+        //     let tgt_idx = 455;
+        //     let tmp = &global_check_potentials_hat.data()[tgt_idx*size_real..(tgt_idx+1)*size_real];
+        //     println!("fft check pot hat {:?}", tmp.iter().map(|c| c.re).collect_vec());
+        //     println!("fft check pot hat {:?}", tmp.iter().map(|c| c.im).collect_vec());
+
+        // }
+        ////////////////////////////////////////////
+
+        let start = Instant::now();
+        irfft3_fftw_par_vec(&mut global_check_potentials_hat, &mut global_check_potentials, &[p, q, r]);
+        println!("ifft time {:?}", start.elapsed().as_millis());
+
+
+        /// TEST CODE TO BE REMOVED
+        if level == 3 {
+
+            let mut full_v_lists = Vec::new();
+            for (i, tgt) in targets.iter().enumerate() {
+                let mut v_list: Vec<MortonKey> = tgt
+                    .parent()
+                    .neighbors()
+                    .iter()
+                    .flat_map(|pn| pn.children())
+                    .filter(|pnc| !tgt.is_adjacent(pnc))
+                    .collect();
+
+                let mut counter = 0;
+                for source in v_list.iter() {
+                    if self.fmm.tree.keys_set.contains(source) {
+                        counter += 1;
+                    }
+                }
+
+                if counter == 189 {
+                    full_v_lists.push(i);
+                }
+            }
+
+            // println!("full v lists {:?}", full_v_lists);
+
+            let tgt_idx = 0;
+            let tgt_idx = full_v_lists[7];
+            let tgt = targets[tgt_idx];
+            let target_check_surface = tgt.compute_surface(&self.fmm.tree().domain, self.fmm.order, self.fmm.alpha_inner);
+            let n_target_check_surface = target_check_surface.len() / 3;
+            let ncoeffs = 6 * (self.fmm.order - 1 ).pow(2) + 2;
+            let mut tst_pot = vec![0f64; ncoeffs];
+
+            let mut v_list: Vec<MortonKey> = tgt
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| !tgt.is_adjacent(pnc))
+                .collect();
+
+            let n_corners = 8;
+
+            let mut test_check_potential_hat = vec![Complex::<f64>::zero(); size_real];
+
+            for source in v_list.iter() {
+                if self.fmm.tree.keys_set.contains(source) {
+
+                    let source_equivalent_surface = source.compute_surface(&self.fmm.tree().domain, self.fmm.order, self.fmm.alpha_inner);
+                    let multipole = vec![1.0; ncoeffs];
+                    let mut direct = vec![0f64; ncoeffs];
+
+                    self.fmm.m2l.kernel.evaluate_st(
+                        EvalType::Value,
+                        &source_equivalent_surface[..],
+                        &target_check_surface[..],
+                        &multipole[..],
+                        &mut direct[..],
+                    );
+
+                    tst_pot.iter_mut().zip(direct.iter()).for_each(|(t, d)| *t+= d);
+
+                    // Compute FFT kernels for each source box
+                    let conv_point_corner_index = 7;
+                    let corners = find_corners(&source_equivalent_surface[..]);
+                    let conv_point_corner = [
+                        corners[conv_point_corner_index],
+                        corners[n_corners + conv_point_corner_index],
+                        corners[2*n_corners + conv_point_corner_index],
+                    ];
+
+                    let (conv_grid, _) = source.convolution_grid(
+                        self.fmm.order, &self.fmm.tree.domain, self.fmm.alpha_inner, &conv_point_corner, conv_point_corner_index);
+
+                    // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
+                    let kernel_point_index = 0;
+                    let kernel_point = [
+                        target_check_surface[kernel_point_index],
+                        target_check_surface[n_target_check_surface + kernel_point_index],
+                        target_check_surface[2*n_target_check_surface + kernel_point_index],
+                    ];
+
+                    // Compute Green's fct evaluations
+                    let kernel = self.fmm.m2l.compute_kernel(self.fmm.order, &conv_grid, kernel_point);
+                    let (m, n, o) = kernel.shape();
+                    let p = m + 1;
+                    let q = n + 1;
+                    let r: usize = o + 1;
+
+                    let padded_kernel = pad3(&kernel, (p-m, q-n, r-o), (0, 0, 0));
+                    let mut padded_kernel = flip3(&padded_kernel);
+
+                    // Compute FFT of padded kernel
+                    let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r/2 + 1));
+                    rfft3_fftw(padded_kernel.get_data_mut(), padded_kernel_hat.get_data_mut(), &[p, q, r]);
+
+                    // Compute FFT of the representative signal
+                    // let signal = self.fmm.m2l.compute_signal(self.fmm.order, &multipole[..]);
+                    // let &(m, n, o) = signal.shape();
+                    // let p = m + 1;
+                    // let q = n + 1;
+                    // let r = o + 1;
+                    // let pad_size = (p - m, q - n, r - o);
+                    // let pad_index = (p - m, q - n, r - o);
+                    // let mut padded_signal = pad3(&signal, pad_size, pad_index);
+                    // let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+
+                    // rfft3_fftw(
+                    //     padded_signal.get_data_mut(),
+                    //     padded_signal_hat.get_data_mut(),
+                    //     &[p, q, r],
+                    // );
+                    let padded_signal_hat = &padded_signals_hat.data()[tgt_idx*size_real..(tgt_idx+1)*size_real];
+                    // Compute convolution
+                    let hadamard_product = padded_signal_hat
+                        // .get_data()
+                        .iter()
+                        .zip(padded_kernel_hat.get_data().iter())
+                        .map(|(a, b)| a * b)
+                        .collect_vec();
+
+                    test_check_potential_hat.iter_mut().zip(hadamard_product.iter()).for_each(|(t, h)| *t += h);
+                    // let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
+                }
+            }
+
+            // let mut test_check_potential = vec![0f64; size];
+            let mut test_check_potential = Array3D::new((p, q, r));
+            // println!("fft check pot hat {:?}", test_check_potential_hat.iter().map(|c| c.re).collect_vec());
+            // println!("fft check pot hat {:?}", test_check_potential_hat.iter().map(|c| c.im).collect_vec());
+
+            irfft3_fftw(&mut test_check_potential_hat[..], test_check_potential.get_data_mut(), &[p, q, r]);
+            let (_, multi_indices) = MortonKey::surface_grid(self.fmm.order);
+
+            let mut tmp = Vec::new();
+            let ntargets = multi_indices.len() / 3;
+            let xs = &multi_indices[0..ntargets];
+            let ys = &multi_indices[ntargets..2 * ntargets];
+            let zs = &multi_indices[2 * ntargets..];
+
+            for i in 0..ntargets {
+                let val = test_check_potential.get(zs[i], ys[i], xs[i]).unwrap();
+                tmp.push(*val);
+            }
+
+            // println!("test check pot hat {:?}", test_check_potential_hat);
+            // println!("test check pot hat {:?}", tmp);
+            // let tst_global_check_potentials_hat = &global_check_potentials_hat.data()[tgt_idx*size_real..(tgt_idx+1)*size_real];
+            // println!("found {:?}", &test_check_potential.get_data());
+            // println!("FOO {:?}", &test_check_potential.get_data()[0..10]);
+            // println!("test check pot hat {:?}", &global_check_potentials.data()[tgt_idx*size..(tgt_idx+1)*size]);
+            // println!("direct pot {:?}", tst_pot);
+
+            let fft_pot = &global_check_potentials.data()[tgt_idx*size..(tgt_idx+1)*size];
+
+            let m = 2*self.fmm.order - 1;
+            let p = m + 1;
+            let mut potentials = Array3D::new((p, p, p));
+            potentials.get_data_mut().copy_from_slice(fft_pot);
+
+            let (_, multi_indices) = MortonKey::surface_grid(self.fmm.order);
+
+            let mut tmp = Vec::new();
+            let ntargets = multi_indices.len() / 3;
+            let xs = &multi_indices[0..ntargets];
+            let ys = &multi_indices[ntargets..2 * ntargets];
+            let zs = &multi_indices[2 * ntargets..];
+
+            for i in 0..ntargets {
+                let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
+                tmp.push(*val);
+            }
+
+            // println!("fft pot {:?}", tmp)
+        }
+
+        //////////////////////////////////``
+
+
+        // Compute local expansion coefficients and save to data tree
+        let start = Instant::now();
+
+        let (_, multi_indices) = MortonKey::surface_grid(self.fmm.order);
+        let check_potentials = global_check_potentials.data().chunks_exact(size).map(|chunk| {
+            let m = 2*self.fmm.order - 1;
+            let p = m + 1;
+            let mut potentials = Array3D::new((p, p, p));
+            potentials.get_data_mut().copy_from_slice(chunk);
+
+            let (_, multi_indices) = MortonKey::surface_grid(self.fmm.order);
+
+            let mut tmp = Vec::new();
+            let ntargets = multi_indices.len() / 3;
+            let xs = &multi_indices[0..ntargets];
+            let ys = &multi_indices[ntargets..2 * ntargets];
+            let zs = &multi_indices[2 * ntargets..];
+
+            for i in 0..ntargets {
+                let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
+                tmp.push(*val);
+            }
+            tmp
+        }).flat_map(|c| c).collect_vec();
+
+        // println!("check potentials {:?}", &check_potentials[0..8]);
+        println!("local time {:?}", start.elapsed().as_millis());
+        // println!("check potentials {:?} {:?}", &global_check_potentials.data()[0..10], &global_check_potentials_hat.data()[0..10]);
+
     }
 
     fn m2l_scale(&self, level: u64) -> f64 {
@@ -720,38 +993,4 @@ where
             2_f64.powf((level - 3) as f64)
         }
     }
-}
-
-fn every_kth_mut<T>(slice: &mut [T], offset: usize, k: usize) -> Vec<&mut T> {
-    if k == 0 {
-        return Vec::new();
-    }
-
-    let mut result = Vec::new();
-    // Start at the offset
-    let mut remainder = &mut slice[offset..];
-
-    while remainder.len() >= k {
-        let (front, back) = remainder.split_at_mut(k);
-        result.push(&mut front[k.saturating_sub(1)]);  // Using saturating_sub to prevent underflow
-        remainder = back;
-    }
-    result
-}
-
-fn every_kth<T>(slice: &[T], offset: usize, k: usize) -> Vec<&T> {
-    if k == 0 {
-        return Vec::new();
-    }
-
-    let mut result = Vec::new();
-    // Start at the offset
-    let mut remainder = &slice[offset..];
-
-    while remainder.len() >= k {
-        let (front, back) = remainder.split_at(k);
-        result.push(&front[k.saturating_sub(1)]);  // Using saturating_sub to prevent underflow
-        remainder = back;
-    }
-    result
 }
