@@ -497,7 +497,7 @@ mod test {
         let alpha_outer = 2.9;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 3;
+        let depth = 4;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(
