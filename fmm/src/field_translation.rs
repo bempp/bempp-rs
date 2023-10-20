@@ -556,11 +556,11 @@ where
         range.zip(chunks).for_each(|(i, chunk)| {
             let fmm_arc = Arc::clone(&self.fmm);
             let target = targets[i];
-            // let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
-            // let source_multipole_lock = source_multipole_arc.lock().unwrap();
-            // let signal = fmm_arc
-            //     .m2l
-            //     .compute_signal(fmm_arc.order, source_multipole_lock.data());
+            let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
+            let source_multipole_lock = source_multipole_arc.lock().unwrap();
+            let signal = fmm_arc
+                .m2l
+                .compute_signal(fmm_arc.order, source_multipole_lock.data());
 
             // TO REMOVE
             let ncoeffs =  6*(self.fmm.order-1).pow(2) + 2;
@@ -584,11 +584,11 @@ where
         println!("fft time {:?}", start.elapsed().as_millis());
 
         // TO REMOVE (fill with unique identifiers for each target)
-        let mut padded_signals_hat = rlst_col_vec![c64, size_real*ntargets];
-        for i in 0..ntargets {
-            let tmp =  vec![Complex::new(i as f64, 0 as f64); size_real];
-            padded_signals_hat.data_mut()[i*size_real..(i+1)*size_real].copy_from_slice(&tmp);
-        }
+        // let mut padded_signals_hat = rlst_col_vec![c64, size_real*ntargets];
+        // for i in 0..ntargets {
+        //     let tmp =  vec![Complex::new(i as f64, 0 as f64); size_real];
+        //     padded_signals_hat.data_mut()[i*size_real..(i+1)*size_real].copy_from_slice(&tmp);
+        // }
 
 
         let start = Instant::now();
@@ -676,82 +676,48 @@ where
             // Extract frequency components of save locations (ntargets long)
             let check_potential_freq = &global_check_potentials_hat_freq[freq];
 
-            // println!("ntargets {:?}={:?}={:?} freq {:?}", targets.len(), padded_signal_freq.len(), check_potential_freq.len(), freq);
+            // for each halo position compute convolutions to a given sibling set
+            for i in 0..26 {
 
-            // Iterate over sets of siblings
-            padded_signal_freq
+                // Find kernels for this halo position at the current frequency
+                let frequency_offset = 64*freq;
+                let kernel_chunk = &kernel_data[i][frequency_offset..(frequency_offset+64)];
+
+                // Can now iterate over sibling chunks
+                padded_signal_freq
                     .chunks_exact(8)
                     .enumerate()
                     .for_each(|(sibling_idx, signal_sibling_chunk)| {
 
-                        // if sibling_idx == 1 {
-                        //     unsafe {
-                        //         println!("freq {:?} kernel chunk {:?}", freq, signal_sibling_chunk.iter().map(|s| *s.raw).collect_vec());
-                        //     }
-                        // }
-                        // Index locations of save locations for this sibling set.
-                        let displacements = &all_displacements[sibling_idx];
+                        // Find displacements for signal being translated
+                        let displacements = &all_displacements[sibling_idx][i];
 
-                        // if freq == 0 && sibling_idx == 1 {
-                        //     // println!("displacements {:?}", displacements.iter().map(|d| d[0]).collect_vec());
-                        //     println!("displacements {:?}", displacements);
-                        //     println!("parent neighbours {:?}", targets[sibling_idx*8].parent().all_neighbors());
-                        //     println!("siblings {:?}", targets[sibling_idx*8].parent().neighbors().len());
-                        //     println!("")
-                        // }
+                        // Lookup signal to be translated if a translation is to be performed
+                        if displacements[0] > -1 {
+                            let signal = &padded_signal_freq[(displacements[0] as usize)..=(displacements[7] as usize)];
 
-                        if freq == 0 {
-                            unsafe {
-                                println!("sibling idx {:?} SIBLING SIGNAL CHUNK {:?}", sibling_idx*8, signal_sibling_chunk.iter().map(|s| *s.raw).collect_vec())
-                            }
+                            // lookup associated save locations for our current sibling set
+                            let save_locations = &check_potential_freq[(sibling_idx*8)..(sibling_idx+1)*8];
 
-                        }
+                            assert!(save_locations.len() == 8);
 
-                        // For each halo position
-                        for i in 0..26 {
+                            // For each of set of 8 convolutions (corresponding to each halo child) compute convolution
+                            for j in 0..8 {
+                                let kernel_chunk_chunk = &kernel_chunk[j*8..(j+1)*8];
+                                unsafe {
 
-                            // For the current frequency, load the kernel chunk, for the current halo position
-                            let frequency_offset = 64*freq;
-
-                            // Find the kernel evaluations for the set of siblings in this halo position
-                            // expected to be in order [s1, ..., s8, s1, ..., s8, ....] for each halo child position
-                            let kernel_chunk = &kernel_data[i][frequency_offset..frequency_offset+64];
-
-                            // if sibling_idx == 15 {
-                            //     // unsafe {
-                            //     //     println!("halo pos {:?} freq {:?} kernel chunk {:?}", i, freq, kernel_chunk.iter().map(|s| *s).collect_vec());
-                            //     // }
-                            //         println!("displacements [{:?}] {:?}", i, displacements[i])
-                            // }
-
-                            // println!("HERE frq = {:?} i={:?} {:?}", freq, i, kernel_chunk);
-
-                            // Grab the displacements
-                            if displacements[i][0] > -1 {
-
-                                let save_locations = &check_potential_freq[(displacements[i][0] as usize)..=(displacements[i][7] as usize)];
-
-                                // For each possible convolution in this halo position
-                                for j in 0..8 {
-
-                                    // I want this to be of form [s1,..,s8] for this freq
-                                    let kernel_chunk_chunk = &kernel_chunk[j*8..(j+1)*8];
-
-                                    // if freq == 1 && sibling_idx == 0 {
-                                    //     println!("KERNEL CHUNK j={:?} {:?}", j, kernel_chunk_chunk);
-                                    // }
-
-                                    unsafe {
-                                        save_locations.iter().zip(kernel_chunk_chunk.iter()).zip(signal_sibling_chunk.iter())
-                                            .for_each(|((sav, ker), &sig)| {
-                                                *sav.raw +=  (scale * ker * *sig.raw);
-                                            });
-                                    }
+                                    save_locations.iter().zip(signal.iter()).zip(kernel_chunk_chunk.iter())
+                                        .for_each(|((sav, sig), ker)| {
+                                            *sav.raw += scale * *sig.raw * ker
+                                        })
                                 }
-
                             }
+
                         }
-                    });
+
+                    })
+            }
+
         });
 
         println!("hadamard products {:?}", start.elapsed());
@@ -798,7 +764,7 @@ where
 
             // println!("full v lists {:?}", full_v_lists);
 
-            let tgt_idx = 0;
+            // let tgt_idx = 4;
             let tgt_idx = full_v_lists[7];
             let tgt = targets[tgt_idx];
             let target_check_surface = tgt.compute_surface(&self.fmm.tree().domain, self.fmm.order, self.fmm.alpha_inner);
@@ -821,10 +787,9 @@ where
             for source in v_list.iter() {
                 if self.fmm.tree.keys_set.contains(source) {
 
+                    let mut direct = vec![0f64; ncoeffs];
                     let source_equivalent_surface = source.compute_surface(&self.fmm.tree().domain, self.fmm.order, self.fmm.alpha_inner);
                     let multipole = vec![1.0; ncoeffs];
-                    let mut direct = vec![0f64; ncoeffs];
-
                     self.fmm.m2l.kernel.evaluate_st(
                         EvalType::Value,
                         &source_equivalent_surface[..],
@@ -832,6 +797,16 @@ where
                         &multipole[..],
                         &mut direct[..],
                     );
+
+                    // let multipole = self.multipoles.get(source).unwrap();
+                    // let multipole_lock = multipole.lock().unwrap();
+                    // self.fmm.m2l.kernel.evaluate_st(
+                    //     EvalType::Value,
+                    //     &source_equivalent_surface[..],
+                    //     &target_check_surface[..],
+                    //     multipole_lock.data(),
+                    //     &mut direct[..],
+                    // );
 
                     tst_pot.iter_mut().zip(direct.iter()).for_each(|(t, d)| *t+= d);
 
@@ -869,32 +844,16 @@ where
                     let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r/2 + 1));
                     rfft3_fftw(padded_kernel.get_data_mut(), padded_kernel_hat.get_data_mut(), &[p, q, r]);
 
-                    // Compute FFT of the representative signal
-                    // let signal = self.fmm.m2l.compute_signal(self.fmm.order, &multipole[..]);
-                    // let &(m, n, o) = signal.shape();
-                    // let p = m + 1;
-                    // let q = n + 1;
-                    // let r = o + 1;
-                    // let pad_size = (p - m, q - n, r - o);
-                    // let pad_index = (p - m, q - n, r - o);
-                    // let mut padded_signal = pad3(&signal, pad_size, pad_index);
-                    // let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+                    // let padded_signal_hat = &padded_signals_hat.data()[tgt_idx*size_real..(tgt_idx+1)*size_real];
+                    // // Compute convolution
+                    // let hadamard_product = padded_signal_hat
+                    //     // .get_data()
+                    //     .iter()
+                    //     .zip(padded_kernel_hat.get_data().iter())
+                    //     .map(|(a, b)| a * b)
+                    //     .collect_vec();
 
-                    // rfft3_fftw(
-                    //     padded_signal.get_data_mut(),
-                    //     padded_signal_hat.get_data_mut(),
-                    //     &[p, q, r],
-                    // );
-                    let padded_signal_hat = &padded_signals_hat.data()[tgt_idx*size_real..(tgt_idx+1)*size_real];
-                    // Compute convolution
-                    let hadamard_product = padded_signal_hat
-                        // .get_data()
-                        .iter()
-                        .zip(padded_kernel_hat.get_data().iter())
-                        .map(|(a, b)| a * b)
-                        .collect_vec();
-
-                    test_check_potential_hat.iter_mut().zip(hadamard_product.iter()).for_each(|(t, h)| *t += h);
+                    // test_check_potential_hat.iter_mut().zip(hadamard_product.iter()).for_each(|(t, h)| *t += h);
                     // let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
                 }
             }
@@ -919,12 +878,12 @@ where
             }
 
             // println!("test check pot hat {:?}", test_check_potential_hat);
-            // println!("test check pot hat {:?}", tmp);
+            println!("test check pot hat {:?}", tmp);
             // let tst_global_check_potentials_hat = &global_check_potentials_hat.data()[tgt_idx*size_real..(tgt_idx+1)*size_real];
             // println!("found {:?}", &test_check_potential.get_data());
             // println!("FOO {:?}", &test_check_potential.get_data()[0..10]);
             // println!("test check pot hat {:?}", &global_check_potentials.data()[tgt_idx*size..(tgt_idx+1)*size]);
-            // println!("direct pot {:?}", tst_pot);
+            println!("direct pot {:?}", tst_pot);
 
             let fft_pot = &global_check_potentials.data()[tgt_idx*size..(tgt_idx+1)*size];
 
@@ -946,7 +905,7 @@ where
                 tmp.push(*val);
             }
 
-            // println!("fft pot {:?}", tmp)
+            println!("fft pot {:?}", tmp)
         }
 
         //////////////////////////////////``
