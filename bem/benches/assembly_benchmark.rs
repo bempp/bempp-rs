@@ -3,7 +3,7 @@ use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d;
-use bempp_tools::arrays::Array2D;
+use bempp_tools::arrays::zero_matrix;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
@@ -24,8 +24,7 @@ pub fn full_assembly_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix =
-            Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
 
         group.bench_function(
             &format!(
@@ -63,8 +62,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix =
-            Array2D::<f64>::new((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
 
         let colouring = space.compute_cell_colouring();
 

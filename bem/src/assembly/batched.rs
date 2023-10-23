@@ -5,15 +5,15 @@ use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use bempp_tools::arrays::{Array2D, Array4D};
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array4DAccess};
+use bempp_tools::arrays::{to_matrix, zero_matrix, Array4D, Mat};
+use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_dense::{RawAccess, UnsafeRandomAccessMut};
+use rlst_dense::{RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -85,8 +85,8 @@ fn assemble_batch_singular<'a>(
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
     cell_pairs: &[(usize, usize)],
-    trial_points: &Array2D<f64>,
-    test_points: &Array2D<f64>,
+    trial_points: &Mat<f64>,
+    test_points: &Mat<f64>,
     weights: &[f64],
     trial_table: &Array4D<f64>,
     test_table: &Array4D<f64>,
@@ -97,10 +97,10 @@ fn assemble_batch_singular<'a>(
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut test_jdet = vec![0.0; test_points.shape().0];
     let mut trial_jdet = vec![0.0; trial_points.shape().0];
-    let mut test_mapped_pts = Array2D::<f64>::new((test_points.shape().0, 3));
-    let mut trial_mapped_pts = Array2D::<f64>::new((trial_points.shape().0, 3));
-    let mut test_normals = Array2D::<f64>::new((test_points.shape().0, 3));
-    let mut trial_normals = Array2D::<f64>::new((trial_points.shape().0, 3));
+    let mut test_mapped_pts = zero_matrix((test_points.shape().0, 3));
+    let mut trial_mapped_pts = zero_matrix((trial_points.shape().0, 3));
+    let mut test_normals = zero_matrix((test_points.shape().0, 3));
+    let mut trial_normals = zero_matrix((trial_points.shape().0, 3));
 
     for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
@@ -149,17 +149,21 @@ fn assemble_batch_singular<'a>(
                 let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    kernel.assemble_st(
-                        EvalType::Value,
-                        test_mapped_pts.row(index).unwrap(),
-                        trial_mapped_pts.row(index).unwrap(),
-                        &mut k,
-                    );
+                    let mut test_row = vec![0.0; test_mapped_pts.shape().1];
+                    for (i, ti) in test_row.iter_mut().enumerate() {
+                        *ti = *test_mapped_pts.get(index, i).unwrap();
+                    }
+                    let mut trial_row = vec![0.0; trial_mapped_pts.shape().1];
+                    for (i, ti) in trial_row.iter_mut().enumerate() {
+                        *ti = *trial_mapped_pts.get(index, i).unwrap();
+                    }
+
+                    kernel.assemble_st(EvalType::Value, &test_row, &trial_row, &mut k);
                     sum += k[0]
                         * (wt
-                            * unsafe { test_table.get_unchecked(0, index, test_i, 0) }
+                            * test_table.get(0, index, test_i, 0).unwrap()
                             * test_jdet[index]
-                            * unsafe { trial_table.get_unchecked(0, index, trial_i, 0) }
+                            * trial_table.get(0, index, trial_i, 0).unwrap()
                             * trial_jdet[index]);
                 }
                 unsafe {
@@ -185,9 +189,9 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     trial_cells: &[usize],
     test_space: &SerialFunctionSpace<'a>,
     test_cells: &[usize],
-    trial_points: &Array2D<f64>,
+    trial_points: &Mat<f64>,
     trial_weights: &[f64],
-    test_points: &Array2D<f64>,
+    test_points: &Mat<f64>,
     test_weights: &[f64],
     trial_table: &Array4D<f64>,
     test_table: &Array4D<f64>,
@@ -200,8 +204,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
     let mut test_jdet = vec![0.0; NPTS_TEST];
     let mut trial_jdet = vec![0.0; NPTS_TRIAL];
-    let mut test_normals = Array2D::<f64>::new((NPTS_TEST, 3));
-    let mut trial_normals = Array2D::<f64>::new((NPTS_TRIAL, 3));
+    let mut test_normals = zero_matrix((NPTS_TEST, 3));
+    let mut trial_normals = zero_matrix((NPTS_TRIAL, 3));
 
     // let mut rlst_test_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
     // let mut rlst_trial_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
@@ -215,16 +219,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let gdim = test_grid.geometry().dim();
 
     // TODO: move this to grid.get_compute_points_function(test_points)
-    let test_compute_points = |cell: usize,
-                               pts: &mut rlst_dense::Matrix<
-        f64,
-        rlst_dense::base_matrix::BaseMatrix<
-            f64,
-            rlst_dense::VectorContainer<f64>,
-            rlst_dense::Dynamic,
-        >,
-        rlst_dense::Dynamic,
-    >| {
+    let test_compute_points = |cell: usize, pts: &mut Mat<f64>| {
         for p in 0..NPTS_TEST {
             for i in 0..gdim {
                 unsafe {
@@ -274,7 +269,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                 trial_cell_gindex,
                 &mut trial_jdet,
             );
-            trial_grid.geometry().compute_points_rlst(
+            trial_grid.geometry().compute_points(
                 trial_points,
                 trial_cell_gindex,
                 &mut rlst_trial_mapped_pts,
@@ -315,13 +310,9 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                             sum += k[test_index * trial_weights.len() + trial_index]
                                 * (test_wt
                                     * trial_wt
-                                    * unsafe {
-                                        test_table.get_unchecked(0, test_index, test_i, 0)
-                                    }
+                                    * test_table.get(0, test_index, test_i, 0).unwrap()
                                     * test_jdet[test_index]
-                                    * unsafe {
-                                        trial_table.get_unchecked(0, trial_index, trial_i, 0)
-                                    }
+                                    * trial_table.get(0, trial_index, trial_i, 0).unwrap()
                                     * trial_jdet[test_index]);
                         }
                     }
@@ -350,7 +341,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 }
 
 pub fn assemble<'a>(
-    output: &mut Array2D<f64>,
+    output: &mut Mat<f64>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
@@ -388,7 +379,7 @@ pub fn assemble<'a>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
-    output: &mut Array2D<f64>,
+    output: &mut Mat<f64>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
@@ -413,10 +404,10 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
     // TODO: pass cell types into this function
     let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
-    let qpoints_test = Array2D::from_data(qrule_test.points, (NPTS_TEST, 2));
+    let qpoints_test = to_matrix(&qrule_test.points, (NPTS_TEST, 2));
     let qweights_test = qrule_test.weights;
     let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
-    let qpoints_trial = Array2D::from_data(qrule_trial.points, (NPTS_TRIAL, 2));
+    let qpoints_trial = to_matrix(&qrule_trial.points, (NPTS_TRIAL, 2));
     let qweights_trial = qrule_trial.weights;
 
     let mut test_table =
@@ -432,8 +423,8 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
         .tabulate(&qpoints_test, 0, &mut trial_table);
 
     let output_raw = RawData2D {
-        data: output.data.as_mut_ptr(),
-        shape: *output.shape(),
+        data: output.data_mut().as_mut_ptr(),
+        shape: output.shape(),
     };
 
     for test_c in test_colouring {
@@ -492,7 +483,7 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
 #[allow(clippy::too_many_arguments)]
 pub fn assemble_singular<'a>(
-    output: &mut Array2D<f64>,
+    output: &mut Mat<f64>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
@@ -524,8 +515,8 @@ pub fn assemble_singular<'a>(
     let npoints = 4;
 
     let output_raw = RawData2D {
-        data: output.data.as_mut_ptr(),
-        shape: *output.shape(),
+        data: output.data_mut().as_mut_ptr(),
+        shape: output.shape(),
     };
 
     let grid = test_space.grid();
@@ -566,7 +557,7 @@ pub fn assemble_singular<'a>(
             npoints,
         );
 
-        let points = Array2D::from_data(qrule.trial_points, (qrule.npoints, 2));
+        let points = to_matrix(&qrule.trial_points, (qrule.npoints, 2));
         let mut table = Array4D::<f64>::new(
             trial_space
                 .element()
@@ -576,7 +567,7 @@ pub fn assemble_singular<'a>(
         trial_points.push(points);
         trial_tables.push(table);
 
-        let points = Array2D::from_data(qrule.test_points, (qrule.npoints, 2));
+        let points = to_matrix(&qrule.test_points, (qrule.npoints, 2));
         let mut table = Array4D::<f64>::new(
             test_space
                 .element()
@@ -653,9 +644,7 @@ pub fn assemble_singular<'a>(
 #[cfg(test)]
 mod test {
     use crate::assembly::batched::*;
-    use crate::assembly::dense;
     use crate::function_space::SerialFunctionSpace;
-    use crate::green;
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
@@ -663,10 +652,44 @@ mod test {
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::{Continuity, ElementFamily};
 
-    #[cfg_attr(debug_assertions, ignore)]
     #[test]
-    fn test_laplace_single_layer_dp0_dp0_larger() {
-        let grid = regular_sphere(2);
+    fn test_laplace_single_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = zero_matrix::<f64>((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            &Laplace3dKernel::new(),
+            false,
+            false,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.08755414595678074, 0.05963897421514473, 0.04670742127454548, 0.05963897421514472], vec![0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.05963897421514472, 0.08755414595678074, 0.05963897421514473, 0.04670742127454548], vec![0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.04670742127454548, 0.05963897421514472, 0.08755414595678074, 0.05963897421514473], vec![0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.05963897421514473, 0.04670742127454548, 0.05963897421514472, 0.08755414595678074], vec![0.08755414595678074, 0.05963897421514472, 0.046707421274545476, 0.05963897421514473, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074], vec![0.05963897421514473, 0.08755414595678074, 0.05963897421514472, 0.046707421274545476, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074, 0.05963897421514472], vec![0.046707421274545476, 0.05963897421514473, 0.08755414595678074, 0.05963897421514472, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487, 0.08755414595678074], vec![0.05963897421514472, 0.046707421274545476, 0.05963897421514473, 0.08755414595678074, 0.08755414595678074, 0.05963897421514472, 0.08755414595678074, 0.1854538822982487]];
+
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-3);
+            }
+        }
+    }
+    /*
+
+    #[test]
+    fn test_laplace_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
         let element = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -680,28 +703,109 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            &Laplace3dKernel::new(),
-            false,
-            false,
-            &space,
-            &space,
-        );
-
-        let mut dmat = Array2D::<f64>::new((ndofs, ndofs));
-        dense::assemble(
-            &mut dmat,
-            &green::LaplaceGreenKernel {},
-            false,
+            &green::LaplaceGreenDyKernel {},
+            true,
             false,
             &space,
             &space,
         );
 
-        for i in 0..matrix.shape().0 {
-            for j in 0..matrix.shape().1 {
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![-1.9658941517361406e-33, -0.08477786720045567, -0.048343860959178774, -0.08477786720045567, -0.08477786720045566, -0.048343860959178774, -0.033625570841778946, -0.04834386095917877], vec![-0.08477786720045567, -1.9658941517361406e-33, -0.08477786720045567, -0.048343860959178774, -0.04834386095917877, -0.08477786720045566, -0.048343860959178774, -0.033625570841778946], vec![-0.048343860959178774, -0.08477786720045567, -1.9658941517361406e-33, -0.08477786720045567, -0.033625570841778946, -0.04834386095917877, -0.08477786720045566, -0.048343860959178774], vec![-0.08477786720045567, -0.048343860959178774, -0.08477786720045567, -1.9658941517361406e-33, -0.048343860959178774, -0.033625570841778946, -0.04834386095917877, -0.08477786720045566], vec![-0.08477786720045566, -0.04834386095917877, -0.033625570841778946, -0.04834386095917877, 4.910045345075783e-33, -0.08477786720045566, -0.048343860959178774, -0.08477786720045566], vec![-0.04834386095917877, -0.08477786720045566, -0.04834386095917877, -0.033625570841778946, -0.08477786720045566, 4.910045345075783e-33, -0.08477786720045566, -0.048343860959178774], vec![-0.033625570841778946, -0.04834386095917877, -0.08477786720045566, -0.04834386095917877, -0.048343860959178774, -0.08477786720045566, 4.910045345075783e-33, -0.08477786720045566], vec![-0.04834386095917877, -0.033625570841778946, -0.04834386095917877, -0.08477786720045566, -0.08477786720045566, -0.048343860959178774, -0.08477786720045566, 4.910045345075783e-33]];
+
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_laplace_adjoint_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            &green::LaplaceGreenDxKernel {},
+            false,
+            true,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![1.9658941517361406e-33, -0.08478435261011981, -0.048343860959178774, -0.0847843526101198, -0.08478435261011981, -0.04834386095917877, -0.033625570841778946, -0.048343860959178774], vec![-0.0847843526101198, 1.9658941517361406e-33, -0.08478435261011981, -0.048343860959178774, -0.048343860959178774, -0.08478435261011981, -0.04834386095917877, -0.033625570841778946], vec![-0.048343860959178774, -0.0847843526101198, 1.9658941517361406e-33, -0.08478435261011981, -0.033625570841778946, -0.048343860959178774, -0.08478435261011981, -0.04834386095917877], vec![-0.08478435261011981, -0.048343860959178774, -0.0847843526101198, 1.9658941517361406e-33, -0.04834386095917877, -0.033625570841778946, -0.048343860959178774, -0.08478435261011981], vec![-0.0847843526101198, -0.04834386095917877, -0.033625570841778946, -0.04834386095917877, -4.910045345075783e-33, -0.0847843526101198, -0.048343860959178774, -0.08478435261011981], vec![-0.04834386095917877, -0.0847843526101198, -0.04834386095917877, -0.033625570841778946, -0.08478435261011981, -4.910045345075783e-33, -0.0847843526101198, -0.048343860959178774], vec![-0.033625570841778946, -0.04834386095917877, -0.0847843526101198, -0.04834386095917877, -0.048343860959178774, -0.08478435261011981, -4.910045345075783e-33, -0.0847843526101198], vec![-0.04834386095917877, -0.033625570841778946, -0.04834386095917877, -0.0847843526101198, -0.0847843526101198, -0.048343860959178774, -0.08478435261011981, -4.910045345075783e-33]];
+
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_laplace_hypersingular_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        laplace_hypersingular_assemble(&mut matrix, &space, &space);
+
+        for i in 0..ndofs {
+            for j in 0..ndofs {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), 0.0, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_laplace_hypersingular_p1_p1() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            Continuity::Continuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+
+        laplace_hypersingular_assemble(&mut matrix, &space, &space);
+
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![0.33550642155494004, -0.10892459915262698, -0.05664545560057827, -0.05664545560057828, -0.0566454556005783, -0.05664545560057828], vec![-0.10892459915262698, 0.33550642155494004, -0.05664545560057828, -0.05664545560057827, -0.05664545560057828, -0.05664545560057829], vec![-0.05664545560057828, -0.05664545560057827, 0.33550642155494004, -0.10892459915262698, -0.056645455600578286, -0.05664545560057829], vec![-0.05664545560057827, -0.05664545560057828, -0.10892459915262698, 0.33550642155494004, -0.05664545560057828, -0.056645455600578286], vec![-0.05664545560057829, -0.0566454556005783, -0.05664545560057829, -0.05664545560057829, 0.33550642155494004, -0.10892459915262698], vec![-0.05664545560057829, -0.05664545560057831, -0.05664545560057829, -0.05664545560057829, -0.10892459915262698, 0.33550642155494004]];
+
+        let perm = [0, 5, 2, 4, 3, 1];
+
+        for (i, pi) in perm.iter().enumerate() {
+            for (j, pj) in perm.iter().enumerate() {
                 assert_relative_eq!(
                     *matrix.get(i, j).unwrap(),
-                    *dmat.get(i, j).unwrap(),
+                    from_cl[*pi][*pj],
                     epsilon = 1e-4
                 );
             }
@@ -709,8 +813,8 @@ mod test {
     }
 
     #[test]
-    fn test_laplace_single_layer_dp0_dp0_smaller() {
-        let grid = regular_sphere(1);
+    fn test_helmholtz_single_layer_real_dp0_dp0() {
+        let grid = regular_sphere(0);
         let element = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -724,31 +828,164 @@ mod test {
         let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
         assemble(
             &mut matrix,
-            &Laplace3dKernel::new(),
+            &green::HelmholtzGreenKernel { k: 3.0 },
             false,
             false,
             &space,
             &space,
         );
 
-        let mut dmat = Array2D::<f64>::new((ndofs, ndofs));
-        dense::assemble(
-            &mut dmat,
-            &green::LaplaceGreenKernel {},
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![0.08742460357596939, -0.02332791148192136, -0.04211947809894265, -0.02332791148192136, -0.023327911481921364, -0.042119478098942634, -0.03447046598405515, -0.04211947809894265], vec![-0.023327911481921364, 0.08742460357596939, -0.02332791148192136, -0.04211947809894265, -0.04211947809894265, -0.02332791148192136, -0.042119478098942634, -0.03447046598405515], vec![-0.04211947809894265, -0.02332791148192136, 0.08742460357596939, -0.02332791148192136, -0.03447046598405515, -0.04211947809894265, -0.023327911481921364, -0.042119478098942634], vec![-0.02332791148192136, -0.04211947809894265, -0.023327911481921364, 0.08742460357596939, -0.042119478098942634, -0.03447046598405515, -0.04211947809894265, -0.02332791148192136], vec![-0.023327911481921364, -0.04211947809894265, -0.03447046598405515, -0.042119478098942634, 0.08742460357596939, -0.02332791148192136, -0.04211947809894265, -0.023327911481921364], vec![-0.042119478098942634, -0.02332791148192136, -0.04211947809894265, -0.034470465984055156, -0.02332791148192136, 0.08742460357596939, -0.023327911481921364, -0.04211947809894265], vec![-0.03447046598405515, -0.042119478098942634, -0.023327911481921364, -0.04211947809894265, -0.04211947809894265, -0.023327911481921364, 0.08742460357596939, -0.02332791148192136], vec![-0.04211947809894265, -0.034470465984055156, -0.042119478098942634, -0.02332791148192136, -0.023327911481921364, -0.04211947809894265, -0.02332791148192136, 0.08742460357596939]];
+
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            }
+        }
+    }
+    #[test]
+    fn test_helmholtz_single_layer_complex_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            &green::HelmholtzGreenKernel { k: 3.0 },
             false,
             false,
             &space,
             &space,
         );
 
-        for i in 0..matrix.shape().0 {
-            for j in 0..matrix.shape().1 {
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![Complex::new(0.08742460357596939, 0.11004203436820102), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.003720159902487029), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.023327911481921364, 0.04919102584271124), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.04211947809894265, 0.0037201599024870254)], vec![Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.04211947809894265, 0.0037201599024870254), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.03447046598405515, -0.028165446806261072)], vec![Complex::new(-0.04211947809894265, 0.003720159902487029), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820102), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.04211947809894265, 0.0037201599024870254), Complex::new(-0.023327911481921364, 0.04919102584271124), Complex::new(-0.042119478098942634, 0.003720159902487025)], vec![Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.03447046598405515, -0.028165446806261072), Complex::new(-0.04211947809894265, 0.0037201599024870254), Complex::new(-0.02332791148192136, 0.04919102584271125)], vec![Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.0037201599024870267), Complex::new(-0.023327911481921364, 0.04919102584271125)], vec![Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.034470465984055156, -0.028165446806261075), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870237)], vec![Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.04211947809894265, 0.0037201599024870267), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.02332791148192136, 0.04919102584271124)], vec![Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.034470465984055156, -0.028165446806261075), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870237), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(0.08742460357596939, 0.11004203436820104)]];
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            &green::HelmholtzGreenDyKernel { k: 3.0 },
+            true,
+            false,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![Complex::new(-1.025266688854119e-33, -7.550086433767158e-36), Complex::new(-0.07902626473768169, -0.08184681047051735), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07902626473768172, -0.08184681047051737), Complex::new(-0.07902626473768169, -0.08184681047051737), Complex::new(0.01906923918000323, -0.10276858786959302), Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.019069239180003215, -0.10276858786959299)], vec![Complex::new(-0.07902626473768172, -0.08184681047051737), Complex::new(-1.025266688854119e-33, 1.0291684702482414e-35), Complex::new(-0.0790262647376817, -0.08184681047051737), Complex::new(0.019069239180003212, -0.10276858786959299), Complex::new(0.019069239180003212, -0.10276858786959298), Complex::new(-0.07902626473768168, -0.08184681047051737), Complex::new(0.01906923918000323, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722506)], vec![Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07902626473768172, -0.08184681047051737), Complex::new(-1.025266688854119e-33, -7.550086433767158e-36), Complex::new(-0.07902626473768169, -0.08184681047051735), Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.019069239180003215, -0.10276858786959299), Complex::new(-0.07902626473768169, -0.08184681047051737), Complex::new(0.01906923918000323, -0.10276858786959302)], vec![Complex::new(-0.0790262647376817, -0.08184681047051737), Complex::new(0.019069239180003212, -0.10276858786959299), Complex::new(-0.07902626473768172, -0.08184681047051737), Complex::new(-1.025266688854119e-33, 1.0291684702482414e-35), Complex::new(0.01906923918000323, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722506), Complex::new(0.019069239180003212, -0.10276858786959298), Complex::new(-0.07902626473768168, -0.08184681047051737)], vec![Complex::new(-0.07902626473768172, -0.08184681047051737), Complex::new(0.019069239180003215, -0.10276858786959298), Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.01906923918000323, -0.10276858786959299), Complex::new(5.00373588753262e-33, -1.8116810507789718e-36), Complex::new(-0.07902626473768169, -0.08184681047051735), Complex::new(0.019069239180003212, -0.10276858786959299), Complex::new(-0.07902626473768169, -0.08184681047051737)], vec![Complex::new(0.019069239180003222, -0.10276858786959299), Complex::new(-0.07902626473768173, -0.08184681047051737), Complex::new(0.01906923918000322, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722506), Complex::new(-0.07902626473768169, -0.08184681047051735), Complex::new(7.314851820797302e-33, -1.088140415641433e-35), Complex::new(-0.07902626473768169, -0.08184681047051737), Complex::new(0.01906923918000322, -0.10276858786959299)], vec![Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.01906923918000323, -0.10276858786959299), Complex::new(-0.07902626473768172, -0.08184681047051737), Complex::new(0.019069239180003215, -0.10276858786959298), Complex::new(0.019069239180003212, -0.10276858786959299), Complex::new(-0.07902626473768169, -0.08184681047051737), Complex::new(5.00373588753262e-33, -1.8116810507789718e-36), Complex::new(-0.07902626473768169, -0.08184681047051735)], vec![Complex::new(0.01906923918000322, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722506), Complex::new(0.019069239180003222, -0.10276858786959299), Complex::new(-0.07902626473768173, -0.08184681047051737), Complex::new(-0.07902626473768169, -0.08184681047051737), Complex::new(0.01906923918000322, -0.10276858786959299), Complex::new(-0.07902626473768169, -0.08184681047051735), Complex::new(7.314851820797302e-33, -1.088140415641433e-35)]];
+
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        assemble(
+            &mut matrix,
+            &green::HelmholtzGreenDxKernel { k: 3.0 },
+            false,
+            true,
+            &space,
+            &space,
+        );
+
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![Complex::new(1.025266688854119e-33, 7.550086433767158e-36), Complex::new(-0.079034545070751, -0.08184700030244885), Complex::new(0.019069239180003205, -0.10276858786959298), Complex::new(-0.07903454507075097, -0.08184700030244886), Complex::new(-0.07903454507075099, -0.08184700030244887), Complex::new(0.01906923918000323, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.019069239180003212, -0.10276858786959298)], vec![Complex::new(-0.07903454507075097, -0.08184700030244885), Complex::new(1.025266688854119e-33, -1.0291684702482414e-35), Complex::new(-0.079034545070751, -0.08184700030244887), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07903454507075099, -0.08184700030244887), Complex::new(0.019069239180003233, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722506)], vec![Complex::new(0.019069239180003205, -0.10276858786959298), Complex::new(-0.07903454507075097, -0.08184700030244886), Complex::new(1.025266688854119e-33, 7.550086433767158e-36), Complex::new(-0.079034545070751, -0.08184700030244885), Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.019069239180003212, -0.10276858786959298), Complex::new(-0.07903454507075099, -0.08184700030244887), Complex::new(0.01906923918000323, -0.10276858786959299)], vec![Complex::new(-0.079034545070751, -0.08184700030244887), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07903454507075097, -0.08184700030244885), Complex::new(1.025266688854119e-33, -1.0291684702482414e-35), Complex::new(0.019069239180003233, -0.10276858786959299), Complex::new(0.10089706509966115, -0.07681163409722506), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07903454507075099, -0.08184700030244887)], vec![Complex::new(-0.07903454507075099, -0.08184700030244887), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.01906923918000323, -0.10276858786959302), Complex::new(-5.00373588753262e-33, 1.8116810507789718e-36), Complex::new(-0.07903454507075099, -0.08184700030244885), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07903454507075099, -0.08184700030244886)], vec![Complex::new(0.019069239180003233, -0.10276858786959302), Complex::new(-0.07903454507075099, -0.08184700030244886), Complex::new(0.019069239180003212, -0.10276858786959298), Complex::new(0.10089706509966115, -0.07681163409722506), Complex::new(-0.07903454507075099, -0.08184700030244885), Complex::new(-7.314851820797302e-33, 1.088140415641433e-35), Complex::new(-0.07903454507075099, -0.08184700030244886), Complex::new(0.019069239180003215, -0.10276858786959298)], vec![Complex::new(0.10089706509966115, -0.07681163409722505), Complex::new(0.01906923918000323, -0.10276858786959302), Complex::new(-0.07903454507075099, -0.08184700030244887), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(0.01906923918000321, -0.10276858786959298), Complex::new(-0.07903454507075099, -0.08184700030244886), Complex::new(-5.00373588753262e-33, 1.8116810507789718e-36), Complex::new(-0.07903454507075099, -0.08184700030244885)], vec![Complex::new(0.019069239180003212, -0.10276858786959298), Complex::new(0.10089706509966115, -0.07681163409722506), Complex::new(0.019069239180003233, -0.10276858786959302), Complex::new(-0.07903454507075099, -0.08184700030244886), Complex::new(-0.07903454507075099, -0.08184700030244886), Complex::new(0.019069239180003215, -0.10276858786959298), Complex::new(-0.07903454507075099, -0.08184700030244885), Complex::new(-7.314851820797302e-33, 1.088140415641433e-35)]];
+
+        for (i, row) in from_cl.iter().enumerate() {
+            for (j, entry) in row.iter().enumerate() {
+                assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
+                assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_hypersingular_p1_p1() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            Continuity::Continuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+
+        helmholtz_hypersingular_assemble(&mut matrix, &space, &space, 3.0);
+
+        // Compare to result from bempp-cl
+        #[rustfmt::skip]
+        let from_cl = vec![vec![Complex::new(-0.24054975187128322, -0.37234907871793793), Complex::new(-0.2018803657726846, -0.3708486980714607), Complex::new(-0.31151549914430937, -0.36517694339435425), Complex::new(-0.31146604913280734, -0.3652407688678574), Complex::new(-0.3114620814217625, -0.36524076431695807), Complex::new(-0.311434147468966, -0.36530056813389983)], vec![Complex::new(-0.2018803657726846, -0.3708486980714607), Complex::new(-0.24054975187128322, -0.3723490787179379), Complex::new(-0.31146604913280734, -0.3652407688678574), Complex::new(-0.31151549914430937, -0.36517694339435425), Complex::new(-0.3114620814217625, -0.36524076431695807), Complex::new(-0.311434147468966, -0.36530056813389983)], vec![Complex::new(-0.31146604913280734, -0.3652407688678574), Complex::new(-0.31151549914430937, -0.36517694339435425), Complex::new(-0.24054975187128322, -0.3723490787179379), Complex::new(-0.2018803657726846, -0.3708486980714607), Complex::new(-0.31146208142176246, -0.36524076431695807), Complex::new(-0.31143414746896597, -0.36530056813389983)], vec![Complex::new(-0.31151549914430937, -0.36517694339435425), Complex::new(-0.31146604913280734, -0.3652407688678574), Complex::new(-0.2018803657726846, -0.3708486980714607), Complex::new(-0.24054975187128322, -0.3723490787179379), Complex::new(-0.3114620814217625, -0.36524076431695807), Complex::new(-0.311434147468966, -0.36530056813389983)], vec![Complex::new(-0.31146208142176257, -0.36524076431695807), Complex::new(-0.3114620814217625, -0.3652407643169581), Complex::new(-0.3114620814217625, -0.3652407643169581), Complex::new(-0.3114620814217625, -0.3652407643169581), Complex::new(-0.24056452443903534, -0.37231826606213236), Complex::new(-0.20188036577268464, -0.37084869807146076)], vec![Complex::new(-0.3114335658086867, -0.36530052927274986), Complex::new(-0.31143356580868675, -0.36530052927274986), Complex::new(-0.3114335658086867, -0.36530052927274986), Complex::new(-0.3114335658086867, -0.36530052927274986), Complex::new(-0.2018803657726846, -0.37084869807146076), Complex::new(-0.2402983805938184, -0.37203286968364935)]];
+
+        let perm = [0, 5, 2, 4, 3, 1];
+
+        for (i, pi) in perm.iter().enumerate() {
+            for (j, pj) in perm.iter().enumerate() {
                 assert_relative_eq!(
-                    *matrix.get(i, j).unwrap(),
-                    *dmat.get(i, j).unwrap(),
+                    matrix.get(i, j).unwrap().re,
+                    from_cl[*pi][*pj].re,
+                    epsilon = 1e-3
+                );
+                assert_relative_eq!(
+                    matrix.get(i, j).unwrap().im,
+                    from_cl[*pi][*pj].im,
                     epsilon = 1e-3
                 );
             }
         }
     }
+    */
 }

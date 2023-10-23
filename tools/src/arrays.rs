@@ -20,6 +20,10 @@ pub fn to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
     mat
 }
 
+pub fn zero_matrix<T: Scalar>(shape: (usize, usize)) -> Mat<T> {
+    rlst_dynamic_mat![T, shape]
+}
+
 /// A three-dimensional rectangular array
 pub struct Array3D<T: Num> {
     /// The data in the array, in row-major order

@@ -4,4 +4,3 @@
 pub mod assembly;
 pub mod dofmap;
 pub mod function_space;
-pub mod green;
