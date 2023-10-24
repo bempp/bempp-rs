@@ -109,10 +109,10 @@ mod test {
     fn test_normal_is_outward() {
         for i in 0..3 {
             let g = regular_sphere(i);
-            let points = to_matrix(&vec![1.0 / 3.0, 1.0 / 3.0], (1, 2));
+            let points = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], (1, 2));
 
-            let mut mapped_pt = to_matrix(&vec![0.0; 3], (1, 3));
-            let mut normal = to_matrix(&vec![0.0; 3], (1, 3));
+            let mut mapped_pt = to_matrix(&[0.0; 3], (1, 3));
+            let mut normal = to_matrix(&[0.0; 3], (1, 3));
 
             for i in 0..g.geometry().cell_count() {
                 g.geometry().compute_points(&points, i, &mut mapped_pt);

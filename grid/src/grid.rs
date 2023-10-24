@@ -819,7 +819,7 @@ mod test {
     #[test]
     fn test_connectivity() {
         let g = SerialGrid::new(
-            to_matrix(&vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0], (4, 2)),
+            to_matrix(&[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0], (4, 2)),
             AdjacencyList::from_data(vec![0, 1, 2, 2, 1, 3], vec![0, 3, 6]),
             vec![ReferenceCellType::Triangle; 2],
         );
@@ -921,7 +921,7 @@ mod test {
     fn test_serial_triangle_grid_octahedron() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0,
                     0.0, 0.0, -1.0,
                 ],
@@ -947,7 +947,7 @@ mod test {
     fn test_serial_triangle_grid_screen() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
                     1.0, 1.0,
                 ],
@@ -973,7 +973,7 @@ mod test {
     fn test_serial_mixed_grid_screen() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
                     1.0, 1.0,
                 ],
@@ -1005,7 +1005,7 @@ mod test {
         let s = 1.0 / (2.0_f64).sqrt();
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 1.0, 0.0, s, s, 0.0, 1.0, -s, s, -1.0, 0.0, -s, -s, 0.0, -1.0, s, -s,
                 ],
                 (9, 2),
@@ -1025,7 +1025,7 @@ mod test {
     fn test_higher_order_mixed_grid() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.5, 0.25, 0.0, 0.0, 0.5, 0.5,
                     0.5, 0.5, 0.5, 1.0, 0.5, 0.5, 2.0, 0.5, 0.0, 1.5, 0.75, 0.0, 0.0, 1.0, 0.0,
                     0.5, 1.0, 0.0, 1.0, 1.0, 0.0, 2.0, -0.5, 0.0,
@@ -1054,7 +1054,7 @@ mod test {
     fn test_points_and_jacobians() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     2.0, 2.0, 0.0, 4.0, 2.0, 0.0, 5.0, 3.0, 1.0, 0.0, 0.0, 1.0, -1.0, 0.0, 1.0,
                     0.0, -1.0, 1.0,
                 ],
@@ -1067,7 +1067,7 @@ mod test {
         assert_eq!(g.geometry().dim(), 3);
 
         let points = to_matrix(
-            &vec![0.2, 0.0, 0.5, 0.5, 1.0 / 3.0, 1.0 / 3.0, 0.15, 0.3],
+            &[0.2, 0.0, 0.5, 0.5, 1.0 / 3.0, 1.0 / 3.0, 0.15, 0.3],
             (4, 2),
         );
 
@@ -1261,7 +1261,7 @@ mod test {
     fn test_normals() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 1.0, 1.0, -1.0, 0.0, 1.0,
                 ],
                 (5, 3),
@@ -1276,9 +1276,9 @@ mod test {
             ],
         );
 
-        let pt = to_matrix(&vec![1.0 / 3.0, 1.0 / 3.0], (1, 2));
+        let pt = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], (1, 2));
 
-        let mut normal = to_matrix(&vec![0.0; 3], (1, 3));
+        let mut normal = to_matrix(&[0.0; 3], (1, 3));
 
         g.geometry().compute_normals(&pt, 0, &mut normal);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
@@ -1299,7 +1299,7 @@ mod test {
         // Test a curved quadrilateral cell
         let curved_g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, -1.0, 0.0,
                     -1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
                 ],
@@ -1310,10 +1310,10 @@ mod test {
         );
 
         let points = to_matrix(
-            &vec![0.0, 0.0, 0.2, 0.3, 0.5, 0.9, 0.7, 1.0, 1.0, 0.3],
+            &[0.0, 0.0, 0.2, 0.3, 0.5, 0.9, 0.7, 1.0, 1.0, 0.3],
             (5, 2),
         );
-        let mut normals = to_matrix(&vec![0.0; 15], (5, 3));
+        let mut normals = to_matrix(&[0.0; 15], (5, 3));
 
         curved_g
             .geometry()
