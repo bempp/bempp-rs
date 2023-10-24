@@ -25,6 +25,7 @@ def test_dependencies():
     cargos = walk_dirs(root_dir, "Cargo.toml")
 
     deps = {}
+    errors = []
     for c in cargos:
         with open(c, "rb") as f:
             data = tomllib.load(f)
@@ -38,6 +39,8 @@ def test_dependencies():
                     if d not in deps:
                         deps[d] = (info, c)
                     elif deps[d][0] != info:
-                        raise ValueError(
+                        errors.append(
                             f"Version of {d} in {c} ({info}) does not agree "
                             f"with version in {deps[d][1]} ({deps[d][0]})")
+    if len(errors) > 0:
+        raise ValueError("\n".join(errors))
