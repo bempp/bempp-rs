@@ -136,7 +136,7 @@ mod test {
     fn test_gmsh_output_quads() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
                     1.0, 1.0,
                 ],
@@ -155,7 +155,7 @@ mod test {
     fn test_gmsh_output_mixed_cell_type() {
         let g = SerialGrid::new(
             to_matrix(
-                &vec![
+                &[
                     0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.5, 0.0, 1.0, 0.5, 1.0,
                     1.0, 1.0,
                 ],
