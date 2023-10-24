@@ -27,6 +27,7 @@ jobs:
         with:
           path: |
             target/*/deps/*rlst*
+            target/*/deps/*lapack*
           key: rlst-${{ steps.rlst-commit.output.commit }}-${{ matrix.mpi }}
 
       - name: Set up Rust
@@ -78,6 +79,7 @@ jobs:
         with:
           path: |
             target/*/deps/*rlst*
+            target/*/deps/*lapack*
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
   run-tests-python:
