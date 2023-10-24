@@ -26,8 +26,8 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: |
-            target/*/deps/*rlst*
-            target/*/deps/*lapack*
+            target/debug/deps/
+            target/release/deps/
           key: rlst-${{ steps.rlst-commit.output.commit }}-${{ matrix.mpi }}
 
       - name: Set up Rust
@@ -78,8 +78,8 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: |
-            target/*/deps/*rlst*
-            target/*/deps/*lapack*
+            target/debug/deps/
+            target/release/deps/
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
   run-tests-python:
