@@ -183,7 +183,7 @@ mod test {
         let e = create(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
-        let points = to_matrix(&vec![0.0, 0.2, 0.4, 1.0], (4, 1));
+        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -197,7 +197,7 @@ mod test {
         let e = create(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
-        let points = to_matrix(&vec![0.0, 0.2, 0.4, 1.0], (4, 1));
+        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], (4, 1));
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -216,7 +216,7 @@ mod test {
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
-            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -233,7 +233,7 @@ mod test {
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
-            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -314,7 +314,7 @@ mod test {
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
-            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -331,7 +331,7 @@ mod test {
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
-            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
@@ -363,7 +363,7 @@ mod test {
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
-            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.25, 0.5, 0.3, 0.2],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);

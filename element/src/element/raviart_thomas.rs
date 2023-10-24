@@ -130,7 +130,7 @@ mod test {
         assert_eq!(e.value_size(), 2);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
-            &vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);
