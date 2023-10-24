@@ -31,10 +31,15 @@ def test_dependencies():
             if "dependencies" in data:
                 for d, info in data["dependencies"].items():
                     if isinstance(info, dict):
-                        if "version" not in info:
-                            info = None
-                        else:
+                        if "version" in info:
                             info = info["version"]
+                        elif "git" in info:
+                            if "branch" in info:
+                                info = f"{info['git']}@{info['branch']}"
+                            else:
+                                info = info["git"]
+                        else:
+                            info = None
                     if d not in deps:
                         deps[d] = (info, c)
                     elif deps[d][0] != info:
