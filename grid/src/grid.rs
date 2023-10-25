@@ -5,7 +5,7 @@ use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
-use bempp_traits::grid::{Geometry, Grid, Ownership, Topology, GeomF, GeomFMut};
+use bempp_traits::grid::{GeomF, GeomFMut, Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use rlst_dense::{
     rlst_static_mat, RandomAccessByRef, RandomAccessMut, RawAccess, Shape, SizeIdentifier,
