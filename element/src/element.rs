@@ -2,13 +2,13 @@
 
 use crate::cell::create_cell;
 use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
-use bempp_tools::arrays::{AdjacencyList, Array2D, Array3D};
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess, Array3DAccess, Array4DAccess};
+use bempp_tools::arrays::{AdjacencyList, Array3D, Mat};
+use bempp_traits::arrays::{AdjacencyListAccess, Array3DAccess, Array4DAccess};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
 use rlst_algorithms::linalg::LinAlg;
 use rlst_algorithms::traits::inverse::Inverse;
-use rlst_dense::{RandomAccessByRef, RandomAccessMut};
+use rlst_dense::{rlst_dynamic_mat, RandomAccessByRef, RandomAccessMut, Shape};
 pub mod lagrange;
 pub mod raviart_thomas;
 
@@ -37,7 +37,7 @@ impl CiarletElement {
         degree: usize,
         value_shape: Vec<usize>,
         polynomial_coeffs: Array3D<f64>,
-        interpolation_points: [Vec<Array2D<f64>>; 4],
+        interpolation_points: [Vec<Mat<f64>>; 4],
         interpolation_weights: [Vec<Array3D<f64>>; 4],
         map_type: MapType,
         continuity: Continuity,
@@ -69,12 +69,12 @@ impl CiarletElement {
         }
 
         let new_pts = if continuity == Continuity::Discontinuous {
-            let mut new_pts = [vec![], vec![], vec![], vec![]];
+            let mut new_pts: [Vec<Mat<f64>>; 4] = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
-            let mut all_pts = Array2D::<f64>::new((npts, tdim));
+            let mut all_pts = rlst_dynamic_mat![f64, (npts, tdim)];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
                 for _pts in pts_i {
-                    new_pts[i].push(Array2D::<f64>::new((0, tdim)));
+                    new_pts[i].push(rlst_dynamic_mat![f64, (0, tdim)]);
                 }
             }
             for pts_i in interpolation_points.iter() {
@@ -240,9 +240,9 @@ impl FiniteElement for CiarletElement {
     fn dim(&self) -> usize {
         self.dim
     }
-    fn tabulate<'a>(
+    fn tabulate<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         nderivs: usize,
         data: &mut impl Array4DAccess<f64>,
     ) {

@@ -1,20 +1,21 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
+use approx::*;
+#[cfg(feature = "mpi")]
 use bempp_grid::parallel_grid::ParallelGrid;
 #[cfg(feature = "mpi")]
-use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_tools::arrays::{zero_matrix, AdjacencyList};
 #[cfg(feature = "mpi")]
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
+use bempp_traits::arrays::AdjacencyListAccess;
 #[cfg(feature = "mpi")]
 use bempp_traits::cell::ReferenceCellType;
 #[cfg(feature = "mpi")]
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, request::WaitGuard, topology::Communicator, traits::*};
-
 #[cfg(feature = "mpi")]
-use approx::*;
+use rlst_dense::RandomAccessMut;
 
 #[cfg(feature = "mpi")]
 fn test_parallel_grid() {
@@ -28,7 +29,7 @@ fn test_parallel_grid() {
     let n = 10;
 
     let grid = if rank == 0 {
-        let mut pts = Array2D::new((n * n, 3));
+        let mut pts = zero_matrix((n * n, 3));
         let mut i = 0;
         for y in 0..n {
             for x in 0..n {

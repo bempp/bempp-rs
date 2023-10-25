@@ -1,11 +1,12 @@
 //! A parallel implementation of a grid
 use crate::grid::{SerialGeometry, SerialTopology};
 use bempp_element::element::CiarletElement;
-use bempp_tools::arrays::{AdjacencyList, Array2D};
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
+use bempp_tools::arrays::{zero_matrix, AdjacencyList, Mat};
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
+use rlst_dense::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// Geometry of a parallel grid
 pub struct ParallelGeometry<'a, C: Communicator> {
@@ -16,7 +17,7 @@ pub struct ParallelGeometry<'a, C: Communicator> {
 impl<'a, C: Communicator> ParallelGeometry<'a, C> {
     pub fn new(
         comm: &'a C,
-        coordinates: Array2D<f64>,
+        coordinates: Mat<f64>,
         cells: &AdjacencyList<usize>,
         cell_types: &Vec<ReferenceCellType>,
     ) -> Self {
@@ -44,7 +45,7 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         self.serial_geometry.dim()
     }
 
-    fn point(&self, i: usize) -> Option<&[f64]> {
+    fn point(&self, i: usize) -> Option<Vec<f64>> {
         self.serial_geometry.point(i)
     }
 
@@ -61,46 +62,58 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
     fn index_map(&self) -> &[usize] {
         self.serial_geometry.index_map()
     }
-    fn compute_points<'b>(
+    fn compute_points<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'b, f64>,
+        points: &T,
         cell: usize,
-        physical_points: &mut impl Array2DAccess<'b, f64>,
+        physical_points: &mut TMut,
     ) {
         self.serial_geometry
             .compute_points(points, cell, physical_points)
     }
-    fn compute_normals<'b>(
+    fn compute_normals<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'b, f64>,
+        points: &T,
         cell: usize,
-        normals: &mut impl Array2DAccess<'b, f64>,
+        normals: &mut TMut,
     ) {
         self.serial_geometry.compute_points(points, cell, normals)
     }
-    fn compute_jacobians<'b>(
+    fn compute_jacobians<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'b, f64>,
+        points: &T,
         cell: usize,
-        jacobians: &mut impl Array2DAccess<'b, f64>,
+        jacobians: &mut TMut,
     ) {
         self.serial_geometry
             .compute_jacobians(points, cell, jacobians)
     }
-    fn compute_jacobian_determinants<'b>(
+    fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
-        points: &impl Array2DAccess<'b, f64>,
+        points: &T,
         cell: usize,
         jacobian_determinants: &mut [f64],
     ) {
         self.serial_geometry
             .compute_jacobian_determinants(points, cell, jacobian_determinants)
     }
-    fn compute_jacobian_inverses<'b>(
+    fn compute_jacobian_inverses<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'b, f64>,
+        points: &T,
         cell: usize,
-        jacobian_inverses: &mut impl Array2DAccess<'b, f64>,
+        jacobian_inverses: &mut TMut,
     ) {
         self.serial_geometry
             .compute_jacobian_inverses(points, cell, jacobian_inverses)
@@ -179,7 +192,7 @@ pub struct ParallelGrid<'a, C: Communicator> {
 impl<'a, C: Communicator> ParallelGrid<'a, C> {
     pub fn new(
         comm: &'a C,
-        coordinates: Array2D<f64>,
+        coordinates: Mat<f64>,
         cells: AdjacencyList<usize>,
         cell_types: Vec<ReferenceCellType>,
         cell_owners: Vec<usize>,
@@ -214,8 +227,8 @@ impl<'a, C: Communicator> ParallelGrid<'a, C> {
                     vertex_indices_per_proc[p].push(*v);
                     vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
                     vertex_local_indices_per_proc[p].push(vertex_owners[*v].1);
-                    for x in unsafe { coordinates.row_unchecked(*v) } {
-                        coordinates_per_proc[p].push(*x)
+                    for i in 0..coordinates.shape().1 {
+                        coordinates_per_proc[p].push(*coordinates.get(*v, i).unwrap())
                     }
                 }
             }
@@ -237,8 +250,8 @@ impl<'a, C: Communicator> ParallelGrid<'a, C> {
                         vertex_indices_per_proc[p].push(*v);
                         vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
                         vertex_local_indices_per_proc[p].push(vertex_owners[*v].1);
-                        for x in unsafe { coordinates.row_unchecked(*v) } {
-                            coordinates_per_proc[p].push(*x)
+                        for i in 0..coordinates.shape().1 {
+                            coordinates_per_proc[p].push(*coordinates.get(*v, i).unwrap())
                         }
                     }
                     cells_per_proc[p].push(
@@ -379,7 +392,7 @@ impl<'a, C: Communicator> ParallelGrid<'a, C> {
                 panic!("Unsupported cell type");
             });
         }
-        let mut coordinates = Array2D::<f64>::new((vertex_indices.len(), gdim));
+        let mut coordinates = zero_matrix((vertex_indices.len(), gdim));
         for i in 0..vertex_indices.len() {
             for j in 0..gdim {
                 *coordinates.get_mut(i, j).unwrap() = flat_coordinates[i * gdim + j];
