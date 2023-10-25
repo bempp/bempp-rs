@@ -17,24 +17,14 @@ jobs:
         rust-version: ["stable"]
         mpi: ['mpich', 'openmpi']
     steps:
-      - name: Get latest rlst commit id
-        id: rlst-commit
-        run: |
-          echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | head -c 40)" >> $GITHUB_OUTPUT
-      - name: Restore cached dependencies
-        id: cache
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            target/debug/deps/
-            target/release/deps/
-          key: rlst-${{ steps.rlst-commit.outputs.commit }}-${{ matrix.mpi }}
-
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
         with:
@@ -73,14 +63,6 @@ jobs:
 
       - name: Build docs
         run: cargo doc --features "strict" --no-deps
-
-      - name: Cache dependencies
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            target/debug/deps/
-            target/release/deps/
-          key: ${{ steps.cache.outputs.cache-primary-key }}
 
   run-tests-python:
     name: Run tests (Python)
