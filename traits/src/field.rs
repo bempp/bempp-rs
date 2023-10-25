@@ -9,19 +9,12 @@ where
     /// Defines the field translation operator being applied
     type TransferVector;
 
-    /// A map between unique and redundant transfer vectors, this is a kernel dependent map.
-    type TransferVectorMap;
-
     /// The specific data structure holding the field translation operators for this method.
     /// Each translation operator corresponds to a transfer vector.
     type M2LOperators;
 
     /// The computational domain for these operators, defined by the input points distribution.
     type Domain;
-
-    /// Compute transfer vectors, and a mapping to unique vectors if there are redundancies available
-    /// from the type of kernel.
-    fn compute_transfer_vectors(&self) -> (Self::TransferVector, Self::TransferVectorMap);
 
     /// Compute the field translation operators corresponding to each unique transfer vector.
     ///
@@ -31,8 +24,7 @@ where
     fn compute_m2l_operators(
         &self,
         order: usize,
-        domain: Self::Domain,
-        // );
+        domain: Self::Domain
     ) -> Self::M2LOperators;
 
     /// Number of coefficients for a given expansion order in a given FMM scheme.

@@ -127,7 +127,7 @@ pub fn map_corners_to_surface(order: usize) -> (HashMap<usize, usize>, HashMap<u
 
     let nsurf = surface_multindex.len() / 3;
     let ncorners = 8;
-    let corners_multindex = vec![
+    let corners_multindex = [
         0,
         order - 1,
         0,

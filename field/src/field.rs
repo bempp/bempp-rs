@@ -1,15 +1,17 @@
 //! Implementation of traits for field translations via the FFT and SVD.
+use num::Zero;
 use std::collections::{HashMap, HashSet};
 
 use fftw::types::*;
 use itertools::Itertools;
+use num::Complex;
 use rlst::{
     algorithms::{
         linalg::LinAlg,
         traits::svd::{Mode, Svd},
     },
     common::traits::{Eval, Transpose},
-    dense::{rlst_mat, Dot, RandomAccessMut, RawAccess, RawAccessMut, Shape},
+    dense::{rlst_mat, Dot, RawAccess, RawAccessMut, Shape},
 };
 
 use bempp_tools::Array3D;
@@ -23,11 +25,7 @@ use bempp_tree::{
 use crate::{
     array::{flip3, pad3},
     fft::rfft3_fftw,
-    surface::{axial_reflection_surface, diagonal_reflection},
-    transfer_vector::{
-        axially_reflect_components, compute_transfer_vectors, compute_transfer_vectors_unique,
-        diagonally_reflect_components,
-    },
+    transfer_vector::compute_transfer_vectors,
     types::{
         FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm, SvdM2lOperatorData,
         TransferVector,
@@ -39,13 +37,8 @@ where
     T: Kernel<T = f64> + Default,
 {
     type TransferVector = Vec<TransferVector>;
-    type TransferVectorMap = HashMap<usize, usize>;
     type M2LOperators = SvdM2lOperatorData;
     type Domain = Domain;
-
-    fn compute_transfer_vectors(&self) -> (Self::TransferVector, Self::TransferVectorMap) {
-        compute_transfer_vectors()
-    }
 
     fn ncoeffs(&self, order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
@@ -177,7 +170,7 @@ where
             result.k = 50;
         }
 
-        (result.transfer_vectors, _) = result.compute_transfer_vectors();
+        result.transfer_vectors = compute_transfer_vectors();
         result.operator_data = result.compute_m2l_operators(order, domain);
 
         result
@@ -193,217 +186,181 @@ where
     type M2LOperators = FftM2lOperatorData;
 
     type TransferVector = Vec<TransferVector>;
-    type TransferVectorMap = HashMap<usize, usize>;
 
     fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
-        let mut kernel_data = HashMap::new();
+        // pick a point in the middle of the domain
+        let midway = domain.diameter.iter().map(|d| *d / 2.0).collect_vec();
+        let point = midway
+            .iter()
+            .zip(domain.origin)
+            .map(|(m, o)| m + o)
+            .collect_vec();
+        let point = [point[0], point[1], point[2]];
 
-        let mut permutation_matrices = HashMap::new();
-        let mut permuted_multi_indices = HashMap::new();
+        // Encode point in centre of domain and compute halo
+        let key = MortonKey::from_point(&point, &domain, 3);
+        let mut siblings = key.siblings();
+        siblings.sort();
+        let parent = key.parent();
+        let halo = parent.neighbors();
 
-        // Calculate all transfer vectors (316)
-        let (transfer_vectors, _) = compute_transfer_vectors();
+        let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
-        // Store a set of considered vectors, to avoid redundant computations
-        let mut considered = HashSet::new();
+        // The child boxes in the halo of the sibling set
+        let mut sources = vec![Vec::new(); halo_children.len()];
 
-        for t in transfer_vectors.iter() {
-            // Find transfer vector after it's been reflected in reference octant
-            let axial_transfer_vector = axially_reflect_components(&t.components);
-            // Find transfer vector after reflection into reference cone
-            let diag_axial_transfer_vector =
-                diagonally_reflect_components(&axial_transfer_vector[..]);
-            // Compute reflected checksum
-            let t_refl =
-                MortonKey::find_transfer_vector_from_components(&diag_axial_transfer_vector);
+        // The sibling set
+        let mut targets = vec![Vec::new(); halo_children.len()];
 
-            // Find multi-index after axial reflections
-            let (_, source_multi_index) = MortonKey::surface_grid(order);
+        // The transfer vectors corresponding to source->target translations
+        let mut transfer_vectors = vec![Vec::new(); halo_children.len()];
 
-            // Find multi-indices after axial reflection
-            let mut source_multi_index_axial = vec![0usize; source_multi_index.len()];
+        // Green's function evaluations for each source, target pair interaction
+        let mut kernel_data = vec![Vec::new(); halo_children.len()];
 
-            let nsources = 6 * (order - 1).pow(2) + 2;
+        // Each set of 64 M2L operators will correspond to a point in the halo
 
-            for i in 0..nsources {
-                let m = [
-                    source_multi_index[i],
-                    source_multi_index[nsources + i],
-                    source_multi_index[2 * nsources + i],
-                ];
-                let m_refl = axial_reflection_surface(&m[..], &t.components[..], order);
+        // Computing transfer of potential from sibling set to halo
+        for (i, halo_child_set) in halo_children.iter().enumerate() {
+            let mut tmp_transfer_vectors = Vec::new();
+            let mut tmp_targets = Vec::new();
+            let mut tmp_sources = Vec::new();
 
-                source_multi_index_axial[i] = m_refl[0];
-                source_multi_index_axial[nsources + i] = m_refl[1];
-                source_multi_index_axial[2 * nsources + i] = m_refl[2];
+            // Consider all halo children for a given sibling at a time
+            for sibling in siblings.iter() {
+                for halo_child in halo_child_set.iter() {
+                    tmp_transfer_vectors.push(halo_child.find_transfer_vector(sibling));
+                    tmp_targets.push(sibling);
+                    tmp_sources.push(halo_child);
+                }
             }
 
-            // Find multi-index after diagonal and axial reflections
-            let mut source_multi_index_axial_diag = vec![0usize; source_multi_index.len()];
+            // From source to target
+            transfer_vectors[i] = tmp_transfer_vectors;
+            targets[i] = tmp_targets;
+            sources[i] = tmp_sources;
+        }
 
-            for i in 0..nsources {
-                let m = [
-                    source_multi_index_axial[i],
-                    source_multi_index_axial[nsources + i],
-                    source_multi_index_axial[2 * nsources + i],
-                ];
+        let n_source_equivalent_surface = 6 * (order - 1).pow(2) + 2;
+        let n_target_check_surface = n_source_equivalent_surface;
+        let n_corners = 8;
 
-                let m_refl = diagonal_reflection(&m, &axial_transfer_vector);
+        // Iterate over each set of convolutions in the halo (26)
+        for i in 0..transfer_vectors.len() {
+            // Iterate over each unique convolution between sibling set, and halo siblings (64)
+            for j in 0..transfer_vectors[i].len() {
+                // Translating from sibling set to boxes in its M2L halo
+                let target = targets[i][j];
+                let source = sources[i][j];
 
-                source_multi_index_axial_diag[i] = m_refl[0];
-                source_multi_index_axial_diag[nsources + i] = m_refl[1];
-                source_multi_index_axial_diag[2 * nsources + i] = m_refl[2];
-            }
+                let source_equivalent_surface = source.compute_surface(&domain, order, self.alpha);
+                let target_check_surface = target.compute_surface(&domain, order, self.alpha);
 
-            // Need a map between between reflected/unreflected surfaces multiindices in terms of linear index
-            let mut map_surface = rlst_mat![f64, (nsources, nsources)];
+                let v_list: HashSet<MortonKey> = target
+                    .parent()
+                    .neighbors()
+                    .iter()
+                    .flat_map(|pn| pn.children())
+                    .filter(|pnc| !target.is_adjacent(pnc))
+                    .collect();
 
-            for i in 0..nsources {
-                let original = [
-                    source_multi_index[i],
-                    source_multi_index[nsources + i],
-                    source_multi_index[2 * nsources + i],
-                ];
-                for j in 0..nsources {
-                    let reflected = [
-                        source_multi_index_axial_diag[j],
-                        source_multi_index_axial_diag[nsources + j],
-                        source_multi_index_axial_diag[2 * nsources + j],
+                if v_list.contains(source) {
+                    // Compute convolution grid around the source box
+                    let conv_point_corner_index = 7;
+                    let corners = find_corners(&source_equivalent_surface[..]);
+                    let conv_point_corner = [
+                        corners[conv_point_corner_index],
+                        corners[n_corners + conv_point_corner_index],
+                        corners[2 * n_corners + conv_point_corner_index],
                     ];
 
-                    if (original[0] == reflected[0])
-                        & (original[1] == reflected[1])
-                        & (original[2] == reflected[2])
-                    {
-                        // map_surface.insert(i, j);
-                        *map_surface.get_mut(i, j).unwrap() = 1.0;
+                    let (conv_grid, _) = source.convolution_grid(
+                        order,
+                        &domain,
+                        self.alpha,
+                        &conv_point_corner,
+                        conv_point_corner_index,
+                    );
+
+                    // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
+                    let kernel_point_index = 0;
+                    let kernel_point = [
+                        target_check_surface[kernel_point_index],
+                        target_check_surface[n_target_check_surface + kernel_point_index],
+                        target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                    ];
+
+                    // Compute Green's fct evaluations
+                    let kernel = self.compute_kernel(order, &conv_grid, kernel_point);
+                    let (m, n, o) = kernel.shape();
+                    let p = m + 1;
+                    let q = n + 1;
+                    let r: usize = o + 1;
+
+                    let padded_kernel = pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
+                    let mut padded_kernel = flip3(&padded_kernel);
+
+                    // Compute FFT of padded kernel
+                    let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+                    rfft3_fftw(
+                        padded_kernel.get_data_mut(),
+                        padded_kernel_hat.get_data_mut(),
+                        &[p, q, r],
+                    );
+
+                    kernel_data[i].push(padded_kernel_hat);
+                } else {
+                    // Fill with zeros
+                    let n = 2 * order - 1;
+                    let p = n + 1;
+                    let padded_kernel_hat_zeros = Array3D::<c64>::new((p, p, p / 2 + 1));
+                    kernel_data[i].push(padded_kernel_hat_zeros);
+                }
+            }
+        }
+
+        // Want to store FFT of Green's fct evaluations in a vec for easy application
+        let m = 2 * order - 1;
+        let p = m + 1;
+        let size_real = p * p * (p / 2 + 1);
+        let nsiblings = 8;
+        let nconvolutions = nsiblings * nsiblings;
+
+        // Each element corresponds to all evaluations for each sibling (in order) at that halo position
+        let mut kernel_data_mat =
+            vec![vec![Complex::<f64>::zero(); nconvolutions * size_real]; halo_children.len()];
+
+        // For each halo position
+        for i in 0..halo_children.len() {
+            // For each unique interaction
+            for j in 0..nconvolutions {
+                let offset = j * size_real;
+                kernel_data_mat[i][offset..offset + size_real]
+                    .copy_from_slice(kernel_data[i][j].get_data())
+            }
+        }
+
+        // We want to use this data by frequency in the implementation of FFT M2L
+        // Rearrangement: Grouping by frequency, then halo child, then sibling
+        let mut rearranged = vec![Vec::new(); halo_children.len()];
+        for i in 0..halo_children.len() {
+            let current_vector = &kernel_data_mat[i];
+            for l in 0..size_real {
+                // halo child
+                for k in 0..8 {
+                    // sibling
+                    for j in 0..8 {
+                        let index = j * size_real * 8 + k * size_real + l;
+                        rearranged[i].push(current_vector[index]);
                     }
                 }
             }
-
-            // let source_multi_index_axial_diag = source_multi_index_axial_diag.iter().map(|e| e -1 ).collect_vec();
-            permutation_matrices.insert(t.hash, map_surface);
-            permuted_multi_indices.insert(t.hash, source_multi_index_axial_diag);
-
-            if !considered.contains(&t_refl) {
-                // Add reflected checksum to checked set.
-                considered.insert(t_refl);
-
-                // Continue with algorithm
-                let source_equivalent_surface =
-                    t.source.compute_surface(&domain, order, self.alpha);
-                let nsources = source_equivalent_surface.len() / 3;
-
-                let ntargets = source_equivalent_surface.len() / 3;
-
-                // Find multi-index after axial reflections
-                let (_, source_multi_index) = MortonKey::surface_grid(order);
-
-                // Find multi-indices after axial reflection
-                let mut source_multi_index_axial = vec![0usize; source_multi_index.len()];
-
-                for i in 0..nsources {
-                    let m = [
-                        source_multi_index[i],
-                        source_multi_index[nsources + i],
-                        source_multi_index[2 * nsources + i],
-                    ];
-                    let m_refl = axial_reflection_surface(&m[..], &t.components[..], order);
-
-                    source_multi_index_axial[i] = m_refl[0];
-                    source_multi_index_axial[nsources + i] = m_refl[1];
-                    source_multi_index_axial[2 * nsources + i] = m_refl[2];
-                }
-
-                // Find multi-index after diagonal and axial reflections
-                let mut source_multi_index_axial_diag = vec![0usize; source_multi_index.len()];
-
-                for i in 0..nsources {
-                    let m = [
-                        source_multi_index_axial[i],
-                        source_multi_index_axial[nsources + i],
-                        source_multi_index_axial[2 * nsources + i],
-                    ];
-
-                    let m_refl = diagonal_reflection(&m, &axial_transfer_vector);
-
-                    source_multi_index_axial_diag[i] = m_refl[0];
-                    source_multi_index_axial_diag[nsources + i] = m_refl[1];
-                    source_multi_index_axial_diag[2 * nsources + i] = m_refl[2];
-                }
-
-                // Find representative source/target pair
-                let r_idx = transfer_vectors
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, t)| if t.hash == t_refl { Some(i) } else { None })
-                    .collect_vec();
-                let r_idx = r_idx[0];
-                let r_t = &transfer_vectors[r_idx];
-
-                let r_source_equivalent_surface =
-                    r_t.source.compute_surface(&domain, order, self.alpha);
-                let r_target_check_surface = r_t.target.compute_surface(&domain, order, self.alpha);
-
-                // Find the representative convolution point, i.e. furthest corner.
-                let r_conv_point_corner_index = 7;
-                let r_corners = find_corners(&r_source_equivalent_surface[..]);
-                let r_conv_point_corner = [
-                    r_corners[r_conv_point_corner_index],
-                    r_corners[8 + r_conv_point_corner_index],
-                    r_corners[16 + r_conv_point_corner_index],
-                ];
-
-                let (r_conv_grid, _) = t.source.convolution_grid(
-                    order,
-                    &domain,
-                    self.alpha,
-                    &r_conv_point_corner,
-                    r_conv_point_corner_index,
-                );
-
-                // Compute representative kernel
-                let r_kernel_point_index = 0;
-                let r_kernel_point = [
-                    r_target_check_surface[r_kernel_point_index],
-                    r_target_check_surface[ntargets + r_kernel_point_index],
-                    r_target_check_surface[2 * ntargets + r_kernel_point_index],
-                ];
-
-                // Compute the kernel.
-                let r_kernel = self.compute_kernel(order, &r_conv_grid, r_kernel_point);
-                let &(m, n, o) = r_kernel.shape();
-                let p = m + 1;
-                let q = n + 1;
-                let r = o + 1;
-                let r_padded_kernel = pad3(&r_kernel, (p - m, q - n, r - o), (0, 0, 0));
-
-                let mut r_padded_kernel = flip3(&r_padded_kernel);
-
-                // Compute FFT of kernel for this transfer vector
-                let mut r_padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
-                rfft3_fftw(
-                    r_padded_kernel.get_data_mut(),
-                    r_padded_kernel_hat.get_data_mut(),
-                    &[p, q, r],
-                );
-
-                // Store FFT of kernel for this transfer vector
-                kernel_data.insert(t_refl, r_padded_kernel_hat);
-            }
         }
-
-        assert!(considered.len() == 16);
 
         FftM2lOperatorData {
-            kernel_data,
-            permutation_matrices,
-            permuted_multi_indices,
+            kernel_data: kernel_data_mat,
+            kernel_data_rearranged: rearranged,
         }
-    }
-
-    fn compute_transfer_vectors(&self) -> (Self::TransferVector, Self::TransferVectorMap) {
-        compute_transfer_vectors_unique()
     }
 
     fn ncoeffs(&self, order: usize) -> usize {
@@ -430,7 +387,6 @@ where
             conv_to_surf_map: HashMap::default(),
             operator_data: FftM2lOperatorData::default(),
             transfer_vectors: Vec::default(),
-            transfer_vector_map: HashMap::default(),
         };
 
         // Create maps between surface and convolution grids
@@ -439,7 +395,7 @@ where
 
         result.surf_to_conv_map = surf_to_conv;
         result.conv_to_surf_map = conv_to_surf;
-        (result.transfer_vectors, result.transfer_vector_map) = result.compute_transfer_vectors();
+        result.transfer_vectors = compute_transfer_vectors();
 
         result.operator_data = result.compute_m2l_operators(order, domain);
 
@@ -549,11 +505,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::fft::irfft3_fftw;
-
-    use super::*;
-
+    use rlst::dense::RandomAccessMut;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use crate::fft::irfft3_fftw;
+    use super::*;
 
     #[test]
     pub fn test_svd_operator_data() {
@@ -563,6 +518,7 @@ mod test {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
         };
+        let depth = 5;
         let alpha = 1.05;
         let k = 60;
         let ntransfer_vectors = 316;
@@ -607,6 +563,7 @@ mod test {
             diameter: [1., 1., 1.],
         };
         let alpha = 1.05;
+        let depth = 5;
 
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
@@ -614,7 +571,7 @@ mod test {
         let m2l = fft.compute_m2l_operators(order, domain);
 
         // Test that the number of precomputed kernel interactions matches the number of transfer vectors
-        assert_eq!(m2l.kernel_data.keys().len(), 16);
+        // assert_eq!(m2l.kernel_data.keys().len(), 16);
     }
 
     #[test]
@@ -627,7 +584,7 @@ mod test {
             diameter: [1., 1., 1.],
         };
         let alpha = 1.05;
-
+        let depth = 5;
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
         let mut multipole = rlst_mat![f64, (ncoeffs, 1)];
@@ -641,7 +598,7 @@ mod test {
 
         // Pick a random source/target pair
         let idx = 153;
-        let (all_transfer_vectors, _) = compute_transfer_vectors();
+        let all_transfer_vectors = compute_transfer_vectors();
 
         let transfer_vector = &all_transfer_vectors[idx];
 
@@ -691,15 +648,212 @@ mod test {
         assert!(rel_error < 1e-14);
     }
 
+    fn m2l_scale(level: u64) -> f64 {
+        if level < 2 {
+            panic!("M2L only performed on level 2 and below")
+        }
+        if level == 2 {
+            1. / 2.
+        } else {
+            2_f64.powf((level - 3) as f64)
+        }
+    }
+
     #[test]
-    fn test_fft_field_translation() {
+    fn test_fft_operator_data_kernels() {
         let kernel = Laplace3dKernel::new();
-        let order: usize = 5;
+        let order: usize = 2;
 
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
         };
+        let alpha = 1.05;
+
+        // Some expansion data998
+        let ncoeffs = 6 * (order - 1).pow(2) + 2;
+        let mut multipole = rlst_mat![f64, (ncoeffs, 1)];
+
+        for i in 0..ncoeffs {
+            *multipole.get_mut(i, 0).unwrap() = i as f64;
+        }
+
+        let level = 2;
+        // Create field translation object
+        let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
+
+        let kernels = &fft.operator_data.kernel_data;
+
+        let key = MortonKey::from_point(&[0.5, 0.5, 0.5], &domain, level);
+
+        let v_list: Vec<_> = key
+            .parent()
+            .neighbors()
+            .iter()
+            .flat_map(|pn| pn.children())
+            .filter(|pnc| !key.is_adjacent(pnc))
+            .map(|k| k)
+            .collect();
+
+        let parent_neighbours = key.parent().neighbors();
+        let mut v_list_structured = vec![Vec::new(); 26];
+        for (i, pn) in parent_neighbours.iter().enumerate() {
+            for child in pn.children() {
+                if !key.is_adjacent(&child) {
+                    v_list_structured[i].push(Some(child));
+                } else {
+                    v_list_structured[i].push(None)
+                }
+            }
+        }
+
+        // println!(" v list {:?}", v_list);
+        // println!(" v list {:?}", v_list_structured[0]);
+
+        // pick a halo position
+        let halo_idx = 0;
+        // pick a halo child position
+        let halo_child_idx = 2;
+        let n = 2 * order - 1;
+        let p = n + 1;
+        let size_real = p * p * (p / 2 + 1);
+
+        // Find kernel from precomputation;
+        let kernel_hat =
+            &kernels[halo_idx][halo_child_idx * size_real..(halo_child_idx + 1) * size_real];
+
+        // Apply scaling
+        let scale = m2l_scale(level);
+        let kernel_hat = kernel_hat.iter().map(|k| *k * scale).collect_vec();
+
+        let target = key;
+        let source = v_list_structured[halo_idx][halo_child_idx].unwrap();
+        let source_equivalent_surface = source.compute_surface(&domain, order, fft.alpha);
+        let target_check_surface = target.compute_surface(&domain, order, fft.alpha);
+        let ntargets = target_check_surface.len() / 3;
+
+        // Compute conv grid
+        let conv_point_corner_index = 7;
+        let corners = find_corners(&source_equivalent_surface[..]);
+        let conv_point_corner = [
+            corners[conv_point_corner_index],
+            corners[8 + conv_point_corner_index],
+            corners[16 + conv_point_corner_index],
+        ];
+
+        let (conv_grid, _) = source.convolution_grid(
+            order,
+            &domain,
+            fft.alpha,
+            &conv_point_corner,
+            conv_point_corner_index,
+        );
+
+        let kernel_point_index = 0;
+        let kernel_point = [
+            target_check_surface[kernel_point_index],
+            target_check_surface[ntargets + kernel_point_index],
+            target_check_surface[2 * ntargets + kernel_point_index],
+        ];
+
+        // Compute kernel from source/target pair
+        let test_kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
+        let (m, n, o) = test_kernel.shape();
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+
+        let mut padded_kernel = pad3(&test_kernel, (p - m, q - n, r - o), (0, 0, 0));
+        let mut padded_kernel = flip3(&padded_kernel);
+
+        // Compute FFT of padded kernel
+        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        rfft3_fftw(
+            padded_kernel.get_data_mut(),
+            padded_kernel_hat.get_data_mut(),
+            &[p, q, r],
+        );
+
+        for (p, t) in padded_kernel_hat.get_data().iter().zip(kernel_hat.iter()) {
+            // println!("p t {:?}={:?}", p, t);
+            assert!((p - t).norm() < 1e-6)
+        }
+        // println!("pre comp kernel {:?}", kernel_hat);
+        // println!("kernel {:?}", padded_kernel_hat.get_data());
+
+        // assert!(false);
+    }
+
+    #[test]
+    fn test_kernel_rearrangement() {
+        // Dummy data mirroring unrearranged kernels
+        // here each '1000' corresponds to a sibling index
+        // each '100' to a child in a given halo element
+        // and each '1' to a frequency
+        let mut kernel_data_mat = vec![Vec::new(); 26];
+        let size_real = 10;
+        for i in 0..26 {
+            // sibling index
+            for j in 0..8 {
+                // halo child index
+                for k in 0..8 {
+                    // frequency
+                    for l in 0..size_real {
+                        kernel_data_mat[i].push(Complex::new((1000 * j + 100 * k + l) as f64, 0.));
+                    }
+                }
+            }
+        }
+
+        // We want to use this data by frequency in the implementation of FFT M2L
+        // Rearrangement: Grouping by frequency, then halo child, then sibling
+        let mut rearranged = vec![Vec::new(); 26];
+        for i in 0..26 {
+            let current_vector = &kernel_data_mat[i];
+            for l in 0..size_real {
+                // halo child
+                for k in 0..8 {
+                    // sibling
+                    for j in 0..8 {
+                        let index = j * size_real * 8 + k * size_real + l;
+                        rearranged[i].push(current_vector[index]);
+                    }
+                }
+            }
+        }
+
+        // We expect the first 64 elements to correspond to the first frequency components of all
+        // siblings with all elements in a given halo position
+        let halo_idx = 3;
+        let freq = 4;
+        let offset = freq * 64;
+        let result = &rearranged[0][offset..offset + 64];
+
+        // For each halo child
+        for i in 0..8 {
+            // for each sibling
+            for j in 0..8 {
+                let expected = (i * 100 + j * 1000 + freq) as f64;
+                // println!("expected {:?} {:?}", expected, result[i*8+j].re);
+                assert!(expected == result[i * 8 + j].re)
+            }
+        }
+
+        // println!("expected {:?}", &kernel_data_mat[0][0..8*size_real]);
+        println!("expected {:?}", &rearranged[0][0..64]);
+        // assert!(false);
+    }
+
+    #[test]
+    fn test_fft_field_translation() {
+        let kernel = Laplace3dKernel::new();
+        let order: usize = 2;
+
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [5., 5., 5.],
+        };
+
         let alpha = 1.05;
 
         // Some expansion data
@@ -714,92 +868,117 @@ mod test {
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Compute all M2L operators
-        let m2l = fft.compute_m2l_operators(order, domain);
+        // let m2l = fft.compute_m2l_operators(order, domain);
 
         // Pick a random source/target pair
-        let idx = 153;
-        let (all_transfer_vectors, _) = compute_transfer_vectors();
+        let idx = 123;
+        let all_transfer_vectors = compute_transfer_vectors();
 
         let transfer_vector = &all_transfer_vectors[idx];
-        let unique_transfer_vector = fft.transfer_vector_map.get(&transfer_vector.hash).unwrap();
-
-        // Place charges on the convolution grid
-        let permutation_matrix = fft
-            .operator_data
-            .permutation_matrices
-            .get(&transfer_vector.hash)
-            .unwrap();
-
-        let r_multipole = permutation_matrix.dot(&multipole).eval();
 
         // Compute FFT of the representative signal
-        let r_signal = fft.compute_signal(order, r_multipole.data());
-        let &(m, n, o) = r_signal.shape();
+        let signal = fft.compute_signal(order, multipole.data());
+        let &(m, n, o) = signal.shape();
         let p = m + 1;
         let q = n + 1;
         let r = o + 1;
         let pad_size = (p - m, q - n, r - o);
         let pad_index = (p - m, q - n, r - o);
-        let mut r_padded_signal = pad3(&r_signal, pad_size, pad_index);
-        let mut r_padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        let mut padded_signal = pad3(&signal, pad_size, pad_index);
+        let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
 
         rfft3_fftw(
-            r_padded_signal.get_data_mut(),
-            r_padded_signal_hat.get_data_mut(),
+            padded_signal.get_data_mut(),
+            padded_signal_hat.get_data_mut(),
             &[p, q, r],
         );
 
-        // Lookup appropriate FFT of Kernel matrix from precomputatoins
-        let r_padded_kernel_hat = m2l.kernel_data.get(unique_transfer_vector).unwrap();
+        let source_equivalent_surface = transfer_vector
+            .source
+            .compute_surface(&domain, order, fft.alpha);
+        let target_check_surface = transfer_vector
+            .target
+            .compute_surface(&domain, order, fft.alpha);
+        let ntargets = target_check_surface.len() / 3;
+
+        // Compute conv grid
+        let conv_point_corner_index = 7;
+        let corners = find_corners(&source_equivalent_surface[..]);
+        let conv_point_corner = [
+            corners[conv_point_corner_index],
+            corners[8 + conv_point_corner_index],
+            corners[16 + conv_point_corner_index],
+        ];
+
+        let (conv_grid, _) = transfer_vector.source.convolution_grid(
+            order,
+            &domain,
+            fft.alpha,
+            &conv_point_corner,
+            conv_point_corner_index,
+        );
+
+        let kernel_point_index = 0;
+        let kernel_point = [
+            target_check_surface[kernel_point_index],
+            target_check_surface[ntargets + kernel_point_index],
+            target_check_surface[2 * ntargets + kernel_point_index],
+        ];
+
+        // Compute kernel
+        let kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
+        let (m, n, o) = kernel.shape();
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+
+        let padded_kernel = pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
+        let mut padded_kernel = flip3(&padded_kernel);
+
+        // Compute FFT of padded kernel
+        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        rfft3_fftw(
+            padded_kernel.get_data_mut(),
+            padded_kernel_hat.get_data_mut(),
+            &[p, q, r],
+        );
 
         // Compute convolution
-        let hadamard_product = r_padded_signal_hat
+        let hadamard_product = padded_signal_hat
             .get_data()
             .iter()
-            .zip(r_padded_kernel_hat.get_data().iter())
+            .zip(padded_kernel_hat.get_data().iter())
             .map(|(a, b)| a * b)
             .collect_vec();
+
         let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
 
-        let mut r_potentials = Array3D::new((p, q, r));
+        let mut potentials = Array3D::new((p, q, r));
         irfft3_fftw(
             hadamard_product.get_data_mut(),
-            r_potentials.get_data_mut(),
+            potentials.get_data_mut(),
             &[p, q, r],
         );
 
-        // Unpermute the coefficients
-        let permuted_multi_indices = fft
-            .operator_data
-            .permuted_multi_indices
-            .get(&transfer_vector.hash)
-            .unwrap();
+        let (_, multi_indices) = MortonKey::surface_grid(order);
 
         let mut tmp = Vec::new();
-        let ntargets = permuted_multi_indices.len() / 3;
-        let xs = &permuted_multi_indices[0..ntargets];
-        let ys = &permuted_multi_indices[ntargets..2 * ntargets];
-        let zs = &permuted_multi_indices[2 * ntargets..];
+        let ntargets = multi_indices.len() / 3;
+        let xs = &multi_indices[0..ntargets];
+        let ys = &multi_indices[ntargets..2 * ntargets];
+        let zs = &multi_indices[2 * ntargets..];
 
         for i in 0..ntargets {
-            let val = r_potentials.get(zs[i], ys[i], xs[i]).unwrap();
+            let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
             tmp.push(*val);
         }
-
-        // Find source and target surfaces
-        let sources = transfer_vector
-            .source
-            .compute_surface(&domain, order, alpha);
-        let targets = transfer_vector
-            .target
-            .compute_surface(&domain, order, alpha);
 
         // Get direct evaluations for testing
         let mut direct = vec![0f64; ncoeffs];
         fft.kernel.evaluate_st(
             EvalType::Value,
-            &sources[..],
-            &targets[..],
+            &source_equivalent_surface[..],
+            &target_check_surface[..],
             multipole.data(),
             &mut direct[..],
         );

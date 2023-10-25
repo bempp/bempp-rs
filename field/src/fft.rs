@@ -76,7 +76,7 @@ pub fn rfft3_fftw_par_vec(input: &mut FftMatrixf64, output: &mut FftMatrixc64, s
 /// # Arguments
 /// * `input` - Input slice of complex data, corresponding to an FFT of a 3D array stored in column major order.
 /// * `output` - Output slice.
-/// * `shape` - Shape of input data.
+/// * `shape` - Shape of output data.
 pub fn irfft3_fftw_par_vec(input: &mut FftMatrixc64, output: &mut FftMatrixf64, shape: &[usize]) {
     assert!(shape.len() == 3);
     let size: usize = shape.iter().product();

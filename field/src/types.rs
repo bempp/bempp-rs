@@ -1,7 +1,6 @@
 //! Types for storing field translation data.
 use std::collections::HashMap;
 
-use bempp_tools::Array3D;
 use cauchy::c64;
 
 use rlst::{
@@ -19,7 +18,7 @@ pub type SvdM2lEntry =
     Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
 
 /// Type alias for pre-computed FFT of green's function evaluations corresponding a given transfer vector.
-pub type FftKernelData = HashMap<usize, Array3D<c64>>;
+pub type FftKernelData = Vec<Vec<c64>>;
 
 /// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
 pub struct FftFieldTranslationKiFmm<T>
@@ -40,9 +39,6 @@ where
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
-
-    /// Map between redundant and unique transfer vectors when in checksum form
-    pub transfer_vector_map: HashMap<usize, usize>,
 
     /// The associated kernel with this translation operator.
     pub kernel: T,
@@ -85,24 +81,11 @@ pub struct TransferVector {
     pub target: MortonKey,
 }
 
-/// Type alias for a surface permutation map
-type PermutationMatrix =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
-
-/// Type alias for a the permuted multi-indices corresponding to unique transfer vectors (column major order)
-type PermutedMultiIndices = Vec<usize>;
-
-/// Container to store precomputed data required for FFT field translations.
 #[derive(Default)]
 pub struct FftM2lOperatorData {
-    /// The FFT of unique kernel evaluations for each transfer vector
+    // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set
     pub kernel_data: FftKernelData,
-
-    /// The permutation matrix between unreflected/reflected surface indices, indexed by transfer vector
-    pub permutation_matrices: HashMap<usize, PermutationMatrix>,
-
-    /// The multi-indices of the reflected surfaces, indexed by transfer vector
-    pub permuted_multi_indices: HashMap<usize, PermutedMultiIndices>,
+    pub kernel_data_rearranged: FftKernelData,
 }
 
 /// Container to store precomputed data required for SVD field translations.
@@ -117,7 +100,7 @@ pub struct SvdM2lOperatorData {
     /// The quantity $C_{block} = \Sigma \cdot V^T_{block} S_{block} $, where $\Sigma$ is diagonal matrix of singular values
     /// from the SVD of the fat M2L matrix, $V^T_{block}$ is a is a block of the right singular vectors corresponding
     /// to each transfer vector from the same SVD, and $S_{block}$ is a block of the transposed right singular vectors
-    /// from the SVD of the thin M2L matrix. $C$ is composed of $C_{block}$, with one for each unique transfer vector.  
+    /// from the SVD of the thin M2L matrix. $C$ is composed of $C_{block}$, with one for each unique transfer vector.
     pub c: SvdM2lEntry,
 }
 

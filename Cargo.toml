@@ -4,6 +4,7 @@ members = [
     "bem",
     "element",
     "fmm",
+    "field",
     "grid",
     "hyksort",
     "quadrature",
@@ -13,10 +14,13 @@ members = [
     "traits",
 ]
 
+resolver = "2"
+
 default-members = [
     "bem",
     "element",
     "fmm",
+    "field",
     "grid",
     "hyksort",
     "quadrature",

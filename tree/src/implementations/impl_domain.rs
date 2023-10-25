@@ -31,6 +31,7 @@ impl Domain {
         let diameter_y = (max_y - min_y).abs();
         let diameter_z = (max_z - min_z).abs();
 
+        // Want a cubic box to place everything in
         let diameter = diameter_x.max(diameter_y).max(diameter_z);
         let diameter = [
             diameter + 2. * err,

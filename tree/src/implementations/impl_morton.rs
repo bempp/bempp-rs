@@ -103,8 +103,7 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
     let mut minimal_tree: Vec<MortonKey> = Vec::new();
     let mut work_list: Vec<MortonKey> = a.finest_ancestor(b).children().into_iter().collect();
 
-    while !work_list.is_empty() {
-        let current_item = work_list.pop().unwrap();
+    while let Some(current_item) = work_list.pop() {
         if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item) {
             minimal_tree.push(current_item);
         } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item)) {
@@ -140,8 +139,8 @@ impl MortonKeys {
         let end_val = vec![*b];
         self.keys = start_val
             .into_iter()
-            .chain(completion.into_iter())
-            .chain(end_val.into_iter())
+            .chain(completion)
+            .chain(end_val)
             .collect();
     }
 
@@ -324,7 +323,7 @@ impl MortonKey {
     /// Find the transfer vector between two Morton keys in component form.
     ///
     /// # Arguments
-    /// * `other` - A Morton Key with which to calcualte a transfer vector to.
+    /// * `other` - A Morton Key with which to calculate a transfer vector to.
     pub fn find_transfer_vector_components(&self, &other: &MortonKey) -> [i64; 3] {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
@@ -382,7 +381,7 @@ impl MortonKey {
     /// ie. the vector other->self returned as an unsigned integer.
     ///
     /// # Arguments
-    /// * `other` - A Morton Key with which to calcualte a transfer vector to.
+    /// * `other` - A Morton Key with which to calculate a transfer vector to.
     pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
         let tmp = self.find_transfer_vector_components(&other);
         MortonKey::find_transfer_vector_from_components(&tmp)
@@ -500,6 +499,7 @@ impl MortonKey {
             children.push(MortonKey::from_morton(child_morton))
         }
 
+        children.sort();
         children
     }
 
