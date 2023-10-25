@@ -2,7 +2,7 @@
 
 use crate::element::{create_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_tools::arrays::{Array2D, Array3D};
+use bempp_tools::arrays::{to_matrix, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
@@ -45,7 +45,7 @@ pub fn create(
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
     for _e in 0..cell.entity_count(0) {
-        x[0].push(Array2D::<f64>::new((0, tdim)));
+        x[0].push(to_matrix(&[], (0, tdim)));
         m[0].push(Array3D::<f64>::new((0, 2, 0)));
     }
 
@@ -61,12 +61,12 @@ pub fn create(
         }
         mat[0] = v0[1] - v1[1];
         mat[1] = v1[0] - v0[0];
-        x[1].push(Array2D::<f64>::from_data(pts, (1, tdim)));
+        x[1].push(to_matrix(&pts, (1, tdim)));
         m[1].push(Array3D::<f64>::from_data(mat, (1, 2, 1)));
     }
 
     for _e in 0..cell.entity_count(2) {
-        x[2].push(Array2D::<f64>::new((0, tdim)));
+        x[2].push(to_matrix(&[], (0, tdim)));
         m[2].push(Array3D::<f64>::new((0, 2, 0)));
     }
 
@@ -89,9 +89,10 @@ mod test {
     use crate::cell::*;
     use crate::element::raviart_thomas::*;
     use approx::*;
-    use bempp_tools::arrays::{Array2D, Array4D};
-    use bempp_traits::arrays::{Array2DAccess, Array4DAccess};
+    use bempp_tools::arrays::Array4D;
+    use bempp_traits::arrays::Array4DAccess;
     use bempp_traits::element::FiniteElement;
+    use rlst_dense::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -128,8 +129,8 @@ mod test {
         let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 2);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
-        let points = Array2D::from_data(
-            vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
+        let points = to_matrix(
+            &[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5],
             (6, 2),
         );
         e.tabulate(&points, 0, &mut data);

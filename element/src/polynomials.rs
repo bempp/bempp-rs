@@ -1,11 +1,12 @@
 //! Orthonormal polynomials
 
-use bempp_traits::arrays::{Array2DAccess, Array3DAccess};
+use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
+use rlst_dense::{RandomAccessByRef, Shape};
 
 /// Tabulate orthonormal polynomials on a interval
-fn tabulate_legendre_polynomials_interval<'a>(
-    points: &impl Array2DAccess<'a, f64>,
+fn tabulate_legendre_polynomials_interval<T: RandomAccessByRef<Item = f64> + Shape>(
+    points: &T,
     degree: usize,
     derivatives: usize,
     data: &mut impl Array3DAccess<f64>,
@@ -57,8 +58,8 @@ fn quad_index(i: usize, j: usize, n: usize) -> usize {
 }
 
 /// Tabulate orthonormal polynomials on a quadrilateral
-fn tabulate_legendre_polynomials_quadrilateral<'a>(
-    points: &impl Array2DAccess<'a, f64>,
+fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<Item = f64> + Shape>(
+    points: &T,
     degree: usize,
     derivatives: usize,
     data: &mut impl Array3DAccess<f64>,
@@ -191,8 +192,8 @@ fn tabulate_legendre_polynomials_quadrilateral<'a>(
     }
 }
 /// Tabulate orthonormal polynomials on a triangle
-fn tabulate_legendre_polynomials_triangle<'a>(
-    points: &impl Array2DAccess<'a, f64>,
+fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Shape>(
+    points: &T,
     degree: usize,
     derivatives: usize,
     data: &mut impl Array3DAccess<f64>,
@@ -368,9 +369,9 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
     }
 }
 
-pub fn legendre_shape<'a>(
+pub fn legendre_shape<T: RandomAccessByRef<Item = f64> + Shape>(
     cell_type: ReferenceCellType,
-    points: &impl Array2DAccess<'a, f64>,
+    points: &T,
     degree: usize,
     derivatives: usize,
 ) -> (usize, usize, usize) {
@@ -382,9 +383,9 @@ pub fn legendre_shape<'a>(
 }
 
 /// Tabulate orthonormal polynomials
-pub fn tabulate_legendre_polynomials<'a>(
+pub fn tabulate_legendre_polynomials<T: RandomAccessByRef<Item = f64> + Shape>(
     cell_type: ReferenceCellType,
-    points: &impl Array2DAccess<'a, f64>,
+    points: &T,
     degree: usize,
     derivatives: usize,
     data: &mut impl Array3DAccess<f64>,
@@ -410,14 +411,13 @@ mod test {
     use crate::polynomials::*;
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
-    use bempp_tools::arrays::{Array2D, Array3D};
-
+    use bempp_tools::arrays::{to_matrix, Array3D};
     #[test]
     fn test_legendre_interval() {
         let degree = 6;
 
         let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
-        let points = Array2D::from_data(rule.points, (rule.npoints, 1));
+        let points = to_matrix(&rule.points, (rule.npoints, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -448,7 +448,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
-        let points = Array2D::from_data(rule.points, (rule.npoints, 2));
+        let points = to_matrix(&rule.points, (rule.npoints, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Triangle,
@@ -479,7 +479,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
-        let points = Array2D::from_data(rule.points, (rule.npoints, 2));
+        let points = to_matrix(&rule.points, (rule.npoints, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,
@@ -521,7 +521,7 @@ mod test {
             p[2 * i] = i as f64 / 10.0;
             p[2 * i + 1] = p[2 * i] + epsilon;
         }
-        let points = Array2D::from_data(p, (20, 1));
+        let points = to_matrix(&p, (20, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -560,7 +560,7 @@ mod test {
                 index += 1;
             }
         }
-        let points = Array2D::from_data(p, (165, 2));
+        let points = to_matrix(&p, (165, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Triangle,
@@ -603,7 +603,7 @@ mod test {
                 p[6 * index + 5] = p[6 * index + 1] + epsilon;
             }
         }
-        let points = Array2D::from_data(p, (300, 2));
+        let points = to_matrix(&p, (300, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,
@@ -643,7 +643,7 @@ mod test {
         for (i, pi) in p.iter_mut().enumerate() {
             *pi = i as f64 / 10.0;
         }
-        let points = Array2D::from_data(p, (11, 1));
+        let points = to_matrix(&p, (11, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -729,7 +729,7 @@ mod test {
                 p[2 * (11 * i + j) + 1] = j as f64 / 10.0;
             }
         }
-        let points = Array2D::from_data(p, (121, 2));
+        let points = to_matrix(&p, (121, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,

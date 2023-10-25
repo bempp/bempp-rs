@@ -4,7 +4,7 @@ use crate::types::KernelType;
 use bempp_traits::types::Scalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
-pub trait Kernel {
+pub trait Kernel: Sync {
     type T: Scalar;
 
     /// Single threaded evaluation of Green's functions.

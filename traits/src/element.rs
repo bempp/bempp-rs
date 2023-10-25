@@ -1,7 +1,8 @@
 //! Finite element definitions
 
-use crate::arrays::{Array2DAccess, Array4DAccess};
+use crate::arrays::Array4DAccess;
 use crate::cell::ReferenceCellType;
+use rlst_common::traits::{RandomAccessByRef, Shape};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -70,9 +71,9 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate<'a>(
+    fn tabulate<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         nderivs: usize,
         data: &mut impl Array4DAccess<f64>,
     );

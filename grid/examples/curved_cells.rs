@@ -1,6 +1,6 @@
 use bempp_grid::grid::SerialGrid;
 use bempp_grid::io::export_as_gmsh;
-use bempp_tools::arrays::{AdjacencyList, Array2D};
+use bempp_tools::arrays::{to_matrix, AdjacencyList};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::grid::{Geometry, Grid, Topology};
@@ -8,8 +8,8 @@ use bempp_traits::grid::{Geometry, Grid, Topology};
 fn main() {
     // Create a grid of three cells. One cell is a curved triangle, one cell is a flat triangle, the other is a curved quadrilateral
     let grid = SerialGrid::new(
-        Array2D::from_data(
-            vec![
+        to_matrix(
+            &vec![
                 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.5, 0.25, 0.0, 0.0, 0.5, 0.5, 0.5,
                 0.5, 0.5, 1.0, 0.5, 0.5, 2.0, 0.5, 0.0, 1.5, 0.75, 0.0, 0.0, 1.0, 0.0, 0.5, 1.0,
                 0.0, 1.0, 1.0, 0.0, 2.0, -0.5, 0.0,
