@@ -13,7 +13,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_dense::{RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut};
+use rlst_dense::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -209,36 +209,27 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
     // let mut rlst_test_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
     // let mut rlst_trial_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
-    let mut rlst_test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
-    let mut rlst_trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TRIAL, 3)];
+    let mut test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
+    let mut trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TRIAL, 3)];
 
     let test_element = test_grid.geometry().element(test_cells[0]);
+    let trial_element = trial_grid.geometry().element(trial_cells[0]);
 
-    let mut test_data = Array4D::<f64>::new(test_element.tabulate_array_shape(0, NPTS_TEST));
-    test_element.tabulate(test_points, 0, &mut test_data);
-    let gdim = test_grid.geometry().dim();
+    let test_compute_points = test_grid.geometry().get_compute_points_function(test_element, test_points);
+    let trial_compute_points = trial_grid.geometry().get_compute_points_function(trial_element, trial_points);
 
-    // TODO: move this to grid.get_compute_points_function(test_points)
-    let test_compute_points = |cell: usize, pts: &mut Mat<f64>| {
-        for p in 0..NPTS_TEST {
-            for i in 0..gdim {
-                unsafe {
-                    *pts.get_unchecked_mut(p, i) = 0.0;
-                }
-            }
-        }
-        let vertices = test_grid.geometry().cell_vertices(cell).unwrap();
-        for (i, n) in vertices.iter().enumerate() {
-            let pt = test_grid.geometry().point(*n).unwrap();
-            for p in 0..NPTS_TEST {
-                for (j, pt_j) in pt.iter().enumerate() {
-                    unsafe {
-                        *pts.get_unchecked_mut(p, j) +=
-                            *pt_j * *test_data.get_unchecked(0, p, i, 0);
-                    }
-                }
-            }
-        }
+    let mut test_compute_jdets = test_grid.geometry().get_compute_jacobian_determinants_function(test_element, test_points);
+    let mut trial_compute_jdets = trial_grid.geometry().get_compute_jacobian_determinants_function(trial_element, trial_points);
+
+    let mut test_compute_normals = if needs_test_normal {
+        test_grid.geometry().get_compute_normals_function(test_element, test_points)
+    } else {
+        Box::new(|_i: usize, _m: &mut Mat<f64>| {})
+    };
+    let mut trial_compute_normals = if needs_trial_normal {
+        trial_grid.geometry().get_compute_normals_function(trial_element, trial_points)
+    } else {
+        Box::new(|_i: usize, _m: &mut Mat<f64>| {})
     };
 
     for test_cell in test_cells {
@@ -246,46 +237,23 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         let test_cell_gindex = test_grid.geometry().index_map()[*test_cell];
         let test_vertices = unsafe { test_c20.row_unchecked(test_cell_tindex) };
 
-        test_grid.geometry().compute_jacobian_determinants(
-            test_points,
-            test_cell_gindex,
-            &mut test_jdet,
-        );
-        test_compute_points(test_cell_gindex, &mut rlst_test_mapped_pts);
-
-        if needs_test_normal {
-            test_grid
-                .geometry()
-                .compute_normals(test_points, test_cell_gindex, &mut test_normals);
-        }
+        test_compute_jdets(test_cell_gindex, &mut test_jdet);
+        test_compute_points(test_cell_gindex, &mut test_mapped_pts);
+        test_compute_normals(test_cell_gindex, &mut test_normals);
 
         for trial_cell in trial_cells {
             let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
             let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
             let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
 
-            trial_grid.geometry().compute_jacobian_determinants(
-                trial_points,
-                trial_cell_gindex,
-                &mut trial_jdet,
-            );
-            trial_grid.geometry().compute_points(
-                trial_points,
-                trial_cell_gindex,
-                &mut rlst_trial_mapped_pts,
-            );
-            if needs_trial_normal {
-                trial_grid.geometry().compute_normals(
-                    trial_points,
-                    trial_cell_gindex,
-                    &mut trial_normals,
-                );
-            }
+            trial_compute_jdets(test_cell_gindex, &mut trial_jdet);
+            trial_compute_points(trial_cell_gindex, &mut trial_mapped_pts);
+            trial_compute_normals(trial_cell_gindex, &mut trial_normals);
 
             kernel.assemble_st(
                 EvalType::Value,
-                rlst_test_mapped_pts.data(),
-                rlst_trial_mapped_pts.data(),
+                test_mapped_pts.data(),
+                trial_mapped_pts.data(),
                 &mut k,
             );
 

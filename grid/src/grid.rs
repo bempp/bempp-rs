@@ -1,14 +1,16 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
 use bempp_element::element::{create_element, CiarletElement};
-use bempp_tools::arrays::{to_matrix, AdjacencyList, Array4D, Mat};
+use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
-use rlst_dense::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::{RandomAccessByRef, RandomAccessMut, Shape, rlst_static_mat, SizeIdentifier, RawAccess};
+use rlst_proc_macro::rlst_static_size;
 use std::ptr;
+
 /// Geometry of a serial grid
 pub struct SerialGeometry {
     coordinate_elements: Vec<CiarletElement>,
@@ -17,6 +19,10 @@ pub struct SerialGeometry {
     element_changes: Vec<usize>,
     index_map: Vec<usize>,
 }
+
+#[rlst_static_size(2, 3)]
+struct TwoByThree;
+
 
 fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
     create_element(
@@ -119,36 +125,37 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
-    /*
-        fn get_compute_points_function<T: RandomAccessMut<Item = f64> + Shape>(
-            &self,
-            element: &impl FiniteElement,
-            points: &T,
-        ) -> Box<dyn Fn(usize, &mut T)> {
-            let npts = points.shape().0;
-            let mut table = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
-            element.tabulate(points, 0, &mut table);
-            let gdim = self.dim();
+    fn get_compute_points_function<'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> Box<dyn Fn(usize, &mut TMut) + 'a> {
+        let npts = points.shape().0;
+        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
+        element.tabulate(points, 0, &mut table);
+        let gdim = self.dim();
 
-            Box::new(|cell: usize, pts: &mut T| {
-                for p in 0..npts {
-                    for i in 0..gdim {
-                            *pts.get_mut(p, i).unwrap() = 0.0;
+        Box::new(move |cell: usize, pts: &mut TMut| {
+            for p in 0..npts {
+                for i in 0..gdim {
+                        *pts.get_mut(p, i).unwrap() = 0.0;
+                }
+            }
+            let vertices = self.cell_vertices(cell).unwrap();
+            for (i, n) in vertices.iter().enumerate() {
+                let pt = self.point(*n).unwrap();
+                for p in 0..points.shape().0 {
+                    for (j, pt_j) in pt.iter().enumerate() {
+                            *pts.get_mut(p, j).unwrap() +=
+                                *pt_j * *table.get(0, p, i, 0).unwrap();
                     }
                 }
-                let vertices = self.cell_vertices(cell).unwrap();
-                for (i, n) in vertices.iter().enumerate() {
-                    let pt = self.point(*n).unwrap();
-                    for p in 0..points.shape().0 {
-                        for (j, pt_j) in pt.iter().enumerate() {
-                                *pts.get_mut(p, j).unwrap() +=
-                                    *pt_j * *table.get(0, p, i, 0);
-                        }
-                    }
-                }
-            })
-        }
-    */
+            }
+        })
+    }
     fn compute_points<
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
@@ -175,13 +182,54 @@ impl Geometry for SerialGeometry {
         }
         for i in 0..data.shape().2 {
             let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
-            for p in 0..points.shape().0 {
-                for (j, pt_j) in pt.iter().enumerate() {
+            for (j, pt_j) in pt.iter().enumerate() {
+                for p in 0..points.shape().0 {
                     *physical_points.get_mut(p, j).unwrap() +=
                         *pt_j * data.get(0, p, i, 0).unwrap();
                 }
             }
         }
+    }
+    fn get_compute_normals_function<'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> Box<dyn FnMut(usize, &mut TMut) + 'a> {
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut axes = rlst_static_mat![f64, TwoByThree];
+        element.tabulate(points, 1, &mut data);
+        Box::new(move |cell: usize, normals: &mut TMut| {
+            for p in 0..points.shape().0 {
+                for i in 0..axes.shape().0 {
+                    for j in 0..axes.shape().1 {
+                        *axes.get_mut(i, j).unwrap() = 0.0;
+                    }
+                }
+                for i in 0..data.shape().2 {
+                    let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
+                    for (j, pt_j) in pt.iter().enumerate() {
+                        *axes.get_mut(0, j).unwrap() += *pt_j * data.get(1, p, i, 0).unwrap();
+                        *axes.get_mut(1, j).unwrap() += *pt_j * data.get(2, p, i, 0).unwrap();
+                    }
+                }
+                *normals.get_mut(p, 0).unwrap() = *axes.get(0, 1).unwrap() * *axes.get(1, 2).unwrap()
+                    - *axes.get(0, 2).unwrap() * *axes.get(1, 1).unwrap();
+                *normals.get_mut(p, 1).unwrap() = *axes.get(0, 2).unwrap() * *axes.get(1, 0).unwrap()
+                    - *axes.get(0, 0).unwrap() * *axes.get(1, 2).unwrap();
+                *normals.get_mut(p, 2).unwrap() = *axes.get(0, 0).unwrap() * *axes.get(1, 1).unwrap()
+                    - *axes.get(0, 1).unwrap() * *axes.get(1, 0).unwrap();
+                let size = (*normals.get(p, 0).unwrap() * *normals.get(p, 0).unwrap()
+                    + *normals.get(p, 1).unwrap() * *normals.get(p, 1).unwrap()
+                    + *normals.get(p, 2).unwrap() * *normals.get(p, 2).unwrap())
+                .sqrt();
+                *normals.get_mut(p, 0).unwrap() /= size;
+                *normals.get_mut(p, 1).unwrap() /= size;
+                *normals.get_mut(p, 2).unwrap() /= size;
+            }
+        })
     }
     fn compute_normals<
         T: RandomAccessByRef<Item = f64> + Shape,
@@ -204,7 +252,7 @@ impl Geometry for SerialGeometry {
         }
         let element = self.element(cell);
         let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
-        let mut axes = to_matrix(&[0.0; 6], (2, 3));
+        let mut axes = rlst_static_mat![f64, TwoByThree];
         element.tabulate(points, 1, &mut data);
         for p in 0..points.shape().0 {
             for i in 0..axes.shape().0 {
@@ -233,6 +281,37 @@ impl Geometry for SerialGeometry {
             *normals.get_mut(p, 1).unwrap() /= size;
             *normals.get_mut(p, 2).unwrap() /= size;
         }
+    }
+    fn get_compute_jacobians_function<'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> Box<dyn Fn(usize, &mut TMut) + 'a> {
+        let tdim = points.shape().1;
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        element.tabulate(points, 1, &mut data);
+
+        Box::new(move |cell: usize, jacobians: &mut TMut| {
+            for p in 0..points.shape().0 {
+                for i in 0..jacobians.shape().0 {
+                    *jacobians.get_mut(i, p).unwrap() = 0.0;
+                }
+            }
+            for i in 0..data.shape().2 {
+                let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
+                for p in 0..points.shape().0 {
+                    for (j, pt_j) in pt.iter().enumerate() {
+                        for k in 0..tdim {
+                            *jacobians.get_mut(k + tdim * j, p).unwrap() +=
+                                *pt_j * data.get(k + 1, p, i, 0).unwrap();
+                        }
+                    }
+                }
+            }
+        })
     }
     fn compute_jacobians<
         T: RandomAccessByRef<Item = f64> + Shape,
@@ -272,6 +351,82 @@ impl Geometry for SerialGeometry {
             }
         }
     }
+    fn get_compute_jacobian_determinants_function<'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> Box<dyn FnMut(usize, &mut [f64]) + 'a> {
+
+        let gdim = self.dim();
+        let tdim = points.shape().1;
+        let mut js = zero_matrix((gdim * tdim, points.shape().0));
+
+        let det = match tdim {
+            1 => match gdim {
+                1 => |x: &[f64]| x[0],
+                2 => { |x: &[f64]|
+                    ((x[0]).powi(2) + (x[1]).powi(2)).sqrt()
+                }
+                3 => |x: &[f64]| ((x[0]).powi(2)
+                    + (x[1]).powi(2)
+                    + (x[2]).powi(2))
+                .sqrt(),
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            },
+            2 => match gdim {
+                2 => { |x: &[f64]|
+                    x[0] * x[3]
+                        - x[1] * x[2]
+                }
+                3 => |x: &[f64]| (((x[0]).powi(2)
+                    + (x[2]).powi(2)
+                    + (x.get(4).unwrap()).powi(2))
+                    * ((x[1]).powi(2)
+                        + (x[3]).powi(2)
+                        + (x[5]).powi(2))
+                    - (x[0] * x[1]
+                        + x[2] * x[3]
+                        + x.get(4).unwrap() * x[5])
+                    .powi(2))
+                .sqrt(),
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            },
+            3 => match gdim {
+                3 => { |x: &[f64]|
+                    x[0]
+                        * (x.get(4).unwrap() * x[8]
+                            - x[5] * x[7])
+                        - x[1]
+                            * (x[3] * x[8]
+                                - x[5] * x[6])
+                        + x[2]
+                            * (x[3] * x[7]
+                                - x.get(4).unwrap() * x[6])
+                }
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            },
+            _ => {
+                panic!("Unsupported dimensions.");
+            }
+        };
+
+        let compute_jacobians = self.get_compute_jacobians_function(element, points);
+
+        Box::new(move |cell: usize, jacobian_determinants: &mut [f64]| {
+            compute_jacobians(cell, &mut js);
+            for (p, jdet) in jacobian_determinants.iter_mut().enumerate() {
+                *jdet = det(&js.data()[tdim * gdim * p.. tdim * gdim * (p+1)]);
+            }
+        })
+    }
     fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
         points: &T,
@@ -283,9 +438,7 @@ impl Geometry for SerialGeometry {
         if points.shape().0 != jacobian_determinants.len() {
             panic!("jacobian_determinants has wrong length.");
         }
-        let mut js = to_matrix(
-            &vec![0.0; points.shape().0 * gdim * tdim],
-            (points.shape().0, gdim * tdim),
+        let mut js = zero_matrix((points.shape().0, gdim * tdim),
         ); // TODO: Memory is assigned here. Can we avoid this?
         self.compute_jacobians(points, cell, &mut js);
 
@@ -370,10 +523,7 @@ impl Geometry for SerialGeometry {
             && element.degree() == 1
         {
             // Map is affine
-            let mut js = to_matrix(
-                &vec![0.0; points.shape().0 * gdim * tdim],
-                (points.shape().0, gdim * tdim),
-            ); // TODO: Memory is assigned here. Can we avoid this?
+            let mut js = zero_matrix((points.shape().0, gdim * tdim)); // TODO: Memory is assigned here. Can we avoid this?
             self.compute_jacobians(points, cell, &mut js);
 
             // TODO: is it faster if we move this for inside the if statement?
@@ -815,6 +965,7 @@ impl Eq for SerialGrid {}
 mod test {
     use crate::grid::*;
     use approx::*;
+    use bempp_tools::arrays::to_matrix;
 
     #[test]
     fn test_connectivity() {
