@@ -188,7 +188,15 @@ where
     type TransferVector = Vec<TransferVector>;
 
     fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
-        // pick a point in the middle of the domain
+        // Parameters related to the FFT and Tree
+        let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        let size_real = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
+        let nsiblings = 8; // Number of siblings for a given tree node
+        let nconvolutions = nsiblings * nsiblings; // Number of convolutions computed for each node
+
+        // Pick a point in the middle of the domain
         let midway = domain.diameter.iter().map(|d| *d / 2.0).collect_vec();
         let point = midway
             .iter()
@@ -197,13 +205,11 @@ where
             .collect_vec();
         let point = [point[0], point[1], point[2]];
 
-        // Encode point in centre of domain and compute halo
+        // Encode point in centre of domain and compute halo of parent, and their resp. children
         let key = MortonKey::from_point(&point, &domain, 3);
-        let mut siblings = key.siblings();
-        siblings.sort();
+        let siblings = key.siblings();
         let parent = key.parent();
         let halo = parent.neighbors();
-
         let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
         // The child boxes in the halo of the sibling set
@@ -216,10 +222,9 @@ where
         let mut transfer_vectors = vec![Vec::new(); halo_children.len()];
 
         // Green's function evaluations for each source, target pair interaction
-        let mut kernel_data = vec![Vec::new(); halo_children.len()];
+        let mut kernel_data_vec = vec![Vec::new(); halo_children.len()];
 
         // Each set of 64 M2L operators will correspond to a point in the halo
-
         // Computing transfer of potential from sibling set to halo
         for (i, halo_child_set) in halo_children.iter().enumerate() {
             let mut tmp_transfer_vectors = Vec::new();
@@ -292,42 +297,31 @@ where
 
                     // Compute Green's fct evaluations
                     let kernel = self.compute_kernel(order, &conv_grid, kernel_point);
-                    let (m, n, o) = kernel.shape();
-                    let p = m + 1;
-                    let q = n + 1;
-                    let r: usize = o + 1;
 
-                    let padded_kernel = pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
+                    let padded_kernel = pad3(&kernel, (p - m, p - m, p - m), (0, 0, 0));
                     let mut padded_kernel = flip3(&padded_kernel);
 
                     // Compute FFT of padded kernel
-                    let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+                    let mut padded_kernel_hat = Array3D::<c64>::new((p, p, p / 2 + 1));
                     rfft3_fftw(
                         padded_kernel.get_data_mut(),
                         padded_kernel_hat.get_data_mut(),
-                        &[p, q, r],
+                        &[p, p, p],
                     );
 
-                    kernel_data[i].push(padded_kernel_hat);
+                    kernel_data_vec[i].push(padded_kernel_hat);
                 } else {
-                    // Fill with zeros
+                    // Fill with zeros when interaction doesn't exist
                     let n = 2 * order - 1;
                     let p = n + 1;
                     let padded_kernel_hat_zeros = Array3D::<c64>::new((p, p, p / 2 + 1));
-                    kernel_data[i].push(padded_kernel_hat_zeros);
+                    kernel_data_vec[i].push(padded_kernel_hat_zeros);
                 }
             }
         }
 
-        // Want to store FFT of Green's fct evaluations in a vec for easy application
-        let m = 2 * order - 1;
-        let p = m + 1;
-        let size_real = p * p * (p / 2 + 1);
-        let nsiblings = 8;
-        let nconvolutions = nsiblings * nsiblings;
-
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
-        let mut kernel_data_mat =
+        let mut kernel_data =
             vec![vec![Complex::<f64>::zero(); nconvolutions * size_real]; halo_children.len()];
 
         // For each halo position
@@ -335,31 +329,31 @@ where
             // For each unique interaction
             for j in 0..nconvolutions {
                 let offset = j * size_real;
-                kernel_data_mat[i][offset..offset + size_real]
-                    .copy_from_slice(kernel_data[i][j].get_data())
+                kernel_data[i][offset..offset + size_real]
+                    .copy_from_slice(kernel_data_vec[i][j].get_data())
             }
         }
 
         // We want to use this data by frequency in the implementation of FFT M2L
         // Rearrangement: Grouping by frequency, then halo child, then sibling
-        let mut rearranged = vec![Vec::new(); halo_children.len()];
+        let mut kernel_data_rearranged = vec![Vec::new(); halo_children.len()];
         for i in 0..halo_children.len() {
-            let current_vector = &kernel_data_mat[i];
+            let current_vector = &kernel_data[i];
             for l in 0..size_real {
                 // halo child
                 for k in 0..8 {
                     // sibling
                     for j in 0..8 {
                         let index = j * size_real * 8 + k * size_real + l;
-                        rearranged[i].push(current_vector[index]);
+                        kernel_data_rearranged[i].push(current_vector[index]);
                     }
                 }
             }
         }
 
         FftM2lOperatorData {
-            kernel_data: kernel_data_mat,
-            kernel_data_rearranged: rearranged,
+            kernel_data,
+            kernel_data_rearranged,
         }
     }
 
@@ -505,10 +499,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use rlst::dense::RandomAccessMut;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use crate::fft::irfft3_fftw;
     use super::*;
+    use crate::fft::irfft3_fftw;
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use rlst::dense::RandomAccessMut;
 
     #[test]
     pub fn test_svd_operator_data() {
@@ -518,7 +512,7 @@ mod test {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
         };
-        let depth = 5;
+
         let alpha = 1.05;
         let k = 60;
         let ntransfer_vectors = 316;
@@ -563,15 +557,23 @@ mod test {
             diameter: [1., 1., 1.],
         };
         let alpha = 1.05;
-        let depth = 5;
 
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Create a random point in the middle of the domain
         let m2l = fft.compute_m2l_operators(order, domain);
+        let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        let size_real = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
 
-        // Test that the number of precomputed kernel interactions matches the number of transfer vectors
-        // assert_eq!(m2l.kernel_data.keys().len(), 16);
+        // Test that the number of precomputed kernel interactions matches the number of halo postitions
+        assert_eq!(m2l.kernel_data.len(), 26);
+
+        // Test that each halo position has exactly 8x8 kernels associated with it
+        for i in 0..26 {
+            assert_eq!(m2l.kernel_data[i].len() / size_real, 64)
+        }
     }
 
     #[test]
@@ -584,7 +586,7 @@ mod test {
             diameter: [1., 1., 1.],
         };
         let alpha = 1.05;
-        let depth = 5;
+
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
         let mut multipole = rlst_mat![f64, (ncoeffs, 1)];
@@ -686,15 +688,6 @@ mod test {
 
         let key = MortonKey::from_point(&[0.5, 0.5, 0.5], &domain, level);
 
-        let v_list: Vec<_> = key
-            .parent()
-            .neighbors()
-            .iter()
-            .flat_map(|pn| pn.children())
-            .filter(|pnc| !key.is_adjacent(pnc))
-            .map(|k| k)
-            .collect();
-
         let parent_neighbours = key.parent().neighbors();
         let mut v_list_structured = vec![Vec::new(); 26];
         for (i, pn) in parent_neighbours.iter().enumerate() {
@@ -706,9 +699,6 @@ mod test {
                 }
             }
         }
-
-        // println!(" v list {:?}", v_list);
-        // println!(" v list {:?}", v_list_structured[0]);
 
         // pick a halo position
         let halo_idx = 0;
@@ -763,7 +753,7 @@ mod test {
         let q = n + 1;
         let r = o + 1;
 
-        let mut padded_kernel = pad3(&test_kernel, (p - m, q - n, r - o), (0, 0, 0));
+        let padded_kernel = pad3(&test_kernel, (p - m, q - n, r - o), (0, 0, 0));
         let mut padded_kernel = flip3(&padded_kernel);
 
         // Compute FFT of padded kernel
@@ -775,13 +765,8 @@ mod test {
         );
 
         for (p, t) in padded_kernel_hat.get_data().iter().zip(kernel_hat.iter()) {
-            // println!("p t {:?}={:?}", p, t);
             assert!((p - t).norm() < 1e-6)
         }
-        // println!("pre comp kernel {:?}", kernel_hat);
-        // println!("kernel {:?}", padded_kernel_hat.get_data());
-
-        // assert!(false);
     }
 
     #[test]
@@ -792,14 +777,15 @@ mod test {
         // and each '1' to a frequency
         let mut kernel_data_mat = vec![Vec::new(); 26];
         let size_real = 10;
-        for i in 0..26 {
+
+        for elem in kernel_data_mat.iter_mut().take(26) {
             // sibling index
             for j in 0..8 {
                 // halo child index
                 for k in 0..8 {
                     // frequency
                     for l in 0..size_real {
-                        kernel_data_mat[i].push(Complex::new((1000 * j + 100 * k + l) as f64, 0.));
+                        elem.push(Complex::new((1000 * j + 100 * k + l) as f64, 0.))
                     }
                 }
             }
@@ -824,7 +810,6 @@ mod test {
 
         // We expect the first 64 elements to correspond to the first frequency components of all
         // siblings with all elements in a given halo position
-        let halo_idx = 3;
         let freq = 4;
         let offset = freq * 64;
         let result = &rearranged[0][offset..offset + 64];
@@ -834,14 +819,9 @@ mod test {
             // for each sibling
             for j in 0..8 {
                 let expected = (i * 100 + j * 1000 + freq) as f64;
-                // println!("expected {:?} {:?}", expected, result[i*8+j].re);
                 assert!(expected == result[i * 8 + j].re)
             }
         }
-
-        // println!("expected {:?}", &kernel_data_mat[0][0..8*size_real]);
-        println!("expected {:?}", &rearranged[0][0..64]);
-        // assert!(false);
     }
 
     #[test]

@@ -4,6 +4,5 @@
 pub mod array;
 pub mod fft;
 pub mod field;
-pub mod surface;
 pub mod transfer_vector;
 pub mod types;

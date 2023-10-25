@@ -8,8 +8,7 @@ use crate::types::TransferVector;
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
 /// There are at most 316 such interactions, corresponding to unique `transfer vectors'. Here we compute all of them
-/// with respect to level 3 of an associated octree (this is the first level in which they all exist). The returned map
-/// is somewhat redundant, as it simply maps each unique transfer vector to itself.
+/// with respect to level 3 of an associated octree (this is the first level in which they all exist).
 pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     let point = [0.5, 0.5, 0.5];
     let domain = Domain {
@@ -105,10 +104,4 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     }
 
     result
-}
-
-#[cfg(test)]
-pub mod test {
-
-    use super::*;
 }
