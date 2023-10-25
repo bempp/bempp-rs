@@ -40,7 +40,7 @@ fn main() {
     assemble_batched(
         &mut matrix,
         BoundaryOperator::SingleLayer,
-        PDEType::Helmholtz(5.0),
+        PDEType::Laplace,
         &space0,
         &space1,
     );
