@@ -20,7 +20,6 @@ jobs:
       - name: Get latest rlst commit id
         id: rlst-commit
         run: |
-          echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | head -c 40)"
           echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | head -c 40)" >> $GITHUB_OUTPUT
       - name: Restore cached dependencies
         id: cache
@@ -31,57 +30,57 @@ jobs:
             target/release/deps/
           key: rlst-${{ steps.rlst-commit.outputs.commit }}-${{ matrix.mpi }}
 
-      #- name: Set up Rust
-      #  uses: actions-rs/toolchain@v1
-      #  with:
-      #    toolchain: ${{ matrix.rust-version }}
-      #    components: rustfmt
-      #- name: Set up MPI
-      #  uses: mpi4py/setup-mpi@v1
-      #  with:
-      #    mpi: ${{ matrix.mpi }}
-      #- name: Install cargo-mpirun
-      #  run: cargo install cargo-mpirun
-      #- uses: actions/checkout@v3
-      #- name: Install LAPACK & OpenBLAS
-      #  run:
-      #    sudo apt-get install libopenblas-dev liblapack-dev
-      #- name: Style checks
-      #  run: |
-      #    cargo fmt -- --check
-      #    cargo clippy -- -D warnings
-      #    cargo clippy --tests -- -D warnings
-      #    cargo clippy --examples -- -D warnings
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-version }}
+          components: rustfmt
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }}
+      - name: Install cargo-mpirun
+        run: cargo install cargo-mpirun
+      - uses: actions/checkout@v3
+      - name: Install LAPACK & OpenBLAS
+        run:
+          sudo apt-get install libopenblas-dev liblapack-dev
+      - name: Style checks
+        run: |
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+          cargo clippy --tests -- -D warnings
+          cargo clippy --examples -- -D warnings
 
-      #- name: Build rust library
-      #  run: cargo build --features "strict"
+      - name: Build rust library
+        run: cargo build --features "strict"
 
-      #- name: Run unit tests
-      #  run: cargo test --lib --features "strict"
-      #- name: Run unit tests (release)
-      #  run: cargo test --lib --release --features "strict"
-      #- name: Run unit tests (with mpi enabled)
-      #  run: cargo test --lib --features "mpi,strict"
-      #- name: Run unit tests (release with mpi enabled)
-      #  run: cargo test --lib --release --features "mpi,strict"
-      #- name: Run tests
-      #  run: cargo test --examples --release --features "mpi,strict"
-      #- name: Run examples
-      #  run: |
-      #    python3 find_examples.py
-      #    chmod +x examples.sh
-      #    ./examples.sh
+      - name: Run unit tests
+        run: cargo test --lib --features "strict"
+      - name: Run unit tests (release)
+        run: cargo test --lib --release --features "strict"
+      - name: Run unit tests (with mpi enabled)
+        run: cargo test --lib --features "mpi,strict"
+      - name: Run unit tests (release with mpi enabled)
+        run: cargo test --lib --release --features "mpi,strict"
+      - name: Run tests
+        run: cargo test --examples --release --features "mpi,strict"
+      - name: Run examples
+        run: |
+          python3 find_examples.py
+          chmod +x examples.sh
+          ./examples.sh
 
-      #- name: Build docs
-      #  run: cargo doc --features "strict" --no-deps
+      - name: Build docs
+        run: cargo doc --features "strict" --no-deps
 
-      #- name: Cache dependencies
-      #  uses: actions/cache/save@v3
-      #  with:
-      #    path: |
-      #      target/debug/deps/
-      #      target/release/deps/
-      #    key: ${{ steps.cache.outputs.cache-primary-key }}
+      - name: Cache dependencies
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            target/debug/deps/
+            target/release/deps/
+          key: ${{ steps.cache.outputs.cache-primary-key }}
 
   run-tests-python:
     name: Run tests (Python)
