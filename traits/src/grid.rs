@@ -36,7 +36,8 @@ pub trait Geometry {
     fn index_map(&self) -> &[usize];
 
     /// Get function that computes the physical coordinates of a set of points in a given cell
-    fn get_compute_points_function<'a,
+    fn get_compute_points_function<
+        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
@@ -57,7 +58,8 @@ pub trait Geometry {
     );
 
     /// Get function that computes the normals to a set of points in a given cell
-    fn get_compute_normals_function<'a,
+    fn get_compute_normals_function<
+        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
@@ -80,7 +82,8 @@ pub trait Geometry {
     /// Get function that evaluates the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn get_compute_jacobians_function<'a,
+    fn get_compute_jacobians_function<
+        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
@@ -105,9 +108,7 @@ pub trait Geometry {
     /// Get function that evaluates the determinand of the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn get_compute_jacobian_determinants_function<'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-    >(
+    fn get_compute_jacobian_determinants_function<'a, T: RandomAccessByRef<Item = f64> + Shape>(
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,

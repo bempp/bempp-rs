@@ -215,19 +215,31 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let test_element = test_grid.geometry().element(test_cells[0]);
     let trial_element = trial_grid.geometry().element(trial_cells[0]);
 
-    let test_compute_points = test_grid.geometry().get_compute_points_function(test_element, test_points);
-    let trial_compute_points = trial_grid.geometry().get_compute_points_function(trial_element, trial_points);
+    let test_compute_points = test_grid
+        .geometry()
+        .get_compute_points_function(test_element, test_points);
+    let trial_compute_points = trial_grid
+        .geometry()
+        .get_compute_points_function(trial_element, trial_points);
 
-    let mut test_compute_jdets = test_grid.geometry().get_compute_jacobian_determinants_function(test_element, test_points);
-    let mut trial_compute_jdets = trial_grid.geometry().get_compute_jacobian_determinants_function(trial_element, trial_points);
+    let mut test_compute_jdets = test_grid
+        .geometry()
+        .get_compute_jacobian_determinants_function(test_element, test_points);
+    let mut trial_compute_jdets = trial_grid
+        .geometry()
+        .get_compute_jacobian_determinants_function(trial_element, trial_points);
 
     let mut test_compute_normals = if needs_test_normal {
-        test_grid.geometry().get_compute_normals_function(test_element, test_points)
+        test_grid
+            .geometry()
+            .get_compute_normals_function(test_element, test_points)
     } else {
         Box::new(|_i: usize, _m: &mut Mat<f64>| {})
     };
     let mut trial_compute_normals = if needs_trial_normal {
-        trial_grid.geometry().get_compute_normals_function(trial_element, trial_points)
+        trial_grid
+            .geometry()
+            .get_compute_normals_function(trial_element, trial_points)
     } else {
         Box::new(|_i: usize, _m: &mut Mat<f64>| {})
     };

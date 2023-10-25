@@ -7,7 +7,9 @@ use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 use itertools::izip;
-use rlst_dense::{RandomAccessByRef, RandomAccessMut, Shape, rlst_static_mat, SizeIdentifier, RawAccess};
+use rlst_dense::{
+    rlst_static_mat, RandomAccessByRef, RandomAccessMut, RawAccess, Shape, SizeIdentifier,
+};
 use rlst_proc_macro::rlst_static_size;
 use std::ptr;
 
@@ -22,7 +24,6 @@ pub struct SerialGeometry {
 
 #[rlst_static_size(2, 3)]
 struct TwoByThree;
-
 
 fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
     create_element(
@@ -125,7 +126,8 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
-    fn get_compute_points_function<'a,
+    fn get_compute_points_function<
+        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
@@ -141,7 +143,7 @@ impl Geometry for SerialGeometry {
         Box::new(move |cell: usize, pts: &mut TMut| {
             for p in 0..npts {
                 for i in 0..gdim {
-                        *pts.get_mut(p, i).unwrap() = 0.0;
+                    *pts.get_mut(p, i).unwrap() = 0.0;
                 }
             }
             let vertices = self.cell_vertices(cell).unwrap();
@@ -149,8 +151,7 @@ impl Geometry for SerialGeometry {
                 let pt = self.point(*n).unwrap();
                 for p in 0..points.shape().0 {
                     for (j, pt_j) in pt.iter().enumerate() {
-                            *pts.get_mut(p, j).unwrap() +=
-                                *pt_j * *table.get(0, p, i, 0).unwrap();
+                        *pts.get_mut(p, j).unwrap() += *pt_j * *table.get(0, p, i, 0).unwrap();
                     }
                 }
             }
@@ -190,7 +191,8 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn get_compute_normals_function<'a,
+    fn get_compute_normals_function<
+        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
@@ -215,11 +217,14 @@ impl Geometry for SerialGeometry {
                         *axes.get_mut(1, j).unwrap() += *pt_j * data.get(2, p, i, 0).unwrap();
                     }
                 }
-                *normals.get_mut(p, 0).unwrap() = *axes.get(0, 1).unwrap() * *axes.get(1, 2).unwrap()
+                *normals.get_mut(p, 0).unwrap() = *axes.get(0, 1).unwrap()
+                    * *axes.get(1, 2).unwrap()
                     - *axes.get(0, 2).unwrap() * *axes.get(1, 1).unwrap();
-                *normals.get_mut(p, 1).unwrap() = *axes.get(0, 2).unwrap() * *axes.get(1, 0).unwrap()
+                *normals.get_mut(p, 1).unwrap() = *axes.get(0, 2).unwrap()
+                    * *axes.get(1, 0).unwrap()
                     - *axes.get(0, 0).unwrap() * *axes.get(1, 2).unwrap();
-                *normals.get_mut(p, 2).unwrap() = *axes.get(0, 0).unwrap() * *axes.get(1, 1).unwrap()
+                *normals.get_mut(p, 2).unwrap() = *axes.get(0, 0).unwrap()
+                    * *axes.get(1, 1).unwrap()
                     - *axes.get(0, 1).unwrap() * *axes.get(1, 0).unwrap();
                 let size = (*normals.get(p, 0).unwrap() * *normals.get(p, 0).unwrap()
                     + *normals.get(p, 1).unwrap() * *normals.get(p, 1).unwrap()
@@ -282,7 +287,8 @@ impl Geometry for SerialGeometry {
             *normals.get_mut(p, 2).unwrap() /= size;
         }
     }
-    fn get_compute_jacobians_function<'a,
+    fn get_compute_jacobians_function<
+        'a,
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
     >(
@@ -351,14 +357,11 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn get_compute_jacobian_determinants_function<'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-    >(
+    fn get_compute_jacobian_determinants_function<'a, T: RandomAccessByRef<Item = f64> + Shape>(
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
     ) -> Box<dyn FnMut(usize, &mut [f64]) + 'a> {
-
         let gdim = self.dim();
         let tdim = points.shape().1;
         let mut js = zero_matrix((gdim * tdim, points.shape().0));
@@ -366,49 +369,30 @@ impl Geometry for SerialGeometry {
         let det = match tdim {
             1 => match gdim {
                 1 => |x: &[f64]| x[0],
-                2 => { |x: &[f64]|
-                    ((x[0]).powi(2) + (x[1]).powi(2)).sqrt()
-                }
-                3 => |x: &[f64]| ((x[0]).powi(2)
-                    + (x[1]).powi(2)
-                    + (x[2]).powi(2))
-                .sqrt(),
+                2 => |x: &[f64]| ((x[0]).powi(2) + (x[1]).powi(2)).sqrt(),
+                3 => |x: &[f64]| ((x[0]).powi(2) + (x[1]).powi(2) + (x[2]).powi(2)).sqrt(),
                 _ => {
                     panic!("Unsupported dimensions.");
                 }
             },
             2 => match gdim {
-                2 => { |x: &[f64]|
-                    x[0] * x[3]
-                        - x[1] * x[2]
-                }
-                3 => |x: &[f64]| (((x[0]).powi(2)
-                    + (x[2]).powi(2)
-                    + (x.get(4).unwrap()).powi(2))
-                    * ((x[1]).powi(2)
-                        + (x[3]).powi(2)
-                        + (x[5]).powi(2))
-                    - (x[0] * x[1]
-                        + x[2] * x[3]
-                        + x.get(4).unwrap() * x[5])
-                    .powi(2))
-                .sqrt(),
+                2 => |x: &[f64]| x[0] * x[3] - x[1] * x[2],
+                3 => |x: &[f64]| {
+                    (((x[0]).powi(2) + (x[2]).powi(2) + (x.get(4).unwrap()).powi(2))
+                        * ((x[1]).powi(2) + (x[3]).powi(2) + (x[5]).powi(2))
+                        - (x[0] * x[1] + x[2] * x[3] + x.get(4).unwrap() * x[5]).powi(2))
+                    .sqrt()
+                },
                 _ => {
                     panic!("Unsupported dimensions.");
                 }
             },
             3 => match gdim {
-                3 => { |x: &[f64]|
-                    x[0]
-                        * (x.get(4).unwrap() * x[8]
-                            - x[5] * x[7])
-                        - x[1]
-                            * (x[3] * x[8]
-                                - x[5] * x[6])
-                        + x[2]
-                            * (x[3] * x[7]
-                                - x.get(4).unwrap() * x[6])
-                }
+                3 => |x: &[f64]| {
+                    x[0] * (x.get(4).unwrap() * x[8] - x[5] * x[7])
+                        - x[1] * (x[3] * x[8] - x[5] * x[6])
+                        + x[2] * (x[3] * x[7] - x.get(4).unwrap() * x[6])
+                },
                 _ => {
                     panic!("Unsupported dimensions.");
                 }
@@ -423,7 +407,7 @@ impl Geometry for SerialGeometry {
         Box::new(move |cell: usize, jacobian_determinants: &mut [f64]| {
             compute_jacobians(cell, &mut js);
             for (p, jdet) in jacobian_determinants.iter_mut().enumerate() {
-                *jdet = det(&js.data()[tdim * gdim * p.. tdim * gdim * (p+1)]);
+                *jdet = det(&js.data()[tdim * gdim * p..tdim * gdim * (p + 1)]);
             }
         })
     }
@@ -438,8 +422,7 @@ impl Geometry for SerialGeometry {
         if points.shape().0 != jacobian_determinants.len() {
             panic!("jacobian_determinants has wrong length.");
         }
-        let mut js = zero_matrix((points.shape().0, gdim * tdim),
-        ); // TODO: Memory is assigned here. Can we avoid this?
+        let mut js = zero_matrix((points.shape().0, gdim * tdim)); // TODO: Memory is assigned here. Can we avoid this?
         self.compute_jacobians(points, cell, &mut js);
 
         // TODO: is it faster if we move this for inside the match statement?
