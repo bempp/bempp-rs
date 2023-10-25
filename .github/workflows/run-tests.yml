@@ -20,8 +20,8 @@ jobs:
       - name: Get latest rlst commit id
         id: rlst-commit
         run: |
-          echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | cut -d' ' -f1)"
-          echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | head -c 10)"
+          echo "commit=$(git ls-remote https://github.com/linalg-rs/rlst.git HEAD | head -c 10)" >> $GITHUB_OUTPUT
       - name: Restore cached dependencies
         id: cache
         uses: actions/cache/restore@v3
