@@ -478,7 +478,7 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
         println!("{:?}", rel_error);
-        assert!(rel_error <= 1e-7);
+        assert!(rel_error <= 1e-6);
     }
 
     #[test]

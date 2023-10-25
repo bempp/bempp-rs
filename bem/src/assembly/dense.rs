@@ -936,7 +936,7 @@ mod test {
             ],
         ];
 
-        let perm = vec![0, 5, 2, 4, 3, 1];
+        let perm = [0, 5, 2, 4, 3, 1];
 
         for (i, pi) in perm.iter().enumerate() {
             for (j, pj) in perm.iter().enumerate() {
@@ -1475,7 +1475,7 @@ mod test {
             ],
         ];
 
-        let perm = vec![0, 5, 2, 4, 3, 1];
+        let perm = [0, 5, 2, 4, 3, 1];
 
         for (i, pi) in perm.iter().enumerate() {
             for (j, pj) in perm.iter().enumerate() {
