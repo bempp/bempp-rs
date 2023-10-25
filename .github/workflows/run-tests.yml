@@ -22,16 +22,18 @@ jobs:
         with:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
       - name: Install cargo-mpirun
         run: cargo install cargo-mpirun
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bempp-rs-${{ matrix.rust-version }}
+
       - uses: actions/checkout@v3
       - name: Install LAPACK & OpenBLAS
         run:
