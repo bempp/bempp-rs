@@ -12,6 +12,9 @@ pub enum Ownership {
     Ghost(usize, usize),
 }
 
+pub type GeomF<'a, T> = Box<dyn Fn(usize, &mut T) + 'a>;
+pub type GeomFMut<'a, T> = Box<dyn FnMut(usize, &mut T) + 'a>;
+
 pub trait Geometry {
     //! Grid geometry
     //!
@@ -44,7 +47,7 @@ pub trait Geometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn Fn(usize, &mut TMut) + 'a>;
+    ) -> GeomF<'a, TMut>;
 
     /// Compute the physical coordinates of a set of points in a given cell
     fn compute_points<
@@ -66,7 +69,7 @@ pub trait Geometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn FnMut(usize, &mut TMut) + 'a>;
+    ) -> GeomFMut<'a, TMut>;
 
     /// Compute the normals to a set of points in a given cell
     fn compute_normals<
@@ -90,7 +93,7 @@ pub trait Geometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn Fn(usize, &mut TMut) + 'a>;
+    ) -> GeomF<'a, TMut>;
 
     /// Evaluate the jacobian at a set of points in a given cell
     ///
@@ -112,7 +115,7 @@ pub trait Geometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn FnMut(usize, &mut [f64]) + 'a>;
+    ) -> GeomFMut<[f64]>;
 
     /// Evaluate the determinand of the jacobian at a set of points in a given cell
     ///

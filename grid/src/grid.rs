@@ -5,7 +5,7 @@ use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
-use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
+use bempp_traits::grid::{Geometry, Grid, Ownership, Topology, GeomF, GeomFMut};
 use itertools::izip;
 use rlst_dense::{
     rlst_static_mat, RandomAccessByRef, RandomAccessMut, RawAccess, Shape, SizeIdentifier,
@@ -134,7 +134,7 @@ impl Geometry for SerialGeometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn Fn(usize, &mut TMut) + 'a> {
+    ) -> GeomF<'a, TMut> {
         let npts = points.shape().0;
         let mut table = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
         element.tabulate(points, 0, &mut table);
@@ -199,7 +199,7 @@ impl Geometry for SerialGeometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn FnMut(usize, &mut TMut) + 'a> {
+    ) -> GeomFMut<'a, TMut> {
         let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         let mut axes = rlst_static_mat![f64, TwoByThree];
         element.tabulate(points, 1, &mut data);
@@ -295,7 +295,7 @@ impl Geometry for SerialGeometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn Fn(usize, &mut TMut) + 'a> {
+    ) -> GeomF<'a, TMut> {
         let tdim = points.shape().1;
         let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
         element.tabulate(points, 1, &mut data);
@@ -361,7 +361,7 @@ impl Geometry for SerialGeometry {
         &'a self,
         element: &impl FiniteElement,
         points: &'a T,
-    ) -> Box<dyn FnMut(usize, &mut [f64]) + 'a> {
+    ) -> GeomFMut<'a, [f64]> {
         let gdim = self.dim();
         let tdim = points.shape().1;
         let mut js = zero_matrix((gdim * tdim, points.shape().0));
