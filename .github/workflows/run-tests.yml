@@ -23,7 +23,8 @@ jobs:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
 
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
