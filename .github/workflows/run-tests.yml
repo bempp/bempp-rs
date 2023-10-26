@@ -36,7 +36,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: bempp-rs-${{ matrix.rust-version }}
+          prefix-key: bempp-rs-${{ matrix.rust-version }}-${{ matrix.mpi }}
 
       - name: Style checks
         run: |
