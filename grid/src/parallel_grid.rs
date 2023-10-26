@@ -4,7 +4,8 @@ use bempp_element::element::CiarletElement;
 use bempp_tools::arrays::{zero_matrix, AdjacencyList, Mat};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
+use bempp_traits::element::FiniteElement;
+use bempp_traits::grid::{GeomF, GeomFMut, Geometry, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
 use rlst_dense::{RandomAccessByRef, RandomAccessMut, Shape};
 
@@ -62,6 +63,18 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
     fn index_map(&self) -> &[usize] {
         self.serial_geometry.index_map()
     }
+    fn get_compute_points_function<
+        'b,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'b self,
+        element: &impl FiniteElement,
+        points: &'b T,
+    ) -> GeomF<'b, TMut> {
+        self.serial_geometry
+            .get_compute_points_function(element, points)
+    }
     fn compute_points<
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
@@ -74,6 +87,18 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         self.serial_geometry
             .compute_points(points, cell, physical_points)
     }
+    fn get_compute_normals_function<
+        'b,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'b self,
+        element: &impl FiniteElement,
+        points: &'b T,
+    ) -> GeomFMut<'b, TMut> {
+        self.serial_geometry
+            .get_compute_normals_function(element, points)
+    }
     fn compute_normals<
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
@@ -84,6 +109,18 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         normals: &mut TMut,
     ) {
         self.serial_geometry.compute_points(points, cell, normals)
+    }
+    fn get_compute_jacobians_function<
+        'b,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'b self,
+        element: &impl FiniteElement,
+        points: &'b T,
+    ) -> GeomF<'b, TMut> {
+        self.serial_geometry
+            .get_compute_jacobians_function(element, points)
     }
     fn compute_jacobians<
         T: RandomAccessByRef<Item = f64> + Shape,
@@ -96,6 +133,14 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
     ) {
         self.serial_geometry
             .compute_jacobians(points, cell, jacobians)
+    }
+    fn get_compute_jacobian_determinants_function<'b, T: RandomAccessByRef<Item = f64> + Shape>(
+        &'b self,
+        element: &impl FiniteElement,
+        points: &'b T,
+    ) -> GeomFMut<'b, [f64]> {
+        self.serial_geometry
+            .get_compute_jacobian_determinants_function(element, points)
     }
     fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
