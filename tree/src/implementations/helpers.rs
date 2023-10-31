@@ -6,13 +6,12 @@ use std::collections::HashMap;
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use rlst::dense::{base_matrix::BaseMatrix, rlst_mat, Dynamic, Matrix, VectorContainer};
+use rlst::dense::{base_matrix::BaseMatrix, rlst_dynamic_mat, Dynamic, Matrix, VectorContainer};
 
 use crate::types::morton::MortonKey;
 
 /// Alias for an rlst container for point data.
-pub type PointsMat =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type PointsMat = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
 
 /// Points fixture for testing, uniformly samples in each axis from min to max.
 ///
@@ -31,7 +30,7 @@ pub fn points_fixture(npoints: usize, min: Option<f64>, max: Option<f64>) -> Poi
         between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
     }
 
-    let mut points = rlst_mat![f64, (npoints, 3)];
+    let mut points = rlst_dynamic_mat![f64, (npoints, 3)];
 
     for i in 0..npoints {
         points[[i, 0]] = between.sample(&mut range);
@@ -54,7 +53,7 @@ pub fn points_fixture_col(npoints: usize) -> PointsMat {
     let between1 = rand::distributions::Uniform::from(0f64..0.1f64);
     let between2 = rand::distributions::Uniform::from(0f64..500f64);
 
-    let mut points = rlst_mat![f64, (npoints, 3)];
+    let mut points = rlst_dynamic_mat![f64, (npoints, 3)];
 
     for i in 0..npoints {
         // One axis has a different sampling
