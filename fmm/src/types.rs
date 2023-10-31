@@ -19,16 +19,13 @@ pub type GlobalIdx = usize;
 pub type ChargeDict = HashMap<GlobalIdx, Charge>;
 
 /// Type alias for multipole/local expansion containers.
-pub type Expansions =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type Expansions = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
 
 /// Type alias for potential containers.
-pub type Potentials =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type Potentials = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
 
 /// Type alias for approximation of FMM operator matrices.
-pub type C2EType =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type C2EType = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
 
 /// Type to store data associated with an FMM in.
 pub struct FmmData<T: Fmm> {

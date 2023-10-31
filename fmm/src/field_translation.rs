@@ -28,7 +28,7 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use rlst::{
     common::traits::*,
-    dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot, Shape},
+    dense::{rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, Shape},
 };
 
 use crate::types::{FmmData, KiFmm};
@@ -426,7 +426,7 @@ where
                 let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);
 
                 let m2l_rw = m2l_arc.read().unwrap();
-                let mut multipoles = rlst_mat![f64, (self.fmm.m2l.k, m2l_rw.len())];
+                let mut multipoles = rlst_dynamic_mat![f64, (self.fmm.m2l.k, m2l_rw.len())];
 
                 for (i, (source, _)) in m2l_rw.iter().enumerate() {
                     let source_multipole_arc = Arc::clone(self.multipoles.get(source).unwrap());

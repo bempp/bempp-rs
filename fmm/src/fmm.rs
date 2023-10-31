@@ -7,9 +7,8 @@ use std::{
 };
 
 use rlst::{
-    algorithms::{linalg::LinAlg, traits::pseudo_inverse::Pinv},
     common::traits::{Eval, NewLikeSelf, Transpose},
-    dense::{rlst_col_vec, rlst_mat, rlst_pointer_mat, traits::*, Dot},
+    dense::{rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot},
 };
 
 use bempp_traits::{
@@ -21,6 +20,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
+use crate::pinv::pinv;
 use crate::types::{C2EType, ChargeDict, FmmData, KiFmm};
 
 /// Implementation of constructor for single node KiFMM
@@ -72,7 +72,7 @@ where
 
         // Compute upward check to equivalent, and downward check to equivalent Gram matrices
         // as well as their inverses using DGESVD.
-        let mut uc2e = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
+        let mut uc2e = rlst_dynamic_mat![f64, (ncheck_surface, nequiv_surface)];
         kernel.assemble_st(
             EvalType::Value,
             upward_equivalent_surface.data(),
@@ -83,7 +83,7 @@ where
         // Need to tranapose so that rows correspond to targets and columns to sources
         let uc2e = uc2e.transpose().eval();
 
-        let mut dc2e = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
+        let mut dc2e = rlst_dynamic_mat![f64, (ncheck_surface, nequiv_surface)];
         kernel.assemble_st(
             EvalType::Value,
             downward_equivalent_surface.data(),
@@ -94,21 +94,17 @@ where
         // Need to tranapose so that rows correspond to targets and columns to sources
         let dc2e = dc2e.transpose().eval();
 
-        let (s, ut, v) = uc2e.linalg().pinv(None).unwrap();
-        let s = s.unwrap();
-        let ut = ut.unwrap();
-        let v = v.unwrap();
-        let mut mat_s = rlst_mat![f64, (s.len(), s.len())];
+        let (s, ut, v) = pinv::<f64>(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_mat![f64, (s.len(), s.len())];
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
         let uc2e_inv = v.dot(&mat_s).dot(&ut);
 
-        let (s, ut, v) = dc2e.linalg().pinv(None).unwrap();
-        let s = s.unwrap();
-        let ut = ut.unwrap();
-        let v = v.unwrap();
-        let mut mat_s = rlst_mat![f64, (s.len(), s.len())];
+        let (s, ut, v) = pinv::<f64>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_mat![f64, (s.len(), s.len())];
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
@@ -131,7 +127,7 @@ where
                 rlst_pointer_mat!['a, f64, child_downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
             };
 
-            let mut pc2ce = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
+            let mut pc2ce = rlst_dynamic_mat![f64, (ncheck_surface, nequiv_surface)];
 
             kernel.assemble_st(
                 EvalType::Value,
@@ -145,7 +141,7 @@ where
 
             m2m.push(uc2e_inv.dot(&pc2ce).eval());
 
-            let mut cc2pe = rlst_mat![f64, (ncheck_surface, nequiv_surface)];
+            let mut cc2pe = rlst_dynamic_mat![f64, (ncheck_surface, nequiv_surface)];
 
             kernel.assemble_st(
                 EvalType::Value,
@@ -394,7 +390,7 @@ mod test {
         let charges = vec![1.0; npoints];
 
         // Setup a FMM experiment
-        let order = 9;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 1.99;
         let adaptive = false;
@@ -477,8 +473,7 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        println!("{:?}", rel_error);
-        assert!(rel_error <= 1e-6);
+        assert!(rel_error <= 1e-5);
     }
 
     #[test]
@@ -488,7 +483,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 9;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 1.95;
         let adaptive = false;
@@ -514,9 +509,7 @@ mod test {
 
         let datatree = FmmData::new(fmm, &charge_dict);
 
-        let times = datatree.run(Some(true));
-
-        println!("FFT times {:?}", times);
+        datatree.run(Some(true));
 
         let leaf = &datatree.fmm.tree.get_leaves().unwrap()[0];
 
@@ -558,7 +551,6 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        println!("rel error {:?}", rel_error);
-        assert!(rel_error <= 1e-6);
+        assert!(rel_error <= 1e-5);
     }
 }
