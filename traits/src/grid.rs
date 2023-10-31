@@ -1,8 +1,9 @@
 //! Geometry and topology definitions
 
-use crate::arrays::{AdjacencyListAccess, Array2DAccess};
+use crate::arrays::AdjacencyListAccess;
 use crate::cell::ReferenceCellType;
-use std::cell::Ref;
+use crate::element::FiniteElement;
+use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// The ownership of a mesh entity
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -10,6 +11,9 @@ pub enum Ownership {
     Owned,
     Ghost(usize, usize),
 }
+
+pub type GeomF<'a, T> = Box<dyn Fn(usize, &mut T) + 'a>;
+pub type GeomFMut<'a, T> = Box<dyn FnMut(usize, &mut T) + 'a>;
 
 pub trait Geometry {
     //! Grid geometry
@@ -19,8 +23,8 @@ pub trait Geometry {
     /// The geometric dimension
     fn dim(&self) -> usize;
 
-    /// Get the point with the index `i`
-    fn point(&self, i: usize) -> Option<&[f64]>;
+    /// Get the coordinates of a point
+    fn point(&self, index: usize) -> Option<Vec<f64>>; // TODO: Make this Option<&[f64]>
 
     /// The number of points stored in the geometry
     fn point_count(&self) -> usize;
@@ -34,38 +38,91 @@ pub trait Geometry {
     /// Return the index map from the input cell numbers to the storage numbers
     fn index_map(&self) -> &[usize];
 
+    /// Get function that computes the physical coordinates of a set of points in a given cell
+    fn get_compute_points_function<
+        'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> GeomF<'a, TMut>;
+
     /// Compute the physical coordinates of a set of points in a given cell
-    fn compute_points<'a>(
+    fn compute_points<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        physical_points: &mut impl Array2DAccess<'a, f64>,
+        physical_points: &mut TMut,
     );
 
+    /// Get function that computes the normals to a set of points in a given cell
+    fn get_compute_normals_function<
+        'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> GeomFMut<'a, TMut>;
+
     /// Compute the normals to a set of points in a given cell
-    fn compute_normals<'a>(
+    fn compute_normals<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        normals: &mut impl Array2DAccess<'a, f64>,
+        normals: &mut TMut,
     );
+
+    /// Get function that evaluates the jacobian at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn get_compute_jacobians_function<
+        'a,
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> GeomF<'a, TMut>;
 
     /// Evaluate the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobians<'a>(
+    fn compute_jacobians<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        jacobians: &mut impl Array2DAccess<'a, f64>,
+        jacobians: &mut TMut,
     );
+
+    /// Get function that evaluates the determinand of the jacobian at a set of points in a given cell
+    ///
+    /// The input points should be given using coordinates on the reference element
+    fn get_compute_jacobian_determinants_function<'a, T: RandomAccessByRef<Item = f64> + Shape>(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a T,
+    ) -> GeomFMut<[f64]>;
 
     /// Evaluate the determinand of the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_determinants<'a>(
+    fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
         jacobian_determinants: &mut [f64],
     );
@@ -73,11 +130,14 @@ pub trait Geometry {
     /// Evaluate the jacobian inverse at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_inverses<'a>(
+    fn compute_jacobian_inverses<
+        T: RandomAccessByRef<Item = f64> + Shape,
+        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    >(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         cell: usize,
-        jacobian_inverses: &mut impl Array2DAccess<'a, f64>,
+        jacobian_inverses: &mut TMut,
     );
 }
 
@@ -98,45 +158,16 @@ pub trait Topology<'a> {
     fn entity_count(&self, dim: usize) -> usize;
 
     /// The indices of the vertices that from cell with index `index`
-    fn cell(&self, index: usize) -> Option<Ref<[usize]>>;
+    fn cell(&self, index: usize) -> Option<&[usize]>;
 
     /// The indices of the vertices that from cell with index `index`
     fn cell_type(&self, index: usize) -> Option<ReferenceCellType>;
 
-    /// Create the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    ///
-    /// If this function is called multiple times, it will do nothing after the first call
-    fn create_connectivity(&self, dim0: usize, dim1: usize);
-
-    /// Create the connectivity information for all dimensions
-    fn create_connectivity_all(&self) {
-        for dim0 in 0..self.dim() {
-            for dim1 in 0..self.dim() {
-                self.create_connectivity(dim0, dim1);
-            }
-        }
-    }
-
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`
-    fn connectivity(&self, dim0: usize, dim1: usize) -> Ref<Self::Connectivity>;
+    fn connectivity(&self, dim0: usize, dim1: usize) -> &Self::Connectivity;
 
     /// Get the ownership of a mesh entity
     fn entity_ownership(&self, dim: usize, index: usize) -> Ownership;
-
-    /// Get pairs of cells that are adjacent via a facet (entity of dimension tdim - 1).
-    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
-    fn facet_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
-
-    /// Get pairs of cells that are adjacent via a ridge (entity of dimension tdim - 2).
-    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
-    fn ridge_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
-
-    /// Get pairs of cells that are adjacent via a peak (entity of dimension tdim - 3).
-    /// Entries in returned vector are (cell0, cell1, connectivity_type_id)
-    fn peak_adjacent_cells(&self) -> Ref<Vec<(usize, usize, u8)>>;
-
-    /// Get pairs of cells that are not adjacent
-    fn nonadjacent_cells(&self) -> Ref<Vec<(usize, usize)>>;
 }
 
 pub trait Grid<'a> {

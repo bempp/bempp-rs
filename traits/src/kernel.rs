@@ -4,7 +4,7 @@ use crate::types::KernelType;
 use crate::types::Scalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
-pub trait Kernel {
+pub trait Kernel: Sync {
     type T: Scalar;
 
     /// Single threaded evaluation of Green's functions.
@@ -22,9 +22,10 @@ pub trait Kernel {
     ///           for each target in consecutive order the value of the kernel and the three components
     ///           of its derivative.
     ///
-    /// The following code gives an example of how to use it together with the `rlst` dense matrix type.
+    /// The following code gives an example of how to use it together with the [rlst] dense matrix type.
     /// ```
     /// use rlst::dense::*;
+    /// use rlst_dense;
     /// use bempp_kernel::traits::*;
     /// use bempp_kernel::laplace_3d::Laplace3dKernel;
     /// use bempp_kernel::types::*;
@@ -34,7 +35,7 @@ pub trait Kernel {
     /// let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
     /// let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
     /// let charges = rlst::dense::rlst_col_vec![f64, nsources];
-    /// let mut interactions = rlst::dense::rlst_mat![f64, (4, ntargets)];
+    /// let mut interactions = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
     ///
     /// Laplace3dKernel::<f64>::new().evaluate_st(EvalType::ValueDeriv, sources.data(), targets.data(), charges.data(), interactions.data_mut());
     ///
@@ -52,7 +53,7 @@ pub trait Kernel {
 
     /// Multi-threaded evaluation of a Green's function kernel.
     ///
-    /// The method parallelizes over the given targets. It expects a Rayon `ThreadPool`
+    /// The method parallelizes over the given targets. It expects a Rayon [ThreadPool]
     /// in which the multi-threaded execution can be scheduled.
     fn evaluate_mt(
         &self,
@@ -77,9 +78,10 @@ pub trait Kernel {
     ///           in consecutive order the interaction of all sources with the first target and then the corresponding derivatives,
     ///           followed by the interactions with the second target, and so on. See the example for illustration.
     ///
-    /// The following code gives an example of how to use it together with the `rlst` dense matrix type.
+    /// The following code gives an example of how to use it together with the [rlst] dense matrix type.
     /// ```
     /// use rlst::dense::*;
+    /// use rlst_dense;
     /// use bempp_kernel::traits::*;
     /// use bempp_kernel::laplace_3d::Laplace3dKernel;
     /// use bempp_kernel::types::*;
@@ -88,7 +90,7 @@ pub trait Kernel {
     ///
     /// let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
     /// let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-    /// let mut interactions = rlst::dense::rlst_mat![f64, (nsources, 4 * ntargets)];
+    /// let mut interactions = rlst_dense::rlst_dynamic_mat![f64, (nsources, 4 * ntargets)];
     ///
     /// Laplace3dKernel::<f64>::new().assemble_st(EvalType::ValueDeriv, sources.data(), targets.data(), interactions.data_mut());
     ///
@@ -134,6 +136,7 @@ pub trait Kernel {
     /// given, and `4` if [EvalType::ValueDeriv] is given.
     fn range_component_count(&self, eval_type: EvalType) -> usize;
 }
+
 
 /// Scaling required by the FMM to apply kernel to each octree level.
 pub trait KernelScale {

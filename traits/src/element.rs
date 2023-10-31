@@ -1,7 +1,8 @@
 //! Finite element definitions
 
-use crate::arrays::{Array2DAccess, Array4DAccess};
+use crate::arrays::Array4DAccess;
 use crate::cell::ReferenceCellType;
+use rlst_common::traits::{RandomAccessByRef, Shape};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -9,6 +10,13 @@ use crate::cell::ReferenceCellType;
 pub enum ElementFamily {
     Lagrange = 0,
     RaviartThomas = 1,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[repr(u8)]
+pub enum Continuity {
+    Continuous = 0,
+    Discontinuous = 1,
 }
 
 /// The map type used by an element
@@ -53,16 +61,19 @@ pub trait FiniteElement {
     /// The number of basis functions
     fn dim(&self) -> usize;
 
-    /// Is the element discontinuous between cells?
-    fn discontinuous(&self) -> bool;
+    /// Type of continuity between cells
+    fn continuity(&self) -> Continuity;
+
+    /// The value shape
+    fn value_shape(&self) -> &[usize];
 
     /// The value size
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate<'a>(
+    fn tabulate<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
-        points: &impl Array2DAccess<'a, f64>,
+        points: &T,
         nderivs: usize,
         data: &mut impl Array4DAccess<f64>,
     );

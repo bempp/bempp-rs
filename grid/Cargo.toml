@@ -26,3 +26,6 @@ bempp-element = { path = "../element"}
 approx = "0.5"
 itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
+rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-proc-macro = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }

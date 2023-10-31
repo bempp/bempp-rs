@@ -1,12 +1,12 @@
-use bempp_tools::arrays::{AdjacencyList, Array2D};
-use bempp_traits::arrays::{AdjacencyListAccess, Array2DAccess};
+use bempp_tools::arrays::AdjacencyList;
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::DofMap;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Grid, Topology};
 
 pub struct SerialDofMap {
     entity_dofs: [AdjacencyList<usize>; 4],
-    cell_dofs: Array2D<usize>,
+    cell_dofs: AdjacencyList<usize>,
     size: usize,
 }
 
@@ -18,8 +18,14 @@ impl SerialDofMap {
         for d in 0..tdim + 1 {
             entity_dofs_data.push(vec![vec![]; grid.topology().entity_count(d)]);
         }
-        let mut cell_dofs =
-            Array2D::<usize>::new((grid.topology().entity_count(tdim), element.dim()));
+        let mut offsets = vec![];
+        for i in 0..grid.topology().entity_count(tdim) + 1 {
+            offsets.push(i * element.dim());
+        }
+        let mut cell_dofs = AdjacencyList::from_data(
+            vec![0; grid.topology().entity_count(tdim) * element.dim()],
+            offsets,
+        );
         for cell in 0..grid.topology().entity_count(tdim) {
             for (d, ed_data) in entity_dofs_data.iter_mut().enumerate() {
                 for (i, e) in unsafe {
@@ -92,7 +98,7 @@ mod test {
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::ElementFamily;
+    use bempp_traits::element::{Continuity, ElementFamily};
 
     #[test]
     fn test_dofmap_lagrange0() {
@@ -101,7 +107,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
-            true,
+            Continuity::Discontinuous,
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
@@ -118,7 +124,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
-            false,
+            Continuity::Continuous,
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
@@ -132,7 +138,7 @@ mod test {
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             2,
-            false,
+            Continuity::Continuous,
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
