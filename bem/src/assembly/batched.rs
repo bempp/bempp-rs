@@ -1,6 +1,4 @@
 use crate::function_space::SerialFunctionSpace;
-use bempp_kernel::traits::Kernel;
-use bempp_kernel::types::EvalType;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -11,6 +9,8 @@ use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
+use bempp_traits::kernel::Kernel;
+use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
 use rlst_dense::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
@@ -968,8 +968,4 @@ mod test {
         }
     }
     */
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> main

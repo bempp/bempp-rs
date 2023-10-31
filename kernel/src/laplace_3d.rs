@@ -139,8 +139,6 @@ where
             });
     }
 
-
-
     fn assemble_mt(
         &self,
         eval_type: bempp_traits::types::EvalType,

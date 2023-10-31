@@ -137,7 +137,6 @@ pub trait Kernel: Sync {
     fn range_component_count(&self, eval_type: EvalType) -> usize;
 }
 
-
 /// Scaling required by the FMM to apply kernel to each octree level.
 pub trait KernelScale {
     /// The kernel is generic over data type.
