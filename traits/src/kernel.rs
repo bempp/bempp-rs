@@ -22,7 +22,7 @@ pub trait Kernel: Sync {
     ///           for each target in consecutive order the value of the kernel and the three components
     ///           of its derivative.
     ///
-    /// The following code gives an example of how to use it together with the [rlst] dense matrix type.
+    /// The following code gives an example of how to use it together with the `rlst` dense matrix type.
     /// ```
     /// use rlst::dense::*;
     /// use rlst_dense;
@@ -53,7 +53,7 @@ pub trait Kernel: Sync {
 
     /// Multi-threaded evaluation of a Green's function kernel.
     ///
-    /// The method parallelizes over the given targets. It expects a Rayon [ThreadPool]
+    /// The method parallelizes over the given targets. It expects a Rayon `ThreadPool`
     /// in which the multi-threaded execution can be scheduled.
     fn evaluate_mt(
         &self,
@@ -78,7 +78,7 @@ pub trait Kernel: Sync {
     ///           in consecutive order the interaction of all sources with the first target and then the corresponding derivatives,
     ///           followed by the interactions with the second target, and so on. See the example for illustration.
     ///
-    /// The following code gives an example of how to use it together with the [rlst] dense matrix type.
+    /// The following code gives an example of how to use it together with the `rlst` dense matrix type.
     /// ```
     /// use rlst::dense::*;
     /// use rlst_dense;
