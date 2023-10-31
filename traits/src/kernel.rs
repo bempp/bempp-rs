@@ -22,26 +22,6 @@ pub trait Kernel: Sync {
     ///           for each target in consecutive order the value of the kernel and the three components
     ///           of its derivative.
     ///
-    /// The following code gives an example of how to use it together with the `rlst` dense matrix type.
-    /// ```
-    /// use rlst::dense::*;
-    /// use rlst_dense;
-    /// use bempp_kernel::traits::*;
-    /// use bempp_kernel::laplace_3d::Laplace3dKernel;
-    /// use bempp_kernel::types::*;
-    /// let nsources = 5;
-    /// let ntargets = 10;
-    ///
-    /// let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-    /// let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-    /// let charges = rlst::dense::rlst_col_vec![f64, nsources];
-    /// let mut interactions = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
-    ///
-    /// Laplace3dKernel::<f64>::new().evaluate_st(EvalType::ValueDeriv, sources.data(), targets.data(), charges.data(), interactions.data_mut());
-    ///
-    /// println!("The value of the potential at the second target is {}", interactions[[0, 1]]);
-    /// println!("The target derivative of the potential at the second target is ({}, {}, {})", interactions[[1, 1]], interactions[[2, 1]], interactions[[3, 1]]);
-    ///```
     fn evaluate_st(
         &self,
         eval_type: EvalType,
@@ -78,30 +58,6 @@ pub trait Kernel: Sync {
     ///           in consecutive order the interaction of all sources with the first target and then the corresponding derivatives,
     ///           followed by the interactions with the second target, and so on. See the example for illustration.
     ///
-    /// The following code gives an example of how to use it together with the `rlst` dense matrix type.
-    /// ```
-    /// use rlst::dense::*;
-    /// use rlst_dense;
-    /// use bempp_kernel::traits::*;
-    /// use bempp_kernel::laplace_3d::Laplace3dKernel;
-    /// use bempp_kernel::types::*;
-    /// let nsources = 5;
-    /// let ntargets = 10;
-    ///
-    /// let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-    /// let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-    /// let mut interactions = rlst_dense::rlst_dynamic_mat![f64, (nsources, 4 * ntargets)];
-    ///
-    /// Laplace3dKernel::<f64>::new().assemble_st(EvalType::ValueDeriv, sources.data(), targets.data(), interactions.data_mut());
-    ///
-    /// // The column index of the third target interaction is 8 = 2 * 4, since each
-    /// // target is associated with its interaction value plus 3 derivatives, i.e. 4 values.
-    /// // The derivatives correspondingly have the column indices 9, 10, 11.
-    /// // If EvalType::Value is chosen then the column index would be 2 as then each target
-    /// // is only associated with 1 value.
-    /// println!("The interaction of the second source with the third target is {}", interactions[[1, 8]]);
-    /// println!("The target derivative of the potential at the second target is ({}, {}, {})", interactions[[1, 9]], interactions[[1, 10]], interactions[[1, 11]]);
-    ///```
     fn assemble_st(
         &self,
         eval_type: EvalType,

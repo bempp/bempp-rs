@@ -92,9 +92,6 @@ mod test {
 
         let (s, ut, v) = pinv::<f64>(&mat, None, None).unwrap();
 
-        let ut = ut;
-        let v = v;
-
         let mut mat_s = rlst_dynamic_mat![f64, (s.len(), s.len())];
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];

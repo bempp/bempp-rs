@@ -23,3 +23,4 @@ cauchy="0.4.*"
 thiserror="1.*"
 num = "0.4"
 rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
