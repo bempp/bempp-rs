@@ -1,3 +1,4 @@
+//! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
 use itertools::{izip, Itertools};
 use std::{
     cmp::Ordering,
@@ -14,6 +15,7 @@ use crate::{
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
+    implementations::helpers::find_corners,
     types::{
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
@@ -24,6 +26,10 @@ use crate::{
 use bempp_traits::tree::MortonKeyInterface;
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
+/// Returns an owned vector of Morton Keys, hence requires a copy.
+///
+/// # Arguments
+/// * `keys` - A slice of Morton Keys to be linearised.
 fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     let depth = keys.iter().map(|k| k.level()).max().unwrap();
     let mut key_set: HashSet<MortonKey> = keys.iter().cloned().collect();
@@ -46,7 +52,12 @@ fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     result
 }
 
-// Only works on complete trees.
+/// Enforce a 2:1 balance on a slice of Morton Keys. This method relies on `complete'
+/// Trees, i.e. there are no gaps between keys provided to the method in the iterator.
+/// Returns a set of Morton Keys.
+///
+/// # Arguments
+/// * `keys` - A slice of Morton Keys to be balanced.
 fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
     for level in (0..=DEEPEST_LEVEL).rev() {
@@ -75,7 +86,12 @@ fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     balanced
 }
 
-/// Complete the region between two keys with the minimum spanning nodes, algorithm 6 in \[1\].
+/// Complete the region between two keys with the minimum spanning boxes that cover the region.
+/// Returns an owned vector of Morton Keys.
+///
+/// # Arguments
+/// * `a` - Morton Key specifying the start of a region to be completed.
+/// * `b` - Morton Key specifying the end of a region to be completed.
 pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
     let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
     let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
@@ -128,19 +144,14 @@ impl MortonKeys {
             .collect();
     }
 
-    /// Wrapper for linearize_keys over all keys in vector of Morton keys.
+    /// Wrapper for linearising a container of Morton Keys.
     pub fn linearize(&mut self) {
         self.keys = linearize_keys(&self.keys);
     }
 
-    /// Wrapper for sorting a tree, by its keys.
+    /// Wrapper for sorting a container of Morton Keys.
     pub fn sort(&mut self) {
         self.keys.sort();
-    }
-
-    /// The depth is defined by the key at the maximum level in the final tree
-    pub fn depth(&self) -> u64 {
-        self.keys.iter().map(|k| k.level()).max().unwrap()
     }
 
     /// Enforce a 2:1 balance for a vector of Morton keys, and remove any overlaps.
@@ -214,22 +225,24 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 
 /// Map a point to the anchor of the enclosing box.
 ///
-/// Returns the 3 integeger coordinates of the enclosing box.
+/// Returns the 3 integer coordinates of the enclosing box.
 ///
 /// # Arguments
-/// `point` - The (x, y, z) coordinates of the point to map.
-/// `level` - The level of the tree at which the point will be mapped.
-/// `domain` - The computational domain defined by the point set.
+/// * `point` - The (x, y, z) coordinates of the point to map.
+/// * `level` - The level of the tree at which the point will be mapped.
+/// * `domain` - The computational domain defined by the point set.
 pub fn point_to_anchor(
     point: &[PointType; 3],
     level: KeyType,
     domain: &Domain,
 ) -> Result<[KeyType; 3], Box<dyn Error>> {
     // Check if point is in the domain
-    let mut contained = true;
+
+    let mut contained = Vec::new();
     for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
-        contained = (o < p) && (p < o + d);
+        contained.push((o <= p) && (p <= o + d));
     }
+    let contained = contained.iter().all(|&x| x);
 
     match contained {
         true => {
@@ -243,7 +256,7 @@ pub fn point_to_anchor(
 
             let scaling_factor = 1 << (DEEPEST_LEVEL - level);
 
-            for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, side_length) {
+            for (a, p, o, s) in izip!(&mut anchor, point, &domain.origin, &side_length) {
                 *a = (((p - o) / s).floor()) as KeyType * scaling_factor;
             }
             Ok(anchor)
@@ -255,11 +268,11 @@ pub fn point_to_anchor(
 }
 
 /// Encode an anchor.
-///
 /// Returns the Morton key associated with the given anchor.
 ///
 /// # Arguments
-/// `anchor` - A vector with 4 elements defining the integer coordinates and level.
+/// * `anchor` - A vector with 3 elements defining the integer coordinates.
+/// * `level` - The level of the tree the anchor is encoded to.
 pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
     let x = anchor[0];
     let y = anchor[1];
@@ -279,8 +292,39 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
 }
 
 impl MortonKey {
-    // Checksum encoding unique transfer vector between this key, and another. ie. the vector other->self.
-    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+    /// Construct a `MortonKey` type from a Morton index
+    pub fn from_morton(morton: KeyType) -> Self {
+        let anchor = decode_key(morton);
+
+        MortonKey { anchor, morton }
+    }
+
+    /// Construct a `MortonKey` type from the anchor at a given level
+    pub fn from_anchor(anchor: &[KeyType; 3], level: u64) -> Self {
+        let morton = encode_anchor(anchor, level);
+
+        MortonKey {
+            anchor: *anchor,
+            morton,
+        }
+    }
+
+    /// Construct a `MortonKey` associated with the box that encloses the point on the deepest level.
+    ///
+    /// # Arguments
+    /// * `point` - Cartesian coordinate for a given point.
+    /// * `domain` - Domain associated with a given tree encoding.
+    /// * `level` - level of octree on which to find the encoding.
+    pub fn from_point(point: &[PointType; 3], domain: &Domain, level: u64) -> Self {
+        let anchor = point_to_anchor(point, level, domain).unwrap();
+        MortonKey::from_anchor(&anchor, level)
+    }
+
+    /// Find the transfer vector between two Morton keys in component form.
+    ///
+    /// # Arguments
+    /// * `other` - A Morton Key with which to calculate a transfer vector to.
+    pub fn find_transfer_vector_components(&self, &other: &MortonKey) -> [i64; 3] {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
             panic!("Transfer vectors only computed for keys at levels deeper than 2")
@@ -300,6 +344,18 @@ impl MortonKey {
         x /= 2_i64.pow(level_diff as u32);
         y /= 2_i64.pow(level_diff as u32);
         z /= 2_i64.pow(level_diff as u32);
+
+        [x, y, z]
+    }
+
+    /// Subroutine for converting components of a transfer vector into a unique, positive, checksum.
+    ///
+    /// # Arguments
+    /// * `components` - A three vector corresponding to a transfer vector.
+    pub fn find_transfer_vector_from_components(components: &[i64]) -> usize {
+        let mut x = components[0];
+        let mut y = components[1];
+        let mut z = components[2];
 
         fn positive_map(num: &mut i64) {
             if *num < 0 {
@@ -321,12 +377,33 @@ impl MortonKey {
         checksum as usize
     }
 
+    /// Checksum encoding unique transfer vector between this key, and another.
+    /// ie. the vector other->self returned as an unsigned integer.
+    ///
+    /// # Arguments
+    /// * `other` - A Morton Key with which to calculate a transfer vector to.
+    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
+        let tmp = self.find_transfer_vector_components(&other);
+        MortonKey::find_transfer_vector_from_components(&tmp)
+    }
+
+    /// The physical diameter of a box specified by this Morton Key, calculated with respect to
+    /// a Domain. Returns a stack allocated array for the size of the box width in each corresponding
+    /// dimension.
+    ///
+    /// # Arguments
+    /// `domain` - The physical domain with which we calculate the diameter with respect to.
     pub fn diameter(&self, domain: &Domain) -> [f64; 3] {
         domain
             .diameter
             .map(|x| 0.5f64.powf(self.level() as f64) * x)
     }
 
+    /// The physical centre of a box specified by this Morton Key, calculated with respect to
+    /// a Domain. Returns a stack allocated array for the coordinates of the centre,
+    ///
+    /// # Arguments
+    /// * `domain` - The physical domain with which we calculate the centre with respect to.
     pub fn centre(&self, domain: &Domain) -> [f64; 3] {
         let mut result = [0f64; 3];
 
@@ -340,45 +417,22 @@ impl MortonKey {
         result
     }
 
-    /// Return the anchor
+    /// The anchor corresponding to this key.
     pub fn anchor(&self) -> &[KeyType; 3] {
         &self.anchor
     }
 
-    /// Return the Morton representation
+    /// The Morton Key in index form.
     pub fn morton(&self) -> KeyType {
         self.morton
     }
 
-    /// Return the level
+    /// The level of this key.
     pub fn level(&self) -> KeyType {
         self.morton & LEVEL_MASK
     }
 
-    /// Return a `MortonKey` type from a Morton index
-    pub fn from_morton(morton: KeyType) -> Self {
-        let anchor = decode_key(morton);
-
-        MortonKey { anchor, morton }
-    }
-
-    /// Return a `MortonKey` type from the anchor at a given level
-    pub fn from_anchor(anchor: &[KeyType; 3], level: u64) -> Self {
-        let morton = encode_anchor(anchor, level);
-
-        MortonKey {
-            anchor: *anchor,
-            morton,
-        }
-    }
-
-    /// Return a `MortonKey` associated with the box that encloses the point on the deepest level
-    pub fn from_point(point: &[PointType; 3], domain: &Domain, level: u64) -> Self {
-        let anchor = point_to_anchor(point, level, domain).unwrap();
-        MortonKey::from_anchor(&anchor, level)
-    }
-
-    /// Return the parent, keys encoded with respect to the deepest level.
+    /// Return the parent of a Morton Key.
     pub fn parent(&self) -> Self {
         let level = self.level();
         let morton = self.morton >> LEVEL_DISPLACEMENT;
@@ -394,7 +448,7 @@ impl MortonKey {
         MortonKey::from_morton(parent_morton)
     }
 
-    /// Return the first child.
+    /// Return the first child of a Morton Key.
     pub fn first_child(&self) -> Self {
         MortonKey {
             anchor: self.anchor,
@@ -402,7 +456,7 @@ impl MortonKey {
         }
     }
 
-    /// Return the first child on the deepest level.
+    /// Return the first child of a Morton Key on the deepest level.
     pub fn finest_first_child(&self) -> Self {
         MortonKey {
             anchor: self.anchor,
@@ -410,7 +464,7 @@ impl MortonKey {
         }
     }
 
-    /// Return the last child on the deepest level.
+    /// Return the last child of a Morton Key on the deepest level.
     pub fn finest_last_child(&self) -> Self {
         if self.level() < DEEPEST_LEVEL {
             let mut level_diff = DEEPEST_LEVEL - self.level();
@@ -428,8 +482,7 @@ impl MortonKey {
         }
     }
 
-    /// Return all children in order of their Morton indices, with respect to an encoding at
-    /// the deepest level.
+    /// Return all children of a Morton Key in sorted order.
     pub fn children(&self) -> Vec<MortonKey> {
         let level = self.level();
         let morton = self.morton() >> LEVEL_DISPLACEMENT;
@@ -446,11 +499,11 @@ impl MortonKey {
             children.push(MortonKey::from_morton(child_morton))
         }
 
+        children.sort();
         children
     }
 
-    /// Return all children of the parent of the current Morton index, with respect to
-    /// an encoding on the deepest level.
+    /// Return all children of the parent of this Morton Key.
     pub fn siblings(&self) -> Vec<MortonKey> {
         self.parent().children()
     }
@@ -466,7 +519,7 @@ impl MortonKey {
         other.is_ancestor(self)
     }
 
-    /// Return set of all ancestors
+    /// Return set of all ancestors of this Morton Key.
     pub fn ancestors(&self) -> HashSet<MortonKey> {
         let mut ancestors = HashSet::<MortonKey>::new();
 
@@ -482,7 +535,10 @@ impl MortonKey {
         ancestors
     }
 
-    /// Return descendants `n` levels down from a key
+    /// Return descendants `n` levels down from a key.
+    ///
+    /// # Arguments
+    /// * `n` - The level below the key's level to return descendants from.
     pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey>, Box<dyn Error>> {
         let valid: bool = self.level() + n <= DEEPEST_LEVEL;
 
@@ -504,7 +560,10 @@ impl MortonKey {
         }
     }
 
-    /// Find the finest ancestor of key and another key
+    /// Find the finest ancestor of key and another key.
+    ///
+    /// # Arguments
+    /// * `other` - The key with which we are calculating the shared finest ancestor with respect to.
     pub fn finest_ancestor(&self, other: &MortonKey) -> MortonKey {
         if self == other {
             *other
@@ -518,7 +577,10 @@ impl MortonKey {
         }
     }
 
-    /// Return a point with the coordinates of the anchor
+    /// Return the coordinates of the anchor for this Morton Key.
+    ///
+    /// # Arguments
+    /// * `domain` - The domain with which we are calculating with respect to.
     pub fn to_coordinates(&self, domain: &Domain) -> [PointType; 3] {
         let mut coord: [PointType; 3] = [0.0; 3];
 
@@ -548,7 +610,7 @@ impl MortonKey {
     /// 8. (1, 1, 1)
     ///
     /// # Arguments
-    /// * `domain` - The domain descriptor.
+    /// * `domain` - The domain with which we are calculating with respect to.
     pub fn box_coordinates(&self, domain: &Domain) -> Vec<f64> {
         let mut serialized = Vec::<f64>::with_capacity(24);
         let level = self.level();
@@ -630,7 +692,7 @@ impl MortonKey {
         }
     }
 
-    /// Find all neighbors for to a given key.
+    /// Find all neighbors for to a given key. Filter out 'invalid' neighbours that lie outside of the tree domain.
     pub fn neighbors(&self) -> Vec<MortonKey> {
         DIRECTIONS
             .iter()
@@ -638,6 +700,40 @@ impl MortonKey {
             .filter(|d| !d.is_none())
             .map(|d| d.unwrap())
             .collect()
+    }
+
+    /// Find all neighbors for to a given key, even if they lie outside of the tree domain.
+    pub fn all_neighbors(&self) -> Vec<Option<MortonKey>> {
+        DIRECTIONS
+            .iter()
+            .map(|d| self.find_key_in_direction(d))
+            .collect()
+    }
+
+    /// Check if two keys are adjacent with respect to each other when they are known to on the same tree level.
+    pub fn is_adjacent_same_level(&self, other: &MortonKey) -> bool {
+        // Calculate distance between centres of each node
+        let da = 1 << (DEEPEST_LEVEL - self.level());
+        let db = 1 << (DEEPEST_LEVEL - other.level());
+        let ra = (da as f64) * 0.5;
+        let rb = (db as f64) * 0.5;
+
+        let ca: Vec<f64> = self.anchor.iter().map(|&x| (x as f64) + ra).collect();
+        let cb: Vec<f64> = other.anchor.iter().map(|&x| (x as f64) + rb).collect();
+
+        let distance: Vec<f64> = ca.iter().zip(cb.iter()).map(|(a, b)| b - a).collect();
+
+        let min = -ra - rb;
+        let max = ra + rb;
+        let mut result = true;
+
+        for &d in distance.iter() {
+            if d > max || d < min {
+                result = false
+            }
+        }
+
+        result
     }
 
     /// Check if two keys are adjacent with respect to each other
@@ -649,49 +745,50 @@ impl MortonKey {
         if ancestors.contains(other) || other_ancestors.contains(self) {
             false
         } else {
-            // Calculate distance between centres of each node
-            let da = 1 << (DEEPEST_LEVEL - self.level());
-            let db = 1 << (DEEPEST_LEVEL - other.level());
-            let ra = (da as f64) * 0.5;
-            let rb = (db as f64) * 0.5;
-
-            let ca: Vec<f64> = self.anchor.iter().map(|&x| (x as f64) + ra).collect();
-            let cb: Vec<f64> = other.anchor.iter().map(|&x| (x as f64) + rb).collect();
-
-            let distance: Vec<f64> = ca.iter().zip(cb.iter()).map(|(a, b)| b - a).collect();
-
-            let min = -ra - rb;
-            let max = ra + rb;
-            let mut result = true;
-
-            for &d in distance.iter() {
-                if d > max || d < min {
-                    result = false
-                }
-            }
-
-            result
+            self.is_adjacent_same_level(other)
         }
     }
 
+    /// Compute the convolution grid centered at a given MortonKey and its respective surface grid. This method is used
+    /// in the FFT sparsification of the Multipole to Local translation operator for Fast Multipole Methods constructed
+    /// on regular grids, such as the kiFMM or bbFMM. Returns an owned vector corresponding to the coordinates of the
+    /// convolution grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N], as well as a
+    /// vector of grid indices.
+    ///
+    /// # Arguments
+    /// * `order` - the order of expansions used in constructing the surface grid
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    /// * `conv_point` - The corner point on the surface grid against which the surface and  convolution grids are aligned.
+    /// * `conv_point_corner_index` - The index of the corner of the surface grid that the conv point lies on.
     pub fn convolution_grid(
         &self,
         order: usize,
         domain: &Domain,
-        surface: &[[f64; 3]],
         alpha: f64,
-    ) -> Vec<[f64; 3]> {
+        conv_point_corner: &[f64],
+        conv_point_corner_index: usize,
+    ) -> (Vec<f64>, Vec<usize>) {
         // Number of convolution points along each axis
         let n = 2 * order - 1;
-        let mut grid = vec![[0f64; 3]; n.pow(3)];
 
-        for i in 0..n {
+        let dim: usize = 3;
+        let ncoeffs = n.pow(dim as u32);
+        let mut grid = vec![0f64; dim * ncoeffs];
+
+        for k in 0..n {
             for j in 0..n {
-                for k in 0..n {
-                    grid[i * n * n + j * n + k] = [i as f64, j as f64, k as f64]
+                for i in 0..n {
+                    let conv_index = i + j * n + k * n * n;
+                    grid[conv_index] = i as f64;
+                    grid[(dim - 2) * ncoeffs + conv_index] = j as f64;
+                    grid[(dim - 1) * ncoeffs + conv_index] = k as f64;
                 }
             }
         }
+
+        // Map conv points to indices
+        let conv_idxs = grid.iter().clone().map(|&x| x as usize).collect();
 
         let diameter = self
             .diameter(domain)
@@ -702,116 +799,124 @@ impl MortonKey {
         // Shift and scale to embed surface grid inside convolution grid
         // Scale
         grid.iter_mut().for_each(|point| {
-            point.iter_mut().enumerate().for_each(|(i, value)| {
-                *value *= 1.0 / ((n - 1) as f64); // normalize
-                *value *= diameter[i]; // find diameter
-                *value *= 2.0; // convolution grid is 2x as large
-            });
+            *point *= 1.0 / ((n - 1) as f64); // normalize
+            *point *= diameter[0]; // find diameter
+            *point *= 2.0; // convolution grid is 2x as large
         });
 
-        // Shift
-        let sums: Vec<f64> = grid.iter().map(|point| point.iter().sum()).collect();
-        let max_index = sums
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .map(|(index, _)| index)
-            .unwrap();
-        let max_conv_point = grid[max_index];
+        // Shift convolution grid to align with a specified corner of surface grid
+        let corners = find_corners(&grid);
 
-        let sums: Vec<f64> = surface.iter().map(|point| point.iter().sum()).collect();
-        let max_index = sums
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .map(|(index, _)| index)
-            .unwrap();
-        let max_surface_point = surface[max_index];
+        let surface_point = [
+            corners[conv_point_corner_index],
+            corners[8 + conv_point_corner_index],
+            corners[16 + conv_point_corner_index],
+        ];
 
-        let diff = max_conv_point
+        let diff = conv_point_corner
             .iter()
-            .zip(max_surface_point)
-            .map(|(a, b)| b - a)
+            .zip(surface_point)
+            .map(|(a, b)| a - b)
             .collect_vec();
 
-        grid.iter_mut().for_each(|point| {
-            point
+        for i in 0..dim {
+            grid[i * ncoeffs..(i + 1) * ncoeffs]
                 .iter_mut()
-                .enumerate()
-                .for_each(|(i, value)| *value += diff[i])
-        });
+                .for_each(|value| *value += diff[i]);
+        }
 
-        grid
+        (grid, conv_idxs)
     }
 
-    pub fn surface_grid(&self, order: usize) -> (Vec<[f64; 3]>, Vec<[usize; 3]>) {
+    /// Compute surface grid for a given expansion order. Used in the discretisation of Fast Multipole
+    /// Methods which require a regular grid, such as the kiFMM or bbFMM.
+    /// Returns a tuple, the first element is an owned vector of the physical coordinates of the
+    /// surface grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// The second element is a vector of indices corresponding to each of these coordinates.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order being used in the FMM simulation.
+    pub fn surface_grid(order: usize) -> (Vec<f64>, Vec<usize>) {
+        let dim = 3;
         let n_coeffs = 6 * (order - 1).pow(2) + 2;
 
-        let mut surface: Vec<[f64; 3]> = vec![[0f64; 3]; n_coeffs];
+        // Implicitly in column major order
+        let mut surface: Vec<f64> = vec![0f64; dim * n_coeffs];
 
+        // Bounds of the surface grid
         let lower = 0;
         let upper = order - 1;
+
+        // Orders the surface grid, implicitly column major
         let mut idx = 0;
 
-        for i in 0..order {
+        for k in 0..order {
             for j in 0..order {
-                for k in 0..order {
+                for i in 0..order {
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
                     {
-                        surface[idx] = [i as f64, j as f64, k as f64];
+                        surface[idx] = i as f64;
+                        surface[(dim - 2) * n_coeffs + idx] = j as f64;
+                        surface[(dim - 1) * n_coeffs + idx] = k as f64;
                         idx += 1;
                     }
                 }
             }
         }
 
-        let surface_idxs = surface
-            .iter()
-            .clone()
-            .map(|&[a, b, c]| [a as usize, b as usize, c as usize])
-            .collect();
-
+        // Map surface points to multi-indices
+        let surface_idxs = surface.iter().clone().map(|&x| x as usize).collect();
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         surface.iter_mut().for_each(|point| {
-            point
-                .iter_mut()
-                .for_each(|value| *value *= 2.0 / (order as f64 - 1.0));
+            *point *= 2.0 / (order as f64 - 1.0);
         });
 
-        surface
-            .iter_mut()
-            .for_each(|point| point.iter_mut().for_each(|value| *value -= 1.0));
+        surface.iter_mut().for_each(|point| *point -= 1.0);
 
         (surface, surface_idxs)
     }
 
-    pub fn scale_surface(
-        &self,
-        surface: Vec<[f64; 3]>,
-        domain: &Domain,
-        alpha: f64,
-    ) -> Vec<[f64; 3]> {
+    /// Compute a surface grid centered at this Morton Key, used in the discretisation of Fast Multipole
+    /// Methods which require a regular grid, such as the kiFMM or bbFMM.
+    ///
+    /// # Arguments
+    /// * `surface` - A general surface grid, computed for a given expansion order computed with the
+    /// associated function `surface_grid`.
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    pub fn scale_surface(&self, surface: Vec<f64>, domain: &Domain, alpha: f64) -> Vec<f64> {
+        let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
         let dilated_diameter = scaled_diameter.map(|d| d * alpha);
 
-        let mut scaled_surface = vec![[0f64; 3]; surface.len()];
+        let mut scaled_surface = vec![0f64; surface.len()];
 
         let centre = self.centre(domain);
 
-        for i in 0..surface.len() {
-            scaled_surface[i][0] = (surface[i][0] * (dilated_diameter[0] / 2.0)) + centre[0];
-            scaled_surface[i][1] = (surface[i][1] * (dilated_diameter[1] / 2.0)) + centre[1];
-            scaled_surface[i][2] = (surface[i][2] * (dilated_diameter[2] / 2.0)) + centre[2];
+        let ncoeffs = surface.len() / 3;
+        for i in 0..ncoeffs {
+            scaled_surface[i] = (surface[i] * (dilated_diameter[0] / 2.0)) + centre[0];
+            scaled_surface[(dim - 2) * ncoeffs + i] =
+                (surface[(dim - 2) * ncoeffs + i] * (dilated_diameter[1] / 2.0)) + centre[1];
+            scaled_surface[(dim - 1) * ncoeffs + i] =
+                (surface[(dim - 1) * ncoeffs + i] * (dilated_diameter[2] / 2.0)) + centre[2];
         }
 
         scaled_surface
     }
 
-    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<[f64; 3]> {
-        let (surface, _) = self.surface_grid(order);
+    /// Compute the surface grid, centered at this Morton Key, for a given expansion order and alpha parameter. This is used
+    /// in the discretisation of Fast Multipole Methods which require a regular grid, such as the kiFMM or bbFMM.
+    ///
+    /// # Arguments
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `order` - The expansion order being used in the FMM simulation.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    pub fn compute_surface(&self, domain: &Domain, order: usize, alpha: f64) -> Vec<f64> {
+        let (surface, _) = MortonKey::surface_grid(order);
 
         self.scale_surface(surface, domain, alpha)
     }
@@ -871,11 +976,10 @@ impl MortonKeyInterface for MortonKey {
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
+    use rlst::dense::{RawAccess, Shape};
     use std::vec;
 
-    use rand::prelude::*;
-    use rand::Rng;
-    use rand::SeedableRng;
+    use crate::implementations::helpers::points_fixture;
 
     use super::*;
 
@@ -1048,22 +1152,17 @@ mod test {
     #[test]
     fn test_sorting() {
         let npoints = 1000;
-        let mut range = rand::thread_rng();
-        let mut points: Vec<[PointType; 3]> = Vec::new();
+        let points = points_fixture(npoints, Some(-1.), Some(1.0));
 
-        for _ in 0..npoints {
-            points.push([range.gen(), range.gen(), range.gen()]);
+        let domain = Domain::from_local_points(points.data());
+
+        let mut keys: Vec<MortonKey> = Vec::new();
+
+        for i in 0..points.shape().0 {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+
+            keys.push(MortonKey::from_point(&point, &domain, DEEPEST_LEVEL));
         }
-
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
-        };
-
-        let mut keys: Vec<MortonKey> = points
-            .iter()
-            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
-            .collect();
 
         // Add duplicates to keys, to test ordering in terms of equality
         let mut cpy: Vec<MortonKey> = keys.to_vec();
@@ -1320,27 +1419,22 @@ mod test {
 
     #[test]
     pub fn test_morton_keys_iterator() {
-        let mut range = StdRng::seed_from_u64(0);
-        let between = rand::distributions::Uniform::from(0.0..1.0);
-        let mut points: Vec<[PointType; 3]> = Vec::new();
-
         let npoints = 1000;
-        for _ in 0..npoints {
-            points.push([
-                between.sample(&mut range),
-                between.sample(&mut range),
-                between.sample(&mut range),
-            ])
-        }
         let domain = Domain {
-            origin: [0.0, 0.0, 0.0],
-            diameter: [1.0, 1.0, 1.0],
+            origin: [-1.01, -1.01, -1.01],
+            diameter: [2.0, 2.0, 2.0],
         };
+        let min = Some(-1.01);
+        let max = Some(0.99);
 
-        let keys = points
-            .iter()
-            .map(|p| MortonKey::from_point(p, &domain, DEEPEST_LEVEL))
-            .collect();
+        let points = points_fixture(npoints, min, max);
+
+        let mut keys = Vec::new();
+
+        for i in 0..points.shape().0 {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+            keys.push(MortonKey::from_point(&point, &domain, DEEPEST_LEVEL))
+        }
 
         let keys = MortonKeys { keys, index: 0 };
 
@@ -1383,7 +1477,7 @@ mod test {
         }
 
         let domain = Domain {
-            origin: [-0.5, -0.5, -0.5],
+            origin: [-0.7, -0.6, -0.5],
             diameter: [1., 1., 1.],
         };
 
@@ -1406,7 +1500,7 @@ mod test {
         };
 
         // Test a point not in the domain
-        let point = [0.9, 0.9, 1.9];
+        let point = [1.9, 0.9, 0.9];
         let level = 2;
         let _anchor = point_to_anchor(&point, level, &domain);
     }
@@ -1420,7 +1514,7 @@ mod test {
         };
 
         // Test a point not in the domain
-        let point = [-0.5, -0.5, -0.5];
+        let point = [-0.51, -0.5, -0.5];
         let level = 2;
         let _anchor = point_to_anchor(&point, level, &domain);
     }
@@ -1569,7 +1663,7 @@ mod test {
     fn test_is_adjacent() {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
-            origin: [0., 0., 0.],
+            origin: [-0.1, -0.1, 0.1],
             diameter: [1., 1., 1.],
         };
 
@@ -1607,9 +1701,9 @@ mod test {
 
     #[test]
     fn test_encoding_is_always_absolute() {
-        let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
+        let point = [-0.099999, -0.099999, -0.099999];
+        let domain: Domain = Domain {
+            origin: [-0.1, -0.1, -0.1],
             diameter: [1., 1., 1.],
         };
 
@@ -1662,5 +1756,146 @@ mod test {
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
         key.find_transfer_vector(&sibling);
+    }
+
+    #[test]
+    fn test_surface_grid() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let key = MortonKey::from_point(&point, &domain, 0);
+
+        let order = 2;
+        let alpha = 1.;
+        let dim = 3;
+        let ncoeffs = 6 * (order - 1_usize).pow(2) + 2;
+
+        // Test lengths
+        let surface = key.compute_surface(&domain, order, alpha);
+        assert_eq!(surface.len(), ncoeffs * dim);
+
+        let (surface, surface_idxs) = MortonKey::surface_grid(order);
+        assert_eq!(surface.len(), ncoeffs * dim);
+        assert_eq!(surface_idxs.len(), ncoeffs * dim);
+
+        let mut expected = vec![[0usize; 3]; ncoeffs];
+        let lower = 0;
+        let upper = order - 1;
+        let mut idx = 0;
+        for k in 0..order {
+            for j in 0..order {
+                for i in 0..order {
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
+                    {
+                        expected[idx] = [i, j, k];
+                        idx += 1;
+                    }
+                }
+            }
+        }
+
+        // Test ordering.
+        for i in 0..ncoeffs {
+            let point = vec![
+                surface_idxs[i],
+                surface_idxs[i + ncoeffs],
+                surface_idxs[i + 2 * ncoeffs],
+            ];
+            assert_eq!(point, expected[i]);
+        }
+
+        // Test scaling
+        let level = 2;
+        let key = MortonKey::from_point(&point, &domain, level);
+        let surface = key.compute_surface(&domain, order, alpha);
+
+        let min_x = surface
+            .iter()
+            .take(ncoeffs)
+            .fold(f64::INFINITY, |a, &b| a.min(b));
+
+        let max_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a.max(b));
+
+        let diam_x = max_x - min_x;
+
+        let expected = key.diameter(&domain)[0];
+        assert_eq!(diam_x, expected);
+
+        // Test shifting
+        let point = [0.1, 0.2, 0.3];
+        let level = 2;
+        let key = MortonKey::from_point(&point, &domain, level);
+        let surface = key.compute_surface(&domain, order, alpha);
+        let expected = key.centre(&domain);
+
+        let c_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
+        let c_y = surface
+            .iter()
+            .skip(ncoeffs)
+            .take(ncoeffs)
+            .fold(0f64, |a, &b| a + b)
+            / (ncoeffs as f64);
+        let c_z = surface
+            .iter()
+            .skip(2 * ncoeffs)
+            .take(ncoeffs)
+            .fold(0f64, |a, &b| a + b)
+            / (ncoeffs as f64);
+
+        let result = vec![c_x, c_y, c_z];
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_convolution_grid() {
+        let point = [0.5, 0.5, 0.5];
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+
+        let order = 5;
+        let alpha = 1.0;
+
+        let key = MortonKey::from_point(&point, &domain, 0);
+
+        let surface_grid = key.compute_surface(&domain, order, alpha);
+
+        // Place convolution grid on max corner
+        let corners = find_corners(&surface_grid);
+        let ncorners = corners.len() / 3;
+        let conv_point_corner_index = 7;
+
+        let conv_point = vec![
+            corners[conv_point_corner_index],
+            corners[ncorners + conv_point_corner_index],
+            corners[2 * ncorners + conv_point_corner_index],
+        ];
+
+        let (conv_grid, _) =
+            key.convolution_grid(order, &domain, alpha, &conv_point, conv_point_corner_index);
+
+        // Test that surface grid is embedded in convolution grid
+        let mut surface = Vec::new();
+        let nsurf = surface_grid.len() / 3;
+        for i in 0..nsurf {
+            surface.push([
+                surface_grid[i],
+                surface_grid[i + nsurf],
+                surface_grid[i + 2 * nsurf],
+            ])
+        }
+
+        let mut convolution = Vec::new();
+        let nconv = conv_grid.len() / 3;
+        for i in 0..nconv {
+            convolution.push([conv_grid[i], conv_grid[i + nconv], conv_grid[i + 2 * nconv]])
+        }
+        assert!(surface.iter().all(|point| convolution.contains(point)));
     }
 }

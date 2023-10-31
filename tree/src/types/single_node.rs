@@ -1,4 +1,4 @@
-//! Data Structures and methods to create octrees on a single node.
+//! Data Structures to create octrees on a single node.
 use std::collections::{HashMap, HashSet};
 
 use crate::types::{

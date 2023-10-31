@@ -1,8 +1,8 @@
-//! Fast Solver FMM library
-#![cfg_attr(feature = "strict", deny(warnings))]
+//! A a general framework for implementing Fast Multipole Methods.
 pub mod charge;
+pub mod constants;
+pub mod field_translation;
 pub mod fmm;
-pub mod helmholtz;
-pub mod impl_charge;
-pub mod laplace;
-pub mod linalg;
+pub mod interaction_lists;
+pub mod pinv;
+pub mod types;

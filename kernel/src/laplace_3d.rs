@@ -1,17 +1,31 @@
 //! Implementation of the Laplace kernel
-use crate::traits::Kernel;
-use crate::types::{EvalType, KernelType};
 use num;
 use std::marker::PhantomData;
 
 use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
-use bempp_traits::types::Scalar;
+use bempp_traits::{
+    kernel::{Kernel, KernelScale},
+    types::{EvalType, KernelType, Scalar},
+};
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
+#[derive(Clone)]
 pub struct Laplace3dKernel<T: Scalar> {
     kernel_type: KernelType,
     _phantom_t: std::marker::PhantomData<T>,
+}
+
+impl<T: Scalar<Real = T>> KernelScale for Laplace3dKernel<T> {
+    type T = T;
+
+    fn scale(&self, level: u64) -> Self::T {
+        let numerator = T::from(1).unwrap();
+        let denominator = T::from(2.).unwrap();
+        let power = T::from(level).unwrap();
+        let denominator = denominator.powf(power);
+        numerator / denominator
+    }
 }
 
 impl<T: Scalar> Laplace3dKernel<T> {
@@ -49,7 +63,7 @@ where
 
     fn evaluate_st(
         &self,
-        eval_type: crate::types::EvalType,
+        eval_type: EvalType,
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
@@ -75,7 +89,7 @@ where
 
     fn evaluate_mt(
         &self,
-        eval_type: crate::types::EvalType,
+        eval_type: bempp_traits::types::EvalType,
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         charges: &[Self::T],
@@ -101,7 +115,7 @@ where
 
     fn assemble_st(
         &self,
-        eval_type: crate::types::EvalType,
+        eval_type: bempp_traits::types::EvalType,
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
@@ -127,7 +141,7 @@ where
 
     fn assemble_mt(
         &self,
-        eval_type: crate::types::EvalType,
+        eval_type: bempp_traits::types::EvalType,
         sources: &[<Self::T as Scalar>::Real],
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
@@ -151,7 +165,7 @@ where
             });
     }
 
-    fn range_component_count(&self, eval_type: crate::types::EvalType) -> usize {
+    fn range_component_count(&self, eval_type: EvalType) -> usize {
         laplace_component_count(eval_type)
     }
 }

@@ -49,7 +49,7 @@ impl RustyDataContainer {
         }
     }
     /// Create a new non-owning but mutable container from a given slice.
-    pub fn from_slice_mut<T: ConversionType>(slice: &mut [T]) -> Self {
+    pub fn from_slice_mut<T: ConversionType>(slice: &[T]) -> Self {
         Self {
             nitems: slice.len(),
             capacity: slice.len(),

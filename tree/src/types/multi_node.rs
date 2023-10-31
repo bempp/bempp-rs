@@ -1,47 +1,46 @@
-// //! Data structures and methods to create distributed octrees with MPI.
-// use mpi::topology::UserCommunicator;
+//! Data structures to create distributed octrees with MPI.
+use mpi::topology::UserCommunicator;
 
-// use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
-// use crate::types::{
-//     data::NodeData,
-//     domain::Domain,
-//     morton::{KeyType, MortonKey, MortonKeys},
-//     point::{Point, Points},
-// };
+use crate::types::{
+    domain::Domain,
+    morton::{KeyType, MortonKey, MortonKeys},
+    point::Points,
+};
 
-// /// Concrete distributed multi-node tree.
-// pub struct MultiNodeTree {
-//     /// Global communicator for this Tree
-//     pub world: UserCommunicator,
+/// Concrete distributed multi-node tree.
+pub struct MultiNodeTree {
+    /// Global communicator for this Tree
+    pub world: UserCommunicator,
 
-//     /// Adaptivity is optional.
-//     pub adaptive: bool,
+    // Depth of the tree
+    pub depth: u64,
 
-//     ///  A vector of Cartesian points.
-//     pub points: Points,
+    /// Domain spanned by the points.
+    pub domain: Domain,
 
-//     /// All ancestors of leaves in tree, as a set.
-//     pub keys_set: HashSet<MortonKey>,
+    ///  A vector of Cartesian points.
+    pub points: Points,
 
-//     /// The leaf nodes that span the tree, defined by its leaf nodes.
-//     pub leaves: MortonKeys,
+    /// The leaves that span the tree.
+    pub leaves: MortonKeys,
 
-//     /// The leaf nodes that span the tree, defined by its leaf nodes, as a set.
-//     pub leaves_set: HashSet<MortonKey>,
+    /// All nodes in tree.
+    pub keys: MortonKeys,
 
-//     /// Domain spanned by the points in the tree.
-//     pub domain: Domain,
+    /// Associate leaves with point indices.
+    pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
 
-//     /// Map between the points and the leaves in the tree.
-//     pub points_to_leaves: HashMap<Point, MortonKey>,
+    /// Associate levels with key indices.
+    pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
-//     /// Map between the nodes in the tree and the points they contain.
-//     pub leaves_to_points: HashMap<MortonKey, Points>,
+    /// All leaves, returned as a set.
+    pub leaves_set: HashSet<MortonKey>,
 
-//     // Map between keys and data
-//     pub keys_to_data: HashMap<MortonKey, NodeData>,
+    /// All keys, returned as a set.
+    pub keys_set: HashSet<MortonKey>,
 
-//     /// Range of Morton keys at this processor, and their current rank [rank, min, max]
-//     pub range: [KeyType; 3],
-// }
+    /// Range of Morton keys at this processor, and their current rank [rank, min, max]
+    pub range: [KeyType; 3],
+}

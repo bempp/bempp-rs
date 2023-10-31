@@ -1,3 +1,4 @@
+//! Implementation of traits for handling, and sorting, containers of point data.
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
