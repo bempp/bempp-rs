@@ -11,7 +11,7 @@ use rlst::{
         traits::svd::{Mode, Svd},
     },
     common::traits::{Eval, Transpose},
-    dense::{rlst_mat, Dot, RawAccess, RawAccessMut, Shape},
+    dense::{rlst_dynamic_mat, Dot, RawAccess, RawAccessMut, Shape},
 };
 
 use bempp_tools::Array3D;
@@ -52,9 +52,9 @@ where
         let ncols = self.ncoeffs(order);
 
         let ntransfer_vectors = self.transfer_vectors.len();
-        let mut se2tc_fat = rlst_mat![f64, (nrows, ncols * ntransfer_vectors)];
+        let mut se2tc_fat = rlst_dynamic_mat![f64, (nrows, ncols * ntransfer_vectors)];
 
-        let mut se2tc_thin = rlst_mat![f64, (nrows * ntransfer_vectors, ncols)];
+        let mut se2tc_thin = rlst_dynamic_mat![f64, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
@@ -63,7 +63,7 @@ where
             let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram = rlst_mat![f64, (ntargets, nsources)];
+            let mut tmp_gram = rlst_dynamic_mat![f64, (ntargets, nsources)];
 
             self.kernel.assemble_st(
                 EvalType::Value,
@@ -96,7 +96,7 @@ where
         let vt = vt.unwrap();
 
         // Keep 'k' singular values
-        let mut sigma_mat = rlst_mat![f64, (self.k, self.k)];
+        let mut sigma_mat = rlst_dynamic_mat![f64, (self.k, self.k)];
         for i in 0..self.k {
             sigma_mat[[i, i]] = sigma[i]
         }
@@ -114,7 +114,7 @@ where
         let st_block = st.block((0, 0), (self.k, nst));
         let s_block = st_block.transpose().eval();
 
-        let mut c = rlst_mat![f64, (self.k, self.k * ntransfer_vectors)];
+        let mut c = rlst_dynamic_mat![f64, (self.k, self.k * ntransfer_vectors)];
 
         for i in 0..self.transfer_vectors.len() {
             let top_left = (0, i * ncols);
@@ -589,7 +589,7 @@ mod test {
 
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_mat![f64, (ncoeffs, 1)];
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
         for i in 0..ncoeffs {
             *multipole.get_mut(i, 0).unwrap() = i as f64;
@@ -674,7 +674,7 @@ mod test {
 
         // Some expansion data998
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_mat![f64, (ncoeffs, 1)];
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
         for i in 0..ncoeffs {
             *multipole.get_mut(i, 0).unwrap() = i as f64;
@@ -838,7 +838,7 @@ mod test {
 
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_mat![f64, (ncoeffs, 1)];
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
         for i in 0..ncoeffs {
             *multipole.get_mut(i, 0).unwrap() = i as f64;

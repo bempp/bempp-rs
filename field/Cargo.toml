@@ -28,7 +28,7 @@ bempp-kernel = { path = "../kernel" }
 bempp-tools = { path = "../tools" }
 itertools = "0.10"
 num = "0.4"
-rlst = {git = "https://github.com/skailasa/rlst.git", branch = "enh/moore-penrose-pseudo-inverse"}
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = {git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.0"
 dashmap = {version = "5.5.0", features=["rayon"]}

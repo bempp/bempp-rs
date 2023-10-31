@@ -7,12 +7,10 @@ use rlst::dense::{
 };
 
 /// Type alias for real coefficients for into FFTW wrappers
-pub type FftMatrixf64 =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type FftMatrixf64 = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
 
 /// Type alias for complex coefficients for FFTW wrappers
-pub type FftMatrixc64 =
-    Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type FftMatrixc64 = Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic>, Dynamic>;
 
 /// Compute a Real FFT of an input slice corresponding to a 3D array stored in column major format, specified by `shape` using the FFTW library.
 ///

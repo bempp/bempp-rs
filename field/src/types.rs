@@ -6,7 +6,8 @@ use cauchy::c64;
 use rlst::{
     common::traits::{Eval, NewLikeSelf},
     dense::{
-        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_mat, Dynamic,
+        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_dynamic_mat,
+        Dynamic,
     },
 };
 
@@ -14,8 +15,7 @@ use bempp_traits::kernel::Kernel;
 use bempp_tree::types::morton::MortonKey;
 
 /// Simple type alias for a 2D `Matrix<f64>`
-pub type SvdM2lEntry =
-    Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic, Dynamic>, Dynamic, Dynamic>;
+pub type SvdM2lEntry = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
 
 /// Simple type alias for pre-computed FFT of green's function evaluations computed for each transfer vector in a box's halo
 /// Each index corresponds to a halo position, and contains 64 convolutions, one for each of a box's siblings with each child
@@ -108,7 +108,7 @@ pub struct SvdM2lOperatorData {
 
 impl Default for SvdM2lOperatorData {
     fn default() -> Self {
-        let tmp = rlst_mat![f64, (1, 1)];
+        let tmp = rlst_dynamic_mat![f64, (1, 1)];
 
         SvdM2lOperatorData {
             u: tmp.new_like_self().eval(),
