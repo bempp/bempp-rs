@@ -6,7 +6,7 @@ on:
 
 jobs:
   run-tests-rust:
-    name: Run tests (Rust)
+    name: Run Rust tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -29,21 +29,21 @@ jobs:
         run:
           sudo apt-get install libopenblas-dev liblapack-dev
 
-      - name: Build rust library (debug)
+      - name: Build rust library
         run: cargo build --features "strict"
-      - name: Build rust library (release)
+      - name: Build rust library in release mode
         run: cargo build --release --features "strict"
-      - name: Build rust library (release with mpi)
+      - name: Build rust library in release mode with mpi
         run: cargo build --release --features "strict,mpi"
 
 
       - name: Run unit tests
         run: cargo test --lib --features "strict"
-      - name: Run unit tests (release)
+      - name: Run unit tests in release mode
         run: cargo test --lib --release --features "strict"
-      - name: Run unit tests (with mpi enabled)
+      - name: Run unit tests with mpi enabled
         run: cargo test --lib --features "mpi,strict"
-      - name: Run unit tests (release with mpi enabled)
+      - name: Run unit tests in release mode with mpi enabled
         run: cargo test --lib --release --features "mpi,strict"
       - name: Run tests
         run: cargo test --examples --release --features "mpi,strict"

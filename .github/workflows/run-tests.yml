@@ -10,7 +10,7 @@ on:
 
 jobs:
   run-tests-rust:
-    name: Run tests (Rust)
+    name: Run Rust tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -44,7 +44,7 @@ jobs:
 
       - name: Run unit tests
         run: cargo test --lib ${{ matrix.feature-flags }}
-      - name: Run unit tests (release mode)
+      - name: Run unit tests in release mode
         run: cargo test --lib --release ${{ matrix.feature-flags }}
       - name: Run tests
         run: cargo test --examples --release ${{ matrix.feature-flags }}
@@ -55,7 +55,7 @@ jobs:
           ./examples.sh
 
   run-tests-python:
-    name: Run tests (Python)
+    name: Run Python tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
