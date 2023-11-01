@@ -26,6 +26,7 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
+      - uses: actions/checkout@v3
       - name: Install LAPACK & OpenBLAS
         run:
           sudo apt-get install libopenblas-dev liblapack-dev
