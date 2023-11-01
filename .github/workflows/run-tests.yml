@@ -34,10 +34,15 @@ jobs:
         run:
           sudo apt-get install libopenblas-dev liblapack-dev
 
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          info="${{matrix.rust-version }}-${{ matrix.mpi }}-${{ matrix.feature-flags }}"
+          echo "key=${info//@(,| )/-}" >> $GITHUB_OUTPUT
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: bempp-rs-${{ matrix.rust-version }}-${{ matrix.mpi }}-${{ matrix.feature-flags }}
+          prefix-key: bempp-rs-${{ steps.cache-key.outputs.key }}
 
       - name: Build Bempp-rs
         run: cargo build ${{ matrix.feature-flags }}
