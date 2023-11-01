@@ -38,6 +38,11 @@ jobs:
         with:
           prefix-key: bempp-rs-${{ matrix.rust-version }}-${{ matrix.mpi }}
 
+      - name: Build Bempp-rs
+        run: cargo build --lib --features "mpi,strict"
+      - name: Build Bempp-rs (release mode)
+        run: cargo build --lib --release --features "mpi,strict"
+
       - name: Style checks
         run: |
           cargo fmt -- --check
@@ -45,9 +50,9 @@ jobs:
           cargo clippy --tests -- -D warnings
           cargo clippy --examples -- -D warnings
 
-      - name: Run unit tests (with mpi enabled)
+      - name: Run unit tests
         run: cargo test --lib --features "mpi,strict"
-      - name: Run unit tests (release with mpi enabled)
+      - name: Run unit tests (release mode)
         run: cargo test --lib --release --features "mpi,strict"
       - name: Run tests
         run: cargo test --examples --release --features "mpi,strict"
