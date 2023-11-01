@@ -16,7 +16,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust-version }}
+          toolchain: stable
           components: rustfmt
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
