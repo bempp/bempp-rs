@@ -43,13 +43,6 @@ jobs:
       - name: Build Bempp-rs (release mode)
         run: cargo build --lib --release --features "mpi,strict"
 
-      - name: Style checks
-        run: |
-          cargo fmt -- --check
-          cargo clippy -- -D warnings
-          cargo clippy --tests -- -D warnings
-          cargo clippy --examples -- -D warnings
-
       - name: Run unit tests
         run: cargo test --lib --features "mpi,strict"
       - name: Run unit tests (release mode)

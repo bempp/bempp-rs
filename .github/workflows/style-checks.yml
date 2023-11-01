@@ -1,0 +1,43 @@
+name: ✨ Style checks
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  run-tests-rust:
+    name: Rust style checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust-version: ["stable"]
+        mpi: ['mpich']
+    steps:
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-version }}
+          components: rustfmt
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }}
+      - name: Install LAPACK & OpenBLAS
+        run:
+          sudo apt-get install libopenblas-dev liblapack-dev
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bempp-rs-style-${{ matrix.rust-version }}-${{ matrix.mpi }}
+
+      - name: Style checks
+        run: |
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+          cargo clippy --tests -- -D warnings
+          cargo clippy --examples -- -D warnings
