@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  run-tests-rust:
+  style-checks:
     name: Rust style checks
     runs-on: ubuntu-latest
     steps:
