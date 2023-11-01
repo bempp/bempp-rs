@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+  merge_group:
 
 jobs:
   style-checks:
@@ -26,11 +27,6 @@ jobs:
       - name: Install LAPACK & OpenBLAS
         run:
           sudo apt-get install libopenblas-dev liblapack-dev
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: bempp-rs-style
 
       - name: Style checks
         run: |
