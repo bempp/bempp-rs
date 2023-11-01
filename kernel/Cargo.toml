@@ -28,7 +28,7 @@ approx = "0.5"
 rayon = "1.7"
 num = "0.4"
 num_cpus = "1"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 
 [dev-dependencies]
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }

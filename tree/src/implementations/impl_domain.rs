@@ -1,78 +1,82 @@
+//! Constructor for a single node Domain.
 use crate::types::{domain::Domain, point::PointType};
 
 impl Domain {
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
-    /// ensure correct Morton Encoding.
-    pub fn from_local_points(points: &[[PointType; 3]]) -> Domain {
+    /// ensure correct Morton encoding.
+    ///
+    /// # Arguments
+    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    pub fn from_local_points(points: &[PointType]) -> Domain {
         // Increase size of bounding box to capture all points
-        let err: f64 = 0.001;
-        let max_x = points
-            .iter()
-            .max_by(|a, b| a[0].partial_cmp(&b[0]).unwrap())
-            .unwrap()[0];
-        let max_y = points
-            .iter()
-            .max_by(|a, b| a[1].partial_cmp(&b[1]).unwrap())
-            .unwrap()[1];
-        let max_z = points
-            .iter()
-            .max_by(|a, b| a[2].partial_cmp(&b[2]).unwrap())
-            .unwrap()[2];
+        let err: f64 = 1e-5;
+        // TODO: Should be parametrised by dimension
+        let dim = 3;
+        let npoints = points.len() / dim;
+        let x = points[0..npoints].to_vec();
+        let y = points[npoints..2 * npoints].to_vec();
+        let z = points[2 * npoints..].to_vec();
 
-        let min_x = points
-            .iter()
-            .min_by(|a, b| a[0].partial_cmp(&b[0]).unwrap())
-            .unwrap()[0];
-        let min_y = points
-            .iter()
-            .min_by(|a, b| a[1].partial_cmp(&b[1]).unwrap())
-            .unwrap()[1];
-        let min_z = points
-            .iter()
-            .min_by(|a, b| a[2].partial_cmp(&b[2]).unwrap())
-            .unwrap()[2];
+        let max_x = x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_y = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_z = z.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
+        let min_x = x.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let min_y = y.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let min_z = z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+        // Find maximum dimension, this will define the size of the boxes in the domain
+        let diameter_x = (max_x - min_x).abs();
+        let diameter_y = (max_y - min_y).abs();
+        let diameter_z = (max_z - min_z).abs();
+
+        // Want a cubic box to place everything in
+        let diameter = diameter_x.max(diameter_y).max(diameter_z);
+        let diameter = [
+            diameter + 2. * err,
+            diameter + 2. * err,
+            diameter + 2. * err,
+        ];
+
+        // The origin is defined by the minimum point
+        let origin = [min_x - err, min_y - err, min_z - err];
+
+        Domain { origin, diameter }
+    }
+
+    /// Construct a domain a user specified origin and diameter.
+    ///
+    /// # Arguments
+    /// * `origin` - The point from which to construct a cuboid domain.
+    /// * `diameter` - The diameter along each axis of the domain.
+    pub fn new(origin: &[f64; 3], diameter: &[f64; 3]) -> Self {
         Domain {
-            origin: [min_x - err, min_y - err, min_z - err],
-            diameter: [
-                (max_x - min_x) + 2. * err,
-                (max_y - min_y) + 2. * err,
-                (max_z - min_z) + 2. * err,
-            ],
+            origin: *origin,
+            diameter: *diameter,
         }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use rlst::dense::{RawAccess, Shape};
 
-    use rand::prelude::*;
-    use rand::SeedableRng;
+    use crate::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
 
-    use crate::types::domain::Domain;
+    use super::*;
 
-    const NPOINTS: u64 = 100000;
+    fn test_compute_bounds(points: PointsMat) {
+        let domain = Domain::from_local_points(points.data());
 
-    #[test]
-    fn test_compute_bounds() {
-        // Generate a set of randomly distributed points
-        let mut range = StdRng::seed_from_u64(0);
-        let between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
-        let mut points = Vec::new();
-
-        for _ in 0..NPOINTS {
-            points.push([
-                between.sample(&mut range),
-                between.sample(&mut range),
-                between.sample(&mut range),
-            ])
-        }
-
-        let domain = Domain::from_local_points(&points);
+        // Test that the domain remains cubic
+        assert!(domain.diameter.iter().all(|&x| x == domain.diameter[0]));
 
         // Test that all local points are contained within the local domain
-        for point in points {
+        let npoints = points.shape().0;
+        for i in 0..npoints {
+            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+
             assert!(
                 domain.origin[0] <= point[0] && point[0] <= domain.origin[0] + domain.diameter[0]
             );
@@ -83,5 +87,22 @@ mod test {
                 domain.origin[2] <= point[2] && point[2] <= domain.origin[2] + domain.diameter[2]
             );
         }
+    }
+
+    #[test]
+    fn test_bounds() {
+        let npoints = 10000;
+
+        // Test points in positive octant only
+        let points = points_fixture(npoints, None, None);
+        test_compute_bounds(points);
+
+        // Test points in positive and negative octants
+        let points = points_fixture(npoints, Some(-1.), Some(1.));
+        test_compute_bounds(points);
+
+        // Test rectangular distributions of points
+        let points = points_fixture_col(npoints);
+        test_compute_bounds(points);
     }
 }

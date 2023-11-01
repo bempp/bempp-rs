@@ -1,115 +1,103 @@
-// //? mpirun -n {{NPROCESSES}} --features "mpi"
+// ? mpirun -n {{NPROCESSES}} --features "mpi"
+#![allow(unused_imports)]
 
-// use rand::prelude::*;
-// use rand::SeedableRng;
+#[cfg(feature = "mpi")]
+use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
-// use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
+use bempp_traits::tree::Tree;
 
-// use bempp_traits::tree::Tree;
+#[cfg(feature = "mpi")]
+use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
 
-// use bempp_tree::types::{
-//     domain::Domain, morton::MortonKey, multi_node::MultiNodeTree, point::PointType,
-// };
+use bempp_tree::implementations::helpers::points_fixture;
+use rlst::dense::RawAccess;
 
-// pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
-//     let mut range = StdRng::seed_from_u64(0);
-//     let between = rand::distributions::Uniform::from(0.0..1.0);
-//     let mut points: Vec<[PointType; 3]> = Vec::new();
+/// Test that the leaves on separate nodes do not overlap.
+#[cfg(feature = "mpi")]
+fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
+    // Communicate bounds from each process
+    let max = tree.get_all_leaves_set().iter().max().unwrap();
+    let min = tree.get_all_leaves_set().iter().min().unwrap();
 
-//     for _ in 0..npoints {
-//         points.push([
-//             between.sample(&mut range),
-//             between.sample(&mut range),
-//             between.sample(&mut range),
-//         ])
-//     }
+    // Gather all bounds at root
+    let size = world.size();
+    let rank = world.rank();
 
-//     points
-// }
+    let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
+    let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
 
-// /// Test that the leaves on separate nodes do not overlap.
-// fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
-//     // Communicate bounds from each process
-//     let max = tree.get_keys().iter().max().unwrap();
-//     let min = *tree.get_keys().iter().min().unwrap();
+    let previous_process = world.process_at_rank(previous_rank);
+    let next_process = world.process_at_rank(next_rank);
 
-//     // Gather all bounds at root
-//     let size = world.size();
-//     let rank = world.rank();
+    // Send min to partner
+    if rank > 0 {
+        previous_process.send(min);
+    }
 
-//     let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
-//     let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
+    let mut partner_min = MortonKey::default();
 
-//     let previous_process = world.process_at_rank(previous_rank);
-//     let next_process = world.process_at_rank(next_rank);
+    if rank < (size - 1) {
+        next_process.receive_into(&mut partner_min);
+    }
 
-//     // Send min to partner
-//     if rank > 0 {
-//         previous_process.send(&min);
-//     }
+    // Test that the partner's minimum node is greater than the process's maximum node
+    if rank < size - 1 {
+        assert!(max < &partner_min)
+    }
+}
 
-//     let mut partner_min = MortonKey::default();
+/// Test that the globally defined domain contains all the points at a given node.
+#[cfg(feature = "mpi")]
+fn test_global_bounds(world: &UserCommunicator) {
+    let npoints = 10000;
+    let points = points_fixture(npoints, None, None);
 
-//     if rank < (size - 1) {
-//         next_process.receive_into(&mut partner_min);
-//     }
+    let comm = world.duplicate();
 
-//     // Test that the partner's minimum node is greater than the process's maximum node
-//     if rank < size - 1 {
-//         assert!(max < &partner_min)
-//     }
-// }
+    let domain = Domain::from_global_points(points.data(), &comm);
 
-// fn test_uniform(tree: &MultiNodeTree) {
-//     let levels: Vec<u64> = tree.get_keys().iter().map(|key| key.level()).collect();
-//     let first = levels[0];
-//     assert_eq!(true, levels.iter().all(|level| *level == first));
-// }
+    // Test that all local points are contained within the global domain
+    for i in 0..npoints {
+        let x = points.data()[i];
+        let y = points.data()[i + npoints];
+        let z = points.data()[i + 2 * npoints];
 
-// /// Test that the globally defined domain contains all the points at a given node.
-// fn test_global_bounds(world: &UserCommunicator) {
-//     let points = points_fixture(10000);
+        assert!(domain.origin[0] <= x && x <= domain.origin[0] + domain.diameter[0]);
+        assert!(domain.origin[1] <= y && y <= domain.origin[1] + domain.diameter[1]);
+        assert!(domain.origin[2] <= z && z <= domain.origin[2] + domain.diameter[2]);
+    }
+}
 
-//     let comm = world.duplicate();
+#[cfg(feature = "mpi")]
+fn main() {
+    // Setup an MPI environment
+    let universe: Universe = mpi::initialize().unwrap();
+    let world = universe.world();
+    let comm = world.duplicate();
 
-//     let domain = Domain::from_global_points(&points, &comm);
+    // Setup tree parameters
+    let adaptive = false;
+    let k = 2;
+    let depth = Some(3);
+    let n_points = 10000;
 
-//     // Test that all local points are contained within the global domain
-//     for point in points {
-//         assert!(domain.origin[0] <= point[0] && point[0] <= domain.origin[0] + domain.diameter[0]);
-//         assert!(domain.origin[1] <= point[1] && point[1] <= domain.origin[1] + domain.diameter[1]);
-//         assert!(domain.origin[2] <= point[2] && point[2] <= domain.origin[2] + domain.diameter[2]);
-//     }
-// }
+    // Generate some random test data local to each process
+    let points = points_fixture(n_points, None, None);
+    let global_idxs: Vec<_> = (0..n_points).collect();
 
-// fn main() {
-//     // Setup an MPI environment
-//     let universe: Universe = mpi::initialize().unwrap();
-//     let world = universe.world();
-//     let comm = world.duplicate();
+    // Create a uniform tree
+    let tree = MultiNodeTree::new(&comm, points.data(), adaptive, None, depth, k, &global_idxs);
 
-//     // Setup tree parameters
-//     let adaptive = false;
-//     let n_crit: Option<_> = None;
-//     let k: Option<_> = None;
-//     let depth = Some(4);
-//     let n_points = 10000;
+    test_global_bounds(&comm);
+    if world.rank() == 0 {
+        println!("\t ... test_global_bounds passed on uniform tree");
+    }
 
-//     let points = points_fixture(n_points);
+    test_no_overlaps(&comm, &tree);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on uniform tree");
+    }
+}
 
-//     let tree = MultiNodeTree::new(&comm, k, &points, adaptive, n_crit, depth);
-
-//     test_global_bounds(&comm);
-//     if world.rank() == 0 {
-//         println!("\t ... test_global_bounds passed on uniform tree");
-//     }
-//     test_uniform(&tree);
-//     if world.rank() == 0 {
-//         println!("\t ... test_uniform passed on uniform tree");
-//     }
-//     test_no_overlaps(&comm, &tree);
-//     if world.rank() == 0 {
-//         println!("\t ... test_no_overlaps passed on uniform tree");
-//     }
-// }
+#[cfg(not(feature = "mpi"))]
 fn main() {}

@@ -1,4 +1,4 @@
-/// Helper Routines for MPI functionality
+//! Helper Routines for MPI functionality
 use mpi::{
     datatype::Equivalence,
     topology::{Communicator, UserCommunicator},
@@ -19,7 +19,7 @@ use mpi::{
 pub fn all_to_allv_sparse<T>(
     comm: &UserCommunicator,
     packets: &Vec<Vec<T>>,
-    packet_destinations: &Vec<Rank>,
+    packet_destinations: &[Rank],
     &recv_count: &Count,
 ) -> Vec<T>
 where

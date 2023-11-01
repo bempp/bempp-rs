@@ -25,6 +25,7 @@ pub fn zero_matrix<T: Scalar>(shape: (usize, usize)) -> Mat<T> {
 }
 
 /// A three-dimensional rectangular array
+#[derive(Clone)]
 pub struct Array3D<T: Num> {
     /// The data in the array, in row-major order
     data: Vec<T>,
@@ -72,6 +73,14 @@ impl<T: Num> Array3DAccess<T> for Array3D<T> {
     }
     fn shape(&self) -> &(usize, usize, usize) {
         &self.shape
+    }
+
+    fn get_data(&self) -> &[T] {
+        &self.data
+    }
+
+    fn get_data_mut(&mut self) -> &mut [T] {
+        &mut self.data
     }
 }
 

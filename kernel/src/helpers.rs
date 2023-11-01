@@ -1,6 +1,7 @@
-use crate::traits::Kernel;
-use crate::types::EvalType;
-use bempp_traits::types::Scalar;
+use bempp_traits::{
+    kernel::Kernel,
+    types::{EvalType, Scalar},
+};
 
 pub(crate) fn check_dimensions_evaluate<K: Kernel, T: Scalar>(
     kernel: &K,

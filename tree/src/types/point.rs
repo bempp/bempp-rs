@@ -1,4 +1,4 @@
-//! Data structures and methods for Cartesian Points in 3D.
+//! Data structures for Cartesian Points in 3D.
 use crate::types::morton::MortonKey;
 
 pub type PointType = f64;
@@ -8,7 +8,7 @@ pub type PointType = f64;
 /// Morton encoding at the lowest possible level of discretization (DEEPEST_LEVEL), and an 'encoded key'
 /// specifiying its encoding at a given level of discretization. Points also have associated data
 #[repr(C)]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Copy)]
 pub struct Point {
     /// Physical coordinate in Cartesian space.
     pub coordinate: [PointType; 3],

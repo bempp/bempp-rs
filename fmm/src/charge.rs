@@ -1,18 +1,11 @@
-#[derive(Clone, Debug, Default)]
-pub struct Charge {
-    /// Charge data
-    pub data: f64,
+use std::collections::HashMap;
 
-    /// Global unique index.
-    pub global_idx: usize,
-}
+use crate::types::{Charge, ChargeDict, GlobalIdx};
 
-/// Container of **Points**.
-#[derive(Clone, Debug, Default)]
-pub struct Charges {
-    /// A vector of Charges
-    pub charges: Vec<Charge>,
-
-    /// index for implementing the Iterator trait.
-    pub index: usize,
+pub fn build_charge_dict(global_idxs: &[GlobalIdx], charges: &[Charge]) -> ChargeDict {
+    let mut res: ChargeDict = HashMap::new();
+    for (&global_idx, &charge) in global_idxs.iter().zip(charges.iter()) {
+        res.insert(global_idx, charge);
+    }
+    res
 }
