@@ -42,11 +42,6 @@ jobs:
         with:
           prefix-key: bempp-rs-${{ steps.cache-key.outputs.key }}
 
-      - name: Build Bempp-rs
-        run: cargo build ${{ matrix.feature-flags }}
-      - name: Build Bempp-rs (release mode)
-        run: cargo build --release ${{ matrix.feature-flags }}
-
       - name: Run unit tests
         run: cargo test --lib ${{ matrix.feature-flags }}
       - name: Run unit tests (release mode)
