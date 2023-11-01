@@ -54,9 +54,6 @@ jobs:
           chmod +x examples.sh
           ./examples.sh
 
-      - name: Build docs
-        run: cargo doc ${{ matrix.feature-flags }} --no-deps
-
   run-tests-python:
     name: Run tests (Python)
     runs-on: ubuntu-latest

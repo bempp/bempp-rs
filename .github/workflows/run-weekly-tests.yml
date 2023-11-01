@@ -54,4 +54,4 @@ jobs:
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "strict" --no-deps
+        run: cargo doc --features "mpi,strict" --no-deps
