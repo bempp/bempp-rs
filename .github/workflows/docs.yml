@@ -2,24 +2,43 @@ name: 📖
 
 on:
   push:
+  pull_request:
     branches:
       - main
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
 
 jobs:
+  build-docs:
+    name: Build docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: "stable"
+          components: rustfmt
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: "mpich"
+      - uses: actions/checkout@v3
+
+      - name: Build docs
+        run: cargo doc --no-deps --features "mpi"
+
   build-and-deploy-docs:
     name: Build and deploy docs
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: true
     steps:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
