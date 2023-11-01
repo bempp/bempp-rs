@@ -36,9 +36,7 @@ jobs:
 
       - name: Generate cache key
         id: cache-key
-        run: |
-          info="${{matrix.rust-version }}-${{ matrix.mpi }}-${{ matrix.feature-flags }}"
-          echo "key=${info//@(,| )/-}" >> $GITHUB_OUTPUT
+        run: echo "key=$(sed \"s/[, ]/-/g\" <<< \"${{matrix.rust-version }}-${{ matrix.mpi }}-${{ matrix.feature-flags }}\")" >> $GITHUB_OUTPUT
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
