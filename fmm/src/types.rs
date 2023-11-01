@@ -54,10 +54,14 @@ pub struct KiFmm<T: Tree, U: Kernel, V: FieldTranslationData<U>> {
     pub order: usize,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
-    pub uc2e_inv: C2EType,
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_1: C2EType,
+    pub uc2e_inv_2: C2EType,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
-    pub dc2e_inv: C2EType,
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_1: C2EType,
+    pub dc2e_inv_2: C2EType,
 
     /// The ratio of the inner check surface diamater in comparison to the surface discretising a box.
     pub alpha_inner: f64,

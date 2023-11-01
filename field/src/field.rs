@@ -440,7 +440,7 @@ where
     ///
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
-    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in row major order.
+    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in column major order.
     /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn compute_kernel(
         &self,

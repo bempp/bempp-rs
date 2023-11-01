@@ -100,7 +100,8 @@ where
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
-        let uc2e_inv = v.dot(&mat_s).dot(&ut);
+        let uc2e_inv_1 = v.dot(&mat_s);
+        let uc2e_inv_2 = ut;
 
         let (s, ut, v) = pinv::<f64>(&dc2e, None, None).unwrap();
 
@@ -108,7 +109,8 @@ where
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
-        let dc2e_inv = v.dot(&mat_s).dot(&ut);
+        let dc2e_inv_1 = v.dot(&mat_s);
+        let dc2e_inv_2 = ut;
 
         // Calculate M2M/L2L matrices
         let children = ROOT.children();
@@ -139,7 +141,7 @@ where
             // Need to transpose so that rows correspond to targets, and columns to sources
             let pc2ce = pc2ce.transpose().eval();
 
-            m2m.push(uc2e_inv.dot(&pc2ce).eval());
+            m2m.push(uc2e_inv_1.dot(&uc2e_inv_2.dot(&pc2ce)).eval());
 
             let mut cc2pe = rlst_dynamic_mat![f64, (ncheck_surface, nequiv_surface)];
 
@@ -152,13 +154,17 @@ where
 
             // Need to transpose so that rows correspond to targets, and columns to sources
             let cc2pe = cc2pe.transpose().eval();
-            l2l.push((kernel.scale(child.level()) * dc2e_inv.dot(&cc2pe)).eval());
+            l2l.push(
+                (kernel.scale(child.level()) * dc2e_inv_1.dot(&dc2e_inv_2.dot(&cc2pe))).eval(),
+            );
         }
 
         Self {
             order,
-            uc2e_inv,
-            dc2e_inv,
+            uc2e_inv_1,
+            uc2e_inv_2,
+            dc2e_inv_1,
+            dc2e_inv_2,
             alpha_inner,
             alpha_outer,
             m2m,
@@ -392,7 +398,7 @@ mod test {
         // Setup a FMM experiment
         let order = 6;
         let alpha_inner = 1.05;
-        let alpha_outer = 1.99;
+        let alpha_outer = 2.95;
         let adaptive = false;
         let k = 1000;
         let ncrit = 150;
@@ -445,7 +451,6 @@ mod test {
 
         let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
-        // Get into row major order
         let leaf_coordinates = unsafe {
             rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
         }.eval();
@@ -473,7 +478,7 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 1e-6);
     }
 
     #[test]
@@ -485,7 +490,7 @@ mod test {
 
         let order = 6;
         let alpha_inner = 1.05;
-        let alpha_outer = 1.95;
+        let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
         let depth = 3;
@@ -524,7 +529,6 @@ mod test {
 
         let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
-        // Get into row major order
         let leaf_coordinates = unsafe {
             rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
         }.eval();
@@ -551,6 +555,6 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 1e-6);
     }
 }

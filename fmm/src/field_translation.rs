@@ -57,7 +57,6 @@ where
 
                     let nsources = leaf_coordinates.len() / self.fmm.kernel.space_dimension();
 
-                    // Get into row major order
                     let leaf_coordinates = unsafe {
                         rlst_pointer_mat!['a, f64, leaf_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
                     }.eval();
@@ -84,7 +83,7 @@ where
 
                     let leaf_multipole_owned = (
                         fmm_arc.kernel.scale(leaf.level())
-                        * fmm_arc.uc2e_inv.dot(&check_potential)
+                        * fmm_arc.uc2e_inv_1.dot(&fmm_arc.uc2e_inv_2.dot(&check_potential))
                     ).eval();
 
                     let mut leaf_multipole_lock = leaf_multipole_arc.lock().unwrap();
@@ -174,7 +173,6 @@ where
 
                             let ntargets = target_coordinates.len() / self.fmm.kernel.space_dimension();
 
-                            // Get into row major order
                             let target_coordinates = unsafe {
                                 rlst_pointer_mat!['a, f64, target_coordinates.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
                             }.eval();
@@ -216,7 +214,6 @@ where
                         .collect_vec();
                     let ntargets = target_coordinates.len() / self.fmm.kernel.space_dimension();
 
-                    // Get into row major order
                     let target_coordinates = unsafe {
                         rlst_pointer_mat!['a, f64, target_coordinates.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
                     }.eval();
@@ -264,7 +261,6 @@ where
 
                             let nsources = source_coordinates.len() / self.fmm.kernel.space_dimension();
 
-                            // Get into row major order
                             let source_coordinates = unsafe {
                                 rlst_pointer_mat!['a, f64, source_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
                             }.eval();
@@ -291,7 +287,7 @@ where
 
                             let mut target_local_lock = target_local_arc.lock().unwrap();
 
-                            let target_local_owned = (fmm_arc.kernel.scale(leaf.level()) * fmm_arc.dc2e_inv.dot(&downward_check_potential)).eval();
+                            let target_local_owned = (fmm_arc.kernel.scale(leaf.level()) * fmm_arc.dc2e_inv_1.dot(&fmm_arc.dc2e_inv_2.dot(&downward_check_potential))).eval();
 
                             *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
                         }
@@ -316,7 +312,6 @@ where
 
                     let ntargets= target_coordinates.len() / self.fmm.kernel.space_dimension();
 
-                    // Get into row major order
                     let target_coordinates = unsafe {
                         rlst_pointer_mat!['a, f64, target_coordinates.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
                     }.eval();
@@ -332,7 +327,6 @@ where
 
                                 let nsources = source_coordinates.len() / self.fmm.kernel.space_dimension();
 
-                                // Get into row major order
                                 let source_coordinates = unsafe {
                                     rlst_pointer_mat!['a, f64, source_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
                                 }.eval();
@@ -463,7 +457,10 @@ where
                 // println!("check potential svd {:?}", check_potential_owned.data());
 
                 // Compute local
-                let locals_owned = (self.fmm.dc2e_inv.dot(&check_potential_owned)
+                let locals_owned = (self
+                    .fmm
+                    .dc2e_inv_1
+                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential_owned))
                     * self.fmm.kernel.scale(level)
                     * self.m2l_scale(level))
                 .eval();
@@ -727,8 +724,12 @@ where
             rlst_pointer_mat!['a, f64, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
         };
 
-        let locals =
-            (self.fmm.dc2e_inv.dot(&check_potentials) * self.fmm.kernel.scale(level)).eval();
+        let locals = (self
+            .fmm
+            .dc2e_inv_1
+            .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
+            * self.fmm.kernel.scale(level))
+        .eval();
 
         for (i, target) in targets.iter().enumerate() {
             let target_local_arc = Arc::clone(self.locals.get(target).unwrap());
