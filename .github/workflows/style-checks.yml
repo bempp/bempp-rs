@@ -27,11 +27,6 @@ jobs:
         run:
           sudo apt-get install libopenblas-dev liblapack-dev
 
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: bempp-rs-style
-
       - name: Style checks
         run: |
           cargo fmt -- --check
