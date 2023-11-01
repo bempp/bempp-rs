@@ -1,4 +1,4 @@
-name: ✨ Style checks
+name: ✨
 
 on:
   push:
