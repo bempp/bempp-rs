@@ -16,6 +16,7 @@ jobs:
       matrix:
         rust-version: ["stable"]
         mpi: ['mpich', 'openmpi']
+        feature-flags: ['--features "mpi,strict"']
     steps:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -36,19 +37,19 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: bempp-rs-${{ matrix.rust-version }}-${{ matrix.mpi }}
+          prefix-key: bempp-rs-${{ matrix.rust-version }}-${{ matrix.mpi }}-${{ matrix.feature-flags }}
 
       - name: Build Bempp-rs
-        run: cargo build --lib --features "mpi,strict"
+        run: cargo build ${{ matrix.feature-flags }}
       - name: Build Bempp-rs (release mode)
-        run: cargo build --lib --release --features "mpi,strict"
+        run: cargo build --release ${{ matrix.feature-flags }}
 
       - name: Run unit tests
-        run: cargo test --lib --features "mpi,strict"
+        run: cargo test --lib ${{ matrix.feature-flags }}
       - name: Run unit tests (release mode)
-        run: cargo test --lib --release --features "mpi,strict"
+        run: cargo test --lib --release ${{ matrix.feature-flags }}
       - name: Run tests
-        run: cargo test --examples --release --features "mpi,strict"
+        run: cargo test --examples --release ${{ matrix.feature-flags }}
       - name: Run examples
         run: |
           python3 find_examples.py
@@ -56,7 +57,7 @@ jobs:
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "mpi,strict" --no-deps
+        run: cargo doc ${{ matrix.feature-flags }} --no-deps
 
   run-tests-python:
     name: Run tests (Python)
