@@ -10,11 +10,11 @@ use mpi::{
 /// to a subset of the communicator.
 ///
 /// For Example, you may have four processes in a communicator
-/// Communicator = [P0, P1, P2, P3]. Each process communicates
+/// Communicator = \[P0, P1, P2, P3\]. Each process communicates
 /// with a subset of the communicator excluding itself,
-/// ie. P0 -> [P0, P2], P1 -> [P0], P2-> [], P3 -> [P0, P1, P2].
+/// ie. P0 -> \[P0, P2\], P1 -> \[P0\], P2-> \[\], P3 -> \[P0, P1, P2\].
 /// This function expects these packets to be separated in a
-/// Vec<Vec<T>>, their destination ranks, as well as the number of
+/// `Vec<Vec<T>>`, their destination ranks, as well as the number of
 /// packets this process expects to receive overall `recv_count`.
 pub fn all_to_allv_sparse<T>(
     comm: &UserCommunicator,
