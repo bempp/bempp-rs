@@ -38,6 +38,3 @@ num = "0.4"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = {git = "https://github.com/skailasa/fftw.git" }
 rayon = "1.7"
-
-[dev.dependencies]
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
