@@ -411,7 +411,7 @@ mod test {
     use crate::polynomials::*;
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
-    use bempp_tools::arrays::{to_matrix, zero_matrix, Array3D};
+    use bempp_tools::arrays::{transpose_to_matrix, zero_matrix, Array3D};
     use rlst_dense::RandomAccessMut;
 
     #[test]
@@ -419,7 +419,7 @@ mod test {
         let degree = 6;
 
         let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
-        let points = to_matrix(&rule.points, (rule.npoints, 1));
+        let points = transpose_to_matrix(&rule.points, (rule.npoints, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -450,7 +450,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
-        let points = to_matrix(&rule.points, (rule.npoints, 2));
+        let points = transpose_to_matrix(&rule.points, (rule.npoints, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Triangle,
@@ -481,7 +481,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
-        let points = to_matrix(&rule.points, (rule.npoints, 2));
+        let points = transpose_to_matrix(&rule.points, (rule.npoints, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,
@@ -642,11 +642,10 @@ mod test {
     fn test_legendre_interval_against_known_polynomials() {
         let degree = 3;
 
-        let mut p = vec![0.0; 11];
-        for (i, pi) in p.iter_mut().enumerate() {
-            *pi = i as f64 / 10.0;
+        let mut points = zero_matrix((11, 1));
+        for i in 0..11 {
+            *points.get_mut(i, 0).unwrap() = i as f64 / 10.0;
         }
-        let points = to_matrix(&p, (11, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
