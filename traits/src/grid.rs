@@ -23,7 +23,7 @@ pub trait Geometry {
     /// The geometric dimension
     fn dim(&self) -> usize;
 
-    /// Get the a coordinate of a point
+    /// Get one of the coordinates of a point
     fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&f64>;
 
     /// The number of points stored in the geometry
