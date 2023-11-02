@@ -71,12 +71,11 @@ pub fn export_as_gmsh(grid: &SerialGrid, fname: String) {
         gmsh_s.push_str(&format!("{}\n", i + 1));
     }
     for i in 0..node_count {
-        let pt = grid.geometry().point(i).unwrap();
-        for (n, j) in pt.iter().enumerate() {
+        for n in 0..grid.geometry().dim() {
             if n != 0 {
                 gmsh_s.push(' ');
             }
-            gmsh_s.push_str(&format!("{j}"));
+            gmsh_s.push_str(&format!("{}", grid.geometry().coordinate(i, n).unwrap()));
         }
         for _ in grid.geometry().dim()..3 {
             gmsh_s.push_str(" 0.0");
@@ -137,7 +136,8 @@ mod test {
         let g = SerialGrid::new(
             to_matrix(
                 &[
-                    0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0
+                    0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0,
+                    1.0, 1.0,
                 ],
                 (9, 2),
             ),
@@ -155,7 +155,8 @@ mod test {
         let g = SerialGrid::new(
             to_matrix(
                 &[
-                    0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0
+                    0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0,
+                    1.0, 1.0,
                 ],
                 (9, 2),
             ),

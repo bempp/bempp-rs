@@ -9,6 +9,7 @@ use bempp_traits::grid::{GeomF, GeomFMut, Geometry, Grid, Ownership, Topology};
 use itertools::izip;
 use rlst_dense::{
     rlst_static_mat, RandomAccessByRef, RandomAccessMut, RawAccess, Shape, SizeIdentifier,
+    UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
 };
 use rlst_proc_macro::rlst_static_size;
 use std::ptr;
@@ -96,20 +97,21 @@ impl SerialGeometry {
     }
 }
 
+impl SerialGeometry {
+    unsafe fn coordinate_unchecked(&self, point_index: usize, coord_index: usize) -> &f64 {
+        self.coordinates.get_unchecked(point_index, coord_index)
+    }
+}
 impl Geometry for SerialGeometry {
     fn dim(&self) -> usize {
         self.coordinates.shape().1
     }
 
-    fn point(&self, index: usize) -> Option<Vec<f64>> {
-        if index > self.point_count() {
+    fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&f64> {
+        if point_index >= self.point_count() || coord_index >= self.dim() {
             None
         } else {
-            let mut pt = vec![0.0; self.dim()];
-            for (i, p) in pt.iter_mut().enumerate() {
-                *p = *self.coordinates.get(index, i).unwrap();
-            }
-            Some(pt)
+            Some(unsafe { self.coordinate_unchecked(point_index, coord_index) })
         }
     }
 
@@ -136,22 +138,26 @@ impl Geometry for SerialGeometry {
         points: &'a T,
     ) -> GeomF<'a, TMut> {
         let npts = points.shape().0;
+        let gdim = self.dim();
         let mut table = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
         element.tabulate(points, 0, &mut table);
-        let gdim = self.dim();
 
         Box::new(move |cell: usize, pts: &mut TMut| {
             for p in 0..npts {
                 for i in 0..gdim {
-                    *pts.get_mut(p, i).unwrap() = 0.0;
+                    unsafe {
+                        *pts.get_unchecked_mut(p, i) = 0.0;
+                    }
                 }
             }
-            let vertices = self.cell_vertices(cell).unwrap();
-            for (i, n) in vertices.iter().enumerate() {
-                let pt = self.point(*n).unwrap();
+            for i in 0..table.shape().2 {
+                let v = unsafe { *self.cells.get_unchecked(cell, i) };
                 for p in 0..points.shape().0 {
-                    for (j, pt_j) in pt.iter().enumerate() {
-                        *pts.get_mut(p, j).unwrap() += *pt_j * *table.get(0, p, i, 0).unwrap();
+                    for j in 0..gdim {
+                        unsafe {
+                            *pts.get_unchecked_mut(p, j) +=
+                                *self.coordinate_unchecked(v, j) * *table.get(0, p, i, 0).unwrap();
+                        }
                     }
                 }
             }
@@ -166,27 +172,28 @@ impl Geometry for SerialGeometry {
         cell: usize,
         physical_points: &mut TMut,
     ) {
+        let npts = points.shape().0;
         let gdim = self.dim();
-        if points.shape().0 != physical_points.shape().0 {
+        if physical_points.shape().0 != npts {
             panic!("physical_points has wrong number of rows.");
         }
-        if gdim != physical_points.shape().1 {
+        if physical_points.shape().1 != gdim {
             panic!("physical_points has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(0, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
         element.tabulate(points, 0, &mut data);
-        for p in 0..points.shape().0 {
-            for i in 0..physical_points.shape().1 {
+        for p in 0..npts {
+            for i in 0..gdim {
                 *physical_points.get_mut(p, i).unwrap() = 0.0;
             }
         }
         for i in 0..data.shape().2 {
-            let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
-            for (j, pt_j) in pt.iter().enumerate() {
-                for p in 0..points.shape().0 {
+            let v = *self.cells.get(cell, i).unwrap();
+            for j in 0..gdim {
+                for p in 0..npts {
                     *physical_points.get_mut(p, j).unwrap() +=
-                        *pt_j * data.get(0, p, i, 0).unwrap();
+                        *self.coordinate(v, j).unwrap() * data.get(0, p, i, 0).unwrap();
                 }
             }
         }
@@ -200,39 +207,50 @@ impl Geometry for SerialGeometry {
         element: &impl FiniteElement,
         points: &'a T,
     ) -> GeomFMut<'a, TMut> {
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let npts = points.shape().0;
+        let tdim = points.shape().1;
+        let gdim = self.dim();
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
         let mut axes = rlst_static_mat![f64, TwoByThree];
         element.tabulate(points, 1, &mut data);
         Box::new(move |cell: usize, normals: &mut TMut| {
-            for p in 0..points.shape().0 {
-                for i in 0..axes.shape().0 {
-                    for j in 0..axes.shape().1 {
-                        *axes.get_mut(i, j).unwrap() = 0.0;
+            for p in 0..npts {
+                for i in 0..tdim {
+                    for j in 0..gdim {
+                        unsafe {
+                            *axes.get_unchecked_mut(i, j) = 0.0;
+                        }
                     }
                 }
                 for i in 0..data.shape().2 {
-                    let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
-                    for (j, pt_j) in pt.iter().enumerate() {
-                        *axes.get_mut(0, j).unwrap() += *pt_j * data.get(1, p, i, 0).unwrap();
-                        *axes.get_mut(1, j).unwrap() += *pt_j * data.get(2, p, i, 0).unwrap();
+                    let v = unsafe { *self.cells.get_unchecked(cell, i) };
+                    for j in 0..gdim {
+                        unsafe {
+                            *axes.get_unchecked_mut(0, j) +=
+                                *self.coordinate_unchecked(v, j) * data.get(1, p, i, 0).unwrap();
+                            *axes.get_unchecked_mut(1, j) +=
+                                *self.coordinate_unchecked(v, j) * data.get(2, p, i, 0).unwrap();
+                        }
                     }
                 }
-                *normals.get_mut(0, p).unwrap() = *axes.get(0, 1).unwrap()
-                    * *axes.get(1, 2).unwrap()
-                    - *axes.get(0, 2).unwrap() * *axes.get(1, 1).unwrap();
-                *normals.get_mut(1, p).unwrap() = *axes.get(0, 2).unwrap()
-                    * *axes.get(1, 0).unwrap()
-                    - *axes.get(0, 0).unwrap() * *axes.get(1, 2).unwrap();
-                *normals.get_mut(2, p).unwrap() = *axes.get(0, 0).unwrap()
-                    * *axes.get(1, 1).unwrap()
-                    - *axes.get(0, 1).unwrap() * *axes.get(1, 0).unwrap();
-                let size = (*normals.get(0, p).unwrap() * *normals.get(0, p).unwrap()
-                    + *normals.get(1, p).unwrap() * *normals.get(1, p).unwrap()
-                    + *normals.get(2, p).unwrap() * *normals.get(2, p).unwrap())
-                .sqrt();
-                *normals.get_mut(0, p).unwrap() /= size;
-                *normals.get_mut(1, p).unwrap() /= size;
-                *normals.get_mut(2, p).unwrap() /= size;
+                unsafe {
+                    *normals.get_unchecked_mut(0, p) = *axes.get_unchecked(0, 1)
+                        * *axes.get_unchecked(1, 2)
+                        - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
+                    *normals.get_unchecked_mut(1, p) = *axes.get_unchecked(0, 2)
+                        * *axes.get_unchecked(1, 0)
+                        - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
+                    *normals.get_unchecked_mut(2, p) = *axes.get_unchecked(0, 0)
+                        * *axes.get_unchecked(1, 1)
+                        - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
+                    let size = (*normals.get_unchecked(0, p) * *normals.get_unchecked(0, p)
+                        + *normals.get_unchecked(1, p) * *normals.get_unchecked(1, p)
+                        + *normals.get_unchecked(2, p) * *normals.get_unchecked(2, p))
+                    .sqrt();
+                    *normals.get_unchecked_mut(0, p) /= size;
+                    *normals.get_unchecked_mut(1, p) /= size;
+                    *normals.get_unchecked_mut(2, p) /= size;
+                }
             }
         })
     }
@@ -245,31 +263,35 @@ impl Geometry for SerialGeometry {
         cell: usize,
         normals: &mut TMut,
     ) {
+        let npts = points.shape().0;
+        let tdim = points.shape().1;
         let gdim = self.dim();
         if gdim != 3 {
             unimplemented!("normals currently only implemented for 2D cells embedded in 3D.");
         }
-        if points.shape().0 != normals.shape().1 {
+        if normals.shape().1 != npts {
             panic!("normals has wrong number of columns.");
         }
-        if gdim != normals.shape().0 {
+        if normals.shape().0 != gdim {
             panic!("normals has wrong number of rows.");
         }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
         let mut axes = rlst_static_mat![f64, TwoByThree];
         element.tabulate(points, 1, &mut data);
-        for p in 0..points.shape().0 {
-            for i in 0..axes.shape().0 {
-                for j in 0..axes.shape().1 {
+        for p in 0..npts {
+            for i in 0..tdim {
+                for j in 0..gdim {
                     *axes.get_mut(i, j).unwrap() = 0.0;
                 }
             }
             for i in 0..data.shape().2 {
-                let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
-                for (j, pt_j) in pt.iter().enumerate() {
-                    *axes.get_mut(0, j).unwrap() += *pt_j * data.get(1, p, i, 0).unwrap();
-                    *axes.get_mut(1, j).unwrap() += *pt_j * data.get(2, p, i, 0).unwrap();
+                let v = *self.cells.get(cell, i).unwrap();
+                for j in 0..gdim {
+                    *axes.get_mut(0, j).unwrap() +=
+                        *self.coordinate(v, j).unwrap() * data.get(1, p, i, 0).unwrap();
+                    *axes.get_mut(1, j).unwrap() +=
+                        *self.coordinate(v, j).unwrap() * data.get(2, p, i, 0).unwrap();
                 }
             }
             *normals.get_mut(0, p).unwrap() = *axes.get(0, 1).unwrap() * *axes.get(1, 2).unwrap()
@@ -296,23 +318,30 @@ impl Geometry for SerialGeometry {
         element: &impl FiniteElement,
         points: &'a T,
     ) -> GeomF<'a, TMut> {
+        let npts = points.shape().0;
         let tdim = points.shape().1;
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let gdim = self.dim();
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
         element.tabulate(points, 1, &mut data);
 
         Box::new(move |cell: usize, jacobians: &mut TMut| {
             for p in 0..points.shape().0 {
                 for i in 0..jacobians.shape().0 {
-                    *jacobians.get_mut(i, p).unwrap() = 0.0;
+                    unsafe {
+                        *jacobians.get_unchecked_mut(i, p) = 0.0;
+                    }
                 }
             }
             for i in 0..data.shape().2 {
-                let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
+                let v = unsafe { *self.cells.get_unchecked(cell, i) };
                 for p in 0..points.shape().0 {
-                    for (j, pt_j) in pt.iter().enumerate() {
+                    for j in 0..gdim {
                         for k in 0..tdim {
-                            *jacobians.get_mut(k + tdim * j, p).unwrap() +=
-                                *pt_j * data.get(k + 1, p, i, 0).unwrap();
+                            unsafe {
+                                *jacobians.get_unchecked_mut(k + tdim * j, p) += *self
+                                    .coordinate_unchecked(v, j)
+                                    * data.get(k + 1, p, i, 0).unwrap();
+                            }
                         }
                     }
                 }
@@ -328,30 +357,31 @@ impl Geometry for SerialGeometry {
         cell: usize,
         jacobians: &mut TMut,
     ) {
-        let gdim = self.dim();
+        let npts = points.shape().0;
         let tdim = points.shape().1;
-        if points.shape().0 != jacobians.shape().1 {
+        let gdim = self.dim();
+        if jacobians.shape().1 != npts {
             panic!("jacobians has wrong number of columns.");
         }
-        if gdim * tdim != jacobians.shape().0 {
+        if jacobians.shape().0 != gdim * tdim {
             panic!("jacobians has wrong number of rows.");
         }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts)); // TODO: Memory is assigned here. Can we avoid this?
         let tdim = data.shape().0 - 1;
         element.tabulate(points, 1, &mut data);
-        for p in 0..points.shape().0 {
+        for p in 0..npts {
             for i in 0..jacobians.shape().0 {
                 *jacobians.get_mut(i, p).unwrap() = 0.0;
             }
         }
         for i in 0..data.shape().2 {
-            let pt = self.point(*self.cells.get(cell, i).unwrap()).unwrap();
-            for p in 0..points.shape().0 {
-                for (j, pt_j) in pt.iter().enumerate() {
+            let v = *self.cells.get(cell, i).unwrap();
+            for p in 0..npts {
+                for j in 0..gdim {
                     for k in 0..tdim {
                         *jacobians.get_mut(k + tdim * j, p).unwrap() +=
-                            *pt_j * data.get(k + 1, p, i, 0).unwrap();
+                            *self.coordinate(v, j).unwrap() * data.get(k + 1, p, i, 0).unwrap();
                     }
                 }
             }
@@ -363,8 +393,9 @@ impl Geometry for SerialGeometry {
         points: &'a T,
     ) -> GeomFMut<'a, [f64]> {
         let gdim = self.dim();
+        let npts = points.shape().0;
         let tdim = points.shape().1;
-        let mut js = zero_matrix((gdim * tdim, points.shape().0));
+        let mut js = zero_matrix((gdim * tdim, npts));
 
         let det = match tdim {
             1 => match gdim {

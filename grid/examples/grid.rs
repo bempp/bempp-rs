@@ -39,10 +39,11 @@ fn main() {
         let g_vertices = grid.geometry().cell_vertices(i).unwrap();
         println!("The geometric vertices of triangle {} are:", i);
         for v in g_vertices {
-            let coords = grid.geometry().point(*v).unwrap();
             println!(
-                "  Vertex {} with coordinates ({}, {}, {})",
-                v, coords[0], coords[1], coords[2]
+                "  Vertex {v} with coordinates ({}, {}, {})",
+                grid.geometry().coordinate(*v, 0).unwrap(),
+                grid.geometry().coordinate(*v, 1).unwrap(),
+                grid.geometry().coordinate(*v, 2).unwrap()
             );
         }
     }
