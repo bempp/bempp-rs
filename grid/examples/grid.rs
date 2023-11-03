@@ -61,14 +61,20 @@ fn test_surface_area() {
         for i in 0..grid.topology().entity_count(2) {
             let v = grid.geometry().cell_vertices(i).unwrap();
             let e1 = [
-                grid.geometry().coordinate(v[1], 0).unwrap() - grid.geometry().coordinate(v[0], 0).unwrap(),
-                grid.geometry().coordinate(v[1], 1).unwrap() - grid.geometry().coordinate(v[0], 1).unwrap(),
-                grid.geometry().coordinate(v[1], 2).unwrap() - grid.geometry().coordinate(v[0], 2).unwrap(),
+                grid.geometry().coordinate(v[1], 0).unwrap()
+                    - grid.geometry().coordinate(v[0], 0).unwrap(),
+                grid.geometry().coordinate(v[1], 1).unwrap()
+                    - grid.geometry().coordinate(v[0], 1).unwrap(),
+                grid.geometry().coordinate(v[1], 2).unwrap()
+                    - grid.geometry().coordinate(v[0], 2).unwrap(),
             ];
             let e2 = [
-                grid.geometry().coordinate(v[2], 0).unwrap() - grid.geometry().coordinate(v[0], 0).unwrap(),
-                grid.geometry().coordinate(v[2], 1).unwrap() - grid.geometry().coordinate(v[0], 1).unwrap(),
-                grid.geometry().coordinate(v[2], 2).unwrap() - grid.geometry().coordinate(v[0], 2).unwrap(),
+                grid.geometry().coordinate(v[2], 0).unwrap()
+                    - grid.geometry().coordinate(v[0], 0).unwrap(),
+                grid.geometry().coordinate(v[2], 1).unwrap()
+                    - grid.geometry().coordinate(v[0], 1).unwrap(),
+                grid.geometry().coordinate(v[2], 2).unwrap()
+                    - grid.geometry().coordinate(v[0], 2).unwrap(),
             ];
             let c = [
                 e1[1] * e2[2] - e1[2] * e2[1],
