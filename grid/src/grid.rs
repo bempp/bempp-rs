@@ -5,7 +5,7 @@ use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
-use bempp_traits::grid::{GeomF, GeomFMut, Geometry, Grid, Ownership, Topology};
+use bempp_traits::grid::{GeomF, GeomFMut, Geometry, Grid, Ownership, Topology, GeometryEvaluator};
 use itertools::izip;
 use rlst_dense::{
     rlst_static_mat, RandomAccessByRef, RandomAccessMut, RawAccess, Shape, SizeIdentifier,
@@ -13,6 +13,180 @@ use rlst_dense::{
 };
 use rlst_proc_macro::rlst_static_size;
 use std::ptr;
+use std::cell::RefCell;
+
+pub struct Evaluator<'a> {
+    geometry: &'a SerialGeometry,
+    points: &'a Mat<f64>,
+    table: Array4D<f64>,
+    npts: usize,
+    gdim: usize,
+    tdim: usize,
+    axes: RefCell<Mat<f64>>,
+    js: RefCell<Mat<f64>>,
+    det: Box<dyn Fn(&[f64]) -> f64>
+}
+
+impl<'a> Evaluator<'a> {
+    pub fn new(geometry: &'a SerialGeometry, element: &impl FiniteElement, points: &'a Mat<f64>) -> Self {
+        let npts = points.shape().0;
+        let tdim = points.shape().1;
+        let gdim = geometry.dim();
+        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
+        element.tabulate(points, 1, &mut table);
+        let axes = RefCell::new(zero_matrix((tdim, gdim)));
+        let js = RefCell::new(zero_matrix((gdim * tdim, npts)));
+
+
+        let det = Box::new(match tdim {
+            1 => match gdim {
+                1 => |x: &[f64]| x[0],
+                2 => |x: &[f64]| ((x[0]).powi(2) + (x[1]).powi(2)).sqrt(),
+                3 => |x: &[f64]| ((x[0]).powi(2) + (x[1]).powi(2) + (x[2]).powi(2)).sqrt(),
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            },
+            2 => match gdim {
+                2 => |x: &[f64]| x[0] * x[3] - x[1] * x[2],
+                3 => |x: &[f64]| {
+                    (((x[0]).powi(2) + (x[2]).powi(2) + (x.get(4).unwrap()).powi(2))
+                        * ((x[1]).powi(2) + (x[3]).powi(2) + (x[5]).powi(2))
+                        - (x[0] * x[1] + x[2] * x[3] + x.get(4).unwrap() * x[5]).powi(2))
+                    .sqrt()
+                },
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            },
+            3 => match gdim {
+                3 => |x: &[f64]| {
+                    x[0] * (x.get(4).unwrap() * x[8] - x[5] * x[7])
+                        - x[1] * (x[3] * x[8] - x[5] * x[6])
+                        + x[2] * (x[3] * x[7] - x.get(4).unwrap() * x[6])
+                },
+                _ => {
+                    panic!("Unsupported dimensions.");
+                }
+            },
+            _ => {
+                panic!("Unsupported dimensions.");
+            }
+        });
+
+        Self {
+            geometry,
+            points,
+            table,
+            npts,
+            gdim, tdim, axes, js, det
+        }
+    }
+}
+
+impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for Evaluator<'a> {
+    fn points(&self) -> &Mat<f64> { self.points }
+
+    fn compute_points(&self, cell_index: usize, points: &mut Mat<f64>) {
+        for p in 0..self.npts {
+            for i in 0..self.gdim {
+                unsafe {
+                    *points.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for p in 0..self.npts {
+                for j in 0..self.gdim {
+                    unsafe {
+                        *points.get_unchecked_mut(p, j) +=
+                            *self.geometry.coordinate_unchecked(v, j) * *self.table.get(0, p, i, 0).unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    fn compute_normals(&self, cell_index: usize, normals: &mut Mat<f64>) {
+        let mut axes = self.axes.borrow_mut();
+        for p in 0..self.npts {
+            for i in 0..self.tdim {
+                for j in 0..self.gdim {
+                    unsafe {
+                        *axes.get_unchecked_mut(i, j) = 0.0;
+                    }
+                }
+            }
+            for i in 0..self.table.shape().2 {
+                let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+                for j in 0..self.gdim {
+                    unsafe {
+                        *axes.get_unchecked_mut(0, j) +=
+                            *self.geometry.coordinate_unchecked(v, j) * self.table.get(1, p, i, 0).unwrap();
+                        *axes.get_unchecked_mut(1, j) +=
+                            *self.geometry.coordinate_unchecked(v, j) * self.table.get(2, p, i, 0).unwrap();
+                    }
+                }
+            }
+            unsafe {
+                *normals.get_unchecked_mut(0, p) = *axes.get_unchecked(0, 1)
+                    * *axes.get_unchecked(1, 2)
+                    - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
+                *normals.get_unchecked_mut(1, p) = *axes.get_unchecked(0, 2)
+                    * *axes.get_unchecked(1, 0)
+                    - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
+                *normals.get_unchecked_mut(2, p) = *axes.get_unchecked(0, 0)
+                    * *axes.get_unchecked(1, 1)
+                    - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
+                let size = (*normals.get_unchecked(0, p) * *normals.get_unchecked(0, p)
+                    + *normals.get_unchecked(1, p) * *normals.get_unchecked(1, p)
+                    + *normals.get_unchecked(2, p) * *normals.get_unchecked(2, p))
+                .sqrt();
+                *normals.get_unchecked_mut(0, p) /= size;
+                *normals.get_unchecked_mut(1, p) /= size;
+                *normals.get_unchecked_mut(2, p) /= size;
+            }
+        }
+    }
+
+    fn compute_jacobians(&self, cell_index: usize, jacobians: &mut Mat<f64>) {
+        for p in 0..self.npts {
+            for i in 0..self.tdim * self.gdim {
+                unsafe {
+                    *jacobians.get_unchecked_mut(i, p) = 0.0;
+                }
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for p in 0..self.npts {
+                for j in 0..self.gdim {
+                    for k in 0..self.tdim {
+                        unsafe {
+                            *jacobians.get_unchecked_mut(k + self.tdim * j, p) += *self
+                                .geometry.coordinate_unchecked(v, j)
+                                * self.table.get(k + 1, p, i, 0).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]) {
+        let mut js = self.js.borrow_mut();
+        self.compute_jacobians(cell_index, &mut js);
+        for (p, jdet) in jdets.iter_mut().enumerate() {
+            *jdet = (self.det)(&js.data()[self.tdim * self.gdim * p..self.tdim * self.gdim * (p + 1)]);
+        }
+    }
+
+    fn compute_jacobian_inverses(&self, _cell_index: usize, _jinvs: &mut Mat<f64>) {
+        panic!("Not implemented yet");
+    }
+}
+
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -103,6 +277,8 @@ impl SerialGeometry {
     }
 }
 impl Geometry for SerialGeometry {
+    type T = Mat<f64>;
+    type TMut = Mat<f64>;
     fn dim(&self) -> usize {
         self.coordinates.shape().1
     }
@@ -128,6 +304,15 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
+
+    fn get_evaluator<'a>(
+        &'a self,
+        element: &impl FiniteElement,
+        points: &'a Self::T,
+    ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a> {
+        Box::new(Evaluator::new(self, element, points))
+    }
+
     fn get_compute_points_function<
         'a,
         T: RandomAccessByRef<Item = f64> + Shape,
