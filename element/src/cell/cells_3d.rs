@@ -19,6 +19,10 @@ impl ReferenceCell for Tetrahedron {
         3
     }
 
+    fn is_simplex(&self) -> bool {
+        true
+    }
+
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Tetrahedron
     }
@@ -163,6 +167,10 @@ impl ReferenceCell for Tetrahedron {
 impl ReferenceCell for Hexahedron {
     fn dim(&self) -> usize {
         3
+    }
+
+    fn is_simplex(&self) -> bool {
+        false
     }
 
     fn cell_type(&self) -> ReferenceCellType {
@@ -342,6 +350,10 @@ impl ReferenceCell for Prism {
         3
     }
 
+    fn is_simplex(&self) -> bool {
+        false
+    }
+
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Prism
     }
@@ -505,6 +517,10 @@ impl ReferenceCell for Prism {
 impl ReferenceCell for Pyramid {
     fn dim(&self) -> usize {
         3
+    }
+
+    fn is_simplex(&self) -> bool {
+        false
     }
 
     fn cell_type(&self) -> ReferenceCellType {

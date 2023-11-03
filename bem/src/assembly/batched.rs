@@ -207,41 +207,32 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut test_normals = zero_matrix((NPTS_TEST, 3));
     let mut trial_normals = zero_matrix((NPTS_TRIAL, 3));
 
-    // let mut rlst_test_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
-    // let mut rlst_trial_normals = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
     let mut test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
     let mut trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TRIAL, 3)];
 
     let test_element = test_grid.geometry().element(test_cells[0]);
     let trial_element = trial_grid.geometry().element(trial_cells[0]);
 
-    let test_compute_points = test_grid
+    let test_evaluator = test_grid
         .geometry()
-        .get_compute_points_function(test_element, test_points);
-    let trial_compute_points = trial_grid
+        .get_evaluator(test_element, test_points);
+    let trial_evaluator = trial_grid
         .geometry()
-        .get_compute_points_function(trial_element, trial_points);
+        .get_evaluator(trial_element, trial_points);
 
-    let mut test_compute_jdets = test_grid
-        .geometry()
-        .get_compute_jacobian_determinants_function(test_element, test_points);
-    let mut trial_compute_jdets = trial_grid
-        .geometry()
-        .get_compute_jacobian_determinants_function(trial_element, trial_points);
-
-    let mut test_compute_normals = if needs_test_normal {
-        test_grid
-            .geometry()
-            .get_compute_normals_function(test_element, test_points)
+    let test_compute_normals: Box<dyn Fn(usize, &mut Mat<f64>)> = if needs_test_normal {
+        Box::new(|index: usize, normals: &mut Mat<f64>| {
+            test_evaluator.compute_normals(index, normals)
+        })
     } else {
-        Box::new(|_i: usize, _m: &mut Mat<f64>| {})
+        Box::new(|_: usize, _: &mut Mat<f64>| ())
     };
-    let mut trial_compute_normals = if needs_trial_normal {
-        trial_grid
-            .geometry()
-            .get_compute_normals_function(trial_element, trial_points)
+    let trial_compute_normals: Box<dyn Fn(usize, &mut Mat<f64>)> = if needs_trial_normal {
+        Box::new(|index: usize, normals: &mut Mat<f64>| {
+            trial_evaluator.compute_normals(index, normals)
+        })
     } else {
-        Box::new(|_i: usize, _m: &mut Mat<f64>| {})
+        Box::new(|_: usize, _: &mut Mat<f64>| ())
     };
 
     for test_cell in test_cells {
@@ -249,8 +240,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         let test_cell_gindex = test_grid.geometry().index_map()[*test_cell];
         let test_vertices = unsafe { test_c20.row_unchecked(test_cell_tindex) };
 
-        test_compute_jdets(test_cell_gindex, &mut test_jdet);
-        test_compute_points(test_cell_gindex, &mut test_mapped_pts);
+        test_evaluator.compute_jacobian_determinants(test_cell_gindex, &mut test_jdet);
+        test_evaluator.compute_points(test_cell_gindex, &mut test_mapped_pts);
         test_compute_normals(test_cell_gindex, &mut test_normals);
 
         for trial_cell in trial_cells {
@@ -258,8 +249,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
             let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
             let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
 
-            trial_compute_jdets(test_cell_gindex, &mut trial_jdet);
-            trial_compute_points(trial_cell_gindex, &mut trial_mapped_pts);
+            trial_evaluator.compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet);
+            trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
             trial_compute_normals(trial_cell_gindex, &mut trial_normals);
 
             kernel.assemble_st(

@@ -12,10 +12,11 @@ pub enum Ownership {
     Ghost(usize, usize),
 }
 
-pub type GeomF<'a, T> = Box<dyn Fn(usize, &mut T) + 'a>;
-pub type GeomFMut<'a, T> = Box<dyn FnMut(usize, &mut T) + 'a>;
-
-pub trait GeometryEvaluator<T: RandomAccessByRef<Item = f64> + Shape, TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape> {
+pub trait GeometryEvaluator<
+    T: RandomAccessByRef<Item = f64> + Shape,
+    TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+>
+{
     /// The points on the reference cell that this evaluator computes information at
     fn points(&self) -> &T;
 
@@ -61,24 +62,11 @@ pub trait Geometry {
     fn index_map(&self) -> &[usize];
 
     /// Get the evaluator for the given points
-    fn get_evaluator<
-        'a,
-    >(
+    fn get_evaluator<'a>(
         &'a self,
         element: &impl FiniteElement,
         points: &'a Self::T,
     ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a>;
-
-    /// Get function that computes the physical coordinates of a set of points in a given cell
-    fn get_compute_points_function<
-        'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
-    >(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomF<'a, TMut>;
 
     /// Compute the physical coordinates of a set of points in a given cell
     fn compute_points<
@@ -91,17 +79,6 @@ pub trait Geometry {
         physical_points: &mut TMut,
     );
 
-    /// Get function that computes the normals to a set of points in a given cell
-    fn get_compute_normals_function<
-        'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
-    >(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomFMut<'a, TMut>;
-
     /// Compute the normals to a set of points in a given cell
     fn compute_normals<
         T: RandomAccessByRef<Item = f64> + Shape,
@@ -112,19 +89,6 @@ pub trait Geometry {
         cell: usize,
         normals: &mut TMut,
     );
-
-    /// Get function that evaluates the jacobian at a set of points in a given cell
-    ///
-    /// The input points should be given using coordinates on the reference element
-    fn get_compute_jacobians_function<
-        'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
-    >(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomF<'a, TMut>;
 
     /// Evaluate the jacobian at a set of points in a given cell
     ///
@@ -138,15 +102,6 @@ pub trait Geometry {
         cell: usize,
         jacobians: &mut TMut,
     );
-
-    /// Get function that evaluates the determinand of the jacobian at a set of points in a given cell
-    ///
-    /// The input points should be given using coordinates on the reference element
-    fn get_compute_jacobian_determinants_function<'a, T: RandomAccessByRef<Item = f64> + Shape>(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomFMut<[f64]>;
 
     /// Evaluate the determinand of the jacobian at a set of points in a given cell
     ///

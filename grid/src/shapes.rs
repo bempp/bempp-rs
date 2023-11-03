@@ -92,6 +92,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
 #[cfg(test)]
 mod test {
     use crate::shapes::*;
+    use bempp_tools::arrays::zero_matrix;
 
     #[test]
     fn test_regular_sphere_0() {
@@ -111,15 +112,15 @@ mod test {
             let g = regular_sphere(i);
             let points = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], (1, 2));
 
-            let mut mapped_pt = to_matrix(&[0.0; 3], (1, 3));
-            let mut normal = to_matrix(&[0.0; 3], (3, 1));
+            let mut mapped_pt = zero_matrix((1, 3));
+            let mut normal = zero_matrix((1, 3));
 
             for i in 0..g.geometry().cell_count() {
                 g.geometry().compute_points(&points, i, &mut mapped_pt);
                 g.geometry().compute_normals(&points, i, &mut normal);
                 let dot = *mapped_pt.get(0, 0).unwrap() * *normal.get(0, 0).unwrap()
-                    + *mapped_pt.get(0, 1).unwrap() * *normal.get(1, 0).unwrap()
-                    + *mapped_pt.get(0, 2).unwrap() * *normal.get(2, 0).unwrap();
+                    + *mapped_pt.get(0, 1).unwrap() * *normal.get(0, 1).unwrap()
+                    + *mapped_pt.get(0, 2).unwrap() * *normal.get(0, 2).unwrap();
                 assert!(dot > 0.0);
             }
         }
