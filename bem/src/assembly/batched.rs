@@ -220,6 +220,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         .geometry()
         .get_evaluator(trial_element, trial_points);
 
+    #[allow(clippy::type_complexity)]
     let test_compute_normals: Box<dyn Fn(usize, &mut Mat<f64>)> = if needs_test_normal {
         Box::new(|index: usize, normals: &mut Mat<f64>| {
             test_evaluator.compute_normals(index, normals)
@@ -227,6 +228,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     } else {
         Box::new(|_: usize, _: &mut Mat<f64>| ())
     };
+    #[allow(clippy::type_complexity)]
     let trial_compute_normals: Box<dyn Fn(usize, &mut Mat<f64>)> = if needs_trial_normal {
         Box::new(|index: usize, normals: &mut Mat<f64>| {
             trial_evaluator.compute_normals(index, normals)

@@ -15,6 +15,8 @@ use rlst_proc_macro::rlst_static_size;
 use std::cell::RefCell;
 use std::ptr;
 
+type DetFn = Box<dyn Fn(&[f64]) -> f64>;
+
 pub struct Evaluator<'a> {
     geometry: &'a SerialGeometry,
     points: &'a Mat<f64>,
@@ -24,7 +26,7 @@ pub struct Evaluator<'a> {
     tdim: usize,
     axes: RefCell<Mat<f64>>,
     js: RefCell<Mat<f64>>,
-    det: Box<dyn Fn(&[f64]) -> f64>,
+    det: DetFn,
 }
 
 impl<'a> Evaluator<'a> {
@@ -207,7 +209,7 @@ pub struct LinearSimplexEvaluator<'a> {
     tdim: usize,
     axes: RefCell<Mat<f64>>,
     js: RefCell<Vec<f64>>,
-    det: Box<dyn Fn(&[f64]) -> f64>,
+    det: DetFn,
 }
 
 impl<'a> LinearSimplexEvaluator<'a> {
