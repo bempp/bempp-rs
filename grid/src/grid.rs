@@ -145,16 +145,21 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
     fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]) {
         let mut js = self.js.borrow_mut();
         self.compute_jacobians(cell_index, &mut js);
-        for (p, jdet) in jdets.iter_mut().enumerate() { unsafe {
-            *jdet = (
-                (js.get_unchecked(p, 0).powi(2) + js.get_unchecked(p, 2).powi(2) + js.get_unchecked(p, 4).powi(2))
-                * (js.get_unchecked(p, 1).powi(2) + js.get_unchecked(p, 3).powi(2) + js.get_unchecked(p, 5).powi(2))
-                        - (
-                js.get_unchecked(p, 0) * js.get_unchecked(p, 1) +
-                js.get_unchecked(p, 2) * js.get_unchecked(p, 3) +
-                js.get_unchecked(p, 4) * js.get_unchecked(p, 5)).powi(2)
-            ).sqrt();
-        }}
+        for (p, jdet) in jdets.iter_mut().enumerate() {
+            unsafe {
+                *jdet = ((js.get_unchecked(p, 0).powi(2)
+                    + js.get_unchecked(p, 2).powi(2)
+                    + js.get_unchecked(p, 4).powi(2))
+                    * (js.get_unchecked(p, 1).powi(2)
+                        + js.get_unchecked(p, 3).powi(2)
+                        + js.get_unchecked(p, 5).powi(2))
+                    - (js.get_unchecked(p, 0) * js.get_unchecked(p, 1)
+                        + js.get_unchecked(p, 2) * js.get_unchecked(p, 3)
+                        + js.get_unchecked(p, 4) * js.get_unchecked(p, 5))
+                    .powi(2))
+                .sqrt();
+            }
+        }
     }
     fn compute_jacobian_inverses(&self, _cell_index: usize, _jinvs: &mut Mat<f64>) {
         panic!("Not implemented yet");
@@ -260,7 +265,7 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
                 for k in 0..2 {
                     unsafe {
                         *axes.get_unchecked_mut(k, j) += *self.geometry.coordinate_unchecked(v, j)
-                            * self.table.get(k+1, 0, i, 0).unwrap();
+                            * self.table.get(k + 1, 0, i, 0).unwrap();
                     }
                 }
             }
@@ -275,10 +280,9 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
             *normals.get_unchecked_mut(0, 2) = *axes.get_unchecked(0, 0)
                 * *axes.get_unchecked(1, 1)
                 - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
-            let size = (
-(*normals.get_unchecked(0, 0)).powi(2) +
-(*normals.get_unchecked(0, 1)).powi(2) +
-(*normals.get_unchecked(0, 2)).powi(2))
+            let size = ((*normals.get_unchecked(0, 0)).powi(2)
+                + (*normals.get_unchecked(0, 1)).powi(2)
+                + (*normals.get_unchecked(0, 2)).powi(2))
             .sqrt();
             *normals.get_unchecked_mut(0, 0) /= size;
             *normals.get_unchecked_mut(0, 1) /= size;
@@ -308,14 +312,19 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
     fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]) {
         self.single_jacobian(cell_index);
         let js = self.js.borrow();
-        let d = unsafe {(
-                (js.get_unchecked(0).powi(2) + js.get_unchecked(2).powi(2) + js.get_unchecked(4).powi(2))
-                * (js.get_unchecked(1).powi(2) + js.get_unchecked(3).powi(2) + js.get_unchecked(5).powi(2))
-                        - (
-                js.get_unchecked(0) * js.get_unchecked(1) +
-                js.get_unchecked(2) * js.get_unchecked(3) +
-                js.get_unchecked(4) * js.get_unchecked(5)).powi(2)
-            ).sqrt() };
+        let d = unsafe {
+            ((js.get_unchecked(0).powi(2)
+                + js.get_unchecked(2).powi(2)
+                + js.get_unchecked(4).powi(2))
+                * (js.get_unchecked(1).powi(2)
+                    + js.get_unchecked(3).powi(2)
+                    + js.get_unchecked(5).powi(2))
+                - (js.get_unchecked(0) * js.get_unchecked(1)
+                    + js.get_unchecked(2) * js.get_unchecked(3)
+                    + js.get_unchecked(4) * js.get_unchecked(5))
+                .powi(2))
+            .sqrt()
+        };
         for jdet in jdets.iter_mut() {
             *jdet = d;
         }
