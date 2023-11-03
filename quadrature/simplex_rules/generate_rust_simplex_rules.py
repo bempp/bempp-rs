@@ -23,18 +23,20 @@ with open("simplex_rule_definitions.rs", 'w') as f:
     f.write("//! Definition of simplex rules.\n")
     f.write("\n")
     f.write("use std::collections::HashMap;\n")
-    f.write("use solvers_element::cell::ReferenceCellType;\n")
+    f.write("use bempp_traits::cell::ReferenceCellType;\n")
+    f.write("\n")
+    f.write("type HM = HashMap<usize, (usize, Vec<f64>, Vec<f64>)>;\n")
     f.write("\n")
     f.write("lazy_static! {\n")
-    f.write("pub(crate) static ref SIMPLEX_RULE_DEFINITIONS: HashMap<ReferenceCellType, HashMap<usize, (usize, Vec<f64>, Vec<f64>)>> = {\n")
-    f.write("let mut m = HashMap::<ReferenceCellType, HashMap<usize, (usize, Vec<f64>, Vec<f64>)>>::new();\n")
-    f.write("m.insert(ReferenceCellType::Triangle, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
-    f.write("m.insert(ReferenceCellType::Quadrilateral, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
-    f.write("m.insert(ReferenceCellType::Hexahedron, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
-    f.write("m.insert(ReferenceCellType::Tetrahedron, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
-    f.write("m.insert(ReferenceCellType::Prism, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
-    f.write("m.insert(ReferenceCellType::Pyramid, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
-    f.write("m.insert(ReferenceCellType::Interval, HashMap::<usize, (usize, Vec<f64>, Vec<f64>)>::new());\n")
+    f.write("pub(crate) static ref SIMPLEX_RULE_DEFINITIONS: HashMap<ReferenceCellType, HM> = {\n")
+    f.write("let mut m = HashMap::<ReferenceCellType, HM>::new();\n")
+    f.write("m.insert(ReferenceCellType::Triangle, HM::new());\n")
+    f.write("m.insert(ReferenceCellType::Quadrilateral, HM::new());\n")
+    f.write("m.insert(ReferenceCellType::Hexahedron, HM::new());\n")
+    f.write("m.insert(ReferenceCellType::Tetrahedron, HM::new());\n")
+    f.write("m.insert(ReferenceCellType::Prism, HM::new());\n")
+    f.write("m.insert(ReferenceCellType::Pyramid, HM::new());\n")
+    f.write("m.insert(ReferenceCellType::Interval, HM::new());\n")
 
 
 
@@ -92,12 +94,11 @@ with open("simplex_rule_definitions.rs", 'w') as f:
         else:
             raise ValueError("Unknown simplex type.")
 
-        points = points.flatten()
+        points = points.T.flatten()
         weights = weights.flatten()
 
         f.write("m.get_mut(&" + identifier + ").unwrap().insert(\n")
 
-        
         f.write(str(npoints[index]) + ", \n")
         f.write("(" + str(orders[index]) + ",vec![")
         for point in points:

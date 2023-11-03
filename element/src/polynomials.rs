@@ -411,13 +411,15 @@ mod test {
     use crate::polynomials::*;
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
-    use bempp_tools::arrays::{to_matrix, Array3D};
+    use bempp_tools::arrays::{transpose_to_matrix, zero_matrix, Array3D};
+    use rlst_dense::RandomAccessMut;
+
     #[test]
     fn test_legendre_interval() {
         let degree = 6;
 
         let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
-        let points = to_matrix(&rule.points, (rule.npoints, 1));
+        let points = transpose_to_matrix(&rule.points, (rule.npoints, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -448,7 +450,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
-        let points = to_matrix(&rule.points, (rule.npoints, 2));
+        let points = transpose_to_matrix(&rule.points, (rule.npoints, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Triangle,
@@ -479,7 +481,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
-        let points = to_matrix(&rule.points, (rule.npoints, 2));
+        let points = transpose_to_matrix(&rule.points, (rule.npoints, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,
@@ -516,12 +518,11 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut p = vec![0.0; 20];
+        let mut points = zero_matrix((20, 1));
         for i in 0..10 {
-            p[2 * i] = i as f64 / 10.0;
-            p[2 * i + 1] = p[2 * i] + epsilon;
+            *points.get_mut(2 * i, 0).unwrap() = i as f64 / 10.0;
+            *points.get_mut(2 * i + 1, 0).unwrap() = points.get(2 * i, 0).unwrap() + epsilon;
         }
-        let points = to_matrix(&p, (20, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -547,20 +548,21 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut p = vec![0.0; 330];
+        let mut points = zero_matrix((165, 2));
         let mut index = 0;
         for i in 0..10 {
             for j in 0..10 - i {
-                p[6 * index] = i as f64 / 10.0;
-                p[6 * index + 1] = j as f64 / 10.0;
-                p[6 * index + 2] = p[6 * index] + epsilon;
-                p[6 * index + 3] = p[6 * index + 1];
-                p[6 * index + 4] = p[6 * index];
-                p[6 * index + 5] = p[6 * index + 1] + epsilon;
+                *points.get_mut(3 * index, 0).unwrap() = i as f64 / 10.0;
+                *points.get_mut(3 * index, 1).unwrap() = j as f64 / 10.0;
+                *points.get_mut(3 * index + 1, 0).unwrap() =
+                    *points.get(3 * index, 0).unwrap() + epsilon;
+                *points.get_mut(3 * index + 1, 1).unwrap() = *points.get(3 * index, 1).unwrap();
+                *points.get_mut(3 * index + 2, 0).unwrap() = *points.get(3 * index, 0).unwrap();
+                *points.get_mut(3 * index + 2, 1).unwrap() =
+                    *points.get(3 * index, 1).unwrap() + epsilon;
                 index += 1;
             }
         }
-        let points = to_matrix(&p, (165, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Triangle,
@@ -591,19 +593,20 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut p = vec![0.0; 600];
+        let mut points = zero_matrix((300, 2));
         for i in 0..10 {
             for j in 0..10 {
                 let index = 10 * i + j;
-                p[6 * index] = i as f64 / 10.0;
-                p[6 * index + 1] = j as f64 / 10.0;
-                p[6 * index + 2] = p[6 * index] + epsilon;
-                p[6 * index + 3] = p[6 * index + 1];
-                p[6 * index + 4] = p[6 * index];
-                p[6 * index + 5] = p[6 * index + 1] + epsilon;
+                *points.get_mut(3 * index, 0).unwrap() = i as f64 / 10.0;
+                *points.get_mut(3 * index, 1).unwrap() = j as f64 / 10.0;
+                *points.get_mut(3 * index + 1, 0).unwrap() =
+                    *points.get(3 * index, 0).unwrap() + epsilon;
+                *points.get_mut(3 * index + 1, 1).unwrap() = *points.get(3 * index, 1).unwrap();
+                *points.get_mut(3 * index + 2, 0).unwrap() = *points.get(3 * index, 0).unwrap();
+                *points.get_mut(3 * index + 2, 1).unwrap() =
+                    *points.get(3 * index, 1).unwrap() + epsilon;
             }
         }
-        let points = to_matrix(&p, (300, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,
@@ -639,11 +642,10 @@ mod test {
     fn test_legendre_interval_against_known_polynomials() {
         let degree = 3;
 
-        let mut p = vec![0.0; 11];
-        for (i, pi) in p.iter_mut().enumerate() {
-            *pi = i as f64 / 10.0;
+        let mut points = zero_matrix((11, 1));
+        for i in 0..11 {
+            *points.get_mut(i, 0).unwrap() = i as f64 / 10.0;
         }
-        let points = to_matrix(&p, (11, 1));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -722,14 +724,13 @@ mod test {
     fn test_legendre_quadrilateral_against_known_polynomials() {
         let degree = 2;
 
-        let mut p = vec![0.0; 242];
+        let mut points = zero_matrix((121, 2));
         for i in 0..11 {
             for j in 0..11 {
-                p[2 * (11 * i + j)] = i as f64 / 10.0;
-                p[2 * (11 * i + j) + 1] = j as f64 / 10.0;
+                *points.get_mut(11 * i + j, 0).unwrap() = i as f64 / 10.0;
+                *points.get_mut(11 * i + j, 1).unwrap() = j as f64 / 10.0;
             }
         }
-        let points = to_matrix(&p, (121, 2));
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,

@@ -79,11 +79,18 @@ fn test_parallel_grid() {
     {
         if grid.topology().entity_ownership(2, *ti) == Ownership::Owned {
             let vs = grid.geometry().cell_vertices(*gi).unwrap();
-            let v0 = grid.geometry().point(vs[0]).unwrap();
-            let v1 = grid.geometry().point(vs[1]).unwrap();
-            let v2 = grid.geometry().point(vs[2]).unwrap();
-            let edge1 = vec![v1[0] - v0[0], v1[1] - v0[1]];
-            let edge2 = vec![v2[0] - v0[0], v2[1] - v0[1]];
+            let edge1 = vec![
+                grid.geometry().coordinate(vs[1], 0).unwrap()
+                    - grid.geometry().coordinate(vs[0], 0).unwrap(),
+                grid.geometry().coordinate(vs[1], 1).unwrap()
+                    - grid.geometry().coordinate(vs[0], 1).unwrap(),
+            ];
+            let edge2 = vec![
+                grid.geometry().coordinate(vs[2], 0).unwrap()
+                    - grid.geometry().coordinate(vs[0], 0).unwrap(),
+                grid.geometry().coordinate(vs[2], 1).unwrap()
+                    - grid.geometry().coordinate(vs[0], 1).unwrap(),
+            ];
             area += ((edge1[0] * edge2[1] - edge1[1] * edge2[0]) / 2.0).abs();
         }
     }

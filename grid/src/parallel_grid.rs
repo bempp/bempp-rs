@@ -46,8 +46,8 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
         self.serial_geometry.dim()
     }
 
-    fn point(&self, i: usize) -> Option<Vec<f64>> {
-        self.serial_geometry.point(i)
+    fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&f64> {
+        self.serial_geometry.coordinate(point_index, coord_index)
     }
 
     fn point_count(&self) -> usize {

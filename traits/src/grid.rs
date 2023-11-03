@@ -23,8 +23,8 @@ pub trait Geometry {
     /// The geometric dimension
     fn dim(&self) -> usize;
 
-    /// Get the coordinates of a point
-    fn point(&self, index: usize) -> Option<Vec<f64>>; // TODO: Make this Option<&[f64]>
+    /// Get one of the coordinates of a point
+    fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&f64>;
 
     /// The number of points stored in the geometry
     fn point_count(&self) -> usize;

@@ -10,9 +10,9 @@ fn main() {
     let grid = SerialGrid::new(
         to_matrix(
             &vec![
-                0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.5, 0.25, 0.0, 0.0, 0.5, 0.5, 0.5,
-                0.5, 0.5, 1.0, 0.5, 0.5, 2.0, 0.5, 0.0, 1.5, 0.75, 0.0, 0.0, 1.0, 0.0, 0.5, 1.0,
-                0.0, 1.0, 1.0, 0.0, 2.0, -0.5, 0.0,
+                0.0, 0.5, 1.0, 1.5, 0.0, 0.5, 1.0, 2.0, 1.5, 0.0, 0.5, 1.0, 2.0, 0.0, 0.0, 0.0,
+                0.25, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0, 1.0, 1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5,
+                0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             ],
             (13, 3),
         ),
@@ -61,8 +61,12 @@ fn main() {
         }
         println!("The geometric points for this cell are:");
         for pti in grid.geometry().cell_vertices(i).unwrap() {
-            let pt = grid.geometry().point(*pti).unwrap();
-            println!("  {} {} {}", pt[0], pt[1], pt[2]);
+            println!(
+                "  {} {} {}",
+                grid.geometry().coordinate(*pti, 0).unwrap(),
+                grid.geometry().coordinate(*pti, 1).unwrap(),
+                grid.geometry().coordinate(*pti, 2).unwrap()
+            );
         }
         println!();
     }

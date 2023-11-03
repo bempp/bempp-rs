@@ -17,7 +17,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
     let mut g = SerialGrid::new(
         to_matrix(
             &[
-                0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0,
                 0.0, -1.0,
             ],
             (6, 3),
@@ -47,9 +47,9 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
             let tv = g.topology().cell(ti).unwrap();
             let gv = g.geometry().cell_vertices(gi).unwrap();
             for (j, gv_j) in gv.iter().enumerate() {
-                let pt = g.geometry().point(*gv_j).unwrap();
-                for (k, pt_k) in pt.iter().enumerate() {
-                    *coordinates.get_mut(tv[j], k).unwrap() = *pt_k;
+                for k in 0..g.geometry().dim() {
+                    *coordinates.get_mut(tv[j], k).unwrap() =
+                        *g.geometry().coordinate(*gv_j, k).unwrap();
                 }
             }
 

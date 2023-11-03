@@ -3,7 +3,7 @@ use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use bempp_tools::arrays::{to_matrix, zero_matrix, Array4D, Mat};
+use bempp_tools::arrays::{transpose_to_matrix, zero_matrix, Array4D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
@@ -384,10 +384,10 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
     // TODO: pass cell types into this function
     let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
-    let qpoints_test = to_matrix(&qrule_test.points, (NPTS_TEST, 2));
+    let qpoints_test = transpose_to_matrix(&qrule_test.points, (NPTS_TEST, 2));
     let qweights_test = qrule_test.weights;
     let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
-    let qpoints_trial = to_matrix(&qrule_trial.points, (NPTS_TRIAL, 2));
+    let qpoints_trial = transpose_to_matrix(&qrule_trial.points, (NPTS_TRIAL, 2));
     let qweights_trial = qrule_trial.weights;
 
     let mut test_table =
@@ -537,7 +537,7 @@ pub fn assemble_singular<'a>(
             npoints,
         );
 
-        let points = to_matrix(&qrule.trial_points, (qrule.npoints, 2));
+        let points = transpose_to_matrix(&qrule.trial_points, (qrule.npoints, 2));
         let mut table = Array4D::<f64>::new(
             trial_space
                 .element()
@@ -547,7 +547,7 @@ pub fn assemble_singular<'a>(
         trial_points.push(points);
         trial_tables.push(table);
 
-        let points = to_matrix(&qrule.test_points, (qrule.npoints, 2));
+        let points = transpose_to_matrix(&qrule.test_points, (qrule.npoints, 2));
         let mut table = Array4D::<f64>::new(
             test_space
                 .element()

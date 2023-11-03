@@ -14,6 +14,16 @@ pub fn to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
     let mut mat = rlst_dynamic_mat![T, shape];
     for (i, d) in data.iter().enumerate() {
         unsafe {
+            *mat.get_unchecked_mut(i % shape.0, i / shape.0) = *d;
+        }
+    }
+    mat
+}
+
+pub fn transpose_to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
+    let mut mat = rlst_dynamic_mat![T, shape];
+    for (i, d) in data.iter().enumerate() {
+        unsafe {
             *mat.get_unchecked_mut(i / shape.1, i % shape.1) = *d;
         }
     }
