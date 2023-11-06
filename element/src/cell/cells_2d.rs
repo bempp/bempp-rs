@@ -13,6 +13,10 @@ impl ReferenceCell for Triangle {
         2
     }
 
+    fn is_simplex(&self) -> bool {
+        true
+    }
+
     fn cell_type(&self) -> ReferenceCellType {
         ReferenceCellType::Triangle
     }
@@ -113,6 +117,10 @@ impl ReferenceCell for Triangle {
 impl ReferenceCell for Quadrilateral {
     fn dim(&self) -> usize {
         2
+    }
+
+    fn is_simplex(&self) -> bool {
+        false
     }
 
     fn cell_type(&self) -> ReferenceCellType {

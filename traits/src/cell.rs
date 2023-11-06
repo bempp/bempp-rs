@@ -30,6 +30,9 @@ pub trait ReferenceCell {
     /// The dimension of the reference cell (eg a triangle's dimension is 2, tetrahedron's dimension is 3)
     fn dim(&self) -> usize;
 
+    /// Check if the cell is a simplex
+    fn is_simplex(&self) -> bool;
+
     /// The vertices of the cell
     ///
     /// The first dim components represent the first vertex, the next dim the second vertex, and so on.

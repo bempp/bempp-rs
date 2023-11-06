@@ -5,14 +5,335 @@ use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
-use bempp_traits::grid::{GeomF, GeomFMut, Geometry, Grid, Ownership, Topology};
+use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use itertools::izip;
 use rlst_dense::{
-    rlst_static_mat, RandomAccessByRef, RandomAccessMut, RawAccess, Shape, SizeIdentifier,
+    rlst_static_mat, RandomAccessByRef, RandomAccessMut, Shape, SizeIdentifier,
     UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
 };
 use rlst_proc_macro::rlst_static_size;
+use std::cell::RefCell;
 use std::ptr;
+
+pub struct EvaluatorTdim2Gdim3<'a> {
+    geometry: &'a SerialGeometry,
+    points: &'a Mat<f64>,
+    table: Array4D<f64>,
+    npts: usize,
+    axes: RefCell<Mat<f64>>,
+    js: RefCell<Mat<f64>>,
+}
+
+impl<'a> EvaluatorTdim2Gdim3<'a> {
+    pub fn new(
+        geometry: &'a SerialGeometry,
+        element: &impl FiniteElement,
+        points: &'a Mat<f64>,
+    ) -> Self {
+        let npts = points.shape().0;
+        assert_eq!(points.shape().1, 2);
+        assert_eq!(geometry.dim(), 3);
+        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
+        element.tabulate(points, 1, &mut table);
+        let axes = RefCell::new(zero_matrix((2, 3)));
+        let js = RefCell::new(zero_matrix((npts, 6)));
+
+        Self {
+            geometry,
+            points,
+            table,
+            npts,
+            axes,
+            js,
+        }
+    }
+}
+
+impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
+    fn points(&self) -> &Mat<f64> {
+        self.points
+    }
+
+    fn compute_points(&self, cell_index: usize, points: &mut Mat<f64>) {
+        for i in 0..3 {
+            for p in 0..self.npts {
+                unsafe {
+                    *points.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for j in 0..3 {
+                for p in 0..self.npts {
+                    unsafe {
+                        *points.get_unchecked_mut(p, j) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * *self.table.get(0, p, i, 0).unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    fn compute_normals(&self, cell_index: usize, normals: &mut Mat<f64>) {
+        let mut axes = self.axes.borrow_mut();
+        for p in 0..self.npts {
+            for i in 0..2 {
+                for j in 0..3 {
+                    unsafe {
+                        *axes.get_unchecked_mut(i, j) = 0.0;
+                    }
+                }
+            }
+            for i in 0..self.table.shape().2 {
+                let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+                for j in 0..3 {
+                    unsafe {
+                        *axes.get_unchecked_mut(0, j) += *self.geometry.coordinate_unchecked(v, j)
+                            * self.table.get(1, p, i, 0).unwrap();
+                        *axes.get_unchecked_mut(1, j) += *self.geometry.coordinate_unchecked(v, j)
+                            * self.table.get(2, p, i, 0).unwrap();
+                    }
+                }
+            }
+            unsafe {
+                *normals.get_unchecked_mut(p, 0) = *axes.get_unchecked(0, 1)
+                    * *axes.get_unchecked(1, 2)
+                    - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
+                *normals.get_unchecked_mut(p, 1) = *axes.get_unchecked(0, 2)
+                    * *axes.get_unchecked(1, 0)
+                    - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
+                *normals.get_unchecked_mut(p, 2) = *axes.get_unchecked(0, 0)
+                    * *axes.get_unchecked(1, 1)
+                    - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
+                let size = (*normals.get_unchecked(p, 0) * *normals.get_unchecked(p, 0)
+                    + *normals.get_unchecked(p, 1) * *normals.get_unchecked(p, 1)
+                    + *normals.get_unchecked(p, 2) * *normals.get_unchecked(p, 2))
+                .sqrt();
+                *normals.get_unchecked_mut(p, 0) /= size;
+                *normals.get_unchecked_mut(p, 1) /= size;
+                *normals.get_unchecked_mut(p, 2) /= size;
+            }
+        }
+    }
+
+    fn compute_jacobians(&self, cell_index: usize, jacobians: &mut Mat<f64>) {
+        for i in 0..6 {
+            for p in 0..self.npts {
+                unsafe {
+                    *jacobians.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for j in 0..3 {
+                for k in 0..2 {
+                    for p in 0..self.npts {
+                        unsafe {
+                            *jacobians.get_unchecked_mut(p, k + 2 * j) +=
+                                *self.geometry.coordinate_unchecked(v, j)
+                                    * self.table.get(k + 1, p, i, 0).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]) {
+        let mut js = self.js.borrow_mut();
+        self.compute_jacobians(cell_index, &mut js);
+        for (p, jdet) in jdets.iter_mut().enumerate() {
+            unsafe {
+                *jdet = ((js.get_unchecked(p, 0).powi(2)
+                    + js.get_unchecked(p, 2).powi(2)
+                    + js.get_unchecked(p, 4).powi(2))
+                    * (js.get_unchecked(p, 1).powi(2)
+                        + js.get_unchecked(p, 3).powi(2)
+                        + js.get_unchecked(p, 5).powi(2))
+                    - (js.get_unchecked(p, 0) * js.get_unchecked(p, 1)
+                        + js.get_unchecked(p, 2) * js.get_unchecked(p, 3)
+                        + js.get_unchecked(p, 4) * js.get_unchecked(p, 5))
+                    .powi(2))
+                .sqrt();
+            }
+        }
+    }
+    fn compute_jacobian_inverses(&self, _cell_index: usize, _jinvs: &mut Mat<f64>) {
+        panic!("Not implemented yet");
+    }
+}
+
+pub struct LinearSimplexEvaluatorTdim2Gdim3<'a> {
+    geometry: &'a SerialGeometry,
+    points: &'a Mat<f64>,
+    table: Array4D<f64>,
+    npts: usize,
+    axes: RefCell<Mat<f64>>,
+    js: RefCell<Vec<f64>>,
+}
+
+impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
+    pub fn new(
+        geometry: &'a SerialGeometry,
+        element: &impl FiniteElement,
+        points: &'a Mat<f64>,
+    ) -> Self {
+        let npts = points.shape().0;
+        assert_eq!(points.shape().1, 2);
+        assert_eq!(geometry.dim(), 3);
+        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
+        element.tabulate(points, 1, &mut table);
+        let axes = RefCell::new(zero_matrix((2, 3)));
+        let js = RefCell::new(vec![0.0; 6]);
+
+        Self {
+            geometry,
+            points,
+            table,
+            npts,
+            axes,
+            js,
+        }
+    }
+}
+
+impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
+    fn single_jacobian(&self, cell_index: usize) {
+        let mut js = self.js.borrow_mut();
+        for i in 0..6 {
+            unsafe {
+                *js.get_unchecked_mut(i) = 0.0;
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for j in 0..3 {
+                for k in 0..2 {
+                    unsafe {
+                        *js.get_unchecked_mut(k + 2 * j) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * self.table.get(k + 1, 0, i, 0).unwrap();
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gdim3<'a> {
+    fn points(&self) -> &Mat<f64> {
+        self.points
+    }
+
+    fn compute_points(&self, cell_index: usize, points: &mut Mat<f64>) {
+        for i in 0..3 {
+            for p in 0..self.npts {
+                unsafe {
+                    *points.get_unchecked_mut(p, i) = 0.0;
+                }
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for j in 0..3 {
+                for p in 0..self.npts {
+                    unsafe {
+                        *points.get_unchecked_mut(p, j) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * *self.table.get(0, p, i, 0).unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    fn compute_normals(&self, cell_index: usize, normals: &mut Mat<f64>) {
+        let mut axes = self.axes.borrow_mut();
+        for j in 0..3 {
+            for i in 0..2 {
+                unsafe {
+                    *axes.get_unchecked_mut(i, j) = 0.0;
+                }
+            }
+        }
+        for i in 0..self.table.shape().2 {
+            let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
+            for j in 0..3 {
+                for k in 0..2 {
+                    unsafe {
+                        *axes.get_unchecked_mut(k, j) += *self.geometry.coordinate_unchecked(v, j)
+                            * self.table.get(k + 1, 0, i, 0).unwrap();
+                    }
+                }
+            }
+        }
+        unsafe {
+            *normals.get_unchecked_mut(0, 0) = *axes.get_unchecked(0, 1)
+                * *axes.get_unchecked(1, 2)
+                - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
+            *normals.get_unchecked_mut(0, 1) = *axes.get_unchecked(0, 2)
+                * *axes.get_unchecked(1, 0)
+                - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
+            *normals.get_unchecked_mut(0, 2) = *axes.get_unchecked(0, 0)
+                * *axes.get_unchecked(1, 1)
+                - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
+            let size = ((*normals.get_unchecked(0, 0)).powi(2)
+                + (*normals.get_unchecked(0, 1)).powi(2)
+                + (*normals.get_unchecked(0, 2)).powi(2))
+            .sqrt();
+            *normals.get_unchecked_mut(0, 0) /= size;
+            *normals.get_unchecked_mut(0, 1) /= size;
+            *normals.get_unchecked_mut(0, 2) /= size;
+        }
+        for i in 0..3 {
+            for p in 1..self.npts {
+                unsafe {
+                    *normals.get_unchecked_mut(p, i) = *normals.get_unchecked(0, i);
+                }
+            }
+        }
+    }
+
+    fn compute_jacobians(&self, cell_index: usize, jacobians: &mut Mat<f64>) {
+        self.single_jacobian(cell_index);
+        let js = self.js.borrow();
+        for i in 0..6 {
+            for p in 0..self.npts {
+                unsafe {
+                    *jacobians.get_unchecked_mut(p, i) = *js.get_unchecked(i);
+                }
+            }
+        }
+    }
+
+    fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]) {
+        self.single_jacobian(cell_index);
+        let js = self.js.borrow();
+        let d = unsafe {
+            ((js.get_unchecked(0).powi(2)
+                + js.get_unchecked(2).powi(2)
+                + js.get_unchecked(4).powi(2))
+                * (js.get_unchecked(1).powi(2)
+                    + js.get_unchecked(3).powi(2)
+                    + js.get_unchecked(5).powi(2))
+                - (js.get_unchecked(0) * js.get_unchecked(1)
+                    + js.get_unchecked(2) * js.get_unchecked(3)
+                    + js.get_unchecked(4) * js.get_unchecked(5))
+                .powi(2))
+            .sqrt()
+        };
+        for jdet in jdets.iter_mut() {
+            *jdet = d;
+        }
+    }
+
+    fn compute_jacobian_inverses(&self, _cell_index: usize, _jinvs: &mut Mat<f64>) {
+        panic!("Not implemented yet");
+    }
+}
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
@@ -103,6 +424,8 @@ impl SerialGeometry {
     }
 }
 impl Geometry for SerialGeometry {
+    type T = Mat<f64>;
+    type TMut = Mat<f64>;
     fn dim(&self) -> usize {
         self.coordinates.shape().1
     }
@@ -128,41 +451,19 @@ impl Geometry for SerialGeometry {
     fn index_map(&self) -> &[usize] {
         &self.index_map
     }
-    fn get_compute_points_function<
-        'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
-    >(
+
+    fn get_evaluator<'a>(
         &'a self,
         element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomF<'a, TMut> {
-        let npts = points.shape().0;
-        let gdim = self.dim();
-        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
-        element.tabulate(points, 0, &mut table);
-
-        Box::new(move |cell: usize, pts: &mut TMut| {
-            for p in 0..npts {
-                for i in 0..gdim {
-                    unsafe {
-                        *pts.get_unchecked_mut(p, i) = 0.0;
-                    }
-                }
-            }
-            for i in 0..table.shape().2 {
-                let v = unsafe { *self.cells.get_unchecked(cell, i) };
-                for p in 0..points.shape().0 {
-                    for j in 0..gdim {
-                        unsafe {
-                            *pts.get_unchecked_mut(p, j) +=
-                                *self.coordinate_unchecked(v, j) * *table.get(0, p, i, 0).unwrap();
-                        }
-                    }
-                }
-            }
-        })
+        points: &'a Self::T,
+    ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a> {
+        if element.degree() == 1 && cell::create_cell(element.cell_type()).is_simplex() {
+            Box::new(LinearSimplexEvaluatorTdim2Gdim3::new(self, element, points))
+        } else {
+            Box::new(EvaluatorTdim2Gdim3::new(self, element, points))
+        }
     }
+
     fn compute_points<
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
@@ -198,62 +499,6 @@ impl Geometry for SerialGeometry {
             }
         }
     }
-    fn get_compute_normals_function<
-        'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
-    >(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomFMut<'a, TMut> {
-        let npts = points.shape().0;
-        let tdim = points.shape().1;
-        let gdim = self.dim();
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
-        let mut axes = rlst_static_mat![f64, TwoByThree];
-        element.tabulate(points, 1, &mut data);
-        Box::new(move |cell: usize, normals: &mut TMut| {
-            for p in 0..npts {
-                for i in 0..tdim {
-                    for j in 0..gdim {
-                        unsafe {
-                            *axes.get_unchecked_mut(i, j) = 0.0;
-                        }
-                    }
-                }
-                for i in 0..data.shape().2 {
-                    let v = unsafe { *self.cells.get_unchecked(cell, i) };
-                    for j in 0..gdim {
-                        unsafe {
-                            *axes.get_unchecked_mut(0, j) +=
-                                *self.coordinate_unchecked(v, j) * data.get(1, p, i, 0).unwrap();
-                            *axes.get_unchecked_mut(1, j) +=
-                                *self.coordinate_unchecked(v, j) * data.get(2, p, i, 0).unwrap();
-                        }
-                    }
-                }
-                unsafe {
-                    *normals.get_unchecked_mut(0, p) = *axes.get_unchecked(0, 1)
-                        * *axes.get_unchecked(1, 2)
-                        - *axes.get_unchecked(0, 2) * *axes.get_unchecked(1, 1);
-                    *normals.get_unchecked_mut(1, p) = *axes.get_unchecked(0, 2)
-                        * *axes.get_unchecked(1, 0)
-                        - *axes.get_unchecked(0, 0) * *axes.get_unchecked(1, 2);
-                    *normals.get_unchecked_mut(2, p) = *axes.get_unchecked(0, 0)
-                        * *axes.get_unchecked(1, 1)
-                        - *axes.get_unchecked(0, 1) * *axes.get_unchecked(1, 0);
-                    let size = (*normals.get_unchecked(0, p) * *normals.get_unchecked(0, p)
-                        + *normals.get_unchecked(1, p) * *normals.get_unchecked(1, p)
-                        + *normals.get_unchecked(2, p) * *normals.get_unchecked(2, p))
-                    .sqrt();
-                    *normals.get_unchecked_mut(0, p) /= size;
-                    *normals.get_unchecked_mut(1, p) /= size;
-                    *normals.get_unchecked_mut(2, p) /= size;
-                }
-            }
-        })
-    }
     fn compute_normals<
         T: RandomAccessByRef<Item = f64> + Shape,
         TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
@@ -269,10 +514,10 @@ impl Geometry for SerialGeometry {
         if gdim != 3 {
             unimplemented!("normals currently only implemented for 2D cells embedded in 3D.");
         }
-        if normals.shape().1 != npts {
+        if normals.shape().0 != npts {
             panic!("normals has wrong number of columns.");
         }
-        if normals.shape().0 != gdim {
+        if normals.shape().1 != gdim {
             panic!("normals has wrong number of rows.");
         }
         let element = self.element(cell);
@@ -294,59 +539,20 @@ impl Geometry for SerialGeometry {
                         *self.coordinate(v, j).unwrap() * data.get(2, p, i, 0).unwrap();
                 }
             }
-            *normals.get_mut(0, p).unwrap() = *axes.get(0, 1).unwrap() * *axes.get(1, 2).unwrap()
+            *normals.get_mut(p, 0).unwrap() = *axes.get(0, 1).unwrap() * *axes.get(1, 2).unwrap()
                 - *axes.get(0, 2).unwrap() * *axes.get(1, 1).unwrap();
-            *normals.get_mut(1, p).unwrap() = *axes.get(0, 2).unwrap() * *axes.get(1, 0).unwrap()
+            *normals.get_mut(p, 1).unwrap() = *axes.get(0, 2).unwrap() * *axes.get(1, 0).unwrap()
                 - *axes.get(0, 0).unwrap() * *axes.get(1, 2).unwrap();
-            *normals.get_mut(2, p).unwrap() = *axes.get(0, 0).unwrap() * *axes.get(1, 1).unwrap()
+            *normals.get_mut(p, 2).unwrap() = *axes.get(0, 0).unwrap() * *axes.get(1, 1).unwrap()
                 - *axes.get(0, 1).unwrap() * *axes.get(1, 0).unwrap();
-            let size = (*normals.get(0, p).unwrap() * *normals.get(0, p).unwrap()
-                + *normals.get(1, p).unwrap() * *normals.get(1, p).unwrap()
-                + *normals.get(2, p).unwrap() * *normals.get(2, p).unwrap())
+            let size = (*normals.get(p, 0).unwrap() * *normals.get(p, 0).unwrap()
+                + *normals.get(p, 1).unwrap() * *normals.get(p, 1).unwrap()
+                + *normals.get(p, 2).unwrap() * *normals.get(p, 2).unwrap())
             .sqrt();
-            *normals.get_mut(0, p).unwrap() /= size;
-            *normals.get_mut(1, p).unwrap() /= size;
-            *normals.get_mut(2, p).unwrap() /= size;
+            *normals.get_mut(p, 0).unwrap() /= size;
+            *normals.get_mut(p, 1).unwrap() /= size;
+            *normals.get_mut(p, 2).unwrap() /= size;
         }
-    }
-    fn get_compute_jacobians_function<
-        'a,
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
-    >(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomF<'a, TMut> {
-        let npts = points.shape().0;
-        let tdim = points.shape().1;
-        let gdim = self.dim();
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
-        element.tabulate(points, 1, &mut data);
-
-        Box::new(move |cell: usize, jacobians: &mut TMut| {
-            for p in 0..points.shape().0 {
-                for i in 0..jacobians.shape().0 {
-                    unsafe {
-                        *jacobians.get_unchecked_mut(i, p) = 0.0;
-                    }
-                }
-            }
-            for i in 0..data.shape().2 {
-                let v = unsafe { *self.cells.get_unchecked(cell, i) };
-                for p in 0..points.shape().0 {
-                    for j in 0..gdim {
-                        for k in 0..tdim {
-                            unsafe {
-                                *jacobians.get_unchecked_mut(k + tdim * j, p) += *self
-                                    .coordinate_unchecked(v, j)
-                                    * data.get(k + 1, p, i, 0).unwrap();
-                            }
-                        }
-                    }
-                }
-            }
-        })
     }
     fn compute_jacobians<
         T: RandomAccessByRef<Item = f64> + Shape,
@@ -360,19 +566,19 @@ impl Geometry for SerialGeometry {
         let npts = points.shape().0;
         let tdim = points.shape().1;
         let gdim = self.dim();
-        if jacobians.shape().1 != npts {
-            panic!("jacobians has wrong number of columns.");
-        }
-        if jacobians.shape().0 != gdim * tdim {
+        if jacobians.shape().0 != npts {
             panic!("jacobians has wrong number of rows.");
         }
+        if jacobians.shape().1 != gdim * tdim {
+            panic!("jacobians has wrong number of columns.");
+        }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
         let tdim = data.shape().0 - 1;
         element.tabulate(points, 1, &mut data);
         for p in 0..npts {
-            for i in 0..jacobians.shape().0 {
-                *jacobians.get_mut(i, p).unwrap() = 0.0;
+            for i in 0..jacobians.shape().1 {
+                *jacobians.get_mut(p, i).unwrap() = 0.0;
             }
         }
         for i in 0..data.shape().2 {
@@ -380,67 +586,12 @@ impl Geometry for SerialGeometry {
             for p in 0..npts {
                 for j in 0..gdim {
                     for k in 0..tdim {
-                        *jacobians.get_mut(k + tdim * j, p).unwrap() +=
+                        *jacobians.get_mut(p, k + tdim * j).unwrap() +=
                             *self.coordinate(v, j).unwrap() * data.get(k + 1, p, i, 0).unwrap();
                     }
                 }
             }
         }
-    }
-    fn get_compute_jacobian_determinants_function<'a, T: RandomAccessByRef<Item = f64> + Shape>(
-        &'a self,
-        element: &impl FiniteElement,
-        points: &'a T,
-    ) -> GeomFMut<'a, [f64]> {
-        let gdim = self.dim();
-        let npts = points.shape().0;
-        let tdim = points.shape().1;
-        let mut js = zero_matrix((gdim * tdim, npts));
-
-        let det = match tdim {
-            1 => match gdim {
-                1 => |x: &[f64]| x[0],
-                2 => |x: &[f64]| ((x[0]).powi(2) + (x[1]).powi(2)).sqrt(),
-                3 => |x: &[f64]| ((x[0]).powi(2) + (x[1]).powi(2) + (x[2]).powi(2)).sqrt(),
-                _ => {
-                    panic!("Unsupported dimensions.");
-                }
-            },
-            2 => match gdim {
-                2 => |x: &[f64]| x[0] * x[3] - x[1] * x[2],
-                3 => |x: &[f64]| {
-                    (((x[0]).powi(2) + (x[2]).powi(2) + (x.get(4).unwrap()).powi(2))
-                        * ((x[1]).powi(2) + (x[3]).powi(2) + (x[5]).powi(2))
-                        - (x[0] * x[1] + x[2] * x[3] + x.get(4).unwrap() * x[5]).powi(2))
-                    .sqrt()
-                },
-                _ => {
-                    panic!("Unsupported dimensions.");
-                }
-            },
-            3 => match gdim {
-                3 => |x: &[f64]| {
-                    x[0] * (x.get(4).unwrap() * x[8] - x[5] * x[7])
-                        - x[1] * (x[3] * x[8] - x[5] * x[6])
-                        + x[2] * (x[3] * x[7] - x.get(4).unwrap() * x[6])
-                },
-                _ => {
-                    panic!("Unsupported dimensions.");
-                }
-            },
-            _ => {
-                panic!("Unsupported dimensions.");
-            }
-        };
-
-        let compute_jacobians = self.get_compute_jacobians_function(element, points);
-
-        Box::new(move |cell: usize, jacobian_determinants: &mut [f64]| {
-            compute_jacobians(cell, &mut js);
-            for (p, jdet) in jacobian_determinants.iter_mut().enumerate() {
-                *jdet = det(&js.data()[tdim * gdim * p..tdim * gdim * (p + 1)]);
-            }
-        })
     }
     fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
         &self,
@@ -448,25 +599,25 @@ impl Geometry for SerialGeometry {
         cell: usize,
         jacobian_determinants: &mut [f64],
     ) {
-        let gdim = self.dim();
+        let npts = points.shape().0;
         let tdim = points.shape().1;
+        let gdim = self.dim();
         if points.shape().0 != jacobian_determinants.len() {
             panic!("jacobian_determinants has wrong length.");
         }
-        let mut js = zero_matrix((gdim * tdim, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+        let mut js = zero_matrix((npts, gdim * tdim));
         self.compute_jacobians(points, cell, &mut js);
 
-        // TODO: is it faster if we move this for inside the match statement?
         for (p, jdet) in jacobian_determinants.iter_mut().enumerate() {
             *jdet = match tdim {
                 1 => match gdim {
-                    1 => *js.get(0, p).unwrap(),
+                    1 => *js.get(p, 0).unwrap(),
                     2 => {
-                        ((*js.get(0, p).unwrap()).powi(2) + (*js.get(1, p).unwrap()).powi(2)).sqrt()
+                        ((*js.get(p, 0).unwrap()).powi(2) + (*js.get(p, 1).unwrap()).powi(2)).sqrt()
                     }
-                    3 => ((*js.get(0, p).unwrap()).powi(2)
-                        + (*js.get(1, p).unwrap()).powi(2)
-                        + (*js.get(2, p).unwrap()).powi(2))
+                    3 => ((*js.get(p, 0).unwrap()).powi(2)
+                        + (*js.get(p, 1).unwrap()).powi(2)
+                        + (*js.get(p, 2).unwrap()).powi(2))
                     .sqrt(),
                     _ => {
                         panic!("Unsupported dimensions.");
@@ -474,18 +625,18 @@ impl Geometry for SerialGeometry {
                 },
                 2 => match gdim {
                     2 => {
-                        *js.get(0, p).unwrap() * *js.get(3, p).unwrap()
-                            - *js.get(1, p).unwrap() * *js.get(2, p).unwrap()
+                        *js.get(p, 0).unwrap() * *js.get(p, 3).unwrap()
+                            - *js.get(p, 1).unwrap() * *js.get(p, 2).unwrap()
                     }
-                    3 => (((*js.get(0, p).unwrap()).powi(2)
-                        + (*js.get(2, p).unwrap()).powi(2)
-                        + (*js.get(4, p).unwrap()).powi(2))
-                        * ((*js.get(1, p).unwrap()).powi(2)
-                            + (*js.get(3, p).unwrap()).powi(2)
-                            + (*js.get(5, p).unwrap()).powi(2))
-                        - (*js.get(0, p).unwrap() * *js.get(1, p).unwrap()
-                            + *js.get(2, p).unwrap() * *js.get(3, p).unwrap()
-                            + *js.get(4, p).unwrap() * *js.get(5, p).unwrap())
+                    3 => (((*js.get(p, 0).unwrap()).powi(2)
+                        + (*js.get(p, 2).unwrap()).powi(2)
+                        + (*js.get(p, 4).unwrap()).powi(2))
+                        * ((*js.get(p, 1).unwrap()).powi(2)
+                            + (*js.get(p, 3).unwrap()).powi(2)
+                            + (*js.get(p, 5).unwrap()).powi(2))
+                        - (*js.get(p, 0).unwrap() * *js.get(p, 1).unwrap()
+                            + *js.get(p, 2).unwrap() * *js.get(p, 3).unwrap()
+                            + *js.get(p, 4).unwrap() * *js.get(p, 5).unwrap())
                         .powi(2))
                     .sqrt(),
                     _ => {
@@ -494,15 +645,15 @@ impl Geometry for SerialGeometry {
                 },
                 3 => match gdim {
                     3 => {
-                        *js.get(0, p).unwrap()
-                            * (*js.get(4, p).unwrap() * *js.get(8, p).unwrap()
-                                - *js.get(5, p).unwrap() * *js.get(7, p).unwrap())
-                            - *js.get(1, p).unwrap()
-                                * (*js.get(3, p).unwrap() * *js.get(8, p).unwrap()
-                                    - *js.get(5, p).unwrap() * *js.get(6, p).unwrap())
-                            + *js.get(2, p).unwrap()
-                                * (*js.get(3, p).unwrap() * *js.get(7, p).unwrap()
-                                    - *js.get(4, p).unwrap() * *js.get(6, p).unwrap())
+                        *js.get(p, 0).unwrap()
+                            * (*js.get(p, 4).unwrap() * *js.get(p, 8).unwrap()
+                                - *js.get(p, 5).unwrap() * *js.get(p, 7).unwrap())
+                            - *js.get(p, 1).unwrap()
+                                * (*js.get(p, 3).unwrap() * *js.get(p, 8).unwrap()
+                                    - *js.get(p, 5).unwrap() * *js.get(p, 6).unwrap())
+                            + *js.get(p, 2).unwrap()
+                                * (*js.get(p, 3).unwrap() * *js.get(p, 7).unwrap()
+                                    - *js.get(p, 4).unwrap() * *js.get(p, 6).unwrap())
                     }
                     _ => {
                         panic!("Unsupported dimensions.");
@@ -523,13 +674,14 @@ impl Geometry for SerialGeometry {
         cell: usize,
         jacobian_inverses: &mut TMut,
     ) {
+        let npts = points.shape().0;
         let gdim = self.dim();
         let tdim = points.shape().1;
-        if points.shape().0 != jacobian_inverses.shape().1 {
-            panic!("jacobian_inverses has wrong number of columns.");
-        }
-        if gdim * tdim != jacobian_inverses.shape().0 {
+        if jacobian_inverses.shape().0 != npts {
             panic!("jacobian_inverses has wrong number of rows.");
+        }
+        if jacobian_inverses.shape().1 != gdim * tdim {
+            panic!("jacobian_inverses has wrong number of columns.");
         }
         let element = self.element(cell);
         if element.cell_type() == ReferenceCellType::Triangle
@@ -537,14 +689,13 @@ impl Geometry for SerialGeometry {
             && element.degree() == 1
         {
             // Map is affine
-            let mut js = zero_matrix((gdim * tdim, points.shape().0)); // TODO: Memory is assigned here. Can we avoid this?
+            let mut js = zero_matrix((npts, gdim * tdim));
             self.compute_jacobians(points, cell, &mut js);
 
-            // TODO: is it faster if we move this for inside the if statement?
-            for p in 0..points.shape().0 {
+            for p in 0..npts {
                 if tdim == 1 {
                     if gdim == 1 {
-                        *jacobian_inverses.get_mut(0, p).unwrap() = 1.0 / *js.get(0, p).unwrap();
+                        *jacobian_inverses.get_mut(p, 0).unwrap() = 1.0 / *js.get(p, 0).unwrap();
                     } else if gdim == 2 {
                         unimplemented!("Inverse jacobian for this dimension not implemented yet.");
                     } else if gdim == 3 {
@@ -554,63 +705,63 @@ impl Geometry for SerialGeometry {
                     }
                 } else if tdim == 2 {
                     if gdim == 2 {
-                        let det = *js.get(0, p).unwrap() * *js.get(3, p).unwrap()
-                            - *js.get(1, p).unwrap() * *js.get(2, p).unwrap();
-                        *jacobian_inverses.get_mut(0, p).unwrap() = js.get(3, p).unwrap() / det;
-                        *jacobian_inverses.get_mut(1, p).unwrap() = -js.get(1, p).unwrap() / det;
-                        *jacobian_inverses.get_mut(2, p).unwrap() = -js.get(2, p).unwrap() / det;
-                        *jacobian_inverses.get_mut(3, p).unwrap() = js.get(0, p).unwrap() / det;
+                        let det = *js.get(p, 0).unwrap() * *js.get(p, 3).unwrap()
+                            - *js.get(p, 1).unwrap() * *js.get(p, 2).unwrap();
+                        *jacobian_inverses.get_mut(p, 0).unwrap() = js.get(p, 3).unwrap() / det;
+                        *jacobian_inverses.get_mut(p, 1).unwrap() = -js.get(p, 1).unwrap() / det;
+                        *jacobian_inverses.get_mut(p, 2).unwrap() = -js.get(p, 2).unwrap() / det;
+                        *jacobian_inverses.get_mut(p, 3).unwrap() = js.get(p, 0).unwrap() / det;
                     } else if gdim == 3 {
-                        let c = (*js.get(3, p).unwrap() * *js.get(4, p).unwrap()
-                            - *js.get(2, p).unwrap() * *js.get(5, p).unwrap())
+                        let c = (*js.get(p, 3).unwrap() * *js.get(p, 4).unwrap()
+                            - *js.get(p, 2).unwrap() * *js.get(p, 5).unwrap())
                         .powi(2)
-                            + (*js.get(5, p).unwrap() * *js.get(0, p).unwrap()
-                                - *js.get(4, p).unwrap() * *js.get(1, p).unwrap())
+                            + (*js.get(p, 5).unwrap() * *js.get(p, 0).unwrap()
+                                - *js.get(p, 4).unwrap() * *js.get(p, 1).unwrap())
                             .powi(2)
-                            + (*js.get(1, p).unwrap() * *js.get(2, p).unwrap()
-                                - *js.get(0, p).unwrap() * *js.get(3, p).unwrap())
+                            + (*js.get(p, 1).unwrap() * *js.get(p, 2).unwrap()
+                                - *js.get(p, 0).unwrap() * *js.get(p, 3).unwrap())
                             .powi(2);
-                        *jacobian_inverses.get_mut(0, p).unwrap() = (*js.get(0, p).unwrap()
-                            * ((*js.get(5, p).unwrap()).powi(2)
-                                + (*js.get(3, p).unwrap()).powi(2))
-                            - *js.get(1, p).unwrap()
-                                * (*js.get(2, p).unwrap() * *js.get(3, p).unwrap()
-                                    + *js.get(4, p).unwrap() * *js.get(5, p).unwrap()))
+                        *jacobian_inverses.get_mut(p, 0).unwrap() = (*js.get(p, 0).unwrap()
+                            * ((*js.get(p, 5).unwrap()).powi(2)
+                                + (*js.get(p, 3).unwrap()).powi(2))
+                            - *js.get(p, 1).unwrap()
+                                * (*js.get(p, 2).unwrap() * *js.get(p, 3).unwrap()
+                                    + *js.get(p, 4).unwrap() * *js.get(p, 5).unwrap()))
                             / c;
-                        *jacobian_inverses.get_mut(1, p).unwrap() = (*js.get(2, p).unwrap()
-                            * ((*js.get(1, p).unwrap()).powi(2)
-                                + (*js.get(5, p).unwrap()).powi(2))
-                            - *js.get(3, p).unwrap()
-                                * (*js.get(4, p).unwrap() * *js.get(5, p).unwrap()
-                                    + *js.get(0, p).unwrap() * *js.get(1, p).unwrap()))
+                        *jacobian_inverses.get_mut(p, 1).unwrap() = (*js.get(p, 2).unwrap()
+                            * ((*js.get(p, 1).unwrap()).powi(2)
+                                + (*js.get(p, 5).unwrap()).powi(2))
+                            - *js.get(p, 3).unwrap()
+                                * (*js.get(p, 4).unwrap() * *js.get(p, 5).unwrap()
+                                    + *js.get(p, 0).unwrap() * *js.get(p, 1).unwrap()))
                             / c;
-                        *jacobian_inverses.get_mut(2, p).unwrap() = (*js.get(4, p).unwrap()
-                            * ((*js.get(3, p).unwrap()).powi(2)
-                                + (*js.get(1, p).unwrap()).powi(2))
-                            - *js.get(5, p).unwrap()
-                                * (*js.get(0, p).unwrap() * *js.get(1, p).unwrap()
-                                    + *js.get(2, p).unwrap() * *js.get(3, p).unwrap()))
+                        *jacobian_inverses.get_mut(p, 2).unwrap() = (*js.get(p, 4).unwrap()
+                            * ((*js.get(p, 3).unwrap()).powi(2)
+                                + (*js.get(p, 1).unwrap()).powi(2))
+                            - *js.get(p, 5).unwrap()
+                                * (*js.get(p, 0).unwrap() * *js.get(p, 1).unwrap()
+                                    + *js.get(p, 2).unwrap() * *js.get(p, 3).unwrap()))
                             / c;
-                        *jacobian_inverses.get_mut(3, p).unwrap() = (*js.get(1, p).unwrap()
-                            * ((*js.get(4, p).unwrap()).powi(2)
-                                + (*js.get(2, p).unwrap()).powi(2))
-                            - *js.get(0, p).unwrap()
-                                * (*js.get(2, p).unwrap() * *js.get(3, p).unwrap()
-                                    + *js.get(4, p).unwrap() * *js.get(5, p).unwrap()))
+                        *jacobian_inverses.get_mut(p, 3).unwrap() = (*js.get(p, 1).unwrap()
+                            * ((*js.get(p, 4).unwrap()).powi(2)
+                                + (*js.get(p, 2).unwrap()).powi(2))
+                            - *js.get(p, 0).unwrap()
+                                * (*js.get(p, 2).unwrap() * *js.get(p, 3).unwrap()
+                                    + *js.get(p, 4).unwrap() * *js.get(p, 5).unwrap()))
                             / c;
-                        *jacobian_inverses.get_mut(4, p).unwrap() = (*js.get(3, p).unwrap()
-                            * ((*js.get(0, p).unwrap()).powi(2)
-                                + (*js.get(4, p).unwrap()).powi(2))
-                            - *js.get(2, p).unwrap()
-                                * (*js.get(4, p).unwrap() * *js.get(5, p).unwrap()
-                                    + *js.get(0, p).unwrap() * *js.get(1, p).unwrap()))
+                        *jacobian_inverses.get_mut(p, 4).unwrap() = (*js.get(p, 3).unwrap()
+                            * ((*js.get(p, 0).unwrap()).powi(2)
+                                + (*js.get(p, 4).unwrap()).powi(2))
+                            - *js.get(p, 2).unwrap()
+                                * (*js.get(p, 4).unwrap() * *js.get(p, 5).unwrap()
+                                    + *js.get(p, 0).unwrap() * *js.get(p, 1).unwrap()))
                             / c;
-                        *jacobian_inverses.get_mut(5, p).unwrap() = (*js.get(5, p).unwrap()
-                            * ((*js.get(2, p).unwrap()).powi(2)
-                                + (*js.get(0, p).unwrap()).powi(2))
-                            - *js.get(4, p).unwrap()
-                                * (*js.get(0, p).unwrap() * *js.get(1, p).unwrap()
-                                    + *js.get(2, p).unwrap() * *js.get(3, p).unwrap()))
+                        *jacobian_inverses.get_mut(p, 5).unwrap() = (*js.get(p, 5).unwrap()
+                            * ((*js.get(p, 2).unwrap()).powi(2)
+                                + (*js.get(p, 0).unwrap()).powi(2))
+                            - *js.get(p, 4).unwrap()
+                                * (*js.get(p, 0).unwrap() * *js.get(p, 1).unwrap()
+                                    + *js.get(p, 2).unwrap() * *js.get(p, 3).unwrap()))
                             / c;
                     } else {
                         panic!("Unsupported dimensions.");
@@ -1365,25 +1516,24 @@ mod test {
         );
 
         // Test compute_jacobians
-        let mut jacobians = zero_matrix((6, points.shape().0));
+        let mut jacobians = zero_matrix((points.shape().0, 6));
         g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
-            assert_relative_eq!(*jacobians.get(0, i).unwrap(), 2.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(1, i).unwrap(), 3.0, max_relative = 1e-14);
-            // assert_relative_eq!(*jacobians.get(2, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(3, i).unwrap(), 1.0, max_relative = 1e-14);
-            // assert_relative_eq!(*jacobians.get(4, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(5, i).unwrap(), 1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), 2.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 3.0, max_relative = 1e-14);
+            // assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), 1.0, max_relative = 1e-14);
+            // assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 1.0, max_relative = 1e-14);
         }
         g.geometry().compute_jacobians(&points, 1, &mut jacobians);
         for i in 0..3 {
-            assert_relative_eq!(*jacobians.get(0, i).unwrap(), -1.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(1, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(2, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(3, i).unwrap(), -1.0, max_relative = 1e-14);
-            assert_relative_eq!(*jacobians.get(4, i).unwrap(), 0.0, max_relative = 1e-14);
-            println!("{i} {}", *jacobians.get(5, i).unwrap());
-            assert_relative_eq!(*jacobians.get(5, i).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 0).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 1).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 2).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 3).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 4).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jacobians.get(i, 5).unwrap(), 0.0, max_relative = 1e-14);
         }
 
         // test compute_jacobian_determinants
@@ -1400,26 +1550,26 @@ mod test {
         }
 
         // Test compute_jacobian_inverses
-        let mut jinvs = zero_matrix((6, points.shape().0));
+        let mut jinvs = zero_matrix((points.shape().0, 6));
         g.geometry()
             .compute_jacobian_inverses(&points, 0, &mut jinvs);
         for i in 0..3 {
-            assert_relative_eq!(*jinvs.get(0, i).unwrap(), 0.5, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(1, i).unwrap(), -0.75, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(2, i).unwrap(), -0.75, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(3, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(4, i).unwrap(), 0.5, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(5, i).unwrap(), 0.5, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), 0.5, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), -0.75, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), -0.75, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), 0.5, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.5, max_relative = 1e-14);
         }
         g.geometry()
             .compute_jacobian_inverses(&points, 1, &mut jinvs);
         for i in 0..3 {
-            assert_relative_eq!(*jinvs.get(0, i).unwrap(), -1.0, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(1, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(2, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(3, i).unwrap(), 0.0, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(4, i).unwrap(), -1.0, max_relative = 1e-14);
-            assert_relative_eq!(*jinvs.get(5, i).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 0).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 1).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 2).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 3).unwrap(), 0.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 4).unwrap(), -1.0, max_relative = 1e-14);
+            assert_relative_eq!(*jinvs.get(i, 5).unwrap(), 0.0, max_relative = 1e-14);
         }
     }
 
@@ -1444,23 +1594,23 @@ mod test {
 
         let pt = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], (1, 2));
 
-        let mut normal = zero_matrix((3, 1));
+        let mut normal = zero_matrix((1, 3));
 
         g.geometry().compute_normals(&pt, 0, &mut normal);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
-        assert_relative_eq!(*normal.get(1, 0).unwrap(), -1.0);
-        assert_relative_eq!(*normal.get(2, 0).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), -1.0);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), 0.0);
 
         g.geometry().compute_normals(&pt, 1, &mut normal);
         let a = f64::sqrt(1.0 / 3.0);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), a);
-        assert_relative_eq!(*normal.get(1, 0).unwrap(), a);
-        assert_relative_eq!(*normal.get(2, 0).unwrap(), a);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), a);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), a);
 
         g.geometry().compute_normals(&pt, 2, &mut normal);
         assert_relative_eq!(*normal.get(0, 0).unwrap(), 0.0);
-        assert_relative_eq!(*normal.get(1, 0).unwrap(), 0.0);
-        assert_relative_eq!(*normal.get(2, 0).unwrap(), 1.0);
+        assert_relative_eq!(*normal.get(0, 1).unwrap(), 0.0);
+        assert_relative_eq!(*normal.get(0, 2).unwrap(), 1.0);
 
         // Test a curved quadrilateral cell
         let curved_g = SerialGrid::new(
@@ -1476,7 +1626,7 @@ mod test {
         );
 
         let points = to_matrix(&[0.0, 0.2, 0.5, 0.7, 1.0, 0.0, 0.3, 0.9, 1.0, 0.3], (5, 2));
-        let mut normals = zero_matrix((3, 5));
+        let mut normals = zero_matrix((5, 3));
 
         curved_g
             .geometry()
@@ -1487,56 +1637,56 @@ mod test {
             2.0 * f64::sqrt(1.0 / 5.0),
             epsilon = 1e-12
         );
-        assert_relative_eq!(*normals.get(1, 0).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(0, 1).unwrap(), 0.0, epsilon = 1e-12);
         assert_relative_eq!(
-            *normals.get(2, 0).unwrap(),
+            *normals.get(0, 2).unwrap(),
             f64::sqrt(1.0 / 5.0),
             epsilon = 1e-12
         );
 
         assert_relative_eq!(
-            *normals.get(0, 1).unwrap(),
+            *normals.get(1, 0).unwrap(),
             1.2 * f64::sqrt(1.0 / 2.44),
             epsilon = 1e-12
         );
         assert_relative_eq!(*normals.get(1, 1).unwrap(), 0.0, epsilon = 1e-12);
         assert_relative_eq!(
-            *normals.get(2, 1).unwrap(),
+            *normals.get(1, 2).unwrap(),
             f64::sqrt(1.0 / 2.44),
             epsilon = 1e-12
         );
 
-        assert_relative_eq!(*normals.get(0, 2).unwrap(), 0.0, epsilon = 1e-12);
-        assert_relative_eq!(*normals.get(1, 2).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(2, 0).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(2, 1).unwrap(), 0.0, epsilon = 1e-12);
         assert_relative_eq!(*normals.get(2, 2).unwrap(), 1.0, epsilon = 1e-12);
 
         assert_relative_eq!(
-            *normals.get(0, 3).unwrap(),
+            *normals.get(3, 0).unwrap(),
             -0.8 * f64::sqrt(1.0 / 1.64),
             epsilon = 1e-12
         );
-        assert_relative_eq!(*normals.get(1, 3).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(3, 1).unwrap(), 0.0, epsilon = 1e-12);
         assert_relative_eq!(
-            *normals.get(2, 3).unwrap(),
+            *normals.get(3, 2).unwrap(),
             f64::sqrt(1.0 / 1.64),
             epsilon = 1e-12
         );
 
         assert_relative_eq!(
-            *normals.get(0, 4).unwrap(),
+            *normals.get(4, 0).unwrap(),
             -2.0 * f64::sqrt(1.0 / 5.0),
             epsilon = 1e-12
         );
-        assert_relative_eq!(*normals.get(1, 4).unwrap(), 0.0, epsilon = 1e-12);
+        assert_relative_eq!(*normals.get(4, 1).unwrap(), 0.0, epsilon = 1e-12);
         assert_relative_eq!(
-            *normals.get(2, 4).unwrap(),
+            *normals.get(4, 2).unwrap(),
             f64::sqrt(1.0 / 5.0),
             epsilon = 1e-12
         );
     }
 
     #[test]
-    fn test_compute_points_function() {
+    fn test_compute_points_evaluator() {
         let grid = regular_sphere(2);
         let element = create_element(
             ElementFamily::Lagrange,
@@ -1545,13 +1695,13 @@ mod test {
             Continuity::Continuous,
         );
         let pts = to_matrix(&[0.1, 0.2, 0.6, 0.1, 0.4, 0.2], (3, 2));
-        let f = grid.geometry().get_compute_points_function(&element, &pts);
+        let e = grid.geometry().get_evaluator(&element, &pts);
 
         let mut points0 = zero_matrix((3, 3));
         let mut points1 = zero_matrix((3, 3));
         for c in 0..grid.geometry().cell_count() {
             grid.geometry().compute_points(&pts, c, &mut points0);
-            f(c, &mut points1);
+            e.compute_points(c, &mut points1);
             for i in 0..3 {
                 for j in 0..3 {
                     assert_relative_eq!(
@@ -1565,7 +1715,7 @@ mod test {
     }
 
     #[test]
-    fn test_compute_normals_function() {
+    fn test_compute_normals_evaluator() {
         let grid = regular_sphere(2);
         let element = create_element(
             ElementFamily::Lagrange,
@@ -1574,13 +1724,13 @@ mod test {
             Continuity::Continuous,
         );
         let pts = to_matrix(&[0.1, 0.2, 0.6, 0.1, 0.4, 0.2], (3, 2));
-        let mut f = grid.geometry().get_compute_normals_function(&element, &pts);
+        let e = grid.geometry().get_evaluator(&element, &pts);
 
         let mut normals0 = zero_matrix((3, 3));
         let mut normals1 = zero_matrix((3, 3));
         for c in 0..grid.geometry().cell_count() {
             grid.geometry().compute_normals(&pts, c, &mut normals0);
-            f(c, &mut normals1);
+            e.compute_normals(c, &mut normals1);
             for i in 0..3 {
                 for j in 0..3 {
                     assert_relative_eq!(
@@ -1594,7 +1744,7 @@ mod test {
     }
 
     #[test]
-    fn test_compute_jacobians_function() {
+    fn test_compute_jacobians_evaluator() {
         let grid = regular_sphere(2);
         let element = create_element(
             ElementFamily::Lagrange,
@@ -1603,17 +1753,15 @@ mod test {
             Continuity::Continuous,
         );
         let pts = to_matrix(&[0.1, 0.1, 0.2, 0.4, 0.6, 0.2], (3, 2));
-        let f = grid
-            .geometry()
-            .get_compute_jacobians_function(&element, &pts);
+        let e = grid.geometry().get_evaluator(&element, &pts);
 
-        let mut jacobians0 = zero_matrix((6, 3));
-        let mut jacobians1 = zero_matrix((6, 3));
+        let mut jacobians0 = zero_matrix((3, 6));
+        let mut jacobians1 = zero_matrix((3, 6));
         for c in 0..grid.geometry().cell_count() {
             grid.geometry().compute_jacobians(&pts, c, &mut jacobians0);
-            f(c, &mut jacobians1);
-            for i in 0..6 {
-                for j in 0..3 {
+            e.compute_jacobians(c, &mut jacobians1);
+            for i in 0..3 {
+                for j in 0..6 {
                     assert_relative_eq!(
                         *jacobians0.get(i, j).unwrap(),
                         *jacobians1.get(i, j).unwrap(),
@@ -1625,7 +1773,7 @@ mod test {
     }
 
     #[test]
-    fn test_compute_jacobian_determinants_function() {
+    fn test_compute_jacobian_determinants_evaluator() {
         let grid = regular_sphere(2);
         let element = create_element(
             ElementFamily::Lagrange,
@@ -1634,16 +1782,14 @@ mod test {
             Continuity::Continuous,
         );
         let pts = to_matrix(&[0.1, 0.1, 0.2, 0.4, 0.6, 0.2], (3, 2));
-        let mut f = grid
-            .geometry()
-            .get_compute_jacobian_determinants_function(&element, &pts);
+        let e = grid.geometry().get_evaluator(&element, &pts);
 
         let mut jacobian_determinants0 = vec![0.0; 3];
         let mut jacobian_determinants1 = vec![0.0; 3];
         for c in 0..grid.geometry().cell_count() {
             grid.geometry()
                 .compute_jacobian_determinants(&pts, c, &mut jacobian_determinants0);
-            f(c, &mut jacobian_determinants1);
+            e.compute_jacobian_determinants(c, &mut jacobian_determinants1);
             for i in 0..3 {
                 assert_relative_eq!(
                     jacobian_determinants0[i],
