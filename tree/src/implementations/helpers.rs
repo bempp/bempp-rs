@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 
+use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
@@ -70,7 +71,7 @@ pub fn points_fixture_col(npoints: usize) -> PointsMat {
 ///
 /// # Arguements:
 /// * `coordinates` - points on the surface of a box.
-pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
+pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
     let n = coordinates.len() / 3;
 
     let xs = coordinates.iter().take(n);
@@ -121,8 +122,11 @@ pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
 ///
 /// # Arguments
 /// * `order` - the order of expansions used in constructing the surface grid
-pub fn map_corners_to_surface(order: usize) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
-    let (_, surface_multindex) = MortonKey::surface_grid(order);
+pub fn map_corners_to_surface<T>(order: usize) -> (HashMap<usize, usize>, HashMap<usize, usize>)
+where
+    T: Float + std::ops::SubAssign + std::ops::MulAssign,
+{
+    let (_, surface_multindex) = MortonKey::surface_grid::<T>(order);
 
     let nsurf = surface_multindex.len() / 3;
     let ncorners = 8;
@@ -189,10 +193,10 @@ mod test {
     #[test]
     fn test_find_corners() {
         let order = 5;
-        let (grid_1, _) = MortonKey::surface_grid(order);
+        let (grid_1, _) = MortonKey::surface_grid::<f64>(order);
 
         let order = 2;
-        let (grid_2, _) = MortonKey::surface_grid(order);
+        let (grid_2, _) = MortonKey::surface_grid::<f64>(order);
 
         let corners_1 = find_corners(&grid_1);
         let corners_2 = find_corners(&grid_2);

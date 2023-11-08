@@ -9,7 +9,7 @@ use mpi::{
     Address,
 };
 
-unsafe impl Equivalence for Point {
+unsafe impl <T: Float> Equivalence for Point<T> {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(

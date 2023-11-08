@@ -10,7 +10,7 @@ use crate::types::{
 };
 
 /// Concrete distributed multi-node tree.
-pub struct MultiNodeTree {
+pub struct MultiNodeTree<T> {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
 
@@ -18,10 +18,10 @@ pub struct MultiNodeTree {
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain,
+    pub domain: Domain<T>,
 
     ///  A vector of Cartesian points.
-    pub points: Points,
+    pub points: Points<T>,
 
     /// The leaves that span the tree.
     pub leaves: MortonKeys,

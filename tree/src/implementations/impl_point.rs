@@ -4,42 +4,42 @@ use std::hash::{Hash, Hasher};
 
 use crate::types::point::{Point, Points};
 
-impl PartialEq for Point {
+impl<T> PartialEq for Point<T> {
     fn eq(&self, other: &Self) -> bool {
         self.encoded_key == other.encoded_key
     }
 }
 
-impl Eq for Point {}
+impl<T> Eq for Point<T> {}
 
-impl Ord for Point {
+impl<T> Ord for Point<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.encoded_key.cmp(&other.encoded_key)
     }
 }
 
-impl PartialOrd for Point {
+impl<T> PartialOrd for Point<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // less_than(&self.morton, &other.morton)
         Some(self.encoded_key.cmp(&other.encoded_key))
     }
 }
 
-impl Hash for Point {
+impl<T> Hash for Point<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.encoded_key.hash(state);
     }
 }
 
-impl Points {
-    pub fn new() -> Points {
+impl<T> Points<T> {
+    pub fn new() -> Points<T> {
         Points {
             points: Vec::new(),
             index: 0,
         }
     }
 
-    pub fn add(&mut self, item: Point) {
+    pub fn add(&mut self, item: Point<T>) {
         self.points.push(item);
     }
 
@@ -48,29 +48,29 @@ impl Points {
     }
 }
 
-impl Iterator for Points {
-    type Item = Point;
+// impl <T>Iterator for Points<T> {
+//     type Item = Point<T>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.points.len() {
-            return None;
-        }
+//     fn next(&mut self) -> Option<Self::Item> {
+//         if self.index >= self.points.len() {
+//             return None;
+//         }
 
-        self.index += 1;
-        self.points.get(self.index).cloned()
-    }
-}
+//         self.index += 1;
+//         self.points.get(self.index)
+//     }
+// }
 
-impl FromIterator<Point> for Points {
-    fn from_iter<I: IntoIterator<Item = Point>>(iter: I) -> Self {
-        let mut c = Points::new();
+// impl <T> FromIterator<Point<T>> for Points<T> {
+//     fn from_iter<I: IntoIterator<Item = Point<T>>>(iter: I) -> Self {
+//         let mut c = Points::new();
 
-        for i in iter {
-            c.add(i);
-        }
-        c
-    }
-}
+//         for i in iter {
+//             c.add(i);
+//         }
+//         c
+//     }
+// }
 
 #[cfg(test)]
 mod test {
@@ -87,7 +87,7 @@ mod test {
     pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
-        let mut points: Vec<[PointType; 3]> = Vec::new();
+        let mut points: Vec<[PointType<f64>; 3]> = Vec::new();
 
         for _ in 0..npoints {
             points.push([
@@ -107,7 +107,7 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
-        let mut points: Vec<Point> = points_fixture(1000)
+        let mut points: Vec<Point<f64>> = points_fixture(1000)
             .iter()
             .enumerate()
             .map(|(i, p)| Point {

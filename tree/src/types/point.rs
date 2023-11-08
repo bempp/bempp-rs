@@ -1,7 +1,7 @@
 //! Data structures for Cartesian Points in 3D.
 use crate::types::morton::MortonKey;
 
-pub type PointType = f64;
+pub type PointType<T> = T;
 
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
 /// the octree node in which it lies. Each Point as an associated 'base key', which is its matching
@@ -9,9 +9,9 @@ pub type PointType = f64;
 /// specifiying its encoding at a given level of discretization. Points also have associated data
 #[repr(C)]
 #[derive(Clone, Debug, Default, Copy)]
-pub struct Point {
+pub struct Point<T> {
     /// Physical coordinate in Cartesian space.
-    pub coordinate: [PointType; 3],
+    pub coordinate: [PointType<T>; 3],
 
     /// Global unique index.
     pub global_idx: usize,
@@ -26,9 +26,9 @@ pub struct Point {
 /// Vector of **Points**.
 /// Container of **Points**.
 #[derive(Clone, Debug, Default)]
-pub struct Points {
+pub struct Points<T> {
     /// A vector of Points
-    pub points: Vec<Point>,
+    pub points: Vec<Point<T>>,
 
     /// index for implementing the Iterator trait.
     pub index: usize,

@@ -1,6 +1,8 @@
 //! Data Structures to create octrees on a single node.
 use std::collections::{HashMap, HashSet};
 
+use num::Float;
+
 use crate::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},
@@ -9,15 +11,15 @@ use crate::types::{
 
 /// Local Trees (non-distributed).
 #[derive(Debug)]
-pub struct SingleNodeTree {
+pub struct SingleNodeTree<T: Float> {
     /// Depth of a tree.
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain,
+    pub domain: Domain<T>,
 
     ///  All Points.
-    pub points: Points,
+    pub points: Points<T>,
 
     /// The leaves that span the tree, and associated Point data.
     pub leaves: MortonKeys,
