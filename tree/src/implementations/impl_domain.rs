@@ -3,7 +3,7 @@ use num::Float;
 
 use crate::types::{domain::Domain, point::PointType};
 
-impl<T: Float> Domain<T> {
+impl<T: Float + Default> Domain<T> {
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
     /// ensure correct Morton encoding.
@@ -63,13 +63,17 @@ impl<T: Float> Domain<T> {
 
 #[cfg(test)]
 mod test {
+    use bempp_traits::types::Scalar;
     use rlst::dense::{RawAccess, Shape};
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
 
     use super::*;
 
-    fn test_compute_bounds(points: PointsMat) {
+    fn test_compute_bounds<T>(points: PointsMat<T>)
+    where
+        T: Float + Default + Scalar,
+    {
         let domain = Domain::from_local_points(points.data());
 
         // Test that the domain remains cubic
@@ -97,15 +101,15 @@ mod test {
         let npoints = 10000;
 
         // Test points in positive octant only
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         test_compute_bounds(points);
 
         // Test points in positive and negative octants
-        let points = points_fixture(npoints, Some(-1.), Some(1.));
+        let points = points_fixture::<f64>(npoints, Some(-1.), Some(1.));
         test_compute_bounds(points);
 
         // Test rectangular distributions of points
-        let points = points_fixture_col(npoints);
+        let points = points_fixture_col::<f64>(npoints);
         test_compute_bounds(points);
     }
 }

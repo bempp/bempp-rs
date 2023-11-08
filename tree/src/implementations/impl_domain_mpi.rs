@@ -7,38 +7,44 @@ use mpi::{
     Address,
 };
 
+use num::traits::Float;
+
 use crate::types::{domain::Domain, point::PointType};
 
-unsafe impl Equivalence for Domain {
+unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(
             &[1, 1],
             &[
-                offset_of!(Domain, origin) as Address,
-                offset_of!(Domain, diameter) as Address,
+                offset_of!(Domain<T>, origin) as Address,
+                offset_of!(Domain<T>, diameter) as Address,
             ],
             &[
-                UncommittedUserDatatype::contiguous(3, &PointType::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::contiguous(3, &PointType::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
             ],
         )
     }
 }
 
-impl Domain {
+impl<T: Float + Default> Domain<T>
+where
+    [Domain<T>]: BufferMut,
+    Vec<Domain<T>>: Buffer,
+{
     /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
     /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
     ///
     /// # Arguments
     /// * `local_points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// * `comm` - An MPI (User) communicator over which the domain is defined.
-    pub fn from_global_points(local_points: &[PointType], comm: &UserCommunicator) -> Domain {
+    pub fn from_global_points(local_points: &[PointType<T>], comm: &UserCommunicator) -> Domain<T> {
         let size = comm.size();
 
-        let local_domain = Domain::from_local_points(local_points);
-        let local_bounds: Vec<Domain> = vec![local_domain; size as usize];
-        let mut buffer = vec![Domain::default(); size as usize];
+        let local_domain = Domain::<T>::from_local_points(local_points);
+        let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];
+        let mut buffer = vec![Domain::<T>::default(); size as usize];
 
         comm.all_to_all_into(&local_bounds, &mut buffer[..]);
 

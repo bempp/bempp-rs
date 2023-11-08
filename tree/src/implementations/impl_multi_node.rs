@@ -1,8 +1,10 @@
 //! Implementation of constructors for multi node trees from distributed point data.
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 
 use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Rank};
+use num::traits::Float;
 
 use hyksort::hyksort;
 
@@ -23,7 +25,7 @@ use crate::{
     },
 };
 
-impl MultiNodeTree {
+impl<T: Float + Default + Equivalence + Debug> MultiNodeTree<T> {
     /// Constructor for uniform trees.
     ///
     /// # Arguments
@@ -36,11 +38,11 @@ impl MultiNodeTree {
     pub fn uniform_tree(
         world: &UserCommunicator,
         k: i32,
-        points: &[PointType],
-        domain: &Domain,
+        points: &[PointType<T>],
+        domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
-    ) -> MultiNodeTree {
+    ) -> MultiNodeTree<T> {
         // Encode points at deepest level, and map to specified depth.
         let dim = 3;
         let npoints = points.len() / dim;
@@ -188,11 +190,11 @@ impl MultiNodeTree {
     pub fn adaptive_tree(
         world: &UserCommunicator,
         k: i32,
-        points: &[PointType],
-        domain: &Domain,
+        points: &[PointType<T>],
+        domain: &Domain<T>,
         n_crit: u64,
         global_idxs: &[usize],
-    ) -> MultiNodeTree {
+    ) -> MultiNodeTree<T> {
         // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
         let dim = 3;
         let npoints = points.len() / dim;
@@ -228,13 +230,13 @@ impl MultiNodeTree {
         local.complete();
 
         // 5.i Find seeds and compute the coarse blocktree
-        let mut seeds = SingleNodeTree::find_seeds(&local);
+        let mut seeds = SingleNodeTree::<T>::find_seeds(&local);
 
-        let blocktree = MultiNodeTree::complete_blocktree(world, &mut seeds);
+        let blocktree = MultiNodeTree::<T>::complete_blocktree(world, &mut seeds);
 
         // 5.ii any data below the min seed sent to partner process
         let mut points =
-            MultiNodeTree::transfer_points_to_blocktree(world, &points.points[..], &blocktree);
+            MultiNodeTree::<T>::transfer_points_to_blocktree(world, &points.points[..], &blocktree);
 
         // 6. Split blocks based on ncrit constraint
         let mut locally_balanced =
@@ -246,7 +248,7 @@ impl MultiNodeTree {
         locally_balanced.linearize();
 
         // // 8. Find new maps between points and locally balanced tree
-        let _unmapped = SingleNodeTree::assign_nodes_to_points(&locally_balanced, &mut points);
+        let _unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&locally_balanced, &mut points);
 
         // 9. Perform another distributed sort and remove overlaps locally
         let comm = world.duplicate();
@@ -276,7 +278,7 @@ impl MultiNodeTree {
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
         // 10. Find final maps to non-overlapping tree
-        let unmapped = SingleNodeTree::assign_nodes_to_points(&globally_balanced, &mut points);
+        let unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&globally_balanced, &mut points);
 
         // Add unmapped leaves
         let globally_balanced = MortonKeys {
@@ -383,13 +385,13 @@ impl MultiNodeTree {
     /// * `global_idxs` - Globally unique indices for point data.
     pub fn new(
         world: &UserCommunicator,
-        points: &[PointType],
+        points: &[PointType<T>],
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
         k: i32,
         global_idxs: &[usize],
-    ) -> MultiNodeTree {
+    ) -> MultiNodeTree<T> {
         // TODO: Come back and reconcile a runtime point dimension detector
 
         let domain = Domain::from_global_points(points, world);
@@ -487,9 +489,9 @@ impl MultiNodeTree {
     /// * `blocktree` - A minimal spanning blocktree.
     fn transfer_points_to_blocktree(
         world: &UserCommunicator,
-        points: &[Point],
+        points: &[Point<T>],
         blocktree: &[MortonKey],
-    ) -> Points {
+    ) -> Points<T> {
         let rank = world.rank();
         let size = world.size();
 
@@ -538,17 +540,21 @@ impl MultiNodeTree {
     }
 }
 
-impl Tree for MultiNodeTree {
-    type Domain = Domain;
+impl<T: Float + Default> Tree for MultiNodeTree<T> {
+    type Domain = Domain<T>;
     type NodeIndex = MortonKey;
-    type NodeIndexSlice<'a> = &'a [MortonKey];
+    type NodeIndexSlice<'a> = &'a [MortonKey]
+        where T: 'a;
     type NodeIndices = MortonKeys;
-    type Point = Point;
-    type PointSlice<'a> = &'a [Point];
+    type Point = Point<T>;
+    type PointSlice<'a> = &'a [Point<T>]
+        where T: 'a;
     type PointData = f64;
-    type PointDataSlice<'a> = &'a [f64];
+    type PointDataSlice<'a> = &'a [f64]
+        where T: 'a;
     type GlobalIndex = usize;
-    type GlobalIndexSlice<'a> = &'a [usize];
+    type GlobalIndexSlice<'a> = &'a [usize]
+        where T: 'a;
 
     fn get_depth(&self) -> u64 {
         self.depth
@@ -599,14 +605,14 @@ impl Tree for MultiNodeTree {
     }
 }
 
-impl MultiNodeTree {
+impl<T: Float + Default + Equivalence> MultiNodeTree<T> {
     /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
     ///
     /// The idea is to communicate the required point and octant data across the distributed tree prior
     /// to the running of the upward pass so that multipole expansions can be constructed independently
     /// on each processor at the leaf level, and for the final potential evaluation each process already
     /// contains its required point data for near field calculations.
-    pub fn create_let(&self) -> MultiNodeTree {
+    pub fn create_let(&self) -> MultiNodeTree<T> {
         // Communicate ranges globally using AllGather
         let rank = self.world.rank();
         let size = self.world.size();
@@ -714,7 +720,7 @@ impl MultiNodeTree {
 
         let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
         let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut point_packets: Vec<Vec<Point>> = Vec::new();
+        let mut point_packets: Vec<Vec<Point<T>>> = Vec::new();
 
         let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
         let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
@@ -741,7 +747,7 @@ impl MultiNodeTree {
                     .cloned()
                     .collect();
 
-                let point_packet: Vec<Point> = leaf_packet
+                let point_packet: Vec<Point<T>> = leaf_packet
                     .iter()
                     .flat_map(|leaf| self.get_points(leaf).unwrap().to_vec())
                     .collect();

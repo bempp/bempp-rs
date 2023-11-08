@@ -599,7 +599,7 @@ mod test {
         assert!(first == depth);
 
         // Test a column distribution of data
-        let points = points_fixture_col(npoints);
+        let points = points_fixture_col::<f64>(npoints);
         let global_idxs = (0..npoints).collect_vec();
         let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
@@ -632,7 +632,7 @@ mod test {
     #[test]
     pub fn test_adaptive_tree() {
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
 
         let adaptive = true;
@@ -677,7 +677,7 @@ mod test {
     #[test]
     pub fn test_no_overlaps() {
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4), &global_idxs);
         let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs);
@@ -689,7 +689,7 @@ mod test {
     pub fn test_assign_nodes_to_points() {
         // Generate points in a single octant of the domain
         let npoints = 10;
-        let points = points_fixture(npoints, Some(0.), Some(0.5));
+        let points = points_fixture::<f64>(npoints, Some(0.), Some(0.5));
 
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
@@ -831,7 +831,7 @@ mod test {
     pub fn test_levels_to_keys() {
         // Uniform tree
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let depth = 3;
         let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);

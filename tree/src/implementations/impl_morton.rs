@@ -232,7 +232,7 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-pub fn point_to_anchor<T: Float + ToPrimitive>(
+pub fn point_to_anchor<T: Float + ToPrimitive + Default>(
     point: &[PointType<T>; 3],
     level: KeyType,
     domain: &Domain<T>,
@@ -316,7 +316,11 @@ impl MortonKey {
     /// * `point` - Cartesian coordinate for a given point.
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
-    pub fn from_point<T: Float>(point: &[PointType<T>; 3], domain: &Domain<T>, level: u64) -> Self {
+    pub fn from_point<T: Float + Default>(
+        point: &[PointType<T>; 3],
+        domain: &Domain<T>,
+        level: u64,
+    ) -> Self {
         let anchor = point_to_anchor(point, level, domain).unwrap();
         MortonKey::from_anchor(&anchor, level)
     }
@@ -394,7 +398,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// `domain` - The physical domain with which we calculate the diameter with respect to.
-    pub fn diameter<T: Float>(&self, domain: &Domain<T>) -> [T; 3] {
+    pub fn diameter<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
         domain
             .diameter
             .map(|x| T::from(0.5).unwrap().powf(T::from(self.level()).unwrap()) * x)
@@ -405,7 +409,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The physical domain with which we calculate the centre with respect to.
-    pub fn centre<T: Float>(&self, domain: &Domain<T>) -> [T; 3] {
+    pub fn centre<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
         let mut result = [T::zero(); 3];
 
         let anchor_coordinate = self.to_coordinates(domain);
@@ -583,7 +587,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The domain with which we are calculating with respect to.
-    pub fn to_coordinates<T: Float>(&self, domain: &Domain<T>) -> [PointType<T>; 3] {
+    pub fn to_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> [PointType<T>; 3] {
         let mut coord: [PointType<T>; 3] = [T::zero(); 3];
 
         for (anchor_value, coord_ref, origin_value, diameter_value) in
@@ -613,7 +617,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The domain with which we are calculating with respect to.
-    pub fn box_coordinates<T: Float>(&self, domain: &Domain<T>) -> Vec<T> {
+    pub fn box_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> Vec<T> {
         let mut serialized = Vec::<T>::with_capacity(24);
         let level = self.level();
         let step = (1 << (DEEPEST_LEVEL - level)) as u64;
@@ -773,7 +777,7 @@ impl MortonKey {
         conv_point_corner_index: usize,
     ) -> (Vec<T>, Vec<usize>)
     where
-        T: Float + std::ops::MulAssign + std::ops::AddAssign + ToPrimitive,
+        T: Float + std::ops::MulAssign + std::ops::AddAssign + ToPrimitive + Default,
     {
         // Number of convolution points along each axis
         let n = 2 * order - 1;
@@ -905,7 +909,12 @@ impl MortonKey {
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn scale_surface<T: Float>(&self, surface: Vec<T>, domain: &Domain<T>, alpha: T) -> Vec<T> {
+    pub fn scale_surface<T: Float + Default>(
+        &self,
+        surface: Vec<T>,
+        domain: &Domain<T>,
+        alpha: T,
+    ) -> Vec<T> {
         let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
@@ -937,7 +946,7 @@ impl MortonKey {
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
     pub fn compute_surface<T>(&self, domain: &Domain<T>, order: usize, alpha: T) -> Vec<T>
     where
-        T: Float + std::ops::MulAssign + std::ops::SubAssign,
+        T: Float + std::ops::MulAssign + std::ops::SubAssign + Default,
     {
         let (surface, _) = MortonKey::surface_grid(order);
 

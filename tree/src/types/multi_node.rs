@@ -3,6 +3,8 @@ use mpi::topology::UserCommunicator;
 
 use std::collections::{HashMap, HashSet};
 
+use num::traits::Float;
+
 use crate::types::{
     domain::Domain,
     morton::{KeyType, MortonKey, MortonKeys},
@@ -10,7 +12,10 @@ use crate::types::{
 };
 
 /// Concrete distributed multi-node tree.
-pub struct MultiNodeTree<T> {
+pub struct MultiNodeTree<T>
+where
+    T: Default + Float,
+{
     /// Global communicator for this Tree
     pub world: UserCommunicator,
 
