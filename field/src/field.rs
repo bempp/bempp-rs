@@ -1,12 +1,9 @@
 //! Implementation of traits for field translations via the FFT and SVD.
 use cauchy::Scalar;
-use fftw::plan::Plan;
-use num::{Float, ToPrimitive, Zero};
+use num::Float;
 use std::collections::{HashMap, HashSet};
 
-use fftw::{plan::R2CPlan, types::*};
 use itertools::Itertools;
-use num::Complex;
 use rlst::dense::LayoutType;
 use rlst::{
     algorithms::{
@@ -15,8 +12,8 @@ use rlst::{
     },
     common::traits::{Eval, Transpose},
     dense::{
-        rlst_dynamic_mat, rlst_pointer_mat, rlst_rand_mat, Dot, Dynamic, MultiplyAdd, RawAccess,
-        RawAccessMut, Shape, VectorContainer,
+        rlst_dynamic_mat, rlst_pointer_mat, Dot, Dynamic, MultiplyAdd, RawAccess, RawAccessMut,
+        Shape, VectorContainer,
     },
 };
 
@@ -548,6 +545,8 @@ mod test {
     use super::*;
     use crate::fft::irfft3_fftw;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use cauchy::{c32, c64};
+    use num::complex::Complex;
     use rlst::dense::RandomAccessMut;
 
     #[test]
@@ -608,7 +607,7 @@ mod test {
             FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Create a random point in the middle of the domain
-        let m2l: FftM2lOperatorData<Complex<f32>> = fft.compute_m2l_operators(order, domain);
+        let m2l: FftM2lOperatorData<c32> = fft.compute_m2l_operators(order, domain);
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
         let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
@@ -817,207 +816,207 @@ mod test {
         }
     }
 
-    // #[test]
-    // fn test_kernel_rearrangement() {
-    //     // Dummy data mirroring unrearranged kernels
-    //     // here each '1000' corresponds to a sibling index
-    //     // each '100' to a child in a given halo element
-    //     // and each '1' to a frequency
-    //     let mut kernel_data_mat = vec![Vec::new(); 26];
-    //     let size_real = 10;
+    #[test]
+    fn test_kernel_rearrangement() {
+        // Dummy data mirroring unrearranged kernels
+        // here each '1000' corresponds to a sibling index
+        // each '100' to a child in a given halo element
+        // and each '1' to a frequency
+        let mut kernel_data_mat = vec![Vec::new(); 26];
+        let size_real = 10;
 
-    //     for elem in kernel_data_mat.iter_mut().take(26) {
-    //         // sibling index
-    //         for j in 0..8 {
-    //             // halo child index
-    //             for k in 0..8 {
-    //                 // frequency
-    //                 for l in 0..size_real {
-    //                     elem.push(Complex::new((1000 * j + 100 * k + l) as f64, 0.))
-    //                 }
-    //             }
-    //         }
-    //     }
+        for elem in kernel_data_mat.iter_mut().take(26) {
+            // sibling index
+            for j in 0..8 {
+                // halo child index
+                for k in 0..8 {
+                    // frequency
+                    for l in 0..size_real {
+                        elem.push(Complex::new((1000 * j + 100 * k + l) as f64, 0.))
+                    }
+                }
+            }
+        }
 
-    //     // We want to use this data by frequency in the implementation of FFT M2L
-    //     // Rearrangement: Grouping by frequency, then halo child, then sibling
-    //     let mut rearranged = vec![Vec::new(); 26];
-    //     for i in 0..26 {
-    //         let current_vector = &kernel_data_mat[i];
-    //         for l in 0..size_real {
-    //             // halo child
-    //             for k in 0..8 {
-    //                 // sibling
-    //                 for j in 0..8 {
-    //                     let index = j * size_real * 8 + k * size_real + l;
-    //                     rearranged[i].push(current_vector[index]);
-    //                 }
-    //             }
-    //         }
-    //     }
+        // We want to use this data by frequency in the implementation of FFT M2L
+        // Rearrangement: Grouping by frequency, then halo child, then sibling
+        let mut rearranged = vec![Vec::new(); 26];
+        for i in 0..26 {
+            let current_vector = &kernel_data_mat[i];
+            for l in 0..size_real {
+                // halo child
+                for k in 0..8 {
+                    // sibling
+                    for j in 0..8 {
+                        let index = j * size_real * 8 + k * size_real + l;
+                        rearranged[i].push(current_vector[index]);
+                    }
+                }
+            }
+        }
 
-    //     // We expect the first 64 elements to correspond to the first frequency components of all
-    //     // siblings with all elements in a given halo position
-    //     let freq = 4;
-    //     let offset = freq * 64;
-    //     let result = &rearranged[0][offset..offset + 64];
+        // We expect the first 64 elements to correspond to the first frequency components of all
+        // siblings with all elements in a given halo position
+        let freq = 4;
+        let offset = freq * 64;
+        let result = &rearranged[0][offset..offset + 64];
 
-    //     // For each halo child
-    //     for i in 0..8 {
-    //         // for each sibling
-    //         for j in 0..8 {
-    //             let expected = (i * 100 + j * 1000 + freq) as f64;
-    //             assert!(expected == result[i * 8 + j].re)
-    //         }
-    //     }
-    // }
+        // For each halo child
+        for i in 0..8 {
+            // for each sibling
+            for j in 0..8 {
+                let expected = (i * 100 + j * 1000 + freq) as f64;
+                assert!(expected == result[i * 8 + j].re)
+            }
+        }
+    }
 
-    // #[test]
-    // fn test_fft_field_translation() {
-    //     let kernel = Laplace3dKernel::new();
-    //     let order: usize = 2;
+    #[test]
+    fn test_fft_field_translation() {
+        let kernel = Laplace3dKernel::new();
+        let order: usize = 2;
 
-    //     let domain = Domain {
-    //         origin: [0., 0., 0.],
-    //         diameter: [5., 5., 5.],
-    //     };
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [5., 5., 5.],
+        };
 
-    //     let alpha = 1.05;
+        let alpha = 1.05;
 
-    //     // Some expansion data
-    //     let ncoeffs = 6 * (order - 1).pow(2) + 2;
-    //     let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
+        // Some expansion data
+        let ncoeffs = 6 * (order - 1).pow(2) + 2;
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
-    //     for i in 0..ncoeffs {
-    //         *multipole.get_mut(i, 0).unwrap() = i as f64;
-    //     }
+        for i in 0..ncoeffs {
+            *multipole.get_mut(i, 0).unwrap() = i as f64;
+        }
 
-    //     // Create field translation object
-    //     let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
+        // Create field translation object
+        let fft: FftFieldTranslationKiFmm<Laplace3dKernel<f64>, f64, c64> =
+            FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
-    //     // Compute all M2L operators
-    //     // let m2l = fft.compute_m2l_operators(order, domain);
+        // Compute all M2L operators
 
-    //     // Pick a random source/target pair
-    //     let idx = 123;
-    //     let all_transfer_vectors = compute_transfer_vectors();
+        // Pick a random source/target pair
+        let idx = 123;
+        let all_transfer_vectors = compute_transfer_vectors();
 
-    //     let transfer_vector = &all_transfer_vectors[idx];
+        let transfer_vector = &all_transfer_vectors[idx];
 
-    //     // Compute FFT of the representative signal
-    //     let signal = fft.compute_signal(order, multipole.data());
-    //     let &(m, n, o) = signal.shape();
-    //     let p = m + 1;
-    //     let q = n + 1;
-    //     let r = o + 1;
-    //     let pad_size = (p - m, q - n, r - o);
-    //     let pad_index = (p - m, q - n, r - o);
-    //     let mut padded_signal = pad3(&signal, pad_size, pad_index);
-    //     let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        // Compute FFT of the representative signal
+        let signal = fft.compute_signal(order, multipole.data());
+        let &(m, n, o) = signal.shape();
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+        let pad_size = (p - m, q - n, r - o);
+        let pad_index = (p - m, q - n, r - o);
+        let mut padded_signal = pad3(&signal, pad_size, pad_index);
+        let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
 
-    //     rfft3_fftw(
-    //         padded_signal.get_data_mut(),
-    //         padded_signal_hat.get_data_mut(),
-    //         &[p, q, r],
-    //     );
+        rfft3_fftw::<f64, c64>(
+            padded_signal.get_data_mut(),
+            padded_signal_hat.get_data_mut(),
+            &[p, q, r],
+        );
 
-    //     let source_equivalent_surface = transfer_vector
-    //         .source
-    //         .compute_surface(&domain, order, fft.alpha);
-    //     let target_check_surface = transfer_vector
-    //         .target
-    //         .compute_surface(&domain, order, fft.alpha);
-    //     let ntargets = target_check_surface.len() / 3;
+        let source_equivalent_surface = transfer_vector
+            .source
+            .compute_surface(&domain, order, fft.alpha);
+        let target_check_surface = transfer_vector
+            .target
+            .compute_surface(&domain, order, fft.alpha);
+        let ntargets = target_check_surface.len() / 3;
 
-    //     // Compute conv grid
-    //     let conv_point_corner_index = 7;
-    //     let corners = find_corners(&source_equivalent_surface[..]);
-    //     let conv_point_corner = [
-    //         corners[conv_point_corner_index],
-    //         corners[8 + conv_point_corner_index],
-    //         corners[16 + conv_point_corner_index],
-    //     ];
+        // Compute conv grid
+        let conv_point_corner_index = 7;
+        let corners = find_corners(&source_equivalent_surface[..]);
+        let conv_point_corner = [
+            corners[conv_point_corner_index],
+            corners[8 + conv_point_corner_index],
+            corners[16 + conv_point_corner_index],
+        ];
 
-    //     let (conv_grid, _) = transfer_vector.source.convolution_grid(
-    //         order,
-    //         &domain,
-    //         fft.alpha,
-    //         &conv_point_corner,
-    //         conv_point_corner_index,
-    //     );
+        let (conv_grid, _) = transfer_vector.source.convolution_grid(
+            order,
+            &domain,
+            fft.alpha,
+            &conv_point_corner,
+            conv_point_corner_index,
+        );
 
-    //     let kernel_point_index = 0;
-    //     let kernel_point = [
-    //         target_check_surface[kernel_point_index],
-    //         target_check_surface[ntargets + kernel_point_index],
-    //         target_check_surface[2 * ntargets + kernel_point_index],
-    //     ];
+        let kernel_point_index = 0;
+        let kernel_point = [
+            target_check_surface[kernel_point_index],
+            target_check_surface[ntargets + kernel_point_index],
+            target_check_surface[2 * ntargets + kernel_point_index],
+        ];
 
-    //     // Compute kernel
-    //     let kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
-    //     let (m, n, o) = kernel.shape();
-    //     let p = m + 1;
-    //     let q = n + 1;
-    //     let r = o + 1;
+        // Compute kernel
+        let kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
+        let (m, n, o) = kernel.shape();
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
 
-    //     let padded_kernel = pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
-    //     let mut padded_kernel = flip3(&padded_kernel);
+        let padded_kernel = pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
+        let mut padded_kernel = flip3(&padded_kernel);
 
-    //     // Compute FFT of padded kernel
-    //     let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
-    //     rfft3_fftw(
-    //         padded_kernel.get_data_mut(),
-    //         padded_kernel_hat.get_data_mut(),
-    //         &[p, q, r],
-    //     );
+        // Compute FFT of padded kernel
+        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        rfft3_fftw::<f64, c64>(
+            padded_kernel.get_data_mut(),
+            padded_kernel_hat.get_data_mut(),
+            &[p, q, r],
+        );
 
-    //     // Compute convolution
-    //     let hadamard_product = padded_signal_hat
-    //         .get_data()
-    //         .iter()
-    //         .zip(padded_kernel_hat.get_data().iter())
-    //         .map(|(a, b)| a * b)
-    //         .collect_vec();
+        // Compute convolution
+        let hadamard_product = padded_signal_hat
+            .get_data()
+            .iter()
+            .zip(padded_kernel_hat.get_data().iter())
+            .map(|(a, b)| a * b)
+            .collect_vec();
 
-    //     let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
+        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
 
-    //     let mut potentials = Array3D::new((p, q, r));
-    //     irfft3_fftw(
-    //         hadamard_product.get_data_mut(),
-    //         potentials.get_data_mut(),
-    //         &[p, q, r],
-    //     );
+        let mut potentials = Array3D::new((p, q, r));
+        irfft3_fftw(
+            hadamard_product.get_data_mut(),
+            potentials.get_data_mut(),
+            &[p, q, r],
+        );
 
-    //     let (_, multi_indices) = MortonKey::surface_grid(order);
+        let (_, multi_indices) = MortonKey::surface_grid::<f64>(order);
 
-    //     let mut tmp = Vec::new();
-    //     let ntargets = multi_indices.len() / 3;
-    //     let xs = &multi_indices[0..ntargets];
-    //     let ys = &multi_indices[ntargets..2 * ntargets];
-    //     let zs = &multi_indices[2 * ntargets..];
+        let mut tmp = Vec::new();
+        let ntargets = multi_indices.len() / 3;
+        let xs = &multi_indices[0..ntargets];
+        let ys = &multi_indices[ntargets..2 * ntargets];
+        let zs = &multi_indices[2 * ntargets..];
 
-    //     for i in 0..ntargets {
-    //         let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
-    //         tmp.push(*val);
-    //     }
+        for i in 0..ntargets {
+            let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
+            tmp.push(*val);
+        }
 
-    //     // Get direct evaluations for testing
-    //     let mut direct = vec![0f64; ncoeffs];
-    //     fft.kernel.evaluate_st(
-    //         EvalType::Value,
-    //         &source_equivalent_surface[..],
-    //         &target_check_surface[..],
-    //         multipole.data(),
-    //         &mut direct[..],
-    //     );
+        // Get direct evaluations for testing
+        let mut direct = vec![0f64; ncoeffs];
+        fft.kernel.evaluate_st(
+            EvalType::Value,
+            &source_equivalent_surface[..],
+            &target_check_surface[..],
+            multipole.data(),
+            &mut direct[..],
+        );
 
-    //     let abs_error: f64 = tmp
-    //         .iter()
-    //         .zip(direct.iter())
-    //         .map(|(a, b)| (a - b).abs())
-    //         .sum();
-    //     let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        let abs_error: f64 = tmp
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-    //     assert!(rel_error < 1e-15);
-    // }
+        assert!(rel_error < 1e-15);
+    }
 }

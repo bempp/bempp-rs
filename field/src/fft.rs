@@ -3,7 +3,6 @@ use std::any::{Any, TypeId};
 
 use cauchy::Scalar;
 use fftw::{plan::*, types::*};
-use num::Float;
 use rayon::prelude::*;
 
 use rlst::dense::{

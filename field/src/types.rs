@@ -1,8 +1,6 @@
 //! Types for storing field translation data.
 use std::collections::HashMap;
 
-use cauchy::{c64, Scalar};
-
 use num::Float;
 use rlst::{
     common::traits::{Eval, NewLikeSelf},
@@ -13,6 +11,7 @@ use rlst::{
 };
 
 use bempp_traits::kernel::Kernel;
+use bempp_traits::types::Scalar;
 use bempp_tree::types::morton::MortonKey;
 
 /// Simple type alias for a 2D `Matrix<f64>`
