@@ -1,5 +1,9 @@
 //! Wrappers for FFTW functions, including multithreaded implementations.
+use std::any::{Any, TypeId};
+
+use cauchy::Scalar;
 use fftw::{plan::*, types::*};
+use num::Float;
 use rayon::prelude::*;
 
 use rlst::dense::{
@@ -18,10 +22,44 @@ pub type FftMatrixc64 = Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynami
 /// * `input` - Input slice of real data, corresponding to a 3D array stored in column major order.
 /// * `output` - Output slice.
 /// * `shape` - Shape of input data.
-pub fn rfft3_fftw(input: &mut [f64], output: &mut [c64], shape: &[usize]) {
+pub fn rfft3_fftw64(input: &mut [f64], output: &mut [c64], shape: &[usize]) {
     assert!(shape.len() == 3);
     let plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
     let _ = plan.r2c(input, output);
+}
+
+/// Compute a Real FFT of an input slice corresponding to a 3D array stored in column major format, specified by `shape` using the FFTW library.
+///
+/// # Arguments
+/// * `input` - Input slice of real data, corresponding to a 3D array stored in column major order.
+/// * `output` - Output slice.
+/// * `shape` - Shape of input data.
+pub fn rfft3_fftw32(input: &mut [f32], output: &mut [c32], shape: &[usize]) {
+    assert!(shape.len() == 3);
+    let plan: R2CPlan32 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+    let _ = plan.r2c(input, output);
+}
+
+pub fn rfft3_fftw<R, C>(input: &mut [R::Real], output: &mut [C::Complex], shape: &[usize])
+where
+    R: Default + Scalar<Real = R> + Any,
+    C: Default + Scalar<Complex = C> + Any,
+{
+    if TypeId::of::<R>() == TypeId::of::<f32>() && TypeId::of::<C>() == TypeId::of::<c32>() {
+        let input_f32 =
+            unsafe { std::slice::from_raw_parts_mut(input.as_mut_ptr() as *mut f32, input.len()) };
+        let output_c32 = unsafe {
+            std::slice::from_raw_parts_mut(output.as_mut_ptr() as *mut c32, output.len())
+        };
+        rfft3_fftw32(input_f32, output_c32, shape);
+    } else if TypeId::of::<R>() == TypeId::of::<f64>() && TypeId::of::<C>() == TypeId::of::<c64>() {
+        let input_f64 =
+            unsafe { std::slice::from_raw_parts_mut(input.as_mut_ptr() as *mut f64, input.len()) };
+        let output_c64 = unsafe {
+            std::slice::from_raw_parts_mut(output.as_mut_ptr() as *mut c64, output.len())
+        };
+        rfft3_fftw64(input_f64, output_c64, shape);
+    }
 }
 
 /// Compute an inverse Real FFT of an input slice corresponding to the FFT of a 3D array stored in column major format, specified by `shape` using the FFTW library.
