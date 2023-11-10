@@ -11,7 +11,10 @@ use crate::types::{
 
 /// Local Trees (non-distributed).
 #[derive(Debug)]
-pub struct SingleNodeTree<T: Float + Default> {
+pub struct SingleNodeTree<T>
+where
+    T: Float + Default,
+{
     /// Depth of a tree.
     pub depth: u64,
 

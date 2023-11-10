@@ -23,14 +23,14 @@ pub type SvdM2lEntry<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, 
 pub type FftKernelData<C> = Vec<Vec<C>>;
 
 /// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
-pub struct FftFieldTranslationKiFmm<K, R, C>
+pub struct FftFieldTranslationKiFmm<T, U, V>
 where
-    R: Default + Scalar<Real = R> + Float,
-    C: Default + Scalar<Complex = C>,
-    K: Kernel + Default,
+    T: Default + Scalar<Real = T> + Float,
+    U: Default + Scalar<Complex = U>,
+    V: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by
-    pub alpha: R,
+    pub alpha: T,
 
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: HashMap<usize, usize>,
@@ -39,20 +39,20 @@ where
     pub conv_to_surf_map: HashMap<usize, usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
-    pub operator_data: FftM2lOperatorData<C>,
+    pub operator_data: FftM2lOperatorData<U>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector>,
 
     /// The associated kernel with this translation operator.
-    pub kernel: K,
+    pub kernel: V,
 }
 
 /// A type to store the M2L field translation meta-data  and datafor an SVD based sparsification in the kernel independent FMM.
-pub struct SvdFieldTranslationKiFmm<K, T>
+pub struct SvdFieldTranslationKiFmm<T, U>
 where
     T: Scalar + Float + Default,
-    K: Kernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by when computing operator.
     pub alpha: T,
@@ -67,7 +67,7 @@ where
     pub transfer_vectors: Vec<TransferVector>,
 
     /// The associated kernel with this translation operator.
-    pub kernel: K,
+    pub kernel: U,
 }
 
 /// A type to store a transfer vector between a `source` and `target` Morton key.

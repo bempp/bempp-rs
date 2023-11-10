@@ -35,7 +35,7 @@ use crate::{
     },
 };
 
-impl<K, T> FieldTranslationData<K> for SvdFieldTranslationKiFmm<K, T>
+impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
 where
     T: Float
         + Default
@@ -50,7 +50,7 @@ where
         >,
     DenseMatrixLinAlgBuilder<T>: Svd,
     T: Scalar<Real = <DenseMatrixLinAlgBuilder<T> as Svd>::T>,
-    K: Kernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
 {
     type TransferVector = Vec<TransferVector>;
     type M2LOperators = SvdM2lOperatorData<T>;
@@ -163,7 +163,7 @@ where
     }
 }
 
-impl<K, T> SvdFieldTranslationKiFmm<K, T>
+impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
     T: Float
         + Default
@@ -178,7 +178,7 @@ where
         >,
     DenseMatrixLinAlgBuilder<T>: Svd,
     T: Scalar<Real = <DenseMatrixLinAlgBuilder<T> as Svd>::T>,
-    K: Kernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
     ///
@@ -188,7 +188,7 @@ where
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: K, k: Option<usize>, order: usize, domain: Domain<T>, alpha: T) -> Self {
+    pub fn new(kernel: U, k: Option<usize>, order: usize, domain: Domain<T>, alpha: T) -> Self {
         let mut result = SvdFieldTranslationKiFmm {
             alpha,
             k: 0,
@@ -216,15 +216,15 @@ where
     }
 }
 
-impl<K, R, C> FieldTranslationData<K> for FftFieldTranslationKiFmm<K, R, C>
+impl<T, U, V> FieldTranslationData<V> for FftFieldTranslationKiFmm<T, U, V>
 where
-    R: Scalar<Real = R> + Float + Default,
-    C: Scalar<Complex = C> + Default,
-    K: Kernel<T = R> + Default,
+    T: Scalar<Real = T> + Float + Default,
+    U: Scalar<Complex = U> + Default,
+    V: Kernel<T = T> + Default,
 {
-    type Domain = Domain<R>;
+    type Domain = Domain<T>;
 
-    type M2LOperators = FftM2lOperatorData<C>;
+    type M2LOperators = FftM2lOperatorData<U>;
 
     type TransferVector = Vec<TransferVector>;
 
@@ -238,7 +238,7 @@ where
         let nconvolutions = nsiblings * nsiblings; // Number of convolutions computed for each node
 
         // Pick a point in the middle of the domain
-        let two = R::from(2.0).unwrap();
+        let two = T::from(2.0).unwrap();
         let midway = domain.diameter.iter().map(|d| *d / two).collect_vec();
         let point = midway
             .iter()
@@ -344,8 +344,8 @@ where
                     let mut padded_kernel = flip3(&padded_kernel);
 
                     // Compute FFT of padded kernel
-                    let mut padded_kernel_hat = Array3D::<C>::new((p, p, p / 2 + 1));
-                    rfft3_fftw::<R, C>(
+                    let mut padded_kernel_hat = Array3D::<U>::new((p, p, p / 2 + 1));
+                    rfft3_fftw::<T, U>(
                         padded_kernel.get_data_mut(),
                         padded_kernel_hat.get_data_mut(),
                         &[p, p, p],
@@ -356,14 +356,14 @@ where
                     // Fill with zeros when interaction doesn't exist
                     let n = 2 * order - 1;
                     let p = n + 1;
-                    let padded_kernel_hat_zeros = Array3D::<C>::new((p, p, p / 2 + 1));
+                    let padded_kernel_hat_zeros = Array3D::<U>::new((p, p, p / 2 + 1));
                     kernel_data_vec[i].push(padded_kernel_hat_zeros);
                 }
             }
         }
 
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
-        let mut kernel_data = vec![vec![C::zero(); nconvolutions * size_real]; halo_children.len()];
+        let mut kernel_data = vec![vec![U::zero(); nconvolutions * size_real]; halo_children.len()];
 
         // For each halo position
         for i in 0..halo_children.len() {
@@ -403,11 +403,11 @@ where
     }
 }
 
-impl<K, R, C> FftFieldTranslationKiFmm<K, R, C>
+impl<T, U, V> FftFieldTranslationKiFmm<T, U, V>
 where
-    R: Float + Scalar<Real = R> + Default,
-    C: Scalar<Complex = C> + Default,
-    K: Kernel<T = R> + Default,
+    T: Float + Scalar<Real = T> + Default,
+    U: Scalar<Complex = U> + Default,
+    V: Kernel<T = T> + Default,
 {
     /// Constructor for FFT field translation struct for the kernel independent FMM (KiFMM).
     ///
@@ -416,7 +416,7 @@ where
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: K, order: usize, domain: Domain<R>, alpha: R) -> Self {
+    pub fn new(kernel: V, order: usize, domain: Domain<T>, alpha: T) -> Self {
         let mut result = FftFieldTranslationKiFmm {
             alpha,
             kernel,
@@ -428,7 +428,7 @@ where
 
         // Create maps between surface and convolution grids
         let (surf_to_conv, conv_to_surf) =
-            FftFieldTranslationKiFmm::<K, R, C>::compute_surf_to_conv_map(order);
+            FftFieldTranslationKiFmm::<T, U, V>::compute_surf_to_conv_map(order);
 
         result.surf_to_conv_map = surf_to_conv;
         result.conv_to_surf_map = conv_to_surf;
@@ -488,14 +488,14 @@ where
     pub fn compute_kernel(
         &self,
         order: usize,
-        convolution_grid: &[R],
-        target_pt: [R; 3],
-    ) -> Array3D<R> {
+        convolution_grid: &[T],
+        target_pt: [T; 3],
+    ) -> Array3D<T> {
         let n = 2 * order - 1;
-        let mut result = Array3D::<R>::new((n, n, n));
+        let mut result = Array3D::<T>::new((n, n, n));
         let nconv = n.pow(3);
 
-        let mut kernel_evals = vec![R::zero(); nconv];
+        let mut kernel_evals = vec![T::zero(); nconv];
 
         self.kernel.assemble_st(
             EvalType::Value,
@@ -514,12 +514,12 @@ where
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `charges` - A vector of charges.
-    pub fn compute_signal(&self, order: usize, charges: &[R]) -> Array3D<R> {
+    pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
         let n = 2 * order - 1;
         let n_tot = n * n * n;
         let mut result = Array3D::new((n, n, n));
 
-        let mut tmp = vec![R::zero(); n_tot];
+        let mut tmp = vec![T::zero(); n_tot];
 
         for k in 0..n {
             for j in 0..n {
@@ -528,7 +528,7 @@ where
                     if let Some(surf_index) = self.conv_to_surf_map.get(&conv_index) {
                         tmp[conv_index] = charges[*surf_index];
                     } else {
-                        tmp[conv_index] = R::zero();
+                        tmp[conv_index] = T::zero();
                     }
                 }
             }
@@ -603,8 +603,7 @@ mod test {
         };
         let alpha = 1.05;
 
-        let fft: FftFieldTranslationKiFmm<Laplace3dKernel<f32>, f32, c32> =
-            FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
+        let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Create a random point in the middle of the domain
         let m2l: FftM2lOperatorData<c32> = fft.compute_m2l_operators(order, domain);
@@ -728,7 +727,7 @@ mod test {
 
         let level = 2;
         // Create field translation object
-        let fft: FftFieldTranslationKiFmm<Laplace3dKernel<f64>, f64, c64> =
+        let fft: FftFieldTranslationKiFmm<f64, c64, Laplace3dKernel<f64>> =
             FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         let kernels = &fft.operator_data.kernel_data;
@@ -892,7 +891,7 @@ mod test {
         }
 
         // Create field translation object
-        let fft: FftFieldTranslationKiFmm<Laplace3dKernel<f64>, f64, c64> =
+        let fft: FftFieldTranslationKiFmm<f64, c64, Laplace3dKernel<f64>> =
             FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Compute all M2L operators

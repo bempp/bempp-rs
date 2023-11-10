@@ -1,5 +1,7 @@
 //! Implementation of constructors for FMMs as well as the implementation of FmmData, Fmm traits.
+use cauchy::Scalar;
 use itertools::Itertools;
+use num::Float;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -24,10 +26,11 @@ use crate::pinv::pinv;
 use crate::types::{C2EType, ChargeDict, FmmData, KiFmm};
 
 /// Implementation of constructor for single node KiFMM
-impl<'a, T, U> KiFmm<SingleNodeTree, T, U>
+impl<'a, K, R, F> KiFmm<SingleNodeTree<R>, K, F>
 where
-    T: Kernel<T = f64> + KernelScale<T = f64>,
-    U: FieldTranslationData<T>,
+    K: Kernel<T = R> + KernelScale<T = R>,
+    R: Scalar + Default + Float,
+    F: FieldTranslationData<K>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
     /// the associated single node octree, and the associated kernel function.
@@ -43,9 +46,9 @@ where
         order: usize,
         alpha_inner: f64,
         alpha_outer: f64,
-        kernel: T,
-        tree: SingleNodeTree,
-        m2l: U,
+        kernel: K,
+        tree: SingleNodeTree<R>,
+        m2l: F,
     ) -> Self {
         let upward_equivalent_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
         let upward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
@@ -177,17 +180,18 @@ where
 }
 
 /// Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U> FmmData<KiFmm<SingleNodeTree, T, U>>
+impl<K, F, R> FmmData<KiFmm<SingleNodeTree<R>, K, F>>
 where
-    T: Kernel,
-    U: FieldTranslationData<T>,
+    K: Kernel,
+    F: FieldTranslationData<K>,
+    R: Float + Scalar + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
     ///
     /// # Arguments
     /// `fmm` - A single node KiFMM object.
     /// `global_charges` - The charge data associated to the point data via unique global indices.
-    pub fn new(fmm: KiFmm<SingleNodeTree, T, U>, global_charges: &ChargeDict) -> Self {
+    pub fn new(fmm: KiFmm<SingleNodeTree<R>, K, F>, global_charges: &ChargeDict) -> Self {
         let mut multipoles = HashMap::new();
         let mut locals = HashMap::new();
         let mut potentials = HashMap::new();
