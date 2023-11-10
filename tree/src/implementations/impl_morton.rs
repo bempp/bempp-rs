@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-use bempp_traits::tree::MortonKeyInterface;
+use bempp_traits::{tree::MortonKeyInterface, types::Scalar};
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 /// Returns an owned vector of Morton Keys, hence requires a copy.
@@ -909,29 +909,32 @@ impl MortonKey {
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn scale_surface<T: Float + Default>(
+    pub fn scale_surface<T: Float + Default + Scalar>(
         &self,
-        surface: Vec<T>,
+        surface: Vec<T::Real>,
         domain: &Domain<T>,
         alpha: T,
-    ) -> Vec<T> {
+    ) -> Vec<T::Real> {
         let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
         let dilated_diameter = scaled_diameter.map(|d| d * alpha);
 
-        let mut scaled_surface = vec![T::zero(); surface.len()];
+        let mut scaled_surface = vec![T::real(0.); surface.len()];
 
         let centre = self.centre(domain);
 
         let two = T::from(2.0).unwrap();
         let ncoeffs = surface.len() / 3;
         for i in 0..ncoeffs {
-            scaled_surface[i] = (surface[i] * (dilated_diameter[0] / two)) + centre[0];
-            scaled_surface[(dim - 2) * ncoeffs + i] =
-                (surface[(dim - 2) * ncoeffs + i] * (dilated_diameter[1] / two)) + centre[1];
-            scaled_surface[(dim - 1) * ncoeffs + i] =
-                (surface[(dim - 1) * ncoeffs + i] * (dilated_diameter[2] / two)) + centre[2];
+            scaled_surface[i] =
+                (surface[i] * T::real(dilated_diameter[0] / two)) + T::real(centre[0]);
+            scaled_surface[(dim - 2) * ncoeffs + i] = (surface[(dim - 2) * ncoeffs + i]
+                * T::real(dilated_diameter[1] / two))
+                + T::real(centre[1]);
+            scaled_surface[(dim - 1) * ncoeffs + i] = (surface[(dim - 1) * ncoeffs + i]
+                * T::real(dilated_diameter[2] / two))
+                + T::real(centre[2]);
         }
 
         scaled_surface
@@ -944,9 +947,9 @@ impl MortonKey {
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `order` - The expansion order being used in the FMM simulation.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn compute_surface<T>(&self, domain: &Domain<T>, order: usize, alpha: T) -> Vec<T>
+    pub fn compute_surface<T>(&self, domain: &Domain<T>, order: usize, alpha: T) -> Vec<T::Real>
     where
-        T: Float + std::ops::MulAssign + std::ops::SubAssign + Default,
+        T: Float + std::ops::MulAssign + std::ops::SubAssign + Default + Scalar,
     {
         let (surface, _) = MortonKey::surface_grid(order);
 
