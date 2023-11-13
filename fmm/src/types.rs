@@ -96,11 +96,3 @@ where
     /// The M2L operator matrices, as well as metadata associated with this FMM.
     pub m2l: V,
 }
-
-pub trait SameType {
-    type Other;
-}
-
-impl<T> SameType for T {
-    type Other = T;
-}
