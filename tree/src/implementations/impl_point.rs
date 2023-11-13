@@ -2,36 +2,53 @@
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
+use bempp_traits::types::Scalar;
+
 use crate::types::point::{Point, Points};
 
-impl<T> PartialEq for Point<T> {
+impl<T> PartialEq for Point<T>
+where
+    T: Scalar<Real = T>,
+{
     fn eq(&self, other: &Self) -> bool {
         self.encoded_key == other.encoded_key
     }
 }
 
-impl<T> Eq for Point<T> {}
+impl<T> Eq for Point<T> where T: Scalar<Real = T> {}
 
-impl<T> Ord for Point<T> {
+impl<T> Ord for Point<T>
+where
+    T: Scalar<Real = T>,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         self.encoded_key.cmp(&other.encoded_key)
     }
 }
 
-impl<T> PartialOrd for Point<T> {
+impl<T> PartialOrd for Point<T>
+where
+    T: Scalar<Real = T>,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // less_than(&self.morton, &other.morton)
         Some(self.encoded_key.cmp(&other.encoded_key))
     }
 }
 
-impl<T> Hash for Point<T> {
+impl<T> Hash for Point<T>
+where
+    T: Scalar<Real = T>,
+{
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.encoded_key.hash(state);
     }
 }
 
-impl<T> Points<T> {
+impl<T> Points<T>
+where
+    T: Scalar<Real = T>,
+{
     pub fn new() -> Points<T> {
         Points {
             points: Vec::new(),

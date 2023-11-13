@@ -18,7 +18,10 @@ use num::traits::Float;
 
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
-fn test_no_overlaps<T: Float + Default>(world: &UserCommunicator, tree: &MultiNodeTree<T>) {
+fn test_no_overlaps<T: Float + Default + Scalar<Real = T>>(
+    world: &UserCommunicator,
+    tree: &MultiNodeTree<T>,
+) {
     // Communicate bounds from each process
     let max = tree.leaves.iter().max().unwrap();
     let min = tree.leaves.iter().min().unwrap();

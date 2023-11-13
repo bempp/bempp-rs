@@ -1,5 +1,5 @@
 //! Types for storing field translation data.
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
 use num::Float;
 use rlst::{
@@ -51,7 +51,7 @@ where
 /// A type to store the M2L field translation meta-data  and datafor an SVD based sparsification in the kernel independent FMM.
 pub struct SvdFieldTranslationKiFmm<T, U>
 where
-    T: Scalar + Float + Default,
+    T: Scalar<Real = T> + Float + Default,
     U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by when computing operator.

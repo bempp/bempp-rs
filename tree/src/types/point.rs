@@ -1,4 +1,6 @@
 //! Data structures for Cartesian Points in 3D.
+use bempp_traits::types::Scalar;
+
 use crate::types::morton::MortonKey;
 
 pub type PointType<T> = T;
@@ -9,7 +11,10 @@ pub type PointType<T> = T;
 /// specifiying its encoding at a given level of discretization. Points also have associated data
 #[repr(C)]
 #[derive(Clone, Debug, Default, Copy)]
-pub struct Point<T> {
+pub struct Point<T>
+where
+    T: Scalar<Real = T>,
+{
     /// Physical coordinate in Cartesian space.
     pub coordinate: [PointType<T>; 3],
 
@@ -26,7 +31,10 @@ pub struct Point<T> {
 /// Vector of **Points**.
 /// Container of **Points**.
 #[derive(Clone, Debug, Default)]
-pub struct Points<T> {
+pub struct Points<T>
+where
+    T: Scalar<Real = T>,
+{
     /// A vector of Points
     pub points: Vec<Point<T>>,
 

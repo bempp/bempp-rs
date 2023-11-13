@@ -1,6 +1,6 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use num::{Float, Zero};
-use rlst::algorithms::linalg::LinAlg;
+use rlst::algorithms::linalg::{DenseMatrixLinAlgBuilder, LinAlg};
 use rlst::algorithms::traits::svd::{Mode, Svd};
 use rlst::dense::{
     base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, Dynamic, Shape,
@@ -10,13 +10,11 @@ use rlst::common::traits::{Eval, Transpose};
 use rlst::common::types::{RlstError, RlstResult, Scalar};
 use rlst::dense::MatrixD;
 
-pub type PinvMatrix = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
+pub type PinvMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
 
-type PinvReturnType<T> = RlstResult<(
-    Vec<<T as Scalar>::Real>,
-    MatrixD<<T as Scalar>::Real>,
-    MatrixD<<T as Scalar>::Real>,
-)>;
+type PinvReturnType<T> = RlstResult<(Vec<<T as Scalar>::Real>, MatrixD<T>, MatrixD<T>)>;
+
+pub type SvdScalar<T> = <DenseMatrixLinAlgBuilder<T> as Svd>::T;
 
 /// Compute the (Moore-Penrose) pseudo-inverse of a matrix.
 ///
@@ -28,11 +26,17 @@ type PinvReturnType<T> = RlstResult<(
 /// * `mat` - (M, N) matrix to be inverted.
 /// * `atol` - Absolute threshold term, default is 0.
 /// * `rtol` - Relative threshold term, default value is max(M, N) * eps
-pub fn pinv<T: Scalar<Real = f64> + Float>(
-    mat: &PinvMatrix,
+pub fn pinv<T>(
+    mat: &PinvMatrix<T>,
     atol: Option<T::Real>,
     rtol: Option<T::Real>,
-) -> PinvReturnType<T> {
+) -> PinvReturnType<SvdScalar<T>>
+where
+    DenseMatrixLinAlgBuilder<T>: Svd,
+    SvdScalar<T>: PartialOrd,
+    SvdScalar<T>: Scalar + Float,
+    T: Scalar + Float,
+{
     let shape = mat.shape();
 
     if shape.0 == 0 || shape.1 == 0 {
@@ -57,14 +61,15 @@ pub fn pinv<T: Scalar<Real = f64> + Float>(
         let atol = atol.unwrap_or(T::Real::zero());
         let rtol = rtol.unwrap_or(max_dim * eps);
 
-        let max_s = T::real(s[0]);
-        let threshold = atol + rtol * max_s;
+        let max_s = s[0];
+        let threshold = SvdScalar::<T>::real(atol + rtol) * SvdScalar::<T>::real(max_s);
+
         // Filter singular values below this threshold
         for s in s.iter_mut() {
             if *s > threshold {
-                *s = T::real(1.0) / *s;
+                *s = SvdScalar::<T>::real(1.0) / SvdScalar::<T>::real(*s);
             } else {
-                *s = T::real(0.)
+                *s = SvdScalar::<T>::real(0.)
             }
         }
 

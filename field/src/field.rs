@@ -49,7 +49,7 @@ where
             Dynamic,
         >,
     DenseMatrixLinAlgBuilder<T>: Svd,
-    T: Scalar<Real = <DenseMatrixLinAlgBuilder<T> as Svd>::T>,
+    T: Scalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     type TransferVector = Vec<TransferVector>;
@@ -177,7 +177,7 @@ where
             Dynamic,
         >,
     DenseMatrixLinAlgBuilder<T>: Svd,
-    T: Scalar<Real = <DenseMatrixLinAlgBuilder<T> as Svd>::T>,
+    T: Scalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).

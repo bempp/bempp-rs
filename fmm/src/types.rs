@@ -33,7 +33,7 @@ pub type C2EType<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dyna
 pub struct FmmData<T, U>
 where
     T: Fmm,
-    U: Scalar + Float + Default,
+    U: Scalar<Real = U> + Float + Default,
 {
     /// The associated FMM object, which implements an FMM interface
     pub fmm: Arc<T>,
@@ -76,10 +76,10 @@ where
     pub dc2e_inv_2: C2EType<W>,
 
     /// The ratio of the inner check surface diamater in comparison to the surface discretising a box.
-    pub alpha_inner: f64,
+    pub alpha_inner: W,
 
     /// The ratio of the outer check surface diamater in comparison to the surface discretising a box.
-    pub alpha_outer: f64,
+    pub alpha_outer: W,
 
     /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
     pub m2m: Vec<C2EType<W>>,
@@ -95,4 +95,12 @@ where
 
     /// The M2L operator matrices, as well as metadata associated with this FMM.
     pub m2l: V,
+}
+
+pub trait SameType {
+    type Other;
+}
+
+impl<T> SameType for T {
+    type Other = T;
 }
