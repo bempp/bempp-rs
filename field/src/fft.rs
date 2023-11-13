@@ -3,7 +3,7 @@ use fftw::{plan::*, types::*};
 use num::Complex;
 use rayon::prelude::*;
 
-use crate::types::{FftMatrix, FftMatrixc32, FftMatrixc64, FftMatrixf32, FftMatrixf64};
+use crate::types::{FftMatrixc32, FftMatrixc64, FftMatrixf32, FftMatrixf64};
 use rlst::dense::RawAccessMut;
 
 pub trait Fft<DtypeReal, DtypeCplx>
