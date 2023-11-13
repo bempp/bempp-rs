@@ -1,7 +1,10 @@
 //! Data structures to create distributed octrees with MPI.
+use bempp_traits::types::Scalar;
 use mpi::topology::UserCommunicator;
 
 use std::collections::{HashMap, HashSet};
+
+use num::traits::Float;
 
 use crate::types::{
     domain::Domain,
@@ -10,7 +13,10 @@ use crate::types::{
 };
 
 /// Concrete distributed multi-node tree.
-pub struct MultiNodeTree {
+pub struct MultiNodeTree<T>
+where
+    T: Default + Float + Scalar<Real = T>,
+{
     /// Global communicator for this Tree
     pub world: UserCommunicator,
 
@@ -18,10 +24,10 @@ pub struct MultiNodeTree {
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain,
+    pub domain: Domain<T>,
 
     ///  A vector of Cartesian points.
-    pub points: Points,
+    pub points: Points<T>,
 
     /// The leaves that span the tree.
     pub leaves: MortonKeys,

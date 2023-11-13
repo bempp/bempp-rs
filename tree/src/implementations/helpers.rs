@@ -3,6 +3,8 @@
 
 use std::collections::HashMap;
 
+use bempp_traits::types::Scalar;
+use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
@@ -11,7 +13,7 @@ use rlst::dense::{base_matrix::BaseMatrix, rlst_dynamic_mat, Dynamic, Matrix, Ve
 use crate::types::morton::MortonKey;
 
 /// Alias for an rlst container for point data.
-pub type PointsMat = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
+pub type PointsMat<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
 
 /// Points fixture for testing, uniformly samples in each axis from min to max.
 ///
@@ -19,7 +21,11 @@ pub type PointsMat = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>,
 /// * `npoints` - The number of points to sample.
 /// # `min` - The minumum coordinate value along each axis.
 /// # `max` - The maximum coordinate value along each axis.
-pub fn points_fixture(npoints: usize, min: Option<f64>, max: Option<f64>) -> PointsMat {
+pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUniform>(
+    npoints: usize,
+    min: Option<T>,
+    max: Option<T>,
+) -> PointsMat<T> {
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
 
@@ -27,10 +33,10 @@ pub fn points_fixture(npoints: usize, min: Option<f64>, max: Option<f64>) -> Poi
     if let (Some(min), Some(max)) = (min, max) {
         between = rand::distributions::Uniform::from(min..max);
     } else {
-        between = rand::distributions::Uniform::from(0.0_f64..1.0_f64);
+        between = rand::distributions::Uniform::from(T::zero()..T::one());
     }
 
-    let mut points = rlst_dynamic_mat![f64, (npoints, 3)];
+    let mut points = rlst_dynamic_mat![T, (npoints, 3)];
 
     for i in 0..npoints {
         points[[i, 0]] = between.sample(&mut range);
@@ -46,14 +52,16 @@ pub fn points_fixture(npoints: usize, min: Option<f64>, max: Option<f64>) -> Poi
 ///
 /// # Arguments
 /// * `npoints` - The number of points to sample.
-pub fn points_fixture_col(npoints: usize) -> PointsMat {
+pub fn points_fixture_col<T: Float + Scalar + rand::distributions::uniform::SampleUniform>(
+    npoints: usize,
+) -> PointsMat<T> {
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
 
-    let between1 = rand::distributions::Uniform::from(0f64..0.1f64);
-    let between2 = rand::distributions::Uniform::from(0f64..500f64);
+    let between1 = rand::distributions::Uniform::from(T::zero()..T::from(0.1).unwrap());
+    let between2 = rand::distributions::Uniform::from(T::zero()..T::from(500).unwrap());
 
-    let mut points = rlst_dynamic_mat![f64, (npoints, 3)];
+    let mut points = rlst_dynamic_mat![T, (npoints, 3)];
 
     for i in 0..npoints {
         // One axis has a different sampling
@@ -70,7 +78,7 @@ pub fn points_fixture_col(npoints: usize) -> PointsMat {
 ///
 /// # Arguements:
 /// * `coordinates` - points on the surface of a box.
-pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
+pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
     let n = coordinates.len() / 3;
 
     let xs = coordinates.iter().take(n);
@@ -121,8 +129,11 @@ pub fn find_corners(coordinates: &[f64]) -> Vec<f64> {
 ///
 /// # Arguments
 /// * `order` - the order of expansions used in constructing the surface grid
-pub fn map_corners_to_surface(order: usize) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
-    let (_, surface_multindex) = MortonKey::surface_grid(order);
+pub fn map_corners_to_surface<T>(order: usize) -> (HashMap<usize, usize>, HashMap<usize, usize>)
+where
+    T: Float + std::ops::SubAssign + std::ops::MulAssign,
+{
+    let (_, surface_multindex) = MortonKey::surface_grid::<T>(order);
 
     let nsurf = surface_multindex.len() / 3;
     let ncorners = 8;
@@ -189,10 +200,10 @@ mod test {
     #[test]
     fn test_find_corners() {
         let order = 5;
-        let (grid_1, _) = MortonKey::surface_grid(order);
+        let (grid_1, _) = MortonKey::surface_grid::<f64>(order);
 
         let order = 2;
-        let (grid_2, _) = MortonKey::surface_grid(order);
+        let (grid_2, _) = MortonKey::surface_grid::<f64>(order);
 
         let corners_1 = find_corners(&grid_1);
         let corners_2 = find_corners(&grid_2);

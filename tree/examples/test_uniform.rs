@@ -5,6 +5,9 @@
 use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 use bempp_traits::tree::Tree;
+use bempp_traits::types::Scalar;
+
+use rand::distributions::uniform::SampleUniform;
 
 #[cfg(feature = "mpi")]
 use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
@@ -12,9 +15,14 @@ use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNode
 use bempp_tree::implementations::helpers::points_fixture;
 use rlst::dense::RawAccess;
 
+use num::traits::Float;
+
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
-fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
+fn test_no_overlaps<T: Float + Default + Scalar<Real = T>>(
+    world: &UserCommunicator,
+    tree: &MultiNodeTree<T>,
+) {
     // Communicate bounds from each process
     let max = tree.get_all_leaves_set().iter().max().unwrap();
     let min = tree.get_all_leaves_set().iter().min().unwrap();
@@ -48,9 +56,11 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 
 /// Test that the globally defined domain contains all the points at a given node.
 #[cfg(feature = "mpi")]
-fn test_global_bounds(world: &UserCommunicator) {
+fn test_global_bounds<T: Scalar + Float + Default + Equivalence + SampleUniform>(
+    world: &UserCommunicator,
+) {
     let npoints = 10000;
-    let points = points_fixture(npoints, None, None);
+    let points = points_fixture::<T>(npoints, None, None);
 
     let comm = world.duplicate();
 
@@ -82,13 +92,13 @@ fn main() {
     let n_points = 10000;
 
     // Generate some random test data local to each process
-    let points = points_fixture(n_points, None, None);
+    let points = points_fixture::<f32>(n_points, None, None);
     let global_idxs: Vec<_> = (0..n_points).collect();
 
     // Create a uniform tree
     let tree = MultiNodeTree::new(&comm, points.data(), adaptive, None, depth, k, &global_idxs);
 
-    test_global_bounds(&comm);
+    test_global_bounds::<f32>(&comm);
     if world.rank() == 0 {
         println!("\t ... test_global_bounds passed on uniform tree");
     }

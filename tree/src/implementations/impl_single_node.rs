@@ -1,8 +1,9 @@
 //! Implementation of constructors for single node trees.
 use itertools::Itertools;
+use num::Float;
 use std::collections::{HashMap, HashSet};
 
-use bempp_traits::tree::Tree;
+use bempp_traits::{tree::Tree, types::Scalar};
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -15,7 +16,10 @@ use crate::{
     },
 };
 
-impl SingleNodeTree {
+impl<T> SingleNodeTree<T>
+where
+    T: Float + Default + Scalar<Real = T>,
+{
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     /// Returns a SingleNodeTree, with the leaves in sorted order.
     ///
@@ -25,11 +29,11 @@ impl SingleNodeTree {
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     pub fn uniform_tree(
-        points: &[PointType],
-        domain: &Domain,
+        points: &[PointType<T>],
+        domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
-    ) -> SingleNodeTree {
+    ) -> SingleNodeTree<T> {
         // Encode points at deepest level, and map to specified depth
 
         // TODO: Automatically infer dimension
@@ -154,11 +158,11 @@ impl SingleNodeTree {
     /// * `n_crit` - The maximum number of points per leaf node.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     pub fn adaptive_tree(
-        points: &[PointType],
-        domain: &Domain,
+        points: &[PointType<T>],
+        domain: &Domain<T>,
         n_crit: u64,
         global_idxs: &[usize],
-    ) -> SingleNodeTree {
+    ) -> SingleNodeTree<T> {
         // Encode points at deepest level
         let dim = 3;
         let npoints = points.len() / dim;
@@ -188,10 +192,10 @@ impl SingleNodeTree {
         complete.complete();
 
         // Find seeds (coarsest node(s))
-        let mut seeds = SingleNodeTree::find_seeds(&complete);
+        let mut seeds = SingleNodeTree::<T>::find_seeds(&complete);
 
         // The tree's domain is defined by the finest first/last descendants
-        let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let blocktree = SingleNodeTree::<T>::complete_blocktree(&mut seeds);
 
         // Split the blocks based on the n_crit constraint
         let mut balanced = SingleNodeTree::split_blocks(&mut points, blocktree, n_crit as usize);
@@ -299,12 +303,12 @@ impl SingleNodeTree {
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     pub fn new(
-        points: &[PointType],
+        points: &[PointType<T>],
         adaptive: bool,
         n_crit: Option<u64>,
         depth: Option<u64>,
         global_idxs: &[usize],
-    ) -> SingleNodeTree {
+    ) -> SingleNodeTree<T> {
         // TODO: Come back and reconcile a runtime point dimension detector
         let domain = Domain::from_local_points(points);
 
@@ -394,7 +398,7 @@ impl SingleNodeTree {
     /// * `blocktree` - An owned container of the `blocktree`, created by completing the space between seeds.
     /// * `n_crit` - The maximum number of points per leaf node.
     pub fn split_blocks(
-        points: &mut Points,
+        points: &mut Points<T>,
         mut blocktree: MortonKeys,
         n_crit: usize,
     ) -> MortonKeys {
@@ -466,7 +470,7 @@ impl SingleNodeTree {
     /// # Arguments
     /// * `nodes` - A reference to a container of MortonKeys.
     /// * `points` - A mutable reference to a container of points.
-    pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points) -> MortonKeys {
+    pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points<T>) -> MortonKeys {
         let mut map: HashMap<MortonKey, bool> = HashMap::new();
         for node in nodes.iter() {
             map.insert(*node, false);
@@ -499,17 +503,25 @@ impl SingleNodeTree {
     }
 }
 
-impl Tree for SingleNodeTree {
-    type Domain = Domain;
+impl<T> Tree for SingleNodeTree<T>
+where
+    T: Float + Default + Scalar<Real = T>,
+{
+    type Domain = Domain<T>;
     type NodeIndex = MortonKey;
-    type NodeIndexSlice<'a> = &'a [MortonKey];
+    type NodeIndexSlice<'a> = &'a [MortonKey]
+        where T: 'a;
     type NodeIndices = MortonKeys;
-    type Point = Point;
-    type PointSlice<'a> = &'a [Point];
+    type Point = Point<T>;
+
+    type PointSlice<'a> = &'a [Point<T>]
+        where T: 'a;
     type PointData = f64;
-    type PointDataSlice<'a> = &'a [f64];
+    type PointDataSlice<'a> = &'a [f64]
+        where T: 'a;
     type GlobalIndex = usize;
-    type GlobalIndexSlice<'a> = &'a [usize];
+    type GlobalIndexSlice<'a> = &'a [usize]
+        where T: 'a;
 
     fn get_depth(&self) -> u64 {
         self.depth
@@ -593,7 +605,7 @@ mod test {
         assert!(first == depth);
 
         // Test a column distribution of data
-        let points = points_fixture_col(npoints);
+        let points = points_fixture_col::<f64>(npoints);
         let global_idxs = (0..npoints).collect_vec();
         let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
 
@@ -626,7 +638,7 @@ mod test {
     #[test]
     pub fn test_adaptive_tree() {
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
 
         let adaptive = true;
@@ -671,7 +683,7 @@ mod test {
     #[test]
     pub fn test_no_overlaps() {
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4), &global_idxs);
         let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs);
@@ -683,7 +695,7 @@ mod test {
     pub fn test_assign_nodes_to_points() {
         // Generate points in a single octant of the domain
         let npoints = 10;
-        let points = points_fixture(npoints, Some(0.), Some(0.5));
+        let points = points_fixture::<f64>(npoints, Some(0.), Some(0.5));
 
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
@@ -787,7 +799,7 @@ mod test {
             index: 0,
         };
 
-        let blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
 
         SingleNodeTree::split_blocks(&mut points, blocktree, 25);
         let split_blocktree = MortonKeys {
@@ -807,7 +819,7 @@ mod test {
             index: 0,
         };
 
-        let mut blocktree = SingleNodeTree::complete_blocktree(&mut seeds);
+        let mut blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
 
         blocktree.sort();
 
@@ -825,7 +837,7 @@ mod test {
     pub fn test_levels_to_keys() {
         // Uniform tree
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let depth = 3;
         let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);

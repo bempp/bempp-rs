@@ -1,16 +1,18 @@
 //! Constructor for a single node Domain.
+use num::Float;
+
 use crate::types::{domain::Domain, point::PointType};
 
-impl Domain {
+impl<T: Float + Default> Domain<T> {
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
     /// ensure correct Morton encoding.
     ///
     /// # Arguments
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
-    pub fn from_local_points(points: &[PointType]) -> Domain {
+    pub fn from_local_points(points: &[PointType<T>]) -> Domain<T> {
         // Increase size of bounding box to capture all points
-        let err: f64 = 1e-5;
+        let err = T::from(1e-5).unwrap();
         // TODO: Should be parametrised by dimension
         let dim = 3;
         let npoints = points.len() / dim;
@@ -27,20 +29,21 @@ impl Domain {
         let min_z = z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
         // Find maximum dimension, this will define the size of the boxes in the domain
-        let diameter_x = (max_x - min_x).abs();
-        let diameter_y = (max_y - min_y).abs();
-        let diameter_z = (max_z - min_z).abs();
+        let diameter_x = (*max_x - *min_x).abs();
+        let diameter_y = (*max_y - *min_y).abs();
+        let diameter_z = (*max_z - *min_z).abs();
 
         // Want a cubic box to place everything in
         let diameter = diameter_x.max(diameter_y).max(diameter_z);
+        let two = T::from(2.0).unwrap();
         let diameter = [
-            diameter + 2. * err,
-            diameter + 2. * err,
-            diameter + 2. * err,
+            diameter + two * err,
+            diameter + two * err,
+            diameter + two * err,
         ];
 
         // The origin is defined by the minimum point
-        let origin = [min_x - err, min_y - err, min_z - err];
+        let origin = [*min_x - err, *min_y - err, *min_z - err];
 
         Domain { origin, diameter }
     }
@@ -50,7 +53,7 @@ impl Domain {
     /// # Arguments
     /// * `origin` - The point from which to construct a cuboid domain.
     /// * `diameter` - The diameter along each axis of the domain.
-    pub fn new(origin: &[f64; 3], diameter: &[f64; 3]) -> Self {
+    pub fn new(origin: &[T; 3], diameter: &[T; 3]) -> Self {
         Domain {
             origin: *origin,
             diameter: *diameter,
@@ -60,13 +63,17 @@ impl Domain {
 
 #[cfg(test)]
 mod test {
+    use bempp_traits::types::Scalar;
     use rlst::dense::{RawAccess, Shape};
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
 
     use super::*;
 
-    fn test_compute_bounds(points: PointsMat) {
+    fn test_compute_bounds<T>(points: PointsMat<T>)
+    where
+        T: Float + Default + Scalar,
+    {
         let domain = Domain::from_local_points(points.data());
 
         // Test that the domain remains cubic
@@ -94,15 +101,15 @@ mod test {
         let npoints = 10000;
 
         // Test points in positive octant only
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         test_compute_bounds(points);
 
         // Test points in positive and negative octants
-        let points = points_fixture(npoints, Some(-1.), Some(1.));
+        let points = points_fixture::<f64>(npoints, Some(-1.), Some(1.));
         test_compute_bounds(points);
 
         // Test rectangular distributions of points
-        let points = points_fixture_col(npoints);
+        let points = points_fixture_col::<f64>(npoints);
         test_compute_bounds(points);
     }
 }

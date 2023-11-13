@@ -9,11 +9,19 @@ use bempp_tree::implementations::helpers::points_fixture;
 #[cfg(feature = "mpi")]
 use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
 
+use bempp_traits::types::Scalar;
 use rlst::dense::RawAccess;
+
+use rand::distributions::uniform::SampleUniform;
+
+use num::traits::Float;
 
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
-fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
+fn test_no_overlaps<T: Float + Default + Scalar<Real = T>>(
+    world: &UserCommunicator,
+    tree: &MultiNodeTree<T>,
+) {
     // Communicate bounds from each process
     let max = tree.leaves.iter().max().unwrap();
     let min = tree.leaves.iter().min().unwrap();
@@ -47,9 +55,11 @@ fn test_no_overlaps(world: &UserCommunicator, tree: &MultiNodeTree) {
 
 /// Test that the globally defined domain contains all the points at a given node.
 #[cfg(feature = "mpi")]
-fn test_global_bounds(world: &UserCommunicator) {
+fn test_global_bounds<T: Float + Default + Scalar + Equivalence + SampleUniform>(
+    world: &UserCommunicator,
+) {
     let npoints = 10000;
-    let points = points_fixture(npoints, None, None);
+    let points = points_fixture::<T>(npoints, None, None);
 
     let comm = world.duplicate();
 
@@ -81,7 +91,7 @@ fn main() {
     let n_points = 10000;
     let k = 2;
 
-    let points = points_fixture(n_points, None, None);
+    let points = points_fixture::<f64>(n_points, None, None);
     let global_idxs: Vec<_> = (0..n_points).collect();
 
     let tree = MultiNodeTree::new(
@@ -94,7 +104,7 @@ fn main() {
         &global_idxs,
     );
 
-    test_global_bounds(&comm);
+    test_global_bounds::<f64>(&comm);
     if world.rank() == 0 {
         println!("\t ... test_global_bounds passed on adaptive tree");
     }

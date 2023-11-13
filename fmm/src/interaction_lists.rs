@@ -1,18 +1,21 @@
 //! Implementation of interaction lists for FMMs (single and multi node)
+use cauchy::Scalar;
 use itertools::Itertools;
 
 use bempp_traits::{
     field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
 };
 use bempp_tree::types::morton::{MortonKey, MortonKeys};
+use num::Float;
 
 use crate::types::KiFmm;
 
-impl<T, U, V> InteractionLists for KiFmm<T, U, V>
+impl<T, U, V, W> InteractionLists for KiFmm<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
-    U: Kernel,
+    U: Kernel<T = W>,
     V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
 {
     type Tree = T;
 

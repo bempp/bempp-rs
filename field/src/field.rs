@@ -1,18 +1,21 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use num::Zero;
-use std::collections::{HashMap, HashSet};
-
-use fftw::types::*;
+use cauchy::Scalar;
 use itertools::Itertools;
-use num::Complex;
+use num::Zero;
+use num::{Complex, Float};
+use rlst::dense::LayoutType;
 use rlst::{
     algorithms::{
-        linalg::LinAlg,
+        linalg::{DenseMatrixLinAlgBuilder, LinAlg},
         traits::svd::{Mode, Svd},
     },
     common::traits::{Eval, Transpose},
-    dense::{rlst_dynamic_mat, Dot, RawAccess, RawAccessMut, Shape},
+    dense::{
+        rlst_dynamic_mat, rlst_pointer_mat, Dot, Dynamic, MultiplyAdd, RawAccess, RawAccessMut,
+        Shape, VectorContainer,
+    },
 };
+use std::collections::{HashMap, HashSet};
 
 use bempp_tools::Array3D;
 use bempp_traits::{
@@ -24,21 +27,34 @@ use bempp_tree::{
 
 use crate::{
     array::{flip3, pad3},
-    fft::rfft3_fftw,
+    fft::Fft,
     transfer_vector::compute_transfer_vectors,
     types::{
-        FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm, SvdM2lOperatorData,
-        TransferVector,
+        FftFieldTranslationKiFmm, FftM2lOperatorData, FftMatrix, SvdFieldTranslationKiFmm,
+        SvdM2lOperatorData, TransferVector,
     },
 };
 
-impl<T> FieldTranslationData<T> for SvdFieldTranslationKiFmm<T>
+impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
 where
-    T: Kernel<T = f64> + Default,
+    T: Float
+        + Default
+        + MultiplyAdd<
+            T,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            Dynamic,
+            Dynamic,
+            Dynamic,
+        >,
+    DenseMatrixLinAlgBuilder<T>: Svd,
+    T: Scalar<Real = T>,
+    U: Kernel<T = T> + Default,
 {
     type TransferVector = Vec<TransferVector>;
-    type M2LOperators = SvdM2lOperatorData;
-    type Domain = Domain;
+    type M2LOperators = SvdM2lOperatorData<T>;
+    type Domain = Domain<T>;
 
     fn ncoeffs(&self, order: usize) -> usize {
         6 * (order - 1).pow(2) + 2
@@ -52,9 +68,8 @@ where
         let ncols = self.ncoeffs(order);
 
         let ntransfer_vectors = self.transfer_vectors.len();
-        let mut se2tc_fat = rlst_dynamic_mat![f64, (nrows, ncols * ntransfer_vectors)];
-
-        let mut se2tc_thin = rlst_dynamic_mat![f64, (nrows * ntransfer_vectors, ncols)];
+        let mut se2tc_fat = rlst_dynamic_mat![T, (nrows, ncols * ntransfer_vectors)];
+        let mut se2tc_thin = rlst_dynamic_mat![T, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
@@ -63,7 +78,7 @@ where
             let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram = rlst_dynamic_mat![f64, (ntargets, nsources)];
+            let mut tmp_gram = rlst_dynamic_mat![T, (ntargets, nsources)];
 
             self.kernel.assemble_st(
                 EvalType::Value,
@@ -96,16 +111,20 @@ where
         let vt = vt.unwrap();
 
         // Keep 'k' singular values
-        let mut sigma_mat = rlst_dynamic_mat![f64, (self.k, self.k)];
+        let mut sigma_mat = rlst_dynamic_mat![T, (self.k, self.k)];
         for i in 0..self.k {
-            sigma_mat[[i, i]] = sigma[i]
+            sigma_mat[[i, i]] = T::from(sigma[i]).unwrap()
         }
 
         let (mu, _) = u.shape();
         let u = u.block((0, 0), (mu, self.k)).eval();
+        let u = u.data().iter().map(|&x| T::from(x).unwrap()).collect_vec();
+        let u = unsafe { rlst_pointer_mat!['static, T, u.as_ptr(), (mu, self.k), (1, mu)] }.eval();
 
         let (_, nvt) = vt.shape();
         let vt = vt.block((0, 0), (self.k, nvt)).eval();
+        let vt: Vec<T> = vt.data().iter().map(|&x| T::from(x).unwrap()).collect();
+        let vt = unsafe { rlst_pointer_mat!['static, T, vt.as_ptr(), (self.k, nvt), (1, self.k)] };
 
         // Store compressed M2L operators
         let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::Slim, Mode::All).unwrap();
@@ -113,8 +132,15 @@ where
         let (_, nst) = st.shape();
         let st_block = st.block((0, 0), (self.k, nst));
         let s_block = st_block.transpose().eval();
+        let s_block: Vec<T> = s_block
+            .data()
+            .iter()
+            .map(|&x| T::from(x).unwrap())
+            .collect();
+        let s_block =
+            unsafe { rlst_pointer_mat!['static, T, s_block.as_ptr(), (nst, self.k), (1, nst)] };
 
-        let mut c = rlst_dynamic_mat![f64, (self.k, self.k * ntransfer_vectors)];
+        let mut c = rlst_dynamic_mat![T, (self.k, self.k * ntransfer_vectors)];
 
         for i in 0..self.transfer_vectors.len() {
             let top_left = (0, i * ncols);
@@ -137,9 +163,22 @@ where
     }
 }
 
-impl<T> SvdFieldTranslationKiFmm<T>
+impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
-    T: Kernel<T = f64> + Default,
+    T: Float
+        + Default
+        + MultiplyAdd<
+            T,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            Dynamic,
+            Dynamic,
+            Dynamic,
+        >,
+    DenseMatrixLinAlgBuilder<T>: Svd,
+    T: Scalar<Real = T>,
+    U: Kernel<T = T> + Default,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
     ///
@@ -149,7 +188,7 @@ where
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: T, k: Option<usize>, order: usize, domain: Domain, alpha: f64) -> Self {
+    pub fn new(kernel: U, k: Option<usize>, order: usize, domain: Domain<T>, alpha: T) -> Self {
         let mut result = SvdFieldTranslationKiFmm {
             alpha,
             k: 0,
@@ -177,13 +216,15 @@ where
     }
 }
 
-impl<T> FieldTranslationData<T> for FftFieldTranslationKiFmm<T>
+impl<T, U> FieldTranslationData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: Kernel<T = f64> + Default,
+    T: Scalar<Real = T> + Float + Default + Fft<FftMatrix<T>, FftMatrix<Complex<T>>>,
+    Complex<T>: Scalar,
+    U: Kernel<T = T> + Default,
 {
-    type Domain = Domain;
+    type Domain = Domain<T>;
 
-    type M2LOperators = FftM2lOperatorData;
+    type M2LOperators = FftM2lOperatorData<Complex<T>>;
 
     type TransferVector = Vec<TransferVector>;
 
@@ -197,11 +238,12 @@ where
         let nconvolutions = nsiblings * nsiblings; // Number of convolutions computed for each node
 
         // Pick a point in the middle of the domain
-        let midway = domain.diameter.iter().map(|d| *d / 2.0).collect_vec();
+        let two = T::from(2.0).unwrap();
+        let midway = domain.diameter.iter().map(|d| *d / two).collect_vec();
         let point = midway
             .iter()
             .zip(domain.origin)
-            .map(|(m, o)| m + o)
+            .map(|(m, o)| *m + o)
             .collect_vec();
         let point = [point[0], point[1], point[2]];
 
@@ -302,8 +344,9 @@ where
                     let mut padded_kernel = flip3(&padded_kernel);
 
                     // Compute FFT of padded kernel
-                    let mut padded_kernel_hat = Array3D::<c64>::new((p, p, p / 2 + 1));
-                    rfft3_fftw(
+                    let mut padded_kernel_hat = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
+
+                    T::rfft3_fftw(
                         padded_kernel.get_data_mut(),
                         padded_kernel_hat.get_data_mut(),
                         &[p, p, p],
@@ -314,7 +357,7 @@ where
                     // Fill with zeros when interaction doesn't exist
                     let n = 2 * order - 1;
                     let p = n + 1;
-                    let padded_kernel_hat_zeros = Array3D::<c64>::new((p, p, p / 2 + 1));
+                    let padded_kernel_hat_zeros = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
                     kernel_data_vec[i].push(padded_kernel_hat_zeros);
                 }
             }
@@ -322,7 +365,7 @@ where
 
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
         let mut kernel_data =
-            vec![vec![Complex::<f64>::zero(); nconvolutions * size_real]; halo_children.len()];
+            vec![vec![Complex::<T>::zero(); nconvolutions * size_real]; halo_children.len()];
 
         // For each halo position
         for i in 0..halo_children.len() {
@@ -362,9 +405,11 @@ where
     }
 }
 
-impl<T> FftFieldTranslationKiFmm<T>
+impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Kernel<T = f64> + Default,
+    T: Float + Scalar<Real = T> + Default + Fft<FftMatrix<T>, FftMatrix<Complex<T>>>,
+    Complex<T>: Scalar,
+    U: Kernel<T = T> + Default,
 {
     /// Constructor for FFT field translation struct for the kernel independent FMM (KiFMM).
     ///
@@ -373,7 +418,7 @@ where
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: T, order: usize, domain: Domain, alpha: f64) -> Self {
+    pub fn new(kernel: U, order: usize, domain: Domain<T>, alpha: T) -> Self {
         let mut result = FftFieldTranslationKiFmm {
             alpha,
             kernel,
@@ -385,7 +430,7 @@ where
 
         // Create maps between surface and convolution grids
         let (surf_to_conv, conv_to_surf) =
-            FftFieldTranslationKiFmm::<T>::compute_surf_to_conv_map(order);
+            FftFieldTranslationKiFmm::<T, U>::compute_surf_to_conv_map(order);
 
         result.surf_to_conv_map = surf_to_conv;
         result.conv_to_surf_map = conv_to_surf;
@@ -445,14 +490,14 @@ where
     pub fn compute_kernel(
         &self,
         order: usize,
-        convolution_grid: &[f64],
-        target_pt: [f64; 3],
-    ) -> Array3D<f64> {
+        convolution_grid: &[T],
+        target_pt: [T; 3],
+    ) -> Array3D<T> {
         let n = 2 * order - 1;
-        let mut result = Array3D::<f64>::new((n, n, n));
+        let mut result = Array3D::<T>::new((n, n, n));
         let nconv = n.pow(3);
 
-        let mut kernel_evals = vec![0f64; nconv];
+        let mut kernel_evals = vec![T::zero(); nconv];
 
         self.kernel.assemble_st(
             EvalType::Value,
@@ -471,12 +516,12 @@ where
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `charges` - A vector of charges.
-    pub fn compute_signal(&self, order: usize, charges: &[f64]) -> Array3D<f64> {
+    pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
         let n = 2 * order - 1;
         let n_tot = n * n * n;
         let mut result = Array3D::new((n, n, n));
 
-        let mut tmp = vec![0f64; n_tot];
+        let mut tmp = vec![T::zero(); n_tot];
 
         for k in 0..n {
             for j in 0..n {
@@ -485,7 +530,7 @@ where
                     if let Some(surf_index) = self.conv_to_surf_map.get(&conv_index) {
                         tmp[conv_index] = charges[*surf_index];
                     } else {
-                        tmp[conv_index] = 0f64;
+                        tmp[conv_index] = T::zero();
                     }
                 }
             }
@@ -500,8 +545,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fft::irfft3_fftw;
+    use crate::fft::Fft;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use cauchy::{c32, c64};
+    use num::complex::Complex;
     use rlst::dense::RandomAccessMut;
 
     #[test]
@@ -550,7 +597,7 @@ mod test {
 
     #[test]
     pub fn test_fft_operator_data() {
-        let kernel = Laplace3dKernel::new();
+        let kernel: Laplace3dKernel<f32> = Laplace3dKernel::<f32>::new();
         let order = 5;
         let domain = Domain {
             origin: [0., 0., 0.],
@@ -561,7 +608,7 @@ mod test {
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Create a random point in the middle of the domain
-        let m2l = fft.compute_m2l_operators(order, domain);
+        let m2l: FftM2lOperatorData<c32> = fft.compute_m2l_operators(order, domain);
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
         let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
@@ -758,7 +805,7 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
-        rfft3_fftw(
+        f64::rfft3_fftw(
             padded_kernel.get_data_mut(),
             padded_kernel_hat.get_data_mut(),
             &[p, q, r],
@@ -848,7 +895,6 @@ mod test {
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Compute all M2L operators
-        // let m2l = fft.compute_m2l_operators(order, domain);
 
         // Pick a random source/target pair
         let idx = 123;
@@ -867,7 +913,7 @@ mod test {
         let mut padded_signal = pad3(&signal, pad_size, pad_index);
         let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
 
-        rfft3_fftw(
+        f64::rfft3_fftw(
             padded_signal.get_data_mut(),
             padded_signal_hat.get_data_mut(),
             &[p, q, r],
@@ -917,7 +963,7 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
-        rfft3_fftw(
+        f64::rfft3_fftw(
             padded_kernel.get_data_mut(),
             padded_kernel_hat.get_data_mut(),
             &[p, q, r],
@@ -934,13 +980,14 @@ mod test {
         let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
 
         let mut potentials = Array3D::new((p, q, r));
-        irfft3_fftw(
+
+        f64::irfft3_fftw(
             hadamard_product.get_data_mut(),
             potentials.get_data_mut(),
             &[p, q, r],
         );
 
-        let (_, multi_indices) = MortonKey::surface_grid(order);
+        let (_, multi_indices) = MortonKey::surface_grid::<f64>(order);
 
         let mut tmp = Vec::new();
         let ntargets = multi_indices.len() / 3;
