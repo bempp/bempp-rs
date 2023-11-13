@@ -299,8 +299,6 @@ where
             }
         }
 
-        let fmm = Arc::new(fmm);
-
         Self {
             fmm,
             multipoles,

@@ -36,7 +36,7 @@ where
     U: Scalar<Real = U> + Float + Default,
 {
     /// The associated FMM object, which implements an FMM interface
-    pub fmm: Arc<T>,
+    pub fmm: T,
 
     /// The multipole expansion data at each box.
     pub multipoles: HashMap<MortonKey, Arc<Mutex<Expansions<U>>>>,

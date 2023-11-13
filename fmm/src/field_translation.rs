@@ -57,7 +57,6 @@ where
         if let Some(leaves) = self.fmm.tree().get_leaves() {
             leaves.par_iter().for_each(move |&leaf| {
                 let leaf_multipole_arc = Arc::clone(self.multipoles.get(&leaf).unwrap());
-                let fmm_arc = Arc::clone(&self.fmm);
 
                 if let Some(leaf_points) = self.points.get(&leaf) {
                     let leaf_charges_arc = Arc::clone(self.charges.get(&leaf).unwrap());
@@ -72,22 +71,22 @@ where
                     let nsources = leaf_coordinates.len() / self.fmm.kernel.space_dimension();
 
                     let leaf_coordinates = unsafe {
-                        rlst_pointer_mat!['a, V, leaf_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                        rlst_pointer_mat!['a, V, leaf_coordinates.as_ptr(), (nsources, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                     }.eval();
 
                     let upward_check_surface = leaf.compute_surface(
-                        &fmm_arc.tree().domain,
-                        fmm_arc.order,
-                        fmm_arc.alpha_outer,
+                        &self.fmm.tree().domain,
+                        self.fmm.order,
+                        self.fmm.alpha_outer,
                     );
-                    let ntargets = upward_check_surface.len() / fmm_arc.kernel.space_dimension();
+                    let ntargets = upward_check_surface.len() / self.fmm.kernel.space_dimension();
 
                     let leaf_charges = leaf_charges_arc.deref();
 
                     // Calculate check potential
                     let mut check_potential = rlst_col_vec![V, ntargets];
 
-                    fmm_arc.kernel.evaluate_st(
+                    self.fmm.kernel.evaluate_st(
                         EvalType::Value,
                         leaf_coordinates.data(),
                         &upward_check_surface[..],
@@ -95,8 +94,8 @@ where
                         check_potential.data_mut(),
                     );
 
-                    let mut tmp = fmm_arc.uc2e_inv_1.dot(&fmm_arc.uc2e_inv_2.dot(&check_potential)).eval();
-                    tmp.data_mut().iter_mut().for_each(|d| *d  *= fmm_arc.kernel.scale(leaf.level()));
+                    let mut tmp = self.fmm.uc2e_inv_1.dot(&self.fmm.uc2e_inv_2.dot(&check_potential)).eval();
+                    tmp.data_mut().iter_mut().for_each(|d| *d  *= self.fmm.kernel.scale(leaf.level()));
                     let leaf_multipole_owned = tmp;
                     let mut leaf_multipole_lock = leaf_multipole_arc.lock().unwrap();
                     *leaf_multipole_lock.deref_mut() = (leaf_multipole_lock.deref() + leaf_multipole_owned).eval();
@@ -114,12 +113,11 @@ where
                 let source_multipole_arc = Arc::clone(self.multipoles.get(&source).unwrap());
                 let target_multipole_arc =
                     Arc::clone(self.multipoles.get(&source.parent()).unwrap());
-                let fmm_arc = Arc::clone(&self.fmm);
 
                 let source_multipole_lock = source_multipole_arc.lock().unwrap();
 
                 let target_multipole_owned =
-                    fmm_arc.m2m[operator_index].dot(&source_multipole_lock);
+                    self.fmm.m2m[operator_index].dot(&source_multipole_lock);
 
                 let mut target_multipole_lock = target_multipole_arc.lock().unwrap();
 
@@ -150,13 +148,12 @@ where
             targets.par_iter().for_each(move |&target| {
                 let source_local_arc = Arc::clone(self.locals.get(&target.parent()).unwrap());
                 let target_local_arc = Arc::clone(self.locals.get(&target).unwrap());
-                let fmm = Arc::clone(&self.fmm);
 
                 let operator_index = target.siblings().iter().position(|&x| x == target).unwrap();
 
                 let source_local_lock = source_local_arc.lock().unwrap();
 
-                let target_local_owned = fmm.l2l[operator_index].dot(&source_local_lock);
+                let target_local_owned = self.fmm.l2l[operator_index].dot(&source_local_lock);
                 let mut target_local_lock = target_local_arc.lock().unwrap();
 
                 *target_local_lock.deref_mut() =
@@ -169,19 +166,18 @@ where
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&target| {
 
-                let fmm_arc = Arc::clone(&self.fmm);
 
-                if let Some(points) = fmm_arc.tree().get_points(&target) {
+                if let Some(points) = self.fmm.tree().get_points(&target) {
                     let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
-                    if let Some(w_list) = fmm_arc.get_w_list(&target) {
+                    if let Some(w_list) = self.fmm.get_w_list(&target) {
                         for source in w_list.iter() {
                             let source_multipole_arc =
                                 Arc::clone(self.multipoles.get(source).unwrap());
 
                             let upward_equivalent_surface = source.compute_surface(
-                                fmm_arc.tree().get_domain(),
-                                fmm_arc.order(),
-                                fmm_arc.alpha_inner,
+                                self.fmm.tree().get_domain(),
+                                self.fmm.order(),
+                                self.fmm.alpha_inner,
                             );
 
                             let source_multipole_lock = source_multipole_arc.lock().unwrap();
@@ -195,13 +191,13 @@ where
                             let ntargets = target_coordinates.len() / self.fmm.kernel.space_dimension();
 
                             let target_coordinates = unsafe {
-                                rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                                rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                             }.eval();
 
 
                             let mut target_potential = rlst_col_vec![V, ntargets];
 
-                            fmm_arc.kernel.evaluate_st(
+                            self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 &upward_equivalent_surface[..],
                                 target_coordinates.data(),
@@ -223,10 +219,9 @@ where
     fn l2p<'a>(&self) {
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&leaf| {
-                let fmm_arc = Arc::clone(&self.fmm);
                 let source_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
-                if let Some(target_points) = fmm_arc.tree().get_points(&leaf) {
+                if let Some(target_points) = self.fmm.tree().get_points(&leaf) {
                     let target_potential_arc = Arc::clone(self.potentials.get(&leaf).unwrap());
                     // Lookup data
                     let target_coordinates = target_points
@@ -237,20 +232,20 @@ where
                     let ntargets = target_coordinates.len() / self.fmm.kernel.space_dimension();
 
                     let target_coordinates = unsafe {
-                        rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                        rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                     }.eval();
 
                     let downward_equivalent_surface = leaf.compute_surface(
-                        &fmm_arc.tree().domain,
-                        fmm_arc.order,
-                        fmm_arc.alpha_outer,
+                        &self.fmm.tree().domain,
+                        self.fmm.order,
+                        self.fmm.alpha_outer,
                     );
 
                     let source_local_lock = source_local_arc.lock().unwrap();
 
                     let mut target_potential = rlst_col_vec![V, ntargets];
 
-                    fmm_arc.kernel.evaluate_st(
+                    self.fmm.kernel.evaluate_st(
                         EvalType::Value,
                         &downward_equivalent_surface[..],
                         target_coordinates.data(),
@@ -269,12 +264,11 @@ where
     fn p2l<'a>(&self) {
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&leaf| {
-                let fmm_arc = Arc::clone(&self.fmm);
                 let target_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
-                if let Some(x_list) = fmm_arc.get_x_list(&leaf) {
+                if let Some(x_list) = self.fmm.get_x_list(&leaf) {
                     for source in x_list.iter() {
-                        if let Some(source_points) = fmm_arc.tree().get_points(source) {
+                        if let Some(source_points) = self.fmm.tree().get_points(source) {
                             let source_coordinates = source_points
                                 .iter()
                                 .map(|p| p.coordinate)
@@ -284,21 +278,21 @@ where
                             let nsources = source_coordinates.len() / self.fmm.kernel.space_dimension();
 
                             let source_coordinates = unsafe {
-                                rlst_pointer_mat!['a, V, source_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                                rlst_pointer_mat!['a, V, source_coordinates.as_ptr(), (nsources, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                             }.eval();
 
                             let source_charges = self.charges.get(source).unwrap();
 
                             let downward_check_surface = leaf.compute_surface(
-                                &fmm_arc.tree().domain,
-                                fmm_arc.order,
-                                fmm_arc.alpha_inner,
+                                &self.fmm.tree().domain,
+                                self.fmm.order,
+                                self.fmm.alpha_inner,
                             );
 
-                            let ntargets = downward_check_surface.len() / fmm_arc.kernel.space_dimension();
+                            let ntargets = downward_check_surface.len() / self.fmm.kernel.space_dimension();
                             let mut downward_check_potential = rlst_col_vec![V, ntargets];
 
-                            fmm_arc.kernel.evaluate_st(
+                            self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 source_coordinates.data(),
                                 &downward_check_surface[..],
@@ -308,8 +302,8 @@ where
 
 
                             let mut target_local_lock = target_local_arc.lock().unwrap();
-                            let mut tmp = fmm_arc.dc2e_inv_1.dot(&fmm_arc.dc2e_inv_2.dot(&downward_check_potential)).eval();
-                            tmp.data_mut().iter_mut().for_each(|d| *d *=  fmm_arc.kernel.scale(leaf.level()));
+                            let mut tmp = self.fmm.dc2e_inv_1.dot(&self.fmm.dc2e_inv_2.dot(&downward_check_potential)).eval();
+                            tmp.data_mut().iter_mut().for_each(|d| *d *=  self.fmm.kernel.scale(leaf.level()));
                             let target_local_owned =  tmp;
                             *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
                         }
@@ -322,9 +316,8 @@ where
     fn p2p<'a>(&self) {
         if let Some(targets) = self.fmm.tree().get_leaves() {
             targets.par_iter().for_each(move |&target| {
-                let fmm_arc = Arc::clone(&self.fmm);
 
-                if let Some(target_points) = fmm_arc.tree().get_points(&target) {
+                if let Some(target_points) = self.fmm.tree().get_points(&target) {
                     let target_potential_arc = Arc::clone(self.potentials.get(&target).unwrap());
                     let target_coordinates = target_points
                         .iter()
@@ -335,12 +328,12 @@ where
                     let ntargets= target_coordinates.len() / self.fmm.kernel.space_dimension();
 
                     let target_coordinates = unsafe {
-                        rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                        rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                     }.eval();
 
-                    if let Some(u_list) = fmm_arc.get_u_list(&target) {
+                    if let Some(u_list) = self.fmm.get_u_list(&target) {
                         for source in u_list.iter() {
-                            if let Some(source_points) = fmm_arc.tree().get_points(source) {
+                            if let Some(source_points) = self.fmm.tree().get_points(source) {
                                 let source_coordinates = source_points
                                     .iter()
                                     .map(|p| p.coordinate)
@@ -350,7 +343,7 @@ where
                                 let nsources = source_coordinates.len() / self.fmm.kernel.space_dimension();
 
                                 let source_coordinates = unsafe {
-                                    rlst_pointer_mat!['a, V, source_coordinates.as_ptr(), (nsources, fmm_arc.kernel.space_dimension()), (fmm_arc.kernel.space_dimension(), 1)]
+                                    rlst_pointer_mat!['a, V, source_coordinates.as_ptr(), (nsources, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                                 }.eval();
 
                                 let source_charges_arc =
@@ -358,7 +351,7 @@ where
 
                                 let mut target_potential = rlst_col_vec![V, ntargets];
 
-                                fmm_arc.kernel.evaluate_st(
+                                self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
                                     source_coordinates.data(),
                                     target_coordinates.data(),
@@ -590,13 +583,13 @@ where
 
         let range = (0..chunks.len()).into_par_iter();
         range.zip(chunks).for_each(|(i, chunk)| {
-            let fmm_arc = Arc::clone(&self.fmm);
             let target = targets[i];
             let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
             let source_multipole_lock = source_multipole_arc.lock().unwrap();
-            let signal = fmm_arc
+            let signal = self
+                .fmm
                 .m2l
-                .compute_signal(fmm_arc.order, source_multipole_lock.data());
+                .compute_signal(self.fmm.order, source_multipole_lock.data());
 
             let padded_signal = pad3(&signal, pad_size, pad_index);
 
