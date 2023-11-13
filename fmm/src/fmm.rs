@@ -584,11 +584,10 @@ mod test {
             &global_idxs[..],
         );
 
-        let m2l_data_fft: FftFieldTranslationKiFmm<f64, c64, Laplace3dKernel<f64>> =
+        let m2l_data_fft =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        let fmm: KiFmm<SingleNodeTree<f64>, _, _, f64> =
-            KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
@@ -636,7 +635,12 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
 
-        println!("HERE {:?} \n{:?} \n{:?}", leaf.morton(), potentials.data(), direct);
+        println!(
+            "HERE {:?} \n{:?} \n{:?}",
+            leaf.morton(),
+            potentials.data(),
+            direct
+        );
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
         println!("rel error {:?}", rel_error);
         assert!(rel_error <= 1e-6);

@@ -1,5 +1,6 @@
 //! Implementation of field translations for each FMM.
 use std::{
+    any::TypeId,
     collections::HashMap,
     ops::{Deref, DerefMut, Mul},
     sync::{Arc, Mutex, RwLock},
@@ -8,12 +9,12 @@ use std::{
 use bempp_tools::Array3D;
 use fftw::types::*;
 use itertools::Itertools;
-use num::Float;
+use num::{Complex, Float};
 use rayon::prelude::*;
 
 use bempp_field::{
     array::pad3,
-    fft::{irfft3_fftw_par_vec, rfft3_fftw_par_vec, rfft3_fftw_par_vec_64},
+    fft::{Fft, FftMatrix},
     types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
 };
 
@@ -34,8 +35,8 @@ use rlst::{
     blis::interface::gemm::Gemm,
     common::traits::*,
     dense::{
-        rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, Shape,
-        VectorContainer,
+        base_matrix::BaseMatrix, rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot,
+        Matrix, MultiplyAdd, Shape, VectorContainer,
     },
 };
 
@@ -109,6 +110,7 @@ where
                     let leaf_multipole_owned = tmp;
 
                     let mut leaf_multipole_lock = leaf_multipole_arc.lock().unwrap();
+
 
                     *leaf_multipole_lock.deref_mut() = (leaf_multipole_lock.deref() + leaf_multipole_owned).eval();
                 }
@@ -559,8 +561,8 @@ struct SendPtr<T> {
 unsafe impl<T> Sync for SendPtr<T> {}
 
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
-impl<T, U, V> FieldTranslation<U>
-    for FmmData<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, V, T>, U>, U>
+impl<T, U> FieldTranslation<U>
+    for FmmData<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
     T: Kernel<T = U> + KernelScale<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
@@ -568,14 +570,8 @@ where
         + Default
         + std::marker::Send
         + std::marker::Sync
-        + std::ops::Mul<V, Output = V>,
-    V: Scalar<Complex = V>
-        + ComplexFloat
-        + Default
-        + std::ops::Mul<U, Output = V>
-        + std::marker::Send
-        + std::marker::Sync
-        + std::ops::AddAssign<V>,
+        + Fft<FftMatrix<U>, FftMatrix<Complex<U>>>,
+    Complex<U>: Scalar,
     U: MultiplyAdd<
         U,
         VectorContainer<U>,
@@ -585,7 +581,6 @@ where
         Dynamic,
         Dynamic,
     >,
-    // <U as Mul<V>>::Output: Mul<V>
 {
     fn m2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -624,14 +619,14 @@ where
 
             chunk.copy_from_slice(padded_signal.get_data());
         });
+        let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
 
-        let mut padded_signals_hat = rlst_col_vec![V, size_real * ntargets];
-        rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
+        U::rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
 
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         let ntargets = targets.len();
         let nparents = ntargets / 8;
-        let mut global_check_potentials_hat = rlst_col_vec![V, size_real * ntargets];
+        let mut global_check_potentials_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
         let mut global_check_potentials = rlst_col_vec![U, size * ntargets];
 
         // Get check potentials in frequency order
@@ -654,7 +649,7 @@ where
 
         // Get signals into frequency order
         let mut padded_signals_hat_freq = vec![Vec::new(); size_real];
-        let zero = rlst_col_vec![V, 8];
+        let zero = rlst_col_vec![Complex<U>, 8];
         unsafe {
             let ptr = padded_signals_hat.get_pointer();
 
@@ -721,7 +716,7 @@ where
             all_displacements.push(displacements);
         });
 
-        let scale = V::from(self.m2l_scale(level)).unwrap();
+        let scale = Complex::from(self.m2l_scale(level));
 
         (0..size_real).into_par_iter().for_each(|freq| {
             // Extract frequency component of signal (ntargets long)
@@ -753,14 +748,16 @@ where
                             save_locations_raw
                                 .iter()
                                 .zip(kernel_data_ij.iter())
-                                .for_each(|(&sav, ker)|  {*sav += scale * *sig * *ker;})
+                                // .for_each(|(&sav, &ker)|{ *sav += V::from(1000000).unwrap();})
+                                .for_each(|(&sav, &ker)| *sav += scale * ker * *sig)
+                            // .for_each(|(&sav, &ker)| *sav += scale * *sig * ker)
                         }
                     } // inner loop
                 }
             }); // over each sibling set
         });
 
-        irfft3_fftw_par_vec(
+        U::irfft_fftw_par_vec(
             &mut global_check_potentials_hat,
             &mut global_check_potentials,
             &[p, q, r],
