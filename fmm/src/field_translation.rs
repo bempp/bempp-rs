@@ -1,21 +1,19 @@
 //! Implementation of field translations for each FMM.
 use std::{
-    any::TypeId,
     collections::HashMap,
-    ops::{Deref, DerefMut, Mul},
+    ops::{Deref, DerefMut},
     sync::{Arc, Mutex, RwLock},
 };
 
 use bempp_tools::Array3D;
-use fftw::types::*;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
 
 use bempp_field::{
     array::pad3,
-    fft::{Fft, FftMatrix},
-    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
+    fft::Fft,
+    types::{FftFieldTranslationKiFmm, FftMatrix, SvdFieldTranslationKiFmm},
 };
 
 use bempp_traits::{
@@ -28,15 +26,12 @@ use bempp_traits::{
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use num::complex::ComplexFloat;
-
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
-    blis::interface::gemm::Gemm,
     common::traits::*,
     dense::{
-        base_matrix::BaseMatrix, rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot,
-        Matrix, MultiplyAdd, Shape, VectorContainer,
+        rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, Shape,
+        VectorContainer,
     },
 };
 
@@ -100,18 +95,10 @@ where
                         check_potential.data_mut(),
                     );
 
-                    // let leaf_multipole_owned = (
-                    //     fmm_arc.kernel.scale(leaf.level())
-                    //     * fmm_arc.uc2e_inv_1.dot(&fmm_arc.uc2e_inv_2.dot(&check_potential))
-                    // ).eval();
-
                     let mut tmp = fmm_arc.uc2e_inv_1.dot(&fmm_arc.uc2e_inv_2.dot(&check_potential)).eval();
                     tmp.data_mut().iter_mut().for_each(|d| *d  *= fmm_arc.kernel.scale(leaf.level()));
                     let leaf_multipole_owned = tmp;
-
                     let mut leaf_multipole_lock = leaf_multipole_arc.lock().unwrap();
-
-
                     *leaf_multipole_lock.deref_mut() = (leaf_multipole_lock.deref() + leaf_multipole_owned).eval();
                 }
             });
@@ -321,13 +308,9 @@ where
 
 
                             let mut target_local_lock = target_local_arc.lock().unwrap();
-
-                            // let target_local_owned = (fmm_arc.kernel.scale(leaf.level()) * fmm_arc.dc2e_inv_1.dot(&fmm_arc.dc2e_inv_2.dot(&downward_check_potential))).eval();
-
                             let mut tmp = fmm_arc.dc2e_inv_1.dot(&fmm_arc.dc2e_inv_2.dot(&downward_check_potential)).eval();
                             tmp.data_mut().iter_mut().for_each(|d| *d *=  fmm_arc.kernel.scale(leaf.level()));
                             let target_local_owned =  tmp;
-
                             *target_local_lock.deref_mut() = (target_local_lock.deref() + target_local_owned).eval();
                         }
                     }
@@ -748,9 +731,7 @@ where
                             save_locations_raw
                                 .iter()
                                 .zip(kernel_data_ij.iter())
-                                // .for_each(|(&sav, &ker)|{ *sav += V::from(1000000).unwrap();})
                                 .for_each(|(&sav, &ker)| *sav += scale * ker * *sig)
-                            // .for_each(|(&sav, &ker)| *sav += scale * *sig * ker)
                         }
                     } // inner loop
                 }
@@ -793,13 +774,6 @@ where
         let check_potentials = unsafe {
             rlst_pointer_mat!['a, U, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
         };
-
-        // let locals = (self
-        //     .fmm
-        //     .dc2e_inv_1
-        //     .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
-        //     * self.fmm.kernel.scale(level))
-        // .eval();
 
         let mut tmp = self
             .fmm

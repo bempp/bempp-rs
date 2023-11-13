@@ -4,7 +4,7 @@ use mpi::topology::UserCommunicator;
 
 use std::collections::{HashMap, HashSet};
 
-use num::traits::{real::Real, Float};
+use num::traits::Float;
 
 use crate::types::{
     domain::Domain,

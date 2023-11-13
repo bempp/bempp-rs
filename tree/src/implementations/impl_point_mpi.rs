@@ -1,7 +1,7 @@
 //! Implementation of an equivalent MPI type for point data.
 use crate::types::{
     morton::{KeyType, MortonKey},
-    point::{Point, PointType},
+    point::Point,
 };
 use bempp_traits::types::Scalar;
 use memoffset::offset_of;
