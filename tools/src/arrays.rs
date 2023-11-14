@@ -75,11 +75,11 @@ impl<T: Num> Array3DAccess<T> for Array3D<T> {
     }
     unsafe fn get_unchecked(&self, index0: usize, index1: usize, index2: usize) -> &T {
         self.data
-            .get_unchecked((index0 * self.shape.1 + index1) * self.shape.2 + index2)
+            .get_unchecked((index2 * self.shape.1 + index1) * self.shape.0 + index0)
     }
     unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize, index2: usize) -> &mut T {
         self.data
-            .get_unchecked_mut((index0 * self.shape.1 + index1) * self.shape.2 + index2)
+            .get_unchecked_mut((index2 * self.shape.1 + index1) * self.shape.0 + index0)
     }
     fn shape(&self) -> &(usize, usize, usize) {
         &self.shape
@@ -154,7 +154,7 @@ impl<T: Num> Array4DAccess<T> for Array4D<T> {
         index3: usize,
     ) -> &T {
         self.data.get_unchecked(
-            ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
+            ((index3 * self.shape.2 + index2) * self.shape.1 + index1) * self.shape.0 + index0,
         )
     }
     unsafe fn get_unchecked_mut(
@@ -165,7 +165,7 @@ impl<T: Num> Array4DAccess<T> for Array4D<T> {
         index3: usize,
     ) -> &mut T {
         self.data.get_unchecked_mut(
-            ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
+            ((index3 * self.shape.2 + index2) * self.shape.1 + index1) * self.shape.0 + index0,
         )
     }
     fn shape(&self) -> &(usize, usize, usize, usize) {
