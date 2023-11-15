@@ -27,7 +27,7 @@ use bempp_traits::{
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
 use crate::pinv::{pinv, SvdScalar};
-use crate::types::{C2EType, ChargeDict, FmmData, KiFmm};
+use crate::types::{C2EType, ChargeDict, FmmData, FmmDataLinear, KiFmm};
 
 /// Implementation of constructor for single node KiFMM
 impl<'a, T, U, V> KiFmm<SingleNodeTree<V>, T, U, V>
@@ -307,6 +307,86 @@ where
             points,
             charges,
         }
+    }
+}
+
+/// Implementation of the data structure to store the data for the single node KiFMM.
+impl<T, U, V> FmmDataLinear<KiFmm<SingleNodeTree<V>, T, U, V>, V>
+where
+    T: Kernel<T = V>,
+    U: FieldTranslationData<T>,
+    V: Float + Scalar<Real = V> + Default,
+{
+    /// Constructor fo the KiFMM's associated FmmData on a single node.
+    ///
+    /// # Arguments
+    /// `fmm` - A single node KiFMM object.
+    /// `global_charges` - The charge data associated to the point data via unique global indices.
+    pub fn new(
+        fmm: KiFmm<SingleNodeTree<V>, T, U, V>,
+        global_charges: &ChargeDict<V>,
+    ) -> Result<Self, String> {
+        if let Some(keys) = fmm.tree().get_all_keys() {
+            let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+            let nkeys = keys.len();
+            let mut npoints = 0;
+
+            for key in keys.iter() {
+                if let Some(points) = fmm.tree().get_points(key) {
+                    npoints += points.len();
+                }
+            }
+
+            let multipoles = vec![V::default(); ncoeffs * nkeys];
+            let locals = vec![V::default(); ncoeffs * nkeys];
+
+            let potentials = vec![V::default(); npoints];
+            let points = vec![V::default(); npoints * 3];
+            let charges = vec![V::default(); npoints];
+            let global_indices = vec![0usize; npoints];
+
+            // Assign point coordinates and associated charges.
+            fmm.tree().get_all_points();
+
+            return Ok(Self {
+                fmm,
+                multipoles,
+                locals,
+                potentials,
+                points,
+                charges,
+                global_indices,
+            });
+        }
+
+        Err("Not a valid tree".to_string())
+
+        // let dummy = rlst_col_vec![V, ncoeffs];
+
+        // if let Some(keys) = fmm.tree().get_all_keys() {
+        //     for key in keys.iter() {
+        //         multipoles.insert(*key, Arc::new(Mutex::new(dummy.new_like_self().eval())));
+        //         locals.insert(*key, Arc::new(Mutex::new(dummy.new_like_self().eval())));
+        //         if let Some(point_data) = fmm.tree().get_points(key) {
+        //             points.insert(*key, point_data.iter().cloned().collect_vec());
+
+        //             let npoints = point_data.len();
+        //             potentials.insert(*key, Arc::new(Mutex::new(rlst_col_vec![V, npoints])));
+
+        //             // Lookup indices and store with charges
+        //             let mut tmp_idx = Vec::new();
+        //             for point in point_data.iter() {
+        //                 tmp_idx.push(point.global_idx)
+        //             }
+        //             let mut tmp_charges = vec![V::zero(); point_data.len()];
+        //             for i in 0..tmp_idx.len() {
+        //                 tmp_charges[i] = *global_charges.get(&tmp_idx[i]).unwrap();
+        //             }
+
+        //             charges.insert(*key, Arc::new(tmp_charges));
+        //         }
+        //     }
+        // }
     }
 }
 

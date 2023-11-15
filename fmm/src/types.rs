@@ -54,6 +54,33 @@ where
     pub charges: HashMap<MortonKey, Arc<Vec<U>>>,
 }
 
+pub struct FmmDataLinear<T, U>
+where
+    T: Fmm,
+    U: Scalar<Real = U> + Float + Default,
+{
+    /// The associated FMM object, which implements an FMM interface
+    pub fmm: T,
+
+    /// The multipole expansion data at each box.
+    pub multipoles: Vec<U>,
+
+    /// The local expansion data at each box.
+    pub locals: Vec<U>,
+
+    /// The evaluated potentials at each leaf box.
+    pub potentials: Vec<U>,
+
+    /// The point data at each leaf box. (matches charges/global idxs, but displaced by factor 3)
+    pub points: Vec<U>,
+
+    /// The charge data at each leaf box.
+    pub charges: Vec<U>,
+
+    /// Global indices of each charge
+    pub global_indices: Vec<usize>,
+}
+
 /// Type to store data associated with the kernel independent (KiFMM) in.
 pub struct KiFmm<T, U, V, W>
 where
