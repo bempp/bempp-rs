@@ -180,24 +180,27 @@ where
                 );
 
             // Now compute the multipole expansions, with each of chunk_size boxes at a time.
-            let chunk_size = 128;
+            // println!("HERE {:?}={:?}={:?}", self.scales.len()/ncoeffs, self.leaf_multipoles.len(), check_potentials.data().len() / ncoeffs);
+        
+            let chunk_size = 512;
             check_potentials
                 .data()
                 .par_chunks(ncoeffs*chunk_size)
-                .zip(self.multipoles.par_chunks_exact(ncoeffs*chunk_size))
+                .zip(self.leaf_multipoles.into_par_iter()) // This is wrong, should be only leaf multipoles here, should probably be done by reference
                 .zip(self.scales.par_chunks_exact(ncoeffs*chunk_size))
-                .for_each(|((check_potential, multipole), scale)| {
+                .for_each(|((check_potential, multipole_ptr), scale)| {
 
                     let check_potential = unsafe { rlst_pointer_mat!['a, V, check_potential.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
-                    let scale = unsafe {rlst_pointer_mat!['a, V, scale.as_ptr(), (ncoeffs, chunk_size), (chunk_size, ncoeffs)]}.eval();
+                    let scale = unsafe {rlst_pointer_mat!['a, V, scale.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)]}.eval();
 
                     let tmp = (self.fmm.uc2e_inv_1.dot(&self.fmm.uc2e_inv_2.dot(&check_potential.cmp_wise_product(&scale)))).eval();
-                    // println!("here {:?} {:?} {:?}", tmp.shape(), tmp.data().len(), multipole.len());
+
                     unsafe {
-                        let mut raw = multipole.as_ptr() as *mut V;
+                        let mut ptr = multipole_ptr.raw;
+                        // let mut raw = multipole.raw as *mut V;
                         for i in 0..ncoeffs*chunk_size {
-                            *raw += tmp.data()[i];
-                            raw = raw.add(1);
+                            *ptr += tmp.data()[i];
+                            ptr = ptr.add(1);
                         }
                     }
                 })
@@ -207,6 +210,26 @@ where
     /// Multipole to multipole translations, multithreaded over all boxes at a given level.
     fn m2m<'a>(&self, level: u64) {
 
+        if let Some(sources) = self.fmm.tree().get_keys(level) {
+            // Assume that all source boxes are arranged in sets of siblings
+
+            // Find multipoles at this level, by reference
+            // let multipoles //
+            // self.multipoles.par_chunk
+
+            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+ 
+            // replace with 'multipoles'
+            let nsiblings = 8;
+            self.multipoles.par_chunks_exact(ncoeffs*nsiblings).for_each(|multipole| {
+
+                let tmp = unsafe { rlst_pointer_mat!['a, V, multipole.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)] };
+                self.fmm.m2m.dot(&tmp);
+
+                // Then need another vector of 'parent' multipoles that chunk exactly with this.
+
+            });
+        }
         // // Parallelise over nodes at a given level
         // if let Some(sources) = self.fmm.tree().get_keys(level) {
         //     sources.par_iter().for_each(move |&source| {

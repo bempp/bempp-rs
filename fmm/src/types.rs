@@ -65,6 +65,8 @@ where
     /// The multipole expansion data at each box.
     pub multipoles: Vec<U>,
 
+    pub leaf_multipoles: Vec<SendPtrMut<U>>,
+
     /// The local expansion data at each box.
     pub locals: Vec<U>,
 

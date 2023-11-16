@@ -26,7 +26,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{C2EType, ChargeDict, FmmData, FmmDataLinear, KiFmm};
+use crate::types::{C2EType, ChargeDict, FmmData, FmmDataLinear, KiFmm, SendPtrMut};
 use crate::{
     pinv::{pinv, SvdScalar},
     types::KiFmmLinear,
@@ -584,6 +584,21 @@ where
                 charges[i] = *charge;
             }
 
+
+            // Need a reference to leaf multipoles
+            let mut leaf_multipoles = Vec::new();
+            for (i, key) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
+
+                if fmm.tree().get_all_leaves_set().contains(key) {
+                    unsafe {
+                        let raw = multipoles.as_ptr().add(i*ncoeffs) as *mut V;
+                        leaf_multipoles.push(SendPtrMut { raw })
+                    }
+                }
+            }
+
+            // println!("leaf index pointer {:?}", leaf_index_pointer);
+
             // Create an index pointer for the charge data
             let mut index_pointer = 0;
             let mut charge_index_pointer = vec![(0usize, 0usize); nleaves];
@@ -626,6 +641,7 @@ where
             return Ok(Self {
                 fmm,
                 multipoles,
+                leaf_multipoles,
                 locals,
                 upward_surfaces,
                 downward_surfaces,
