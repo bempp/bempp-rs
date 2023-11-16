@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
 use bempp_traits::{
-    kernel::{Kernel, KernelScale},
+    kernel::{Kernel, ScaleInvariantKernel},
     types::{EvalType, KernelType, Scalar},
 };
 use num::traits::FloatConst;
@@ -16,7 +16,7 @@ pub struct Laplace3dKernel<T: Scalar> {
     _phantom_t: std::marker::PhantomData<T>,
 }
 
-impl<T: Scalar<Real = T>> KernelScale for Laplace3dKernel<T> {
+impl<T: Scalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
     type T = T;
 
     fn scale(&self, level: u64) -> Self::T {
