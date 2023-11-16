@@ -3,6 +3,8 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 use bempp_traits::types::Scalar;
+use bempp_traits::tree::{Point as PointInterface};
+use num::Float;
 
 use crate::types::point::{Point, Points};
 
@@ -63,6 +65,13 @@ where
     pub fn sort(&mut self) {
         self.points.sort();
     }
+}
+
+impl <T> PointInterface<T> for Point<T> 
+where 
+    T: Scalar<Real = T> + Float + Default
+{
+
 }
 
 // impl <T>Iterator for Points<T> {

@@ -166,11 +166,16 @@ where
             subset.sort();
         }
 
+        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+        
         MultiNodeTree {
             world: world.duplicate(),
             depth,
             domain: *domain,
             points,
+            coordinates,
+            global_indices,
             leaves,
             keys,
             leaves_to_points,
@@ -361,11 +366,16 @@ where
             subset.sort();
         }
 
+        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+        
         MultiNodeTree {
             world: world.duplicate(),
             depth,
             domain: *domain,
             points,
+            coordinates,
+            global_indices,
             leaves: globally_balanced,
             keys,
             leaves_to_points,
@@ -548,6 +558,7 @@ impl<T> Tree for MultiNodeTree<T>
 where
     T: Float + Default + Scalar<Real = T>,
 {
+    type Precision = T;
     type Domain = Domain<T>;
     type NodeIndex = MortonKey;
     type NodeIndexSlice<'a> = &'a [MortonKey]
@@ -588,7 +599,7 @@ where
         &self.leaves_set
     }
 
-    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
+    fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
         Some(&self.leaves)
     }
 
@@ -600,6 +611,35 @@ where
         }
     }
 
+
+    fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
+        Some(&self.points.points)
+    }
+
+    fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
+        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+            Some(&self.coordinates[l*3..r*3])
+        } else {
+            None
+        }
+    }
+
+    fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]> {
+        Some(&self.coordinates)
+    }
+
+    fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]> {
+        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+            Some(&self.global_indices[l..r])
+        } else {
+            None
+        }
+    }
+
+    fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
+        Some(&self.global_indices)
+    }
+
     fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
         self.leaves_set.contains(key)
     }
@@ -609,225 +649,225 @@ where
     }
 }
 
-impl<T> MultiNodeTree<T>
-where
-    T: Float + Default + Equivalence + Scalar<Real = T>,
-{
-    /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
-    ///
-    /// The idea is to communicate the required point and octant data across the distributed tree prior
-    /// to the running of the upward pass so that multipole expansions can be constructed independently
-    /// on each processor at the leaf level, and for the final potential evaluation each process already
-    /// contains its required point data for near field calculations.
-    pub fn create_let(&self) -> MultiNodeTree<T> {
-        // Communicate ranges globally using AllGather
-        let rank = self.world.rank();
-        let size = self.world.size();
+// impl<T> MultiNodeTree<T>
+// where
+//     T: Float + Default + Equivalence + Scalar<Real = T>,
+// {
+//     /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
+//     ///
+//     /// The idea is to communicate the required point and octant data across the distributed tree prior
+//     /// to the running of the upward pass so that multipole expansions can be constructed independently
+//     /// on each processor at the leaf level, and for the final potential evaluation each process already
+//     /// contains its required point data for near field calculations.
+//     pub fn create_let(&self) -> MultiNodeTree<T> {
+//         // Communicate ranges globally using AllGather
+//         let rank = self.world.rank();
+//         let size = self.world.size();
 
-        let mut ranges = vec![0 as KeyType; (size as usize) * 3];
+//         let mut ranges = vec![0 as KeyType; (size as usize) * 3];
 
-        self.world.all_gather_into(&self.range, &mut ranges);
+//         self.world.all_gather_into(&self.range, &mut ranges);
 
-        // Calculate users for each key in local tree
-        let mut users: Vec<Vec<Rank>> = Vec::new();
-        let mut key_packet_destinations = vec![0 as Rank; size as usize];
-        let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
+//         // Calculate users for each key in local tree
+//         let mut users: Vec<Vec<Rank>> = Vec::new();
+//         let mut key_packet_destinations = vec![0 as Rank; size as usize];
+//         let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
 
-        for key in self.keys_set.iter() {
-            let mut user_tmp: Vec<Rank> = Vec::new();
+//         for key in self.keys_set.iter() {
+//             let mut user_tmp: Vec<Rank> = Vec::new();
 
-            // Loop over all ranges, each key may be used by multiple processes
-            for chunk in ranges.chunks_exact(3) {
-                let rank = chunk[0] as Rank;
-                let min = MortonKey::from_morton(chunk[1]);
-                let max = MortonKey::from_morton(chunk[2]);
+//             // Loop over all ranges, each key may be used by multiple processes
+//             for chunk in ranges.chunks_exact(3) {
+//                 let rank = chunk[0] as Rank;
+//                 let min = MortonKey::from_morton(chunk[1]);
+//                 let max = MortonKey::from_morton(chunk[2]);
 
-                // Check if ranges overlap with the neighbors of the key's parent
-                if rank != self.world.rank() {
-                    if key.level() > 1 {
-                        let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
-                        let (cp_min, cp_max) = (
-                            colleagues_parent.iter().min(),
-                            colleagues_parent.iter().max(),
-                        );
+//                 // Check if ranges overlap with the neighbors of the key's parent
+//                 if rank != self.world.rank() {
+//                     if key.level() > 1 {
+//                         let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
+//                         let (cp_min, cp_max) = (
+//                             colleagues_parent.iter().min(),
+//                             colleagues_parent.iter().max(),
+//                         );
 
-                        if let (Some(cp_min), Some(cp_max)) = (cp_min, cp_max) {
-                            if (cp_min >= &min) && (cp_max <= &max)
-                                || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
-                                || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
-                                || (cp_min <= &min) && (cp_max >= &max)
-                            {
-                                user_tmp.push(rank);
+//                         if let (Some(cp_min), Some(cp_max)) = (cp_min, cp_max) {
+//                             if (cp_min >= &min) && (cp_max <= &max)
+//                                 || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
+//                                 || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
+//                                 || (cp_min <= &min) && (cp_max >= &max)
+//                             {
+//                                 user_tmp.push(rank);
 
-                                // Mark ranks as users of keys/leaves from this process
-                                if key_packet_destinations[rank as usize] == 0 {
-                                    key_packet_destinations[rank as usize] = 1
-                                }
+//                                 // Mark ranks as users of keys/leaves from this process
+//                                 if key_packet_destinations[rank as usize] == 0 {
+//                                     key_packet_destinations[rank as usize] = 1
+//                                 }
 
-                                if leaf_packet_destinations[rank as usize] == 0
-                                    && self.leaves_set.contains(key)
-                                {
-                                    leaf_packet_destinations[rank as usize] = 1;
-                                }
-                            }
-                        }
-                    }
-                    // If the key is at level one its parent is the root node, so by definition
-                    // it will always overlap with a range
-                    else if key.level() <= 1 {
-                        user_tmp.push(rank);
-                        if key_packet_destinations[rank as usize] == 0 {
-                            key_packet_destinations[rank as usize] = 1
-                        }
+//                                 if leaf_packet_destinations[rank as usize] == 0
+//                                     && self.leaves_set.contains(key)
+//                                 {
+//                                     leaf_packet_destinations[rank as usize] = 1;
+//                                 }
+//                             }
+//                         }
+//                     }
+//                     // If the key is at level one its parent is the root node, so by definition
+//                     // it will always overlap with a range
+//                     else if key.level() <= 1 {
+//                         user_tmp.push(rank);
+//                         if key_packet_destinations[rank as usize] == 0 {
+//                             key_packet_destinations[rank as usize] = 1
+//                         }
 
-                        if leaf_packet_destinations[rank as usize] == 0
-                            && self.leaves_set.contains(key)
-                        {
-                            leaf_packet_destinations[rank as usize] = 1;
-                        }
-                    }
-                }
-            }
-            users.push(user_tmp);
-        }
+//                         if leaf_packet_destinations[rank as usize] == 0
+//                             && self.leaves_set.contains(key)
+//                         {
+//                             leaf_packet_destinations[rank as usize] = 1;
+//                         }
+//                     }
+//                 }
+//             }
+//             users.push(user_tmp);
+//         }
 
-        // Communicate number of packets being received by each process globally
-        let mut keys_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &key_packet_destinations,
-            &mut keys_to_receive,
-            SystemOperation::sum(),
-        );
+//         // Communicate number of packets being received by each process globally
+//         let mut keys_to_receive = vec![0i32; size as usize];
+//         self.world.all_reduce_into(
+//             &key_packet_destinations,
+//             &mut keys_to_receive,
+//             SystemOperation::sum(),
+//         );
 
-        let mut leaves_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &leaf_packet_destinations,
-            &mut leaves_to_receive,
-            SystemOperation::sum(),
-        );
+//         let mut leaves_to_receive = vec![0i32; size as usize];
+//         self.world.all_reduce_into(
+//             &leaf_packet_destinations,
+//             &mut leaves_to_receive,
+//             SystemOperation::sum(),
+//         );
 
-        // Calculate the number of receives that this process is expecting
-        let recv_count_keys = keys_to_receive[rank as usize];
-        let recv_count_leaves = leaves_to_receive[rank as usize];
+//         // Calculate the number of receives that this process is expecting
+//         let recv_count_keys = keys_to_receive[rank as usize];
+//         let recv_count_leaves = leaves_to_receive[rank as usize];
 
-        // Filter for packet destinations
-        key_packet_destinations = key_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
+//         // Filter for packet destinations
+//         key_packet_destinations = key_packet_destinations
+//             .into_iter()
+//             .enumerate()
+//             .filter(|(_, x)| x > &0)
+//             .map(|(i, _)| i as Rank)
+//             .collect();
 
-        leaf_packet_destinations = leaf_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
+//         leaf_packet_destinations = leaf_packet_destinations
+//             .into_iter()
+//             .enumerate()
+//             .filter(|(_, x)| x > &0)
+//             .map(|(i, _)| i as Rank)
+//             .collect();
 
-        let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut point_packets: Vec<Vec<Point<T>>> = Vec::new();
+//         let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
+//         let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
+//         let mut point_packets: Vec<Vec<Point<T>>> = Vec::new();
 
-        let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
-        let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
+//         let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
+//         let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
 
-        // Form packets for each send
-        for &rank in key_packet_destinations.iter() {
-            let key_packet: Vec<MortonKey> = self
-                .keys_set
-                .iter()
-                .zip(users.iter())
-                .filter(|(_, user)| user.contains(&rank))
-                .map(|(k, _)| *k)
-                .collect();
-            let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
+//         // Form packets for each send
+//         for &rank in key_packet_destinations.iter() {
+//             let key_packet: Vec<MortonKey> = self
+//                 .keys_set
+//                 .iter()
+//                 .zip(users.iter())
+//                 .filter(|(_, user)| user.contains(&rank))
+//                 .map(|(k, _)| *k)
+//                 .collect();
+//             let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
 
-            if !key_packet.is_empty() {
-                key_packets.push(key_packet);
-                key_packet_destinations_filt.push(rank);
-            }
+//             if !key_packet.is_empty() {
+//                 key_packets.push(key_packet);
+//                 key_packet_destinations_filt.push(rank);
+//             }
 
-            if leaf_packet_destinations.contains(&rank) {
-                let leaf_packet: Vec<MortonKey> = key_packet_set
-                    .intersection(&self.leaves_set)
-                    .cloned()
-                    .collect();
+//             if leaf_packet_destinations.contains(&rank) {
+//                 let leaf_packet: Vec<MortonKey> = key_packet_set
+//                     .intersection(&self.leaves_set)
+//                     .cloned()
+//                     .collect();
 
-                let point_packet: Vec<Point<T>> = leaf_packet
-                    .iter()
-                    .flat_map(|leaf| self.get_points(leaf).unwrap().to_vec())
-                    .collect();
+//                 let point_packet: Vec<Point<T>> = leaf_packet
+//                     .iter()
+//                     .flat_map(|leaf| self.get_points(leaf).unwrap().to_vec())
+//                     .collect();
 
-                if !leaf_packet.is_empty() {
-                    leaf_packets.push(leaf_packet);
-                    point_packets.push(point_packet);
-                    leaf_packet_destinations_filt.push(rank);
-                }
-            }
-        }
+//                 if !leaf_packet.is_empty() {
+//                     leaf_packets.push(leaf_packet);
+//                     point_packets.push(point_packet);
+//                     leaf_packet_destinations_filt.push(rank);
+//                 }
+//             }
+//         }
 
-        // Communicate keys, leaves and points
-        let received_leaves = all_to_allv_sparse(
-            &self.world,
-            &leaf_packets,
-            &leaf_packet_destinations_filt,
-            &recv_count_leaves,
-        );
+//         // Communicate keys, leaves and points
+//         let received_leaves = all_to_allv_sparse(
+//             &self.world,
+//             &leaf_packets,
+//             &leaf_packet_destinations_filt,
+//             &recv_count_leaves,
+//         );
 
-        let mut received_points = all_to_allv_sparse(
-            &self.world,
-            &point_packets,
-            &leaf_packet_destinations_filt,
-            &recv_count_leaves,
-        );
+//         let mut received_points = all_to_allv_sparse(
+//             &self.world,
+//             &point_packets,
+//             &leaf_packet_destinations_filt,
+//             &recv_count_leaves,
+//         );
 
-        let received_keys = all_to_allv_sparse(
-            &self.world,
-            &key_packets,
-            &key_packet_destinations_filt,
-            &recv_count_keys,
-        );
+//         let received_keys = all_to_allv_sparse(
+//             &self.world,
+//             &key_packets,
+//             &key_packet_destinations_filt,
+//             &recv_count_keys,
+//         );
 
-        // Group received points by received leaves
-        received_points.sort();
+//         // Group received points by received leaves
+//         received_points.sort();
 
-        let mut leaves_to_points = HashMap::new();
-        let mut curr = received_points[0];
-        let mut curr_idx = 0;
+//         let mut leaves_to_points = HashMap::new();
+//         let mut curr = received_points[0];
+//         let mut curr_idx = 0;
 
-        for (i, point) in received_points.iter().enumerate() {
-            if point.encoded_key != curr.encoded_key {
-                leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
-                curr_idx = i;
-                curr = *point;
-            }
-        }
-        leaves_to_points.insert(curr.encoded_key, (curr_idx, received_points.len()));
+//         for (i, point) in received_points.iter().enumerate() {
+//             if point.encoded_key != curr.encoded_key {
+//                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
+//                 curr_idx = i;
+//                 curr = *point;
+//             }
+//         }
+//         leaves_to_points.insert(curr.encoded_key, (curr_idx, received_points.len()));
 
-        let locally_essential_tree = MultiNodeTree {
-            range: self.range,
-            world: self.world.duplicate(),
-            depth: self.depth,
-            domain: self.domain,
-            leaves_to_points,
-            levels_to_keys: HashMap::default(),
-            leaves_set: received_leaves.iter().cloned().collect(),
-            keys_set: received_keys.iter().cloned().collect(),
-            points: Points {
-                points: received_points,
-                index: 0,
-            },
-            leaves: MortonKeys {
-                keys: received_leaves,
-                index: 0,
-            },
-            keys: MortonKeys {
-                keys: received_keys,
-                index: 0,
-            },
-        };
+//         let locally_essential_tree = MultiNodeTree {
+//             range: self.range,
+//             world: self.world.duplicate(),
+//             depth: self.depth,
+//             domain: self.domain,
+//             leaves_to_points,
+//             levels_to_keys: HashMap::default(),
+//             leaves_set: received_leaves.iter().cloned().collect(),
+//             keys_set: received_keys.iter().cloned().collect(),
+//             points: Points {
+//                 points: received_points,
+//                 index: 0,
+//             },
+//             leaves: MortonKeys {
+//                 keys: received_leaves,
+//                 index: 0,
+//             },
+//             keys: MortonKeys {
+//                 keys: received_keys,
+//                 index: 0,
+//             },
+//         };
 
-        locally_essential_tree
-    }
-}
+//         locally_essential_tree
+//     }
+// }

@@ -25,6 +25,12 @@ where
     ///  All Points.
     pub points: Points<T>,
 
+    /// All coordinates
+    pub coordinates: Vec<T>,
+
+    /// All global indices
+    pub global_indices: Vec<usize>,
+
     /// The leaves that span the tree, and associated Point data.
     pub leaves: MortonKeys,
 

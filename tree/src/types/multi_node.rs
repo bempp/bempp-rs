@@ -28,6 +28,12 @@ where
 
     ///  A vector of Cartesian points.
     pub points: Points<T>,
+    
+    /// All coordinates
+    pub coordinates: Vec<T>,
+
+    /// All global indices
+    pub global_indices: Vec<usize>,
 
     /// The leaves that span the tree.
     pub leaves: MortonKeys,

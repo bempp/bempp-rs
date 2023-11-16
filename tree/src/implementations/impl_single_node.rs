@@ -135,9 +135,14 @@ where
             subset.sort();
         }
 
+        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+
         SingleNodeTree {
             depth,
             points,
+            coordinates,
+            global_indices,
             domain: *domain,
             leaves,
             keys,
@@ -277,10 +282,15 @@ where
             let subset = &mut keys[l..r];
             subset.sort();
         }
+        
+        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
 
         SingleNodeTree {
             depth,
             points,
+            coordinates,
+            global_indices,
             domain: *domain,
             leaves,
             keys,
@@ -507,12 +517,13 @@ impl<T> Tree for SingleNodeTree<T>
 where
     T: Float + Default + Scalar<Real = T>,
 {
+    type Precision = T;
     type Domain = Domain<T>;
     type NodeIndex = MortonKey;
     type NodeIndexSlice<'a> = &'a [MortonKey]
         where T: 'a;
     type NodeIndices = MortonKeys;
-    type Point = Point<T>;
+    type Point = Point<Self::Precision>;
 
     type PointSlice<'a> = &'a [Point<T>]
         where T: 'a;
@@ -549,7 +560,7 @@ where
         &self.leaves_set
     }
 
-    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
+    fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
         Some(&self.leaves)
     }
 
@@ -559,6 +570,34 @@ where
         } else {
             None
         }
+    }
+
+    fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
+        Some(&self.points.points)
+    }
+
+    fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
+        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+            Some(&self.coordinates[l*3..r*3])
+        } else {
+            None
+        }
+    }
+
+    fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]> {
+        Some(&self.coordinates)
+    }
+
+    fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]> {
+        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+            Some(&self.global_indices[l..r])
+        } else {
+            None
+        }
+    }
+
+    fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
+        Some(&self.global_indices)
     }
 
     fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
@@ -591,7 +630,7 @@ mod test {
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
-            .get_leaves()
+            .get_all_leaves()
             .unwrap()
             .iter()
             .map(|node| node.level())
@@ -609,7 +648,7 @@ mod test {
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
-            .get_leaves()
+            .get_all_leaves()
             .unwrap()
             .iter()
             .map(|node| node.level())
@@ -645,7 +684,7 @@ mod test {
 
         // Test that tree is not uniform
         let levels: Vec<u64> = tree
-            .get_leaves()
+            .get_all_leaves()
             .unwrap()
             .iter()
             .map(|node| node.level())
@@ -685,8 +724,8 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4), &global_idxs);
         let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs);
-        test_no_overlaps_helper(uniform.get_leaves().unwrap());
-        test_no_overlaps_helper(adaptive.get_leaves().unwrap());
+        test_no_overlaps_helper(uniform.get_all_leaves().unwrap());
+        test_no_overlaps_helper(adaptive.get_all_leaves().unwrap());
     }
 
     #[test]
