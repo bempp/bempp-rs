@@ -35,7 +35,7 @@ use rlst::{
     },
 };
 
-use crate::types::{FmmData, KiFmm};
+use crate::types::{FmmData, KiFmm, SendPtrMut, SendPtr};
 
 impl<T, U, V> SourceTranslation for FmmData<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -521,20 +521,6 @@ where
         }
     }
 }
-
-#[derive(Clone, Debug, Copy)]
-struct SendPtrMut<T> {
-    raw: *mut T,
-}
-
-unsafe impl<T> Sync for SendPtrMut<T> {}
-
-#[derive(Clone, Debug, Copy)]
-struct SendPtr<T> {
-    raw: *const T,
-}
-
-unsafe impl<T> Sync for SendPtr<T> {}
 
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
 impl<T, U> FieldTranslation<U>

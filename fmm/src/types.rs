@@ -71,8 +71,8 @@ where
     /// The evaluated potentials at each leaf box.
     pub potentials: Vec<U>,
 
-    /// The point data at each leaf box. (matches charges/global idxs, but displaced by factor 3)
-    pub points: Vec<U>,
+    // /// The point data at each leaf box. (matches charges/global idxs, but displaced by factor 3)
+    // pub points: Vec<U>,
 
     /// The charge data at each leaf box.
     pub charges: Vec<U>,
@@ -123,3 +123,21 @@ where
     /// The M2L operator matrices, as well as metadata associated with this FMM.
     pub m2l: V,
 }
+
+
+/// A threadsafe mutable raw pointer
+#[derive(Clone, Debug, Copy)]
+pub struct SendPtrMut<T> {
+    pub raw: *mut T,
+}
+
+unsafe impl<T> Sync for SendPtrMut<T> {}
+
+
+/// A threadsafe raw pointer
+#[derive(Clone, Debug, Copy)]
+pub struct SendPtr<T> {
+    pub raw: *const T,
+}
+
+unsafe impl<T> Sync for SendPtr<T> {}

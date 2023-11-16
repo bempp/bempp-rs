@@ -329,64 +329,32 @@ where
         if let Some(keys) = fmm.tree().get_all_keys() {
             let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
             let nkeys = keys.len();
-            let mut npoints = 0;
-
-            for key in keys.iter() {
-                if let Some(points) = fmm.tree().get_points(key) {
-                    npoints += points.len();
-                }
-            }
+            let npoints = fmm.tree().get_all_points().unwrap().len();
 
             let multipoles = vec![V::default(); ncoeffs * nkeys];
             let locals = vec![V::default(); ncoeffs * nkeys];
 
             let potentials = vec![V::default(); npoints];
-            let points = vec![V::default(); npoints * 3];
-            let charges = vec![V::default(); npoints];
+            let mut charges = vec![V::default(); npoints];
             let global_indices = vec![0usize; npoints];
 
-            // Assign point coordinates and associated charges.
-            // fmm.tree().get_all_points();
+            // Lookup leaf coordinates, and assign charges from within the data tree.
+            for (i, g_idx) in fmm.tree().get_all_global_indices().unwrap().iter().enumerate() {
+                let charge = global_charges.get(g_idx).unwrap();
+                charges[i] = *charge;
+            }
 
             return Ok(Self {
                 fmm,
                 multipoles,
                 locals,
                 potentials,
-                points,
                 charges,
                 global_indices,
             });
         }
 
         Err("Not a valid tree".to_string())
-
-        // let dummy = rlst_col_vec![V, ncoeffs];
-
-        // if let Some(keys) = fmm.tree().get_all_keys() {
-        //     for key in keys.iter() {
-        //         multipoles.insert(*key, Arc::new(Mutex::new(dummy.new_like_self().eval())));
-        //         locals.insert(*key, Arc::new(Mutex::new(dummy.new_like_self().eval())));
-        //         if let Some(point_data) = fmm.tree().get_points(key) {
-        //             points.insert(*key, point_data.iter().cloned().collect_vec());
-
-        //             let npoints = point_data.len();
-        //             potentials.insert(*key, Arc::new(Mutex::new(rlst_col_vec![V, npoints])));
-
-        //             // Lookup indices and store with charges
-        //             let mut tmp_idx = Vec::new();
-        //             for point in point_data.iter() {
-        //                 tmp_idx.push(point.global_idx)
-        //             }
-        //             let mut tmp_charges = vec![V::zero(); point_data.len()];
-        //             for i in 0..tmp_idx.len() {
-        //                 tmp_charges[i] = *global_charges.get(&tmp_idx[i]).unwrap();
-        //             }
-
-        //             charges.insert(*key, Arc::new(tmp_charges));
-        //         }
-        //     }
-        // }
     }
 }
 
@@ -736,7 +704,7 @@ mod test {
 
     #[test]
     fn test_fmm_fft_f64() {
-        let npoints = 10000;
+        let npoints = 1000000;
         let points = points_fixture(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
@@ -746,7 +714,7 @@ mod test {
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 3;
+        let depth = 5;
         let kernel = Laplace3dKernel::<f64>::default();
 
         let tree = SingleNodeTree::new(
@@ -765,8 +733,10 @@ mod test {
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
+        let s = Instant::now();
         let datatree = FmmData::new(fmm, &charge_dict);
-
+        println!("data tree setup old {:?}", s.elapsed());
+        assert!(false);
         datatree.run(Some(true));
 
         let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
@@ -888,5 +858,43 @@ mod test {
 
         let rel_error = abs_error / (direct.iter().sum::<f32>());
         assert!(rel_error <= 1e-4);
+    }
+
+    #[test]
+    fn test_fmm_linear() {
+        let npoints = 1000000;
+        let points = points_fixture::<f64>(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let charges = vec![1.0; npoints];
+
+        let order = 6;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.95;
+        let adaptive = false;
+        let ncrit = 150;
+        let depth = 5;
+        let kernel = Laplace3dKernel::default();
+
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            Some(depth),
+            &global_idxs[..],
+        );
+
+        let m2l_data_fft =
+            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+
+        // Form charge dict, matching charges with their associated global indices
+        let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+
+        let s = Instant::now();
+        let datatree = FmmDataLinear::new(fmm, &charge_dict);
+ 
+        println!("data tree setup {:?}", s.elapsed());
+        assert!(false)
     }
 }
