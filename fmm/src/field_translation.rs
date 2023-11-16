@@ -30,12 +30,12 @@ use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
     dense::{
-        rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, Shape,
-        VectorContainer,
+        base_matrix::BaseMatrix, rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot,
+        Matrix, MultiplyAdd, Shape, VectorContainer,
     },
 };
 
-use crate::types::{FmmData, KiFmm, SendPtrMut, SendPtr};
+use crate::types::{FmmData, FmmDataLinear, KiFmm, KiFmmLinear, SendPtr, SendPtrMut};
 
 impl<T, U, V> SourceTranslation for FmmData<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -125,6 +125,107 @@ where
                     (target_multipole_lock.deref() + target_multipole_owned).eval();
             })
         }
+    }
+}
+
+const P2M_CHUNK_SIZE: usize = 128;
+
+impl<T, U, V> SourceTranslation for FmmDataLinear<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+where
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
+    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
+    V: MultiplyAdd<
+        V,
+        VectorContainer<V>,
+        VectorContainer<V>,
+        VectorContainer<V>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
+{
+    /// Point to multipole evaluations, multithreaded over each leaf box.
+    fn p2m<'a>(&self) {
+        // Iterate over sibling sets
+        if let Some(leaves) = self.fmm.tree().get_all_leaves() {
+            let nleaves = leaves.len();
+            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+
+            let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
+
+            let mut check_potentials = rlst_col_vec![V, nleaves * ncoeffs];
+            let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
+            let dim = self.fmm.kernel.space_dimension();
+
+            check_potentials
+                .data_mut()
+                .par_chunks_exact_mut(ncoeffs)
+                .zip(self.upward_surfaces.par_chunks_exact(surface_size))
+                .zip(&self.charge_index_pointer)
+                .for_each(
+                    |((check_potential, upward_check_surface), charge_index_pointer)| {
+                        let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
+                        let coordinates = &coordinates
+                            [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
+
+                        self.fmm.kernel.evaluate_st(
+                            EvalType::Value,
+                            coordinates,
+                            upward_check_surface,
+                            charges,
+                            check_potential,
+                        );
+                    },
+                );
+
+            // Now compute the multipole expansions, with each of chunk_size boxes at a time.
+            let chunk_size = 128;
+            check_potentials
+                .data()
+                .par_chunks(ncoeffs*chunk_size)
+                .zip(self.multipoles.par_chunks_exact(ncoeffs*chunk_size))
+                .zip(self.scales.par_chunks_exact(ncoeffs*chunk_size))
+                .for_each(|((check_potential, multipole), scale)| {
+
+                    let check_potential = unsafe { rlst_pointer_mat!['a, V, check_potential.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
+                    let scale = unsafe {rlst_pointer_mat!['a, V, scale.as_ptr(), (ncoeffs, chunk_size), (chunk_size, ncoeffs)]}.eval();
+
+                    let tmp = (self.fmm.uc2e_inv_1.dot(&self.fmm.uc2e_inv_2.dot(&check_potential.cmp_wise_product(&scale)))).eval();
+                    // println!("here {:?} {:?} {:?}", tmp.shape(), tmp.data().len(), multipole.len());
+                    unsafe {
+                        let mut raw = multipole.as_ptr() as *mut V;
+                        for i in 0..ncoeffs*chunk_size {
+                            *raw += tmp.data()[i];
+                            raw = raw.add(1);
+                        }
+                    }
+                })
+        }
+    }
+
+    /// Multipole to multipole translations, multithreaded over all boxes at a given level.
+    fn m2m<'a>(&self, level: u64) {
+
+        // // Parallelise over nodes at a given level
+        // if let Some(sources) = self.fmm.tree().get_keys(level) {
+        //     sources.par_iter().for_each(move |&source| {
+        //         let operator_index = source.siblings().iter().position(|&x| x == source).unwrap();
+        //         let source_multipole_arc = Arc::clone(self.multipoles.get(&source).unwrap());
+        //         let target_multipole_arc =
+        //             Arc::clone(self.multipoles.get(&source.parent()).unwrap());
+
+        //         let source_multipole_lock = source_multipole_arc.lock().unwrap();
+
+        //         let target_multipole_owned =
+        //             self.fmm.m2m[operator_index].dot(&source_multipole_lock);
+
+        //         let mut target_multipole_lock = target_multipole_arc.lock().unwrap();
+
+        //         *target_multipole_lock.deref_mut() =
+        //             (target_multipole_lock.deref() + target_multipole_owned).eval();
+        //     })
+        // }
     }
 }
 
@@ -376,7 +477,11 @@ where
 impl<T, U> FieldTranslation<U>
     for FmmData<KiFmm<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
 where
-    T: Kernel<T = U> + ScaleInvariantKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = U>
+        + ScaleInvariantKernel<T = U>
+        + std::marker::Send
+        + std::marker::Sync
+        + Default,
     DenseMatrixLinAlgBuilder<U>: Svd,
     U: Scalar<Real = U>,
     U: Float
@@ -526,7 +631,11 @@ where
 impl<T, U> FieldTranslation<U>
     for FmmData<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
-    T: Kernel<T = U> + ScaleInvariantKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = U>
+        + ScaleInvariantKernel<T = U>
+        + std::marker::Send
+        + std::marker::Sync
+        + Default,
     U: Scalar<Real = U>
         + Float
         + Default

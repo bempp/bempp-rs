@@ -71,12 +71,21 @@ where
     /// The evaluated potentials at each leaf box.
     pub potentials: Vec<U>,
 
-    // /// The point data at each leaf box. (matches charges/global idxs, but displaced by factor 3)
-    // pub points: Vec<U>,
+    /// All upward surfaces
+    pub upward_surfaces: Vec<U>,
+
+    /// All downward surfaces
+    pub downward_surfaces: Vec<U>,
 
     /// The charge data at each leaf box.
     pub charges: Vec<U>,
 
+    /// Index pointer between morton keys and charges
+    pub charge_index_pointer: Vec<(usize, usize)>,
+
+    /// Scales of each leaf operator
+    pub scales: Vec<U>,
+    
     /// Global indices of each charge
     pub global_indices: Vec<usize>,
 }
@@ -124,6 +133,48 @@ where
     pub m2l: V,
 }
 
+/// Type to store data associated with the kernel independent (KiFMM) in.
+pub struct KiFmmLinear<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    /// The expansion order
+    pub order: usize,
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_1: C2EType<W>,
+    pub uc2e_inv_2: C2EType<W>,
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_1: C2EType<W>,
+    pub dc2e_inv_2: C2EType<W>,
+
+    /// The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    pub alpha_inner: W,
+
+    /// The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    pub alpha_outer: W,
+
+    /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
+    pub m2m: C2EType<W>,
+
+    /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
+    pub l2l: C2EType<W>,
+
+    /// The tree (single or multi node) associated with this FMM
+    pub tree: T,
+
+    /// The kernel associated with this FMM.
+    pub kernel: U,
+
+    /// The M2L operator matrices, as well as metadata associated with this FMM.
+    pub m2l: V,
+}
 
 /// A threadsafe mutable raw pointer
 #[derive(Clone, Debug, Copy)]
@@ -132,7 +183,6 @@ pub struct SendPtrMut<T> {
 }
 
 unsafe impl<T> Sync for SendPtrMut<T> {}
-
 
 /// A threadsafe raw pointer
 #[derive(Clone, Debug, Copy)]

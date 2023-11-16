@@ -19,15 +19,18 @@ use rlst::{
 
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
-    fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
+    fmm::{Fmm, FmmLoop, KiFmm as KiFmmTrait, SourceTranslation, TargetTranslation, TimeDict},
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
     types::EvalType,
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::pinv::{pinv, SvdScalar};
 use crate::types::{C2EType, ChargeDict, FmmData, FmmDataLinear, KiFmm};
+use crate::{
+    pinv::{pinv, SvdScalar},
+    types::KiFmmLinear,
+};
 
 /// Implementation of constructor for single node KiFMM
 impl<'a, T, U, V> KiFmm<SingleNodeTree<V>, T, U, V>
@@ -251,6 +254,235 @@ where
     }
 }
 
+/// Implementation of constructor for single node KiFMM
+impl<'a, T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
+where
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
+    U: FieldTranslationData<T>,
+    V: Scalar<Real = V> + Default + Float,
+    SvdScalar<V>: PartialOrd,
+    SvdScalar<V>: Scalar + Float + ToPrimitive,
+    DenseMatrixLinAlgBuilder<V>: Svd,
+    V: MultiplyAdd<
+        V,
+        VectorContainer<V>,
+        VectorContainer<V>,
+        VectorContainer<V>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
+    SvdScalar<V>: MultiplyAdd<
+        SvdScalar<V>,
+        VectorContainer<SvdScalar<V>>,
+        VectorContainer<SvdScalar<V>>,
+        VectorContainer<SvdScalar<V>>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
+{
+    /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
+    /// the associated single node octree, and the associated kernel function.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `alpha_inner` - The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    /// * `alpha_order` - The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    /// * `kernel` - The kernel function for this FMM.
+    /// * `tree` - The type of tree associated with this FMM, can be single or multi node.
+    /// * `m2l` - The M2L operator matrices, as well as metadata associated with this FMM.
+    pub fn new(
+        order: usize,
+        alpha_inner: V,
+        alpha_outer: V,
+        kernel: T,
+        tree: SingleNodeTree<V>,
+        m2l: U,
+    ) -> Self {
+        let upward_equivalent_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
+        let upward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
+        let downward_equivalent_surface =
+            ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
+        let downward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
+
+        let nequiv_surface = upward_equivalent_surface.len() / kernel.space_dimension();
+        let ncheck_surface = upward_check_surface.len() / kernel.space_dimension();
+
+        // Store in RLST matrices
+        let upward_equivalent_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, upward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
+        };
+        let upward_check_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, upward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
+        };
+        let downward_equivalent_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, downward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
+        };
+        let downward_check_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
+        };
+
+        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
+        // as well as their inverses using DGESVD.
+        let mut uc2e = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+        kernel.assemble_st(
+            EvalType::Value,
+            upward_equivalent_surface.data(),
+            upward_check_surface.data(),
+            uc2e.data_mut(),
+        );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let uc2e = uc2e.transpose().eval();
+
+        let mut dc2e = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+        kernel.assemble_st(
+            EvalType::Value,
+            downward_equivalent_surface.data(),
+            downward_check_surface.data(),
+            dc2e.data_mut(),
+        );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let dc2e = dc2e.transpose().eval();
+
+        let (s, ut, v) = pinv::<V>(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_mat![SvdScalar<V>, (s.len(), s.len())];
+        for i in 0..s.len() {
+            mat_s[[i, i]] = SvdScalar::<V>::from_real(s[i]);
+        }
+        let uc2e_inv_1 = v.dot(&mat_s);
+        let uc2e_inv_2 = ut;
+
+        let uc2e_inv_1_shape = uc2e_inv_1.shape();
+        let uc2e_inv_2_shape = uc2e_inv_2.shape();
+
+        let uc2e_inv_1 = uc2e_inv_1
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let uc2e_inv_1 = unsafe {
+            rlst_pointer_mat!['a, V, uc2e_inv_1.as_ptr(), uc2e_inv_1_shape, (1, uc2e_inv_1_shape.0)]
+        }
+        .eval();
+        let uc2e_inv_2 = uc2e_inv_2
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let uc2e_inv_2 = unsafe {
+            rlst_pointer_mat!['a, V, uc2e_inv_2.as_ptr(), uc2e_inv_2_shape, (1, uc2e_inv_2_shape.0)]
+        }
+        .eval();
+
+        let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_mat![SvdScalar<V>, (s.len(), s.len())];
+        for i in 0..s.len() {
+            mat_s[[i, i]] = SvdScalar::<V>::from_real(s[i]);
+        }
+
+        let dc2e_inv_1 = v.dot(&mat_s);
+        let dc2e_inv_2 = ut;
+
+        let dc2e_inv_1_shape = dc2e_inv_1.shape();
+        let dc2e_inv_2_shape = dc2e_inv_2.shape();
+
+        let dc2e_inv_1 = dc2e_inv_1
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let dc2e_inv_1 = unsafe {
+            rlst_pointer_mat!['a, V, dc2e_inv_1.as_ptr(), dc2e_inv_1_shape, (1, dc2e_inv_1_shape.0)]
+        }
+        .eval();
+        let dc2e_inv_2 = dc2e_inv_2
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let dc2e_inv_2 = unsafe {
+            rlst_pointer_mat!['a, V, dc2e_inv_2.as_ptr(), dc2e_inv_2_shape, (1, dc2e_inv_2_shape.0)]
+        }
+        .eval();
+
+        // Calculate M2M/L2L matrices
+        let children = ROOT.children();
+        let mut m2m = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
+        let mut l2l = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
+
+        for (i, child) in children.iter().enumerate() {
+            let child_upward_equivalent_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_downward_check_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_upward_equivalent_surface = unsafe {
+                rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, child_upward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
+            };
+            let child_downward_check_surface = unsafe {
+                rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, child_downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
+            };
+
+            let mut pc2ce = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+
+            kernel.assemble_st(
+                EvalType::Value,
+                child_upward_equivalent_surface.data(),
+                upward_check_surface.data(),
+                pc2ce.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let pc2ce = pc2ce.transpose().eval();
+
+            let tmp = uc2e_inv_1.dot(&uc2e_inv_2.dot(&pc2ce)).eval();
+            let l = i * nequiv_surface * nequiv_surface;
+            let r = l + nequiv_surface * nequiv_surface;
+
+            m2m.data_mut()[l..r].copy_from_slice(tmp.data());
+
+            let mut cc2pe = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+
+            kernel.assemble_st(
+                EvalType::Value,
+                downward_equivalent_surface.data(),
+                child_downward_check_surface.data(),
+                cc2pe.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let cc2pe = cc2pe.transpose().eval();
+            let mut tmp = dc2e_inv_1.dot(&dc2e_inv_2.dot(&cc2pe)).eval();
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|d| *d *= kernel.scale(child.level()));
+
+            let l = i * nequiv_surface * nequiv_surface;
+            let r = l + nequiv_surface * nequiv_surface;
+            l2l.data_mut()[l..r].copy_from_slice(tmp.data());
+        }
+
+        Self {
+            order,
+            uc2e_inv_1,
+            uc2e_inv_2,
+            dc2e_inv_1,
+            dc2e_inv_2,
+            alpha_inner,
+            alpha_outer,
+            m2m,
+            l2l,
+            kernel,
+            tree,
+            m2l,
+        }
+    }
+}
+
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmData<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -311,9 +543,9 @@ where
 }
 
 /// Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U, V> FmmDataLinear<KiFmm<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> FmmDataLinear<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V>,
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
     V: Float + Scalar<Real = V> + Default,
 {
@@ -323,12 +555,14 @@ where
     /// `fmm` - A single node KiFMM object.
     /// `global_charges` - The charge data associated to the point data via unique global indices.
     pub fn new(
-        fmm: KiFmm<SingleNodeTree<V>, T, U, V>,
+        fmm: KiFmmLinear<SingleNodeTree<V>, T, U, V>,
         global_charges: &ChargeDict<V>,
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
             let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
             let nkeys = keys.len();
+            let leaves = fmm.tree().get_all_leaves().unwrap();
+            let nleaves = leaves.len();
             let npoints = fmm.tree().get_all_points().unwrap().len();
 
             let multipoles = vec![V::default(); ncoeffs * nkeys];
@@ -339,17 +573,66 @@ where
             let global_indices = vec![0usize; npoints];
 
             // Lookup leaf coordinates, and assign charges from within the data tree.
-            for (i, g_idx) in fmm.tree().get_all_global_indices().unwrap().iter().enumerate() {
+            for (i, g_idx) in fmm
+                .tree()
+                .get_all_global_indices()
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
                 let charge = global_charges.get(g_idx).unwrap();
                 charges[i] = *charge;
+            }
+
+            // Create an index pointer for the charge data
+            let mut index_pointer = 0;
+            let mut charge_index_pointer = vec![(0usize, 0usize); nleaves];
+            let mut scales = vec![V::default(); nleaves*ncoeffs];
+            for (i, leaf) in leaves.iter().enumerate() {
+
+                let l = i * ncoeffs;
+                let r = l + ncoeffs;
+                scales[l..r].copy_from_slice(vec![fmm.kernel.scale(leaf.level()); ncoeffs].as_slice());
+                let npoints;
+                if let Some(points) = fmm.tree().get_points(leaf) {
+                    npoints = points.len();
+                } else {
+                    npoints = 0;
+                }
+
+                let bounds = (index_pointer, index_pointer + npoints);
+                charge_index_pointer[i] = bounds;
+                index_pointer += npoints
+            }
+
+            let dim = fmm.kernel().space_dimension();
+            let mut upward_surfaces = vec![V::default(); ncoeffs * nkeys * dim];
+            let mut downward_surfaces = vec![V::default(); ncoeffs * nkeys * dim];
+            // For each key form both upward and downward check surfaces
+            for (i, leaf) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
+                let upward_surface =
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+
+                let downward_surface =
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
+
+                let l = i * ncoeffs * dim;
+                let r = l + ncoeffs * dim;
+
+                upward_surfaces[l..r].copy_from_slice(&upward_surface);
+                downward_surfaces[l..r].copy_from_slice(&downward_surface);
             }
 
             return Ok(Self {
                 fmm,
                 multipoles,
                 locals,
+                upward_surfaces,
+                downward_surfaces,
                 potentials,
                 charges,
+                charge_index_pointer,
+                scales,
                 global_indices,
             });
         }
@@ -358,7 +641,62 @@ where
     }
 }
 
+impl<T, U, V, W> KiFmmTrait for KiFmm<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_inner
+    }
+
+    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_outer
+    }
+}
+
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    type Tree = T;
+    type Kernel = U;
+
+    fn order(&self) -> usize {
+        self.order
+    }
+
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
+
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
+    }
+}
+
+impl<T, U, V, W> KiFmmTrait for KiFmmLinear<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_inner
+    }
+
+    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_outer
+    }
+}
+
+impl<T, U, V, W> Fmm for KiFmmLinear<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
@@ -736,8 +1074,12 @@ mod test {
         let s = Instant::now();
         let datatree = FmmData::new(fmm, &charge_dict);
         println!("data tree setup old {:?}", s.elapsed());
-        assert!(false);
         datatree.run(Some(true));
+
+        let s = Instant::now();
+        datatree.p2m();
+        println!("linear p2m {:?}", s.elapsed());
+        assert!(false);
 
         let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
 
@@ -886,15 +1228,20 @@ mod test {
         let m2l_data_fft =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
         let s = Instant::now();
-        let datatree = FmmDataLinear::new(fmm, &charge_dict);
- 
+        let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
+
         println!("data tree setup {:?}", s.elapsed());
+
+        let s = Instant::now();
+        datatree.p2m();
+        println!("linear p2m {:?}", s.elapsed());
+
         assert!(false)
     }
 }
