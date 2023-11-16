@@ -149,4 +149,58 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_against_cl() {
+        let grid = regular_sphere(2);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+        let colouring = space.compute_cell_colouring();
+
+        let mut matrix =
+            zero_matrix::<f64>((space.dofmap().global_size(), space.dofmap().global_size()));
+        batched::assemble_nonsingular::<16, 16>(
+            &mut matrix,
+            &laplace_3d::Laplace3dKernel::new(),
+            false,
+            false,
+            &space,
+            &space,
+            &colouring,
+            &colouring,
+            128,
+        );
+        let mut matrix2 =
+            zero_matrix::<f64>((space.dofmap().global_size(), space.dofmap().global_size()));
+        cl_kernel::assemble(
+            &mut matrix,
+            &Laplace3dKernel::new(),
+            false,
+            false,
+            &space,
+            &space,
+        );
+
+        for i in 0..5 {
+            for j in 0..5 {
+                println!("{} {}", *matrix.get(i, j).unwrap(),
+                    *matrix2.get(i, j).unwrap());
+            }
+            println!();
+        }
+        for i in 0..space.dofmap().global_size() {
+            for j in 0..space.dofmap().global_size() {
+                assert_relative_eq!(
+                    *matrix.get(i, j).unwrap(),
+                    *matrix2.get(i, j).unwrap(),
+                    epsilon = 0.0001
+                );
+            }
+        }
+    }
 }
