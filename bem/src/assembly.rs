@@ -1,4 +1,5 @@
 pub mod batched;
+pub mod cl_kernel;
 use crate::function_space::SerialFunctionSpace;
 use bempp_kernel::laplace_3d;
 use bempp_tools::arrays::Mat;
@@ -34,6 +35,35 @@ pub fn assemble_batched<'a>(
         PDEType::Laplace => match operator {
             BoundaryOperator::SingleLayer => {
                 batched::assemble(
+                    output,
+                    &laplace_3d::Laplace3dKernel::new(),
+                    false,
+                    false,
+                    trial_space,
+                    test_space,
+                );
+            }
+            _ => {
+                panic!("Invalid operator");
+            }
+        },
+        _ => {
+            panic!("Invalid PDE");
+        }
+    };
+}
+
+pub fn assemble_cl<'a>(
+    output: &mut Mat<f64>,
+    operator: BoundaryOperator,
+    pde: PDEType,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+) {
+    match pde {
+        PDEType::Laplace => match operator {
+            BoundaryOperator::SingleLayer => {
+                cl_kernel::assemble(
                     output,
                     &laplace_3d::Laplace3dKernel::new(),
                     false,
