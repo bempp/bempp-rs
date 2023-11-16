@@ -516,9 +516,7 @@ where
 
     type PointSlice<'a> = &'a [Point<T>]
         where T: 'a;
-    type PointData = f64;
-    type PointDataSlice<'a> = &'a [f64]
-        where T: 'a;
+    
     type GlobalIndex = usize;
     type GlobalIndexSlice<'a> = &'a [usize]
         where T: 'a;
