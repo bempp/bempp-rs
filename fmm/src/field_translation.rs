@@ -20,7 +20,7 @@ use bempp_traits::{
     arrays::Array3DAccess,
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
-    kernel::{Kernel, KernelScale},
+    kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
     types::EvalType,
 };
@@ -39,7 +39,7 @@ use crate::types::{FmmData, KiFmm};
 
 impl<T, U, V> SourceTranslation for FmmData<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + KernelScale<T = V> + std::marker::Send + std::marker::Sync,
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
     V: MultiplyAdd<
@@ -54,7 +54,7 @@ where
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
-        if let Some(leaves) = self.fmm.tree().get_leaves() {
+        if let Some(leaves) = self.fmm.tree().get_all_leaves() {
             leaves.par_iter().for_each(move |&leaf| {
                 let leaf_multipole_arc = Arc::clone(self.multipoles.get(&leaf).unwrap());
 
@@ -130,7 +130,7 @@ where
 
 impl<T, U, V> TargetTranslation for FmmData<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + KernelScale<T = V> + std::marker::Send + std::marker::Sync,
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
     V: MultiplyAdd<
@@ -163,7 +163,7 @@ where
     }
 
     fn m2p<'a>(&self) {
-        if let Some(targets) = self.fmm.tree().get_leaves() {
+        if let Some(targets) = self.fmm.tree().get_all_leaves() {
             targets.par_iter().for_each(move |&target| {
 
 
@@ -217,7 +217,7 @@ where
     }
 
     fn l2p<'a>(&self) {
-        if let Some(targets) = self.fmm.tree().get_leaves() {
+        if let Some(targets) = self.fmm.tree().get_all_leaves() {
             targets.par_iter().for_each(move |&leaf| {
                 let source_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
@@ -262,7 +262,7 @@ where
     }
 
     fn p2l<'a>(&self) {
-        if let Some(targets) = self.fmm.tree().get_leaves() {
+        if let Some(targets) = self.fmm.tree().get_all_leaves() {
             targets.par_iter().for_each(move |&leaf| {
                 let target_local_arc = Arc::clone(self.locals.get(&leaf).unwrap());
 
@@ -314,7 +314,7 @@ where
     }
 
     fn p2p<'a>(&self) {
-        if let Some(targets) = self.fmm.tree().get_leaves() {
+        if let Some(targets) = self.fmm.tree().get_all_leaves() {
             targets.par_iter().for_each(move |&target| {
 
                 if let Some(target_points) = self.fmm.tree().get_points(&target) {
@@ -376,7 +376,7 @@ where
 impl<T, U> FieldTranslation<U>
     for FmmData<KiFmm<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
 where
-    T: Kernel<T = U> + KernelScale<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = U> + ScaleInvariantKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     DenseMatrixLinAlgBuilder<U>: Svd,
     U: Scalar<Real = U>,
     U: Float
@@ -540,7 +540,7 @@ unsafe impl<T> Sync for SendPtr<T> {}
 impl<T, U> FieldTranslation<U>
     for FmmData<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
-    T: Kernel<T = U> + KernelScale<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = U> + ScaleInvariantKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
         + Float
         + Default

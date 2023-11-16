@@ -20,7 +20,7 @@ use rlst::{
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
-    kernel::{Kernel, KernelScale},
+    kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
     types::EvalType,
 };
@@ -32,7 +32,7 @@ use crate::types::{C2EType, ChargeDict, FmmData, FmmDataLinear, KiFmm};
 /// Implementation of constructor for single node KiFMM
 impl<'a, T, U, V> KiFmm<SingleNodeTree<V>, T, U, V>
 where
-    T: Kernel<T = V> + KernelScale<T = V>,
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
     V: Scalar<Real = V> + Default + Float,
     SvdScalar<V>: PartialOrd,
@@ -346,7 +346,7 @@ where
             let global_indices = vec![0usize; npoints];
 
             // Assign point coordinates and associated charges.
-            fmm.tree().get_all_points();
+            // fmm.tree().get_all_points();
 
             return Ok(Self {
                 fmm,
