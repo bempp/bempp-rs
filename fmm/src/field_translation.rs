@@ -94,7 +94,6 @@ where
                         &leaf_charges[..],
                         check_potential.data_mut(),
                     );
-                
                     // if i == 0 {
                     //     println!("HERE {:?}", leaf);
                     //     println!("HERE check potential {:?}", check_potential.data());
@@ -136,7 +135,19 @@ where
     }
 }
 
-const P2M_CHUNK_SIZE: usize = 128;
+const P2M_MAX_CHUNK_SIZE: usize = 256;
+
+/// Euclidean algorithm to find greatest common divisor less than max
+fn find_chunk_size(n: usize, max_chunk_size: usize) -> usize {
+    let max_divisor = max_chunk_size;
+    for divisor in (1..=max_divisor).rev() {
+        if n % divisor == 0 {
+            return divisor;
+        }
+    }
+    1 // If no divisor is found greater than 1, return 1 as the GCD
+}
+
 
 impl<T, U, V> SourceTranslation for FmmDataLinear<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -177,7 +188,7 @@ where
                         let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
                         let coordinates = &coordinates
                             [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                        
+
                         let nsources = coordinates.len() / dim;
 
                         let coordinates = unsafe {
@@ -191,21 +202,16 @@ where
                             charges,
                             check_potential,
                         );
-       
-                        // if i == 0 {
-                        //     println!("FOO {:?}", leaves[i]);
-                        //     println!("FOO check potential {:?}", check_potential);
-                        //     println!("FOO upward check surface {:?}", upward_check_surface);
-                        //     println!("FOO coordinates {:?}", coordinates.data());
-                        // }
                     },
                 );
 
             // Now compute the multipole expansions, with each of chunk_size boxes at a time.
-            let chunk_size = 1;
+            // let chunk_size = 8; // This has to be a divisor of nleaves, 8 is the minimum possible answer for adaptive case
+            let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
+
             check_potentials
                 .data()
-                .par_chunks(ncoeffs*chunk_size)
+                .par_chunks_exact(ncoeffs*chunk_size)
                 .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
                 .zip(self.scales.par_chunks_exact(ncoeffs*chunk_size))
                 .for_each(|((check_potential, multipole_ptrs), scale)| {
@@ -230,28 +236,44 @@ where
 
     /// Multipole to multipole translations, multithreaded over all boxes at a given level.
     fn m2m<'a>(&self, level: u64) {
-        if let Some(_) = self.fmm.tree().get_keys(level) {
+        if let Some(sources) = self.fmm.tree().get_keys(level) {
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-            // Can also be made into a BLAS3 operation.
+            let nsources = sources.len();
+            let min = &sources[0];
+            let max = &sources[nsources - 1];
+            let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
+            let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
+
+            let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+
             let nsiblings = 8;
-            self.level_multipoles[level as usize]
-                .par_chunks_exact(ncoeffs*nsiblings)
-                .zip(self.level_multipoles[(level -1) as usize].into_par_iter())
-                .for_each(|(multipole, parent_multipole)| {
+            let mut max_chunk_size = 8_i32.pow((level-1).try_into().unwrap()) as usize;
 
-                unsafe {
-                    let multipole = multipole.iter().map(|p| *p.raw).collect_vec();
-                    let tmp = rlst_pointer_mat!['a, V, multipole.as_ptr(), (ncoeffs*nsiblings, 1), (1, ncoeffs*ncoeffs)];
-                    let tmp = self.fmm.m2m.dot(&tmp);
+            if max_chunk_size > P2M_MAX_CHUNK_SIZE {
+                max_chunk_size = P2M_MAX_CHUNK_SIZE;
+            }
+            let chunk_size = find_chunk_size(nsources, max_chunk_size);
+            // println!("LEVEL {:?} CHUNK SIZE {:?}", level, chunk_size);
 
-                    let mut ptr = parent_multipole.raw;
-                    for i in 0..ncoeffs {
-                        *ptr += tmp.data()[i];
-                        ptr = ptr.add(1);
+            multipoles
+                .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
+                .zip(self.level_multipoles[(level - 1) as usize].par_chunks_exact(chunk_size))
+                .for_each(|(multipole_chunk, parent)| {
+
+                    unsafe {
+                        let tmp = rlst_pointer_mat!['a, V, multipole_chunk.as_ptr(), (ncoeffs*nsiblings, chunk_size), (1, ncoeffs*nsiblings)];
+                        let tmp = self.fmm.m2m.dot(&tmp).eval();
+
+                        for i in 0..chunk_size {
+                            let mut ptr = parent[i].raw;
+                            for j in 0..ncoeffs {
+                                *ptr += tmp.data()[(i*ncoeffs)+j];
+                                ptr = ptr.add(1)
+                            }
+                        }
                     }
-                }
-            });
+                })
         }
     }
 }

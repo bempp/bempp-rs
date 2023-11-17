@@ -1,8 +1,10 @@
 //! Implementation of constructors for single node trees.
 use itertools::Itertools;
 use num::Float;
+use rlst::{dense::rlst_pointer_mat, common::traits::Eval};
 use std::collections::{HashMap, HashSet};
 
+use rlst::dense::{LayoutType, Dynamic};
 use bempp_traits::{tree::Tree, types::Scalar};
 
 use crate::{
@@ -173,7 +175,7 @@ where
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `n_crit` - The maximum number of points per leaf node.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
-    pub fn adaptive_tree(
+    pub fn adaptive_tree<'a>(
         points: &[PointType<T>],
         domain: &Domain<T>,
         n_crit: u64,
@@ -299,7 +301,7 @@ where
         
         let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
-        
+
         let mut key_to_index = HashMap::new();
 
         for (i, key) in keys.iter().enumerate() {

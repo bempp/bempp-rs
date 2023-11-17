@@ -584,19 +584,19 @@ where
                 charges[i] = *charge;
             }
 
-            let mut level_multipoles = Vec::new();
-            // Need a reference to multipoles at each level
+            let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
             for level in 0..=fmm.tree().get_depth() {
+                let keys = fmm.tree().get_keys(level).unwrap();
+
                 let mut tmp = Vec::new();
-                for (i, key) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
-                    if fmm.tree().get_all_leaves_set().contains(key) {
-                        unsafe {
-                            let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
-                            tmp.push(SendPtrMut { raw })
-                        }
+                for key in keys.iter() {
+                    let idx = fmm.tree().key_to_index.get(key).unwrap();
+                    unsafe {
+                        let raw = multipoles.as_ptr().add(ncoeffs * idx) as *mut V;
+                        tmp.push(SendPtrMut { raw })
                     }
                 }
-                level_multipoles.push(tmp)
+                level_multipoles[level as usize] = tmp;
             }
 
             let mut leaf_multipoles = Vec::new();
@@ -661,18 +661,17 @@ where
             let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
             let mut leaf_downward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
             for (i, leaf) in leaves.iter().enumerate() {
-                let upward_surface = 
+                let upward_surface =
                     leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
-                
+
                 let downward_surface =
                     leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
-                
+
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
                 leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
                 leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
             }
-
 
             return Ok(Self {
                 fmm,
@@ -1321,16 +1320,11 @@ mod test {
 
         let s = Instant::now();
         datatree.p2m();
-        // for level in (1..=depth).rev() {
-        //     datatree.m2m(level)
-        // }
-        // datatree.upward_pass(None);
-        // unsafe {
-        //     println!("HERE {:?}", datatree.leaf_multipoles[0..1000].iter().map(|p| *p.raw).collect_vec());
-        // }
+        for level in (1..=depth).rev() {
+            datatree.m2m(level)
+        }
 
         println!("linear p2m {:?}", s.elapsed());
-        
 
         let kernel = Laplace3dKernel::default();
 
@@ -1345,43 +1339,55 @@ mod test {
         let m2l_data_fft =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
         let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
-        
+
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
         let old_datatree = FmmData::new(fmm, &charge_dict);
 
-        let idx = 4;
+        let &idx = datatree.fmm.tree().key_to_index.get(&ROOT).unwrap();
         let old_leaf = old_datatree.fmm.tree().get_all_leaves().unwrap()[idx];
-        let old_points = old_datatree.points.get(&old_leaf).unwrap();
-        let old_points = old_points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let old_key = old_datatree.fmm.tree().get_all_keys().unwrap()[idx];
+        // let old_points = old_datatree.points.get(&old_leaf).unwrap();
+        // let old_points = old_points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
 
         let new_leaf = datatree.fmm.tree().get_all_leaves().unwrap()[idx];
+        let new_key = datatree.fmm.tree().get_all_keys().unwrap()[idx];
+        println!("old {:?} new {:?} keys", old_key, new_key);
+
         let (l, r) = datatree.charge_index_pointer[idx];
-        let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
-        
+        // let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
+
         let s = Instant::now();
         old_datatree.p2m();
+        for level in (1..=depth).rev() {
+            old_datatree.m2m(level)
+        }
         println!("old p2m {:?}", s.elapsed());
 
         // Check potentials
-        let midx = datatree.fmm.tree().key_to_index.get(&new_leaf).unwrap();
+        let midx = datatree.fmm.tree().key_to_index.get(&new_key).unwrap();
         // let (l, r) = datatree.expansion_index_pointer[*midx];
         let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-        let new_multipole = &datatree.multipoles[midx*ncoeffs..(midx+1)*ncoeffs]; 
-        let old_multipole = old_datatree.multipoles.get(&old_leaf).unwrap().deref().lock().unwrap();
-        println!("HERE {:?} {:?}", old_leaf, old_multipole.data());
-        println!("HERE {:?} {:?}", new_leaf, new_multipole);
-        // println!("HERE {:?} {:?}", old_leaf, old_points);
-        // println!("HERE {:?} {:?}", new_leaf, new_points);
+        let new_multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
+        let old_multipole = old_datatree
+            .multipoles
+            .get(&old_key)
+            .unwrap()
+            .deref()
+            .lock()
+            .unwrap();
 
-        // let tree = SingleNodeTree::new(
-        //     points.data(),
-        //     adaptive,
-        //     Some(ncrit),
-        //     Some(depth),
-        //     &global_idxs[..],
-        // );
-        // println!("{:?}", new_leaf.compute_surface(tree.get_domain(), order, alpha_outer));
+        // println!("HERE {:?} {:?}", old_key, old_multipole.data());
+        // println!("HERE {:?} {:?}", new_key, new_multipole);
+        let abs_error: f64 = old_multipole
+            .data()
+            .iter()
+            .zip(new_multipole.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+
+        let rel_error = abs_error / (old_multipole.data().iter().sum::<f64>());
+        println!("rel error {:?}", rel_error);
 
         assert!(false)
     }

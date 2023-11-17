@@ -80,7 +80,7 @@ where
 
     /// All downward surfaces
     pub downward_surfaces: Vec<U>,
-    
+
     /// Leaf upward surfaces
     pub leaf_upward_surfaces: Vec<U>,
 
