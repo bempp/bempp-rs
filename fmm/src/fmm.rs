@@ -1285,17 +1285,17 @@ mod test {
 
     #[test]
     fn test_fmm_linear() {
-        let npoints = 10000;
+        let npoints = 1000000;
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 2;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 3;
+        let depth = 5;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(
@@ -1359,7 +1359,9 @@ mod test {
         let (l, r) = datatree.charge_index_pointer[idx];
         let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
         
+        let s = Instant::now();
         old_datatree.p2m();
+        println!("old p2m {:?}", s.elapsed());
 
         // Check potentials
         let midx = datatree.fmm.tree().key_to_index.get(&new_leaf).unwrap();
@@ -1372,13 +1374,13 @@ mod test {
         // println!("HERE {:?} {:?}", old_leaf, old_points);
         // println!("HERE {:?} {:?}", new_leaf, new_points);
 
-        let tree = SingleNodeTree::new(
-            points.data(),
-            adaptive,
-            Some(ncrit),
-            Some(depth),
-            &global_idxs[..],
-        );
+        // let tree = SingleNodeTree::new(
+        //     points.data(),
+        //     adaptive,
+        //     Some(ncrit),
+        //     Some(depth),
+        //     &global_idxs[..],
+        // );
         // println!("{:?}", new_leaf.compute_surface(tree.get_domain(), order, alpha_outer));
 
         assert!(false)

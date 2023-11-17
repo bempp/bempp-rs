@@ -42,6 +42,9 @@ where
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
+    
+    /// Map between a key and its index
+    pub key_to_index: HashMap<MortonKey, usize>,
 
     /// All leaves, returned as a set.
     pub leaves_set: HashSet<MortonKey>,

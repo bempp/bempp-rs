@@ -90,7 +90,7 @@ where
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
         // Add unmapped leaves
-        let leaves = MortonKeys {
+        let mut leaves = MortonKeys {
             keys: leaves_to_points
                 .keys()
                 .cloned()
@@ -98,6 +98,9 @@ where
                 .collect_vec(),
             index: 0,
         };
+
+        // Sort leaves before returning
+        leaves.sort();
 
         // Find all keys in tree
         let tmp: HashSet<MortonKey> = leaves
@@ -136,7 +139,14 @@ where
         }
 
         let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+
+        let mut key_to_index = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
 
         SingleNodeTree {
             depth,
@@ -147,6 +157,7 @@ where
             leaves,
             keys,
             leaves_to_points,
+            key_to_index,
             leaves_set,
             keys_set,
             levels_to_keys,
@@ -230,7 +241,7 @@ where
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
         // Add unmapped leaves
-        let leaves = MortonKeys {
+        let mut leaves = MortonKeys {
             keys: leaves_to_points
                 .keys()
                 .cloned()
@@ -238,6 +249,9 @@ where
                 .collect_vec(),
             index: 0,
         };
+        
+        // Sort leaves before returning
+        leaves.sort();
 
         // Find all keys in tree
         let tmp: HashSet<MortonKey> = leaves
@@ -285,6 +299,12 @@ where
         
         let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+        
+        let mut key_to_index = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
 
         SingleNodeTree {
             depth,
@@ -295,6 +315,7 @@ where
             leaves,
             keys,
             leaves_to_points,
+            key_to_index,
             leaves_set,
             keys_set,
             levels_to_keys,
