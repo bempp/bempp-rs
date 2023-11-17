@@ -206,7 +206,6 @@ where
                 );
 
             // Now compute the multipole expansions, with each of chunk_size boxes at a time.
-            // let chunk_size = 8; // This has to be a divisor of nleaves, 8 is the minimum possible answer for adaptive case
             let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
 
             check_potentials
@@ -254,8 +253,7 @@ where
                 max_chunk_size = P2M_MAX_CHUNK_SIZE;
             }
             let chunk_size = find_chunk_size(nsources, max_chunk_size);
-            // println!("LEVEL {:?} CHUNK SIZE {:?}", level, chunk_size);
-
+ 
             multipoles
                 .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
                 .zip(self.level_multipoles[(level - 1) as usize].par_chunks_exact(chunk_size))
