@@ -67,6 +67,8 @@ where
 
     pub leaf_multipoles: Vec<SendPtrMut<U>>,
 
+    pub level_multipoles: Vec<Vec<SendPtrMut<U>>>,
+
     /// The local expansion data at each box.
     pub locals: Vec<U>,
 
@@ -78,16 +80,25 @@ where
 
     /// All downward surfaces
     pub downward_surfaces: Vec<U>,
+    
+    /// Leaf upward surfaces
+    pub leaf_upward_surfaces: Vec<U>,
+
+    /// Leaf downward surfaces
+    pub leaf_downward_surfaces: Vec<U>,
 
     /// The charge data at each leaf box.
     pub charges: Vec<U>,
 
-    /// Index pointer between morton keys and charges
+    /// Index pointer between leaf keys and charges
     pub charge_index_pointer: Vec<(usize, usize)>,
+
+    /// index pointer between all keys and multipole expansions
+    pub expansion_index_pointer: Vec<(usize, usize)>,
 
     /// Scales of each leaf operator
     pub scales: Vec<U>,
-    
+
     /// Global indices of each charge
     pub global_indices: Vec<usize>,
 }

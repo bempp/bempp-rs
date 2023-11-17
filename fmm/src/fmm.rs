@@ -584,30 +584,40 @@ where
                 charges[i] = *charge;
             }
 
+            let mut level_multipoles = Vec::new();
+            // Need a reference to multipoles at each level
+            for level in 0..=fmm.tree().get_depth() {
+                let mut tmp = Vec::new();
+                for (i, key) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
+                    if fmm.tree().get_all_leaves_set().contains(key) {
+                        unsafe {
+                            let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
+                            tmp.push(SendPtrMut { raw })
+                        }
+                    }
+                }
+                level_multipoles.push(tmp)
+            }
 
-            // Need a reference to leaf multipoles
             let mut leaf_multipoles = Vec::new();
             for (i, key) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
-
                 if fmm.tree().get_all_leaves_set().contains(key) {
                     unsafe {
-                        let raw = multipoles.as_ptr().add(i*ncoeffs) as *mut V;
+                        let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
                         leaf_multipoles.push(SendPtrMut { raw })
                     }
                 }
             }
 
-            // println!("leaf index pointer {:?}", leaf_index_pointer);
-
             // Create an index pointer for the charge data
             let mut index_pointer = 0;
             let mut charge_index_pointer = vec![(0usize, 0usize); nleaves];
-            let mut scales = vec![V::default(); nleaves*ncoeffs];
+            let mut scales = vec![V::default(); nleaves * ncoeffs];
             for (i, leaf) in leaves.iter().enumerate() {
-
                 let l = i * ncoeffs;
                 let r = l + ncoeffs;
-                scales[l..r].copy_from_slice(vec![fmm.kernel.scale(leaf.level()); ncoeffs].as_slice());
+                scales[l..r]
+                    .copy_from_slice(vec![fmm.kernel.scale(leaf.level()); ncoeffs].as_slice());
                 let npoints;
                 if let Some(points) = fmm.tree().get_points(leaf) {
                     npoints = points.len();
@@ -620,16 +630,26 @@ where
                 index_pointer += npoints
             }
 
+            // Create an index pointer for expansion data
+            let mut index_pointer = 0;
+            let mut expansion_index_pointer = vec![(0usize, 0usize); nkeys];
+            for (i, key) in keys.iter().enumerate() {
+                let bounds = (index_pointer, index_pointer + ncoeffs);
+                expansion_index_pointer[i] = bounds;
+                index_pointer += 1;
+            }
+
             let dim = fmm.kernel().space_dimension();
             let mut upward_surfaces = vec![V::default(); ncoeffs * nkeys * dim];
             let mut downward_surfaces = vec![V::default(); ncoeffs * nkeys * dim];
+
             // For each key form both upward and downward check surfaces
-            for (i, leaf) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
+            for (i, key) in keys.iter().enumerate() {
                 let upward_surface =
-                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+                    key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
 
                 let downward_surface =
-                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
+                    key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
 
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
@@ -638,16 +658,36 @@ where
                 downward_surfaces[l..r].copy_from_slice(&downward_surface);
             }
 
+            let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
+            let mut leaf_downward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
+            for (i, leaf) in leaves.iter().enumerate() {
+                let upward_surface = 
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+                
+                let downward_surface =
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
+                
+                let l = i * ncoeffs * dim;
+                let r = l + ncoeffs * dim;
+                leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
+                leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
+            }
+
+
             return Ok(Self {
                 fmm,
                 multipoles,
+                level_multipoles,
                 leaf_multipoles,
                 locals,
                 upward_surfaces,
                 downward_surfaces,
+                leaf_upward_surfaces,
+                leaf_downward_surfaces,
                 potentials,
                 charges,
                 charge_index_pointer,
+                expansion_index_pointer,
                 scales,
                 global_indices,
             });
@@ -732,6 +772,31 @@ where
 
     fn tree(&self) -> &Self::Tree {
         &self.tree
+    }
+}
+
+impl<T, U> FmmLoop for FmmDataLinear<T, U>
+where
+    T: Fmm,
+    U: Scalar<Real = U> + Float + Default,
+    FmmDataLinear<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
+{
+    fn upward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
+        self.p2m();
+
+        let depth = self.fmm.tree().get_depth();
+        for level in (1..=depth).rev() {
+            self.m2m(level)
+        }
+        None
+    }
+
+    fn downward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
+        None
+    }
+
+    fn run(&self, time: Option<bool>) -> Option<TimeDict> {
+        None
     }
 }
 
@@ -854,7 +919,7 @@ where
 mod test {
     use super::*;
 
-    use std::env;
+    use std::{env, ops::Deref};
 
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -1093,7 +1158,7 @@ mod test {
         datatree.run(Some(true));
 
         let s = Instant::now();
-        datatree.p2m();
+        datatree.upward_pass(None);
         println!("linear p2m {:?}", s.elapsed());
         assert!(false);
 
@@ -1220,17 +1285,17 @@ mod test {
 
     #[test]
     fn test_fmm_linear() {
-        let npoints = 1000000;
+        let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
-        let depth = 5;
+        let depth = 3;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(
@@ -1256,7 +1321,65 @@ mod test {
 
         let s = Instant::now();
         datatree.p2m();
+        // for level in (1..=depth).rev() {
+        //     datatree.m2m(level)
+        // }
+        // datatree.upward_pass(None);
+        // unsafe {
+        //     println!("HERE {:?}", datatree.leaf_multipoles[0..1000].iter().map(|p| *p.raw).collect_vec());
+        // }
+
         println!("linear p2m {:?}", s.elapsed());
+        
+
+        let kernel = Laplace3dKernel::default();
+
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            Some(depth),
+            &global_idxs[..],
+        );
+
+        let m2l_data_fft =
+            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+        
+        // Form charge dict, matching charges with their associated global indices
+        let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+        let old_datatree = FmmData::new(fmm, &charge_dict);
+
+        let idx = 4;
+        let old_leaf = old_datatree.fmm.tree().get_all_leaves().unwrap()[idx];
+        let old_points = old_datatree.points.get(&old_leaf).unwrap();
+        let old_points = old_points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+
+        let new_leaf = datatree.fmm.tree().get_all_leaves().unwrap()[idx];
+        let (l, r) = datatree.charge_index_pointer[idx];
+        let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
+        
+        old_datatree.p2m();
+
+        // Check potentials
+        let midx = datatree.fmm.tree().key_to_index.get(&new_leaf).unwrap();
+        // let (l, r) = datatree.expansion_index_pointer[*midx];
+        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
+        let new_multipole = &datatree.multipoles[midx*ncoeffs..(midx+1)*ncoeffs]; 
+        let old_multipole = old_datatree.multipoles.get(&old_leaf).unwrap().deref().lock().unwrap();
+        println!("HERE {:?} {:?}", old_leaf, old_multipole.data());
+        println!("HERE {:?} {:?}", new_leaf, new_multipole);
+        // println!("HERE {:?} {:?}", old_leaf, old_points);
+        // println!("HERE {:?} {:?}", new_leaf, new_points);
+
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            Some(depth),
+            &global_idxs[..],
+        );
+        // println!("{:?}", new_leaf.compute_surface(tree.get_domain(), order, alpha_outer));
 
         assert!(false)
     }
