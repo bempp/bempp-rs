@@ -93,9 +93,6 @@ where
     /// Index pointer between leaf keys and charges
     pub charge_index_pointer: Vec<(usize, usize)>,
 
-    /// index pointer between all keys and multipole expansions
-    pub expansion_index_pointer: Vec<(usize, usize)>,
-
     /// Scales of each leaf operator
     pub scales: Vec<U>,
 

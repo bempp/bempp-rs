@@ -54,14 +54,13 @@ pub trait Fmm {
     fn tree(&self) -> &Self::Tree;
 }
 
-pub trait KiFmm 
+pub trait KiFmm
 where
-    Self: Fmm
+    Self: Fmm,
 {
     fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
 
     fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
-
 }
 
 /// Dictionary containing timings

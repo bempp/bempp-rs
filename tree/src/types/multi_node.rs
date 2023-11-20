@@ -28,7 +28,7 @@ where
 
     ///  A vector of Cartesian points.
     pub points: Points<T>,
-    
+
     /// All coordinates
     pub coordinates: Vec<T>,
 

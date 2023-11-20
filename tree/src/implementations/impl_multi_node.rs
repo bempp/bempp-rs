@@ -166,9 +166,14 @@ where
             subset.sort();
         }
 
-        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let coordinates = points
+            .points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
-        
+
         MultiNodeTree {
             world: world.duplicate(),
             depth,
@@ -366,9 +371,14 @@ where
             subset.sort();
         }
 
-        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        let coordinates = points
+            .points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
-        
+
         MultiNodeTree {
             world: world.duplicate(),
             depth,
@@ -611,14 +621,13 @@ where
         }
     }
 
-
     fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
         Some(&self.points.points)
     }
 
     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.coordinates[l*3..r*3])
+            Some(&self.coordinates[l * 3..r * 3])
         } else {
             None
         }

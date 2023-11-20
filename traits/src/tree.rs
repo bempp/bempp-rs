@@ -62,13 +62,13 @@ pub trait Tree {
 
     /// Gets a reference to the points contained with a leaf node.
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
-    
+
     /// Gets a reference to the points contained with a leaf node.
     fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>>;
-    
+
     /// Gets a reference to the coordinates contained with a leaf node.
     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]>;
-    
+
     /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
     fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]>;
 
@@ -88,11 +88,10 @@ pub trait Tree {
     fn is_node(&self, key: &Self::NodeIndex) -> bool;
 }
 
-pub trait Point<T> 
+pub trait Point<T>
 where
-    T: Scalar<Real = T> + Float + Default
+    T: Scalar<Real = T> + Float + Default,
 {
-
 }
 
 /// A minimal interface for Morton Key like nodes.

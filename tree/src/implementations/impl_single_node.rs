@@ -1,11 +1,11 @@
 //! Implementation of constructors for single node trees.
 use itertools::Itertools;
 use num::Float;
-use rlst::{dense::rlst_pointer_mat, common::traits::Eval};
+use rlst::{common::traits::Eval, dense::rlst_pointer_mat};
 use std::collections::{HashMap, HashSet};
 
-use rlst::dense::{LayoutType, Dynamic};
 use bempp_traits::{tree::Tree, types::Scalar};
+use rlst::dense::{Dynamic, LayoutType};
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -140,8 +140,13 @@ where
             subset.sort();
         }
 
-        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
-        
+        let coordinates = points
+            .points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
 
         let mut key_to_index = HashMap::new();
@@ -251,7 +256,7 @@ where
                 .collect_vec(),
             index: 0,
         };
-        
+
         // Sort leaves before returning
         leaves.sort();
 
@@ -298,8 +303,13 @@ where
             let subset = &mut keys[l..r];
             subset.sort();
         }
-        
-        let coordinates = points.points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+
+        let coordinates = points
+            .points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
 
         let mut key_to_index = HashMap::new();
@@ -550,7 +560,7 @@ where
 
     type PointSlice<'a> = &'a [Point<T>]
         where T: 'a;
-    
+
     type GlobalIndex = usize;
     type GlobalIndexSlice<'a> = &'a [usize]
         where T: 'a;
@@ -601,7 +611,7 @@ where
 
     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.coordinates[l*3..r*3])
+            Some(&self.coordinates[l * 3..r * 3])
         } else {
             None
         }
