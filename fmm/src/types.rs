@@ -6,7 +6,7 @@ use std::{
 use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::{morton::MortonKey, point::Point};
 use cauchy::Scalar;
-use num::Float;
+use num::{Float, Complex};
 use rlst::dense::traits::*;
 use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
 use rlst::{self};
@@ -193,6 +193,15 @@ pub struct SendPtrMut<T> {
 }
 
 unsafe impl<T> Sync for SendPtrMut<T> {}
+unsafe impl<T> Send for SendPtrMut<Complex<T>> {}
+
+
+impl <T> Default for SendPtrMut<T> {
+
+    fn default() -> Self {
+        SendPtrMut { raw: std::ptr::null_mut() }
+    }
+}
 
 /// A threadsafe raw pointer
 #[derive(Clone, Debug, Copy)]
@@ -201,3 +210,38 @@ pub struct SendPtr<T> {
 }
 
 unsafe impl<T> Sync for SendPtr<T> {}
+
+
+
+impl <T> Default for SendPtr<T> {
+
+    fn default() -> Self {
+        SendPtr { raw: std::ptr::null() }
+    }
+}
+
+pub struct SendPtrMutIter<'a, T> {
+    vec: &'a Vec<SendPtrMut<T>>,
+    current: usize,
+}
+
+
+impl<'a, T> SendPtrMutIter<'a, T> {
+    pub fn new(vec: &'a Vec<SendPtrMut<T>>) -> Self {
+        SendPtrMutIter { vec, current: 0 }
+    }
+}
+
+impl<'a, T> Iterator for SendPtrMutIter<'a, T> {
+    type Item = &'a SendPtrMut<T>; // Change this to the type of item you want to return
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current >= self.vec.len() {
+            None
+        } else {
+            let item = &self.vec[self.current];
+            self.current += 1;
+            Some(item)
+        }
+    }
+}

@@ -770,34 +770,9 @@ where
     U: Scalar<Real = U> + Float + Default,
     FmmDataLinear<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
 {
-    fn upward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
-        self.p2m();
-
-        let depth = self.fmm.tree().get_depth();
-        for level in (1..=depth).rev() {
-            self.m2m(level)
-        }
-        None
-    }
-
-    fn downward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
-        None
-    }
-
-    fn run(&self, time: Option<bool>) -> Option<TimeDict> {
-        None
-    }
-}
-
-impl<T, U> FmmLoop for FmmData<T, U>
-where
-    T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
-    FmmData<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
-{
-    fn upward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
+    fn upward_pass(&self, time: bool) -> Option<TimeDict> {
         match time {
-            Some(true) => {
+            true => {
                 let mut times = TimeDict::default();
                 // Particle to Multipole
                 let start = Instant::now();
@@ -813,7 +788,7 @@ where
                 times.insert("m2m".to_string(), start.elapsed().as_millis());
                 Some(times)
             }
-            Some(false) | None => {
+            false => {
                 // Particle to Multipole
                 self.p2m();
 
@@ -827,11 +802,126 @@ where
         }
     }
 
-    fn downward_pass(&self, time: Option<bool>) -> Option<TimeDict> {
+    fn downward_pass(&self, time: bool) -> Option<TimeDict> {
         let depth = self.fmm.tree().get_depth();
 
         match time {
-            Some(true) => {
+            true => {
+                let mut times = TimeDict::default();
+                let mut l2l_time = 0;
+                let mut m2l_time = 0;
+
+                for level in 2..=depth {
+                    if level < depth {
+                        let start = Instant::now();
+                        self.l2l(level);
+                        l2l_time += start.elapsed().as_millis();
+                    }
+
+                    let start = Instant::now();
+                    self.m2l(level);
+                    m2l_time += start.elapsed().as_millis();
+                }
+
+                times.insert("l2l".to_string(), l2l_time);
+                times.insert("m2l".to_string(), m2l_time);
+
+                // Leaf level computations
+                let start = Instant::now();
+                self.p2l();
+                times.insert("p2l".to_string(), start.elapsed().as_millis());
+
+                // Sum all potential contributions
+                let start = Instant::now();
+                self.m2p();
+                times.insert("m2p".to_string(), start.elapsed().as_millis());
+
+                let start = Instant::now();
+                self.p2p();
+                times.insert("p2p".to_string(), start.elapsed().as_millis());
+
+                let start = Instant::now();
+                self.l2p();
+                times.insert("l2p".to_string(), start.elapsed().as_millis());
+
+                Some(times)
+            }
+            false => {
+                for level in 2..=depth {
+                    if level > 2 {
+                        self.l2l(level);
+                    }
+                    self.m2l(level);
+                }
+                // Leaf level computations
+                self.p2l();
+
+                // Sum all potential contributions
+                self.m2p();
+                self.p2p();
+                self.l2p();
+
+                None
+            }
+        }
+    }
+
+    fn run(&self, time: bool) -> Option<TimeDict> {
+        let t1 = self.upward_pass(time);
+        let t2 = self.downward_pass(time);
+
+        if let (Some(mut t1), Some(t2)) = (t1, t2) {
+            t1.extend(t2);
+            Some(t1)
+        } else {
+            None
+        }
+    }
+}
+
+impl<T, U> FmmLoop for FmmData<T, U>
+where
+    T: Fmm,
+    U: Scalar<Real = U> + Float + Default,
+    FmmData<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
+{
+    fn upward_pass(&self, time: bool) -> Option<TimeDict> {
+        match time {
+            true => {
+                let mut times = TimeDict::default();
+                // Particle to Multipole
+                let start = Instant::now();
+                self.p2m();
+                times.insert("p2m".to_string(), start.elapsed().as_millis());
+
+                // Multipole to Multipole
+                let depth = self.fmm.tree().get_depth();
+                let start = Instant::now();
+                for level in (1..=depth).rev() {
+                    self.m2m(level)
+                }
+                times.insert("m2m".to_string(), start.elapsed().as_millis());
+                Some(times)
+            }
+            false => {
+                // Particle to Multipole
+                self.p2m();
+
+                // Multipole to Multipole
+                let depth = self.fmm.tree().get_depth();
+                for level in (1..=depth).rev() {
+                    self.m2m(level)
+                }
+                None
+            }
+        }
+    }
+
+    fn downward_pass(&self, time: bool) -> Option<TimeDict> {
+        let depth = self.fmm.tree().get_depth();
+
+        match time {
+            true => {
                 let mut times = TimeDict::default();
                 let mut l2l_time = 0;
                 let mut m2l_time = 0;
@@ -871,7 +961,7 @@ where
 
                 Some(times)
             }
-            Some(false) | None => {
+            false => {
                 for level in 2..=depth {
                     if level > 2 {
                         self.l2l(level);
@@ -891,7 +981,7 @@ where
         }
     }
 
-    fn run(&self, time: Option<bool>) -> Option<TimeDict> {
+    fn run(&self, time: bool) -> Option<TimeDict> {
         let t1 = self.upward_pass(time);
         let t2 = self.downward_pass(time);
 
@@ -967,7 +1057,7 @@ mod test {
         let datatree = FmmData::new(fmm, &charge_dict);
 
         // Run the experiment
-        datatree.run(None);
+        datatree.run(false);
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
@@ -1064,7 +1154,7 @@ mod test {
         let datatree = FmmData::new(fmm, &charge_dict);
 
         // Run the experiment
-        datatree.run(Some(true));
+        datatree.run(true);
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
@@ -1141,15 +1231,7 @@ mod test {
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
-        let s = Instant::now();
         let datatree = FmmData::new(fmm, &charge_dict);
-        println!("data tree setup old {:?}", s.elapsed());
-        datatree.run(Some(true));
-
-        let s = Instant::now();
-        datatree.upward_pass(None);
-        println!("linear p2m {:?}", s.elapsed());
-        assert!(false);
 
         let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
 
@@ -1227,7 +1309,7 @@ mod test {
 
         let datatree = FmmData::new(fmm, &charge_dict);
 
-        datatree.run(None);
+        datatree.run(false);
 
         let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
 
@@ -1279,13 +1361,12 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
 
-        // TODO: There is a bug for when boxes are empty ...
         let depth = 5;
         let kernel = Laplace3dKernel::default();
 
@@ -1311,12 +1392,8 @@ mod test {
         println!("data tree setup {:?}", s.elapsed());
 
         let s = Instant::now();
-        datatree.p2m();
-        for level in (1..=depth).rev() {
-            datatree.m2m(level)
-        }
-
-        println!("linear upward pass {:?}", s.elapsed());
+        let times: Option<HashMap<String, u128>> = datatree.run(true);
+        println!("linear upward pass {:?} {:?}", s.elapsed(), times.unwrap());
 
         let kernel = Laplace3dKernel::default();
 
@@ -1346,17 +1423,14 @@ mod test {
 
         let new_leaf = datatree.fmm.tree().get_all_leaves().unwrap()[idx];
         let new_key = datatree.fmm.tree().get_all_keys().unwrap()[idx];
-        println!("old {:?} new {:?} keys", old_key, new_key);
+        // println!("old {:?} new {:?} keys", old_key, new_key);
 
         let (l, r) = datatree.charge_index_pointer[idx];
         // let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
 
-        let s = Instant::now();
-        old_datatree.p2m();
-        for level in (1..=depth).rev() {
-            old_datatree.m2m(level)
-        }
-        println!("old upward pass {:?}", s.elapsed());
+        // let s = Instant::now();
+        // let times = old_datatree.run(true);
+        // println!("old upward pass {:?} {:?}", s.elapsed(), times.unwrap());
 
         // Check potentials
         let midx = datatree.fmm.tree().key_to_index.get(&new_key).unwrap();

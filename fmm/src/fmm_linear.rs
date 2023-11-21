@@ -1,10 +1,13 @@
+//! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex, RwLock},
 };
-
+use num::Zero;
 use bempp_tools::Array3D;
+use cauchy::c64;
+use fftw::{plan::{C2RPlan64, R2CPlan64, C2RPlan, R2CPlan}, types::Flag, array::AlignedVec};
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -25,7 +28,7 @@ use bempp_traits::{
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::types::{FmmData, FmmDataLinear, KiFmm, KiFmmLinear, SendPtr, SendPtrMut};
+use crate::types::{FmmData, FmmDataLinear, KiFmm, KiFmmLinear, SendPtr, SendPtrMut, SendPtrMutIter};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
@@ -192,7 +195,45 @@ where
         Dynamic,
     >,
 {
-    fn l2l(&self, level: u64) {}
+    fn l2l<'a>(&self, level: u64) {
+        if let Some(sources) = self.fmm.tree().get_keys(level) {
+            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+
+            let nsources = sources.len();
+            let min = &sources[0];
+            let max = &sources[nsources - 1];
+            let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
+            let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
+
+            let locals = &self.locals[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+
+            let nsiblings = 8;
+            let mut max_chunk_size = 8_i32.pow((level - 1).try_into().unwrap()) as usize;
+
+            if max_chunk_size > P2M_MAX_CHUNK_SIZE {
+                max_chunk_size = P2M_MAX_CHUNK_SIZE;
+            }
+            let chunk_size = find_chunk_size(nsources, max_chunk_size);
+            locals
+                .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
+                .zip(self.level_multipoles[(level + 1) as usize].par_chunks_exact(chunk_size))
+                .for_each(|(multipole_chunk, parent)| {
+
+                    unsafe {
+                        let tmp = rlst_pointer_mat!['a, V, multipole_chunk.as_ptr(), (ncoeffs*nsiblings, chunk_size), (1, ncoeffs*nsiblings)];
+                        let tmp = self.fmm.l2l.dot(&tmp).eval();
+
+                        for i in 0..chunk_size {
+                            let mut ptr = parent[i].raw;
+                            for j in 0..ncoeffs {
+                                *ptr += tmp.data()[(i*ncoeffs)+j];
+                                ptr = ptr.add(1)
+                            }
+                        }
+                    }
+                })
+        }
+    }
 
     fn m2p<'a>(&self) {}
 
@@ -233,6 +274,359 @@ where
         let Some(targets) = self.fmm.tree().get_keys(level) else {
             return;
         };
+        // Form signals to use for convolution first
+        let n = 2 * self.fmm.order - 1;
+        let ntargets = targets.len();
+        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+
+        // Pad the signal
+        let &(m, n, o) = &(n, n, n);
+
+        let p = m + 1;
+        let q = n + 1;
+        let r = o + 1;
+        let size = p * q * r;
+        let size_real = p * q * (r / 2 + 1);
+        let pad_size = (p - m, q - n, r - o);
+        let pad_index = (p - m, q - n, r - o);
+        // let mut padded_signals = rlst_col_vec![U, size * ntargets];
+        let mut padded_signals = vec![U::zero(); size*ntargets];
+
+        let padded_signals_chunks = padded_signals.par_chunks_exact_mut(size);
+
+        let ntargets = targets.len();
+        let min = &targets[0];
+        let max = &targets[ntargets - 1];
+        let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
+        let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
+
+        let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+
+        let multipoles_chunks = multipoles.par_chunks_exact(ncoeffs);
+
+        padded_signals_chunks
+            .zip(multipoles_chunks)
+            .for_each(|(padded_signal, multipole)| {
+                let signal = self.fmm.m2l.compute_signal(self.fmm.order, multipole);
+
+                let mut tmp = pad3(&signal, pad_size, pad_index);
+
+                padded_signal.copy_from_slice(tmp.get_data());
+            });
+
+
+        // Allocating and handling this vec of structs is really shit
+        // let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
+        let mut padded_signals_hat = vec![Complex::<U>::zero(); size_real*ntargets];
+        let mut padded_signals_hat = unsafe {rlst_pointer_mat!['a, Complex<U>, padded_signals_hat.as_mut_ptr(), (size_real*ntargets, 1), (1,1)]};
+
+        // U::rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
+
+        // // let mut real_parts = Vec::with_capacity(padded_signals_hat.data().len());
+        // // let mut imag_parts = Vec::with_capacity(padded_signals_hat.data().len());
+
+        // // for complex_val in padded_signals_hat.data().iter() {
+        // //     real_parts.push(complex_val.re);
+        // //     imag_parts.push(complex_val.im);
+        // // }
+
+        // let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
+        // let ntargets = targets.len();
+        // let nparents = ntargets / 8;
+        // let mut global_check_potentials_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
+        // let mut global_check_potentials = rlst_col_vec![U, size * ntargets];
+
+        // Get check potentials in frequency order
+        // let mut global_check_potentials_hat_freq = vec![Vec::new(); size_real];
+
+        // unsafe {
+        //     let ptr = global_check_potentials_hat.get_pointer_mut();
+        //     for (i, elem) in global_check_potentials_hat_freq
+        //         .iter_mut()
+        //         .enumerate()
+        //         .take(size_real)
+        //     {
+        //         for j in 0..ntargets {
+        //             let raw = ptr.offset((j * size_real + i).try_into().unwrap());
+        //             let send_ptr = SendPtrMut { raw };
+        //             elem.push(send_ptr);
+        //         }
+        //     }
+        // }
+
+        // // Get signals into frequency order
+        // let mut padded_signals_hat_freq = vec![Vec::new(); size_real];
+        // let zero = rlst_col_vec![Complex<U>, 8];
+        // unsafe {
+        //     let ptr = padded_signals_hat.get_pointer();
+
+        //     for (i, elem) in padded_signals_hat_freq
+        //         .iter_mut()
+        //         .enumerate()
+        //         .take(size_real)
+        //     {
+        //         for j in 0..ntargets {
+        //             let raw = ptr.offset((j * size_real + i).try_into().unwrap());
+        //             let send_ptr = SendPtr { raw };
+        //             elem.push(send_ptr);
+        //         }
+        //         // put in a bunch of zeros at the end
+        //         let ptr = zero.get_pointer();
+        //         for _ in 0..8 {
+        //             let send_ptr = SendPtr { raw: ptr };
+        //             elem.push(send_ptr)
+        //         }
+        //     }
+        // }
+
+        // // Create a map between targets and index positions in vec of len 'ntargets'
+        // let mut target_map = HashMap::new();
+
+        // for (i, t) in targets.iter().enumerate() {
+        //     target_map.insert(t, i);
+        // }
+        // // Find all the displacements used for saving results
+        // let mut all_displacements = Vec::new();
+        // targets.chunks_exact(8).for_each(|sibling_chunk| {
+        //     // not in Morton order (refer to sort method when called on 'neighbours')
+        //     let parent_neighbours: Vec<Option<MortonKey>> =
+        //         sibling_chunk[0].parent().all_neighbors();
+
+        //     let displacements = parent_neighbours
+        //         .iter()
+        //         .map(|pn| {
+        //             let mut tmp = Vec::new();
+        //             if let Some(pn) = pn {
+        //                 if self.fmm.tree.keys_set.contains(pn) {
+        //                     let mut children = pn.children();
+        //                     children.sort();
+        //                     for child in children {
+        //                         // tmp.push(*target_map.get(&child).unwrap() as i64)
+        //                         tmp.push(*target_map.get(&child).unwrap())
+        //                     }
+        //                 } else {
+        //                     for i in 0..8 {
+        //                         // tmp.push(-1 as i64)
+        //                         tmp.push(ntargets + i)
+        //                     }
+        //                 }
+        //             } else {
+        //                 for i in 0..8 {
+        //                     tmp.push(ntargets + i)
+        //                 }
+        //             }
+
+        //             assert!(tmp.len() == 8);
+        //             tmp
+        //         })
+        //         .collect_vec();
+        //     all_displacements.push(displacements);
+        // });
+
+        // // let scale = self.m2l_scale(level);
+        // let scale = Complex::from(self.m2l_scale(level));
+
+        // let chunk_size = 64;
+
+        // let mut all_save_locations = Vec::new();
+        // // nchunks long
+        // let mut all_displacements_chunked = Vec::new();
+
+        // (0..nparents).step_by(chunk_size).for_each(|chunk_start| {
+        //     let chunk_end = std::cmp::min(chunk_size+chunk_start, nparents);
+            
+        //     // lookup save locations
+        //     let save_locations = (chunk_start..chunk_end).map(|sibling_idx| {
+        //         sibling_idx*8
+        //     }).collect_vec();
+        //     all_save_locations.push(save_locations);
+
+        //     // 26 long
+        //     let mut tmp = Vec::new(); 
+        //     for i in 0..26 {
+        //         // chunk_size long
+        //         let tmp2 = (chunk_start..chunk_end).map(|sibling_idx| {
+        //             all_displacements[sibling_idx][i][0]
+        //         }).collect_vec();
+        //         tmp.push(tmp2);
+        //     }
+        //     all_displacements_chunked.push(tmp);
+        // });
+
+        // (0..size_real).into_par_iter().for_each(|freq| {
+        //     // Extract frequency component of signal (ntargets long)
+        //     let padded_signal_freq = &padded_signals_hat_freq[freq];
+
+        //     // Extract frequency components of save locations (ntargets long)
+        //     let check_potential_freq = &global_check_potentials_hat_freq[freq];
+
+        //     (0..nparents).step_by(chunk_size).enumerate().for_each(|(c, chunk_start)| {
+        //         let chunk_end = std::cmp::min(chunk_size+chunk_start, nparents);
+
+        //         let first = all_save_locations[c].first().unwrap();
+        //         let last = all_save_locations[c].last().unwrap();
+        //         let save_locations = &check_potential_freq[*first..*last+8];
+
+        //         for (i, kernel_data) in kernel_data_halo.iter().enumerate().take(26) {
+        //             let frequency_offset = 64 * freq;
+        //             let kernel_data_i = &kernel_data[frequency_offset..(frequency_offset + 64)];
+
+        //             // lookup signals
+        //             let disps = &all_displacements_chunked[c][i];
+        //             let signals = disps.iter().map(|d| &padded_signal_freq[*d..d+8]).collect_vec();
+        //             let nsignals = signals.len();
+
+        //             // Loop over all signals and apply Hadamard product for a specific kernel
+        //             for k in 0..nsignals {
+        //                 // println!("save_locations {:?} {:?}", save_locations.len(), nsignals);
+        //                 let save_locations_raw = &save_locations[k*8..(k+1)*8];
+
+        //                 for j in 0..8 {
+        //                     let kernel_data_ij = &kernel_data_i[j * 8..(j + 1) * 8];
+        //                     let sig = signals[k][j].raw;
+        //                     unsafe {
+        //                         save_locations_raw
+        //                             .iter()
+        //                             .zip(kernel_data_ij.iter())
+        //                             .for_each(|(&sav, &ker)| *sav.raw += scale * ker * *sig)
+        //                     }
+        //                 } // inner loop 
+        //             }
+
+        //         }
+
+        //     });
+        // });
+
+
+        // // Find all the displacements used for saving results
+        // let mut all_displacements = Vec::new();
+        // targets.chunks_exact(8).for_each(|sibling_chunk| {
+        //     // not in Morton order (refer to sort method when called on 'neighbours')
+        //     let parent_neighbours: Vec<Option<MortonKey>> =
+        //         sibling_chunk[0].parent().all_neighbors();
+
+        //     let displacements = parent_neighbours
+        //         .iter()
+        //         .map(|pn| {
+        //             let mut tmp = Vec::new();
+        //             if let Some(pn) = pn {
+        //                 if self.fmm.tree.keys_set.contains(pn) {
+        //                     let mut children = pn.children();
+        //                     children.sort();
+        //                     for child in children {
+        //                         // tmp.push(*target_map.get(&child).unwrap() as i64)
+        //                         tmp.push(*target_map.get(&child).unwrap())
+        //                     }
+        //                 } else {
+        //                     for i in 0..8 {
+        //                         tmp.push(ntargets + i)
+        //                     }
+        //                 }
+        //             } else {
+        //                 for i in 0..8 {
+        //                     tmp.push(ntargets + i)
+        //                 }
+        //             }
+
+        //             assert!(tmp.len() == 8);
+        //             tmp
+        //         })
+        //         .collect_vec();
+        //     all_displacements.push(displacements);
+        // });
+
+        // let scale = Complex::from(self.m2l_scale(level));
+
+        // (0..size_real).into_par_iter().for_each(|freq| {
+        //     // Extract frequency component of signal (ntargets long)
+        //     let padded_signal_freq = &padded_signals_hat_freq[freq];
+
+        //     // Extract frequency components of save locations (ntargets long)
+        //     let check_potential_freq = &global_check_potentials_hat_freq[freq];
+
+        //     (0..nparents).for_each(|sibling_idx| {
+        //         // lookup associated save locations for our current sibling set
+        //         let save_locations =
+        //             &check_potential_freq[(sibling_idx * 8)..(sibling_idx + 1) * 8];
+        //         let save_locations_raw = save_locations.iter().map(|s| s.raw).collect_vec();
+
+        //         // for each halo position compute convolutions to a given sibling set
+        //         for (i, kernel_data) in kernel_data_halo.iter().enumerate().take(26) {
+        //             let frequency_offset = 64 * freq;
+        //             let kernel_data_i = &kernel_data[frequency_offset..(frequency_offset + 64)];
+
+        //             // Find displacements for signal being translated
+        //             let displacements = &all_displacements[sibling_idx][i];
+
+        //             // Lookup signal to be translated if a translation is to be performed
+        //             let signal = &padded_signal_freq[(displacements[0])..=(displacements[7])];
+        //             for j in 0..8 {
+        //                 let kernel_data_ij = &kernel_data_i[j * 8..(j + 1) * 8];
+        //                 let sig = signal[j].raw;
+        //                 unsafe {
+        //                     save_locations_raw
+        //                         .iter()
+        //                         .zip(kernel_data_ij.iter())
+        //                         .for_each(|(&sav, &ker)| *sav += scale * ker * *sig)
+        //                 }
+        //             } // inner loop
+        //         }
+        //     }); // over each sibling set
+        // });
+
+        // U::irfft_fftw_par_vec(
+        //     &mut global_check_potentials_hat,
+        //     &mut global_check_potentials,
+        //     &[p, q, r],
+        // );
+
+        // // Compute local expansion coefficients and save to data tree
+        // let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
+
+        // let check_potentials = global_check_potentials
+        //     .data()
+        //     .chunks_exact(size)
+        //     .flat_map(|chunk| {
+        //         let m = 2 * self.fmm.order - 1;
+        //         let p = m + 1;
+        //         let mut potentials = Array3D::new((p, p, p));
+        //         potentials.get_data_mut().copy_from_slice(chunk);
+
+        //         let mut tmp = Vec::new();
+        //         let ntargets = multi_indices.len() / 3;
+        //         let xs = &multi_indices[0..ntargets];
+        //         let ys = &multi_indices[ntargets..2 * ntargets];
+        //         let zs = &multi_indices[2 * ntargets..];
+
+        //         for i in 0..ntargets {
+        //             let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
+        //             tmp.push(*val);
+        //         }
+        //         tmp
+        //     })
+        //     .collect_vec();
+
+
+        // // This should be blocked and use blas3
+        // let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        // let check_potentials = unsafe {
+        //     rlst_pointer_mat!['a, U, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
+        // };
+
+        // let mut tmp = self
+        //     .fmm
+        //     .dc2e_inv_1
+        //     .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
+        //     .eval();
+
+    
+        // tmp.data_mut()
+        //     .iter_mut()
+        //     .for_each(|d| *d *= self.fmm.kernel.scale(level));
+        // let locals = tmp;
+
+
     }
 
     fn m2l_scale(&self, level: u64) -> U {
