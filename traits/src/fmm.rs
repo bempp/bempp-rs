@@ -72,19 +72,19 @@ pub trait FmmLoop {
     ///
     /// # Arguments
     /// `time` - If true, method returns a dictionary of times for the downward pass operators.
-    fn upward_pass(&self, time: Option<bool>) -> Option<TimeDict>;
+    fn upward_pass(&self, time: bool) -> Option<TimeDict>;
 
     /// Compute the downward pass, optionally collect timing for each operator.
     ///
     /// # Arguments
     /// `time` - If true, method returns a dictionary of times for the upward pass operators.
-    fn downward_pass(&self, time: Option<bool>) -> Option<TimeDict>;
+    fn downward_pass(&self, time: bool) -> Option<TimeDict>;
 
     /// Compute the upward and downward pass, optionally collect timing for each operator.
     ///
     /// # Arguments
     /// `time` - If true, method returns a dictionary of times for all operators.
-    fn run(&self, time: Option<bool>) -> Option<TimeDict>;
+    fn run(&self, time: bool) -> Option<TimeDict>;
 }
 
 /// Interface to compute interaction lists given a tree.

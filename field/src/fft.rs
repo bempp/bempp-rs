@@ -18,7 +18,7 @@ where
     /// * `output` - Output slice.
     /// * `shape` - Shape of input data.
     fn rfft3_fftw_par_vec(input: &mut DtypeReal, output: &mut DtypeCplx, shape: &[usize]);
-
+    
     /// Compute an inverse Real FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
     ///
@@ -119,6 +119,7 @@ impl Fft<FftMatrixf64, FftMatrixc64> for f64 {
             let _ = plan.r2c(inp, out);
         });
     }
+
     fn irfft_fftw_par_vec(input: &mut FftMatrixc64, output: &mut FftMatrixf64, shape: &[usize]) {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
