@@ -202,8 +202,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
 
     let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
-    let mut test_jdet = vec![0.0; NPTS_TEST];
-    let mut trial_jdet = vec![0.0; NPTS_TRIAL];
+    let mut test_jdet = [0.0; NPTS_TEST];
+    let mut trial_jdet = [0.0; NPTS_TRIAL];
     let mut test_normals = zero_matrix((NPTS_TEST, 3));
     let mut trial_normals = zero_matrix((NPTS_TRIAL, 3));
 
@@ -279,15 +279,15 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     let mut sum = 0.0;
 
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
-                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
+                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() { unsafe {
                             sum += k[test_index * trial_weights.len() + trial_index]
                                 * (test_wt
                                     * trial_wt
-                                    * test_table.get(0, test_index, test_i, 0).unwrap()
+                                    * test_table.get_unchecked(0, test_index, test_i, 0)
                                     * test_jdet[test_index]
-                                    * trial_table.get(0, trial_index, trial_i, 0).unwrap()
+                                    * trial_table.get_unchecked(0, trial_index, trial_i, 0)
                                     * trial_jdet[test_index]);
-                        }
+                        }}
                     }
                     // TODO: should we write into a result array, then copy into output after this loop?
                     let mut neighbour = false;
@@ -300,9 +300,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     if !neighbour {
                         unsafe {
                             *output.data.offset(
-                                (*test_dof + output.shape.0 * *trial_dof)
-                                    .try_into()
-                                    .unwrap(),
+                                (*test_dof + output.shape.0 * *trial_dof) as isize,
                             ) += sum;
                         }
                     }
