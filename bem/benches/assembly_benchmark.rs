@@ -1,4 +1,4 @@
-use bempp_bem::assembly::{assemble_batched, batched, cl_kernel, BoundaryOperator, PDEType};
+use bempp_bem::assembly::{assemble_batched, batched, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
@@ -116,71 +116,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn cl_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cl_assembly");
-    group.sample_size(20);
-
-    for i in 3..5 {
-        let grid = regular_sphere(i);
-        let element = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            0,
-            Continuity::Discontinuous,
-        );
-
-        let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
-
-        /*
-        group.bench_function(
-            &format!(
-                "Assembly of singular terms of {}x{} matrix",
-                space.dofmap().global_size(),
-                space.dofmap().global_size()
-            ),
-            |b| {
-                b.iter(|| {
-                    batched::assemble_singular(
-                        &mut matrix,
-                        &laplace_3d::Laplace3dKernel::new(),
-                        false,
-                        false,
-                        &space,
-                        &space,
-                        &colouring,
-                        &colouring,
-                        128,
-                    )
-                })
-            },
-        );
-        */
-        group.bench_function(
-            &format!(
-                "Bempp-cl style assembly of non-singular terms of {}x{} matrix",
-                space.dofmap().global_size(),
-                space.dofmap().global_size()
-            ),
-            |b| {
-                b.iter(|| {
-                    cl_kernel::assemble(
-                        &mut matrix,
-                        &laplace_3d::Laplace3dKernel::new(),
-                        false,
-                        false,
-                        &space,
-                        &space,
-                    )
-                })
-            },
-        );
-    }
-    group.finish();
-}
-
 // criterion_group!(benches, full_assembly_benchmark, assembly_parts_benchmark);
 criterion_group!(benches, assembly_parts_benchmark);
-//criterion_group!(cl_benches, cl_benchmark);
 criterion_main!(benches);
-//criterion_main!(benches, cl_benches);
