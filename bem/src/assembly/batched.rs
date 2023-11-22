@@ -13,7 +13,7 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut, UnsafeRandomAccessByRef};
+use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -196,6 +196,11 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     trial_table: &Array4D<f64>,
     test_table: &Array4D<f64>,
 ) -> usize {
+    debug_assert!(test_weights.len() == NPTS_TEST);
+    debug_assert!(test_points.shape()[0] == NPTS_TEST);
+    debug_assert!(trial_weights.len() == NPTS_TRIAL);
+    debug_assert!(trial_points.shape()[0] == NPTS_TRIAL);
+
     let test_grid = test_space.grid();
     let test_c20 = test_grid.topology().connectivity(2, 0);
     let trial_grid = trial_space.grid();
@@ -234,22 +239,25 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         Box::new(|_: usize, _: &mut Mat<f64>| ())
     };
 
-    let mut trial_jdet_all = vec![[0.0; NPTS_TRIAL]; trial_cells.len()];
-    let mut trial_mapped_pts_all = vec![];
-    let mut trial_normals_all = vec![];
-    for _ in 0..trial_cells.len() {
-        trial_mapped_pts_all.push(zero_matrix([NPTS_TRIAL, 3]));
-        trial_normals_all.push(zero_matrix([NPTS_TRIAL, 3]));
+    let mut trial_jdet = vec![[0.0; NPTS_TRIAL]; trial_cells.len()];
+    let mut trial_mapped_pts = vec![];
+    let mut trial_normals = vec![];
+    for _i in 0..trial_cells.len() {
+        trial_mapped_pts.push(zero_matrix([NPTS_TRIAL, 3]));
+        trial_normals.push(zero_matrix([NPTS_TRIAL, 3]));
     }
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
         let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
 
         trial_evaluator
-            .compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet_all[trial_cell_i]);
-        trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts_all[trial_cell_i]);
-        trial_compute_normals(trial_cell_gindex, &mut trial_normals_all[trial_cell_i]);
+            .compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet[trial_cell_i]);
+        trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts[trial_cell_i]);
+        trial_compute_normals(trial_cell_gindex, &mut trial_normals[trial_cell_i]);
     }
+
+    let mut sum: f64;
+    let mut trial_integrands = [0.0; NPTS_TRIAL];
 
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
@@ -264,7 +272,6 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
             let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
             let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
 
-
             let mut neighbour = false;
             for v in test_vertices {
                 if trial_vertices.contains(v) {
@@ -272,15 +279,13 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     break;
                 }
             }
-            if neighbour {
-                continue;
-            }
 
+            if neighbour { continue; }
 
             kernel.assemble_st(
                 EvalType::Value,
                 test_mapped_pts.data(),
-                trial_mapped_pts_all[trial_cell_i].data(),
+                trial_mapped_pts[trial_cell_i].data(),
                 &mut k,
             );
 
@@ -298,27 +303,34 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     .iter()
                     .enumerate()
                 {
+                    for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
+                        unsafe {
+                            trial_integrands[trial_index] =
+                                trial_wt
+                                    * trial_jdet[trial_cell_i][trial_index]
+                                    * trial_table.get_unchecked(0, trial_index, trial_i, 0);
+                            }
+                    }
+                    sum = 0.0;
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
                         let test_integrand = unsafe {
                             test_wt
                                 * test_jdet[test_index]
                                 * test_table.get_unchecked(0, test_index, test_i, 0)
                         };
-                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                            unsafe {
-                                let trial_integrand =
-                                    trial_wt
-                                        * trial_jdet_all[trial_cell_i][trial_index]
-                                        * trial_table.get_unchecked(0, trial_index, trial_i, 0);
-                        *output
-                            .data
-                            .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += k[test_index * trial_weights.len() + trial_index]
-                                    * test_integrand
-                                    * trial_integrand;
-                            }
+                        for trial_index in 0..NPTS_TRIAL {
+                            sum += k[test_index * trial_weights.len() + trial_index]
+                                * test_integrand
+                                * trial_integrands[trial_index];
                         }
                     }
-                }
+                    // TODO: should we write into a result array, then copy into output after this loop?
+                    unsafe {
+                        *output
+                            .data
+                            .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += sum;
+                    }
+            }
             }
         }
     }
