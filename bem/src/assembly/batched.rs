@@ -237,7 +237,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut trial_jdet_all = vec![[0.0; NPTS_TRIAL]; trial_cells.len()];
     let mut trial_mapped_pts_all = vec![];
     let mut trial_normals_all = vec![];
-    for i in 0..trial_cells.len() {
+    for _ in 0..trial_cells.len() {
         trial_mapped_pts_all.push(zero_matrix([NPTS_TRIAL, 3]));
         trial_normals_all.push(zero_matrix([NPTS_TRIAL, 3]));
     }
@@ -245,7 +245,6 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
         let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
         let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
-        let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
 
         trial_evaluator
             .compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet_all[trial_cell_i]);
