@@ -212,36 +212,9 @@ pub struct SendPtr<T> {
 unsafe impl<T> Sync for SendPtr<T> {}
 
 
-
 impl <T> Default for SendPtr<T> {
 
     fn default() -> Self {
         SendPtr { raw: std::ptr::null() }
-    }
-}
-
-pub struct SendPtrMutIter<'a, T> {
-    vec: &'a Vec<SendPtrMut<T>>,
-    current: usize,
-}
-
-
-impl<'a, T> SendPtrMutIter<'a, T> {
-    pub fn new(vec: &'a Vec<SendPtrMut<T>>) -> Self {
-        SendPtrMutIter { vec, current: 0 }
-    }
-}
-
-impl<'a, T> Iterator for SendPtrMutIter<'a, T> {
-    type Item = &'a SendPtrMut<T>; // Change this to the type of item you want to return
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current >= self.vec.len() {
-            None
-        } else {
-            let item = &self.vec[self.current];
-            self.current += 1;
-            Some(item)
-        }
     }
 }

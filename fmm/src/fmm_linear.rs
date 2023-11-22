@@ -28,7 +28,7 @@ use bempp_traits::{
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::types::{FmmData, FmmDataLinear, KiFmm, KiFmmLinear, SendPtr, SendPtrMut, SendPtrMutIter};
+use crate::types::{FmmData, FmmDataLinear, KiFmm, KiFmmLinear, SendPtr, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
@@ -289,10 +289,9 @@ where
         let size_real = p * q * (r / 2 + 1);
         let pad_size = (p - m, q - n, r - o);
         let pad_index = (p - m, q - n, r - o);
-        // let mut padded_signals = rlst_col_vec![U, size * ntargets];
-        let mut padded_signals = vec![U::zero(); size*ntargets];
+        let mut padded_signals = rlst_col_vec![U, size * ntargets];
 
-        let padded_signals_chunks = padded_signals.par_chunks_exact_mut(size);
+        let padded_signals_chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
 
         let ntargets = targets.len();
         let min = &targets[0];
@@ -309,26 +308,16 @@ where
             .for_each(|(padded_signal, multipole)| {
                 let signal = self.fmm.m2l.compute_signal(self.fmm.order, multipole);
 
-                let mut tmp = pad3(&signal, pad_size, pad_index);
+                let tmp = pad3(&signal, pad_size, pad_index);
 
                 padded_signal.copy_from_slice(tmp.get_data());
             });
 
 
         // Allocating and handling this vec of structs is really shit
-        // let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
-        let mut padded_signals_hat = vec![Complex::<U>::zero(); size_real*ntargets];
-        let mut padded_signals_hat = unsafe {rlst_pointer_mat!['a, Complex<U>, padded_signals_hat.as_mut_ptr(), (size_real*ntargets, 1), (1,1)]};
+        let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
 
-        // U::rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
-
-        // // let mut real_parts = Vec::with_capacity(padded_signals_hat.data().len());
-        // // let mut imag_parts = Vec::with_capacity(padded_signals_hat.data().len());
-
-        // // for complex_val in padded_signals_hat.data().iter() {
-        // //     real_parts.push(complex_val.re);
-        // //     imag_parts.push(complex_val.im);
-        // // }
+        U::rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
 
         // let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         // let ntargets = targets.len();
