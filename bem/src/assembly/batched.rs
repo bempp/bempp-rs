@@ -203,12 +203,9 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
     let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
     let mut test_jdet = [0.0; NPTS_TEST];
-    let mut trial_jdet = [0.0; NPTS_TRIAL];
     let mut test_normals = zero_matrix([NPTS_TEST, 3]);
-    let mut trial_normals = zero_matrix([NPTS_TRIAL, 3]);
 
     let mut test_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TEST, 3]];
-    let mut trial_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TRIAL, 3]];
 
     let test_element = test_grid.geometry().element(test_cells[0]);
     let trial_element = trial_grid.geometry().element(trial_cells[0]);
@@ -237,6 +234,25 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         Box::new(|_: usize, _: &mut Mat<f64>| ())
     };
 
+    let mut trial_jdet_all = vec![[0.0; NPTS_TRIAL]; trial_cells.len()];
+    let mut trial_mapped_pts_all = vec![];
+    let mut trial_normals_all = vec![];
+    for i in 0..trial_cells.len() {
+        trial_mapped_pts_all.push(zero_matrix([NPTS_TRIAL, 3]));
+        trial_normals_all.push(zero_matrix([NPTS_TRIAL, 3]));
+    }
+
+    for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
+        let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
+        let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
+        let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
+
+        trial_evaluator
+            .compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet_all[trial_cell_i]);
+        trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts_all[trial_cell_i]);
+        trial_compute_normals(trial_cell_gindex, &mut trial_normals_all[trial_cell_i]);
+    }
+
     for test_cell in test_cells {
         let test_cell_tindex = test_grid.topology().index_map()[*test_cell];
         let test_cell_gindex = test_grid.geometry().index_map()[*test_cell];
@@ -246,19 +262,15 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         test_evaluator.compute_points(test_cell_gindex, &mut test_mapped_pts);
         test_compute_normals(test_cell_gindex, &mut test_normals);
 
-        for trial_cell in trial_cells {
+        for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
             let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
             let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
             let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
 
-            trial_evaluator.compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet);
-            trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
-            trial_compute_normals(trial_cell_gindex, &mut trial_normals);
-
             kernel.assemble_st(
                 EvalType::Value,
                 test_mapped_pts.data(),
-                trial_mapped_pts.data(),
+                trial_mapped_pts_all[trial_cell_i].data(),
                 &mut k,
             );
 
@@ -279,15 +291,23 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     let mut sum = 0.0;
 
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
-                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() { unsafe {
-                            sum += k[test_index * trial_weights.len() + trial_index]
-                                * (test_wt
-                                    * trial_wt
-                                    * test_table.get_unchecked(0, test_index, test_i, 0)
-                                    * test_jdet[test_index]
-                                    * trial_table.get_unchecked(0, trial_index, trial_i, 0)
-                                    * trial_jdet[test_index]);
-                        }}
+                        let test_integrand = unsafe {
+                            test_wt
+                                * test_jdet[test_index]
+                                * test_table.get_unchecked(0, test_index, test_i, 0)
+                        };
+                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
+                            unsafe {
+                                let trial_integrand = {
+                                    trial_wt
+                                        * trial_jdet_all[trial_cell_i][trial_index]
+                                        * trial_table.get_unchecked(0, trial_index, trial_i, 0)
+                                };
+                                sum += k[test_index * trial_weights.len() + trial_index]
+                                    * test_integrand
+                                    * trial_integrand;
+                            }
+                        }
                     }
                     // TODO: should we write into a result array, then copy into output after this loop?
                     let mut neighbour = false;
@@ -299,9 +319,9 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     }
                     if !neighbour {
                         unsafe {
-                            *output.data.offset(
-                                (*test_dof + output.shape[0] * *trial_dof) as isize,
-                            ) += sum;
+                            *output
+                                .data
+                                .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += sum;
                         }
                     }
                 }

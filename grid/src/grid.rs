@@ -7,8 +7,8 @@ use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use itertools::izip;
-use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape,
-    UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
+use rlst_common::traits::{
+    RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
 };
 use rlst_proc_macro::rlst_static_array;
 use std::cell::RefCell;
@@ -89,10 +89,12 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
                 let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
                 for j in 0..3 {
                     unsafe {
-                        *axes.get_unchecked_mut([0, j]) += *self.geometry.coordinate_unchecked(v, j)
-                            * self.table.get(1, p, i, 0).unwrap();
-                        *axes.get_unchecked_mut([1, j]) += *self.geometry.coordinate_unchecked(v, j)
-                            * self.table.get(2, p, i, 0).unwrap();
+                        *axes.get_unchecked_mut([0, j]) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * self.table.get(1, p, i, 0).unwrap();
+                        *axes.get_unchecked_mut([1, j]) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * self.table.get(2, p, i, 0).unwrap();
                     }
                 }
             }
@@ -263,8 +265,9 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
             for j in 0..3 {
                 for k in 0..2 {
                     unsafe {
-                        *axes.get_unchecked_mut([k, j]) += *self.geometry.coordinate_unchecked(v, j)
-                            * self.table.get(k + 1, 0, i, 0).unwrap();
+                        *axes.get_unchecked_mut([k, j]) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * self.table.get(k + 1, 0, i, 0).unwrap();
                     }
                 }
             }
@@ -535,11 +538,14 @@ impl Geometry for SerialGeometry {
                         *self.coordinate(v, j).unwrap() * data.get(2, p, i, 0).unwrap();
                 }
             }
-            *normals.get_mut([p, 0]).unwrap() = *axes.get([0, 1]).unwrap() * *axes.get([1, 2]).unwrap()
+            *normals.get_mut([p, 0]).unwrap() = *axes.get([0, 1]).unwrap()
+                * *axes.get([1, 2]).unwrap()
                 - *axes.get([0, 2]).unwrap() * *axes.get([1, 1]).unwrap();
-            *normals.get_mut([p, 1]).unwrap() = *axes.get([0, 2]).unwrap() * *axes.get([1, 0]).unwrap()
+            *normals.get_mut([p, 1]).unwrap() = *axes.get([0, 2]).unwrap()
+                * *axes.get([1, 0]).unwrap()
                 - *axes.get([0, 0]).unwrap() * *axes.get([1, 2]).unwrap();
-            *normals.get_mut([p, 2]).unwrap() = *axes.get([0, 0]).unwrap() * *axes.get([1, 1]).unwrap()
+            *normals.get_mut([p, 2]).unwrap() = *axes.get([0, 0]).unwrap()
+                * *axes.get([1, 1]).unwrap()
                 - *axes.get([0, 1]).unwrap() * *axes.get([1, 0]).unwrap();
             let size = (*normals.get([p, 0]).unwrap() * *normals.get([p, 0]).unwrap()
                 + *normals.get([p, 1]).unwrap() * *normals.get([p, 1]).unwrap()
@@ -608,9 +614,8 @@ impl Geometry for SerialGeometry {
             *jdet = match tdim {
                 1 => match gdim {
                     1 => *js.get([p, 0]).unwrap(),
-                    2 => {
-                        ((*js.get([p, 0]).unwrap()).powi(2) + (*js.get([p, 1]).unwrap()).powi(2)).sqrt()
-                    }
+                    2 => ((*js.get([p, 0]).unwrap()).powi(2) + (*js.get([p, 1]).unwrap()).powi(2))
+                        .sqrt(),
                     3 => ((*js.get([p, 0]).unwrap()).powi(2)
                         + (*js.get([p, 1]).unwrap()).powi(2)
                         + (*js.get([p, 2]).unwrap()).powi(2))
@@ -691,7 +696,8 @@ impl Geometry for SerialGeometry {
             for p in 0..npts {
                 if tdim == 1 {
                     if gdim == 1 {
-                        *jacobian_inverses.get_mut([p, 0]).unwrap() = 1.0 / *js.get([p, 0]).unwrap();
+                        *jacobian_inverses.get_mut([p, 0]).unwrap() =
+                            1.0 / *js.get([p, 0]).unwrap();
                     } else if gdim == 2 {
                         unimplemented!("Inverse jacobian for this dimension not implemented yet.");
                     } else if gdim == 3 {
@@ -704,8 +710,10 @@ impl Geometry for SerialGeometry {
                         let det = *js.get([p, 0]).unwrap() * *js.get([p, 3]).unwrap()
                             - *js.get([p, 1]).unwrap() * *js.get([p, 2]).unwrap();
                         *jacobian_inverses.get_mut([p, 0]).unwrap() = js.get([p, 3]).unwrap() / det;
-                        *jacobian_inverses.get_mut([p, 1]).unwrap() = -js.get([p, 1]).unwrap() / det;
-                        *jacobian_inverses.get_mut([p, 2]).unwrap() = -js.get([p, 2]).unwrap() / det;
+                        *jacobian_inverses.get_mut([p, 1]).unwrap() =
+                            -js.get([p, 1]).unwrap() / det;
+                        *jacobian_inverses.get_mut([p, 2]).unwrap() =
+                            -js.get([p, 2]).unwrap() / det;
                         *jacobian_inverses.get_mut([p, 3]).unwrap() = js.get([p, 0]).unwrap() / det;
                     } else if gdim == 3 {
                         let c = (*js.get([p, 3]).unwrap() * *js.get([p, 4]).unwrap()

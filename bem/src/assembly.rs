@@ -188,8 +188,11 @@ mod test {
 
         for i in 0..5 {
             for j in 0..5 {
-                println!("{} {}", *matrix.get([i, j]).unwrap(),
-                    *matrix2.get([i, j]).unwrap());
+                println!(
+                    "{} {}",
+                    *matrix.get([i, j]).unwrap(),
+                    *matrix2.get([i, j]).unwrap()
+                );
             }
             println!();
         }

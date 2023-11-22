@@ -149,7 +149,10 @@ mod test {
                 *data.get(0, pt, 1, 0).unwrap(),
                 *points.get([pt, 0]).unwrap() - 1.0
             );
-            assert_relative_eq!(*data.get(0, pt, 1, 1).unwrap(), *points.get([pt, 1]).unwrap());
+            assert_relative_eq!(
+                *data.get(0, pt, 1, 1).unwrap(),
+                *points.get([pt, 1]).unwrap()
+            );
             assert_relative_eq!(
                 *data.get(0, pt, 2, 0).unwrap(),
                 -*points.get([pt, 0]).unwrap()

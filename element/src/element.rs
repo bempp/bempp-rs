@@ -6,9 +6,9 @@ use bempp_tools::arrays::{AdjacencyList, Array3D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array3DAccess, Array4DAccess};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
+use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut};
 use rlst_dense::linalg::Trans;
 use rlst_dense::rlst_dynamic_array2;
-use rlst_common::traits::{ RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut};
 pub mod lagrange;
 pub mod raviart_thomas;
 
@@ -166,9 +166,11 @@ impl CiarletElement {
         }
 
         let mut ident = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
-        for i in 0..dim { unsafe {
-            *ident.get_unchecked_mut([i, i]) = 1.0;
-        }}
+        for i in 0..dim {
+            unsafe {
+                *ident.get_unchecked_mut([i, i]) = 1.0;
+            }
+        }
         let lu = dual_matrix.into_lu().unwrap();
         let inverse = lu.solve(Trans::NoTrans, ident).unwrap();
 

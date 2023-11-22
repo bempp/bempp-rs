@@ -364,12 +364,14 @@ fn laplace_component_count(eval_type: EvalType) -> usize {
 mod test {
 
     use super::*;
-    use rand::prelude::*;
     use approx::assert_relative_eq;
-    use bempp_traits::types::Scalar;
-    use rlst_common::traits::{RawAccess, RawAccessMut, RandomAccessByRef, RandomAccessMut, Shape, FillFrom};
-    use rlst_dense::rlst_dynamic_array2;
     use bempp_tools::arrays::Mat;
+    use bempp_traits::types::Scalar;
+    use rand::prelude::*;
+    use rlst_common::traits::{
+        FillFrom, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape,
+    };
+    use rlst_dense::rlst_dynamic_array2;
 
     fn copy(m_in: &Mat<f64>) -> Mat<f64> {
         let mut m = rlst_dynamic_array2!(f64, m_in.shape());

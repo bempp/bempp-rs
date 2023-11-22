@@ -8,7 +8,9 @@ use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use rlst_dense::{base_array::BaseArray, array::Array, rlst_dynamic_array2, data_container::VectorContainer};
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+};
 
 use crate::types::morton::MortonKey;
 

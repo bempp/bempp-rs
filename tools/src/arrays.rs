@@ -1,8 +1,10 @@
 //! Containers to store multi-dimensional data
 use bempp_traits::arrays::{AdjacencyListAccess, Array3DAccess, Array4DAccess};
 use num::Num;
-use rlst_common::{types::Scalar, traits::{UnsafeRandomAccessMut}};
-use rlst_dense::{rlst_dynamic_array2, array::Array, base_array::BaseArray, data_container::VectorContainer};
+use rlst_common::{traits::UnsafeRandomAccessMut, types::Scalar};
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+};
 use std::clone::Clone;
 
 pub type Mat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -44,7 +46,7 @@ impl<T: Num + Clone> Array3D<T> {
     /// Create an array from a data vector
     pub fn new(shape: (usize, usize, usize)) -> Self {
         Self {
-            data: vec![T::zero(); shape.0 * shape.  1 * shape.2],
+            data: vec![T::zero(); shape.0 * shape.1 * shape.2],
             shape,
         }
     }

@@ -76,17 +76,20 @@ fn get_integration_element_vec(jac: &Vec<Vec<f64>>, int_elem: &mut [f64]) {
 
 fn get_global_point(corners: &Vec<Vec<f64>>, point: &[f64], result: &mut [f64]) {
     for i in 0..3 {
-        result[i] = corners[0][i] + point[0] * (corners[1][i] - corners[0][i]) + point[1] * (corners[2][i] - corners[0][i]);
+        result[i] = corners[0][i]
+            + point[0] * (corners[1][i] - corners[0][i])
+            + point[1] * (corners[2][i] - corners[0][i]);
     }
 }
 fn get_global_point_vec(corners: &Vec<Vec<f64>>, point: &[f64], result: &mut [f64]) {
     return;
-    for index in 0.. corners[0].len() / 3 {
+    for index in 0..corners[0].len() / 3 {
         for i in 0..3 {
-            result[index * 3 + i] = corners[0][3 * index + i] + point[0] * (corners[1][3 * index + i] - corners[0][3 * index + i]) + point[1] * (corners[2][3 * index + i] - corners[2][3 * index + i]);
+            result[index * 3 + i] = corners[0][3 * index + i]
+                + point[0] * (corners[1][3 * index + i] - corners[0][3 * index + i])
+                + point[1] * (corners[2][3 * index + i] - corners[2][3 * index + i]);
         }
     }
-    
 }
 
 fn elements_are_adjacent<'a>(e0: &[usize], e1: &[usize]) -> bool {
@@ -206,7 +209,8 @@ fn lagrange_kernel<'a>(
             if !elements_are_adjacent(&test_element, &trial_element[vec_index]) {
                 global_row_index = my_test_local2global[0];
                 global_col_index = my_trial_local2global[vec_index][0];
-                global_result[global_row_index * n_trial + global_col_index] += shape_integral[0][0][vec_index];
+                global_result[global_row_index * n_trial + global_col_index] +=
+                    shape_integral[0][0][vec_index];
             }
         }
     }
@@ -227,7 +231,6 @@ pub fn assemble<'a>(
     let qweights = qrule_test.weights;
     let test_colouring = test_space.compute_cell_colouring();
     let trial_colouring = trial_space.compute_cell_colouring();
-
 
     let mut test_local2global = vec![0];
     for trial_c in &trial_colouring {

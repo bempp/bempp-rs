@@ -2,7 +2,7 @@
 
 use crate::grid::SerialGrid;
 use bempp_element::cell::Triangle;
-use bempp_tools::arrays::{zero_matrix, to_matrix, AdjacencyList};
+use bempp_tools::arrays::{to_matrix, zero_matrix, AdjacencyList};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::grid::{Geometry, Grid, Topology};
