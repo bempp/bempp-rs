@@ -13,7 +13,7 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
+use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut, UnsafeRandomAccessByRef};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -243,7 +243,6 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     }
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
-        let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
         let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
 
         trial_evaluator
@@ -263,8 +262,20 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
             let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
-            let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
             let trial_vertices = unsafe { trial_c20.row_unchecked(trial_cell_tindex) };
+
+
+            let mut neighbour = false;
+            for v in test_vertices {
+                if trial_vertices.contains(v) {
+                    neighbour = true;
+                    break;
+                }
+            }
+            if neighbour {
+                continue;
+            }
+
 
             kernel.assemble_st(
                 EvalType::Value,
@@ -287,8 +298,6 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     .iter()
                     .enumerate()
                 {
-                    let mut sum = 0.0;
-
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
                         let test_integrand = unsafe {
                             test_wt
@@ -297,30 +306,16 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                         };
                         for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
                             unsafe {
-                                let trial_integrand = {
+                                let trial_integrand =
                                     trial_wt
                                         * trial_jdet_all[trial_cell_i][trial_index]
-                                        * trial_table.get_unchecked(0, trial_index, trial_i, 0)
-                                };
-                                sum += k[test_index * trial_weights.len() + trial_index]
+                                        * trial_table.get_unchecked(0, trial_index, trial_i, 0);
+                        *output
+                            .data
+                            .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += k[test_index * trial_weights.len() + trial_index]
                                     * test_integrand
                                     * trial_integrand;
                             }
-                        }
-                    }
-                    // TODO: should we write into a result array, then copy into output after this loop?
-                    let mut neighbour = false;
-                    for v in test_vertices {
-                        if trial_vertices.contains(v) {
-                            neighbour = true;
-                            break;
-                        }
-                    }
-                    if !neighbour {
-                        unsafe {
-                            *output
-                                .data
-                                .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += sum;
                         }
                     }
                 }
