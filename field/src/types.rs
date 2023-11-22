@@ -3,12 +3,9 @@ use std::collections::HashMap;
 
 use cauchy::{c32, c64};
 use num::{Complex, Float};
-use rlst::{
-    common::traits::{Eval, NewLikeSelf},
-    dense::{
-        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_dynamic_mat,
-        Dynamic,
-    },
+use rlst_common::traits::{Eval, NewLikeSelf};
+use rlst_dense::{
+    base_array::BaseArray, data_container::VectorContainer, array::Array, rlst_dynamic_array2,
 };
 
 use bempp_traits::kernel::Kernel;
@@ -16,7 +13,7 @@ use bempp_traits::types::Scalar;
 use bempp_tree::types::morton::MortonKey;
 
 /// Simple type alias for a 2D `Matrix<f64>`
-pub type SvdM2lEntry<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
+pub type SvdM2lEntry<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Simple type alias for pre-computed FFT of green's function evaluations computed for each transfer vector in a box's halo
 /// Each index corresponds to a halo position, and contains 64 convolutions, one for each of a box's siblings with each child
@@ -117,7 +114,7 @@ where
     T: Scalar,
 {
     fn default() -> Self {
-        let tmp = rlst_dynamic_mat![T, (1, 1)];
+        let tmp = rlst_dynamic_array2![T, [1, 1]];
 
         SvdM2lOperatorData {
             u: tmp.new_like_self().eval(),
@@ -128,16 +125,16 @@ where
 }
 
 /// Type alias for real coefficients for into FFTW wrappers
-pub type FftMatrixf64 = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
+pub type FftMatrixf64 = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
 
 /// Type alias for real coefficients for into FFTW wrappers
-pub type FftMatrixf32 = Matrix<f32, BaseMatrix<f32, VectorContainer<f32>, Dynamic>, Dynamic>;
+pub type FftMatrixf32 = Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>;
 
 /// Type alias for complex coefficients for FFTW wrappers
-pub type FftMatrixc64 = Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic>, Dynamic>;
+pub type FftMatrixc64 = Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2>;
 
 /// Type alias for complex coefficients for FFTW wrappers
-pub type FftMatrixc32 = Matrix<c32, BaseMatrix<c32, VectorContainer<c32>, Dynamic>, Dynamic>;
+pub type FftMatrixc32 = Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2>;
 
 /// Type alias for real coefficients for into FFTW wrappers
-pub type FftMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
+pub type FftMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

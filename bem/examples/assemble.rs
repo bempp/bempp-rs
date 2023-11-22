@@ -34,7 +34,7 @@ fn main() {
         space0.dofmap().global_size()
     );
     let mut matrix =
-        zero_matrix::<f64>((space1.dofmap().global_size(), space0.dofmap().global_size()));
+        zero_matrix::<f64>([space1.dofmap().global_size(), space0.dofmap().global_size()]);
 
     println!("Assembling dense matrix (complex)");
     assemble_batched(

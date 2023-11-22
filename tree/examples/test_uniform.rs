@@ -13,7 +13,7 @@ use rand::distributions::uniform::SampleUniform;
 use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
 
 use bempp_tree::implementations::helpers::points_fixture;
-use rlst::dense::RawAccess;
+use rlst_common::traits::RawAccess;
 
 use num::traits::Float;
 

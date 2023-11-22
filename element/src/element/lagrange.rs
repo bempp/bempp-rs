@@ -6,7 +6,7 @@ use bempp_tools::arrays::{to_matrix, zero_matrix, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
-use rlst_dense::RandomAccessMut;
+use rlst_common::traits::RandomAccessMut;
 
 /// Create a Lagrange element
 pub fn create(
@@ -30,24 +30,24 @@ pub fn create(
         }
         for d in 0..tdim {
             for _e in 0..cell.entity_count(d) {
-                x[d].push(zero_matrix((0, tdim)));
+                x[d].push(zero_matrix([0, tdim]));
                 m[d].push(Array3D::<f64>::new((0, 1, 0)));
             }
         }
-        x[tdim].push(to_matrix(&cell.midpoint(), (1, tdim)));
+        x[tdim].push(to_matrix(&cell.midpoint(), [1, tdim]));
         m[tdim].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
     } else {
         // TODO: GLL points
         for e in 0..cell.entity_count(0) {
-            let mut pts = zero_matrix((1, tdim));
+            let mut pts = zero_matrix([1, tdim]);
             for i in 0..tdim {
-                *pts.get_mut(0, i).unwrap() = cell.vertices()[e * tdim + i];
+                *pts.get_mut([0, i]).unwrap() = cell.vertices()[e * tdim + i];
             }
             x[0].push(pts);
             m[0].push(Array3D::<f64>::from_data(vec![1.0], (1, 1, 1)));
         }
         for e in 0..cell.entity_count(1) {
-            let mut pts = zero_matrix((degree - 1, tdim));
+            let mut pts = zero_matrix([degree - 1, tdim]);
             let mut ident = vec![0.0; (degree - 1).pow(2)];
             let vn0 = cell.edges()[2 * e];
             let vn1 = cell.edges()[2 * e + 1];
@@ -56,7 +56,7 @@ pub fn create(
             for i in 1..degree {
                 ident[(i - 1) * degree] = 1.0;
                 for j in 0..tdim {
-                    *pts.get_mut(i - 1, j).unwrap() =
+                    *pts.get_mut([i - 1, j]).unwrap() =
                         v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
                 }
             }
@@ -80,7 +80,7 @@ pub fn create(
             } else {
                 panic!("Unsupported face type");
             };
-            let mut pts = zero_matrix((npts, tdim));
+            let mut pts = zero_matrix([npts, tdim]);
             let mut ident = vec![0.0; npts.pow(2)];
 
             let vn0 = cell.faces()[start];
@@ -96,7 +96,7 @@ pub fn create(
                 for i0 in 1..degree {
                     for i1 in 1..degree - i0 {
                         for j in 0..tdim {
-                            *pts.get_mut(n, j).unwrap() = v0[j]
+                            *pts.get_mut([n, j]).unwrap() = v0[j]
                                 + i0 as f64 / degree as f64 * (v1[j] - v0[j])
                                 + i1 as f64 / degree as f64 * (v2[j] - v0[j]);
                         }
@@ -109,7 +109,7 @@ pub fn create(
                 for i0 in 1..degree {
                     for i1 in 1..degree {
                         for j in 0..tdim {
-                            *pts.get_mut(n, j).unwrap() = v0[j]
+                            *pts.get_mut([n, j]).unwrap() = v0[j]
                                 + i0 as f64 / degree as f64 * (v1[j] - v0[j])
                                 + i1 as f64 / degree as f64 * (v2[j] - v0[j]);
                         }
@@ -150,7 +150,7 @@ mod test {
     use bempp_tools::arrays::Array4D;
     use bempp_traits::arrays::Array4DAccess;
     use bempp_traits::element::FiniteElement;
-    use rlst_dense::RandomAccessByRef;
+    use rlst_common::traits::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -187,7 +187,7 @@ mod test {
         let e = create(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
-        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], (4, 1));
+        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], [4, 1]);
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -201,15 +201,15 @@ mod test {
         let e = create(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 4));
-        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], (4, 1));
+        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], [4, 1]);
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
             assert_relative_eq!(
                 *data.get(0, pt, 0, 0).unwrap(),
-                1.0 - *points.get(pt, 0).unwrap()
+                1.0 - *points.get([pt, 0]).unwrap()
             );
-            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get(pt, 0).unwrap());
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get([pt, 0]).unwrap());
         }
         check_dofs(e);
     }
@@ -221,7 +221,7 @@ mod test {
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            (6, 2),
+            [6, 2],
         );
         e.tabulate(&points, 0, &mut data);
 
@@ -238,17 +238,17 @@ mod test {
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            (6, 2),
+            [6, 2],
         );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
             assert_relative_eq!(
                 *data.get(0, pt, 0, 0).unwrap(),
-                1.0 - *points.get(pt, 0).unwrap() - *points.get(pt, 1).unwrap()
+                1.0 - *points.get([pt, 0]).unwrap() - *points.get([pt, 1]).unwrap()
             );
-            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get(pt, 0).unwrap());
-            assert_relative_eq!(*data.get(0, pt, 2, 0).unwrap(), *points.get(pt, 1).unwrap());
+            assert_relative_eq!(*data.get(0, pt, 1, 0).unwrap(), *points.get([pt, 0]).unwrap());
+            assert_relative_eq!(*data.get(0, pt, 2, 0).unwrap(), *points.get([pt, 1]).unwrap());
         }
         check_dofs(e);
     }
@@ -319,7 +319,7 @@ mod test {
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 1.0, 0.25, 0.3, 0.0, 0.0, 1.0, 1.0, 0.5, 0.2],
-            (6, 2),
+            [6, 2],
         );
         e.tabulate(&points, 0, &mut data);
 
@@ -336,26 +336,26 @@ mod test {
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 1.0, 0.25, 0.3, 0.0, 0.0, 1.0, 1.0, 0.5, 0.2],
-            (6, 2),
+            [6, 2],
         );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
             assert_relative_eq!(
                 *data.get(0, pt, 0, 0).unwrap(),
-                (1.0 - *points.get(pt, 0).unwrap()) * (1.0 - *points.get(pt, 1).unwrap())
+                (1.0 - *points.get([pt, 0]).unwrap()) * (1.0 - *points.get([pt, 1]).unwrap())
             );
             assert_relative_eq!(
                 *data.get(0, pt, 1, 0).unwrap(),
-                *points.get(pt, 0).unwrap() * (1.0 - *points.get(pt, 1).unwrap())
+                *points.get([pt, 0]).unwrap() * (1.0 - *points.get([pt, 1]).unwrap())
             );
             assert_relative_eq!(
                 *data.get(0, pt, 2, 0).unwrap(),
-                (1.0 - *points.get(pt, 0).unwrap()) * *points.get(pt, 1).unwrap()
+                (1.0 - *points.get([pt, 0]).unwrap()) * *points.get([pt, 1]).unwrap()
             );
             assert_relative_eq!(
                 *data.get(0, pt, 3, 0).unwrap(),
-                *points.get(pt, 0).unwrap() * *points.get(pt, 1).unwrap()
+                *points.get([pt, 0]).unwrap() * *points.get([pt, 1]).unwrap()
             );
         }
         check_dofs(e);
@@ -368,13 +368,13 @@ mod test {
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 1.0, 0.25, 0.3, 0.0, 0.0, 1.0, 1.0, 0.5, 0.2],
-            (6, 2),
+            [6, 2],
         );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
-            let x = *points.get(pt, 0).unwrap();
-            let y = *points.get(pt, 1).unwrap();
+            let x = *points.get([pt, 0]).unwrap();
+            let y = *points.get([pt, 1]).unwrap();
             assert_relative_eq!(
                 *data.get(0, pt, 0, 0).unwrap(),
                 (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y)

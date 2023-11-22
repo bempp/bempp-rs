@@ -6,7 +6,7 @@ use bempp_tools::arrays::{zero_matrix, Array3D};
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
-use rlst_dense::RandomAccessMut;
+use rlst_common::traits::RandomAccessMut;
 
 /// Create a Raviart-Thomas element
 pub fn create(
@@ -46,19 +46,19 @@ pub fn create(
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
     for _e in 0..cell.entity_count(0) {
-        x[0].push(zero_matrix((0, tdim)));
+        x[0].push(zero_matrix([0, tdim]));
         m[0].push(Array3D::<f64>::new((0, 2, 0)));
     }
 
     for e in 0..cell.entity_count(1) {
-        let mut pts = zero_matrix((1, tdim));
+        let mut pts = zero_matrix([1, tdim]);
         let mut mat = vec![0.0; 2];
         let vn0 = cell.edges()[2 * e];
         let vn1 = cell.edges()[2 * e + 1];
         let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
         let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
         for i in 0..tdim {
-            *pts.get_mut(0, i).unwrap() = (v0[i] + v1[i]) / 2.0;
+            *pts.get_mut([0, i]).unwrap() = (v0[i] + v1[i]) / 2.0;
         }
         mat[0] = v0[1] - v1[1];
         mat[1] = v1[0] - v0[0];
@@ -67,7 +67,7 @@ pub fn create(
     }
 
     for _e in 0..cell.entity_count(2) {
-        x[2].push(zero_matrix((0, tdim)));
+        x[2].push(zero_matrix([0, tdim]));
         m[2].push(Array3D::<f64>::new((0, 2, 0)));
     }
 
@@ -93,7 +93,7 @@ mod test {
     use bempp_tools::arrays::{to_matrix, Array4D};
     use bempp_traits::arrays::Array4DAccess;
     use bempp_traits::element::FiniteElement;
-    use rlst_dense::RandomAccessByRef;
+    use rlst_common::traits::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -132,31 +132,31 @@ mod test {
         let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            (6, 2),
+            [6, 2],
         );
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
             assert_relative_eq!(
                 *data.get(0, pt, 0, 0).unwrap(),
-                -*points.get(pt, 0).unwrap()
+                -*points.get([pt, 0]).unwrap()
             );
             assert_relative_eq!(
                 *data.get(0, pt, 0, 1).unwrap(),
-                -*points.get(pt, 1).unwrap()
+                -*points.get([pt, 1]).unwrap()
             );
             assert_relative_eq!(
                 *data.get(0, pt, 1, 0).unwrap(),
-                *points.get(pt, 0).unwrap() - 1.0
+                *points.get([pt, 0]).unwrap() - 1.0
             );
-            assert_relative_eq!(*data.get(0, pt, 1, 1).unwrap(), *points.get(pt, 1).unwrap());
+            assert_relative_eq!(*data.get(0, pt, 1, 1).unwrap(), *points.get([pt, 1]).unwrap());
             assert_relative_eq!(
                 *data.get(0, pt, 2, 0).unwrap(),
-                -*points.get(pt, 0).unwrap()
+                -*points.get([pt, 0]).unwrap()
             );
             assert_relative_eq!(
                 *data.get(0, pt, 2, 1).unwrap(),
-                1.0 - *points.get(pt, 1).unwrap()
+                1.0 - *points.get([pt, 1]).unwrap()
             );
         }
         check_dofs(e);

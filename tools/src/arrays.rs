@@ -1,37 +1,34 @@
 //! Containers to store multi-dimensional data
 use bempp_traits::arrays::{AdjacencyListAccess, Array3DAccess, Array4DAccess};
 use num::Num;
-use rlst_dense::{operations::transpose::Scalar, rlst_dynamic_mat, UnsafeRandomAccessMut};
+use rlst_common::{types::Scalar, traits::{UnsafeRandomAccessMut}};
+use rlst_dense::{rlst_dynamic_array2, array::Array, base_array::BaseArray, data_container::VectorContainer};
 use std::clone::Clone;
 
-pub type Mat<T> = rlst_dense::Matrix<
-    T,
-    rlst_dense::base_matrix::BaseMatrix<T, rlst_dense::VectorContainer<T>, rlst_dense::Dynamic>,
-    rlst_dense::Dynamic,
->;
+pub type Mat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-pub fn to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
-    let mut mat = rlst_dynamic_mat![T, shape];
+pub fn to_matrix<T: Scalar>(data: &[T], shape: [usize; 2]) -> Mat<T> {
+    let mut mat = rlst_dynamic_array2![T, shape];
     for (i, d) in data.iter().enumerate() {
         unsafe {
-            *mat.get_unchecked_mut(i % shape.0, i / shape.0) = *d;
+            *mat.get_unchecked_mut([i % shape[0], i / shape[0]]) = *d;
         }
     }
     mat
 }
 
-pub fn transpose_to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
-    let mut mat = rlst_dynamic_mat![T, shape];
+pub fn transpose_to_matrix<T: Scalar>(data: &[T], shape: [usize; 2]) -> Mat<T> {
+    let mut mat = rlst_dynamic_array2![T, shape];
     for (i, d) in data.iter().enumerate() {
         unsafe {
-            *mat.get_unchecked_mut(i / shape.1, i % shape.1) = *d;
+            *mat.get_unchecked_mut([i / shape[1], i % shape[1]]) = *d;
         }
     }
     mat
 }
 
-pub fn zero_matrix<T: Scalar>(shape: (usize, usize)) -> Mat<T> {
-    rlst_dynamic_mat![T, shape]
+pub fn zero_matrix<T: Scalar>(shape: [usize; 2]) -> Mat<T> {
+    rlst_dynamic_array2![T, shape]
 }
 
 /// A three-dimensional rectangular array
@@ -47,7 +44,7 @@ impl<T: Num + Clone> Array3D<T> {
     /// Create an array from a data vector
     pub fn new(shape: (usize, usize, usize)) -> Self {
         Self {
-            data: vec![T::zero(); shape.0 * shape.1 * shape.2],
+            data: vec![T::zero(); shape.0 * shape.  1 * shape.2],
             shape,
         }
     }

@@ -14,7 +14,7 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_dense::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape};
+use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape};
 
 fn get_corners<'a>(grid: &impl Grid<'a>, index: &usize, corners: &mut Vec<Vec<f64>>) {
     let v = grid.geometry().cell_vertices(*index).unwrap();

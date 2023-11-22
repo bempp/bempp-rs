@@ -364,12 +364,42 @@ fn laplace_component_count(eval_type: EvalType) -> usize {
 mod test {
 
     use super::*;
+    use rand::prelude::*;
     use approx::assert_relative_eq;
     use bempp_traits::types::Scalar;
-    use rlst;
-    use rlst::common::traits::{Copy, Eval, Transpose};
-    use rlst::dense::traits::*;
-    use rlst_dense;
+    use rlst_common::traits::{RawAccess, RawAccessMut, RandomAccessByRef, RandomAccessMut, Shape, FillFrom};
+    use rlst_dense::rlst_dynamic_array2;
+    use bempp_tools::arrays::Mat;
+
+    fn copy(m_in: &Mat<f64>) -> Mat<f64> {
+        let mut m = rlst_dynamic_array2!(f64, m_in.shape());
+        for i in 0..m_in.shape()[0] {
+            for j in 0..m_in.shape()[1] {
+                *m.get_mut([i, j]).unwrap() = *m_in.get([i, j]).unwrap();
+            }
+        }
+        m
+    }
+
+    fn rand_mat(shape: [usize; 2]) -> Mat<f64> {
+        let mut m = rlst_dynamic_array2!(f64, shape);
+        let mut rng = rand::thread_rng();
+        for i in 0..shape[0] {
+            for j in 0..shape[1] {
+                *m.get_mut([i, j]).unwrap() = rng.gen()
+            }
+        }
+        m
+    }
+
+    fn rand_vec(size: usize) -> Mat<f64> {
+        let mut v = rlst_dynamic_array2!(f64, [size, 1]);
+        let mut rng = rand::thread_rng();
+        for i in 0..size {
+            *v.get_mut([i, 0]).unwrap() = rng.gen();
+        }
+        v
+    }
 
     #[test]
     fn test_laplace_3d() {
@@ -378,10 +408,10 @@ mod test {
         let nsources = 5;
         let ntargets = 3;
 
-        let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-        let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-        let charges = rlst::dense::rlst_rand_col_vec![f64, nsources];
-        let mut green_value = rlst::dense::rlst_rand_col_vec![f64, ntargets];
+        let sources = rand_mat([nsources, 3]);
+        let targets = rand_mat([ntargets, 3]);
+        let charges = rand_vec(nsources);
+        let mut green_value = rand_vec(ntargets);
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
@@ -405,9 +435,9 @@ mod test {
             assert_relative_eq!(green_value[[target_index, 0]], expected, epsilon = 1E-12);
         }
 
-        let mut targets_x_eps = targets.copy();
-        let mut targets_y_eps = targets.copy();
-        let mut targets_z_eps = targets.copy();
+        let mut targets_x_eps = copy(&targets);
+        let mut targets_y_eps = copy(&targets);
+        let mut targets_z_eps = copy(&targets);
 
         for index in 0..ntargets {
             targets_x_eps[[index, 0]] += eps;
@@ -415,7 +445,7 @@ mod test {
             targets_z_eps[[index, 2]] += eps;
         }
 
-        let mut expected = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
+        let mut expected = rlst_dynamic_array2!(f64, [4, ntargets]);
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::ValueDeriv,
@@ -425,7 +455,7 @@ mod test {
             expected.data_mut(),
         );
 
-        let mut green_value_x_eps = rlst::dense::rlst_col_vec![f64, ntargets];
+        let mut green_value_x_eps = rlst_dynamic_array2![f64, [ntargets, 1]];
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
@@ -435,7 +465,7 @@ mod test {
             green_value_x_eps.data_mut(),
         );
 
-        let mut green_value_y_eps = rlst::dense::rlst_col_vec![f64, ntargets];
+        let mut green_value_y_eps = rlst_dynamic_array2![f64, [ntargets, 1]];
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
@@ -444,7 +474,7 @@ mod test {
             charges.data(),
             green_value_y_eps.data_mut(),
         );
-        let mut green_value_z_eps = rlst::dense::rlst_col_vec![f64, ntargets];
+        let mut green_value_z_eps = rlst_dynamic_array2![f64, [ntargets, 1]];
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
@@ -454,9 +484,16 @@ mod test {
             green_value_z_eps.data_mut(),
         );
 
-        let x_deriv = ((green_value_x_eps - &green_value) * (1.0 / eps)).eval();
-        let y_deriv = ((green_value_y_eps - &green_value) * (1.0 / eps)).eval();
-        let z_deriv = ((green_value_z_eps - &green_value) * (1.0 / eps)).eval();
+        let gv0 = copy(&green_value);
+        let gv1 = copy(&green_value);
+        let gv2 = copy(&green_value);
+
+        let mut x_deriv = rlst_dynamic_array2![f64, [ntargets, 1]];
+        let mut y_deriv = rlst_dynamic_array2![f64, [ntargets, 1]];
+        let mut z_deriv = rlst_dynamic_array2![f64, [ntargets, 1]];
+        x_deriv.fill_from((green_value_x_eps - gv0) * (1.0 / eps));
+        y_deriv.fill_from((green_value_y_eps - gv1) * (1.0 / eps));
+        z_deriv.fill_from((green_value_z_eps - gv2) * (1.0 / eps));
 
         for target_index in 0..ntargets {
             assert_relative_eq!(
@@ -489,25 +526,26 @@ mod test {
         let nsources = 3;
         let ntargets = 5;
 
-        let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-        let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-        let mut green_value = rlst_dense::rlst_dynamic_mat!(f64, (nsources, ntargets));
+        let sources = rand_mat([nsources, 3]);
+        let targets = rand_mat([ntargets, 3]);
+        let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::Value,
             sources.data(),
             targets.data(),
-            green_value.data_mut(),
+            green_value_t.data_mut(),
         );
 
         // The matrix needs to be transposed so that the first row corresponds to the first target,
         // second row to the second target and so on.
 
-        let green_value = green_value.transpose().eval();
+        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
+        green_value.fill_from(green_value_t.transpose());
 
         for charge_index in 0..nsources {
-            let mut charges = rlst::dense::rlst_col_vec![f64, nsources];
-            let mut expected = rlst::dense::rlst_col_vec![f64, ntargets];
+            let mut charges = rlst_dynamic_array2![f64, [nsources, 1]];
+            let mut expected = rlst_dynamic_array2![f64, [ntargets, 1]];
             charges[[charge_index, 0]] = 1.0;
 
             Laplace3dKernel::<f64>::default().evaluate_st(
@@ -527,22 +565,23 @@ mod test {
             }
         }
 
-        let mut green_value_deriv = rlst_dense::rlst_dynamic_mat!(f64, (nsources, 4 * ntargets));
+        let mut green_value_deriv_t = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,
             sources.data(),
             targets.data(),
-            green_value_deriv.data_mut(),
+            green_value_deriv_t.data_mut(),
         );
 
         // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-        let green_value_deriv = green_value_deriv.transpose().eval();
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
+        green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
         for charge_index in 0..nsources {
-            let mut charges = rlst::dense::rlst_col_vec![f64, nsources];
-            let mut expected = rlst_dense::rlst_dynamic_mat!(f64, (4, ntargets));
+            let mut charges = rlst_dynamic_array2![f64, [nsources, 1]];
+            let mut expected = rlst_dynamic_array2!(f64, [4, ntargets]);
 
             charges[[charge_index, 0]] = 1.0;
 
@@ -571,9 +610,9 @@ mod test {
         let nsources = 3;
         let ntargets = 5;
 
-        let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-        let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-        let mut green_value_deriv = rlst_dense::rlst_dynamic_mat!(f64, (nsources, 4 * ntargets));
+        let sources = rand_mat([nsources, 3]);
+        let targets = rand_mat([ntargets, 3]);
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,

@@ -2,10 +2,10 @@
 
 use bempp_traits::arrays::Array3DAccess;
 use bempp_traits::cell::ReferenceCellType;
-use rlst_dense::{RandomAccessByRef, Shape};
+use rlst_common::traits::{RandomAccessByRef, Shape};
 
 /// Tabulate orthonormal polynomials on a interval
-fn tabulate_legendre_polynomials_interval<T: RandomAccessByRef<Item = f64> + Shape>(
+fn tabulate_legendre_polynomials_interval<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
     points: &T,
     degree: usize,
     derivatives: usize,
@@ -13,8 +13,8 @@ fn tabulate_legendre_polynomials_interval<T: RandomAccessByRef<Item = f64> + Sha
 ) {
     assert_eq!(data.shape().0, derivatives + 1);
     assert_eq!(data.shape().1, degree + 1);
-    assert_eq!(data.shape().2, points.shape().0);
-    assert_eq!(points.shape().1, 1);
+    assert_eq!(data.shape().2, points.shape()[0]);
+    assert_eq!(points.shape()[1], 1);
 
     for i in 0..data.shape().2 {
         *data.get_mut(0, 0, i).unwrap() = 1.0;
@@ -31,7 +31,7 @@ fn tabulate_legendre_polynomials_interval<T: RandomAccessByRef<Item = f64> + Sha
             let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
             for i in 0..data.shape().2 {
                 *data.get_mut(k, p, i).unwrap() =
-                    (points.get(i, 0).unwrap() * 2.0 - 1.0) * data.get(k, p - 1, i).unwrap() * b;
+                    (points.get([i, 0]).unwrap() * 2.0 - 1.0) * data.get(k, p - 1, i).unwrap() * b;
             }
             if p > 1 {
                 let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
@@ -58,7 +58,7 @@ fn quad_index(i: usize, j: usize, n: usize) -> usize {
 }
 
 /// Tabulate orthonormal polynomials on a quadrilateral
-fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<Item = f64> + Shape>(
+fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
     points: &T,
     degree: usize,
     derivatives: usize,
@@ -66,8 +66,8 @@ fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<Item = f64> 
 ) {
     assert_eq!(data.shape().0, (derivatives + 1) * (derivatives + 2) / 2);
     assert_eq!(data.shape().1, (degree + 1) * (degree + 1));
-    assert_eq!(data.shape().2, points.shape().0);
-    assert_eq!(points.shape().1, 2);
+    assert_eq!(data.shape().2, points.shape()[0]);
+    assert_eq!(points.shape()[1], 2);
 
     for i in 0..data.shape().2 {
         *data
@@ -91,7 +91,7 @@ fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<Item = f64> 
             for i in 0..data.shape().2 {
                 *data
                     .get_mut(tri_index(k, 0), quad_index(p, 0, degree), i)
-                    .unwrap() = (points.get(i, 0).unwrap() * 2.0 - 1.0)
+                    .unwrap() = (points.get([i, 0]).unwrap() * 2.0 - 1.0)
                     * data
                         .get(tri_index(k, 0), quad_index(p - 1, 0, degree), i)
                         .unwrap()
@@ -139,7 +139,7 @@ fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<Item = f64> 
             for i in 0..data.shape().2 {
                 *data
                     .get_mut(tri_index(0, k), quad_index(0, p, degree), i)
-                    .unwrap() = (points.get(i, 1).unwrap() * 2.0 - 1.0)
+                    .unwrap() = (points.get([i, 1]).unwrap() * 2.0 - 1.0)
                     * data
                         .get(tri_index(0, k), quad_index(0, p - 1, degree), i)
                         .unwrap()
@@ -192,7 +192,7 @@ fn tabulate_legendre_polynomials_quadrilateral<T: RandomAccessByRef<Item = f64> 
     }
 }
 /// Tabulate orthonormal polynomials on a triangle
-fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Shape>(
+fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
     points: &T,
     degree: usize,
     derivatives: usize,
@@ -200,8 +200,8 @@ fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Sha
 ) {
     assert_eq!(data.shape().0, (derivatives + 1) * (derivatives + 2) / 2);
     assert_eq!(data.shape().1, (degree + 1) * (degree + 2) / 2);
-    assert_eq!(data.shape().2, points.shape().0);
-    assert_eq!(points.shape().1, 2);
+    assert_eq!(data.shape().2, points.shape()[0]);
+    assert_eq!(points.shape()[1], 2);
 
     for i in 0..data.shape().2 {
         *data.get_mut(tri_index(0, 0), tri_index(0, 0), i).unwrap() = f64::sqrt(2.0);
@@ -221,7 +221,7 @@ fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Sha
                     f64::sqrt((p as f64 + 0.5) * (p as f64 + 1.0) / ((p as f64 - 0.5) * p as f64));
                 for i in 0..data.shape().2 {
                     *data.get_mut(tri_index(kx, ky), tri_index(0, p), i).unwrap() =
-                        (*points.get(i, 0).unwrap() * 2.0 + *points.get(i, 1).unwrap() - 1.0)
+                        (*points.get([i, 0]).unwrap() * 2.0 + *points.get([i, 1]).unwrap() - 1.0)
                             * *data.get(tri_index(kx, ky), tri_index(0, p - 1), i).unwrap()
                             * a
                             * scale1;
@@ -252,7 +252,7 @@ fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Sha
                         / f64::sqrt((p as f64 - 1.5) * (p as f64 - 1.0));
 
                     for i in 0..data.shape().2 {
-                        let b = 1.0 - *points.get(i, 1).unwrap();
+                        let b = 1.0 - *points.get([i, 1]).unwrap();
                         *data.get_mut(tri_index(kx, ky), tri_index(0, p), i).unwrap() -= b
                             * b
                             * *data.get(tri_index(kx, ky), tri_index(0, p - 2), i).unwrap()
@@ -263,7 +263,7 @@ fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Sha
                         for i in 0..data.shape().2 {
                             *data.get_mut(tri_index(kx, ky), tri_index(0, p), i).unwrap() -= 2.0
                                 * ky as f64
-                                * (*points.get(i, 1).unwrap() - 1.0)
+                                * (*points.get([i, 1]).unwrap() - 1.0)
                                 * *data
                                     .get(tri_index(kx, ky - 1), tri_index(0, p - 2), i)
                                     .unwrap()
@@ -291,7 +291,7 @@ fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Sha
                     *data.get_mut(tri_index(kx, ky), tri_index(1, p), i).unwrap() =
                         *data.get(tri_index(kx, ky), tri_index(0, p), i).unwrap()
                             * scale3
-                            * ((*points.get(i, 1).unwrap() * 2.0 - 1.0) * (1.5 + p as f64)
+                            * ((*points.get([i, 1]).unwrap() * 2.0 - 1.0) * (1.5 + p as f64)
                                 + 0.5
                                 + p as f64);
                 }
@@ -321,7 +321,7 @@ fn tabulate_legendre_polynomials_triangle<T: RandomAccessByRef<Item = f64> + Sha
                             .unwrap() =
                             *data.get_mut(tri_index(kx, ky), tri_index(q, p), i).unwrap()
                                 * scale4
-                                * ((*points.get(i, 1).unwrap() * 2.0 - 1.0) * a1 + a2)
+                                * ((*points.get([i, 1]).unwrap() * 2.0 - 1.0) * a1 + a2)
                                 - *data
                                     .get_mut(tri_index(kx, ky), tri_index(q - 1, p), i)
                                     .unwrap()
@@ -369,7 +369,7 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
     }
 }
 
-pub fn legendre_shape<T: RandomAccessByRef<Item = f64> + Shape>(
+pub fn legendre_shape<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
     cell_type: ReferenceCellType,
     points: &T,
     degree: usize,
@@ -378,12 +378,12 @@ pub fn legendre_shape<T: RandomAccessByRef<Item = f64> + Shape>(
     (
         derivative_count(cell_type, derivatives),
         polynomial_count(cell_type, degree),
-        points.shape().0,
+        points.shape()[0],
     )
 }
 
 /// Tabulate orthonormal polynomials
-pub fn tabulate_legendre_polynomials<T: RandomAccessByRef<Item = f64> + Shape>(
+pub fn tabulate_legendre_polynomials<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
     cell_type: ReferenceCellType,
     points: &T,
     degree: usize,
@@ -412,14 +412,14 @@ mod test {
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
     use bempp_tools::arrays::{transpose_to_matrix, zero_matrix, Array3D};
-    use rlst_dense::RandomAccessMut;
+    use rlst_common::traits::RandomAccessMut;
 
     #[test]
     fn test_legendre_interval() {
         let degree = 6;
 
         let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
-        let points = transpose_to_matrix(&rule.points, (rule.npoints, 1));
+        let points = transpose_to_matrix(&rule.points, [rule.npoints, 1]);
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Interval,
@@ -450,7 +450,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
-        let points = transpose_to_matrix(&rule.points, (rule.npoints, 2));
+        let points = transpose_to_matrix(&rule.points, [rule.npoints, 2]);
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Triangle,
@@ -481,7 +481,7 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
-        let points = transpose_to_matrix(&rule.points, (rule.npoints, 2));
+        let points = transpose_to_matrix(&rule.points, [rule.npoints, 2]);
 
         let mut data = Array3D::<f64>::new(legendre_shape(
             ReferenceCellType::Quadrilateral,
@@ -518,10 +518,10 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut points = zero_matrix((20, 1));
+        let mut points = zero_matrix([20, 1]);
         for i in 0..10 {
-            *points.get_mut(2 * i, 0).unwrap() = i as f64 / 10.0;
-            *points.get_mut(2 * i + 1, 0).unwrap() = points.get(2 * i, 0).unwrap() + epsilon;
+            *points.get_mut([2 * i, 0]).unwrap() = i as f64 / 10.0;
+            *points.get_mut([2 * i + 1, 0]).unwrap() = points.get([2 * i, 0]).unwrap() + epsilon;
         }
 
         let mut data = Array3D::<f64>::new(legendre_shape(
@@ -533,7 +533,7 @@ mod test {
         tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
-            for k in 0..points.shape().0 / 2 {
+            for k in 0..points.shape()[0] / 2 {
                 assert_relative_eq!(
                     *data.get(1, i, 2 * k).unwrap(),
                     (data.get(0, i, 2 * k + 1).unwrap() - data.get(0, i, 2 * k).unwrap()) / epsilon,
@@ -548,18 +548,18 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut points = zero_matrix((165, 2));
+        let mut points = zero_matrix([165, 2]);
         let mut index = 0;
         for i in 0..10 {
             for j in 0..10 - i {
-                *points.get_mut(3 * index, 0).unwrap() = i as f64 / 10.0;
-                *points.get_mut(3 * index, 1).unwrap() = j as f64 / 10.0;
-                *points.get_mut(3 * index + 1, 0).unwrap() =
-                    *points.get(3 * index, 0).unwrap() + epsilon;
-                *points.get_mut(3 * index + 1, 1).unwrap() = *points.get(3 * index, 1).unwrap();
-                *points.get_mut(3 * index + 2, 0).unwrap() = *points.get(3 * index, 0).unwrap();
-                *points.get_mut(3 * index + 2, 1).unwrap() =
-                    *points.get(3 * index, 1).unwrap() + epsilon;
+                *points.get_mut([3 * index, 0]).unwrap() = i as f64 / 10.0;
+                *points.get_mut([3 * index, 1]).unwrap() = j as f64 / 10.0;
+                *points.get_mut([3 * index + 1, 0]).unwrap() =
+                    *points.get([3 * index, 0]).unwrap() + epsilon;
+                *points.get_mut([3 * index + 1, 1]).unwrap() = *points.get([3 * index, 1]).unwrap();
+                *points.get_mut([3 * index + 2, 0]).unwrap() = *points.get([3 * index, 0]).unwrap();
+                *points.get_mut([3 * index + 2, 1]).unwrap() =
+                    *points.get([3 * index, 1]).unwrap() + epsilon;
                 index += 1;
             }
         }
@@ -573,7 +573,7 @@ mod test {
         tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
-            for k in 0..points.shape().0 / 3 {
+            for k in 0..points.shape()[0] / 3 {
                 assert_relative_eq!(
                     *data.get(1, i, 3 * k).unwrap(),
                     (data.get(0, i, 3 * k + 1).unwrap() - data.get(0, i, 3 * k).unwrap()) / epsilon,
@@ -593,18 +593,18 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut points = zero_matrix((300, 2));
+        let mut points = zero_matrix([300, 2]);
         for i in 0..10 {
             for j in 0..10 {
                 let index = 10 * i + j;
-                *points.get_mut(3 * index, 0).unwrap() = i as f64 / 10.0;
-                *points.get_mut(3 * index, 1).unwrap() = j as f64 / 10.0;
-                *points.get_mut(3 * index + 1, 0).unwrap() =
-                    *points.get(3 * index, 0).unwrap() + epsilon;
-                *points.get_mut(3 * index + 1, 1).unwrap() = *points.get(3 * index, 1).unwrap();
-                *points.get_mut(3 * index + 2, 0).unwrap() = *points.get(3 * index, 0).unwrap();
-                *points.get_mut(3 * index + 2, 1).unwrap() =
-                    *points.get(3 * index, 1).unwrap() + epsilon;
+                *points.get_mut([3 * index, 0]).unwrap() = i as f64 / 10.0;
+                *points.get_mut([3 * index, 1]).unwrap() = j as f64 / 10.0;
+                *points.get_mut([3 * index + 1, 0]).unwrap() =
+                    *points.get([3 * index, 0]).unwrap() + epsilon;
+                *points.get_mut([3 * index + 1, 1]).unwrap() = *points.get([3 * index, 1]).unwrap();
+                *points.get_mut([3 * index + 2, 0]).unwrap() = *points.get([3 * index, 0]).unwrap();
+                *points.get_mut([3 * index + 2, 1]).unwrap() =
+                    *points.get([3 * index, 1]).unwrap() + epsilon;
             }
         }
 
@@ -623,7 +623,7 @@ mod test {
         );
 
         for i in 0..degree + 1 {
-            for k in 0..points.shape().0 / 3 {
+            for k in 0..points.shape()[0] / 3 {
                 assert_relative_eq!(
                     *data.get(1, i, 3 * k).unwrap(),
                     (data.get(0, i, 3 * k + 1).unwrap() - data.get(0, i, 3 * k).unwrap()) / epsilon,
@@ -642,9 +642,9 @@ mod test {
     fn test_legendre_interval_against_known_polynomials() {
         let degree = 3;
 
-        let mut points = zero_matrix((11, 1));
+        let mut points = zero_matrix([11, 1]);
         for i in 0..11 {
-            *points.get_mut(i, 0).unwrap() = i as f64 / 10.0;
+            *points.get_mut([i, 0]).unwrap() = i as f64 / 10.0;
         }
 
         let mut data = Array3D::<f64>::new(legendre_shape(
@@ -655,8 +655,8 @@ mod test {
         ));
         tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 3, &mut data);
 
-        for k in 0..points.shape().0 {
-            let x = *points.get(k, 0).unwrap();
+        for k in 0..points.shape()[0] {
+            let x = *points.get([k, 0]).unwrap();
 
             // 0 => 1
             assert_relative_eq!(*data.get(0, 0, k).unwrap(), 1.0, epsilon = 1e-12);
@@ -724,11 +724,11 @@ mod test {
     fn test_legendre_quadrilateral_against_known_polynomials() {
         let degree = 2;
 
-        let mut points = zero_matrix((121, 2));
+        let mut points = zero_matrix([121, 2]);
         for i in 0..11 {
             for j in 0..11 {
-                *points.get_mut(11 * i + j, 0).unwrap() = i as f64 / 10.0;
-                *points.get_mut(11 * i + j, 1).unwrap() = j as f64 / 10.0;
+                *points.get_mut([11 * i + j, 0]).unwrap() = i as f64 / 10.0;
+                *points.get_mut([11 * i + j, 1]).unwrap() = j as f64 / 10.0;
             }
         }
 
@@ -746,9 +746,9 @@ mod test {
             &mut data,
         );
 
-        for k in 0..points.shape().0 {
-            let x = *points.get(k, 0).unwrap();
-            let y = *points.get(k, 1).unwrap();
+        for k in 0..points.shape()[0] {
+            let x = *points.get([k, 0]).unwrap();
+            let y = *points.get([k, 1]).unwrap();
 
             // 0 => 1
             assert_relative_eq!(*data.get(0, 0, k).unwrap(), 1.0, epsilon = 1e-12);

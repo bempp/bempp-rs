@@ -71,7 +71,7 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate<T: RandomAccessByRef<Item = f64> + Shape>(
+    fn tabulate<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
         &self,
         points: &T,
         nderivs: usize,

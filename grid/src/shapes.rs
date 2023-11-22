@@ -2,11 +2,11 @@
 
 use crate::grid::SerialGrid;
 use bempp_element::cell::Triangle;
-use bempp_tools::arrays::{to_matrix, AdjacencyList};
+use bempp_tools::arrays::{zero_matrix, to_matrix, AdjacencyList};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::grid::{Geometry, Grid, Topology};
-use rlst_dense::{RandomAccessByRef, RandomAccessMut};
+use rlst_common::traits::{RandomAccessByRef, RandomAccessMut};
 
 /// Create a regular sphere
 ///
@@ -20,7 +20,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
                 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0,
                 0.0, -1.0,
             ],
-            (6, 3),
+            [6, 3],
         ),
         AdjacencyList::from_data(
             vec![
@@ -35,7 +35,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         let nvertices_old = g.topology().entity_count(0);
         let ncells_old = g.topology().entity_count(2);
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
-        let mut coordinates = to_matrix(&vec![0.0; nvertices * 3], (nvertices, 3));
+        let mut coordinates = zero_matrix([nvertices, 3]);
         let mut cells = AdjacencyList::<usize>::new();
 
         for i in 0..ncells_old {
@@ -48,7 +48,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
             let gv = g.geometry().cell_vertices(gi).unwrap();
             for (j, gv_j) in gv.iter().enumerate() {
                 for k in 0..g.geometry().dim() {
-                    *coordinates.get_mut(tv[j], k).unwrap() =
+                    *coordinates.get_mut([tv[j], k]).unwrap() =
                         *g.geometry().coordinate(*gv_j, k).unwrap();
                 }
             }
@@ -57,15 +57,15 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
                 let vs = ref_e.connectivity(1, j, 0).unwrap();
                 let pt = (0..3)
                     .map(|k| {
-                        (*coordinates.get(tv[vs[0]], k).unwrap()
-                            + *coordinates.get(tv[vs[1]], k).unwrap())
+                        (*coordinates.get([tv[vs[0]], k]).unwrap()
+                            + *coordinates.get([tv[vs[1]], k]).unwrap())
                             / 2.0
                     })
                     .collect::<Vec<f64>>();
 
                 let norm = (pt[0].powi(2) + pt[1].powi(2) + pt[2].powi(2)).sqrt();
                 for (k, pt_k) in pt.iter().enumerate() {
-                    *coordinates.get_mut(nvertices_old + tedges_j, k).unwrap() = *pt_k / norm;
+                    *coordinates.get_mut([nvertices_old + tedges_j, k]).unwrap() = *pt_k / norm;
                 }
             }
 
@@ -92,7 +92,6 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
 #[cfg(test)]
 mod test {
     use crate::shapes::*;
-    use bempp_tools::arrays::zero_matrix;
 
     #[test]
     fn test_regular_sphere_0() {
@@ -110,17 +109,17 @@ mod test {
     fn test_normal_is_outward() {
         for i in 0..3 {
             let g = regular_sphere(i);
-            let points = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], (1, 2));
+            let points = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], [1, 2]);
 
-            let mut mapped_pt = zero_matrix((1, 3));
-            let mut normal = zero_matrix((1, 3));
+            let mut mapped_pt = zero_matrix([1, 3]);
+            let mut normal = zero_matrix([1, 3]);
 
             for i in 0..g.geometry().cell_count() {
                 g.geometry().compute_points(&points, i, &mut mapped_pt);
                 g.geometry().compute_normals(&points, i, &mut normal);
-                let dot = *mapped_pt.get(0, 0).unwrap() * *normal.get(0, 0).unwrap()
-                    + *mapped_pt.get(0, 1).unwrap() * *normal.get(0, 1).unwrap()
-                    + *mapped_pt.get(0, 2).unwrap() * *normal.get(0, 2).unwrap();
+                let dot = *mapped_pt.get([0, 0]).unwrap() * *normal.get([0, 0]).unwrap()
+                    + *mapped_pt.get([0, 1]).unwrap() * *normal.get([0, 1]).unwrap()
+                    + *mapped_pt.get([0, 2]).unwrap() * *normal.get([0, 2]).unwrap();
                 assert!(dot > 0.0);
             }
         }

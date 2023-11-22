@@ -4,7 +4,7 @@ use num::Complex;
 use rayon::prelude::*;
 
 use crate::types::{FftMatrixc32, FftMatrixc64, FftMatrixf32, FftMatrixf64};
-use rlst::dense::RawAccessMut;
+use rlst_common::traits::RawAccessMut;
 
 pub trait Fft<DtypeReal, DtypeCplx>
 where

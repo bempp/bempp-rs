@@ -64,7 +64,7 @@ impl<T: Float + Default> Domain<T> {
 #[cfg(test)]
 mod test {
     use bempp_traits::types::Scalar;
-    use rlst::dense::{RawAccess, Shape};
+    use rlst_common::traits::{RawAccess, Shape};
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
 
@@ -80,7 +80,7 @@ mod test {
         assert!(domain.diameter.iter().all(|&x| x == domain.diameter[0]));
 
         // Test that all local points are contained within the local domain
-        let npoints = points.shape().0;
+        let npoints = points.shape()[0];
         for i in 0..npoints {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
 

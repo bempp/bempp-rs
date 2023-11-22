@@ -10,7 +10,7 @@ use bempp_tree::implementations::helpers::points_fixture;
 use bempp_tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
 
 use bempp_traits::types::Scalar;
-use rlst::dense::RawAccess;
+use rlst_common::traits::RawAccess;
 
 use rand::distributions::uniform::SampleUniform;
 

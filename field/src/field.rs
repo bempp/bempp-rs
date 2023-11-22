@@ -4,17 +4,11 @@ use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
 use rlst::dense::LayoutType;
-use rlst::{
-    algorithms::{
-        linalg::{DenseMatrixLinAlgBuilder, LinAlg},
-        traits::svd::{Mode, Svd},
-    },
-    common::traits::{Eval, Transpose},
-    dense::{
-        rlst_dynamic_mat, rlst_pointer_mat, Dot, Dynamic, MultiplyAdd, RawAccess, RawAccessMut,
+use rlst_common::traits::{Eval, Transpose};
+use rlst_dense::{
+        rlst_dynamic_array2, rlst_pointer_mat, Dot, Dynamic, MultiplyAdd, RawAccess, RawAccessMut,
         Shape, VectorContainer,
-    },
-};
+    };
 use std::collections::{HashMap, HashSet};
 
 use bempp_tools::Array3D;
@@ -68,8 +62,8 @@ where
         let ncols = self.ncoeffs(order);
 
         let ntransfer_vectors = self.transfer_vectors.len();
-        let mut se2tc_fat = rlst_dynamic_mat![T, (nrows, ncols * ntransfer_vectors)];
-        let mut se2tc_thin = rlst_dynamic_mat![T, (nrows * ntransfer_vectors, ncols)];
+        let mut se2tc_fat = rlst_dynamic_array2![T, [nrows, ncols * ntransfer_vectors]];
+        let mut se2tc_thin = rlst_dynamic_array2![T, [nrows * ntransfer_vectors, ncols]];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
@@ -78,7 +72,7 @@ where
             let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram = rlst_dynamic_mat![T, (ntargets, nsources)];
+            let mut tmp_gram = rlst_dynamic_array2![T, [ntargets, nsources]];
 
             self.kernel.assemble_st(
                 EvalType::Value,
@@ -111,7 +105,7 @@ where
         let vt = vt.unwrap();
 
         // Keep 'k' singular values
-        let mut sigma_mat = rlst_dynamic_mat![T, (self.k, self.k)];
+        let mut sigma_mat = rlst_dynamic_array2![T, [self.k, self.k]];
         for i in 0..self.k {
             sigma_mat[[i, i]] = T::from(sigma[i]).unwrap()
         }
@@ -140,7 +134,7 @@ where
         let s_block =
             unsafe { rlst_pointer_mat!['static, T, s_block.as_ptr(), (nst, self.k), (1, nst)] };
 
-        let mut c = rlst_dynamic_mat![T, (self.k, self.k * ntransfer_vectors)];
+        let mut c = rlst_dynamic_array2![T, [self.k, self.k * ntransfer_vectors]];
 
         for i in 0..self.transfer_vectors.len() {
             let top_left = (0, i * ncols);
@@ -549,7 +543,7 @@ mod test {
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use cauchy::{c32, c64};
     use num::complex::Complex;
-    use rlst::dense::RandomAccessMut;
+    use rlst_common::traits::RandomAccessMut;
 
     #[test]
     pub fn test_svd_operator_data() {
@@ -636,7 +630,7 @@ mod test {
 
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
+        let mut multipole = rlst_dynamic_array2![f64, [ncoeffs, 1]];
 
         for i in 0..ncoeffs {
             *multipole.get_mut(i, 0).unwrap() = i as f64;
@@ -721,7 +715,7 @@ mod test {
 
         // Some expansion data998
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
+        let mut multipole = rlst_dynamic_array2![f64, [ncoeffs, 1]];
 
         for i in 0..ncoeffs {
             *multipole.get_mut(i, 0).unwrap() = i as f64;
@@ -885,7 +879,7 @@ mod test {
 
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
+        let mut multipole = rlst_dynamic_array2![f64, [ncoeffs, 1]];
 
         for i in 0..ncoeffs {
             *multipole.get_mut(i, 0).unwrap() = i as f64;

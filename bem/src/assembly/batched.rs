@@ -13,7 +13,7 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_dense::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
+use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -70,7 +70,7 @@ fn get_quadrature_rule(
 
 pub struct RawData2D<T: Scalar> {
     pub data: *mut T,
-    pub shape: (usize, usize),
+    pub shape: [usize; 2],
 }
 
 unsafe impl<T: Scalar> Sync for RawData2D<T> {}
@@ -95,12 +95,12 @@ fn assemble_batch_singular<'a>(
     let mut k = vec![0.0];
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut test_jdet = vec![0.0; test_points.shape().0];
-    let mut trial_jdet = vec![0.0; trial_points.shape().0];
-    let mut test_mapped_pts = zero_matrix((test_points.shape().0, 3));
-    let mut trial_mapped_pts = zero_matrix((trial_points.shape().0, 3));
-    let mut test_normals = zero_matrix((test_points.shape().0, 3));
-    let mut trial_normals = zero_matrix((trial_points.shape().0, 3));
+    let mut test_jdet = vec![0.0; test_points.shape()[0]];
+    let mut trial_jdet = vec![0.0; trial_points.shape()[0]];
+    let mut test_mapped_pts = zero_matrix([test_points.shape()[0], 3]);
+    let mut trial_mapped_pts = zero_matrix([trial_points.shape()[0], 3]);
+    let mut test_normals = zero_matrix([test_points.shape()[0], 3]);
+    let mut trial_normals = zero_matrix([trial_points.shape()[0], 3]);
 
     for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
@@ -149,13 +149,13 @@ fn assemble_batch_singular<'a>(
                 let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    let mut test_row = vec![0.0; test_mapped_pts.shape().1];
+                    let mut test_row = vec![0.0; test_mapped_pts.shape()[1]];
                     for (i, ti) in test_row.iter_mut().enumerate() {
-                        *ti = *test_mapped_pts.get(index, i).unwrap();
+                        *ti = *test_mapped_pts.get([index, i]).unwrap();
                     }
-                    let mut trial_row = vec![0.0; trial_mapped_pts.shape().1];
+                    let mut trial_row = vec![0.0; trial_mapped_pts.shape()[1]];
                     for (i, ti) in trial_row.iter_mut().enumerate() {
-                        *ti = *trial_mapped_pts.get(index, i).unwrap();
+                        *ti = *trial_mapped_pts.get([index, i]).unwrap();
                     }
 
                     kernel.assemble_st(EvalType::Value, &test_row, &trial_row, &mut k);
@@ -168,7 +168,7 @@ fn assemble_batch_singular<'a>(
                 }
                 unsafe {
                     *output.data.offset(
-                        (*test_dof + output.shape.0 * *trial_dof)
+                        (*test_dof + output.shape[0] * *trial_dof)
                             .try_into()
                             .unwrap(),
                     ) += sum;
@@ -204,11 +204,11 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
     let mut test_jdet = vec![0.0; NPTS_TEST];
     let mut trial_jdet = vec![0.0; NPTS_TRIAL];
-    let mut test_normals = zero_matrix((NPTS_TEST, 3));
-    let mut trial_normals = zero_matrix((NPTS_TRIAL, 3));
+    let mut test_normals = zero_matrix([NPTS_TEST, 3]);
+    let mut trial_normals = zero_matrix([NPTS_TRIAL, 3]);
 
-    let mut test_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TEST, 3)];
-    let mut trial_mapped_pts = rlst_dense::rlst_dynamic_mat![f64, (NPTS_TRIAL, 3)];
+    let mut test_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TEST, 3]];
+    let mut trial_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TRIAL, 3]];
 
     let test_element = test_grid.geometry().element(test_cells[0]);
     let trial_element = trial_grid.geometry().element(trial_cells[0]);
@@ -300,7 +300,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     if !neighbour {
                         unsafe {
                             *output.data.offset(
-                                (*test_dof + output.shape.0 * *trial_dof)
+                                (*test_dof + output.shape[0] * *trial_dof)
                                     .try_into()
                                     .unwrap(),
                             ) += sum;
@@ -365,8 +365,8 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
     if !trial_space.is_serial() || !test_space.is_serial() {
         panic!("Dense assemble can only be used for function spaces stored in serial");
     }
-    if output.shape().0 != test_space.dofmap().global_size()
-        || output.shape().1 != trial_space.dofmap().global_size()
+    if output.shape()[0] != test_space.dofmap().global_size()
+        || output.shape()[1] != trial_space.dofmap().global_size()
     {
         panic!("Matrix has wrong shape");
     }
@@ -377,10 +377,10 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
     // TODO: pass cell types into this function
     let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
-    let qpoints_test = transpose_to_matrix(&qrule_test.points, (NPTS_TEST, 2));
+    let qpoints_test = transpose_to_matrix(&qrule_test.points, [NPTS_TEST, 2]);
     let qweights_test = qrule_test.weights;
     let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
-    let qpoints_trial = transpose_to_matrix(&qrule_trial.points, (NPTS_TRIAL, 2));
+    let qpoints_trial = transpose_to_matrix(&qrule_trial.points, [NPTS_TRIAL, 2]);
     let qweights_trial = qrule_trial.weights;
 
     let mut test_table =
@@ -474,8 +474,8 @@ pub fn assemble_singular<'a>(
     if !trial_space.is_serial() || !test_space.is_serial() {
         panic!("Dense assemble can only be used for function spaces stored in serial");
     }
-    if output.shape().0 != test_space.dofmap().global_size()
-        || output.shape().1 != trial_space.dofmap().global_size()
+    if output.shape()[0] != test_space.dofmap().global_size()
+        || output.shape()[1] != trial_space.dofmap().global_size()
     {
         panic!("Matrix has wrong shape");
     }
@@ -530,21 +530,21 @@ pub fn assemble_singular<'a>(
             npoints,
         );
 
-        let points = transpose_to_matrix(&qrule.trial_points, (qrule.npoints, 2));
+        let points = transpose_to_matrix(&qrule.trial_points, [qrule.npoints, 2]);
         let mut table = Array4D::<f64>::new(
             trial_space
                 .element()
-                .tabulate_array_shape(0, points.shape().0),
+                .tabulate_array_shape(0, points.shape()[0]),
         );
         trial_space.element().tabulate(&points, 0, &mut table);
         trial_points.push(points);
         trial_tables.push(table);
 
-        let points = transpose_to_matrix(&qrule.test_points, (qrule.npoints, 2));
+        let points = transpose_to_matrix(&qrule.test_points, [qrule.npoints, 2]);
         let mut table = Array4D::<f64>::new(
             test_space
                 .element()
-                .tabulate_array_shape(0, points.shape().0),
+                .tabulate_array_shape(0, points.shape()[0]),
         );
         test_space.element().tabulate(&points, 0, &mut table);
         test_points.push(points);
@@ -638,7 +638,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = zero_matrix::<f64>((ndofs, ndofs));
+        let mut matrix = zero_matrix::<f64>([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &Laplace3dKernel::new(),
@@ -654,7 +654,7 @@ mod test {
 
         for (i, row) in from_cl.iter().enumerate() {
             for (j, entry) in row.iter().enumerate() {
-                assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-3);
+                assert_relative_eq!(*matrix.get([i, j]).unwrap(), entry, epsilon = 1e-3);
             }
         }
     }
@@ -673,7 +673,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &green::LaplaceGreenDyKernel {},
@@ -707,7 +707,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &green::LaplaceGreenDxKernel {},
@@ -741,7 +741,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
         laplace_hypersingular_assemble(&mut matrix, &space, &space);
 
         for i in 0..ndofs {
@@ -764,7 +764,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
 
         laplace_hypersingular_assemble(&mut matrix, &space, &space);
 
@@ -798,7 +798,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<f64>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &green::HelmholtzGreenKernel { k: 3.0 },
@@ -831,7 +831,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &green::HelmholtzGreenKernel { k: 3.0 },
@@ -865,7 +865,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &green::HelmholtzGreenDyKernel { k: 3.0 },
@@ -900,7 +900,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
         assemble(
             &mut matrix,
             &green::HelmholtzGreenDxKernel { k: 3.0 },
@@ -935,7 +935,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = Array2D::<Complex<f64>>::new((ndofs, ndofs));
+        let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
 
         helmholtz_hypersingular_assemble(&mut matrix, &space, &space, 3.0);
 

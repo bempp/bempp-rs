@@ -6,9 +6,9 @@ use bempp_tools::arrays::{AdjacencyList, Array3D, Mat};
 use bempp_traits::arrays::{AdjacencyListAccess, Array3DAccess, Array4DAccess};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
-use rlst_algorithms::linalg::LinAlg;
-use rlst_algorithms::traits::inverse::Inverse;
-use rlst_dense::{rlst_dynamic_mat, RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::linalg::Trans;
+use rlst_dense::rlst_dynamic_array2;
+use rlst_common::traits::{ RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut};
 pub mod lagrange;
 pub mod raviart_thomas;
 
@@ -71,20 +71,20 @@ impl CiarletElement {
         let new_pts = if continuity == Continuity::Discontinuous {
             let mut new_pts: [Vec<Mat<f64>>; 4] = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
-            let mut all_pts = rlst_dynamic_mat![f64, (npts, tdim)];
+            let mut all_pts = rlst_dynamic_array2![f64, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
                 for _pts in pts_i {
-                    new_pts[i].push(rlst_dynamic_mat![f64, (0, tdim)]);
+                    new_pts[i].push(rlst_dynamic_array2![f64, [0, tdim]]);
                 }
             }
             for pts_i in interpolation_points.iter() {
                 for pts in pts_i {
-                    for j in 0..pts.shape().0 {
+                    for j in 0..pts.shape()[0] {
                         for k in 0..tdim {
-                            *all_pts.get_mut(pn + j, k).unwrap() = *pts.get(j, k).unwrap();
+                            *all_pts.get_mut([pn + j, k]).unwrap() = *pts.get([j, k]).unwrap();
                         }
                     }
-                    pn += pts.shape().0;
+                    pn += pts.shape()[0];
                 }
             }
             new_pts[tdim].push(all_pts);
@@ -129,8 +129,8 @@ impl CiarletElement {
         let mut dof = 0;
         for d in 0..4 {
             for (e, pts) in new_pts[d].iter().enumerate() {
-                if pts.shape().0 > 0 {
-                    let mut table = Array3D::<f64>::new((1, pdim, pts.shape().0));
+                if pts.shape()[0] > 0 {
+                    let mut table = Array3D::<f64>::new((1, pdim, pts.shape()[0]));
                     tabulate_legendre_polynomials(cell_type, pts, highest_degree, 0, &mut table);
                     let mat = &new_wts[d][e];
                     for i in 0..mat.shape().0 {
@@ -138,7 +138,7 @@ impl CiarletElement {
                             for l in 0..pdim {
                                 let value = d_matrix.get_mut(j, l, dof + i).unwrap();
                                 *value = 0.0;
-                                for k in 0..pts.shape().0 {
+                                for k in 0..pts.shape()[0] {
                                     *value +=
                                         *mat.get(i, j, k).unwrap() * *table.get(0, l, k).unwrap();
                                 }
@@ -150,11 +150,11 @@ impl CiarletElement {
             }
         }
 
-        let mut dual_matrix = rlst_dense::rlst_dynamic_mat!(f64, (dim, dim));
+        let mut dual_matrix = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
 
         for i in 0..dim {
             for j in 0..dim {
-                let entry = dual_matrix.get_mut(i, j).unwrap();
+                let entry = dual_matrix.get_mut([i, j]).unwrap();
                 *entry = 0.0;
                 for k in 0..value_size {
                     for l in 0..pdim {
@@ -165,7 +165,12 @@ impl CiarletElement {
             }
         }
 
-        let inverse = dual_matrix.linalg().inverse().unwrap();
+        let mut ident = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
+        for i in 0..dim { unsafe {
+            *ident.get_unchecked_mut([i, i]) = 1.0;
+        }}
+        let lu = dual_matrix.into_lu().unwrap();
+        let inverse = lu.solve(Trans::NoTrans, ident).unwrap();
 
         let mut coefficients = Array3D::<f64>::new((dim, value_size, pdim));
         for i in 0..dim {
@@ -173,7 +178,7 @@ impl CiarletElement {
                 for j in 0..value_size {
                     for k in 0..pdim {
                         *coefficients.get_mut(i, j, k).unwrap() +=
-                            *inverse.get(i, l).unwrap() * *polynomial_coeffs.get(l, j, k).unwrap()
+                            *inverse.get([i, l]).unwrap() * *polynomial_coeffs.get(l, j, k).unwrap()
                     }
                 }
             }
@@ -188,9 +193,9 @@ impl CiarletElement {
         let mut dof = 0;
         for i in 0..4 {
             for pts in &new_pts[i] {
-                let dofs: Vec<usize> = (dof..dof + pts.shape().0).collect();
+                let dofs: Vec<usize> = (dof..dof + pts.shape()[0]).collect();
                 entity_dofs[i].add_row(&dofs);
-                dof += pts.shape().0;
+                dof += pts.shape()[0];
             }
         }
         CiarletElement {
@@ -240,7 +245,7 @@ impl FiniteElement for CiarletElement {
     fn dim(&self) -> usize {
         self.dim
     }
-    fn tabulate<T: RandomAccessByRef<Item = f64> + Shape>(
+    fn tabulate<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
         &self,
         points: &T,
         nderivs: usize,
@@ -261,7 +266,7 @@ impl FiniteElement for CiarletElement {
         );
 
         for d in 0..table.shape().0 {
-            for p in 0..points.shape().0 {
+            for p in 0..points.shape()[0] {
                 for j in 0..self.value_size {
                     for b in 0..self.dim {
                         let value = data.get_mut(d, p, b, j).unwrap();

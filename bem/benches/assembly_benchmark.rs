@@ -24,7 +24,7 @@ pub fn full_assembly_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
 
         group.bench_function(
             &format!(
@@ -62,7 +62,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
 
         let colouring = space.compute_cell_colouring();
 
@@ -130,7 +130,7 @@ pub fn cl_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
 
         /*
         group.bench_function(
@@ -181,5 +181,6 @@ pub fn cl_benchmark(c: &mut Criterion) {
 
 // criterion_group!(benches, full_assembly_benchmark, assembly_parts_benchmark);
 criterion_group!(benches, assembly_parts_benchmark);
-criterion_group!(cl_benches, cl_benchmark);
-criterion_main!(benches, cl_benches);
+//criterion_group!(cl_benches, cl_benchmark);
+criterion_main!(benches);
+//criterion_main!(benches, cl_benches);

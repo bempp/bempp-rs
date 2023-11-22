@@ -13,8 +13,8 @@ pub enum Ownership {
 }
 
 pub trait GeometryEvaluator<
-    T: RandomAccessByRef<Item = f64> + Shape,
-    TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+    T: RandomAccessByRef<2, Item = f64> + Shape<2>,
+    TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
 >
 {
     /// The points on the reference cell that this evaluator computes information at
@@ -40,8 +40,8 @@ pub trait Geometry {
     //! Grid geometry
     //!
     //! Grid geometry provides information about the physical locations of mesh points in space
-    type T: RandomAccessByRef<Item = f64> + Shape;
-    type TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape;
+    type T: RandomAccessByRef<2, Item = f64> + Shape<2>;
+    type TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>;
 
     /// The geometric dimension
     fn dim(&self) -> usize;
@@ -70,8 +70,8 @@ pub trait Geometry {
 
     /// Compute the physical coordinates of a set of points in a given cell
     fn compute_points<
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
+        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
     >(
         &self,
         points: &T,
@@ -81,8 +81,8 @@ pub trait Geometry {
 
     /// Compute the normals to a set of points in a given cell
     fn compute_normals<
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
+        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
     >(
         &self,
         points: &T,
@@ -94,8 +94,8 @@ pub trait Geometry {
     ///
     /// The input points should be given using coordinates on the reference element
     fn compute_jacobians<
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
+        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
     >(
         &self,
         points: &T,
@@ -106,7 +106,7 @@ pub trait Geometry {
     /// Evaluate the determinand of the jacobian at a set of points in a given cell
     ///
     /// The input points should be given using coordinates on the reference element
-    fn compute_jacobian_determinants<T: RandomAccessByRef<Item = f64> + Shape>(
+    fn compute_jacobian_determinants<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
         &self,
         points: &T,
         cell: usize,
@@ -117,8 +117,8 @@ pub trait Geometry {
     ///
     /// The input points should be given using coordinates on the reference element
     fn compute_jacobian_inverses<
-        T: RandomAccessByRef<Item = f64> + Shape,
-        TMut: RandomAccessByRef<Item = f64> + RandomAccessMut<Item = f64> + Shape,
+        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
+        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
     >(
         &self,
         points: &T,
