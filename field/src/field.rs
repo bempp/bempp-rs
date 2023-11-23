@@ -6,6 +6,7 @@ use num::{Complex, Float};
 use rlst::dense::LayoutType;
 use rlst_common::traits::{Eval, Transpose};
 use rlst_dense::{
+        rlst_dynamic_array3,
         rlst_dynamic_array2, rlst_pointer_mat, Dot, Dynamic, MultiplyAdd, RawAccess, RawAccessMut,
         Shape, VectorContainer,
     };
@@ -13,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 
 use bempp_tools::Array3D;
 use bempp_traits::{
-    arrays::Array3DAccess, field::FieldTranslationData, kernel::Kernel, types::EvalType,
+    field::FieldTranslationData, kernel::Kernel, types::EvalType,
 };
 use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
@@ -338,7 +339,7 @@ where
                     let mut padded_kernel = flip3(&padded_kernel);
 
                     // Compute FFT of padded kernel
-                    let mut padded_kernel_hat = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
+                    let mut padded_kernel_hat = rlst_dynamic_array3!(Complex<T>, [p, p, p / 2 + 1]);
 
                     T::rfft3_fftw(
                         padded_kernel.get_data_mut(),
@@ -351,7 +352,7 @@ where
                     // Fill with zeros when interaction doesn't exist
                     let n = 2 * order - 1;
                     let p = n + 1;
-                    let padded_kernel_hat_zeros = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
+                    let padded_kernel_hat_zeros = rlst_dynamic_array3!(Complex<T>, [p, p, p / 2 + 1]);
                     kernel_data_vec[i].push(padded_kernel_hat_zeros);
                 }
             }
@@ -488,7 +489,7 @@ where
         target_pt: [T; 3],
     ) -> Array3D<T> {
         let n = 2 * order - 1;
-        let mut result = Array3D::<T>::new((n, n, n));
+        let mut result = rlst_dynamic_array3!(T, [n, n, n]);
         let nconv = n.pow(3);
 
         let mut kernel_evals = vec![T::zero(); nconv];
@@ -513,7 +514,7 @@ where
     pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
         let n = 2 * order - 1;
         let n_tot = n * n * n;
-        let mut result = Array3D::new((n, n, n));
+        let mut result = rlst_dynamic_array3!(T, [n, n, n]);
 
         let mut tmp = vec![T::zero(); n_tot];
 
@@ -798,7 +799,7 @@ mod test {
         let mut padded_kernel = flip3(&padded_kernel);
 
         // Compute FFT of padded kernel
-        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        let mut padded_kernel_hat = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
         f64::rfft3_fftw(
             padded_kernel.get_data_mut(),
             padded_kernel_hat.get_data_mut(),
@@ -905,7 +906,7 @@ mod test {
         let pad_size = (p - m, q - n, r - o);
         let pad_index = (p - m, q - n, r - o);
         let mut padded_signal = pad3(&signal, pad_size, pad_index);
-        let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        let mut padded_signal_hat = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
 
         f64::rfft3_fftw(
             padded_signal.get_data_mut(),
@@ -956,7 +957,7 @@ mod test {
         let mut padded_kernel = flip3(&padded_kernel);
 
         // Compute FFT of padded kernel
-        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        let mut padded_kernel_hat = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
         f64::rfft3_fftw(
             padded_kernel.get_data_mut(),
             padded_kernel_hat.get_data_mut(),
@@ -971,9 +972,9 @@ mod test {
             .map(|(a, b)| a * b)
             .collect_vec();
 
-        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
+        let mut hadamard_product = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
 
-        let mut potentials = Array3D::new((p, q, r));
+        let mut potentials = rlst_dynamic_array3!(c64, [p, q, r]);
 
         f64::irfft3_fftw(
             hadamard_product.get_data_mut(),

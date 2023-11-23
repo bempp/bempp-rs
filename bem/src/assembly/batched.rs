@@ -4,7 +4,7 @@ use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use bempp_tools::arrays::{transpose_to_matrix, zero_matrix, Array4D, Mat};
-use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
@@ -13,7 +13,8 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape};
+use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef};
+use rlst_dense::rlst_dynamic_array4;
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -161,9 +162,9 @@ fn assemble_batch_singular<'a>(
                     kernel.assemble_st(EvalType::Value, &test_row, &trial_row, &mut k);
                     sum += k[0]
                         * (wt
-                            * test_table.get(0, index, test_i, 0).unwrap()
+                            * test_table.get([0, index, test_i, 0]).unwrap()
                             * test_jdet[index]
-                            * trial_table.get(0, index, trial_i, 0).unwrap()
+                            * trial_table.get([0, index, trial_i, 0]).unwrap()
                             * trial_jdet[index]);
                 }
                 unsafe {
@@ -308,7 +309,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                             trial_integrands[trial_index] =
                                 trial_wt
                                     * trial_jdet[trial_cell_i][trial_index]
-                                    * trial_table.get_unchecked(0, trial_index, trial_i, 0);
+                                    * trial_table.get_unchecked([0, trial_index, trial_i, 0]);
                             }
                     }
                     sum = 0.0;
@@ -316,7 +317,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                         let test_integrand = unsafe {
                             test_wt
                                 * test_jdet[test_index]
-                                * test_table.get_unchecked(0, test_index, test_i, 0)
+                                * test_table.get_unchecked([0, test_index, test_i, 0])
                         };
                         for trial_index in 0..NPTS_TRIAL {
                             sum += k[test_index * trial_weights.len() + trial_index]
@@ -408,13 +409,13 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
     let qweights_trial = qrule_trial.weights;
 
     let mut test_table =
-        Array4D::<f64>::new(test_space.element().tabulate_array_shape(0, NPTS_TEST));
+        rlst_dynamic_array4!(f64, test_space.element().tabulate_array_shape(0, NPTS_TEST));
     test_space
         .element()
         .tabulate(&qpoints_test, 0, &mut test_table);
 
     let mut trial_table =
-        Array4D::<f64>::new(trial_space.element().tabulate_array_shape(0, NPTS_TRIAL));
+        rlst_dynamic_array4!(f64, trial_space.element().tabulate_array_shape(0, NPTS_TRIAL));
     trial_space
         .element()
         .tabulate(&qpoints_test, 0, &mut trial_table);
@@ -555,20 +556,20 @@ pub fn assemble_singular<'a>(
         );
 
         let points = transpose_to_matrix(&qrule.trial_points, [qrule.npoints, 2]);
-        let mut table = Array4D::<f64>::new(
+        let mut table = rlst_dynamic_array4!(f64, 
             trial_space
                 .element()
-                .tabulate_array_shape(0, points.shape()[0]),
+                .tabulate_array_shape(0, points.shape()[0])
         );
         trial_space.element().tabulate(&points, 0, &mut table);
         trial_points.push(points);
         trial_tables.push(table);
 
         let points = transpose_to_matrix(&qrule.test_points, [qrule.npoints, 2]);
-        let mut table = Array4D::<f64>::new(
+        let mut table = rlst_dynamic_array4!(f64, 
             test_space
                 .element()
-                .tabulate_array_shape(0, points.shape()[0]),
+                .tabulate_array_shape(0, points.shape()[0])
         );
         test_space.element().tabulate(&points, 0, &mut table);
         test_points.push(points);

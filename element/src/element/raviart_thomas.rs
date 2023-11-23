@@ -2,11 +2,11 @@
 
 use crate::element::{create_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_tools::arrays::{zero_matrix, Array3D};
-use bempp_traits::arrays::Array3DAccess;
+use bempp_tools::arrays::zero_matrix;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
 use rlst_common::traits::RandomAccessMut;
+use rlst_dense::rlst_dynamic_array3;
 
 /// Create a Raviart-Thomas element
 pub fn create(
@@ -30,29 +30,29 @@ pub fn create(
     let tdim = cell.dim();
     let edim = tdim * polynomial_count(cell_type, degree - 1) + degree;
 
-    let mut wcoeffs = Array3D::<f64>::new((edim, tdim, pdim));
+    let mut wcoeffs = rlst_dynamic_array3!(f64, [edim, tdim, pdim]);
 
     // [sqrt(2), 6*y - 2, 4*sqrt(3)*(x + y/2 - 1/2)]
 
     // norm(x**2 + y**2)
     // sqrt(70)/30
 
-    *wcoeffs.get_mut(0, 0, 0).unwrap() = 1.0;
-    *wcoeffs.get_mut(1, 1, 0).unwrap() = 1.0;
-    *wcoeffs.get_mut(2, 0, 1).unwrap() = -0.5 / f64::sqrt(2.0);
-    *wcoeffs.get_mut(2, 0, 2).unwrap() = 0.5 * f64::sqrt(1.5);
-    *wcoeffs.get_mut(2, 1, 1).unwrap() = 1.0 / f64::sqrt(2.0);
+    *wcoeffs.get_mut([0, 0, 0]).unwrap() = 1.0;
+    *wcoeffs.get_mut([1, 1, 0]).unwrap() = 1.0;
+    *wcoeffs.get_mut([2, 0, 1]).unwrap() = -0.5 / f64::sqrt(2.0);
+    *wcoeffs.get_mut([2, 0, 2]).unwrap() = 0.5 * f64::sqrt(1.5);
+    *wcoeffs.get_mut([2, 1, 1]).unwrap() = 1.0 / f64::sqrt(2.0);
 
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
     for _e in 0..cell.entity_count(0) {
         x[0].push(zero_matrix([0, tdim]));
-        m[0].push(Array3D::<f64>::new((0, 2, 0)));
+        m[0].push(rlst_dynamic_array3!(f64, [0, 2, 0]));
     }
 
     for e in 0..cell.entity_count(1) {
         let mut pts = zero_matrix([1, tdim]);
-        let mut mat = vec![0.0; 2];
+        let mut mat = rlst_dynamic_array3!(f64, [1, 2, 1]);
         let vn0 = cell.edges()[2 * e];
         let vn1 = cell.edges()[2 * e + 1];
         let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
@@ -60,15 +60,15 @@ pub fn create(
         for i in 0..tdim {
             *pts.get_mut([0, i]).unwrap() = (v0[i] + v1[i]) / 2.0;
         }
-        mat[0] = v0[1] - v1[1];
-        mat[1] = v1[0] - v0[0];
+        *mat.get_mut([0, 0, 0]).unwrap() = v0[1] - v1[1];
+        *mat.get_mut([0, 1, 0]).unwrap() = v1[0] - v0[0];
         x[1].push(pts);
-        m[1].push(Array3D::<f64>::from_data(mat, (1, 2, 1)));
+        m[1].push(mat);
     }
 
     for _e in 0..cell.entity_count(2) {
         x[2].push(zero_matrix([0, tdim]));
-        m[2].push(Array3D::<f64>::new((0, 2, 0)));
+        m[2].push(rlst_dynamic_array3!(f64, [0, 2, 0]))
     }
 
     CiarletElement::create(
@@ -90,10 +90,10 @@ mod test {
     use crate::cell::*;
     use crate::element::raviart_thomas::*;
     use approx::*;
-    use bempp_tools::arrays::{to_matrix, Array4D};
-    use bempp_traits::arrays::Array4DAccess;
+    use bempp_tools::arrays::to_matrix;
     use bempp_traits::element::FiniteElement;
     use rlst_common::traits::RandomAccessByRef;
+    use rlst_dense::rlst_dynamic_array4;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -129,7 +129,7 @@ mod test {
     fn test_raviart_thomas_1_triangle() {
         let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 2);
-        let mut data = Array4D::<f64>::new(e.tabulate_array_shape(0, 6));
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let points = to_matrix(
             &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
             [6, 2],
@@ -138,27 +138,27 @@ mod test {
 
         for pt in 0..6 {
             assert_relative_eq!(
-                *data.get(0, pt, 0, 0).unwrap(),
+                *data.get([0, pt, 0, 0]).unwrap(),
                 -*points.get([pt, 0]).unwrap()
             );
             assert_relative_eq!(
-                *data.get(0, pt, 0, 1).unwrap(),
+                *data.get([0, pt, 0, 1]).unwrap(),
                 -*points.get([pt, 1]).unwrap()
             );
             assert_relative_eq!(
-                *data.get(0, pt, 1, 0).unwrap(),
+                *data.get([0, pt, 1, 0]).unwrap(),
                 *points.get([pt, 0]).unwrap() - 1.0
             );
             assert_relative_eq!(
-                *data.get(0, pt, 1, 1).unwrap(),
+                *data.get([0, pt, 1, 1]).unwrap(),
                 *points.get([pt, 1]).unwrap()
             );
             assert_relative_eq!(
-                *data.get(0, pt, 2, 0).unwrap(),
+                *data.get([0, pt, 2, 0]).unwrap(),
                 -*points.get([pt, 0]).unwrap()
             );
             assert_relative_eq!(
-                *data.get(0, pt, 2, 1).unwrap(),
+                *data.get([0, pt, 2, 1]).unwrap(),
                 1.0 - *points.get([pt, 1]).unwrap()
             );
         }

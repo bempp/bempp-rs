@@ -5,7 +5,6 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
-use bempp_tools::Array3D;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -17,7 +16,6 @@ use bempp_field::{
 };
 
 use bempp_traits::{
-    arrays::Array3DAccess,
     field::{FieldTranslation, FieldTranslationData},
     fmm::{Fmm, InteractionLists, SourceTranslation, TargetTranslation},
     kernel::{Kernel, KernelScale},
@@ -30,7 +28,8 @@ use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
     dense::{
-        rlst_col_vec, rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, Shape,
+        rlst_dynamic_array3,
+        rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, Shape,
         VectorContainer,
     },
 };
@@ -753,7 +752,7 @@ where
             .flat_map(|chunk| {
                 let m = 2 * self.fmm.order - 1;
                 let p = m + 1;
-                let mut potentials = Array3D::new((p, p, p));
+                let mut potentials = rlst_dynamic_array3!(f64, [p, p, p]);
                 potentials.get_data_mut().copy_from_slice(chunk);
 
                 let mut tmp = Vec::new();

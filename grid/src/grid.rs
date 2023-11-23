@@ -2,7 +2,7 @@
 use bempp_element::cell;
 use bempp_element::element::{create_element, CiarletElement};
 use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
-use bempp_traits::arrays::{AdjacencyListAccess, Array4DAccess};
+use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
@@ -11,6 +11,7 @@ use rlst_common::traits::{
     RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
 };
 use rlst_proc_macro::rlst_static_array;
+use rlst_dense::rlst_dynamic_array4;
 use std::cell::RefCell;
 use std::ptr;
 
@@ -32,7 +33,7 @@ impl<'a> EvaluatorTdim2Gdim3<'a> {
         let npts = points.shape()[0];
         assert_eq!(points.shape()[1], 2);
         assert_eq!(geometry.dim(), 3);
-        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
+        let mut table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
         element.tabulate(points, 1, &mut table);
         let axes = RefCell::new(zero_matrix([2, 3]));
         let js = RefCell::new(zero_matrix([npts, 6]));
@@ -61,14 +62,14 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
                 }
             }
         }
-        for i in 0..self.table.shape().2 {
+        for i in 0..self.table.shape()[2] {
             let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
             for j in 0..3 {
                 for p in 0..self.npts {
                     unsafe {
                         *points.get_unchecked_mut([p, j]) +=
                             *self.geometry.coordinate_unchecked(v, j)
-                                * *self.table.get(0, p, i, 0).unwrap();
+                                * *self.table.get([0, p, i, 0]).unwrap();
                     }
                 }
             }
@@ -85,16 +86,16 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
                     }
                 }
             }
-            for i in 0..self.table.shape().2 {
+            for i in 0..self.table.shape()[2] {
                 let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
                 for j in 0..3 {
                     unsafe {
                         *axes.get_unchecked_mut([0, j]) +=
                             *self.geometry.coordinate_unchecked(v, j)
-                                * self.table.get(1, p, i, 0).unwrap();
+                                * self.table.get([1, p, i, 0]).unwrap();
                         *axes.get_unchecked_mut([1, j]) +=
                             *self.geometry.coordinate_unchecked(v, j)
-                                * self.table.get(2, p, i, 0).unwrap();
+                                * self.table.get([2, p, i, 0]).unwrap();
                     }
                 }
             }
@@ -127,7 +128,7 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
                 }
             }
         }
-        for i in 0..self.table.shape().2 {
+        for i in 0..self.table.shape()[2] {
             let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
             for j in 0..3 {
                 for k in 0..2 {
@@ -135,7 +136,7 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
                         unsafe {
                             *jacobians.get_unchecked_mut([p, k + 2 * j]) +=
                                 *self.geometry.coordinate_unchecked(v, j)
-                                    * self.table.get(k + 1, p, i, 0).unwrap();
+                                    * self.table.get([k + 1, p, i, 0]).unwrap();
                         }
                     }
                 }
@@ -185,7 +186,7 @@ impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
         let npts = points.shape()[0];
         assert_eq!(points.shape()[1], 2);
         assert_eq!(geometry.dim(), 3);
-        let mut table = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
+        let mut table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
         element.tabulate(points, 1, &mut table);
         let axes = RefCell::new(zero_matrix([2, 3]));
         let js = RefCell::new(vec![0.0; 6]);
@@ -209,14 +210,14 @@ impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
                 *js.get_unchecked_mut(i) = 0.0;
             }
         }
-        for i in 0..self.table.shape().2 {
+        for i in 0..self.table.shape()[2] {
             let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
             for j in 0..3 {
                 for k in 0..2 {
                     unsafe {
                         *js.get_unchecked_mut(k + 2 * j) +=
                             *self.geometry.coordinate_unchecked(v, j)
-                                * self.table.get(k + 1, 0, i, 0).unwrap();
+                                * self.table.get([k + 1, 0, i, 0]).unwrap();
                     }
                 }
             }
@@ -237,14 +238,14 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
                 }
             }
         }
-        for i in 0..self.table.shape().2 {
+        for i in 0..self.table.shape()[2] {
             let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
             for j in 0..3 {
                 for p in 0..self.npts {
                     unsafe {
                         *points.get_unchecked_mut([p, j]) +=
                             *self.geometry.coordinate_unchecked(v, j)
-                                * *self.table.get(0, p, i, 0).unwrap();
+                                * *self.table.get([0, p, i, 0]).unwrap();
                     }
                 }
             }
@@ -260,14 +261,14 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
                 }
             }
         }
-        for i in 0..self.table.shape().2 {
+        for i in 0..self.table.shape()[2] {
             let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
             for j in 0..3 {
                 for k in 0..2 {
                     unsafe {
                         *axes.get_unchecked_mut([k, j]) +=
                             *self.geometry.coordinate_unchecked(v, j)
-                                * self.table.get(k + 1, 0, i, 0).unwrap();
+                                * self.table.get([k + 1, 0, i, 0]).unwrap();
                     }
                 }
             }
@@ -481,19 +482,19 @@ impl Geometry for SerialGeometry {
             panic!("physical_points has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(0, npts));
+        let mut data = rlst_dynamic_array4!(f64, element.tabulate_array_shape(0, npts));
         element.tabulate(points, 0, &mut data);
         for p in 0..npts {
             for i in 0..gdim {
                 *physical_points.get_mut([p, i]).unwrap() = 0.0;
             }
         }
-        for i in 0..data.shape().2 {
+        for i in 0..data.shape()[2] {
             let v = *self.cells.get(cell, i).unwrap();
             for j in 0..gdim {
                 for p in 0..npts {
                     *physical_points.get_mut([p, j]).unwrap() +=
-                        *self.coordinate(v, j).unwrap() * data.get(0, p, i, 0).unwrap();
+                        *self.coordinate(v, j).unwrap() * data.get([0, p, i, 0]).unwrap();
                 }
             }
         }
@@ -520,7 +521,7 @@ impl Geometry for SerialGeometry {
             panic!("normals has wrong number of rows.");
         }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
+        let mut data = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
         let mut axes = rlst_static_array![f64, 2, 3];
         element.tabulate(points, 1, &mut data);
         for p in 0..npts {
@@ -529,13 +530,13 @@ impl Geometry for SerialGeometry {
                     *axes.get_mut([i, j]).unwrap() = 0.0;
                 }
             }
-            for i in 0..data.shape().2 {
+            for i in 0..data.shape()[2] {
                 let v = *self.cells.get(cell, i).unwrap();
                 for j in 0..gdim {
                     *axes.get_mut([0, j]).unwrap() +=
-                        *self.coordinate(v, j).unwrap() * data.get(1, p, i, 0).unwrap();
+                        *self.coordinate(v, j).unwrap() * data.get([1, p, i, 0]).unwrap();
                     *axes.get_mut([1, j]).unwrap() +=
-                        *self.coordinate(v, j).unwrap() * data.get(2, p, i, 0).unwrap();
+                        *self.coordinate(v, j).unwrap() * data.get([2, p, i, 0]).unwrap();
                 }
             }
             *normals.get_mut([p, 0]).unwrap() = *axes.get([0, 1]).unwrap()
@@ -575,21 +576,21 @@ impl Geometry for SerialGeometry {
             panic!("jacobians has wrong number of columns.");
         }
         let element = self.element(cell);
-        let mut data = Array4D::<f64>::new(element.tabulate_array_shape(1, npts));
-        let tdim = data.shape().0 - 1;
+        let mut data = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
+        let tdim = data.shape()[0] - 1;
         element.tabulate(points, 1, &mut data);
         for p in 0..npts {
             for i in 0..jacobians.shape()[1] {
                 *jacobians.get_mut([p, i]).unwrap() = 0.0;
             }
         }
-        for i in 0..data.shape().2 {
+        for i in 0..data.shape()[2] {
             let v = *self.cells.get(cell, i).unwrap();
             for p in 0..npts {
                 for j in 0..gdim {
                     for k in 0..tdim {
                         *jacobians.get_mut([p, k + tdim * j]).unwrap() +=
-                            *self.coordinate(v, j).unwrap() * data.get(k + 1, p, i, 0).unwrap();
+                            *self.coordinate(v, j).unwrap() * data.get([k + 1, p, i, 0]).unwrap();
                     }
                 }
             }

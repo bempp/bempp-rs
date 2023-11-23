@@ -5,8 +5,7 @@ use itertools::Itertools;
 use num::traits::Num;
 
 use bempp_tools::Array3D;
-use bempp_traits::arrays::Array3DAccess;
-
+use rlst_dense::rlst_dynamic_array3;
 /// Return indices that sort a vec.
 ///
 /// # Arguments
@@ -41,7 +40,7 @@ where
     // Check that there is enough space for pad
     assert!(x + p <= m + p && y + q <= n + q && z + r <= o + r);
 
-    let mut padded = Array3D::new((p + m, q + n, r + o));
+    let mut padded = rlst_dynamic_array3!(T, [p + m, q + n, r + o]);
 
     for i in 0..m {
         for j in 0..n {
@@ -62,7 +61,7 @@ pub fn flip3<T>(arr: &Array3D<T>) -> Array3D<T>
 where
     T: Clone + Copy + Num,
 {
-    let mut flipped = Array3D::new(*arr.shape());
+    let mut flipped = rlst_dynamic_array3!(T, *arr.shape());
 
     let &(m, n, o) = arr.shape();
 
@@ -103,7 +102,7 @@ mod test {
     #[test]
     fn test_flip3() {
         let n = 2;
-        let mut arr: Array3D<usize> = Array3D::new((n, n, n));
+        let mut arr: Array3D<usize> = rlst_dynamic_array3!(f64, [n, n, n]);
         for i in 0..n {
             for j in 0..n {
                 for k in 0..n {
@@ -120,7 +119,7 @@ mod test {
     fn test_pad3() {
         let dim = 3;
         // Initialise input data
-        let mut input = Array3D::new((dim, dim, dim));
+        let mut input = rlst_dynamic_array3!(f64, [dim, dim, dim]);
         for i in 0..dim {
             for j in 0..dim {
                 for k in 0..dim {

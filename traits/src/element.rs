@@ -1,8 +1,7 @@
 //! Finite element definitions
 
-use crate::arrays::Array4DAccess;
 use crate::cell::ReferenceCellType;
-use rlst_common::traits::{RandomAccessByRef, Shape};
+use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -71,11 +70,11 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
+    fn tabulate<T: RandomAccessByRef<2, Item = f64> + Shape<2>, T4Mut: RandomAccessMut<4, Item = f64>>(
         &self,
         points: &T,
         nderivs: usize,
-        data: &mut impl Array4DAccess<f64>,
+        data: &mut T4Mut,
     );
 
     /// The DOFs that are associated with a subentity of the reference cell
@@ -85,11 +84,11 @@ pub trait FiniteElement {
     fn map_type(&self) -> MapType;
 
     /// Get the required shape for a tabulation array
-    fn tabulate_array_shape(&self, nderivs: usize, npoints: usize) -> (usize, usize, usize, usize) {
+    fn tabulate_array_shape(&self, nderivs: usize, npoints: usize) -> [usize; 4] {
         let deriv_count = compute_derivative_count(nderivs, self.cell_type());
         let point_count = npoints;
         let basis_count = self.dim();
         let value_size = self.value_size();
-        (deriv_count, point_count, basis_count, value_size)
+        [deriv_count, point_count, basis_count, value_size]
     }
 }
