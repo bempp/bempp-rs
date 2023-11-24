@@ -101,8 +101,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                     batched::assemble_nonsingular::<16, 16>(
                         &mut matrix,
                         &laplace_3d::Laplace3dKernel::new(),
-                        false,
-                        false,
                         &space,
                         &space,
                         &colouring,

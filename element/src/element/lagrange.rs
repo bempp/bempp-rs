@@ -36,7 +36,7 @@ pub fn create(
         }
         x[tdim].push(to_matrix(&cell.midpoint(), [1, tdim]));
         let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
-        *mentry.get_mut([0,0,0]).unwrap() = 1.0;
+        *mentry.get_mut([0, 0, 0]).unwrap() = 1.0;
         m[tdim].push(mentry);
     } else {
         // TODO: GLL points
@@ -47,7 +47,7 @@ pub fn create(
             }
             x[0].push(pts);
             let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
-            *mentry.get_mut([0,0,0]).unwrap() = 1.0;
+            *mentry.get_mut([0, 0, 0]).unwrap() = 1.0;
             m[0].push(mentry);
         }
         for e in 0..cell.entity_count(1) {
@@ -59,7 +59,7 @@ pub fn create(
             let mut ident = rlst_dynamic_array3!(f64, [degree - 1, 1, degree - 1]);
 
             for i in 1..degree {
-                *ident.get_mut([i-1,0,i-1]).unwrap() = 1.0;
+                *ident.get_mut([i - 1, 0, i - 1]).unwrap() = 1.0;
                 for j in 0..tdim {
                     *pts.get_mut([i - 1, j]).unwrap() =
                         v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
@@ -123,7 +123,7 @@ pub fn create(
 
             let mut ident = rlst_dynamic_array3!(f64, [npts, 1, npts]);
             for i in 0..npts {
-                *ident.get_mut([i,0,i]).unwrap() = 1.0;
+                *ident.get_mut([i, 0, i]).unwrap() = 1.0;
             }
             x[2].push(pts);
             m[2].push(ident);

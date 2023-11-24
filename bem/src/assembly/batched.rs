@@ -13,7 +13,9 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_common::traits::{RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef};
+use rlst_common::traits::{
+    RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
+};
 use rlst_dense::rlst_dynamic_array4;
 
 fn get_quadrature_rule(
@@ -184,8 +186,6 @@ fn assemble_batch_singular<'a>(
 fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
     output: &RawData2D<f64>,
     kernel: &impl Kernel<T = f64>,
-    needs_trial_normal: bool,
-    needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
     trial_cells: &[usize],
     test_space: &SerialFunctionSpace<'a>,
@@ -223,23 +223,6 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         .geometry()
         .get_evaluator(trial_element, trial_points);
 
-    #[allow(clippy::type_complexity)]
-    let test_compute_normals: Box<dyn Fn(usize, &mut Mat<f64>)> = if needs_test_normal {
-        Box::new(|index: usize, normals: &mut Mat<f64>| {
-            test_evaluator.compute_normals(index, normals)
-        })
-    } else {
-        Box::new(|_: usize, _: &mut Mat<f64>| ())
-    };
-    #[allow(clippy::type_complexity)]
-    let trial_compute_normals: Box<dyn Fn(usize, &mut Mat<f64>)> = if needs_trial_normal {
-        Box::new(|index: usize, normals: &mut Mat<f64>| {
-            trial_evaluator.compute_normals(index, normals)
-        })
-    } else {
-        Box::new(|_: usize, _: &mut Mat<f64>| ())
-    };
-
     let mut trial_jdet = vec![[0.0; NPTS_TRIAL]; trial_cells.len()];
     let mut trial_mapped_pts = vec![];
     let mut trial_normals = vec![];
@@ -251,10 +234,12 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
         let trial_cell_gindex = trial_grid.geometry().index_map()[*trial_cell];
 
-        trial_evaluator
-            .compute_jacobian_determinants(trial_cell_gindex, &mut trial_jdet[trial_cell_i]);
+        trial_evaluator.compute_normals_and_jacobian_determinants(
+            trial_cell_gindex,
+            &mut trial_normals[trial_cell_i],
+            &mut trial_jdet[trial_cell_i],
+        );
         trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts[trial_cell_i]);
-        trial_compute_normals(trial_cell_gindex, &mut trial_normals[trial_cell_i]);
     }
 
     let mut sum: f64;
@@ -265,9 +250,12 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         let test_cell_gindex = test_grid.geometry().index_map()[*test_cell];
         let test_vertices = unsafe { test_c20.row_unchecked(test_cell_tindex) };
 
-        test_evaluator.compute_jacobian_determinants(test_cell_gindex, &mut test_jdet);
+        test_evaluator.compute_normals_and_jacobian_determinants(
+            test_cell_gindex,
+            &mut test_normals,
+            &mut test_jdet,
+        );
         test_evaluator.compute_points(test_cell_gindex, &mut test_mapped_pts);
-        test_compute_normals(test_cell_gindex, &mut test_normals);
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
             let trial_cell_tindex = trial_grid.topology().index_map()[*trial_cell];
@@ -281,7 +269,9 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                 }
             }
 
-            if neighbour { continue; }
+            if neighbour {
+                continue;
+            }
 
             kernel.assemble_st(
                 EvalType::Value,
@@ -306,11 +296,10 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                 {
                     for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
                         unsafe {
-                            trial_integrands[trial_index] =
-                                trial_wt
-                                    * trial_jdet[trial_cell_i][trial_index]
-                                    * trial_table.get_unchecked([0, trial_index, trial_i, 0]);
-                            }
+                            trial_integrands[trial_index] = trial_wt
+                                * trial_jdet[trial_cell_i][trial_index]
+                                * trial_table.get_unchecked([0, trial_index, trial_i, 0]);
+                        }
                     }
                     sum = 0.0;
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
@@ -331,7 +320,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                             .data
                             .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += sum;
                     }
-            }
+                }
             }
         }
     }
@@ -354,8 +343,6 @@ pub fn assemble<'a>(
     assemble_nonsingular::<16, 16>(
         output,
         kernel,
-        needs_trial_normal,
-        needs_test_normal,
         trial_space,
         test_space,
         &trial_colouring,
@@ -379,8 +366,6 @@ pub fn assemble<'a>(
 pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
     output: &mut Mat<f64>,
     kernel: &impl Kernel<T = f64>,
-    needs_trial_normal: bool,
-    needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
     trial_colouring: &Vec<Vec<usize>>,
@@ -414,8 +399,10 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
         .element()
         .tabulate(&qpoints_test, 0, &mut test_table);
 
-    let mut trial_table =
-        rlst_dynamic_array4!(f64, trial_space.element().tabulate_array_shape(0, NPTS_TRIAL));
+    let mut trial_table = rlst_dynamic_array4!(
+        f64,
+        trial_space.element().tabulate_array_shape(0, NPTS_TRIAL)
+    );
     trial_space
         .element()
         .tabulate(&qpoints_test, 0, &mut trial_table);
@@ -459,8 +446,6 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
                     assemble_batch_nonadjacent::<NPTS_TEST, NPTS_TRIAL>(
                         &output_raw,
                         kernel,
-                        needs_trial_normal,
-                        needs_test_normal,
                         trial_space,
                         trial_cells[t],
                         test_space,
@@ -556,7 +541,8 @@ pub fn assemble_singular<'a>(
         );
 
         let points = transpose_to_matrix(&qrule.trial_points, [qrule.npoints, 2]);
-        let mut table = rlst_dynamic_array4!(f64, 
+        let mut table = rlst_dynamic_array4!(
+            f64,
             trial_space
                 .element()
                 .tabulate_array_shape(0, points.shape()[0])
@@ -566,7 +552,8 @@ pub fn assemble_singular<'a>(
         trial_tables.push(table);
 
         let points = transpose_to_matrix(&qrule.test_points, [qrule.npoints, 2]);
-        let mut table = rlst_dynamic_array4!(f64, 
+        let mut table = rlst_dynamic_array4!(
+            f64,
             test_space
                 .element()
                 .tabulate_array_shape(0, points.shape()[0])

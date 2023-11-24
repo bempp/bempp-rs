@@ -23,17 +23,13 @@ pub trait GeometryEvaluator<
     /// Compute the points in a physical cell
     fn compute_points(&self, cell_index: usize, points: &mut TMut);
 
-    /// Compute the normals at this evaluator's points
-    fn compute_normals(&self, cell_index: usize, normals: &mut TMut);
-
-    /// Compute the jacobians at this evaluator's points
-    fn compute_jacobians(&self, cell_index: usize, jacobians: &mut TMut);
-
-    /// Compute the jacobians at this evaluator's points
-    fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]);
-
-    /// Compute the jacobians at this evaluator's points
-    fn compute_jacobian_inverses(&self, cell_index: usize, jinvs: &mut TMut);
+    /// Compute the normals and jacobian determinants at this evaluator's points
+    fn compute_normals_and_jacobian_determinants(
+        &self,
+        cell_index: usize,
+        normals: &mut TMut,
+        jdets: &mut [f64],
+    );
 }
 
 pub trait Geometry {

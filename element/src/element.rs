@@ -2,13 +2,13 @@
 
 use crate::cell::create_cell;
 use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
-use bempp_tools::arrays::{AdjacencyList, Mat, Array3D};
+use bempp_tools::arrays::{AdjacencyList, Array3D, Mat};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
 use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut};
 use rlst_dense::linalg::Trans;
-use rlst_dense::{rlst_dynamic_array2,rlst_dynamic_array3};
+use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3};
 pub mod lagrange;
 pub mod raviart_thomas;
 
@@ -139,8 +139,8 @@ impl CiarletElement {
                                 let value = d_matrix.get_mut([j, l, dof + i]).unwrap();
                                 *value = 0.0;
                                 for k in 0..pts.shape()[0] {
-                                    *value +=
-                                        *mat.get([i, j, k]).unwrap() * *table.get([0, l, k]).unwrap();
+                                    *value += *mat.get([i, j, k]).unwrap()
+                                        * *table.get([0, l, k]).unwrap();
                                 }
                             }
                         }
@@ -179,8 +179,8 @@ impl CiarletElement {
             for l in 0..pdim {
                 for j in 0..value_size {
                     for k in 0..pdim {
-                        *coefficients.get_mut([i, j, k]).unwrap() +=
-                            *inverse.get([i, l]).unwrap() * *polynomial_coeffs.get([l, j, k]).unwrap()
+                        *coefficients.get_mut([i, j, k]).unwrap() += *inverse.get([i, l]).unwrap()
+                            * *polynomial_coeffs.get([l, j, k]).unwrap()
                     }
                 }
             }
@@ -247,18 +247,19 @@ impl FiniteElement for CiarletElement {
     fn dim(&self) -> usize {
         self.dim
     }
-    fn tabulate<T: RandomAccessByRef<2, Item = f64> + Shape<2>, T4Mut: RandomAccessMut<4, Item = f64>>(
+    fn tabulate<
+        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
+        T4Mut: RandomAccessMut<4, Item = f64>,
+    >(
         &self,
         points: &T,
         nderivs: usize,
         data: &mut T4Mut,
     ) {
-        let mut table = rlst_dynamic_array3!(f64, legendre_shape(
-            self.cell_type,
-            points,
-            self.highest_degree,
-            nderivs,
-        ));
+        let mut table = rlst_dynamic_array3!(
+            f64,
+            legendre_shape(self.cell_type, points, self.highest_degree, nderivs,)
+        );
         tabulate_legendre_polynomials(
             self.cell_type,
             points,
