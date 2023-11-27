@@ -572,9 +572,11 @@ where
         let size_real = p * q * (r / 2 + 1);
         let pad_size = (p - m, q - n, r - o);
         let pad_index = (p - m, q - n, r - o);
-        let mut padded_signals = rlst_col_vec![U, size * ntargets];
+        // let mut padded_signals = rlst_col_vec![U, size * ntargets];
+        let mut padded_signals = vec![U::zero(); size * ntargets];
 
-        let chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
+        // let chunks = padded_signals.data_mut().par_chunks_exact_mut(size);
+        let chunks = padded_signals.par_chunks_exact_mut(size);
 
         let range = (0..chunks.len()).into_par_iter();
         range.zip(chunks).for_each(|(i, chunk)| {
@@ -590,21 +592,25 @@ where
 
             chunk.copy_from_slice(padded_signal.get_data());
         });
-        let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
+        // let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
+        let mut padded_signals_hat = vec![Complex::<U>::default(); size_real * ntargets];
 
         U::rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
 
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         let ntargets = targets.len();
         let nparents = ntargets / 8;
-        let mut global_check_potentials_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
-        let mut global_check_potentials = rlst_col_vec![U, size * ntargets];
+        // let mut global_check_potentials_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
+        // let mut global_check_potentials = rlst_col_vec![U, size * ntargets];
+        let mut global_check_potentials_hat = vec![Complex::<U>::default(); size_real * ntargets];
+        let mut global_check_potentials = vec![U::default(); size * ntargets];
 
         // Get check potentials in frequency order
         let mut global_check_potentials_hat_freq = vec![Vec::new(); size_real];
 
         unsafe {
-            let ptr = global_check_potentials_hat.get_pointer_mut();
+            // let ptr = global_check_potentials_hat.get_pointer_mut();
+            let ptr = global_check_potentials_hat.as_mut_ptr();
             for (i, elem) in global_check_potentials_hat_freq
                 .iter_mut()
                 .enumerate()
@@ -622,7 +628,8 @@ where
         let mut padded_signals_hat_freq = vec![Vec::new(); size_real];
         let zero = rlst_col_vec![Complex<U>, 8];
         unsafe {
-            let ptr = padded_signals_hat.get_pointer();
+            // let ptr = padded_signals_hat.get_pointer();
+            let ptr = padded_signals_hat.as_ptr();
 
             for (i, elem) in padded_signals_hat_freq
                 .iter_mut()
@@ -736,7 +743,7 @@ where
         let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
 
         let check_potentials = global_check_potentials
-            .data()
+            // .data()
             .chunks_exact(size)
             .flat_map(|chunk| {
                 let m = 2 * self.fmm.order - 1;

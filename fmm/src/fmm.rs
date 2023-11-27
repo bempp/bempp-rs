@@ -568,7 +568,9 @@ where
             let multipoles = vec![V::default(); ncoeffs * nkeys];
             let locals = vec![V::default(); ncoeffs * nkeys];
 
-            let potentials = vec![V::default(); npoints];
+            let mut potentials = vec![V::default(); npoints];
+            let mut potentials_send_pointers = vec![SendPtrMut::default(); nleaves];
+
             let mut charges = vec![V::default(); npoints];
             let global_indices = vec![0usize; npoints];
 
@@ -612,6 +614,9 @@ where
             // Create an index pointer for the charge data
             let mut index_pointer = 0;
             let mut charge_index_pointer = vec![(0usize, 0usize); nleaves];
+
+            let mut potential_raw_pointer = potentials.as_mut_ptr();
+
             let mut scales = vec![V::default(); nleaves * ncoeffs];
             for (i, leaf) in leaves.iter().enumerate() {
                 let l = i * ncoeffs;
@@ -625,9 +630,13 @@ where
                     npoints = 0;
                 }
 
+                potentials_send_pointers[i] = SendPtrMut{raw: potential_raw_pointer};
+
                 let bounds = (index_pointer, index_pointer + npoints);
                 charge_index_pointer[i] = bounds;
-                index_pointer += npoints
+                index_pointer += npoints;
+                unsafe { potential_raw_pointer = potential_raw_pointer.add(npoints) };
+
             }
 
             let dim = fmm.kernel().space_dimension();
@@ -674,7 +683,7 @@ where
                 downward_surfaces,
                 leaf_upward_surfaces,
                 leaf_downward_surfaces,
-                potentials,
+                potentials: potentials_send_pointers,
                 charges,
                 charge_index_pointer,
                 scales,
@@ -1361,7 +1370,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 9;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
@@ -1392,70 +1401,70 @@ mod test {
         println!("data tree setup {:?}", s.elapsed());
 
         let s = Instant::now();
-        let times: Option<HashMap<String, u128>> = datatree.run(true);
+        let times = datatree.run(true);
         println!("linear upward pass {:?} {:?}", s.elapsed(), times.unwrap());
 
-        let kernel = Laplace3dKernel::default();
+        // let kernel = Laplace3dKernel::default();
 
-        let tree = SingleNodeTree::new(
-            points.data(),
-            adaptive,
-            Some(ncrit),
-            Some(depth),
-            &global_idxs[..],
-        );
+        // let tree = SingleNodeTree::new(
+        //     points.data(),
+        //     adaptive,
+        //     Some(ncrit),
+        //     Some(depth),
+        //     &global_idxs[..],
+        // );
 
-        let m2l_data_fft =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+        // let m2l_data_fft =
+        //     FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+        // let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
-        let s = Instant::now();
-        let old_datatree = FmmData::new(fmm, &charge_dict);
-        println!("old data tree setup {:?}", s.elapsed());
+        // // // Form charge dict, matching charges with their associated global indices
+        // let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+        // let s = Instant::now();
+        // let old_datatree = FmmData::new(fmm, &charge_dict);
+        // println!("old data tree setup {:?}", s.elapsed());
 
-        let &idx = datatree.fmm.tree().key_to_index.get(&ROOT).unwrap();
-        let old_leaf = old_datatree.fmm.tree().get_all_leaves().unwrap()[idx];
-        let old_key = old_datatree.fmm.tree().get_all_keys().unwrap()[idx];
-        // let old_points = old_datatree.points.get(&old_leaf).unwrap();
-        // let old_points = old_points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
+        // let &idx = datatree.fmm.tree().key_to_index.get(&ROOT).unwrap();
+        // let old_leaf = old_datatree.fmm.tree().get_all_leaves().unwrap()[idx];
+        // let old_key = old_datatree.fmm.tree().get_all_keys().unwrap()[idx];
+        // // let old_points = old_datatree.points.get(&old_leaf).unwrap();
+        // // let old_points = old_points.iter().map(|p| p.coordinate).flat_map(|[x, y, z]| vec![x, y, z]).collect_vec();
 
-        let new_leaf = datatree.fmm.tree().get_all_leaves().unwrap()[idx];
-        let new_key = datatree.fmm.tree().get_all_keys().unwrap()[idx];
-        // println!("old {:?} new {:?} keys", old_key, new_key);
+        // let new_leaf = datatree.fmm.tree().get_all_leaves().unwrap()[idx];
+        // let new_key = datatree.fmm.tree().get_all_keys().unwrap()[idx];
+        // // println!("old {:?} new {:?} keys", old_key, new_key);
 
-        let (l, r) = datatree.charge_index_pointer[idx];
-        // let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
+        // let (l, r) = datatree.charge_index_pointer[idx];
+        // // let new_points = &datatree.fmm.tree().get_all_coordinates().unwrap()[l*3..r*3];
 
         // let s = Instant::now();
         // let times = old_datatree.run(true);
         // println!("old upward pass {:?} {:?}", s.elapsed(), times.unwrap());
 
-        // Check potentials
-        let midx = datatree.fmm.tree().key_to_index.get(&new_key).unwrap();
-        // let (l, r) = datatree.expansion_index_pointer[*midx];
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-        let new_multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
-        let old_multipole = old_datatree
-            .multipoles
-            .get(&old_key)
-            .unwrap()
-            .deref()
-            .lock()
-            .unwrap();
+        // // Check potentials
+        // let midx = datatree.fmm.tree().key_to_index.get(&new_key).unwrap();
+        // // let (l, r) = datatree.expansion_index_pointer[*midx];
+        // let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
+        // let new_multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
+        // let old_multipole = old_datatree
+        //     .multipoles
+        //     .get(&old_key)
+        //     .unwrap()
+        //     .deref()
+        //     .lock()
+        //     .unwrap();
 
-        // println!("HERE {:?} {:?}", old_key, old_multipole.data());
-        // println!("HERE {:?} {:?}", new_key, new_multipole);
-        let abs_error: f64 = old_multipole
-            .data()
-            .iter()
-            .zip(new_multipole.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
+        // // println!("HERE {:?} {:?}", old_key, old_multipole.data());
+        // // println!("HERE {:?} {:?}", new_key, new_multipole);
+        // let abs_error: f64 = old_multipole
+        //     .data()
+        //     .iter()
+        //     .zip(new_multipole.iter())
+        //     .map(|(a, b)| (a - b).abs())
+        //     .sum();
 
-        let rel_error = abs_error / (old_multipole.data().iter().sum::<f64>());
-        println!("rel error {:?}", rel_error);
+        // let rel_error = abs_error / (old_multipole.data().iter().sum::<f64>());
+        // println!("rel error {:?}", rel_error);
 
         assert!(false)
     }

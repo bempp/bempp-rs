@@ -73,7 +73,7 @@ where
     pub locals: Vec<U>,
 
     /// The evaluated potentials at each leaf box.
-    pub potentials: Vec<U>,
+    pub potentials: Vec<SendPtrMut<U>>,
 
     /// All upward surfaces
     pub upward_surfaces: Vec<U>,
