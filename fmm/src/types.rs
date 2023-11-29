@@ -6,7 +6,7 @@ use std::{
 use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::{morton::MortonKey, point::Point};
 use cauchy::Scalar;
-use num::{Float, Complex};
+use num::{Complex, Float};
 use rlst::dense::traits::*;
 use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
 use rlst::{self};
@@ -73,7 +73,9 @@ where
     pub locals: Vec<U>,
 
     /// The evaluated potentials at each leaf box.
-    pub potentials: Vec<SendPtrMut<U>>,
+    pub potentials: Vec<U>,
+
+    pub potentials_send_pointers: Vec<SendPtrMut<U>>,
 
     /// All upward surfaces
     pub upward_surfaces: Vec<U>,
@@ -101,7 +103,7 @@ where
 }
 
 /// Type to store data associated with the kernel independent (KiFMM) in.
-pub struct KiFmm<T, U, V, W>
+pub struct KiFmmHashMap<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
@@ -195,11 +197,11 @@ pub struct SendPtrMut<T> {
 unsafe impl<T> Sync for SendPtrMut<T> {}
 unsafe impl<T> Send for SendPtrMut<Complex<T>> {}
 
-
-impl <T> Default for SendPtrMut<T> {
-
+impl<T> Default for SendPtrMut<T> {
     fn default() -> Self {
-        SendPtrMut { raw: std::ptr::null_mut() }
+        SendPtrMut {
+            raw: std::ptr::null_mut(),
+        }
     }
 }
 
@@ -211,10 +213,10 @@ pub struct SendPtr<T> {
 
 unsafe impl<T> Sync for SendPtr<T> {}
 
-
-impl <T> Default for SendPtr<T> {
-
+impl<T> Default for SendPtr<T> {
     fn default() -> Self {
-        SendPtr { raw: std::ptr::null() }
+        SendPtr {
+            raw: std::ptr::null(),
+        }
     }
 }

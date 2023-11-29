@@ -8,9 +8,9 @@ use bempp_traits::{
 use bempp_tree::types::morton::{MortonKey, MortonKeys};
 use num::Float;
 
-use crate::types::{KiFmm, KiFmmLinear};
+use crate::types::{KiFmmHashMap, KiFmmLinear};
 
-impl<T, U, V, W> InteractionLists for KiFmm<T, U, V, W>
+impl<T, U, V, W> InteractionLists for KiFmmHashMap<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,

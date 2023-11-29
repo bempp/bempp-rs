@@ -145,4 +145,4 @@ pub type FftMatrixc32 = Vec<c32>;
 
 /// Type alias for real coefficients for into FFTW wrappers
 // pub type FftMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
-pub type FftMatrix<T> = Vec<T>; 
+pub type FftMatrix<T> = Vec<T>;
