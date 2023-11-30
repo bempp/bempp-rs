@@ -442,10 +442,10 @@ where
                     self.m2l(level);
                 }
                 // Leaf level computations
-                // self.p2l();
+                self.p2l();
 
                 // Sum all potential contributions
-                // self.m2p();
+                self.m2p();
                 self.p2p();
                 self.l2p();
 
@@ -680,7 +680,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 2;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
@@ -711,9 +711,7 @@ mod test {
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
 
         let potentials = datatree.potentials.get(leaf).unwrap().lock().unwrap();
-        
-        println!("LEAF {:?}", leaf);
-        // println!("POTENTIALS {:?}", potentials.data());
+
         let pts = datatree.fmm.tree().get_points(leaf).unwrap();
 
         let leaf_coordinates = pts
@@ -723,12 +721,6 @@ mod test {
             .collect_vec();
 
         let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
-        // println!("LOCAL EXPANSION {:?}", datatree.locals.get(leaf).unwrap().lock().unwrap().data());
-        // println!("LEAF COORDINATES {:?}", leaf_coordinates);
-        // println!("SURFACE {:?}", leaf.compute_surface(datatree.fmm.tree().get_domain(), order, alpha_outer));
-        println!("POTENTIALS {:?}", potentials.data());
-
-        assert!(false);
 
         let leaf_coordinates = unsafe {
             rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]

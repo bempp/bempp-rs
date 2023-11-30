@@ -16,7 +16,8 @@ use bempp_tree::types::single_node::SingleNodeTree;
 
 use crate::{
     constants::P2M_MAX_CHUNK_SIZE,
-    types::{FmmDataLinear, KiFmmLinear}, field_translation::hashmap::target,
+    field_translation::hashmap::target,
+    types::{FmmDataLinear, KiFmmLinear},
 };
 
 use rlst::{
@@ -118,7 +119,7 @@ where
             let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
             let dim = self.fmm.kernel.space_dimension();
             let surface_size = ncoeffs * dim;
-            
+
             self.leaf_upward_surfaces
                 .par_chunks_exact(surface_size)
                 .zip(leaves.into_par_iter())
@@ -132,13 +133,10 @@ where
                     )| {
                         let target_coordinates = &coordinates
                             [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                        
                         let ntargets = target_coordinates.len() / dim;
-                        
                         let target_coordinates = unsafe {
                             rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, dim), (dim, 1)]
                         }.eval();
-                        
 
                         let local_expansion =
                             unsafe { rlst_pointer_mat!['a, V, local_ptr.raw, (ncoeffs, 1), (1, ncoeffs) ]};
@@ -228,7 +226,6 @@ where
 
                             for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                                 let nsources = sources.len() / dim;
-                                
                                 let sources = unsafe {
                                     rlst_pointer_mat!['a, V, sources.as_ptr(), (nsources, dim), (dim, 1)]
                                 }.eval();
@@ -237,7 +234,6 @@ where
                                 if nsources > 0 {
                                     let mut result = potential_send_pointer.raw;
                                     let mut local_result = vec![V::zero(); ntargets];
-                                    
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
                                         sources.data(),
@@ -245,7 +241,6 @@ where
                                         charges,
                                         &mut local_result,
                                     );
-                                    
                                     // Save to global locations
                                     for res in local_result.iter() {
                                         unsafe {

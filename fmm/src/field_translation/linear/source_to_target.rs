@@ -271,8 +271,6 @@ pub fn m2l_cplx_chunked<U>(
     });
 }
 
-
-
 pub fn m2l_cplx<U>(
     order: usize,
     level: usize,
@@ -281,9 +279,8 @@ pub fn m2l_cplx<U>(
     kernel_data_halo: &[Vec<Complex<U>>],
     all_displacements: &[Vec<Vec<usize>>],
     scale: Complex<U>,
-
 ) where
-U: Scalar + Sync, 
+    U: Scalar + Sync,
 {
     let nparents = nparents(level);
     let size_real = size_real(order);
@@ -453,12 +450,12 @@ where
         );
 
         // m2l_cplx(
-        //     self.fmm.order, 
-        //     level as usize, 
-        //     &padded_signals_hat_freq, 
-        //     &global_check_potentials_hat_freq, 
-        //     &kernel_data_halo, 
-        //     &all_displacements, 
+        //     self.fmm.order,
+        //     level as usize,
+        //     &padded_signals_hat_freq,
+        //     &global_check_potentials_hat_freq,
+        //     &kernel_data_halo,
+        //     &all_displacements,
         //     scale
         // );
 
@@ -513,8 +510,16 @@ where
 
         // Add result
         println!("HERE {:?} {:?}", level, tmp.data().len());
-        println!("HERE {:?} {:?}", level, tmp.data().chunks_exact(ncoeffs).len());
-        println!("HERE {:?} {:?}", level, self.level_locals[level as usize].len());
+        println!(
+            "HERE {:?} {:?}",
+            level,
+            tmp.data().chunks_exact(ncoeffs).len()
+        );
+        println!(
+            "HERE {:?} {:?}",
+            level,
+            self.level_locals[level as usize].len()
+        );
 
         tmp.data()
             .par_chunks_exact(ncoeffs)

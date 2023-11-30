@@ -229,7 +229,6 @@ where
 
                     if let Some(u_list) = self.fmm.get_u_list(&target) {
 
-                        
                         for source in u_list.iter() {
                             if let Some(source_points) = self.fmm.tree().get_points(source) {
                                 let source_coordinates = source_points
