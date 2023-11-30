@@ -155,6 +155,13 @@ where
             key_to_index.insert(*key, i);
         }
 
+        let mut leaf_to_index = HashMap::new();
+        
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
+
+
         SingleNodeTree {
             depth,
             points,
@@ -165,6 +172,7 @@ where
             keys,
             leaves_to_points,
             key_to_index,
+            leaf_to_index,
             leaves_set,
             keys_set,
             levels_to_keys,
@@ -318,6 +326,11 @@ where
             key_to_index.insert(*key, i);
         }
 
+        let mut leaf_to_index = HashMap::new();
+        
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
         SingleNodeTree {
             depth,
             points,
@@ -328,6 +341,7 @@ where
             keys,
             leaves_to_points,
             key_to_index,
+            leaf_to_index,
             leaves_set,
             keys_set,
             levels_to_keys,
@@ -631,6 +645,14 @@ where
 
     fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
         Some(&self.global_indices)
+    }
+
+    fn get_index(&self, key: &Self::NodeIndex) -> Option<&usize> {
+        self.key_to_index.get(key)
+    }
+
+    fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize> {
+        self.leaf_to_index.get(key)
     }
 
     fn is_leaf(&self, key: &Self::NodeIndex) -> bool {

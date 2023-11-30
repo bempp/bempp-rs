@@ -34,11 +34,11 @@ use rlst::{
     },
 };
 
-use crate::types::{FmmData, KiFmmHashMap, SendPtr, SendPtrMut};
+use crate::types::{FmmDataHashmap, KiFmmHashMap, SendPtr, SendPtrMut};
 
 /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
 impl<T, U> FieldTranslation<U>
-    for FmmData<KiFmmHashMap<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
+    for FmmDataHashmap<KiFmmHashMap<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
 where
     T: Kernel<T = U>
         + ScaleInvariantKernel<T = U>
@@ -192,7 +192,7 @@ where
 
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
 impl<T, U> FieldTranslation<U>
-    for FmmData<KiFmmHashMap<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+    for FmmDataHashmap<KiFmmHashMap<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
     T: Kernel<T = U>
         + ScaleInvariantKernel<T = U>

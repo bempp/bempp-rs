@@ -30,7 +30,7 @@ pub type Potentials<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, D
 pub type C2EType<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
 
 /// Type to store data associated with an FMM in.
-pub struct FmmData<T, U>
+pub struct FmmDataHashmap<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
@@ -65,16 +65,25 @@ where
     /// The multipole expansion data at each box.
     pub multipoles: Vec<U>,
 
+    /// Multipole expansions at leaf level
     pub leaf_multipoles: Vec<SendPtrMut<U>>,
 
+    /// Multipole expansions at each level
     pub level_multipoles: Vec<Vec<SendPtrMut<U>>>,
 
-    /// The local expansion data at each box.
+    /// The local expansion at each box
     pub locals: Vec<U>,
+
+    /// Local expansions at the leaf level
+    pub leaf_locals: Vec<SendPtrMut<U>>,
+
+    /// The local expansion data at each level.
+    pub level_locals: Vec<Vec<SendPtrMut<U>>>,
 
     /// The evaluated potentials at each leaf box.
     pub potentials: Vec<U>,
 
+    /// The evaluated potentials at each leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<U>>,
 
     /// All upward surfaces
@@ -176,7 +185,7 @@ where
     pub m2m: C2EType<W>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub l2l: C2EType<W>,
+    pub l2l: Vec<C2EType<W>>,
 
     /// The tree (single or multi node) associated with this FMM
     pub tree: T,

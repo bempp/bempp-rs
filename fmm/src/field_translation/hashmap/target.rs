@@ -22,9 +22,9 @@ use rlst::{
     dense::{rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-use crate::types::{FmmData, KiFmmHashMap};
+use crate::types::{FmmDataHashmap, KiFmmHashMap};
 
-impl<T, U, V> TargetTranslation for FmmData<KiFmmHashMap<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> TargetTranslation for FmmDataHashmap<KiFmmHashMap<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
@@ -228,6 +228,8 @@ where
                     }.eval();
 
                     if let Some(u_list) = self.fmm.get_u_list(&target) {
+
+                        
                         for source in u_list.iter() {
                             if let Some(source_points) = self.fmm.tree().get_points(source) {
                                 let source_coordinates = source_points
@@ -241,6 +243,10 @@ where
                                 let source_coordinates = unsafe {
                                     rlst_pointer_mat!['a, V, source_coordinates.as_ptr(), (nsources, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                                 }.eval();
+
+                                // if target.morton == 3 {
+                                //     println!("SOURCES {:?}", source_coordinates.data());
+                                // }
 
                                 let source_charges_arc =
                                     Arc::clone(self.charges.get(source).unwrap());
@@ -258,8 +264,19 @@ where
                                 let mut target_potential_lock =
                                     target_potential_arc.lock().unwrap();
 
+                        // if target.morton == 3 {
+                        //     println!("TARGETS {:?}", target_coordinates.data());
+                        // }
                                 *target_potential_lock.deref_mut() = (target_potential_lock.deref() + target_potential).eval();
                             }
+                        }
+
+
+                        let mut target_potential_lock =
+                            target_potential_arc.lock().unwrap();
+
+                        if target.morton == 3 {
+                            println!("local result {:?}", target_potential_lock.data());
                         }
                     }
                 }

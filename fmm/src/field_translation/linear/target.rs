@@ -16,7 +16,7 @@ use bempp_tree::types::single_node::SingleNodeTree;
 
 use crate::{
     constants::P2M_MAX_CHUNK_SIZE,
-    types::{FmmDataLinear, KiFmmLinear},
+    types::{FmmDataLinear, KiFmmLinear}, field_translation::hashmap::target,
 };
 
 use rlst::{
@@ -52,42 +52,60 @@ where
     >,
 {
     fn l2l<'a>(&self, level: u64) {
-        if let Some(sources) = self.fmm.tree().get_keys(level) {
-            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        if let Some(parent_sources) = self.fmm.tree().get_keys(level - 1) {
+            if let Some(child_targets) = self.fmm.tree().get_keys(level) {
+                let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-            let nsources = sources.len();
-            let min = &sources[0];
-            let max = &sources[nsources - 1];
-            let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
-            let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
+                let nsources = parent_sources.len();
+                let min_parent = &parent_sources[0];
+                let max_parent = &parent_sources[nsources - 1];
 
-            let locals = &self.locals[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+                let min_parent_idx = self.fmm.tree().key_to_index.get(min_parent).unwrap();
+                let max_parent_idx = self.fmm.tree().key_to_index.get(max_parent).unwrap();
 
-            let nsiblings = 8;
-            let mut max_chunk_size = 8_i32.pow((level - 1).try_into().unwrap()) as usize;
+                let parent_locals =
+                    &self.locals[min_parent_idx * ncoeffs..(max_parent_idx + 1) * ncoeffs];
 
-            if max_chunk_size > P2M_MAX_CHUNK_SIZE {
-                max_chunk_size = P2M_MAX_CHUNK_SIZE;
-            }
-            let chunk_size = find_chunk_size(nsources, max_chunk_size);
-            locals
-                .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
-                .zip(self.level_multipoles[(level + 1) as usize].par_chunks_exact(chunk_size))
-                .for_each(|(multipole_chunk, parent)| {
+                let child_locals = &self.level_locals[level as usize];
 
-                    unsafe {
-                        let tmp = rlst_pointer_mat!['a, V, multipole_chunk.as_ptr(), (ncoeffs*nsiblings, chunk_size), (1, ncoeffs*nsiblings)];
-                        let tmp = self.fmm.l2l.dot(&tmp).eval();
+                let mut max_chunk_size = 8_i32.pow((level).try_into().unwrap()) as usize;
 
-                        for i in 0..chunk_size {
-                            let mut ptr = parent[i].raw;
-                            for j in 0..ncoeffs {
-                                *ptr += tmp.data()[(i*ncoeffs)+j];
-                                ptr = ptr.add(1)
+                if max_chunk_size > P2M_MAX_CHUNK_SIZE {
+                    max_chunk_size = P2M_MAX_CHUNK_SIZE;
+                }
+                let chunk_size = find_chunk_size(nsources, max_chunk_size);
+                let nsiblings = 8;
+
+                // let chunk_size = 1;
+
+                parent_locals
+                .par_chunks_exact(ncoeffs*chunk_size)
+                .zip(child_locals.par_chunks_exact(chunk_size*nsiblings))
+                .for_each(|(parent_local_chunk, children_locals)| {
+
+                    let parent_local_chunk = unsafe { rlst_pointer_mat!['a, V, parent_local_chunk.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
+
+                    for i in 0..8 {
+                        // Evaluate all L2L for this position in local chunk
+                        let tmp = self.fmm.l2l[i].dot(&parent_local_chunk).eval();
+
+                        // Assign for each child in this chunk at this position
+                        for j in 0..chunk_size {
+                            let chunk_displacement = j*nsiblings;
+                            let child_displacement = chunk_displacement + i;
+                            let mut ptr = children_locals[child_displacement].raw;
+
+                            unsafe {
+                                for k in 0..ncoeffs {
+                                    *ptr += tmp.data()[(j*ncoeffs)+k];
+                                    ptr = ptr.add(1);
+                                }
                             }
+
                         }
                     }
-                })
+                });
+            }
         }
     }
 
@@ -95,10 +113,68 @@ where
 
     fn l2p<'a>(&self) {
         if let Some(leaves) = self.fmm.tree().get_all_leaves() {
-            let nleaves = leaves.len();
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-            let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
+            let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
+            let dim = self.fmm.kernel.space_dimension();
+            let surface_size = ncoeffs * dim;
+            
+            self.leaf_upward_surfaces
+                .par_chunks_exact(surface_size)
+                .zip(leaves.into_par_iter())
+                .zip(self.leaf_locals.into_par_iter())
+                .zip(&self.charge_index_pointer)
+                .zip(&self.potentials_send_pointers)
+                .for_each(
+                    |(
+                        (((leaf_downward_equivalent_surface, leaf), local_ptr), charge_index_pointer),
+                        potential_send_ptr,
+                    )| {
+                        let target_coordinates = &coordinates
+                            [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
+                        
+                        let ntargets = target_coordinates.len() / dim;
+                        
+                        let target_coordinates = unsafe {
+                            rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, dim), (dim, 1)]
+                        }.eval();
+                        
+
+                        let local_expansion =
+                            unsafe { rlst_pointer_mat!['a, V, local_ptr.raw, (ncoeffs, 1), (1, ncoeffs) ]};
+
+
+                        // Compute direct
+                        if ntargets > 0 {
+                            let mut local_result = vec![V::zero(); ntargets];
+
+                            self.fmm.kernel.evaluate_st(
+                                EvalType::Value,
+                                leaf_downward_equivalent_surface,
+                                target_coordinates.data(),
+                                local_expansion.data(),
+                                &mut local_result,
+                            );
+
+
+                        // if leaf.morton == 3 {
+                        //     println!("local expansion {:?}", local_expansion.data());
+                        //     println!("surface {:?}", leaf_downward_equivalent_surface);
+                        //     println!("target coordinates {:?}", target_coordinates.data());
+                        //     println!("local result {:?}", local_result);
+                        // }
+
+                            let mut ptr = potential_send_ptr.raw;
+                            // Save to global locations
+                            for res in local_result.iter() {
+                                unsafe {
+                                    *ptr += *res;
+                                    ptr = ptr.add(1);
+                                }
+                            }
+                        }
+                    },
+                );
         }
     }
 
@@ -108,29 +184,27 @@ where
         if let Some(leaves) = self.fmm.tree().get_all_leaves() {
             let dim = self.fmm.kernel.space_dimension();
 
-            let mut target_map = HashMap::new();
-
-            for (i, k) in leaves.iter().enumerate() {
-                target_map.insert(k, i);
-            }
-
             let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
             leaves
                 .par_iter()
-                .enumerate()
                 .zip(&self.charge_index_pointer)
-                .for_each(|((i, leaf), charge_index_pointer)| {
+                .zip(&self.potentials_send_pointers)
+                .for_each(|((leaf, charge_index_pointer), potential_send_pointer)| {
                     let targets =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
                     let ntargets = targets.len() / dim;
+                    let targets = unsafe {
+                        rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
+                    }.eval();
 
                     if ntargets > 0 {
-                        let mut local_result = vec![V::zero(); ntargets];
-                        let mut result = self.potentials_send_pointers[i].raw;
 
                         if let Some(u_list) = self.fmm.get_u_list(leaf) {
-                            let u_list_indices = u_list.iter().filter_map(|k| target_map.get(k));
+
+                            let u_list_indices = u_list
+                                .iter()
+                                .filter_map(|k| self.fmm.tree().get_leaf_index(k));
 
                             let charges = u_list_indices
                                 .clone()
@@ -142,7 +216,7 @@ where
                                 })
                                 .collect_vec();
 
-                            let coordinates = u_list_indices
+                            let sources_coordinates = u_list_indices
                                 .into_iter()
                                 .map(|&idx| {
                                     let index_pointer = &self.charge_index_pointer[idx];
@@ -152,24 +226,33 @@ where
                                 })
                                 .collect_vec();
 
-                            for (&charges, coords) in charges.iter().zip(coordinates) {
-                                let nsources = coords.len() / dim;
+                            for (&charges, sources) in charges.iter().zip(sources_coordinates) {
+                                let nsources = sources.len() / dim;
+                                
+                                let sources = unsafe {
+                                    rlst_pointer_mat!['a, V, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                                }.eval();
+
 
                                 if nsources > 0 {
+                                    let mut result = potential_send_pointer.raw;
+                                    let mut local_result = vec![V::zero(); ntargets];
+                                    
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
-                                        coords,
-                                        targets,
+                                        sources.data(),
+                                        targets.data(),
                                         charges,
                                         &mut local_result,
-                                    )
-                                }
-                            }
-                            // Save to global locations
-                            for res in local_result.iter() {
-                                unsafe {
-                                    *result += *res;
-                                    result = result.add(1);
+                                    );
+                                    
+                                    // Save to global locations
+                                    for res in local_result.iter() {
+                                        unsafe {
+                                            *result += *res;
+                                            result = result.add(1);
+                                        }
+                                    }
                                 }
                             }
                         }

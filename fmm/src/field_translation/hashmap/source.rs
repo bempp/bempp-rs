@@ -22,9 +22,9 @@ use rlst::{
     dense::{rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-use crate::types::{FmmData, KiFmmHashMap};
+use crate::types::{FmmDataHashmap, KiFmmHashMap};
 
-impl<T, U, V> SourceTranslation for FmmData<KiFmmHashMap<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> SourceTranslation for FmmDataHashmap<KiFmmHashMap<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
@@ -165,7 +165,7 @@ mod test {
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
         // Associate data with the FMM
-        let datatree = FmmData::new(fmm, &charge_dict);
+        let datatree = FmmDataHashmap::new(fmm, &charge_dict);
 
         // Upward pass
         {

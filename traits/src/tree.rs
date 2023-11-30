@@ -81,6 +81,12 @@ pub trait Tree {
     /// Get domain defined by the points, gets global domain in multi-node setting.
     fn get_domain(&self) -> &'_ Self::Domain;
 
+    /// Get a map from the key to index position in sorted keys
+    fn get_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
+
+    /// Get a map from the key to leaf index position in sorted leaves
+    fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
+
     /// Checks whether a a given node corresponds to a leaf
     fn is_leaf(&self, key: &Self::NodeIndex) -> bool;
 

@@ -184,7 +184,8 @@ where
         // Calculate M2M/L2L matrices
         let children = ROOT.children();
         let mut m2m = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
-        let mut l2l = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
+        // let mut l2l = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
+        let mut l2l = Vec::new();
 
         for (i, child) in children.iter().enumerate() {
             let child_upward_equivalent_surface =
@@ -232,9 +233,10 @@ where
                 .iter_mut()
                 .for_each(|d| *d *= kernel.scale(child.level()));
 
-            let l = i * nequiv_surface * nequiv_surface;
-            let r = l + nequiv_surface * nequiv_surface;
-            l2l.data_mut()[l..r].copy_from_slice(tmp.data());
+            // let l = i * nequiv_surface * nequiv_surface;
+            // let r = l + nequiv_surface * nequiv_surface;
+            // l2l.data_mut()[l..r].copy_from_slice(tmp.data());
+            l2l.push(tmp);
         }
 
         Self {
@@ -299,26 +301,34 @@ where
             }
 
             let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
+            let mut level_locals = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
             for level in 0..=fmm.tree().get_depth() {
                 let keys = fmm.tree().get_keys(level).unwrap();
 
-                let mut tmp = Vec::new();
+                let mut tmp_multipoles = Vec::new();
+                let mut tmp_locals = Vec::new();
                 for key in keys.iter() {
                     let idx = fmm.tree().key_to_index.get(key).unwrap();
                     unsafe {
                         let raw = multipoles.as_ptr().add(ncoeffs * idx) as *mut V;
-                        tmp.push(SendPtrMut { raw })
+                        tmp_multipoles.push(SendPtrMut { raw });
+                        let raw = locals.as_ptr().add(ncoeffs * idx) as *mut V;
+                        tmp_locals.push(SendPtrMut { raw })
                     }
                 }
-                level_multipoles[level as usize] = tmp;
+                level_multipoles[level as usize] = tmp_multipoles;
+                level_locals[level as usize] = tmp_locals;
             }
 
             let mut leaf_multipoles = Vec::new();
+            let mut leaf_locals = Vec::new();
             for (i, key) in fmm.tree().get_all_keys().unwrap().iter().enumerate() {
                 if fmm.tree().get_all_leaves_set().contains(key) {
                     unsafe {
                         let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
-                        leaf_multipoles.push(SendPtrMut { raw })
+                        leaf_multipoles.push(SendPtrMut { raw });
+                        let raw = locals.as_ptr().add(i * ncoeffs) as *mut V;
+                        leaf_locals.push(SendPtrMut { raw });
                     }
                 }
             }
@@ -331,10 +341,13 @@ where
 
             let mut scales = vec![V::default(); nleaves * ncoeffs];
             for (i, leaf) in leaves.iter().enumerate() {
+                // Assign scales
                 let l = i * ncoeffs;
                 let r = l + ncoeffs;
                 scales[l..r]
                     .copy_from_slice(vec![fmm.kernel.scale(leaf.level()); ncoeffs].as_slice());
+
+                // Assign potential pointers
                 let npoints;
                 if let Some(points) = fmm.tree().get_points(leaf) {
                     npoints = points.len();
@@ -378,7 +391,7 @@ where
                     leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
 
                 let downward_surface =
-                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
 
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
@@ -392,6 +405,8 @@ where
                 level_multipoles,
                 leaf_multipoles,
                 locals,
+                level_locals,
+                leaf_locals,
                 upward_surfaces,
                 downward_surfaces,
                 leaf_upward_surfaces,
@@ -538,10 +553,10 @@ where
                     self.m2l(level);
                 }
                 // Leaf level computations
-                self.p2l();
+                // self.p2l();
 
                 // Sum all potential contributions
-                self.m2p();
+                // self.m2p();
                 self.p2p();
                 self.l2p();
 
@@ -576,8 +591,8 @@ mod test {
     use crate::charge::build_charge_dict;
 
     #[test]
-    fn test_fmm_linear() {
-        let npoints = 1000000;
+    fn test_fmm_data_linear() {
+        let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
@@ -585,10 +600,98 @@ mod test {
         let order = 8;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
+        let ncrit = 150;
+        let depth = 3;
+
+        // Uniform trees
+        {
+            let adaptive = false;
+            let kernel = Laplace3dKernel::default();
+
+            let tree = SingleNodeTree::new(
+                points.data(),
+                adaptive,
+                Some(ncrit),
+                Some(depth),
+                &global_idxs[..],
+            );
+
+            let m2l_data_fft = FftFieldTranslationKiFmm::new(
+                kernel.clone(),
+                order,
+                *tree.get_domain(),
+                alpha_inner,
+            );
+
+            let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+            // Form charge dict, matching charges with their associated global indices
+            let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+
+            let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
+
+            let ncoeffs = datatree.fmm.m2l.ncoeffs(order);
+            let nleaves = datatree.fmm.tree().get_all_leaves_set().len();
+            let nkeys = datatree.fmm.tree().get_all_keys_set().len();
+
+            // Test that the number of of coefficients is being correctly assigned
+            assert_eq!(datatree.multipoles.len(), ncoeffs * nkeys);
+            assert_eq!(datatree.leaf_multipoles.len(), nleaves);
+
+            // Test that leaf indices are being mapped correctly to leaf multipoles
+            let idx = 0;
+            let leaf_key = &datatree.fmm.tree().get_all_leaves().unwrap()[idx];
+            let &leaf_idx = datatree.fmm.tree().get_index(leaf_key).unwrap();
+            unsafe {
+                let result = datatree.multipoles.as_ptr().add(leaf_idx * ncoeffs);
+                let expected =
+                    datatree.multipoles[leaf_idx * ncoeffs..(leaf_idx + 1) * ncoeffs].as_ptr();
+                assert_eq!(result, expected);
+
+                let result = datatree.locals.as_ptr().add(leaf_idx * ncoeffs);
+                let expected =
+                    datatree.locals[leaf_idx * ncoeffs..(leaf_idx + 1) * ncoeffs].as_ptr();
+                assert_eq!(result, expected);
+            }
+
+            // Test that level expansion information is referring to correct memory, and is in correct shape
+            assert_eq!(
+                datatree.level_multipoles.len() as u64,
+                datatree.fmm.tree().get_depth() + 1
+            );
+            assert_eq!(
+                datatree.level_locals.len() as u64,
+                datatree.fmm.tree().get_depth() + 1
+            );
+
+            assert_eq!(
+                datatree.level_multipoles[(datatree.fmm.tree().get_depth()) as usize].len(),
+                nleaves
+            );
+            assert_eq!(
+                datatree.level_locals[(datatree.fmm.tree().get_depth()) as usize].len(),
+                nleaves
+            );
+
+            // Test that points are being assigned correctly
+            assert_eq!(datatree.potentials_send_pointers.len(), nleaves);
+            assert_eq!(datatree.potentials.len(), npoints);
+        }
+    }
+
+    #[test]
+    fn test_fmm_linear() {
+        let npoints = 10000;
+        let points = points_fixture::<f64>(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let charges = vec![1.0; npoints];
+
+        let order = 2;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
 
-        let depth = 5;
+        let depth = 3;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(
@@ -607,14 +710,80 @@ mod test {
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
-        let s = Instant::now();
         let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
 
-        println!("data tree setup {:?}", s.elapsed());
+        let times = datatree.run(false);
 
-        let s = Instant::now();
-        let times = datatree.run(true);
-        println!("linear upward pass {:?} {:?}", s.elapsed(), times.unwrap());
+        // Test that direct computation is close to the FMM.
+        let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
+        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
+        let key_idx = datatree.fmm.tree().get_index(leaf).unwrap();
+
+        // Examine local expansion
+        let ncoeffs = datatree.fmm.m2l.ncoeffs(order);
+        let local_expansion = &datatree.locals[key_idx*ncoeffs..(key_idx+1)*ncoeffs];
+        // println!("leaf {:?}", local_expansion);
+        
+        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
+
+        let potentials = &datatree.potentials[l..r];
+
+        println!(
+            "HERE {:?}",
+            potentials,
+        );
+
+        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
+        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
+        let leaf_coords = &coordinates[l*3..r*3];
+        // println!("HERE {:?}", leaf_coords);
+
+        // let pts = datatree.fmm.tree().get_points(leaf).unwrap();
+        // let leaf_coordinates = pts
+        //     .iter()
+        //     .map(|p| p.coordinate)
+        //     .flat_map(|[x, y, z]| vec![x, y, z])
+        //     .collect_vec();
+
+        // let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+
+        //   let leaf_coordinates = unsafe {
+        //       rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
+        //   }.eval();
+
+        //   let mut direct = vec![0f64; pts.len()];
+        //   let all_point_coordinates = points_fixture::<f64>(npoints, None, None);
+
+        //   let all_charges = charge_dict.into_values().collect_vec();
+
+        //   let kernel = Laplace3dKernel::default();
+
+        //   kernel.evaluate_st(
+        //       EvalType::Value,
+        //       all_point_coordinates.data(),
+        //       leaf_coordinates.data(),
+        //       &all_charges[..],
+        //       &mut direct[..],
+        //   );
+
+        // println!("direct {:?}", direct);
+        // println!("potentials {:?}", potentials);
+        
+        //   let abs_error: f32 = potentials
+        //       .data()
+        //       .iter()
+        //       .zip(direct.iter())
+        //       .map(|(a, b)| (a - b).abs())
+        //       .sum();
+        //   let rel_error: f32 = abs_error / (direct.iter().sum::<f32>());
+
+        //   assert!(rel_error <= 1e-4);
+
+        // println!("potentials {:?}", datatree.potentials);
+
+        // let s = Instant::now();
+        // let times = datatree.run(true);
+        // println!("linear upward pass {:?} {:?}", s.elapsed(), times.unwrap());
 
         // let kernel = Laplace3dKernel::default();
 

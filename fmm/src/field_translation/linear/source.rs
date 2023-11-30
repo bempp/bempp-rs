@@ -1,7 +1,7 @@
 //! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
+use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
-use itertools::Itertools;
 
 use bempp_traits::{
     field::FieldTranslationData,
@@ -165,20 +165,19 @@ where
 mod test {
 
     use super::*;
-    
+
+    use crate::charge::build_charge_dict;
     use bempp_field::types::SvdFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::{implementations::helpers::points_fixture, constants::ROOT};
-    use crate::charge::build_charge_dict;
+    use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
 
     #[test]
     fn test_upward_pass() {
-        
         let npoints = 10000;
         let points = points_fixture(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
-        
+
         let kernel = Laplace3dKernel::<f64>::default();
         let order = 6;
         let alpha_inner = 1.05;
@@ -226,17 +225,17 @@ mod test {
         let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
         let multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
 
-        let surface = ROOT.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
+        let surface =
+            ROOT.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
 
-        let test_point = vec![100000.,0.,0.];
+        let test_point = vec![100000., 0., 0.];
 
         let mut expected = vec![0.];
         let mut found = vec![0.];
 
-        
         let kernel = Laplace3dKernel::<f64>::default();
         kernel.evaluate_st(
-            EvalType::Value, 
+            EvalType::Value,
             points.data(),
             &test_point,
             &charges,
@@ -244,11 +243,11 @@ mod test {
         );
 
         kernel.evaluate_st(
-            EvalType::Value, 
-            &surface, 
-            &test_point, 
+            EvalType::Value,
+            &surface,
+            &test_point,
             &multipole,
-            &mut found
+            &mut found,
         );
 
         let abs_error = (expected[0] - found[0]).abs();

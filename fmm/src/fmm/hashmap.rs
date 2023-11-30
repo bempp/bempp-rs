@@ -27,7 +27,7 @@ use bempp_traits::{
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
 use crate::pinv::{pinv, SvdScalar};
-use crate::types::{C2EType, ChargeDict, FmmData, KiFmmHashMap};
+use crate::types::{C2EType, ChargeDict, FmmDataHashmap, KiFmmHashMap};
 
 /// Implementation of constructor for single node KiFMM
 impl<'a, T, U, V> KiFmmHashMap<SingleNodeTree<V>, T, U, V>
@@ -252,7 +252,7 @@ where
 }
 
 /// Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U, V> FmmData<KiFmmHashMap<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> FmmDataHashmap<KiFmmHashMap<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>,
     U: FieldTranslationData<T>,
@@ -352,11 +352,11 @@ where
     }
 }
 
-impl<T, U> FmmLoop for FmmData<T, U>
+impl<T, U> FmmLoop for FmmDataHashmap<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
-    FmmData<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
+    FmmDataHashmap<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {
         match time {
@@ -442,10 +442,10 @@ where
                     self.m2l(level);
                 }
                 // Leaf level computations
-                self.p2l();
+                // self.p2l();
 
                 // Sum all potential contributions
-                self.m2p();
+                // self.m2p();
                 self.p2p();
                 self.l2p();
 
@@ -471,7 +471,7 @@ where
 mod test {
     use super::*;
 
-    use std::env;
+    use std::{env, ops::Deref};
 
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -527,7 +527,7 @@ mod test {
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
         // Associate data with the FMM
-        let datatree = FmmData::new(fmm, &charge_dict);
+        let datatree = FmmDataHashmap::new(fmm, &charge_dict);
 
         // Run the experiment
         datatree.run(false);
@@ -624,7 +624,7 @@ mod test {
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
         // Associate data with the FMM
-        let datatree = FmmData::new(fmm, &charge_dict);
+        let datatree = FmmDataHashmap::new(fmm, &charge_dict);
 
         // Run the experiment
         datatree.run(true);
@@ -680,7 +680,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 2;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
@@ -704,13 +704,16 @@ mod test {
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
-        let datatree = FmmData::new(fmm, &charge_dict);
+        let datatree = FmmDataHashmap::new(fmm, &charge_dict);
 
         datatree.run(false);
 
-        let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
 
         let potentials = datatree.potentials.get(leaf).unwrap().lock().unwrap();
+        
+        println!("LEAF {:?}", leaf);
+        // println!("POTENTIALS {:?}", potentials.data());
         let pts = datatree.fmm.tree().get_points(leaf).unwrap();
 
         let leaf_coordinates = pts
@@ -720,6 +723,12 @@ mod test {
             .collect_vec();
 
         let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+        // println!("LOCAL EXPANSION {:?}", datatree.locals.get(leaf).unwrap().lock().unwrap().data());
+        // println!("LEAF COORDINATES {:?}", leaf_coordinates);
+        // println!("SURFACE {:?}", leaf.compute_surface(datatree.fmm.tree().get_domain(), order, alpha_outer));
+        println!("POTENTIALS {:?}", potentials.data());
+
+        assert!(false);
 
         let leaf_coordinates = unsafe {
             rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
@@ -782,7 +791,7 @@ mod test {
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
-        let datatree = FmmData::new(fmm, &charge_dict);
+        let datatree = FmmDataHashmap::new(fmm, &charge_dict);
 
         datatree.run(false);
 
