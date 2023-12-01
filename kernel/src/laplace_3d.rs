@@ -209,7 +209,7 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
 
                 my_result += charges[index].mul_real(inv_diff_norm);
             }
-            result[0] = my_result.mul_real(m_inv_4pi);
+            result[0] += my_result.mul_real(m_inv_4pi);
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
@@ -240,10 +240,10 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
                 my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
             }
 
-            result[0] = my_result0.mul_real(m_inv_4pi);
-            result[1] = my_result1.mul_real(m_inv_4pi);
-            result[2] = my_result2.mul_real(m_inv_4pi);
-            result[3] = my_result3.mul_real(m_inv_4pi);
+            result[0] += my_result0.mul_real(m_inv_4pi);
+            result[1] += my_result1.mul_real(m_inv_4pi);
+            result[2] += my_result2.mul_real(m_inv_4pi);
+            result[3] += my_result3.mul_real(m_inv_4pi);
         }
     }
 }

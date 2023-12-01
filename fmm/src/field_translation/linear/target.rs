@@ -144,32 +144,16 @@ where
 
                         // Compute direct
                         if ntargets > 0 {
-                            let mut local_result = vec![V::zero(); ntargets];
+                            let mut result = unsafe { std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)};
 
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
                                 target_coordinates.data(),
                                 local_expansion.data(),
-                                &mut local_result,
+                                &mut result,
                             );
 
-
-                        // if leaf.morton == 3 {
-                        //     println!("local expansion {:?}", local_expansion.data());
-                        //     println!("surface {:?}", leaf_downward_equivalent_surface);
-                        //     println!("target coordinates {:?}", target_coordinates.data());
-                        //     println!("local result {:?}", local_result);
-                        // }
-
-                            let mut ptr = potential_send_ptr.raw;
-                            // Save to global locations
-                            for res in local_result.iter() {
-                                unsafe {
-                                    *ptr += *res;
-                                    ptr = ptr.add(1);
-                                }
-                            }
                         }
                     },
                 );
@@ -232,22 +216,16 @@ where
 
 
                                 if nsources > 0 {
-                                    let mut result = potential_send_pointer.raw;
-                                    let mut local_result = vec![V::zero(); ntargets];
+                                    let mut result = unsafe { std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)};
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
                                         sources.data(),
+                                        // sources,
                                         targets.data(),
                                         charges,
-                                        &mut local_result,
-                                    );
-                                    // Save to global locations
-                                    for res in local_result.iter() {
-                                        unsafe {
-                                            *result += *res;
-                                            result = result.add(1);
-                                        }
-                                    }
+                                        &mut result,
+                                    ); 
+                                
                                 }
                             }
                         }

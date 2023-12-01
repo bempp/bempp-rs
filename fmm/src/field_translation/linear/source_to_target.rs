@@ -509,18 +509,6 @@ where
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
         // Add result
-        println!("HERE {:?} {:?}", level, tmp.data().len());
-        println!(
-            "HERE {:?} {:?}",
-            level,
-            tmp.data().chunks_exact(ncoeffs).len()
-        );
-        println!(
-            "HERE {:?} {:?}",
-            level,
-            self.level_locals[level as usize].len()
-        );
-
         tmp.data()
             .par_chunks_exact(ncoeffs)
             .zip(self.level_locals[level as usize].into_par_iter())
