@@ -243,10 +243,6 @@ where
                                     rlst_pointer_mat!['a, V, source_coordinates.as_ptr(), (nsources, self.fmm.kernel.space_dimension()), (self.fmm.kernel.space_dimension(), 1)]
                                 }.eval();
 
-                                // if target.morton == 3 {
-                                //     println!("SOURCES {:?}", source_coordinates.data());
-                                // }
-
                                 let source_charges_arc =
                                     Arc::clone(self.charges.get(source).unwrap());
 
@@ -263,15 +259,12 @@ where
                                 let mut target_potential_lock =
                                     target_potential_arc.lock().unwrap();
 
-                        // if target.morton == 3 {
-                        //     println!("TARGETS {:?}", target_coordinates.data());
-                        // }
                                 *target_potential_lock.deref_mut() = (target_potential_lock.deref() + target_potential).eval();
                             }
                         }
 
 
-                        let mut target_potential_lock =
+                        let target_potential_lock =
                             target_potential_arc.lock().unwrap();
 
                         if target.morton == 3 {

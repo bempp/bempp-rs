@@ -42,7 +42,7 @@ where
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
         if let Some(leaves) = self.fmm.tree().get_all_leaves() {
-            leaves.par_iter().enumerate().for_each(move |(i, &leaf)| {
+            leaves.par_iter().for_each(move |&leaf| {
 
                 let leaf_multipole_arc = Arc::clone(self.multipoles.get(&leaf).unwrap());
 
@@ -199,7 +199,7 @@ mod test {
             EvalType::Value,
             &surface,
             &test_point,
-            &multipole.lock().unwrap().data(),
+            multipole.lock().unwrap().data(),
             &mut found,
         );
 

@@ -471,8 +471,8 @@ where
 mod test {
     use super::*;
 
-    use std::{env, ops::Deref};
-
+    use std::env;
+    
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::points_fixture;
@@ -676,7 +676,7 @@ mod test {
     #[test]
     fn test_fmm_fft_f64() {
         let npoints = 10000;
-        let points = points_fixture(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
@@ -685,6 +685,7 @@ mod test {
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
+
         let depth = 3;
         let kernel = Laplace3dKernel::<f64>::default();
 
@@ -706,7 +707,9 @@ mod test {
 
         let datatree = FmmDataHashmap::new(fmm, &charge_dict);
 
-        datatree.run(false);
+        let s = Instant::now();
+        let times = datatree.run(true);
+        println!("runtime {:?} operators {:?}", s.elapsed(), times.unwrap());
 
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
 

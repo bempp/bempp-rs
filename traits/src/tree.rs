@@ -64,19 +64,19 @@ pub trait Tree {
     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
 
     /// Gets a reference to the points contained with a leaf node.
-    fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>>;
+    fn get_all_points(&self) -> Option<Self::PointSlice<'_>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
-    fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]>;
+    fn get_all_coordinates(&self) -> Option<&[Self::Precision]>;
 
     /// Gets global indices at a leaf (local in multinode setting)
     fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]>;
 
     /// Gets all global indices (local in multinode setting)
-    fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]>;
+    fn get_all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points, gets global domain in multi-node setting.
     fn get_domain(&self) -> &'_ Self::Domain;

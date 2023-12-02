@@ -1,11 +1,9 @@
 //! Implementation of constructors for single node trees.
 use itertools::Itertools;
 use num::Float;
-use rlst::{common::traits::Eval, dense::rlst_pointer_mat};
 use std::collections::{HashMap, HashSet};
 
 use bempp_traits::{tree::Tree, types::Scalar};
-use rlst::dense::{Dynamic, LayoutType};
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, LEVEL_SIZE, NCRIT, ROOT},
@@ -187,7 +185,7 @@ where
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `n_crit` - The maximum number of points per leaf node.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
-    pub fn adaptive_tree<'a>(
+    pub fn adaptive_tree(
         points: &[PointType<T>],
         domain: &Domain<T>,
         n_crit: u64,
@@ -618,7 +616,7 @@ where
         }
     }
 
-    fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
+    fn get_all_points(&self) -> Option<Self::PointSlice<'_>> {
         Some(&self.points.points)
     }
 
@@ -630,7 +628,7 @@ where
         }
     }
 
-    fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]> {
+    fn get_all_coordinates(&self) -> Option<&[Self::Precision]> {
         Some(&self.coordinates)
     }
 
@@ -642,7 +640,7 @@ where
         }
     }
 
-    fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
+    fn get_all_global_indices(&self) -> Option<&[usize]> {
         Some(&self.global_indices)
     }
 

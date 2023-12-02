@@ -4,18 +4,22 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
-use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Rank};
+use mpi::{
+    // collective::SystemOperation, 
+    topology::UserCommunicator, 
+    traits::*, Rank
+};
 use num::traits::Float;
 
 use hyksort::hyksort;
 
-use bempp_traits::tree::Tree;
+// use bempp_traits::tree::Tree;
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, NCRIT, ROOT},
     implementations::{
         impl_morton::{complete_region, encode_anchor},
-        mpi_helpers::all_to_allv_sparse,
+        // mpi_helpers::all_to_allv_sparse,
     },
     types::{
         domain::Domain,
@@ -564,99 +568,99 @@ where
     }
 }
 
-impl<T> Tree for MultiNodeTree<T>
-where
-    T: Float + Default + Scalar<Real = T>,
-{
-    type Precision = T;
-    type Domain = Domain<T>;
-    type NodeIndex = MortonKey;
-    type NodeIndexSlice<'a> = &'a [MortonKey]
-        where T: 'a;
-    type NodeIndices = MortonKeys;
-    type Point = Point<T>;
-    type PointSlice<'a> = &'a [Point<T>]
-        where T: 'a;
-    type GlobalIndex = usize;
-    type GlobalIndexSlice<'a> = &'a [usize]
-        where T: 'a;
+// impl<T> Tree for MultiNodeTree<T>
+// where
+//     T: Float + Default + Scalar<Real = T>,
+// {
+//     type Precision = T;
+//     type Domain = Domain<T>;
+//     type NodeIndex = MortonKey;
+//     type NodeIndexSlice<'a> = &'a [MortonKey]
+//         where T: 'a;
+//     type NodeIndices = MortonKeys;
+//     type Point = Point<T>;
+//     type PointSlice<'a> = &'a [Point<T>]
+//         where T: 'a;
+//     type GlobalIndex = usize;
+//     type GlobalIndexSlice<'a> = &'a [usize]
+//         where T: 'a;
 
-    fn get_depth(&self) -> u64 {
-        self.depth
-    }
+//     fn get_depth(&self) -> u64 {
+//         self.depth
+//     }
 
-    fn get_domain(&self) -> &'_ Self::Domain {
-        &self.domain
-    }
+//     fn get_domain(&self) -> &'_ Self::Domain {
+//         &self.domain
+//     }
 
-    fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>> {
-        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
-            Some(&self.keys[l..r])
-        } else {
-            None
-        }
-    }
+//     fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>> {
+//         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+//             Some(&self.keys[l..r])
+//         } else {
+//             None
+//         }
+//     }
 
-    fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>> {
-        Some(&self.keys)
-    }
+//     fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>> {
+//         Some(&self.keys)
+//     }
 
-    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex> {
-        &self.keys_set
-    }
+//     fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex> {
+//         &self.keys_set
+//     }
 
-    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
-        &self.leaves_set
-    }
+//     fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
+//         &self.leaves_set
+//     }
 
-    fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
-        Some(&self.leaves)
-    }
+//     fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
+//         Some(&self.leaves)
+//     }
 
-    fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>> {
-        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.points.points[l..r])
-        } else {
-            None
-        }
-    }
+//     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>> {
+//         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+//             Some(&self.points.points[l..r])
+//         } else {
+//             None
+//         }
+//     }
 
-    fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
-        Some(&self.points.points)
-    }
+//     fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
+//         Some(&self.points.points)
+//     }
 
-    fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
-        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.coordinates[l * 3..r * 3])
-        } else {
-            None
-        }
-    }
+//     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
+//         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+//             Some(&self.coordinates[l * 3..r * 3])
+//         } else {
+//             None
+//         }
+//     }
 
-    fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]> {
-        Some(&self.coordinates)
-    }
+//     fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]> {
+//         Some(&self.coordinates)
+//     }
 
-    fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]> {
-        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.global_indices[l..r])
-        } else {
-            None
-        }
-    }
+//     fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]> {
+//         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+//             Some(&self.global_indices[l..r])
+//         } else {
+//             None
+//         }
+//     }
 
-    fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
-        Some(&self.global_indices)
-    }
+//     fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
+//         Some(&self.global_indices)
+//     }
 
-    fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
-        self.leaves_set.contains(key)
-    }
+//     fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
+//         self.leaves_set.contains(key)
+//     }
 
-    fn is_node(&self, key: &Self::NodeIndex) -> bool {
-        self.keys_set.contains(key)
-    }
-}
+//     fn is_node(&self, key: &Self::NodeIndex) -> bool {
+//         self.keys_set.contains(key)
+//     }
+// }
 
 // impl<T> MultiNodeTree<T>
 // where

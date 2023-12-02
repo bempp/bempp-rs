@@ -381,7 +381,7 @@ mod test {
         let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
         let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
         let charges = rlst::dense::rlst_rand_col_vec![f64, nsources];
-        let mut green_value = rlst::dense::rlst_rand_col_vec![f64, ntargets];
+        let mut green_value = rlst::dense::rlst_col_vec![f64, ntargets];
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,

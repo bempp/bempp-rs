@@ -3,7 +3,6 @@
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
-use std::collections::HashMap;
 
 use bempp_traits::{
     field::FieldTranslationData,
@@ -16,7 +15,6 @@ use bempp_tree::types::single_node::SingleNodeTree;
 
 use crate::{
     constants::P2M_MAX_CHUNK_SIZE,
-    field_translation::hashmap::target,
     types::{FmmDataLinear, KiFmmLinear},
 };
 
@@ -54,7 +52,7 @@ where
 {
     fn l2l<'a>(&self, level: u64) {
         if let Some(parent_sources) = self.fmm.tree().get_keys(level - 1) {
-            if let Some(child_targets) = self.fmm.tree().get_keys(level) {
+            if let Some(_child_targets) = self.fmm.tree().get_keys(level) {
                 let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
                 let nsources = parent_sources.len();
@@ -76,8 +74,6 @@ where
                 }
                 let chunk_size = find_chunk_size(nsources, max_chunk_size);
                 let nsiblings = 8;
-
-                // let chunk_size = 1;
 
                 parent_locals
                 .par_chunks_exact(ncoeffs*chunk_size)
@@ -113,7 +109,7 @@ where
     fn m2p<'a>(&self) {}
 
     fn l2p<'a>(&self) {
-        if let Some(leaves) = self.fmm.tree().get_all_leaves() {
+        if let Some(_leaves) = self.fmm.tree().get_all_leaves() {
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
             let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
@@ -122,13 +118,12 @@ where
 
             self.leaf_upward_surfaces
                 .par_chunks_exact(surface_size)
-                .zip(leaves.into_par_iter())
                 .zip(self.leaf_locals.into_par_iter())
                 .zip(&self.charge_index_pointer)
                 .zip(&self.potentials_send_pointers)
                 .for_each(
                     |(
-                        (((leaf_downward_equivalent_surface, leaf), local_ptr), charge_index_pointer),
+                        ((leaf_downward_equivalent_surface, local_ptr), charge_index_pointer),
                         potential_send_ptr,
                     )| {
                         let target_coordinates = &coordinates
@@ -144,14 +139,14 @@ where
 
                         // Compute direct
                         if ntargets > 0 {
-                            let mut result = unsafe { std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)};
+                            let result = unsafe { std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)};
 
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
                                 target_coordinates.data(),
                                 local_expansion.data(),
-                                &mut result,
+                                result,
                             );
 
                         }
@@ -190,11 +185,9 @@ where
 
                             let charges = u_list_indices
                                 .clone()
-                                .into_iter()
                                 .map(|&idx| {
                                     let index_pointer = &self.charge_index_pointer[idx];
-                                    let charges = &self.charges[index_pointer.0..index_pointer.1];
-                                    charges
+                                    &self.charges[index_pointer.0..index_pointer.1]
                                 })
                                 .collect_vec();
 
@@ -202,9 +195,7 @@ where
                                 .into_iter()
                                 .map(|&idx| {
                                     let index_pointer = &self.charge_index_pointer[idx];
-                                    let coords =
-                                        &coordinates[index_pointer.0 * dim..index_pointer.1 * dim];
-                                    coords
+                                    &coordinates[index_pointer.0 * dim..index_pointer.1 * dim]
                                 })
                                 .collect_vec();
 
@@ -216,16 +207,15 @@ where
 
 
                                 if nsources > 0 {
-                                    let mut result = unsafe { std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)};
+                                    let result = unsafe { std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)};
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
                                         sources.data(),
                                         // sources,
                                         targets.data(),
                                         charges,
-                                        &mut result,
-                                    ); 
-                                
+                                        result,
+                                    );
                                 }
                             }
                         }

@@ -1,5 +1,4 @@
 //! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
-use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
 
@@ -63,11 +62,11 @@ where
             check_potentials
                 .data_mut()
                 .par_chunks_exact_mut(ncoeffs)
-                .enumerate()
+                // .enumerate()
                 .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
                 .zip(&self.charge_index_pointer)
                 .for_each(
-                    |(((i, check_potential), upward_check_surface), charge_index_pointer)| {
+                    |((check_potential, upward_check_surface), charge_index_pointer)| {
                         let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
                         let coordinates = &coordinates
                             [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
@@ -106,8 +105,8 @@ where
                     let tmp = (self.fmm.uc2e_inv_1.dot(&self.fmm.uc2e_inv_2.dot(&check_potential.cmp_wise_product(&scale)))).eval();
 
                     unsafe {
-                        for i in 0..chunk_size {
-                            let mut ptr = multipole_ptrs[i].raw;
+                        for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size) {
+                            let mut ptr = multipole_ptr.raw;
                             for j in 0..ncoeffs {
                                 *ptr += tmp.data()[i*ncoeffs+j];
                                 ptr = ptr.add(1);
@@ -148,8 +147,8 @@ where
                         let tmp = rlst_pointer_mat!['a, V, multipole_chunk.as_ptr(), (ncoeffs*nsiblings, chunk_size), (1, ncoeffs*nsiblings)];
                         let tmp = self.fmm.m2m.dot(&tmp).eval();
 
-                        for i in 0..chunk_size {
-                            let mut ptr = parent[i].raw;
+                        for (i, par) in parent.iter().enumerate().take(chunk_size) {
+                            let mut ptr = par.raw;
                             for j in 0..ncoeffs {
                                 *ptr += tmp.data()[(i*ncoeffs)+j];
                                 ptr = ptr.add(1)
@@ -165,6 +164,8 @@ where
 mod test {
 
     use super::*;
+
+    use itertools::Itertools;
 
     use crate::charge::build_charge_dict;
     use bempp_field::types::SvdFieldTranslationKiFmm;
@@ -246,7 +247,7 @@ mod test {
             EvalType::Value,
             &surface,
             &test_point,
-            &multipole,
+            multipole,
             &mut found,
         );
 

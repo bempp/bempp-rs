@@ -511,7 +511,6 @@ where
                 let mut m2l_time = 0;
 
                 for level in 2..=depth {
-
                     if level > 2 {
                         let start = Instant::now();
                         self.l2l(level);
@@ -579,13 +578,12 @@ where
     }
 }
 
+#[cfg(test)]
 mod test {
 
     use super::*;
 
-    use std::env;
-
-    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
+    use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::points_fixture;
 
@@ -681,18 +679,18 @@ mod test {
 
     #[test]
     fn test_fmm_linear() {
-        let npoints = 1000000;
+        let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 9;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
 
-        let depth = 4;
+        let depth = 3;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(
@@ -713,9 +711,7 @@ mod test {
 
         let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
 
-        let s = Instant::now();
-        let times = datatree.run(true);
-        println!("runtime {:?} operators {:?}", s.elapsed(), times.unwrap());
+        datatree.run(false);
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
@@ -756,9 +752,6 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-
-        println!("rel error {:?}", rel_error);
-        assert!(false);
 
         assert!(rel_error <= 1e-6);
     }
