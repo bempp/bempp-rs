@@ -472,7 +472,7 @@ mod test {
     use super::*;
 
     use std::env;
-    
+
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::points_fixture;

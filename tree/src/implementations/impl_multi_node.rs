@@ -5,9 +5,10 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 use mpi::{
-    // collective::SystemOperation, 
-    topology::UserCommunicator, 
-    traits::*, Rank
+    // collective::SystemOperation,
+    topology::UserCommunicator,
+    traits::*,
+    Rank,
 };
 use num::traits::Float;
 
@@ -17,10 +18,7 @@ use hyksort::hyksort;
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, NCRIT, ROOT},
-    implementations::{
-        impl_morton::{complete_region, encode_anchor},
-        // mpi_helpers::all_to_allv_sparse,
-    },
+    implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
