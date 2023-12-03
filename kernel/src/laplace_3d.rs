@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
 use bempp_traits::{
-    kernel::{Kernel, KernelScale},
+    kernel::{Kernel, ScaleInvariantKernel},
     types::{EvalType, KernelType, Scalar},
 };
 use num::traits::FloatConst;
@@ -16,7 +16,7 @@ pub struct Laplace3dKernel<T: Scalar> {
     _phantom_t: std::marker::PhantomData<T>,
 }
 
-impl<T: Scalar<Real = T>> KernelScale for Laplace3dKernel<T> {
+impl<T: Scalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
     type T = T;
 
     fn scale(&self, level: u64) -> Self::T {
@@ -209,7 +209,7 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
 
                 my_result += charges[index].mul_real(inv_diff_norm);
             }
-            result[0] = my_result.mul_real(m_inv_4pi);
+            result[0] += my_result.mul_real(m_inv_4pi);
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
@@ -240,10 +240,10 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
                 my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
             }
 
-            result[0] = my_result0.mul_real(m_inv_4pi);
-            result[1] = my_result1.mul_real(m_inv_4pi);
-            result[2] = my_result2.mul_real(m_inv_4pi);
-            result[3] = my_result3.mul_real(m_inv_4pi);
+            result[0] += my_result0.mul_real(m_inv_4pi);
+            result[1] += my_result1.mul_real(m_inv_4pi);
+            result[2] += my_result2.mul_real(m_inv_4pi);
+            result[3] += my_result3.mul_real(m_inv_4pi);
         }
     }
 }
@@ -381,7 +381,7 @@ mod test {
         let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
         let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
         let charges = rlst::dense::rlst_rand_col_vec![f64, nsources];
-        let mut green_value = rlst::dense::rlst_rand_col_vec![f64, ntargets];
+        let mut green_value = rlst::dense::rlst_col_vec![f64, ntargets];
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
