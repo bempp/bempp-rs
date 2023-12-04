@@ -532,17 +532,11 @@ mod test {
         // Run the experiment
         datatree.run(false);
 
-    
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
 
-
         let potentials = datatree.potentials.get(leaf).unwrap().lock().unwrap();
         let pts = datatree.fmm.tree().get_points(leaf).unwrap();
-        let locals = datatree.locals.get(leaf).unwrap();
-        println!("LOCALS HASH MAP {:?}", locals.lock().unwrap().data());
-        // println!("POTENTIALS HASH MAP {:?}", potentials.data());
-        assert!(false);
 
         let leaf_coordinates = pts
             .iter()

@@ -34,7 +34,7 @@ use crate::{
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
-    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
 pub fn size_real(order: usize) -> usize {
@@ -552,10 +552,6 @@ where
 
             let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
 
-            // if j == 0 {
-            //     println!("HERE! {:?}", transfer_vectors_set.len())
-            // }
-
             for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
                 if transfer_vectors_set.contains(&tv.hash) {
                     let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
@@ -565,38 +561,22 @@ where
             }
         }
 
-        // // let nonzero = target_indices[0].iter().filter(|&&x| x != -1).collect_vec();;
-        // let tmp: Vec<i64> = target_indices
-        //     .iter()
-        //     .map(|indices| indices[0])
-        //     .collect_vec();
-        // let nonzero = tmp.iter().filter(|&&x| x != -1i64).collect_vec();
-
-        // println!("target indices {:?}", nonzero.len());
-
-        // println!("pre processing time {:?}", s.elapsed());
-
         // Interpret multipoles as a matrix
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
         let multipoles = unsafe {
-            rlst_pointer_mat!['a, U, self.multipoles.as_ptr(), (ncoeffs, nsources), (1, ncoeffs)]
+            rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
         };
 
         let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
         let dim = (nrows, self.fmm.m2l.k);
 
-        let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles).eval();
+        let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
 
         compressed_multipoles
             .data_mut()
             .iter_mut()
             .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-        // println!("HERE {:?} {:?}", level, self.level_locals.len());
-        // println!("HERE {:?} {:?} {:?} {:?}", level, self.level_locals.len(), nsources, self.level_locals[level as usize].len());
-
-        println!("HERE {:?}", self.fmm.m2l.operator_data.c.shape());
-        
         (0..316).into_par_iter().for_each(|c_idx| {
             let top_left = (0, c_idx * self.fmm.m2l.k);
             let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);

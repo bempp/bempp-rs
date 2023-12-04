@@ -712,16 +712,10 @@ mod test {
         let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
 
         datatree.run(false);
-        
+
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
         let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-        
-        let tmp_idx = datatree.fmm.tree().get_index(leaf).unwrap();
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-        println!("LOCALS {:?}", &datatree.locals[tmp_idx*ncoeffs..(tmp_idx+1)*ncoeffs]);
-
-        assert!(false);
 
         let (l, r) = datatree.charge_index_pointer[*leaf_idx];
 
@@ -801,20 +795,13 @@ mod test {
 
         let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
 
-        let s = Instant::now();
-        let times = datatree.run(false);
-
-        println!("runtime {:?}, {:?}", s.elapsed(), times);
+        datatree.run(false);
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
         let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
 
         let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let tmp_idx = datatree.fmm.tree().get_index(leaf).unwrap();
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-        // println!("LOCALS {:?}", &datatree.locals[tmp_idx*ncoeffs..(tmp_idx+1)*ncoeffs]);
 
         let potentials = &datatree.potentials[l..r];
 
@@ -850,12 +837,6 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        println!("potentials {:?}", potentials);
-        println!("direct {:?}", direct);
-
-        println!("rel error {:?}", rel_error);
-
         assert!(rel_error <= 1e-6);
-        assert!(false);
     }
 }
