@@ -4,10 +4,7 @@ use bempp_tools::Array3D;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
-use std::{
-    collections::{HashMap, HashSet},
-    time::Instant,
-};
+use std::collections::{HashMap, HashSet};
 
 use bempp_field::{
     array::pad3,
@@ -22,19 +19,13 @@ use bempp_traits::{
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
 };
-use bempp_tree::{
-    constants::DEEPEST_LEVEL,
-    types::{morton::MortonKey, single_node::SingleNodeTree},
-};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::{
-    field_translation::hashmap::target,
-    types::{FmmDataLinear, KiFmmLinear, SendPtrMut},
-};
+use crate::types::{FmmDataLinear, KiFmmLinear, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
-    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
 pub fn size_real(order: usize) -> usize {
@@ -527,7 +518,6 @@ where
             source_map.insert(t, i);
         }
 
-        let s = Instant::now();
         let mut target_indices = vec![vec![-1i64; nsources]; 316];
 
         // Need to identify all save locations in a pre-processing step.
