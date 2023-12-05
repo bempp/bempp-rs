@@ -24,4 +24,4 @@ libc = "0.2"
 num = "0.4"
 bempp-traits = { path = "../traits"}
 rayon = "1.7"
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", branch = "legacy"}
