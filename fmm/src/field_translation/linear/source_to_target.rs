@@ -387,9 +387,7 @@ where
         let scale = Complex::from(self.m2l_scale(level));
 
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
-        // println!("level {:?} pre processing time {:?} ", level, s.elapsed());
 
-        // let s = Instant::now();
         m2l_cplx_chunked(
             self.fmm.order,
             level as usize,
@@ -401,7 +399,6 @@ where
             chunksize,
             scale,
         );
-        // println!("level {:?} kernel time {:?} ", level, s.elapsed());
 
         U::irfft_fftw_par_vec(
             &mut global_check_potentials_hat,
@@ -409,7 +406,6 @@ where
             &[p, q, r],
         );
 
-        // let s = Instant::now();
         // Compute local expansion coefficients and save to data tree
         let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
 
@@ -464,7 +460,6 @@ where
                     ptr = ptr.add(1)
                 }
             });
-        // println!("level {:?} post processing time {:?} ", level, s.elapsed());
     }
 
     fn m2l_scale(&self, level: u64) -> U {
