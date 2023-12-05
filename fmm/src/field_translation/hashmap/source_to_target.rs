@@ -156,6 +156,7 @@ where
                     .fmm
                     .dc2e_inv_1
                     .dot(&self.fmm.dc2e_inv_2.dot(&check_potential_owned));
+
                 tmp.data_mut()
                     .iter_mut()
                     .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));

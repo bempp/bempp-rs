@@ -4,7 +4,7 @@ use bempp_tools::Array3D;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bempp_field::{
     array::pad3,
@@ -387,9 +387,7 @@ where
         let scale = Complex::from(self.m2l_scale(level));
 
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
-        // println!("level {:?} pre processing time {:?} ", level, s.elapsed());
 
-        // let s = Instant::now();
         m2l_cplx_chunked(
             self.fmm.order,
             level as usize,
@@ -401,7 +399,6 @@ where
             chunksize,
             scale,
         );
-        // println!("level {:?} kernel time {:?} ", level, s.elapsed());
 
         U::irfft_fftw_par_vec(
             &mut global_check_potentials_hat,
@@ -409,7 +406,6 @@ where
             &[p, q, r],
         );
 
-        // let s = Instant::now();
         // Compute local expansion coefficients and save to data tree
         let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
 
@@ -464,7 +460,6 @@ where
                     ptr = ptr.add(1)
                 }
             });
-        // println!("level {:?} post processing time {:?} ", level, s.elapsed());
     }
 
     fn m2l_scale(&self, level: u64) -> U {
@@ -506,9 +501,99 @@ where
     U: std::marker::Send + std::marker::Sync + Default,
 {
     fn m2l<'a>(&self, level: u64) {
-        let Some(_targets) = self.fmm.tree().get_keys(level) else {
+        let Some(sources) = self.fmm.tree().get_keys(level) else {
             return;
         };
+
+        let nsources = sources.len();
+
+        let mut source_map = HashMap::new();
+
+        for (i, t) in sources.iter().enumerate() {
+            source_map.insert(t, i);
+        }
+
+        let mut target_indices = vec![vec![-1i64; nsources]; 316];
+
+        // Need to identify all save locations in a pre-processing step.
+        for (j, source) in sources.iter().enumerate() {
+            let v_list = source
+                .parent()
+                .neighbors()
+                .iter()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| !source.is_adjacent(pnc))
+                .collect_vec();
+
+            let transfer_vectors = v_list
+                .iter()
+                .map(|target| target.find_transfer_vector(source))
+                .collect_vec();
+
+            let mut transfer_vectors_map = HashMap::new();
+            for (i, v) in transfer_vectors.iter().enumerate() {
+                transfer_vectors_map.insert(v, i);
+            }
+
+            let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
+
+            for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+                if transfer_vectors_set.contains(&tv.hash) {
+                    let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                    let target_index = source_map.get(target).unwrap();
+                    target_indices[i][j] = *target_index as i64;
+                }
+            }
+        }
+
+        // Interpret multipoles as a matrix
+        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let multipoles = unsafe {
+            rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
+        };
+
+        let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
+        let dim = (nrows, self.fmm.m2l.k);
+
+        let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+
+        compressed_multipoles
+            .data_mut()
+            .iter_mut()
+            .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+
+        (0..316).into_par_iter().for_each(|c_idx| {
+            let top_left = (0, c_idx * self.fmm.m2l.k);
+            let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);
+
+            let locals = self.fmm.dc2e_inv_1.dot(
+                &self.fmm.dc2e_inv_2.dot(
+                    &self
+                        .fmm
+                        .m2l
+                        .operator_data
+                        .u
+                        .dot(&c_sub.dot(&compressed_multipoles)),
+                ),
+            );
+
+            let displacements = &target_indices[c_idx];
+
+            for (result_idx, &save_idx) in displacements.iter().enumerate() {
+                if save_idx > -1 {
+                    let save_idx = save_idx as usize;
+                    let mut local_ptr = self.level_locals[(level) as usize][save_idx].raw;
+                    let res = &locals.data()[result_idx * ncoeffs..(result_idx + 1) * ncoeffs];
+
+                    unsafe {
+                        for &r in res.iter() {
+                            *local_ptr += r;
+                            local_ptr = local_ptr.add(1);
+                        }
+                    }
+                }
+            }
+        })
     }
 
     fn m2l_scale(&self, level: u64) -> U {

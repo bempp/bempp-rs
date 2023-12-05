@@ -533,7 +533,7 @@ mod test {
         datatree.run(false);
 
         // Test that direct computation is close to the FMM.
-        let leaf = &datatree.fmm.tree.get_keys(depth).unwrap()[0];
+        let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
 
         let potentials = datatree.potentials.get(leaf).unwrap().lock().unwrap();
         let pts = datatree.fmm.tree().get_points(leaf).unwrap();
