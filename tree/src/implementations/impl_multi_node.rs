@@ -4,19 +4,21 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
-use mpi::{collective::SystemOperation, topology::UserCommunicator, traits::*, Rank};
+use mpi::{
+    // collective::SystemOperation,
+    topology::UserCommunicator,
+    traits::*,
+    Rank,
+};
 use num::traits::Float;
 
 use hyksort::hyksort;
 
-use bempp_traits::tree::Tree;
+// use bempp_traits::tree::Tree;
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, NCRIT, ROOT},
-    implementations::{
-        impl_morton::{complete_region, encode_anchor},
-        mpi_helpers::all_to_allv_sparse,
-    },
+    implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
@@ -166,11 +168,21 @@ where
             subset.sort();
         }
 
+        let coordinates = points
+            .points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+
         MultiNodeTree {
             world: world.duplicate(),
             depth,
             domain: *domain,
             points,
+            coordinates,
+            global_indices,
             leaves,
             keys,
             leaves_to_points,
@@ -361,11 +373,21 @@ where
             subset.sort();
         }
 
+        let coordinates = points
+            .points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+
         MultiNodeTree {
             world: world.duplicate(),
             depth,
             domain: *domain,
             points,
+            coordinates,
+            global_indices,
             leaves: globally_balanced,
             keys,
             leaves_to_points,
@@ -544,293 +566,319 @@ where
     }
 }
 
-impl<T> Tree for MultiNodeTree<T>
-where
-    T: Float + Default + Scalar<Real = T>,
-{
-    type Domain = Domain<T>;
-    type NodeIndex = MortonKey;
-    type NodeIndexSlice<'a> = &'a [MortonKey]
-        where T: 'a;
-    type NodeIndices = MortonKeys;
-    type Point = Point<T>;
-    type PointSlice<'a> = &'a [Point<T>]
-        where T: 'a;
-    type PointData = f64;
-    type PointDataSlice<'a> = &'a [f64]
-        where T: 'a;
-    type GlobalIndex = usize;
-    type GlobalIndexSlice<'a> = &'a [usize]
-        where T: 'a;
+// impl<T> Tree for MultiNodeTree<T>
+// where
+//     T: Float + Default + Scalar<Real = T>,
+// {
+//     type Precision = T;
+//     type Domain = Domain<T>;
+//     type NodeIndex = MortonKey;
+//     type NodeIndexSlice<'a> = &'a [MortonKey]
+//         where T: 'a;
+//     type NodeIndices = MortonKeys;
+//     type Point = Point<T>;
+//     type PointSlice<'a> = &'a [Point<T>]
+//         where T: 'a;
+//     type GlobalIndex = usize;
+//     type GlobalIndexSlice<'a> = &'a [usize]
+//         where T: 'a;
 
-    fn get_depth(&self) -> u64 {
-        self.depth
-    }
+//     fn get_depth(&self) -> u64 {
+//         self.depth
+//     }
 
-    fn get_domain(&self) -> &'_ Self::Domain {
-        &self.domain
-    }
+//     fn get_domain(&self) -> &'_ Self::Domain {
+//         &self.domain
+//     }
 
-    fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>> {
-        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
-            Some(&self.keys[l..r])
-        } else {
-            None
-        }
-    }
+//     fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>> {
+//         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+//             Some(&self.keys[l..r])
+//         } else {
+//             None
+//         }
+//     }
 
-    fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>> {
-        Some(&self.keys)
-    }
+//     fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>> {
+//         Some(&self.keys)
+//     }
 
-    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex> {
-        &self.keys_set
-    }
+//     fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex> {
+//         &self.keys_set
+//     }
 
-    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
-        &self.leaves_set
-    }
+//     fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
+//         &self.leaves_set
+//     }
 
-    fn get_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
-        Some(&self.leaves)
-    }
+//     fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
+//         Some(&self.leaves)
+//     }
 
-    fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>> {
-        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.points.points[l..r])
-        } else {
-            None
-        }
-    }
+//     fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>> {
+//         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+//             Some(&self.points.points[l..r])
+//         } else {
+//             None
+//         }
+//     }
 
-    fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
-        self.leaves_set.contains(key)
-    }
+//     fn get_all_points<'a>(&'a self) -> Option<Self::PointSlice<'a>> {
+//         Some(&self.points.points)
+//     }
 
-    fn is_node(&self, key: &Self::NodeIndex) -> bool {
-        self.keys_set.contains(key)
-    }
-}
+//     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
+//         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+//             Some(&self.coordinates[l * 3..r * 3])
+//         } else {
+//             None
+//         }
+//     }
 
-impl<T> MultiNodeTree<T>
-where
-    T: Float + Default + Equivalence + Scalar<Real = T>,
-{
-    /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
-    ///
-    /// The idea is to communicate the required point and octant data across the distributed tree prior
-    /// to the running of the upward pass so that multipole expansions can be constructed independently
-    /// on each processor at the leaf level, and for the final potential evaluation each process already
-    /// contains its required point data for near field calculations.
-    pub fn create_let(&self) -> MultiNodeTree<T> {
-        // Communicate ranges globally using AllGather
-        let rank = self.world.rank();
-        let size = self.world.size();
+//     fn get_all_coordinates<'a>(&'a self) -> Option<&'a [Self::Precision]> {
+//         Some(&self.coordinates)
+//     }
 
-        let mut ranges = vec![0 as KeyType; (size as usize) * 3];
+//     fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]> {
+//         if let Some(&(l, r)) = self.leaves_to_points.get(key) {
+//             Some(&self.global_indices[l..r])
+//         } else {
+//             None
+//         }
+//     }
 
-        self.world.all_gather_into(&self.range, &mut ranges);
+//     fn get_all_global_indices<'a>(&'a self) -> Option<&'a [usize]> {
+//         Some(&self.global_indices)
+//     }
 
-        // Calculate users for each key in local tree
-        let mut users: Vec<Vec<Rank>> = Vec::new();
-        let mut key_packet_destinations = vec![0 as Rank; size as usize];
-        let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
+//     fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
+//         self.leaves_set.contains(key)
+//     }
 
-        for key in self.keys_set.iter() {
-            let mut user_tmp: Vec<Rank> = Vec::new();
+//     fn is_node(&self, key: &Self::NodeIndex) -> bool {
+//         self.keys_set.contains(key)
+//     }
+// }
 
-            // Loop over all ranges, each key may be used by multiple processes
-            for chunk in ranges.chunks_exact(3) {
-                let rank = chunk[0] as Rank;
-                let min = MortonKey::from_morton(chunk[1]);
-                let max = MortonKey::from_morton(chunk[2]);
+// impl<T> MultiNodeTree<T>
+// where
+//     T: Float + Default + Equivalence + Scalar<Real = T>,
+// {
+//     /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
+//     ///
+//     /// The idea is to communicate the required point and octant data across the distributed tree prior
+//     /// to the running of the upward pass so that multipole expansions can be constructed independently
+//     /// on each processor at the leaf level, and for the final potential evaluation each process already
+//     /// contains its required point data for near field calculations.
+//     pub fn create_let(&self) -> MultiNodeTree<T> {
+//         // Communicate ranges globally using AllGather
+//         let rank = self.world.rank();
+//         let size = self.world.size();
 
-                // Check if ranges overlap with the neighbors of the key's parent
-                if rank != self.world.rank() {
-                    if key.level() > 1 {
-                        let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
-                        let (cp_min, cp_max) = (
-                            colleagues_parent.iter().min(),
-                            colleagues_parent.iter().max(),
-                        );
+//         let mut ranges = vec![0 as KeyType; (size as usize) * 3];
 
-                        if let (Some(cp_min), Some(cp_max)) = (cp_min, cp_max) {
-                            if (cp_min >= &min) && (cp_max <= &max)
-                                || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
-                                || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
-                                || (cp_min <= &min) && (cp_max >= &max)
-                            {
-                                user_tmp.push(rank);
+//         self.world.all_gather_into(&self.range, &mut ranges);
 
-                                // Mark ranks as users of keys/leaves from this process
-                                if key_packet_destinations[rank as usize] == 0 {
-                                    key_packet_destinations[rank as usize] = 1
-                                }
+//         // Calculate users for each key in local tree
+//         let mut users: Vec<Vec<Rank>> = Vec::new();
+//         let mut key_packet_destinations = vec![0 as Rank; size as usize];
+//         let mut leaf_packet_destinations = vec![0 as Rank; size as usize];
 
-                                if leaf_packet_destinations[rank as usize] == 0
-                                    && self.leaves_set.contains(key)
-                                {
-                                    leaf_packet_destinations[rank as usize] = 1;
-                                }
-                            }
-                        }
-                    }
-                    // If the key is at level one its parent is the root node, so by definition
-                    // it will always overlap with a range
-                    else if key.level() <= 1 {
-                        user_tmp.push(rank);
-                        if key_packet_destinations[rank as usize] == 0 {
-                            key_packet_destinations[rank as usize] = 1
-                        }
+//         for key in self.keys_set.iter() {
+//             let mut user_tmp: Vec<Rank> = Vec::new();
 
-                        if leaf_packet_destinations[rank as usize] == 0
-                            && self.leaves_set.contains(key)
-                        {
-                            leaf_packet_destinations[rank as usize] = 1;
-                        }
-                    }
-                }
-            }
-            users.push(user_tmp);
-        }
+//             // Loop over all ranges, each key may be used by multiple processes
+//             for chunk in ranges.chunks_exact(3) {
+//                 let rank = chunk[0] as Rank;
+//                 let min = MortonKey::from_morton(chunk[1]);
+//                 let max = MortonKey::from_morton(chunk[2]);
 
-        // Communicate number of packets being received by each process globally
-        let mut keys_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &key_packet_destinations,
-            &mut keys_to_receive,
-            SystemOperation::sum(),
-        );
+//                 // Check if ranges overlap with the neighbors of the key's parent
+//                 if rank != self.world.rank() {
+//                     if key.level() > 1 {
+//                         let colleagues_parent: Vec<MortonKey> = key.parent().neighbors();
+//                         let (cp_min, cp_max) = (
+//                             colleagues_parent.iter().min(),
+//                             colleagues_parent.iter().max(),
+//                         );
 
-        let mut leaves_to_receive = vec![0i32; size as usize];
-        self.world.all_reduce_into(
-            &leaf_packet_destinations,
-            &mut leaves_to_receive,
-            SystemOperation::sum(),
-        );
+//                         if let (Some(cp_min), Some(cp_max)) = (cp_min, cp_max) {
+//                             if (cp_min >= &min) && (cp_max <= &max)
+//                                 || (cp_min <= &min) && (cp_max >= &min) && (cp_max <= &max)
+//                                 || (cp_min >= &min) && (cp_min <= &max) && (cp_max >= &max)
+//                                 || (cp_min <= &min) && (cp_max >= &max)
+//                             {
+//                                 user_tmp.push(rank);
 
-        // Calculate the number of receives that this process is expecting
-        let recv_count_keys = keys_to_receive[rank as usize];
-        let recv_count_leaves = leaves_to_receive[rank as usize];
+//                                 // Mark ranks as users of keys/leaves from this process
+//                                 if key_packet_destinations[rank as usize] == 0 {
+//                                     key_packet_destinations[rank as usize] = 1
+//                                 }
 
-        // Filter for packet destinations
-        key_packet_destinations = key_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
+//                                 if leaf_packet_destinations[rank as usize] == 0
+//                                     && self.leaves_set.contains(key)
+//                                 {
+//                                     leaf_packet_destinations[rank as usize] = 1;
+//                                 }
+//                             }
+//                         }
+//                     }
+//                     // If the key is at level one its parent is the root node, so by definition
+//                     // it will always overlap with a range
+//                     else if key.level() <= 1 {
+//                         user_tmp.push(rank);
+//                         if key_packet_destinations[rank as usize] == 0 {
+//                             key_packet_destinations[rank as usize] = 1
+//                         }
 
-        leaf_packet_destinations = leaf_packet_destinations
-            .into_iter()
-            .enumerate()
-            .filter(|(_, x)| x > &0)
-            .map(|(i, _)| i as Rank)
-            .collect();
+//                         if leaf_packet_destinations[rank as usize] == 0
+//                             && self.leaves_set.contains(key)
+//                         {
+//                             leaf_packet_destinations[rank as usize] = 1;
+//                         }
+//                     }
+//                 }
+//             }
+//             users.push(user_tmp);
+//         }
 
-        let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
-        let mut point_packets: Vec<Vec<Point<T>>> = Vec::new();
+//         // Communicate number of packets being received by each process globally
+//         let mut keys_to_receive = vec![0i32; size as usize];
+//         self.world.all_reduce_into(
+//             &key_packet_destinations,
+//             &mut keys_to_receive,
+//             SystemOperation::sum(),
+//         );
 
-        let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
-        let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
+//         let mut leaves_to_receive = vec![0i32; size as usize];
+//         self.world.all_reduce_into(
+//             &leaf_packet_destinations,
+//             &mut leaves_to_receive,
+//             SystemOperation::sum(),
+//         );
 
-        // Form packets for each send
-        for &rank in key_packet_destinations.iter() {
-            let key_packet: Vec<MortonKey> = self
-                .keys_set
-                .iter()
-                .zip(users.iter())
-                .filter(|(_, user)| user.contains(&rank))
-                .map(|(k, _)| *k)
-                .collect();
-            let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
+//         // Calculate the number of receives that this process is expecting
+//         let recv_count_keys = keys_to_receive[rank as usize];
+//         let recv_count_leaves = leaves_to_receive[rank as usize];
 
-            if !key_packet.is_empty() {
-                key_packets.push(key_packet);
-                key_packet_destinations_filt.push(rank);
-            }
+//         // Filter for packet destinations
+//         key_packet_destinations = key_packet_destinations
+//             .into_iter()
+//             .enumerate()
+//             .filter(|(_, x)| x > &0)
+//             .map(|(i, _)| i as Rank)
+//             .collect();
 
-            if leaf_packet_destinations.contains(&rank) {
-                let leaf_packet: Vec<MortonKey> = key_packet_set
-                    .intersection(&self.leaves_set)
-                    .cloned()
-                    .collect();
+//         leaf_packet_destinations = leaf_packet_destinations
+//             .into_iter()
+//             .enumerate()
+//             .filter(|(_, x)| x > &0)
+//             .map(|(i, _)| i as Rank)
+//             .collect();
 
-                let point_packet: Vec<Point<T>> = leaf_packet
-                    .iter()
-                    .flat_map(|leaf| self.get_points(leaf).unwrap().to_vec())
-                    .collect();
+//         let mut key_packets: Vec<Vec<MortonKey>> = Vec::new();
+//         let mut leaf_packets: Vec<Vec<MortonKey>> = Vec::new();
+//         let mut point_packets: Vec<Vec<Point<T>>> = Vec::new();
 
-                if !leaf_packet.is_empty() {
-                    leaf_packets.push(leaf_packet);
-                    point_packets.push(point_packet);
-                    leaf_packet_destinations_filt.push(rank);
-                }
-            }
-        }
+//         let mut key_packet_destinations_filt: Vec<Rank> = Vec::new();
+//         let mut leaf_packet_destinations_filt: Vec<Rank> = Vec::new();
 
-        // Communicate keys, leaves and points
-        let received_leaves = all_to_allv_sparse(
-            &self.world,
-            &leaf_packets,
-            &leaf_packet_destinations_filt,
-            &recv_count_leaves,
-        );
+//         // Form packets for each send
+//         for &rank in key_packet_destinations.iter() {
+//             let key_packet: Vec<MortonKey> = self
+//                 .keys_set
+//                 .iter()
+//                 .zip(users.iter())
+//                 .filter(|(_, user)| user.contains(&rank))
+//                 .map(|(k, _)| *k)
+//                 .collect();
+//             let key_packet_set: HashSet<MortonKey> = key_packet.iter().cloned().collect();
 
-        let mut received_points = all_to_allv_sparse(
-            &self.world,
-            &point_packets,
-            &leaf_packet_destinations_filt,
-            &recv_count_leaves,
-        );
+//             if !key_packet.is_empty() {
+//                 key_packets.push(key_packet);
+//                 key_packet_destinations_filt.push(rank);
+//             }
 
-        let received_keys = all_to_allv_sparse(
-            &self.world,
-            &key_packets,
-            &key_packet_destinations_filt,
-            &recv_count_keys,
-        );
+//             if leaf_packet_destinations.contains(&rank) {
+//                 let leaf_packet: Vec<MortonKey> = key_packet_set
+//                     .intersection(&self.leaves_set)
+//                     .cloned()
+//                     .collect();
 
-        // Group received points by received leaves
-        received_points.sort();
+//                 let point_packet: Vec<Point<T>> = leaf_packet
+//                     .iter()
+//                     .flat_map(|leaf| self.get_points(leaf).unwrap().to_vec())
+//                     .collect();
 
-        let mut leaves_to_points = HashMap::new();
-        let mut curr = received_points[0];
-        let mut curr_idx = 0;
+//                 if !leaf_packet.is_empty() {
+//                     leaf_packets.push(leaf_packet);
+//                     point_packets.push(point_packet);
+//                     leaf_packet_destinations_filt.push(rank);
+//                 }
+//             }
+//         }
 
-        for (i, point) in received_points.iter().enumerate() {
-            if point.encoded_key != curr.encoded_key {
-                leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
-                curr_idx = i;
-                curr = *point;
-            }
-        }
-        leaves_to_points.insert(curr.encoded_key, (curr_idx, received_points.len()));
+//         // Communicate keys, leaves and points
+//         let received_leaves = all_to_allv_sparse(
+//             &self.world,
+//             &leaf_packets,
+//             &leaf_packet_destinations_filt,
+//             &recv_count_leaves,
+//         );
 
-        let locally_essential_tree = MultiNodeTree {
-            range: self.range,
-            world: self.world.duplicate(),
-            depth: self.depth,
-            domain: self.domain,
-            leaves_to_points,
-            levels_to_keys: HashMap::default(),
-            leaves_set: received_leaves.iter().cloned().collect(),
-            keys_set: received_keys.iter().cloned().collect(),
-            points: Points {
-                points: received_points,
-                index: 0,
-            },
-            leaves: MortonKeys {
-                keys: received_leaves,
-                index: 0,
-            },
-            keys: MortonKeys {
-                keys: received_keys,
-                index: 0,
-            },
-        };
+//         let mut received_points = all_to_allv_sparse(
+//             &self.world,
+//             &point_packets,
+//             &leaf_packet_destinations_filt,
+//             &recv_count_leaves,
+//         );
 
-        locally_essential_tree
-    }
-}
+//         let received_keys = all_to_allv_sparse(
+//             &self.world,
+//             &key_packets,
+//             &key_packet_destinations_filt,
+//             &recv_count_keys,
+//         );
+
+//         // Group received points by received leaves
+//         received_points.sort();
+
+//         let mut leaves_to_points = HashMap::new();
+//         let mut curr = received_points[0];
+//         let mut curr_idx = 0;
+
+//         for (i, point) in received_points.iter().enumerate() {
+//             if point.encoded_key != curr.encoded_key {
+//                 leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
+//                 curr_idx = i;
+//                 curr = *point;
+//             }
+//         }
+//         leaves_to_points.insert(curr.encoded_key, (curr_idx, received_points.len()));
+
+//         let locally_essential_tree = MultiNodeTree {
+//             range: self.range,
+//             world: self.world.duplicate(),
+//             depth: self.depth,
+//             domain: self.domain,
+//             leaves_to_points,
+//             levels_to_keys: HashMap::default(),
+//             leaves_set: received_leaves.iter().cloned().collect(),
+//             keys_set: received_keys.iter().cloned().collect(),
+//             points: Points {
+//                 points: received_points,
+//                 index: 0,
+//             },
+//             leaves: MortonKeys {
+//                 keys: received_leaves,
+//                 index: 0,
+//             },
+//             keys: MortonKeys {
+//                 keys: received_keys,
+//                 index: 0,
+//             },
+//         };
+
+//         locally_essential_tree
+//     }
+// }

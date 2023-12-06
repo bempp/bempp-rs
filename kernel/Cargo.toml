@@ -28,9 +28,9 @@ approx = "0.5"
 rayon = "1.7"
 num = "0.4"
 num_cpus = "1"
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
-rlst-common = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
 rand = "0.8.5"
 
 [dev-dependencies]
-rlst = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }

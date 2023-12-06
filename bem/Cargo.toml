@@ -31,11 +31,11 @@ itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
 num = "0.4"
 rayon = "1.7"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
-rlst-blis-src = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
-rlst-common = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
-rlst-algorithms = { git = "https://github.com/linalg-rs/rlst.git", branch="tensor" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-blis-src = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-algorithms = { git = "https://github.com/linalg-rs/rlst.git" }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"]}

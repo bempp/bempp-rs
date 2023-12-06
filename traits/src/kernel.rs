@@ -94,7 +94,7 @@ pub trait Kernel: Sync {
 }
 
 /// Scaling required by the FMM to apply kernel to each octree level.
-pub trait KernelScale {
+pub trait ScaleInvariantKernel {
     /// The kernel is generic over data type.
     type T: Scalar<Real = Self::T>;
 

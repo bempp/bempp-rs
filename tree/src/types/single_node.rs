@@ -25,6 +25,12 @@ where
     ///  All Points.
     pub points: Points<T>,
 
+    /// All coordinates
+    pub coordinates: Vec<T>,
+
+    /// All global indices
+    pub global_indices: Vec<usize>,
+
     /// The leaves that span the tree, and associated Point data.
     pub leaves: MortonKeys,
 
@@ -36,6 +42,12 @@ where
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
+
+    /// Map between a key and its index
+    pub key_to_index: HashMap<MortonKey, usize>,
+
+    /// Map between a leaf and its index
+    pub leaf_to_index: HashMap<MortonKey, usize>,
 
     /// All leaves, returned as a set.
     pub leaves_set: HashSet<MortonKey>,
