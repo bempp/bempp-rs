@@ -1,7 +1,7 @@
 //! Orthonormal polynomials
 
 use bempp_traits::cell::ReferenceCellType;
-use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
@@ -445,8 +445,8 @@ mod test {
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
     use bempp_tools::arrays::{transpose_to_matrix, zero_matrix};
-    use rlst_common::traits::RandomAccessMut;
     use rlst_dense::rlst_dynamic_array3;
+    use rlst_dense::traits::RandomAccessMut;
 
     #[test]
     fn test_legendre_interval() {

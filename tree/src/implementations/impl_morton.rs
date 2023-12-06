@@ -1011,7 +1011,7 @@ impl MortonKeyInterface for MortonKey {
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
-    use rlst_common::traits::{RawAccess, Shape};
+    use rlst_dense::traits::{RawAccess, Shape};
     use std::vec;
 
     use crate::implementations::helpers::points_fixture;

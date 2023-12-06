@@ -67,7 +67,7 @@ mod test {
     use bempp_traits::element::{Continuity, ElementFamily};
     // use num::complex::Complex;
     use bempp_traits::bem::FunctionSpace;
-    use rlst_common::traits::RandomAccessByRef;
+    use rlst_dense::traits::RandomAccessByRef;
 
     #[test]
     fn test_laplace_single_layer() {

@@ -7,10 +7,10 @@ use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use itertools::izip;
-use rlst_common::traits::{
+use rlst_dense::rlst_dynamic_array4;
+use rlst_dense::traits::{
     RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
 };
-use rlst_dense::rlst_dynamic_array4;
 use rlst_proc_macro::rlst_static_array;
 use std::cell::RefCell;
 use std::ptr;

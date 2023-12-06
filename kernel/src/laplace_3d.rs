@@ -368,10 +368,8 @@ mod test {
     use bempp_tools::arrays::Mat;
     use bempp_traits::types::Scalar;
     use rand::prelude::*;
-    use rlst_common::traits::{
-        FillFrom, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape,
-    };
     use rlst_dense::rlst_dynamic_array2;
+    use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape};
 
     fn copy(m_in: &Mat<f64>) -> Mat<f64> {
         let mut m = rlst_dynamic_array2!(f64, m_in.shape());
@@ -410,10 +408,10 @@ mod test {
         let nsources = 5;
         let ntargets = 3;
 
-        let sources = rlst::dense::rlst_rand_mat![f64, (nsources, 3)];
-        let targets = rlst::dense::rlst_rand_mat![f64, (ntargets, 3)];
-        let charges = rlst::dense::rlst_rand_col_vec![f64, nsources];
-        let mut green_value = rlst::dense::rlst_col_vec![f64, ntargets];
+        let sources = rand_mat([nsources, 3]);
+        let targets = rand_mat([ntargets, 3]);
+        let charges = rand_vec(nsources);
+        let mut green_value = rlst::dense::rlst_dynamic_array2!(f64, [ntargets, 1]);
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,

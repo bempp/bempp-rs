@@ -64,7 +64,7 @@ impl<T: Float + Default> Domain<T> {
 #[cfg(test)]
 mod test {
     use bempp_traits::types::Scalar;
-    use rlst_common::traits::{RawAccess, Shape};
+    use rlst_dense::traits::{RawAccess, Shape};
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
 

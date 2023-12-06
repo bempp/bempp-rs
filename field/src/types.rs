@@ -3,9 +3,8 @@ use std::collections::HashMap;
 
 use cauchy::{c32, c64};
 use num::{Complex, Float};
-use rlst_common::traits::{Eval, NewLikeSelf};
 use rlst_dense::{
-    base_array::BaseArray, data_container::VectorContainer, array::Array, rlst_dynamic_array2,
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
 };
 
 use bempp_traits::kernel::Kernel;
@@ -114,12 +113,10 @@ where
     T: Scalar,
 {
     fn default() -> Self {
-        let tmp = rlst_dynamic_array2![T, [1, 1]];
-
         SvdM2lOperatorData {
-            u: tmp.new_like_self().eval(),
-            st_block: tmp.new_like_self().eval(),
-            c: tmp.new_like_self().eval(),
+            u: rlst_dynamic_array2!(T, [1, 1]),
+            st_block: rlst_dynamic_array2!(T, [1, 1]),
+            c: rlst_dynamic_array2!(T, [1, 1]),
         }
     }
 }

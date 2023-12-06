@@ -6,7 +6,7 @@ use bempp_tools::arrays::{to_matrix, zero_matrix, AdjacencyList};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::grid::{Geometry, Grid, Topology};
-use rlst_common::traits::{RandomAccessByRef, RandomAccessMut};
+use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut};
 
 /// Create a regular sphere
 ///

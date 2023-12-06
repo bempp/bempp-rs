@@ -1,10 +1,10 @@
 //! Functionality for handling 3D arrays
 //! # Warning
 //! This module awaits deprecation with the addition of N-Dimensional tensor handling in rlst.
+use bempp_tools::Array3D;
+use cauchy::Scalar;
 use itertools::Itertools;
 use num::traits::Num;
-
-use bempp_tools::Array3D;
 use rlst_dense::rlst_dynamic_array3;
 /// Return indices that sort a vec.
 ///
@@ -30,7 +30,7 @@ pub fn pad3<T>(
     pad_index: (usize, usize, usize),
 ) -> Array3D<T>
 where
-    T: Clone + Copy + Num,
+    T: Clone + Copy + Num + Scalar,
 {
     let &(m, n, o) = arr.shape();
 
@@ -59,7 +59,7 @@ where
 /// * `arr` - An array to be flipped.
 pub fn flip3<T>(arr: &Array3D<T>) -> Array3D<T>
 where
-    T: Clone + Copy + Num,
+    T: Clone + Copy + Num + Scalar,
 {
     let mut flipped = rlst_dynamic_array3!(T, *arr.shape());
 

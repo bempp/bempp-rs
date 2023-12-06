@@ -5,8 +5,8 @@ use crate::polynomials::polynomial_count;
 use bempp_tools::arrays::{to_matrix, zero_matrix};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
-use rlst_common::traits::RandomAccessMut;
 use rlst_dense::rlst_dynamic_array3;
+use rlst_dense::traits::RandomAccessMut;
 
 /// Create a Lagrange element
 pub fn create(
@@ -150,8 +150,8 @@ mod test {
     use crate::element::lagrange::*;
     use approx::*;
     use bempp_traits::element::FiniteElement;
-    use rlst_common::traits::RandomAccessByRef;
     use rlst_dense::rlst_dynamic_array4;
+    use rlst_dense::traits::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
@@ -387,39 +387,48 @@ mod test {
             let y = *points.get([pt, 1]).unwrap();
             assert_relative_eq!(
                 *data.get([0, pt, 0, 0]).unwrap(),
-                (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y)
+                (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 1, 0]).unwrap(),
-                x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y)
+                x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 2, 0]).unwrap(),
-                (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0)
+                (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 3, 0]).unwrap(),
-                x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0)
+                x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 4, 0]).unwrap(),
-                4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y)
+                4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 5, 0]).unwrap(),
-                (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y)
+                (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 6, 0]).unwrap(),
-                x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y)
+                x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 7, 0]).unwrap(),
-                4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0)
+                4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0),
+                epsilon = 1e-14
             );
             assert_relative_eq!(
                 *data.get([0, pt, 8, 0]).unwrap(),
-                4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y)
+                4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y),
+                epsilon = 1e-14
             );
         }
         check_dofs(e);

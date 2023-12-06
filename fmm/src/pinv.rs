@@ -6,8 +6,8 @@ use rlst::dense::{
     base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, Dynamic, Shape,
 };
 // use rlst_common::traits::*;
-use rlst::common::traits::{Eval, Transpose};
 use rlst::common::types::{RlstError, RlstResult, Scalar};
+use rlst::dense::traits::{Eval, Transpose};
 use rlst::dense::MatrixD;
 
 pub type PinvMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;

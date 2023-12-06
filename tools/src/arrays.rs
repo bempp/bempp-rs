@@ -1,9 +1,10 @@
 //! Containers to store multi-dimensional data
 use bempp_traits::arrays::AdjacencyListAccess;
 use num::Num;
-use rlst_common::{traits::UnsafeRandomAccessMut, types::Scalar};
+use rlst_common::types::Scalar;
 use rlst_dense::{
     array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+    traits::UnsafeRandomAccessMut,
 };
 
 pub type Mat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

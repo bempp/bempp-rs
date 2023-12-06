@@ -13,10 +13,10 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_common::traits::{
+use rlst_dense::rlst_dynamic_array4;
+use rlst_dense::traits::{
     RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
 };
-use rlst_dense::rlst_dynamic_array4;
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,

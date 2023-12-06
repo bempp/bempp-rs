@@ -5,8 +5,8 @@ use crate::polynomials::polynomial_count;
 use bempp_tools::arrays::zero_matrix;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
-use rlst_common::traits::RandomAccessMut;
 use rlst_dense::rlst_dynamic_array3;
+use rlst_dense::traits::RandomAccessMut;
 
 /// Create a Raviart-Thomas element
 pub fn create(
@@ -92,8 +92,8 @@ mod test {
     use approx::*;
     use bempp_tools::arrays::to_matrix;
     use bempp_traits::element::FiniteElement;
-    use rlst_common::traits::RandomAccessByRef;
     use rlst_dense::rlst_dynamic_array4;
+    use rlst_dense::traits::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {

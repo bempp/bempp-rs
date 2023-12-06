@@ -3,7 +3,7 @@
 use crate::arrays::AdjacencyListAccess;
 use crate::cell::ReferenceCellType;
 use crate::element::FiniteElement;
-use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// The ownership of a mesh entity
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

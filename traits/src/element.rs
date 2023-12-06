@@ -1,7 +1,7 @@
 //! Finite element definitions
 
 use crate::cell::ReferenceCellType;
-use rlst_common::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
