@@ -33,10 +33,10 @@ where
     pub alpha: T,
 
     /// Map between indices of surface convolution grid points.
-    pub surf_to_conv_map: HashMap<usize, usize>,
+    pub surf_to_conv_map: Vec<usize>,
 
     /// Map between indices of convolution and surface grid points.
-    pub conv_to_surf_map: HashMap<usize, usize>,
+    pub conv_to_surf_map: Vec<usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
     pub operator_data: FftM2lOperatorData<Complex<T>>,

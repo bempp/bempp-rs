@@ -124,72 +124,6 @@ pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
     corners
 }
 
-/// We need to quickly map between corners and their corresponding positions in the surface grid via
-/// their respective indices.
-///
-/// # Arguments
-/// * `order` - the order of expansions used in constructing the surface grid
-pub fn map_corners_to_surface<T>(order: usize) -> (HashMap<usize, usize>, HashMap<usize, usize>)
-where
-    T: Float + std::ops::SubAssign + std::ops::MulAssign,
-{
-    let (_, surface_multindex) = MortonKey::surface_grid::<T>(order);
-
-    let nsurf = surface_multindex.len() / 3;
-    let ncorners = 8;
-    let corners_multindex = [
-        0,
-        order - 1,
-        0,
-        order - 1,
-        0,
-        order - 1,
-        0,
-        order - 1,
-        0,
-        0,
-        order - 1,
-        order - 1,
-        0,
-        0,
-        order - 1,
-        order - 1,
-        0,
-        0,
-        0,
-        0,
-        order - 1,
-        order - 1,
-        order - 1,
-        order - 1,
-    ];
-
-    let mut _map = HashMap::new();
-    let mut _inv_map = HashMap::new();
-
-    for i in 0..nsurf {
-        let s = [
-            surface_multindex[i],
-            surface_multindex[nsurf + i],
-            surface_multindex[2 * nsurf + i],
-        ];
-
-        for j in 0..ncorners {
-            let c = [
-                corners_multindex[j],
-                corners_multindex[8 + j],
-                corners_multindex[16 + j],
-            ];
-
-            if s[0] == c[0] && s[1] == c[1] && s[2] == c[2] {
-                _map.insert(i, j);
-                _inv_map.insert(j, i);
-            }
-        }
-    }
-
-    (_map, _inv_map)
-}
 
 #[cfg(test)]
 mod test {
@@ -200,10 +134,10 @@ mod test {
     #[test]
     fn test_find_corners() {
         let order = 5;
-        let (grid_1, _) = MortonKey::surface_grid::<f64>(order);
+        let grid_1 = MortonKey::surface_grid::<f64>(order);
 
         let order = 2;
-        let (grid_2, _) = MortonKey::surface_grid::<f64>(order);
+        let grid_2 = MortonKey::surface_grid::<f64>(order);
 
         let corners_1 = find_corners(&grid_1);
         let corners_2 = find_corners(&grid_2);

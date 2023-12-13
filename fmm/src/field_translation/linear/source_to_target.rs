@@ -406,60 +406,60 @@ where
             &[p, q, r],
         );
 
-        // Compute local expansion coefficients and save to data tree
-        let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
+        // // Compute local expansion coefficients and save to data tree
+        // let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
 
-        let check_potentials = global_check_potentials
-            .chunks_exact(size)
-            .flat_map(|chunk| {
-                let m = 2 * self.fmm.order - 1;
-                let p = m + 1;
-                let mut potentials = Array3D::new((p, p, p));
-                potentials.get_data_mut().copy_from_slice(chunk);
+        // let check_potentials = global_check_potentials
+        //     .chunks_exact(size)
+        //     .flat_map(|chunk| {
+        //         let m = 2 * self.fmm.order - 1;
+        //         let p = m + 1;
+        //         let mut potentials = Array3D::new((p, p, p));
+        //         potentials.get_data_mut().copy_from_slice(chunk);
 
-                let mut tmp = Vec::new();
-                let ntargets = multi_indices.len() / 3;
-                let xs = &multi_indices[0..ntargets];
-                let ys = &multi_indices[ntargets..2 * ntargets];
-                let zs = &multi_indices[2 * ntargets..];
+        //         let mut tmp = Vec::new();
+        //         let ntargets = multi_indices.len() / 3;
+        //         let xs = &multi_indices[0..ntargets];
+        //         let ys = &multi_indices[ntargets..2 * ntargets];
+        //         let zs = &multi_indices[2 * ntargets..];
 
-                for i in 0..ntargets {
-                    let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
-                    tmp.push(*val);
-                }
-                tmp
-            })
-            .collect_vec();
+        //         for i in 0..ntargets {
+        //             let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
+        //             tmp.push(*val);
+        //         }
+        //         tmp
+        //     })
+        //     .collect_vec();
 
-        // This should be blocked and use blas3
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        let check_potentials = unsafe {
-            rlst_pointer_mat!['a, U, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
-        };
+        // // This should be blocked and use blas3
+        // let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        // let check_potentials = unsafe {
+        //     rlst_pointer_mat!['a, U, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
+        // };
 
-        let mut tmp = self
-            .fmm
-            .dc2e_inv_1
-            .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
-            .eval();
+        // let mut tmp = self
+        //     .fmm
+        //     .dc2e_inv_1
+        //     .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
+        //     .eval();
 
-        tmp.data_mut()
-            .iter_mut()
-            .for_each(|d| *d *= self.fmm.kernel.scale(level));
+        // tmp.data_mut()
+        //     .iter_mut()
+        //     .for_each(|d| *d *= self.fmm.kernel.scale(level));
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        // let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-        // Add result
-        tmp.data()
-            .par_chunks_exact(ncoeffs)
-            .zip(self.level_locals[level as usize].into_par_iter())
-            .for_each(|(result, local)| unsafe {
-                let mut ptr = local.raw;
-                for &r in result.iter().take(ncoeffs) {
-                    *ptr += r;
-                    ptr = ptr.add(1)
-                }
-            });
+        // // Add result
+        // tmp.data()
+        //     .par_chunks_exact(ncoeffs)
+        //     .zip(self.level_locals[level as usize].into_par_iter())
+        //     .for_each(|(result, local)| unsafe {
+        //         let mut ptr = local.raw;
+        //         for &r in result.iter().take(ncoeffs) {
+        //             *ptr += r;
+        //             ptr = ptr.add(1)
+        //         }
+        //     });
     }
 
     fn m2l_scale(&self, level: u64) -> U {

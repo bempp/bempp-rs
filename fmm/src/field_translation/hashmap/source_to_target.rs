@@ -403,58 +403,58 @@ where
             &[p, q, r],
         );
 
-        // Compute local expansion coefficients and save to data tree
-        let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
+        // // Compute local expansion coefficients and save to data tree
+        // let (_, multi_indices) = MortonKey::surface_grid::<U>(self.fmm.order);
 
-        let check_potentials = global_check_potentials
-            // .data()
-            .chunks_exact(size)
-            .flat_map(|chunk| {
-                let m = 2 * self.fmm.order - 1;
-                let p = m + 1;
-                let mut potentials = Array3D::new((p, p, p));
-                potentials.get_data_mut().copy_from_slice(chunk);
+        // let check_potentials = global_check_potentials
+        //     // .data()
+        //     .chunks_exact(size)
+        //     .flat_map(|chunk| {
+        //         let m = 2 * self.fmm.order - 1;
+        //         let p = m + 1;
+        //         let mut potentials = Array3D::new((p, p, p));
+        //         potentials.get_data_mut().copy_from_slice(chunk);
 
-                let mut tmp = Vec::new();
-                let ntargets = multi_indices.len() / 3;
-                let xs = &multi_indices[0..ntargets];
-                let ys = &multi_indices[ntargets..2 * ntargets];
-                let zs = &multi_indices[2 * ntargets..];
+        //         let mut tmp = Vec::new();
+        //         let ntargets = multi_indices.len() / 3;
+        //         let xs = &multi_indices[0..ntargets];
+        //         let ys = &multi_indices[ntargets..2 * ntargets];
+        //         let zs = &multi_indices[2 * ntargets..];
 
-                for i in 0..ntargets {
-                    let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
-                    tmp.push(*val);
-                }
-                tmp
-            })
-            .collect_vec();
+        //         for i in 0..ntargets {
+        //             let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
+        //             tmp.push(*val);
+        //         }
+        //         tmp
+        //     })
+        //     .collect_vec();
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        let check_potentials = unsafe {
-            rlst_pointer_mat!['a, U, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
-        };
+        // let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        // let check_potentials = unsafe {
+        //     rlst_pointer_mat!['a, U, check_potentials.as_ptr(), (ncoeffs, ntargets), (1, ncoeffs)]
+        // };
 
-        let mut tmp = self
-            .fmm
-            .dc2e_inv_1
-            .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
-            .eval();
-        tmp.data_mut()
-            .iter_mut()
-            .for_each(|d| *d *= self.fmm.kernel.scale(level));
-        let locals = tmp;
+        // let mut tmp = self
+        //     .fmm
+        //     .dc2e_inv_1
+        //     .dot(&self.fmm.dc2e_inv_2.dot(&check_potentials))
+        //     .eval();
+        // tmp.data_mut()
+        //     .iter_mut()
+        //     .for_each(|d| *d *= self.fmm.kernel.scale(level));
+        // let locals = tmp;
 
-        for (i, target) in targets.iter().enumerate() {
-            let target_local_arc = Arc::clone(self.locals.get(target).unwrap());
-            let mut target_local_lock = target_local_arc.lock().unwrap();
+        // for (i, target) in targets.iter().enumerate() {
+        //     let target_local_arc = Arc::clone(self.locals.get(target).unwrap());
+        //     let mut target_local_lock = target_local_arc.lock().unwrap();
 
-            let top_left = (0, i);
-            let dim = (ncoeffs, 1);
-            let target_local_owned = locals.block(top_left, dim);
+        //     let top_left = (0, i);
+        //     let dim = (ncoeffs, 1);
+        //     let target_local_owned = locals.block(top_left, dim);
 
-            *target_local_lock.deref_mut() =
-                (target_local_lock.deref() + target_local_owned).eval();
-        }
+        //     *target_local_lock.deref_mut() =
+        //         (target_local_lock.deref() + target_local_owned).eval();
+        // }
     }
 
     fn m2l_scale(&self, level: u64) -> U {
