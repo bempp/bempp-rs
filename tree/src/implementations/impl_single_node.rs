@@ -986,4 +986,28 @@ mod test {
         }
         assert_eq!(tot, npoints);
     }
+
+    #[test]
+    fn test_siblings_in_tree() {
+        // Test that siblings lie adjacently in a tree.
+
+        let npoints = 10000;
+        let points = points_fixture::<f64>(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let depth = 3;
+        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs);
+
+        let keys = tree.get_keys(3).unwrap();
+
+        // Pick out some random indices to test
+        let idx_vec = [0, 8, 16, 32];
+
+        for idx in idx_vec {
+            let found = keys[idx].siblings();
+
+            for i in 0..8 {
+                assert!(found[i] == keys[idx+i])
+            }
+        }
+    } 
 }

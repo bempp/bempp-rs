@@ -1209,6 +1209,7 @@ mod test {
             let b = keys[i + 1];
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
+
     }
 
     #[test]
@@ -1380,13 +1381,18 @@ mod test {
             for i in 0..26 {
                 assert!(expected[i] == result[i]);
             }
+
+            // Test that they are in Morton order
+            for i in 0..25 {
+                assert!(expected[i+1] >= expected[i])
+            } 
         }
 
         // More complex case, in the middle of the tree
         {
             let parent = key.parent().parent().parent();
-            let mut result = parent.neighbors();
-            result.sort();
+            let result = parent.neighbors();
+            // result.sort();
 
             // Test that we get the expected number of neighbors
             assert!(result.len() == 26);
@@ -1444,7 +1450,13 @@ mod test {
             for i in 0..26 {
                 assert!(expected[i] == result[i]);
             }
+            
+            // Test that they are in Morton order
+            for i in 0..25 {
+                assert!(result[i+1] >= result[i])
+            } 
         }
+        // assert!(false)
     }
 
     #[test]

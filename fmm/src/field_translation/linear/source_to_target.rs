@@ -139,6 +139,43 @@ where
     all_displacements
 }
 
+fn displacements_new<U>(
+    tree: &SingleNodeTree<U>,
+    level: u64,
+) -> Vec<Vec<Option<usize>>>
+where
+    U: Float + Default + Scalar<Real = U>
+{
+ 
+    let parents = tree.get_keys(level-1).unwrap();
+    let nparents= parents.len();
+
+    let mut target_map = HashMap::new();
+
+    for (i, parent) in parents.iter().enumerate() {
+        target_map.insert(parent, i);
+    }
+
+    let mut result = vec![Vec::new(); 26];
+
+    let parent_neighbours = parents.iter().map(|parent| parent.all_neighbors()).collect_vec();
+
+    for i in 0..26 {
+        for (j, parent) in parents.iter().enumerate() {
+            let all_neighbours = &parent_neighbours[j];
+
+            if let Some(neighbour) = all_neighbours[i] {
+                result[i].push(Some(*target_map.get(&neighbour).unwrap()))
+            } else {
+                result[i].push(None);
+            }
+        }
+    }
+
+    result
+
+}
+
 pub fn chunked_displacements(
     level: usize,
     chunksize: usize,
@@ -271,6 +308,7 @@ pub fn m2l_cplx_chunked<U>(
     });
 }
 
+
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
 impl<T, U> FieldTranslation<U>
     for FmmDataLinear<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -354,8 +392,12 @@ where
         // Allocate check potentials (in frequency order at this point implicitly)
         let mut check_potentials_hat = vec![Complex::<U>::default(); size_real * ntargets];
         
-        println!("pre processing time {:?}", s.elapsed());
+        let all_displacements = displacements_new(&self.fmm.tree(), level);
 
+        println!("level {:?} pre processing time {:?}", level, s.elapsed());
+
+        let zeros = vec![Complex::<U>::zero(); 8];
+        let scale = Complex::from(self.m2l_scale(level));
         let s = Instant::now();
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         (0..size_real)
@@ -370,11 +412,18 @@ where
                     for (i, kernel_data) in kernel_data_halo.iter().enumerate() {
                         let frequency_offset = 64 * freq;
                         let kernel_data_freq = &kernel_data[frequency_offset..(frequency_offset + 64)];
-                        
+                        let displacement = &all_displacements[i][sibling_index];
 
+                        let mut signal = &zeros[..];
+                        if let Some(displacement) = displacement {
+                            signal = &signal_freq[displacement*8..(displacement+1)*8];
+                        }
+                        
+                        unsafe {
+                            matmul8x8x2_cplx_simple_local(&kernel_data_freq, signal, save_locations, scale);
+                        }
                     }
                 })
-
             });
 
         println!("kernel time {:?}", s.elapsed());
