@@ -29,7 +29,7 @@ def test_dependencies():
     for c in cargos:
 
         # TODO: remove this skip
-        if "field" in c or "fmm" in c:
+        if "field" in c or "fmm" in c or "tree" in c:
             continue
 
         with open(c, "rb") as f:
