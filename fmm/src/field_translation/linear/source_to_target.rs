@@ -1,6 +1,7 @@
 //! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
 use bempp_tools::Array3D;
 
+use fftw::{plan::{R2CPlan, R2CPlan64}, types::Flag};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
 use rayon::prelude::*;
@@ -146,7 +147,7 @@ fn displacements_new<U>(
 where
     U: Float + Default + Scalar<Real = U>
 {
- 
+  
     let parents = tree.get_keys(level-1).unwrap();
     let nparents= parents.len();
 
@@ -161,7 +162,7 @@ where
     let parent_neighbours = parents.iter().map(|parent| parent.all_neighbors()).collect_vec();
 
     for i in 0..26 {
-        for (j, parent) in parents.iter().enumerate() {
+        for j in 0..nparents {
             let all_neighbours = &parent_neighbours[j];
 
             if let Some(neighbour) = all_neighbours[i] {
@@ -375,23 +376,47 @@ where
                 }
             });
 
-        let mut signals_hat = vec![Complex::<U>::default(); size_real * ntargets];
+        // let mut signals_hat = vec![Complex::<U>::default(); size_real * ntargets];
+        // let mut signals_hat_f = vec![Complex::<U>::default(); size_real * ntargets];
+        let mut signals_hat_buffer = vec![U::default(); size_real * ntargets * 2];
+        let mut signals_hat_f_buffer = vec![U::default(); size_real * ntargets * 2];
 
-        U::rfft3_fftw_par_vec(&mut signals, &mut signals_hat, &[p, q, r]);
+        let signals_hat: &mut [Complex<U>];
+        let signals_hat_f: &mut [Complex<U>];
 
-        // Get signal FFTs into frequency order
-        signals_hat.par_chunks_exact_mut(8*size_real).for_each(|sibling_chunk| {
+        unsafe {
+            let ptr = signals_hat_buffer.as_mut_ptr() as *mut Complex<U>;
+            signals_hat = std::slice::from_raw_parts_mut(ptr, size_real*ntargets);
+            
+            let ptr = signals_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
+            signals_hat_f = std::slice::from_raw_parts_mut(ptr, size_real*ntargets);
+        }
+
+        U::rfft3_fftw_par_slice(&mut signals,  signals_hat, &[p, q, r]);
+
+
+        // Get signal FFTs into frequency order (THIS IS WRONG, AND OVERWRITING FREQUENCY INFORMATION)
+        signals_hat.par_chunks(8*size_real)
+        .zip(signals_hat_f.par_chunks_mut(size_real*8))
+        .for_each(|(sibling_chunk, sibling_chunk_f)| {
 
             for i in 0..size_real {
                 for j in 0..8 {
-                    sibling_chunk[8 * i + j] = sibling_chunk[size_real * j + i]
+                    sibling_chunk_f[8 * i + j] = sibling_chunk[size_real * j + i]
                 }
             }
         });
         
         // Allocate check potentials (in frequency order at this point implicitly)
-        let mut check_potentials_hat = vec![Complex::<U>::default(); size_real * ntargets];
-        
+        let mut check_potentials_hat_buffer = vec![U::default(); 2*size_real * ntargets];
+
+        let check_potentials_hat: &mut [Complex<U>];
+        unsafe {
+            let ptr = check_potentials_hat_buffer.as_mut_ptr() as *mut Complex<U>;
+            check_potentials_hat = std::slice::from_raw_parts_mut(ptr, size_real * ntargets);
+        }
+
+
         let all_displacements = displacements_new(&self.fmm.tree(), level);
 
         println!("level {:?} pre processing time {:?}", level, s.elapsed());
@@ -402,17 +427,17 @@ where
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         (0..size_real)
             .into_par_iter()
-            .zip(signals_hat.par_chunks_exact(ntargets))
+            .zip(signals_hat_f.par_chunks_exact(ntargets))
             .zip(check_potentials_hat.par_chunks_exact_mut(ntargets))
             .for_each(|((freq, signal_freq), check_potentials_freq)| {
 
-                (0..nparents).for_each(|sibling_index| {
-                    let save_locations = &mut check_potentials_freq[(sibling_index*8)..(sibling_index + 1)*8];
+                (0..nparents).for_each(|parent_index| {
+                    let save_locations = &mut check_potentials_freq[(parent_index*8)..(parent_index + 1)*8];
 
                     for (i, kernel_data) in kernel_data_halo.iter().enumerate() {
                         let frequency_offset = 64 * freq;
                         let kernel_data_freq = &kernel_data[frequency_offset..(frequency_offset + 64)];
-                        let displacement = &all_displacements[i][sibling_index];
+                        let displacement = &all_displacements[i][parent_index];
 
                         let mut signal = &zeros[..];
                         if let Some(displacement) = displacement {

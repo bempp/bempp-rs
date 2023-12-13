@@ -18,6 +18,8 @@ where
     /// * `shape` - Shape of input data.
     fn rfft3_fftw_par_vec(input: &mut DtypeReal, output: &mut DtypeCplx, shape: &[usize]);
 
+    fn rfft3_fftw_par_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]);
+
     /// Compute an inverse Real FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
     ///
@@ -172,6 +174,20 @@ impl Fft<FftMatrixf32, FftMatrixc32> for f32 {
         });
     }
 
+    fn rfft3_fftw_par_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
+        let size: usize = shape.iter().product();
+        let size_d = shape.last().unwrap();
+        let size_real = (size / size_d) * (size_d / 2 + 1);
+        let plan: R2CPlan32 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+
+        let it_inp = input.par_chunks_exact_mut(size).into_par_iter();
+        let it_out = output.par_chunks_exact_mut(size_real).into_par_iter();
+
+        it_inp.zip(it_out).for_each(|(inp, out)| {
+            let _ = plan.r2c(inp, out);
+        }); 
+    }
+
     fn irfft_fftw_par_vec(input: &mut FftMatrixc32, output: &mut FftMatrixf32, shape: &[usize]) {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
@@ -222,6 +238,21 @@ impl Fft<FftMatrixf64, FftMatrixc64> for f64 {
         });
     }
 
+    fn rfft3_fftw_par_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
+        let size: usize = shape.iter().product();
+        let size_d = shape.last().unwrap();
+        let size_real = (size / size_d) * (size_d / 2 + 1);
+        let plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
+
+        let it_inp = input.par_chunks_exact_mut(size).into_par_iter();
+        let it_out = output.par_chunks_exact_mut(size_real).into_par_iter();
+
+        it_inp.zip(it_out).for_each(|(inp, out)| {
+            let _ = plan.r2c(inp, out);
+        }); 
+    }
+
+    
     fn irfft_fftw_par_vec(input: &mut FftMatrixc64, output: &mut FftMatrixf64, shape: &[usize]) {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
