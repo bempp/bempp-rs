@@ -3,18 +3,24 @@ use cauchy::Scalar;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
-use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::SliceContainer,
-    linalg::svd::SvdMode,
-    rlst_dynamic_array1, rlst_dynamic_array2, rlst_dynamic_array3,
-    traits::{MultIntoResize, RandomAccessByRef, RawAccess, RawAccessMut, Shape, RandomAccessMut},
+use rlst::dense::LayoutType;
+use rlst::{
+    algorithms::{
+        linalg::{DenseMatrixLinAlgBuilder, LinAlg},
+        traits::svd::{Mode, Svd},
+    },
+    common::traits::{Eval, Transpose},
+    dense::{
+        rlst_dynamic_mat, rlst_pointer_mat, Dot, Dynamic, MultiplyAdd, RawAccess, RawAccessMut,
+        Shape, VectorContainer,
+    },
 };
 use std::collections::{HashMap, HashSet};
 
 use bempp_tools::Array3D;
-use bempp_traits::{field::FieldTranslationData, kernel::Kernel, types::EvalType};
+use bempp_traits::{
+    arrays::Array3DAccess, field::FieldTranslationData, kernel::Kernel, types::EvalType,
+};
 use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
@@ -29,12 +35,21 @@ use crate::{
     },
 };
 
-type T = f64;
-
-// impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
-impl<U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
+impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
 where
-    T: Float + Default + Scalar<Real = T>,
+    T: Float
+        + Default
+        + MultiplyAdd<
+            T,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            Dynamic,
+            Dynamic,
+            Dynamic,
+        >,
+    DenseMatrixLinAlgBuilder<T>: Svd,
+    T: Scalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     type TransferVector = Vec<TransferVector>;
@@ -53,8 +68,8 @@ where
         let ncols = self.ncoeffs(order);
 
         let ntransfer_vectors = self.transfer_vectors.len();
-        let mut se2tc_fat = rlst_dynamic_array2![T, [nrows, ncols * ntransfer_vectors]];
-        let mut se2tc_thin = rlst_dynamic_array2![T, [nrows * ntransfer_vectors, ncols]];
+        let mut se2tc_fat = rlst_dynamic_mat![T, (nrows, ncols * ntransfer_vectors)];
+        let mut se2tc_thin = rlst_dynamic_mat![T, (nrows * ntransfer_vectors, ncols)];
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
@@ -63,7 +78,7 @@ where
             let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram = rlst_dynamic_array2![T, [ntargets, nsources]];
+            let mut tmp_gram = rlst_dynamic_mat![T, (ntargets, nsources)];
 
             self.kernel.assemble_st(
                 EvalType::Value,
@@ -73,103 +88,96 @@ where
             );
 
             // Need to transpose so that rows correspond to targets, and columns to sources
-            let tmp_gram_t = tmp_gram.transpose();
-            for x in 0..nrows {
-                for y in 0..ncols {
-                    *se2tc_fat.get_mut([x, i*ncols + y]).unwrap() = *tmp_gram_t.get([x, y]).unwrap();
-                }
-            }
+            let mut tmp_gram = tmp_gram.transpose().eval();
 
-            for x in 0..nrows {
-                for y in 0..ncols {
-                    *se2tc_thin.get_mut([i*nrows + x, y]).unwrap() = *tmp_gram_t.get([x, y]).unwrap();
-                }
+            let block_size = nrows * ncols;
+            let start_idx = i * block_size;
+            let end_idx = start_idx + block_size;
+            let block = se2tc_fat.get_slice_mut(start_idx, end_idx);
+            block.copy_from_slice(tmp_gram.data_mut());
+
+            for j in 0..ncols {
+                let start_idx = j * ntransfer_vectors * nrows + i * nrows;
+                let end_idx = start_idx + nrows;
+                let block_column = se2tc_thin.get_slice_mut(start_idx, end_idx);
+                let gram_column = tmp_gram.get_slice_mut(j * ncols, j * ncols + ncols);
+                block_column.copy_from_slice(gram_column);
             }
         }
 
-        let mut u = rlst_dynamic_array2!(T, [nrows, self.k]);
-        let mut vt = rlst_dynamic_array2!(T, [self.k, ncols * ntransfer_vectors]);
-        // let mut sigma = rlst_dynamic_array1!(T::Real, [self.k]);
-        let mut sigma = rlst_dynamic_array1!(T, [self.k]);
-        se2tc_fat
-            .into_svd_alloc(u.view_mut(), vt.view_mut(), sigma.data_mut(), SvdMode::Full)
-            .unwrap();
+        let (sigma, u, vt) = se2tc_fat.linalg().svd(Mode::All, Mode::Slim).unwrap();
+
+        let u = u.unwrap();
+        let vt = vt.unwrap();
 
         // Keep 'k' singular values
-        let mut sigma_mat = rlst_dynamic_array2![T, [self.k, self.k]];
+        let mut sigma_mat = rlst_dynamic_mat![T, (self.k, self.k)];
         for i in 0..self.k {
-            sigma_mat[[i, i]] = T::from(*sigma.get([i]).unwrap());
+            sigma_mat[[i, i]] = T::from(sigma[i]).unwrap()
         }
 
-        let [mu, _] = u.shape();
-        let u_block = u.into_subview([0, 1], [mu, self.k]);
-        let mut u = rlst_dynamic_array2!(T, [1, self.k - mu]);
-        u.fill_from(u_block);
+        let (mu, _) = u.shape();
+        let u = u.block((0, 0), (mu, self.k)).eval();
+        let u = u.data().iter().map(|&x| T::from(x).unwrap()).collect_vec();
+        let u = unsafe { rlst_pointer_mat!['static, T, u.as_ptr(), (mu, self.k), (1, mu)] }.eval();
 
-        let [_, nvt] = vt.shape();
-        let vt = vt.into_subview([0, 1], [self.k, nvt]);
-        let vt: Vec<T> = vt.data().iter().map(|&x| T::from(x)).collect();
-        let vt = Array::new(BaseArray::new(SliceContainer::new(&vt), [self.k, nvt]));
-        // unsafe { rlst_pointer_mat!['static, T, vt.as_ptr(), (self.k, nvt), (1, self.k)] };
+        let (_, nvt) = vt.shape();
+        let vt = vt.block((0, 0), (self.k, nvt)).eval();
+        let vt: Vec<T> = vt.data().iter().map(|&x| T::from(x).unwrap()).collect();
+        let vt = unsafe { rlst_pointer_mat!['static, T, vt.as_ptr(), (self.k, nvt), (1, self.k)] };
 
         // Store compressed M2L operators
-        let mut _r = rlst_dynamic_array2!(T, [nrows * ntransfer_vectors, self.k]);
-        let mut st = rlst_dynamic_array2!(T, [self.k, ncols]);
-        // let mut _gamma = rlst_dynamic_array1!(T::Real, [self.k]);
-        let mut _gamma = rlst_dynamic_array1!(T, [self.k]);
-        se2tc_thin
-            .into_svd_alloc(
-                _r.view_mut(),
-                st.view_mut(),
-                _gamma.data_mut(),
-                SvdMode::Full,
-            )
-            .unwrap();
-
-        let [_, nst] = st.shape();
-        let st_block = st.into_subview([0, 1], [self.k, nst]);
-        let mut s_block = rlst_dynamic_array2!(T, [self.k, nst]);
-        s_block.fill_from(st_block.transpose());
+        let (_gamma, _r, st) = se2tc_thin.linalg().svd(Mode::Slim, Mode::All).unwrap();
+        let st = st.unwrap();
+        let (_, nst) = st.shape();
+        let st_block = st.block((0, 0), (self.k, nst));
+        let s_block = st_block.transpose().eval();
         let s_block: Vec<T> = s_block
             .data()
             .iter()
-            .map(|&x| T::from(x))
+            .map(|&x| T::from(x).unwrap())
             .collect();
-        let s_block = Array::new(BaseArray::new(SliceContainer::new(&s_block), [nst, self.k]));
-        // unsafe { rlst_pointer_mat!['static, T, s_block.as_ptr(), (nst, self.k), (1, nst)] };
+        let s_block =
+            unsafe { rlst_pointer_mat!['static, T, s_block.as_ptr(), (nst, self.k), (1, nst)] };
 
-        let mut c = rlst_dynamic_array2![T, [self.k, self.k * ntransfer_vectors]];
+        let mut c = rlst_dynamic_mat![T, (self.k, self.k * ntransfer_vectors)];
 
         for i in 0..self.transfer_vectors.len() {
-            let top_left = [0, i * ncols];
-            let dim = [self.k, ncols];
-            let vt_block = vt.view().into_subview(top_left, dim);
+            let top_left = (0, i * ncols);
+            let dim = (self.k, ncols);
+            let vt_block = vt.block(top_left, dim);
 
-            let tmp = empty_array::<T, 2>().simple_mult_into_resize(
-                empty_array::<T, 2>().simple_mult_into_resize(sigma_mat.view(), vt_block.view()),
-                s_block.view(),
-            ); // sigma_mat.dot(&vt_block.dot(&s_block));
+            let tmp = sigma_mat.dot(&vt_block.dot(&s_block));
 
-            let top_left = [0, i * self.k];
-            let dim = [self.k, self.k];
+            let top_left = (0, i * self.k);
+            let dim = (self.k, self.k);
 
-            c.view_mut().into_subview(top_left, dim)
+            c.block_mut(top_left, dim)
                 .data_mut()
                 .copy_from_slice(tmp.data());
         }
 
-        let mut st_block = rlst_dynamic_array2!(T, [self.k, nst]);
-        st_block.fill_from(s_block.transpose());
+        let st_block = s_block.transpose().eval();
 
         SvdM2lOperatorData { u, st_block, c }
     }
 }
 
-// impl<T, U> SvdFieldTranslationKiFmm<T, U>
-impl<U> SvdFieldTranslationKiFmm<T, U>
+impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
-    // T: Float + Default,
-    // T: Scalar<Real = T>,
+    T: Float
+        + Default
+        + MultiplyAdd<
+            T,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            VectorContainer<T>,
+            Dynamic,
+            Dynamic,
+            Dynamic,
+        >,
+    DenseMatrixLinAlgBuilder<T>: Svd,
+    T: Scalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
@@ -185,7 +193,7 @@ where
             alpha,
             k: 0,
             kernel,
-            operator_data: SvdM2lOperatorData::<T>::default(),
+            operator_data: SvdM2lOperatorData::default(),
             transfer_vectors: Vec::new(),
         };
 
@@ -247,19 +255,16 @@ where
         let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
         // The child boxes in the halo of the sibling set
-        let mut sources = vec![vec![]; halo_children.len()];
+        let mut sources = vec![Vec::new(); halo_children.len()];
 
         // The sibling set
-        let mut targets = vec![vec![]; halo_children.len()];
+        let mut targets = vec![Vec::new(); halo_children.len()];
 
         // The transfer vectors corresponding to source->target translations
-        let mut transfer_vectors = vec![vec![]; halo_children.len()];
+        let mut transfer_vectors = vec![Vec::new(); halo_children.len()];
 
         // Green's function evaluations for each source, target pair interaction
-        let mut kernel_data_vec = vec![];
-        for _ in 0..halo_children.len() {
-            kernel_data_vec.push(vec![]);
-        }
+        let mut kernel_data_vec = vec![Vec::new(); halo_children.len()];
 
         // Each set of 64 M2L operators will correspond to a point in the halo
         // Computing transfer of potential from sibling set to halo
@@ -339,11 +344,11 @@ where
                     let mut padded_kernel = flip3(&padded_kernel);
 
                     // Compute FFT of padded kernel
-                    let mut padded_kernel_hat = rlst_dynamic_array3!(Complex<T>, [p, p, p / 2 + 1]);
+                    let mut padded_kernel_hat = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
 
                     T::rfft3_fftw(
-                        padded_kernel.data_mut(),
-                        padded_kernel_hat.data_mut(),
+                        padded_kernel.get_data_mut(),
+                        padded_kernel_hat.get_data_mut(),
                         &[p, p, p],
                     );
 
@@ -352,8 +357,7 @@ where
                     // Fill with zeros when interaction doesn't exist
                     let n = 2 * order - 1;
                     let p = n + 1;
-                    let padded_kernel_hat_zeros =
-                        rlst_dynamic_array3!(Complex<T>, [p, p, p / 2 + 1]);
+                    let padded_kernel_hat_zeros = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
                     kernel_data_vec[i].push(padded_kernel_hat_zeros);
                 }
             }
@@ -369,7 +373,7 @@ where
             for j in 0..nconvolutions {
                 let offset = j * size_real;
                 kernel_data[i][offset..offset + size_real]
-                    .copy_from_slice(kernel_data_vec[i][j].data())
+                    .copy_from_slice(kernel_data_vec[i][j].get_data())
             }
         }
 
@@ -490,7 +494,7 @@ where
         target_pt: [T; 3],
     ) -> Array3D<T> {
         let n = 2 * order - 1;
-        let mut result = rlst_dynamic_array3!(T, [n, n, n]);
+        let mut result = Array3D::<T>::new((n, n, n));
         let nconv = n.pow(3);
 
         let mut kernel_evals = vec![T::zero(); nconv];
@@ -502,7 +506,7 @@ where
             &mut kernel_evals[..],
         );
 
-        result.data_mut().copy_from_slice(&kernel_evals[..]);
+        result.get_data_mut().copy_from_slice(&kernel_evals[..]);
 
         result
     }
@@ -515,7 +519,7 @@ where
     pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
         let n = 2 * order - 1;
         let n_tot = n * n * n;
-        let mut result = rlst_dynamic_array3!(T, [n, n, n]);
+        let mut result = Array3D::new((n, n, n));
 
         let mut tmp = vec![T::zero(); n_tot];
 
@@ -532,7 +536,7 @@ where
             }
         }
 
-        result.data_mut().copy_from_slice(&tmp[..]);
+        result.get_data_mut().copy_from_slice(&tmp[..]);
 
         result
     }
@@ -545,7 +549,7 @@ mod test {
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use cauchy::{c32, c64};
     use num::complex::Complex;
-    use rlst_dense::traits::RandomAccessMut;
+    use rlst::dense::RandomAccessMut;
 
     #[test]
     pub fn test_svd_operator_data() {
@@ -563,9 +567,9 @@ mod test {
         let m2l = svd.compute_m2l_operators(order, domain);
 
         // Test that the rank cutoff has been taken correctly (k < ncoeffs)
-        assert_eq!(m2l.st_block.shape(), [k, svd.ncoeffs(order)]);
-        assert_eq!(m2l.c.shape(), [k, k * ntransfer_vectors]);
-        assert_eq!(m2l.u.shape(), [svd.ncoeffs(order), k]);
+        assert_eq!(m2l.st_block.shape(), (k, svd.ncoeffs(order)));
+        assert_eq!(m2l.c.shape(), (k, k * ntransfer_vectors));
+        assert_eq!(m2l.u.shape(), (svd.ncoeffs(order), k));
 
         // Test that the rank cutoff has been taken correctly (k > ncoeffs)
         let k = 100;
@@ -573,22 +577,22 @@ mod test {
         let m2l = svd.compute_m2l_operators(order, domain);
         assert_eq!(
             m2l.st_block.shape(),
-            [svd.ncoeffs(order), svd.ncoeffs(order)]
+            (svd.ncoeffs(order), svd.ncoeffs(order))
         );
         assert_eq!(
             m2l.c.shape(),
-            [svd.ncoeffs(order), svd.ncoeffs(order) * ntransfer_vectors]
+            (svd.ncoeffs(order), svd.ncoeffs(order) * ntransfer_vectors)
         );
-        assert_eq!(m2l.u.shape(), [svd.ncoeffs(order), svd.ncoeffs(order)]);
+        assert_eq!(m2l.u.shape(), (svd.ncoeffs(order), svd.ncoeffs(order)));
 
         // Test that the rank cutoff has been taken correctly (k unspecified)
         let k = None;
         let default_k = 50;
         let svd = SvdFieldTranslationKiFmm::new(kernel, k, order, domain, alpha);
         let m2l = svd.compute_m2l_operators(order, domain);
-        assert_eq!(m2l.st_block.shape(), [default_k, svd.ncoeffs(order)]);
-        assert_eq!(m2l.c.shape(), [default_k, default_k * ntransfer_vectors]);
-        assert_eq!(m2l.u.shape(), [svd.ncoeffs(order), default_k]);
+        assert_eq!(m2l.st_block.shape(), (default_k, svd.ncoeffs(order)));
+        assert_eq!(m2l.c.shape(), (default_k, default_k * ntransfer_vectors));
+        assert_eq!(m2l.u.shape(), (svd.ncoeffs(order), default_k));
     }
 
     #[test]
@@ -632,10 +636,10 @@ mod test {
 
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_dynamic_array2![f64, [ncoeffs, 1]];
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
         for i in 0..ncoeffs {
-            *multipole.get_mut([i, 0]).unwrap() = i as f64;
+            *multipole.get_mut(i, 0).unwrap() = i as f64;
         }
 
         // Create field translation object
@@ -654,23 +658,18 @@ mod test {
             .position(|x| x.hash == transfer_vector.hash)
             .unwrap();
 
-        let nrows = svd.operator_data.c.shape()[0];
-        let top_left = [0, c_idx * svd.k];
-        let dim = [nrows, svd.k];
+        let (nrows, _) = svd.operator_data.c.shape();
+        let top_left = (0, c_idx * svd.k);
+        let dim = (nrows, svd.k);
 
-        let c_sub = svd.operator_data.c.into_subview(top_left, dim);
+        let c_sub = svd.operator_data.c.block(top_left, dim);
 
-        let compressed_multipole = empty_array::<f64, 2>()
-            .simple_mult_into_resize(svd.operator_data.st_block.view(), multipole.view()); //svd.operator_data.st_block.dot(&multipole).eval();
+        let compressed_multipole = svd.operator_data.st_block.dot(&multipole).eval();
 
-        let compressed_check_potential = empty_array::<f64, 2>()
-            .simple_mult_into_resize(c_sub.view(), compressed_multipole.view()); //c_sub.dot(&compressed_multipole);
+        let compressed_check_potential = c_sub.dot(&compressed_multipole);
 
         // Post process to find check potential
-        let check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
-            svd.operator_data.u.view(),
-            compressed_check_potential.view(),
-        ); // svd.operator_data.u.dot(&compressed_check_potential).eval();
+        let check_potential = svd.operator_data.u.dot(&compressed_check_potential).eval();
 
         let sources = transfer_vector
             .source
@@ -722,10 +721,10 @@ mod test {
 
         // Some expansion data998
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_dynamic_array2![f64, [ncoeffs, 1]];
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
         for i in 0..ncoeffs {
-            *multipole.get_mut([i, 0]).unwrap() = i as f64;
+            *multipole.get_mut(i, 0).unwrap() = i as f64;
         }
 
         let level = 2;
@@ -796,7 +795,7 @@ mod test {
 
         // Compute kernel from source/target pair
         let test_kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
-        let [m, n, o] = test_kernel.shape();
+        let (m, n, o) = test_kernel.shape();
         let p = m + 1;
         let q = n + 1;
         let r = o + 1;
@@ -805,14 +804,14 @@ mod test {
         let mut padded_kernel = flip3(&padded_kernel);
 
         // Compute FFT of padded kernel
-        let mut padded_kernel_hat = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
+        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
         f64::rfft3_fftw(
-            padded_kernel.data_mut(),
-            padded_kernel_hat.data_mut(),
+            padded_kernel.get_data_mut(),
+            padded_kernel_hat.get_data_mut(),
             &[p, q, r],
         );
 
-        for (p, t) in padded_kernel_hat.data().iter().zip(kernel_hat.iter()) {
+        for (p, t) in padded_kernel_hat.get_data().iter().zip(kernel_hat.iter()) {
             assert!((p - t).norm() < 1e-6)
         }
     }
@@ -886,10 +885,10 @@ mod test {
 
         // Some expansion data
         let ncoeffs = 6 * (order - 1).pow(2) + 2;
-        let mut multipole = rlst_dynamic_array2![f64, [ncoeffs, 1]];
+        let mut multipole = rlst_dynamic_mat![f64, (ncoeffs, 1)];
 
         for i in 0..ncoeffs {
-            *multipole.get_mut([i, 0]).unwrap() = i as f64;
+            *multipole.get_mut(i, 0).unwrap() = i as f64;
         }
 
         // Create field translation object
@@ -905,18 +904,18 @@ mod test {
 
         // Compute FFT of the representative signal
         let signal = fft.compute_signal(order, multipole.data());
-        let [m, n, o] = signal.shape();
+        let &(m, n, o) = signal.shape();
         let p = m + 1;
         let q = n + 1;
         let r = o + 1;
         let pad_size = (p - m, q - n, r - o);
         let pad_index = (p - m, q - n, r - o);
         let mut padded_signal = pad3(&signal, pad_size, pad_index);
-        let mut padded_signal_hat = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
+        let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
 
         f64::rfft3_fftw(
-            padded_signal.data_mut(),
-            padded_signal_hat.data_mut(),
+            padded_signal.get_data_mut(),
+            padded_signal_hat.get_data_mut(),
             &[p, q, r],
         );
 
@@ -954,7 +953,7 @@ mod test {
 
         // Compute kernel
         let kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
-        let [m, n, o] = kernel.shape();
+        let (m, n, o) = kernel.shape();
         let p = m + 1;
         let q = n + 1;
         let r = o + 1;
@@ -963,28 +962,28 @@ mod test {
         let mut padded_kernel = flip3(&padded_kernel);
 
         // Compute FFT of padded kernel
-        let mut padded_kernel_hat = rlst_dynamic_array3!(c64, [p, q, r / 2 + 1]);
+        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
         f64::rfft3_fftw(
-            padded_kernel.data_mut(),
-            padded_kernel_hat.data_mut(),
+            padded_kernel.get_data_mut(),
+            padded_kernel_hat.get_data_mut(),
             &[p, q, r],
         );
 
         // Compute convolution
-        let mut hadamard_product = padded_signal_hat
-            .data()
+        let hadamard_product = padded_signal_hat
+            .get_data()
             .iter()
-            .zip(padded_kernel_hat.data().iter())
+            .zip(padded_kernel_hat.get_data().iter())
             .map(|(a, b)| a * b)
             .collect_vec();
 
-        // let mut hadamard_product = Array::new(BaseArray::new(SliceContainer::new(&hadamard_product), [p, q, r / 2 + 1]));
+        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
 
-        let mut potentials = rlst_dynamic_array3!(f64, [p, q, r]);
+        let mut potentials = Array3D::new((p, q, r));
 
         f64::irfft3_fftw(
-            &mut hadamard_product,
-            potentials.data_mut(),
+            hadamard_product.get_data_mut(),
+            potentials.get_data_mut(),
             &[p, q, r],
         );
 
@@ -997,7 +996,7 @@ mod test {
         let zs = &multi_indices[2 * ntargets..];
 
         for i in 0..ntargets {
-            let val = potentials.get([zs[i], ys[i], xs[i]]).unwrap();
+            let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
             tmp.push(*val);
         }
 

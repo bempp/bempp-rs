@@ -1,14 +1,12 @@
 //! Functionality for handling 3D arrays
 //! # Warning
 //! This module awaits deprecation with the addition of N-Dimensional tensor handling in rlst.
-use bempp_tools::Array3D;
-use cauchy::Scalar;
 use itertools::Itertools;
 use num::traits::Num;
-use rlst_dense::{
-    rlst_dynamic_array3,
-    traits::{RandomAccessByRef, RandomAccessMut, Shape},
-};
+
+use bempp_tools::Array3D;
+use bempp_traits::arrays::Array3DAccess;
+
 /// Return indices that sort a vec.
 ///
 /// # Arguments
@@ -33,9 +31,9 @@ pub fn pad3<T>(
     pad_index: (usize, usize, usize),
 ) -> Array3D<T>
 where
-    T: Clone + Copy + Num + Scalar,
+    T: Clone + Copy + Num,
 {
-    let [m, n, o] = arr.shape();
+    let &(m, n, o) = arr.shape();
 
     let (x, y, z) = pad_index;
     let (p, q, r) = pad_size;
@@ -43,12 +41,12 @@ where
     // Check that there is enough space for pad
     assert!(x + p <= m + p && y + q <= n + q && z + r <= o + r);
 
-    let mut padded = rlst_dynamic_array3!(T, [p + m, q + n, r + o]);
+    let mut padded = Array3D::new((p + m, q + n, r + o));
 
     for i in 0..m {
         for j in 0..n {
             for k in 0..o {
-                *padded.get_mut([x + i, y + j, z + k]).unwrap() = *arr.get([i, j, k]).unwrap();
+                *padded.get_mut(x + i, y + j, z + k).unwrap() = *arr.get(i, j, k).unwrap();
             }
         }
     }
@@ -62,17 +60,17 @@ where
 /// * `arr` - An array to be flipped.
 pub fn flip3<T>(arr: &Array3D<T>) -> Array3D<T>
 where
-    T: Clone + Copy + Num + Scalar,
+    T: Clone + Copy + Num,
 {
-    let mut flipped = rlst_dynamic_array3!(T, arr.shape());
+    let mut flipped = Array3D::new(*arr.shape());
 
-    let [m, n, o] = arr.shape();
+    let &(m, n, o) = arr.shape();
 
     for i in 0..m {
         for j in 0..n {
             for k in 0..o {
-                *flipped.get_mut([i, j, k]).unwrap() =
-                    *arr.get([m - i - 1, n - j - 1, o - k - 1]).unwrap();
+                *flipped.get_mut(i, j, k).unwrap() =
+                    *arr.get(m - i - 1, n - j - 1, o - k - 1).unwrap();
             }
         }
     }
@@ -82,8 +80,8 @@ where
 
 #[cfg(test)]
 mod test {
+
     use super::*;
-    use approx::*;
 
     #[test]
     fn test_argsort() {
@@ -105,37 +103,28 @@ mod test {
     #[test]
     fn test_flip3() {
         let n = 2;
-        let mut arr = rlst_dynamic_array3!(f64, [n, n, n]);
+        let mut arr: Array3D<usize> = Array3D::new((n, n, n));
         for i in 0..n {
             for j in 0..n {
                 for k in 0..n {
-                    *arr.get_mut([i, j, k]).unwrap() = (i + j * n + k * n * n) as f64;
+                    *arr.get_mut(i, j, k).unwrap() = i + j * n + k * n * n;
                 }
             }
         }
-        let expected = vec![
-            vec![vec![7.0, 3.0], vec![5.0, 1.0]],
-            vec![vec![6.0, 2.0], vec![4.0, 0.0]],
-        ];
-        let result = flip3(&arr);
-        for i in 0..n {
-            for j in 0..n {
-                for k in 0..n {
-                    assert_relative_eq!(*result.get([i, j, k]).unwrap(), expected[i][j][k]);
-                }
-            }
-        }
+        let expected = vec![7, 3, 5, 1, 6, 2, 4, 0];
+        let result = flip3(&arr).get_data().to_vec();
+        assert_eq!(result, expected);
     }
 
     #[test]
     fn test_pad3() {
         let dim = 3;
         // Initialise input data
-        let mut input = rlst_dynamic_array3!(f64, [dim, dim, dim]);
+        let mut input = Array3D::new((dim, dim, dim));
         for i in 0..dim {
             for j in 0..dim {
                 for k in 0..dim {
-                    *input.get_mut([i, j, k]).unwrap() = (i + j * dim + k * dim * dim + 1) as f64
+                    *input.get_mut(i, j, k).unwrap() = (i + j * dim + k * dim * dim + 1) as f64
                 }
             }
         }
@@ -145,7 +134,7 @@ mod test {
         let pad_index = (0, 0, 0);
         let padded = pad3(&input, pad_size, pad_index);
 
-        let [m, n, o] = padded.shape();
+        let &(m, n, o) = padded.shape();
 
         // Check dimension
         assert_eq!(m, dim + pad_size.0);
@@ -156,7 +145,7 @@ mod test {
         for i in dim..m {
             for j in dim..n {
                 for k in dim..o {
-                    assert_eq!(*padded.get([i, j, k]).unwrap(), 0f64)
+                    assert_eq!(*padded.get(i, j, k).unwrap(), 0f64)
                 }
             }
         }
@@ -164,10 +153,7 @@ mod test {
         for i in 0..dim {
             for j in 0..dim {
                 for k in 0..dim {
-                    assert_eq!(
-                        *padded.get([i, j, k]).unwrap(),
-                        *input.get([i, j, k]).unwrap()
-                    )
+                    assert_eq!(*padded.get(i, j, k).unwrap(), *input.get(i, j, k).unwrap())
                 }
             }
         }
@@ -181,7 +167,7 @@ mod test {
         for i in 0..pad_index.0 {
             for j in 0..pad_index.1 {
                 for k in 0..pad_index.2 {
-                    assert_eq!(*padded.get([i, j, k]).unwrap(), 0f64)
+                    assert_eq!(*padded.get(i, j, k).unwrap(), 0f64)
                 }
             }
         }
@@ -191,9 +177,9 @@ mod test {
                 for k in 0..dim {
                     assert_eq!(
                         *padded
-                            .get([i + pad_index.0, j + pad_index.1, k + pad_index.2])
+                            .get(i + pad_index.0, j + pad_index.1, k + pad_index.2)
                             .unwrap(),
-                        *input.get([i, j, k]).unwrap()
+                        *input.get(i, j, k).unwrap()
                     );
                 }
             }
