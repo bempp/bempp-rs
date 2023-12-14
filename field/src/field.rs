@@ -218,7 +218,7 @@ where
 
 impl<T, U> FieldTranslationData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + Fft<FftMatrix<T>, FftMatrix<Complex<T>>>,
+    T: Scalar<Real = T> + Float + Default + Fft,
     Complex<T>: Scalar,
     U: Kernel<T = T> + Default,
 {
@@ -406,7 +406,7 @@ where
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Float + Scalar<Real = T> + Default + Fft<FftMatrix<T>, FftMatrix<Complex<T>>>,
+    T: Float + Scalar<Real = T> + Default + Fft,
     Complex<T>: Scalar,
     U: Kernel<T = T> + Default,
 {

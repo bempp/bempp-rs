@@ -684,7 +684,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
@@ -752,8 +752,12 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        // println!("potentials {:?}", potentials);
+        // println!("direct {:?}", direct);
+        println!("rel error {:?}", rel_error);
 
         assert!(rel_error <= 1e-6);
+        assert!(false);
     }
 
     #[test]
@@ -840,5 +844,6 @@ mod test {
         println!("rel_error {:?}", rel_error);
 
         assert!(rel_error <= 1e-6);
+        
     }
 }

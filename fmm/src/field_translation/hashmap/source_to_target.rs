@@ -200,12 +200,7 @@ where
         + std::marker::Send
         + std::marker::Sync
         + Default,
-    U: Scalar<Real = U>
-        + Float
-        + Default
-        + std::marker::Send
-        + std::marker::Sync
-        + Fft<FftMatrix<U>, FftMatrix<Complex<U>>>,
+    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
     Complex<U>: Scalar,
     U: MultiplyAdd<
         U,
@@ -247,6 +242,8 @@ where
             let target = targets[i];
             let source_multipole_arc = Arc::clone(self.multipoles.get(&target).unwrap());
             let source_multipole_lock = source_multipole_arc.lock().unwrap();
+
+            // TOD: Fix this, this is broken with new signal computation.
             let signal = self
                 .fmm
                 .m2l
@@ -259,7 +256,11 @@ where
         // let mut padded_signals_hat = rlst_col_vec![Complex<U>, size_real * ntargets];
         let mut padded_signals_hat = vec![Complex::<U>::default(); size_real * ntargets];
 
-        U::rfft3_fftw_par_vec(&mut padded_signals, &mut padded_signals_hat, &[p, q, r]);
+        U::rfft3_fftw_par_slice(
+            &mut padded_signals[..],
+            &mut padded_signals_hat[..],
+            &[p, q, r],
+        );
 
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         let ntargets = targets.len();
@@ -397,7 +398,7 @@ where
             }); // over each sibling set
         });
 
-        U::irfft_fftw_par_vec(
+        U::irfft3_fftw_par_slice(
             &mut global_check_potentials_hat,
             &mut global_check_potentials,
             &[p, q, r],

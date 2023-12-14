@@ -50,8 +50,9 @@ pub const DIRECTIONS: [[i64; 3]; 26] = [
     [1, 0, 0],
     [1, 0, 1],
     [1, 1, 0],
-    [1, 1, 1]
+    [1, 1, 1] 
 ];
+
 
 /// Lookup tables for encoding 'z' position in a Morton encoding from Cartesian coordinates.
 pub const Z_LOOKUP_ENCODE: [KeyType; 256] = [
