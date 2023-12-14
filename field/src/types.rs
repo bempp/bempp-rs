@@ -127,22 +127,3 @@ where
     }
 }
 
-/// Type alias for real coefficients for into FFTW wrappers
-// pub type FftMatrixf64 = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
-pub type FftMatrixf64 = Vec<f64>;
-
-/// Type alias for real coefficients for into FFTW wrappers
-// pub type FftMatrixf32 = Matrix<f32, BaseMatrix<f32, VectorContainer<f32>, Dynamic>, Dynamic>;
-pub type FftMatrixf32 = Vec<f32>;
-
-/// Type alias for complex coefficients for FFTW wrappers
-// pub type FftMatrixc64 = Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic>, Dynamic>;
-pub type FftMatrixc64 = Vec<c64>;
-
-/// Type alias for complex coefficients for FFTW wrappers
-// pub type FftMatrixc32 = Matrix<c32, BaseMatrix<c32, VectorContainer<c32>, Dynamic>, Dynamic>;
-pub type FftMatrixc32 = Vec<c32>;
-
-/// Type alias for real coefficients for into FFTW wrappers
-// pub type FftMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
-pub type FftMatrix<T> = Vec<T>;

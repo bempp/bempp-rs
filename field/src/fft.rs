@@ -3,7 +3,6 @@ use fftw::{plan::*, types::*};
 use num::Complex;
 use rayon::prelude::*;
 
-use crate::types::{FftMatrixc32, FftMatrixc64, FftMatrixf32, FftMatrixf64};
 
 pub trait Fft
 where

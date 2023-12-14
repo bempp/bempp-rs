@@ -16,7 +16,7 @@ use std::{
 use bempp_field::{
     array::pad3,
     fft::Fft,
-    types::{FftFieldTranslationKiFmm, FftMatrix, SvdFieldTranslationKiFmm},
+    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
 };
 
 use bempp_traits::{
@@ -338,7 +338,7 @@ where
         let Some(targets) = self.fmm.tree().get_keys(level) else {
             return;
         };
-        let s = Instant::now();
+        // let s = Instant::now();
         // Form signals to use for convolution first
         let n = 2 * self.fmm.order - 1;
         let ntargets = targets.len();
@@ -449,7 +449,7 @@ where
             let ptr = check_potentials_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
             check_potentials_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * ntargets);
         }
-        println!("l={:?} Pre processing time {:?}", level, s.elapsed());
+        // println!("l={:?} Pre processing time {:?}", level, s.elapsed());
         
         // // Test that the signals in frequency order are correct
         // if level == 3 {
@@ -461,7 +461,7 @@ where
         ////////////////////////////////////////////////////////////////////////////////////
         let zeros = vec![Complex::<U>::zero(); nsiblings];
         let scale = Complex::from(self.m2l_scale(level));
-        let s = Instant::now();
+        // let s = Instant::now();
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         (0..size_real)
             .into_par_iter()
@@ -498,14 +498,12 @@ where
         // if level == 2 {
         //     println!("check_potentials_hat_f {:?}", &check_potentials_hat_f[ntargets..2*ntargets]);
         // }
-        println!("l={:?} kernel time {:?}", level, s.elapsed());
+        // println!("l={:?} kernel time {:?}", level, s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
 
         ////////////////////////////////////////////////////////////////////////////////////
-        let s = Instant::now();
+        // let s = Instant::now();
 
-        let level_locals = &self.level_locals[level as usize];
-        
         // First step is to get check potentials back into target order from frequency order
         let mut check_potential_hat = vec![U::zero(); size_real * ntargets * 2];
         let mut check_potential = vec![U::zero(); size * ntargets];
@@ -568,7 +566,7 @@ where
 
             });
         
-        println!("l={:?} post processing time {:?}", level, s.elapsed());
+        // println!("l={:?} post processing time {:?}", level, s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
     }
 

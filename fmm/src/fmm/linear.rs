@@ -711,7 +711,9 @@ mod test {
 
         let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
 
-        datatree.run(false);
+        let s = Instant::now();
+        let times = datatree.run(true);
+        println!("runtime {:?}, operator times {:?}", s.elapsed(), times);
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];

@@ -30,7 +30,7 @@ use crate::{
     fft::Fft,
     transfer_vector::compute_transfer_vectors,
     types::{
-        FftFieldTranslationKiFmm, FftM2lOperatorData, FftMatrix, SvdFieldTranslationKiFmm,
+        FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm,
         SvdM2lOperatorData, TransferVector,
     },
 };

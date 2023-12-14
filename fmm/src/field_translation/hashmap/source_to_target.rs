@@ -13,7 +13,7 @@ use rayon::prelude::*;
 use bempp_field::{
     array::pad3,
     fft::Fft,
-    types::{FftFieldTranslationKiFmm, FftMatrix, SvdFieldTranslationKiFmm},
+    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
 };
 
 use bempp_traits::{
