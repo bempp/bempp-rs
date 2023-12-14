@@ -10,7 +10,8 @@ use num::{Complex, Float, Zero};
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
-    time::Instant, ops::Add,
+    ops::Add,
+    time::Instant,
 };
 
 use bempp_field::{
@@ -28,7 +29,7 @@ use bempp_traits::{
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::types::{FmmDataLinear, KiFmmLinear, SendPtrMut, SendPtr};
+use crate::types::{FmmDataLinear, KiFmmLinear, SendPtr, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
@@ -42,111 +43,11 @@ pub fn size_real(order: usize) -> usize {
     p * p * (p / 2 + 1) // Number of Fourier coefficients when working with real data
 }
 
-pub fn nleaves(level: usize) -> usize {
-    8i32.pow(level as u32) as usize
-}
-
 pub fn nparents(level: usize) -> usize {
     8i32.pow((level - 1) as u32) as usize
 }
 
-pub fn signal_freq_order_cplx_optimized<U>(
-    order: usize,
-    level: usize,
-    signal: &[Complex<U>],
-) -> Vec<Vec<Complex<U>>>
-where
-    U: Scalar,
-{
-    let size_real = size_real(order);
-    let nleaves = nleaves(level);
-
-    (0..size_real)
-        .map(|i| {
-            let mut tmp = (0..nleaves)
-                .map(|j| signal[j * size_real + i])
-                .collect::<Vec<_>>();
-
-            // Pad with zeros
-            tmp.extend(std::iter::repeat(Complex::new(U::zero(), U::zero())).take(8));
-
-            tmp
-        })
-        .collect()
-}
-
-pub unsafe fn check_potentials_freq_cplx<U>(
-    order: usize,
-    level: usize,
-    check_potentials: &mut Vec<Complex<U>>,
-) -> Vec<Vec<SendPtrMut<Complex<U>>>>
-where
-    U: Scalar,
-{
-    let size_real = size_real(order); // Number of Fourier coefficients when working with real data
-    let nleaves = nleaves(level);
-    let mut check_potentials_freq = vec![Vec::new(); size_real];
-
-    let ptr = check_potentials.as_mut_ptr();
-
-    for (i, elem) in check_potentials_freq.iter_mut().enumerate().take(size_real) {
-        for j in 0..nleaves {
-            let raw = ptr.offset((j * size_real + i).try_into().unwrap());
-            let send_ptr = SendPtrMut { raw };
-            elem.push(send_ptr);
-        }
-    }
-
-    check_potentials_freq
-}
-
-pub fn displacements<U>(
-    tree: &SingleNodeTree<U>,
-    level: u64,
-    target_map_leaves: &HashMap<&MortonKey, usize>,
-) -> Vec<Vec<Vec<usize>>>
-where
-    U: Float + Default + Scalar<Real = U>,
-{
-    let leaves = tree.get_keys(level).unwrap();
-    let nleaves = leaves.len();
-
-    let mut all_displacements = Vec::new();
-
-    leaves.chunks_exact(8).for_each(|sibling_chunk| {
-        let parent_neighbours = sibling_chunk[0].parent().all_neighbors();
-        let displacements = parent_neighbours
-            .iter()
-            .map(|pn| {
-                let mut tmp = Vec::new();
-
-                if let Some(pn) = pn {
-                    if tree.keys_set.contains(pn) {
-                        let mut children = pn.children();
-                        children.sort();
-                        for child in children.iter() {
-                            tmp.push(*target_map_leaves.get(child).unwrap())
-                        }
-                    } else {
-                        for i in 0..8 {
-                            tmp.push(nleaves + i);
-                        }
-                    }
-                } else {
-                    for i in 0..8 {
-                        tmp.push(nleaves + i)
-                    }
-                }
-                tmp
-            })
-            .collect_vec();
-        all_displacements.push(displacements)
-    });
-
-    all_displacements
-}
-
-fn displacements_new<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<Option<usize>>>
+fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<Option<usize>>>
 where
     U: Float + Default + Scalar<Real = U>,
 {
@@ -341,7 +242,6 @@ where
         // let s = Instant::now();
         // Form signals to use for convolution first
         let n = 2 * self.fmm.order - 1;
-        let ntargets = targets.len();
         let nparents = nparents(level as usize);
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
@@ -354,7 +254,7 @@ where
         let r = o + 1;
         let size = p * q * r;
         let size_real = p * q * (r / 2 + 1);
-        let all_displacements = displacements_new(&self.fmm.tree(), level);
+        let all_displacements = displacements(&self.fmm.tree(), level);
 
         let ntargets = targets.len();
         let min = &targets[0];
@@ -364,6 +264,8 @@ where
 
         let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
+        ////////////////////////////////////////////////////////////////////////////////////
+        // Pre processing
         ////////////////////////////////////////////////////////////////////////////////////
         // Pre processing without using parallel FFT implementation
         // Allocation of Complex vector
@@ -375,10 +277,9 @@ where
         }
 
         let raw = signals_hat_f.as_mut_ptr();
-        let signals_hat_f_ptr = SendPtrMut{raw};
+        let signals_hat_f_ptr = SendPtrMut { raw };
 
         // Find offsets for each frequency location and store using send pointers
-
         multipoles
             .par_chunks_exact(ncoeffs * nsiblings)
             .enumerate()
@@ -409,22 +310,24 @@ where
                 let signal_hat_chunk_f_c;
                 unsafe {
                     let ptr = signal_hat_chunk_f_buffer.as_ptr() as *mut Complex<U>;
-                    signal_hat_chunk_f_c = std::slice::from_raw_parts_mut(ptr, size_real * nsiblings);
+                    signal_hat_chunk_f_c =
+                        std::slice::from_raw_parts_mut(ptr, size_real * nsiblings);
                 }
 
                 for i in 0..size_real {
                     for j in 0..nsiblings {
-                        signal_hat_chunk_f_c[nsiblings * i + j] = signal_hat_chunk_c[size_real * j + i]
+                        signal_hat_chunk_f_c[nsiblings * i + j] =
+                            signal_hat_chunk_c[size_real * j + i]
                     }
                 }
 
                 // Storing the results of the FFT in frequency order
                 unsafe {
                     let sibling_offset = i * nsiblings;
-                    
+
                     // Pointer to storage buffer for frequency ordered FFT of signals
                     let ptr = signals_hat_f_ptr;
-                    
+
                     for i in 0..size_real {
                         let frequency_offset = i * ntargets;
 
@@ -432,7 +335,7 @@ where
                         let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
                         // store results for this frequency for this sibling set
-                        let results_i = &signal_hat_chunk_f_c[i*8..(i+1)*8];
+                        let results_i = &signal_hat_chunk_f_c[i * 8..(i + 1) * 8];
 
                         for &res in results_i {
                             *head += res;
@@ -449,58 +352,92 @@ where
             let ptr = check_potentials_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
             check_potentials_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * ntargets);
         }
-        // println!("l={:?} Pre processing time {:?}", level, s.elapsed());
-        
-        // // Test that the signals in frequency order are correct
-        // if level == 3 {
-        //     println!("signal hat f {:?}", &signals_hat_f[0..ntargets])
-        // }
         ////////////////////////////////////////////////////////////////////////////////////
-
-
+        // M2L Kernel
         ////////////////////////////////////////////////////////////////////////////////////
         let zeros = vec![Complex::<U>::zero(); nsiblings];
         let scale = Complex::from(self.m2l_scale(level));
         // let s = Instant::now();
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
+        let chunksize = 512;
+
+        // (0..size_real)
+        //     .into_par_iter()
+        //     .zip(signals_hat_f.par_chunks_exact(ntargets))
+        //     .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+        //     .for_each(|((freq, signal_freq), check_potentials_freq)| {
+        //         (0..nparents).for_each(|parent_index| {
+        //             let save_locations =
+        //                 &mut check_potentials_freq[(parent_index * 8)..(parent_index + 1) * 8];
+
+        //             for (i, kernel_data) in kernel_data_halo.iter().enumerate() {
+        //                 let frequency_offset = 64 * freq;
+        //                 let kernel_data_freq =
+        //                     &kernel_data[frequency_offset..(frequency_offset + 64)];
+        //                 let displacement = &all_displacements[i][parent_index];
+
+        //                 let mut signal = &zeros[..];
+        //                 if let Some(displacement) = displacement {
+        //                     signal = &signal_freq[displacement * 8..(displacement + 1) * 8];
+        //                 }
+
+        //                 unsafe {
+        //                     matmul8x8x2_cplx_simple_local(
+        //                         &kernel_data_freq,
+        //                         signal,
+        //                         save_locations,
+        //                         scale,
+        //                     );
+        //                 }
+        //             }
+        //         });
+        //     });
+
         (0..size_real)
+            .into_par_iter()
             .into_par_iter()
             .zip(signals_hat_f.par_chunks_exact(ntargets))
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
             .for_each(|((freq, signal_freq), check_potentials_freq)| {
+                (0..nparents)
+                    .step_by(chunksize)
+                    .enumerate()
+                    .for_each(|(c, chunk_start)| {
+                        let chunk_end = std::cmp::min(chunk_start + chunksize, nparents);
 
-                (0..nparents).for_each(|parent_index| {
-                    let save_locations = &mut check_potentials_freq[(parent_index*8)..(parent_index + 1)*8];
+                        let save_locations =
+                            &mut check_potentials_freq[chunk_start * 8..(chunk_end) * 8];
 
-                    for (i, kernel_data) in kernel_data_halo.iter().enumerate() {
-                        let frequency_offset = 64 * freq;
-                        let kernel_data_freq = &kernel_data[frequency_offset..(frequency_offset + 64)];
-                        let displacement = &all_displacements[i][parent_index];
+                        for (i, kernel_data) in kernel_data_halo.iter().enumerate().take(26) {
+                            let frequency_offset = 64 * freq;
+                            let kernel_data_freq =
+                                &kernel_data[frequency_offset..(frequency_offset + 64)].to_vec();
 
-                        let signal: &[Complex<U>];
-                        if let Some(displacement) = displacement {
-                            signal = &signal_freq[displacement*8..(displacement+1)*8];
-                        } else {
-                            signal = &zeros[..];
+                            // Lookup signals
+                            let displacements = &all_displacements[i][chunk_start..chunk_end];
+
+                            let mut signal = &zeros[..];
+
+                            for j in 0..(chunk_end - chunk_start) {
+                                if let Some(displacement) = displacements[j] {
+                                    signal = &signal_freq[displacement * 8..(displacement + 1) * 8]
+                                }
+
+                                unsafe {
+                                    matmul8x8x2_cplx_simple_local(
+                                        kernel_data_freq,
+                                        signal,
+                                        &mut save_locations[j * 8..(j + 1) * 8],
+                                        scale,
+                                    )
+                                }
+                            }
                         }
-                        unsafe {
-                            matmul8x8x2_cplx_simple_local(&kernel_data_freq, signal, save_locations, scale);
-                        }
-                    }
-                    // if freq == 0 && level == 2 {
-                    //     println!("check potentials freq 0 {:?}", local_save_locations)
-                    // }
-                });
-
-
+                    });
             });
 
-        // if level == 2 {
-        //     println!("check_potentials_hat_f {:?}", &check_potentials_hat_f[ntargets..2*ntargets]);
-        // }
-        // println!("l={:?} kernel time {:?}", level, s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
-
+        // Post processing
         ////////////////////////////////////////////////////////////////////////////////////
         // let s = Instant::now();
 
@@ -508,52 +445,57 @@ where
         let mut check_potential_hat = vec![U::zero(); size_real * ntargets * 2];
         let mut check_potential = vec![U::zero(); size * ntargets];
         let check_potential_hat_c;
-        unsafe { 
+        unsafe {
             let ptr = check_potential_hat.as_mut_ptr() as *mut Complex<U>;
             check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_real)
         }
 
-        check_potential_hat_c.par_chunks_exact_mut(size_real).enumerate().for_each(|(i, check_potential_hat_chunk)| {
+        check_potential_hat_c
+            .par_chunks_exact_mut(size_real)
+            .enumerate()
+            .for_each(|(i, check_potential_hat_chunk)| {
+                // Lookup all frequencies for this target box
+                for j in 0..size_real {
+                    check_potential_hat_chunk[j] = check_potentials_hat_f[j * ntargets + i]
+                }
+            });
 
-            // Lookup all frequencies for this target box
-            for j in 0..size_real {
-                check_potential_hat_chunk[j] = check_potentials_hat_f[j*ntargets + i]
-            };
-        });
-    
         // Compute FFT
         U::irfft3_fftw_par_slice(check_potential_hat_c, &mut check_potential, &[p, q, r]);
 
-        check_potential.par_chunks_exact(nsiblings*size)
+        // TODO: Experiment with chunk size for post processing
+        check_potential
+            .par_chunks_exact(nsiblings * size)
             .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
             .for_each(|(check_potential_chunk, local_ptrs)| {
-
                 // Map to surface grid
-                let mut tmp = vec![U::zero(); ncoeffs*nsiblings];
+                let mut potential_buffer = vec![U::zero(); ncoeffs * nsiblings];
                 for i in 0..nsiblings {
-                    let buffer = &mut tmp[i*ncoeffs..(i+1)*ncoeffs];
-                    let check_potential = &check_potential_chunk[i*size..(i+1)*size];
+                    let tmp = &mut potential_buffer[i * ncoeffs..(i + 1) * ncoeffs];
+                    let check_potential = &check_potential_chunk[i * size..(i + 1) * size];
                     for (surf_idx, &conv_idx) in self.fmm.m2l.conv_to_surf_map.iter().enumerate() {
-                        buffer[surf_idx] = check_potential[conv_idx];
+                        tmp[surf_idx] = check_potential[conv_idx];
                     }
                 }
 
                 // Can now find local expansion coefficients
-                let check_potential_chunk = unsafe {
-                    rlst_pointer_mat!['a, U, tmp.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
+                let potential_chunk = unsafe {
+                    rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
                 };
 
                 let mut local_chunk = self
                     .fmm
                     .dc2e_inv_1
-                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential_chunk))
+                    .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
                     .eval();
-                
-                local_chunk.data_mut()
+
+                local_chunk
+                    .data_mut()
                     .iter_mut()
                     .for_each(|d| *d *= self.fmm.kernel.scale(level));
 
-                local_chunk.data()
+                local_chunk
+                    .data()
                     .chunks_exact(ncoeffs)
                     .zip(local_ptrs)
                     .for_each(|(result, local)| unsafe {
@@ -563,9 +505,8 @@ where
                             ptr = ptr.add(1)
                         }
                     });
-
             });
-        
+
         // println!("l={:?} post processing time {:?}", level, s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
     }

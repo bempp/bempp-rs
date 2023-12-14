@@ -690,7 +690,7 @@ mod test {
         let adaptive = false;
         let ncrit = 150;
 
-        let depth = 4;
+        let depth = 5;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(
@@ -764,7 +764,7 @@ mod test {
 
     #[test]
     fn test_fmm_linear_svd_f64() {
-        let npoints = 10000;
+        let npoints = 1000000;
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
@@ -775,7 +775,7 @@ mod test {
         let adaptive = false;
         let ncrit = 150;
 
-        let depth = 3;
+        let depth = 4;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(
@@ -801,7 +801,9 @@ mod test {
 
         let datatree = FmmDataLinear::new(fmm, &charge_dict).unwrap();
 
-        datatree.run(false);
+        let s = Instant::now();
+        let times = datatree.run(true);
+        println!("runtime {:?} operators {:?}", s.elapsed(), times);
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
@@ -846,6 +848,6 @@ mod test {
         println!("rel_error {:?}", rel_error);
 
         assert!(rel_error <= 1e-6);
-        
+        assert!(false);
     }
 }
