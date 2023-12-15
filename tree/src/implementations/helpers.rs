@@ -8,14 +8,12 @@ use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
-};
+use rlst::dense::{base_matrix::BaseMatrix, rlst_dynamic_mat, Dynamic, Matrix, VectorContainer};
 
 use crate::types::morton::MortonKey;
 
 /// Alias for an rlst container for point data.
-pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type PointsMat<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
 
 /// Points fixture for testing, uniformly samples in each axis from min to max.
 ///
@@ -38,7 +36,7 @@ pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUn
         between = rand::distributions::Uniform::from(T::zero()..T::one());
     }
 
-    let mut points = rlst_dynamic_array2![T, [npoints, 3]];
+    let mut points = rlst_dynamic_mat![T, (npoints, 3)];
 
     for i in 0..npoints {
         points[[i, 0]] = between.sample(&mut range);
@@ -63,7 +61,7 @@ pub fn points_fixture_col<T: Float + Scalar + rand::distributions::uniform::Samp
     let between1 = rand::distributions::Uniform::from(T::zero()..T::from(0.1).unwrap());
     let between2 = rand::distributions::Uniform::from(T::zero()..T::from(500).unwrap());
 
-    let mut points = rlst_dynamic_array2![T, [npoints, 3]];
+    let mut points = rlst_dynamic_mat![T, (npoints, 3)];
 
     for i in 0..npoints {
         // One axis has a different sampling

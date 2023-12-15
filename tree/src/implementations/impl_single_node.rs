@@ -664,7 +664,7 @@ where
 #[cfg(test)]
 mod test {
 
-    use rlst_dense::traits::RawAccess;
+    use rlst::dense::RawAccess;
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col};
 

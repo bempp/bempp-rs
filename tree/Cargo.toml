@@ -21,9 +21,7 @@ memoffset = "0.6"
 rand = "0.8.*"
 hyksort = { path = "../hyksort", optional = true }
 bempp-traits = { path = "../traits" }
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" , branch = "legacy"}
 num = "0.4"
 
 [features]
