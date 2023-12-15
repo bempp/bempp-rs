@@ -15,7 +15,7 @@ use rlst::{
         Shape, VectorContainer,
     },
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use bempp_tools::Array3D;
 use bempp_traits::{
@@ -26,12 +26,12 @@ use bempp_tree::{
 };
 
 use crate::{
-    array::{flip3, pad3},
+    array::flip3,
     fft::Fft,
     transfer_vector::compute_transfer_vectors,
     types::{
-        FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm,
-        SvdM2lOperatorData, TransferVector,
+        FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm, SvdM2lOperatorData,
+        TransferVector,
     },
 };
 
@@ -345,11 +345,7 @@ where
                     // Compute FFT of padded kernel
                     let mut kernel_hat = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
 
-                    T::rfft3_fftw(
-                        kernel.get_data_mut(),
-                        kernel_hat.get_data_mut(),
-                        &[p, p, p],
-                    );
+                    T::rfft3_fftw(kernel.get_data_mut(), kernel_hat.get_data_mut(), &[p, p, p]);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
@@ -421,7 +417,7 @@ where
         let mut result = FftFieldTranslationKiFmm {
             alpha,
             kernel,
-            surf_to_conv_map:Vec::default(),
+            surf_to_conv_map: Vec::default(),
             conv_to_surf_map: Vec::default(),
             operator_data: FftM2lOperatorData::default(),
             transfer_vectors: Vec::default(),
@@ -444,9 +440,7 @@ where
     ///
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
-    pub fn compute_surf_to_conv_map(
-        order: usize,
-    ) -> (Vec<usize>, Vec<usize>) {
+    pub fn compute_surf_to_conv_map(order: usize) -> (Vec<usize>, Vec<usize>) {
         // Number of points along each axis of convolution grid
         let n = 2 * order - 1;
         let npad = n + 1;
@@ -493,7 +487,7 @@ where
                     {
                         conv_to_surf[surf_index] = conv_index;
                         surf_index += 1;
-                    } 
+                    }
                 }
             }
         }
@@ -530,9 +524,10 @@ where
         for k in 0..n {
             for j in 0..n {
                 for i in 0..n {
-                    let conv_idx = i + j*n + k*n*n;
-                    let save_idx = i+ j*npad + k*npad*npad;
-                    result.get_data_mut()[save_idx..(save_idx+1)].copy_from_slice(&kernel_evals[(conv_idx)..(conv_idx+1)]);
+                    let conv_idx = i + j * n + k * n * n;
+                    let save_idx = i + j * npad + k * npad * npad;
+                    result.get_data_mut()[save_idx..(save_idx + 1)]
+                        .copy_from_slice(&kernel_evals[(conv_idx)..(conv_idx + 1)]);
                 }
             }
         }
@@ -548,7 +543,7 @@ where
     pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
         let n = 2 * order - 1;
         let npad = n + 1;
- 
+
         let mut result = Array3D::new((npad, npad, npad));
 
         for (i, &j) in self.surf_to_conv_map.iter().enumerate() {
@@ -920,11 +915,7 @@ mod test {
         let &(m, n, o) = signal.shape();
         let mut signal_hat = Array3D::<c64>::new((m, n, o / 2 + 1));
 
-        f64::rfft3_fftw(
-            signal.get_data_mut(),
-            signal_hat.get_data_mut(),
-            &[m, n, o],
-        );
+        f64::rfft3_fftw(signal.get_data_mut(), signal_hat.get_data_mut(), &[m, n, o]);
 
         let source_equivalent_surface = transfer_vector
             .source
@@ -966,11 +957,7 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut kernel_hat = Array3D::<c64>::new((m, n, o / 2 + 1));
-        f64::rfft3_fftw(
-            kernel.get_data_mut(),
-            kernel_hat.get_data_mut(),
-            &[m, n, o],
-        );
+        f64::rfft3_fftw(kernel.get_data_mut(), kernel_hat.get_data_mut(), &[m, n, o]);
 
         // Compute convolution
         let hadamard_product = signal_hat

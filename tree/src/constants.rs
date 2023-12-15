@@ -23,7 +23,7 @@ pub const ROOT: MortonKey = MortonKey {
     morton: 0,
 };
 
-/// Transfer vectors in component form to nearest octant neighbours.
+/// Transfer vectors in component form to nearest octant neighbours, in Morton order.
 pub const DIRECTIONS: [[i64; 3]; 26] = [
     [-1, -1, -1],
     [-1, -1, 0],
@@ -50,9 +50,8 @@ pub const DIRECTIONS: [[i64; 3]; 26] = [
     [1, 0, 0],
     [1, 0, 1],
     [1, 1, 0],
-    [1, 1, 1] 
+    [1, 1, 1],
 ];
-
 
 /// Lookup tables for encoding 'z' position in a Morton encoding from Cartesian coordinates.
 pub const Z_LOOKUP_ENCODE: [KeyType; 256] = [

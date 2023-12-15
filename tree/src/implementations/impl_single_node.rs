@@ -1006,8 +1006,8 @@ mod test {
             let found = keys[idx].siblings();
 
             for i in 0..8 {
-                assert!(found[i] == keys[idx+i])
+                assert!(found[i] == keys[idx + i])
             }
         }
-    } 
+    }
 }

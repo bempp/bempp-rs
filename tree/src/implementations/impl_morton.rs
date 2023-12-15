@@ -850,7 +850,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `order` - The expansion order being used in the FMM simulation.
-    pub fn surface_grid<T>(order: usize) -> Vec<T> 
+    pub fn surface_grid<T>(order: usize) -> Vec<T>
     where
         T: Float + std::ops::MulAssign + std::ops::SubAssign + ToPrimitive,
     {
@@ -882,7 +882,6 @@ impl MortonKey {
                 }
             }
         }
-
 
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         let two = T::from(2.0).unwrap();
@@ -1209,7 +1208,6 @@ mod test {
             let b = keys[i + 1];
             assert!(less_than(&a, &b).unwrap() | (a == b));
         }
-
     }
 
     #[test]
@@ -1384,8 +1382,8 @@ mod test {
 
             // Test that they are in Morton order
             for i in 0..25 {
-                assert!(expected[i+1] >= expected[i])
-            } 
+                assert!(expected[i + 1] >= expected[i])
+            }
         }
 
         // More complex case, in the middle of the tree
@@ -1450,11 +1448,11 @@ mod test {
             for i in 0..26 {
                 assert!(expected[i] == result[i]);
             }
-            
+
             // Test that they are in Morton order
             for i in 0..25 {
-                assert!(result[i+1] >= result[i])
-            } 
+                assert!(result[i + 1] >= result[i])
+            }
         }
         // assert!(false)
     }
@@ -1839,7 +1837,6 @@ mod test {
             }
         }
 
-     
         // Test scaling
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);

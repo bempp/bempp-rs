@@ -684,13 +684,13 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
         let ncrit = 150;
 
-        let depth = 5;
+        let depth = 4;
         let kernel = Laplace3dKernel::default();
 
         let tree = SingleNodeTree::new(

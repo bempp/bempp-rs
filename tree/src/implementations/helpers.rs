@@ -1,16 +1,12 @@
 //! Helper functions used in testing tree implementations, specifically test point generators,
 //! as well as helpers for handling surfaces that discretise a box corresponding to a Morton key.
 
-use std::collections::HashMap;
-
 use bempp_traits::types::Scalar;
 use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
 use rlst::dense::{base_matrix::BaseMatrix, rlst_dynamic_mat, Dynamic, Matrix, VectorContainer};
-
-use crate::types::morton::MortonKey;
 
 /// Alias for an rlst container for point data.
 pub type PointsMat<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
@@ -123,7 +119,6 @@ pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
 
     corners
 }
-
 
 #[cfg(test)]
 mod test {

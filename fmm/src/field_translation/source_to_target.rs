@@ -1,51 +1,41 @@
 //! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
-use bempp_tools::Array3D;
-
-use fftw::{
-    plan::{R2CPlan, R2CPlan64},
-    types::Flag,
-};
 use itertools::Itertools;
-use num::{Complex, Float, Zero};
+use num::{Complex, Float};
 use rayon::prelude::*;
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Add,
-    time::Instant,
-};
+use std::collections::{HashMap, HashSet};
 
 use bempp_field::{
-    array::pad3,
     fft::Fft,
     types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
 };
 
 use bempp_traits::{
-    arrays::Array3DAccess,
     field::{FieldTranslation, FieldTranslationData},
     fmm::Fmm,
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
 };
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_tree::types::single_node::SingleNodeTree;
 
-use crate::types::{FmmDataLinear, KiFmmLinear, SendPtr, SendPtrMut};
+use crate::types::{FmmDataLinear, KiFmmLinear, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
     dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-pub fn size_real(order: usize) -> usize {
-    let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
-    let pad_size = 1;
-    let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-    p * p * (p / 2 + 1) // Number of Fourier coefficients when working with real data
-}
+use super::hadamard::matmul8x8x2;
 
-pub fn nparents(level: usize) -> usize {
-    8i32.pow((level - 1) as u32) as usize
-}
+// pub fn size_real(order: usize) -> usize {
+//     let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
+//     let pad_size = 1;
+//     let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+//     p * p * (p / 2 + 1) // Number of Fourier coefficients when working with real data
+// }
+
+// pub fn nparents(level: usize) -> usize {
+//     8i32.pow((level - 1) as u32) as usize
+// }
 
 fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<usize>>
 where
@@ -53,6 +43,7 @@ where
 {
     let parents = tree.get_keys(level - 1).unwrap();
     let nparents = parents.len();
+    let nneighbors = 26; // Number of neighors for a given box
 
     let mut target_map = HashMap::new();
 
@@ -60,17 +51,15 @@ where
         target_map.insert(parent, i);
     }
 
-    let mut result = vec![Vec::new(); 26];
+    let mut result = vec![Vec::new(); nneighbors];
 
     let parent_neighbours = parents
         .iter()
         .map(|parent| parent.all_neighbors())
         .collect_vec();
 
-    for i in 0..26 {
-        for j in 0..nparents {
-            let all_neighbours = &parent_neighbours[j];
-
+    for i in 0..nneighbors {
+        for all_neighbours in parent_neighbours.iter().take(nparents) {
             if let Some(neighbour) = all_neighbours[i] {
                 result[i].push(*target_map.get(&neighbour).unwrap())
             } else {
@@ -80,138 +69,6 @@ where
     }
 
     result
-}
-
-pub fn chunked_displacements(
-    level: usize,
-    chunksize: usize,
-    displacements: &[Vec<Vec<usize>>],
-) -> (Vec<Vec<Vec<usize>>>, Vec<Vec<usize>>) {
-    let mut all_save_locations = Vec::new();
-    let mut all_displacements_chunked = Vec::new(); // indexed by chunk index
-    let nparents = nparents(level);
-    let nsiblings = 8;
-
-    (0..nparents).step_by(chunksize).for_each(|chunk_start| {
-        let chunk_end = std::cmp::min(chunksize + chunk_start, nparents);
-
-        // lookup save locations (head)
-        let save_locations = (chunk_start..chunk_end)
-            .map(|sibling_idx| sibling_idx * nsiblings)
-            .collect_vec();
-        all_save_locations.push(save_locations);
-
-        // 26 long
-        let mut tmp = Vec::new();
-        for i in 0..26 {
-            // chunk_size long
-            let tmp2 = (chunk_start..chunk_end)
-                .map(|sibling_idx| {
-                    // head
-                    displacements[sibling_idx][i][0]
-                })
-                .collect_vec();
-
-            tmp.push(tmp2);
-        }
-        all_displacements_chunked.push(tmp);
-    });
-
-    (all_displacements_chunked, all_save_locations)
-}
-
-#[inline(always)]
-pub unsafe fn matmul8x8x2_cplx_simple_local<U>(
-    kernel_data_freq: &[Complex<U>],
-    signal: &[Complex<U>],
-    save_locations: &mut [Complex<U>],
-    scale: Complex<U>,
-) where
-    U: Scalar,
-{
-    for j in 0..8 {
-        let kernel_data_ij = &kernel_data_freq[j * 8..(j + 1) * 8];
-        let sig = signal[j];
-
-        save_locations
-            .iter_mut()
-            .zip(kernel_data_ij.iter())
-            .for_each(|(sav, &ker)| *sav += scale * ker * sig)
-    } // inner loop
-}
-#[allow(clippy::too_many_arguments)]
-#[inline(always)]
-pub fn m2l_cplx_chunked<U>(
-    order: usize,
-    level: usize,
-    signal_freq_order: &[Vec<Complex<U>>],
-    check_potential_freq_order: &[Vec<SendPtrMut<Complex<U>>>],
-    kernel_data_halo: &[Vec<Complex<U>>],
-    all_displacements_chunked: &[Vec<Vec<usize>>],
-    all_save_locations_chunked: &[Vec<usize>],
-    chunksize: usize,
-    scale: Complex<U>,
-) where
-    U: Scalar + Sync,
-{
-    let nparents = nparents(level);
-    let size_real = size_real(order);
-
-    (0..size_real).into_par_iter().for_each(|freq| {
-        // Extract frequency component of signal (ntargets long)
-        let padded_signal_freq = &signal_freq_order[freq];
-
-        // Extract frequency components of save locations (ntargets long)
-        let check_potential_freq = &check_potential_freq_order[freq];
-
-        let zero = U::from(0.).unwrap();
-
-        (0..nparents)
-            .step_by(chunksize)
-            .enumerate()
-            .for_each(|(c, _chunk_start)| {
-                let first = all_save_locations_chunked[c].first().unwrap();
-                let last = all_save_locations_chunked[c].last().unwrap();
-                let save_locations = &check_potential_freq[*first..*last + 8];
-                let save_locations_raw = save_locations.iter().map(|s| s.raw).collect_vec();
-                let mut local_save_locations = vec![Complex::new(zero, zero); 8 * chunksize];
-
-                for (i, kernel_data) in kernel_data_halo.iter().enumerate().take(26) {
-                    let frequency_offset = 64 * freq;
-                    let kernel_data_freq =
-                        &kernel_data[frequency_offset..(frequency_offset + 64)].to_vec();
-
-                    // lookup signals
-                    let disps = &all_displacements_chunked[c][i];
-
-                    // Expect this to be 8*chunksize
-                    let signals = disps
-                        .iter()
-                        .map(|d| &padded_signal_freq[*d..d + 8])
-                        .collect_vec();
-
-                    for j in 0..chunksize {
-                        unsafe {
-                            matmul8x8x2_cplx_simple_local(
-                                kernel_data_freq,
-                                signals[j],
-                                &mut local_save_locations[j * 8..(j + 1) * 8],
-                                scale,
-                            )
-                        };
-                    }
-                }
-
-                unsafe {
-                    save_locations_raw
-                        .iter()
-                        .zip(local_save_locations.iter())
-                        .for_each(|(&glob, &loc)| {
-                            *glob += loc;
-                        });
-                }
-            });
-    });
 }
 
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
@@ -239,22 +96,16 @@ where
         let Some(targets) = self.fmm.tree().get_keys(level) else {
             return;
         };
-        let s = Instant::now();
-        // Form signals to use for convolution first
         let n = 2 * self.fmm.order - 1;
-        let nparents = nparents(level as usize);
+        let npad = n + 1;
+
+        let nparents = self.fmm.tree().get_keys(level - 1).unwrap().len();
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-
-        // Pad the signal
-        let &(m, n, o) = &(n, n, n);
-
         let nsiblings = 8;
-        let p = m + 1;
-        let q = n + 1;
-        let r = o + 1;
-        let size = p * q * r;
-        let size_real = p * q * (r / 2 + 1);
-        let all_displacements = displacements(&self.fmm.tree(), level);
+        let nzeros = 8;
+        let size = npad * npad * npad;
+        let size_real = npad * npad * (npad / 2 + 1);
+        let all_displacements = displacements(self.fmm.tree(), level);
 
         let ntargets = targets.len();
         let min = &targets[0];
@@ -264,26 +115,29 @@ where
 
         let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
-        ////////////////////////////////////////////////////////////////////////////////////
-        // Pre processing
-        ////////////////////////////////////////////////////////////////////////////////////
-        // Pre processing without using parallel FFT implementation
-        // Allocation of Complex vector
-        let nzeros = 8;
-
-        let mut signals_hat_f_buffer = vec![U::zero(); size_real * (ntargets+nzeros) * 2];
+        // Allocation of FFT of multipoles on convolution grid, in frequency order
+        let mut signals_hat_f_buffer = vec![U::zero(); size_real * (ntargets + nzeros) * 2];
         let signals_hat_f: &mut [Complex<U>];
         unsafe {
             let ptr = signals_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
-            signals_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * (ntargets+nzeros));
+            signals_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * (ntargets + nzeros));
         }
 
+        // A thread safe mutable pointer for saving to this vector
         let raw = signals_hat_f.as_mut_ptr();
         let signals_hat_f_ptr = SendPtrMut { raw };
 
-        // Find offsets for each frequency location and store using send pointers
-        let chunksize = 8;
+        // Pre processing chunk size, in terms of number of parents
+        let chunksize;
+        if level == 2 {
+            chunksize = 8; // Maximum size at level 2
+        } else if level == 3 {
+            chunksize = 64 // Maximum size at level 3
+        } else {
+            chunksize = 128 // Little cache benefit found beyond this
+        }
 
+        // Pre-processing to find FFT
         multipoles
             .par_chunks_exact(ncoeffs * nsiblings * chunksize)
             .enumerate()
@@ -300,17 +154,20 @@ where
                 }
 
                 // Temporary buffer to hold results of FFT
-                let signal_hat_chunk_buffer = vec![U::zero(); size_real * nsiblings * chunksize * 2];
+                let signal_hat_chunk_buffer =
+                    vec![U::zero(); size_real * nsiblings * chunksize * 2];
                 let signal_hat_chunk_c;
                 unsafe {
                     let ptr = signal_hat_chunk_buffer.as_ptr() as *mut Complex<U>;
-                    signal_hat_chunk_c = std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunksize);
+                    signal_hat_chunk_c =
+                        std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunksize);
                 }
 
-                U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[p, q, r]);
+                U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad]);
 
                 // Re-order the temporary buffer into frequency order before flushing to main memory
-                let signal_hat_chunk_f_buffer = vec![U::zero(); size_real * nsiblings * chunksize* 2];
+                let signal_hat_chunk_f_buffer =
+                    vec![U::zero(); size_real * nsiblings * chunksize * 2];
                 let signal_hat_chunk_f_c;
                 unsafe {
                     let ptr = signal_hat_chunk_f_buffer.as_ptr() as *mut Complex<U>;
@@ -338,8 +195,9 @@ where
                         // Head of buffer for each frequency
                         let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
-                        // store results for this frequency for this sibling set
-                        let results_i = &signal_hat_chunk_f_c[i * nsiblings * chunksize..(i + 1) * nsiblings * chunksize];
+                        // Store results for this frequency for this sibling set chunk
+                        let results_i = &signal_hat_chunk_f_c
+                            [i * nsiblings * chunksize..(i + 1) * nsiblings * chunksize];
 
                         for &res in results_i {
                             *head += res;
@@ -357,85 +215,40 @@ where
             check_potentials_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * ntargets);
         }
 
-        println!("pre processing time {:?}", s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
         // M2L Kernel
         ////////////////////////////////////////////////////////////////////////////////////
-        // let zeros = vec![Complex::<U>::zero(); nsiblings];
-        let scale = Complex::from(self.m2l_scale(level) *  self.fmm.kernel.scale(level));
-        let s = Instant::now();
-        let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
-        let chunksize = 512;
-
-        // (0..size_real)
-        //     .into_par_iter()
-        //     .zip(signals_hat_f.par_chunks_exact(ntargets))
-        //     .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-        //     .for_each(|((freq, signal_freq), check_potentials_freq)| {
-        //         (0..nparents).for_each(|parent_index| {
-        //             let save_locations =
-        //                 &mut check_potentials_freq[(parent_index * 8)..(parent_index + 1) * 8];
-
-        //             for (i, kernel_data) in kernel_data_halo.iter().enumerate() {
-        //                 let frequency_offset = 64 * freq;
-        //                 let kernel_data_freq =
-        //                     &kernel_data[frequency_offset..(frequency_offset + 64)];
-        //                 let displacement = &all_displacements[i][parent_index];
-
-        //                 let mut signal = &zeros[..];
-        //                 if let Some(displacement) = displacement {
-        //                     signal = &signal_freq[displacement * 8..(displacement + 1) * 8];
-        //                 }
-
-        //                 unsafe {
-        //                     matmul8x8x2_cplx_simple_local(
-        //                         &kernel_data_freq,
-        //                         signal,
-        //                         save_locations,
-        //                         scale,
-        //                     );
-        //                 }
-        //             }
-        //         });
-        //     });
-
-        // if level == 2 {
-        //     println!("size real {:?}", size_real);
-        //     println!("nsignals hat {:?}", signals_hat_f.chunks_exact(ntargets+nzeros).len());
-        //     println!("n checks hat f {:?}", check_potentials_hat_f.chunks_exact_mut(ntargets).len());
-        // }
+        let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
+        let kernels_f = &self.fmm.m2l.operator_data.kernel_data_rearranged;
+        let max_chunksize = 512;
 
         (0..size_real)
             .into_par_iter()
-            .zip(signals_hat_f.par_chunks_exact(ntargets+nzeros))
+            .zip(signals_hat_f.par_chunks_exact(ntargets + nzeros))
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
             .for_each(|((freq, signal_freq), check_potentials_freq)| {
-
-
                 (0..nparents)
-                    .step_by(chunksize)
-                    .enumerate()
-                    .for_each(|(c, chunk_start)| {
-                        let chunk_end = std::cmp::min(chunk_start + chunksize, nparents);
+                    .step_by(max_chunksize)
+                    .for_each(|chunk_start| {
+                        let chunk_end = std::cmp::min(chunk_start + max_chunksize, nparents);
 
                         let save_locations =
                             &mut check_potentials_freq[chunk_start * 8..(chunk_end) * 8];
 
-
-                        for (i, kernel_data) in kernel_data_halo.iter().enumerate().take(26) {
+                        for (i, kernel_f) in kernels_f.iter().enumerate().take(26) {
                             let frequency_offset = 64 * freq;
                             let kernel_data_freq =
-                                &kernel_data[frequency_offset..(frequency_offset + 64)].to_vec();
+                                &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
 
                             // Lookup signals
                             let displacements = &all_displacements[i][chunk_start..chunk_end];
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
-                                let signal  = &signal_freq[displacement * 8..(displacement + 1) * 8];
+                                let signal = &signal_freq[displacement * 8..(displacement + 1) * 8];
 
                                 unsafe {
-                                    matmul8x8x2_cplx_simple_local(
+                                    matmul8x8x2(
                                         kernel_data_freq,
                                         signal,
                                         &mut save_locations[j * 8..(j + 1) * 8],
@@ -447,13 +260,11 @@ where
                     });
             });
 
-        println!("kernel time {:?}", s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
         // Post processing
         ////////////////////////////////////////////////////////////////////////////////////
-        let s = Instant::now();
 
-        // First step is to get check potentials back into target order from frequency order
+        // Get check potentials back into target order from frequency order
         let mut check_potential_hat = vec![U::zero(); size_real * ntargets * 2];
         let mut check_potential = vec![U::zero(); size * ntargets];
         let check_potential_hat_c;
@@ -472,8 +283,12 @@ where
                 }
             });
 
-        // Compute FFT
-        U::irfft3_fftw_par_slice(check_potential_hat_c, &mut check_potential, &[p, q, r]);
+        // Compute inverse FFT
+        U::irfft3_fftw_par_slice(
+            check_potential_hat_c,
+            &mut check_potential,
+            &[npad, npad, npad],
+        );
 
         // TODO: Experiment with chunk size for post processing
         check_potential
@@ -514,7 +329,6 @@ where
                     });
             });
 
-        println!("l={:?} post processing time {:?}", level, s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
     }
 

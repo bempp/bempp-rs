@@ -1,7 +1,4 @@
 //! Types for storing field translation data.
-use std::collections::HashMap;
-
-use cauchy::{c32, c64};
 use num::{Complex, Float};
 use rlst::{
     common::traits::{Eval, NewLikeSelf},
@@ -126,4 +123,3 @@ where
         }
     }
 }
-

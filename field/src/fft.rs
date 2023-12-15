@@ -3,12 +3,11 @@ use fftw::{plan::*, types::*};
 use num::Complex;
 use rayon::prelude::*;
 
-
 pub trait Fft
 where
     Self: Sized,
 {
-    /// Compute a Real FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
+    /// Compute a parallel real to complex FFT over a slice which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
     ///
     /// # Arguments
@@ -17,7 +16,7 @@ where
     /// * `shape` - Shape of input data.
     fn rfft3_fftw_par_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]);
 
-    /// Compute a Real FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
+    /// Compute a real to complex FFT over a slice which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
     ///
     /// # Arguments
@@ -26,25 +25,25 @@ where
     /// * `shape` - Shape of input data.
     fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]);
 
-    /// Compute an inverse Real FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
+    /// Compute an parallel complex to real inverse FFT over a slice which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
     ///
     /// # Arguments
     /// * `input` - Input slice of complex data, corresponding to an FFT of a 3D array stored in column major order.
     /// * `output` - Output slice.
-    /// * `shape` - Shape of output data. 
-    fn irfft3_fftw_par_slice(input:  &mut [Complex<Self>], output: &mut [Self], shape: &[usize]);
+    /// * `shape` - Shape of output data.
+    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]);
 
-    /// Compute an inverse Real FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
+    /// Compute an complex to real inverse FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
     ///
     /// # Arguments
     /// * `input` - Input slice of complex data, corresponding to an FFT of a 3D array stored in column major order.
     /// * `output` - Output slice.
-    /// * `shape` - Shape of output data. 
+    /// * `shape` - Shape of output data.
     fn irfft3_fftw_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]);
 
-    /// Compute a Real FFT of an input slice corresponding to a 3D array stored in column major format, specified by `shape` using the FFTW library.
+    /// Compute a real to complex FFT of an input slice corresponding to a 3D array stored in column major format, specified by `shape` using the FFTW library.
     ///
     /// # Arguments
     /// * `input` - Input slice of real data, corresponding to a 3D array stored in column major order.
@@ -52,7 +51,7 @@ where
     /// * `shape` - Shape of input data.
     fn rfft3_fftw(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]);
 
-    /// Compute an inverse Real FFT of an input slice corresponding to the FFT of a 3D array stored in column major format, specified by `shape` using the FFTW library.
+    /// Compute an complex to real inverse FFT of an input slice corresponding to the FFT of a 3D array stored in column major format, specified by `shape` using the FFTW library.
     /// This function normalises the output.
     ///
     /// # Arguments
@@ -62,9 +61,7 @@ where
     fn irfft3_fftw(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]);
 }
 
-
 impl Fft for f32 {
-
     fn rfft3_fftw_par_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
@@ -76,7 +73,7 @@ impl Fft for f32 {
 
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.r2c(inp, out);
-        }); 
+        });
     }
 
     fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
@@ -102,12 +99,12 @@ impl Fft for f32 {
         let size_real = (size / size_d) * (size_d / 2 + 1);
         let plan: R2CPlan32 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
 
-        let it_inp = input.chunks_exact_mut(size).into_iter();
-        let it_out = output.chunks_exact_mut(size_real).into_iter();
+        let it_inp = input.chunks_exact_mut(size);
+        let it_out = output.chunks_exact_mut(size_real);
 
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.r2c(inp, out);
-        });  
+        });
     }
 
     fn irfft3_fftw_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
@@ -116,15 +113,15 @@ impl Fft for f32 {
         let size_real = (size / size_d) * (size_d / 2 + 1);
         let plan: C2RPlan32 = C2RPlan::aligned(shape, Flag::MEASURE).unwrap();
 
-        let it_inp = input.chunks_exact_mut(size_real).into_iter();
-        let it_out = output.chunks_exact_mut(size).into_iter();
+        let it_inp = input.chunks_exact_mut(size_real);
+        let it_out = output.chunks_exact_mut(size);
 
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.c2r(inp, out);
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (size as f32));
-        }) 
+        })
     }
 
     fn rfft3_fftw(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
@@ -146,7 +143,6 @@ impl Fft for f32 {
 }
 
 impl Fft for f64 {
-
     fn rfft3_fftw_par_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
@@ -158,7 +154,7 @@ impl Fft for f64 {
 
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.r2c(inp, out);
-        }); 
+        });
     }
 
     fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
@@ -184,12 +180,12 @@ impl Fft for f64 {
         let size_real = (size / size_d) * (size_d / 2 + 1);
         let plan: R2CPlan64 = R2CPlan::aligned(shape, Flag::MEASURE).unwrap();
 
-        let it_inp = input.chunks_exact_mut(size).into_iter();
-        let it_out = output.chunks_exact_mut(size_real).into_iter();
+        let it_inp = input.chunks_exact_mut(size);
+        let it_out = output.chunks_exact_mut(size_real);
 
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.r2c(inp, out);
-        });  
+        });
     }
 
     fn irfft3_fftw_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
@@ -198,15 +194,15 @@ impl Fft for f64 {
         let size_real = (size / size_d) * (size_d / 2 + 1);
         let plan: C2RPlan64 = C2RPlan::aligned(shape, Flag::MEASURE).unwrap();
 
-        let it_inp = input.chunks_exact_mut(size_real).into_iter();
-        let it_out = output.chunks_exact_mut(size).into_iter();
+        let it_inp = input.chunks_exact_mut(size_real);
+        let it_out = output.chunks_exact_mut(size);
 
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.c2r(inp, out);
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (size as f64));
-        }) 
+        })
     }
 
     fn rfft3_fftw(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
