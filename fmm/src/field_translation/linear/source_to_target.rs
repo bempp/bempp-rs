@@ -47,7 +47,7 @@ pub fn nparents(level: usize) -> usize {
     8i32.pow((level - 1) as u32) as usize
 }
 
-fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<Option<usize>>>
+fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<usize>>
 where
     U: Float + Default + Scalar<Real = U>,
 {
@@ -72,9 +72,9 @@ where
             let all_neighbours = &parent_neighbours[j];
 
             if let Some(neighbour) = all_neighbours[i] {
-                result[i].push(Some(*target_map.get(&neighbour).unwrap()))
+                result[i].push(*target_map.get(&neighbour).unwrap())
             } else {
-                result[i].push(None);
+                result[i].push(nparents);
             }
         }
     }
@@ -269,11 +269,13 @@ where
         ////////////////////////////////////////////////////////////////////////////////////
         // Pre processing without using parallel FFT implementation
         // Allocation of Complex vector
-        let mut signals_hat_f_buffer = vec![U::zero(); size_real * ntargets * 2];
+        let nzeros = 8;
+
+        let mut signals_hat_f_buffer = vec![U::zero(); size_real * (ntargets+nzeros) * 2];
         let signals_hat_f: &mut [Complex<U>];
         unsafe {
             let ptr = signals_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
-            signals_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * ntargets);
+            signals_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * (ntargets+nzeros));
         }
 
         let raw = signals_hat_f.as_mut_ptr();
@@ -329,7 +331,7 @@ where
                     let ptr = signals_hat_f_ptr;
 
                     for i in 0..size_real {
-                        let frequency_offset = i * ntargets;
+                        let frequency_offset = i * (ntargets + nzeros);
 
                         // Head of buffer for each frequency
                         let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
@@ -357,7 +359,7 @@ where
         ////////////////////////////////////////////////////////////////////////////////////
         // M2L Kernel
         ////////////////////////////////////////////////////////////////////////////////////
-        let zeros = vec![Complex::<U>::zero(); nsiblings];
+        // let zeros = vec![Complex::<U>::zero(); nsiblings];
         let scale = Complex::from(self.m2l_scale(level) *  self.fmm.kernel.scale(level));
         let s = Instant::now();
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
@@ -395,12 +397,19 @@ where
         //         });
         //     });
 
+        // if level == 2 {
+        //     println!("size real {:?}", size_real);
+        //     println!("nsignals hat {:?}", signals_hat_f.chunks_exact(ntargets+nzeros).len());
+        //     println!("n checks hat f {:?}", check_potentials_hat_f.chunks_exact_mut(ntargets).len());
+        // }
+
         (0..size_real)
             .into_par_iter()
-            .into_par_iter()
-            .zip(signals_hat_f.par_chunks_exact(ntargets))
+            .zip(signals_hat_f.par_chunks_exact(ntargets+nzeros))
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
             .for_each(|((freq, signal_freq), check_potentials_freq)| {
+
+
                 (0..nparents)
                     .step_by(chunksize)
                     .enumerate()
@@ -410,6 +419,7 @@ where
                         let save_locations =
                             &mut check_potentials_freq[chunk_start * 8..(chunk_end) * 8];
 
+
                         for (i, kernel_data) in kernel_data_halo.iter().enumerate().take(26) {
                             let frequency_offset = 64 * freq;
                             let kernel_data_freq =
@@ -418,12 +428,9 @@ where
                             // Lookup signals
                             let displacements = &all_displacements[i][chunk_start..chunk_end];
 
-                            let mut signal = &zeros[..];
-
                             for j in 0..(chunk_end - chunk_start) {
-                                // if let Some(displacement) = displacements[j] {
-                                //     signal = &signal_freq[displacement * 8..(displacement + 1) * 8]
-                                // }
+                                let displacement = displacements[j];
+                                let signal  = &signal_freq[displacement * 8..(displacement + 1) * 8];
 
                                 unsafe {
                                     matmul8x8x2_cplx_simple_local(
