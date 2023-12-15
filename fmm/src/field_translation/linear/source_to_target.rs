@@ -282,7 +282,7 @@ where
         let signals_hat_f_ptr = SendPtrMut { raw };
 
         // Find offsets for each frequency location and store using send pointers
-        let chunksize = 256;
+        let chunksize = 8;
 
         multipoles
             .par_chunks_exact(ncoeffs * nsiblings * chunksize)
@@ -320,7 +320,7 @@ where
 
                 for i in 0..size_real {
                     for j in 0..nsiblings * chunksize {
-                        signal_hat_chunk_f_c[nsiblings * i + j] =
+                        signal_hat_chunk_f_c[nsiblings * chunksize * i + j] =
                             signal_hat_chunk_c[size_real * j + i]
                     }
                 }
@@ -339,7 +339,7 @@ where
                         let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
                         // store results for this frequency for this sibling set
-                        let results_i = &signal_hat_chunk_f_c[i * 8..(i + 1) * 8];
+                        let results_i = &signal_hat_chunk_f_c[i * nsiblings * chunksize..(i + 1) * nsiblings * chunksize];
 
                         for &res in results_i {
                             *head += res;
