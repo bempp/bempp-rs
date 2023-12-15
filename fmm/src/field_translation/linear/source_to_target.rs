@@ -239,7 +239,7 @@ where
         let Some(targets) = self.fmm.tree().get_keys(level) else {
             return;
         };
-        // let s = Instant::now();
+        let s = Instant::now();
         // Form signals to use for convolution first
         let n = 2 * self.fmm.order - 1;
         let nparents = nparents(level as usize);
@@ -352,12 +352,14 @@ where
             let ptr = check_potentials_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
             check_potentials_hat_f = std::slice::from_raw_parts_mut(ptr, size_real * ntargets);
         }
+
+        println!("pre processing time {:?}", s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
         // M2L Kernel
         ////////////////////////////////////////////////////////////////////////////////////
         let zeros = vec![Complex::<U>::zero(); nsiblings];
-        let scale = Complex::from(self.m2l_scale(level));
-        // let s = Instant::now();
+        let scale = Complex::from(self.m2l_scale(level) *  self.fmm.kernel.scale(level));
+        let s = Instant::now();
         let kernel_data_halo = &self.fmm.m2l.operator_data.kernel_data_rearranged;
         let chunksize = 512;
 
@@ -419,9 +421,9 @@ where
                             let mut signal = &zeros[..];
 
                             for j in 0..(chunk_end - chunk_start) {
-                                if let Some(displacement) = displacements[j] {
-                                    signal = &signal_freq[displacement * 8..(displacement + 1) * 8]
-                                }
+                                // if let Some(displacement) = displacements[j] {
+                                //     signal = &signal_freq[displacement * 8..(displacement + 1) * 8]
+                                // }
 
                                 unsafe {
                                     matmul8x8x2_cplx_simple_local(
@@ -436,10 +438,11 @@ where
                     });
             });
 
+        println!("kernel time {:?}", s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
         // Post processing
         ////////////////////////////////////////////////////////////////////////////////////
-        // let s = Instant::now();
+        let s = Instant::now();
 
         // First step is to get check potentials back into target order from frequency order
         let mut check_potential_hat = vec![U::zero(); size_real * ntargets * 2];
@@ -483,16 +486,11 @@ where
                     rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
                 };
 
-                let mut local_chunk = self
+                let local_chunk = self
                     .fmm
                     .dc2e_inv_1
                     .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
                     .eval();
-
-                local_chunk
-                    .data_mut()
-                    .iter_mut()
-                    .for_each(|d| *d *= self.fmm.kernel.scale(level));
 
                 local_chunk
                     .data()
@@ -507,7 +505,7 @@ where
                     });
             });
 
-        // println!("l={:?} post processing time {:?}", level, s.elapsed());
+        println!("l={:?} post processing time {:?}", level, s.elapsed());
         ////////////////////////////////////////////////////////////////////////////////////
     }
 
