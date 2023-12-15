@@ -241,8 +241,7 @@ where
 
                         for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
                             let frequency_offset = 64 * freq;
-                            let k_f =
-                                &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
+                            let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
 
                             // Lookup signals
                             let displacements = &all_displacements[i][chunk_start..chunk_end];
