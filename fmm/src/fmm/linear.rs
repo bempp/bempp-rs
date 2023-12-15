@@ -684,7 +684,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 9;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;

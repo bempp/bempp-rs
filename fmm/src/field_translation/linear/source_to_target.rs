@@ -282,14 +282,16 @@ where
         let signals_hat_f_ptr = SendPtrMut { raw };
 
         // Find offsets for each frequency location and store using send pointers
+        let chunksize = 256;
+
         multipoles
-            .par_chunks_exact(ncoeffs * nsiblings)
+            .par_chunks_exact(ncoeffs * nsiblings * chunksize)
             .enumerate()
             .for_each(|(i, multipole_chunk)| {
                 // Place Signal on convolution grid
-                let mut signal_chunk = vec![U::zero(); size * nsiblings];
+                let mut signal_chunk = vec![U::zero(); size * nsiblings * chunksize];
 
-                for i in 0..nsiblings {
+                for i in 0..nsiblings * chunksize {
                     let multipole = &multipole_chunk[i * ncoeffs..(i + 1) * ncoeffs];
                     let signal = &mut signal_chunk[i * size..(i + 1) * size];
                     for (surf_idx, &conv_idx) in self.fmm.m2l.surf_to_conv_map.iter().enumerate() {
@@ -298,26 +300,26 @@ where
                 }
 
                 // Temporary buffer to hold results of FFT
-                let signal_hat_chunk_buffer = vec![U::zero(); size_real * nsiblings * 2];
+                let signal_hat_chunk_buffer = vec![U::zero(); size_real * nsiblings * chunksize * 2];
                 let signal_hat_chunk_c;
                 unsafe {
                     let ptr = signal_hat_chunk_buffer.as_ptr() as *mut Complex<U>;
-                    signal_hat_chunk_c = std::slice::from_raw_parts_mut(ptr, size_real * nsiblings);
+                    signal_hat_chunk_c = std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunksize);
                 }
 
                 U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[p, q, r]);
 
                 // Re-order the temporary buffer into frequency order before flushing to main memory
-                let signal_hat_chunk_f_buffer = vec![U::zero(); size_real * nsiblings * 2];
+                let signal_hat_chunk_f_buffer = vec![U::zero(); size_real * nsiblings * chunksize* 2];
                 let signal_hat_chunk_f_c;
                 unsafe {
                     let ptr = signal_hat_chunk_f_buffer.as_ptr() as *mut Complex<U>;
                     signal_hat_chunk_f_c =
-                        std::slice::from_raw_parts_mut(ptr, size_real * nsiblings);
+                        std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunksize);
                 }
 
                 for i in 0..size_real {
-                    for j in 0..nsiblings {
+                    for j in 0..nsiblings * chunksize {
                         signal_hat_chunk_f_c[nsiblings * i + j] =
                             signal_hat_chunk_c[size_real * j + i]
                     }
@@ -325,7 +327,7 @@ where
 
                 // Storing the results of the FFT in frequency order
                 unsafe {
-                    let sibling_offset = i * nsiblings;
+                    let sibling_offset = i * nsiblings * chunksize;
 
                     // Pointer to storage buffer for frequency ordered FFT of signals
                     let ptr = signals_hat_f_ptr;
