@@ -1,7 +1,4 @@
 //! Types for storing field translation data.
-use std::collections::HashMap;
-
-use cauchy::{c32, c64};
 use num::{Complex, Float};
 use rlst::{
     common::traits::{Eval, NewLikeSelf},
@@ -33,10 +30,10 @@ where
     pub alpha: T,
 
     /// Map between indices of surface convolution grid points.
-    pub surf_to_conv_map: HashMap<usize, usize>,
+    pub surf_to_conv_map: Vec<usize>,
 
     /// Map between indices of convolution and surface grid points.
-    pub conv_to_surf_map: HashMap<usize, usize>,
+    pub conv_to_surf_map: Vec<usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
     pub operator_data: FftM2lOperatorData<Complex<T>>,
@@ -90,7 +87,9 @@ pub struct TransferVector {
 pub struct FftM2lOperatorData<C> {
     // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set
     pub kernel_data: FftKernelData<C>,
-    pub kernel_data_rearranged: FftKernelData<C>,
+
+    // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set, re-arranged in frequency order
+    pub kernel_data_f: FftKernelData<C>,
 }
 
 /// Container to store precomputed data required for SVD field translations.
@@ -126,23 +125,3 @@ where
         }
     }
 }
-
-/// Type alias for real coefficients for into FFTW wrappers
-// pub type FftMatrixf64 = Matrix<f64, BaseMatrix<f64, VectorContainer<f64>, Dynamic>, Dynamic>;
-pub type FftMatrixf64 = Vec<f64>;
-
-/// Type alias for real coefficients for into FFTW wrappers
-// pub type FftMatrixf32 = Matrix<f32, BaseMatrix<f32, VectorContainer<f32>, Dynamic>, Dynamic>;
-pub type FftMatrixf32 = Vec<f32>;
-
-/// Type alias for complex coefficients for FFTW wrappers
-// pub type FftMatrixc64 = Matrix<c64, BaseMatrix<c64, VectorContainer<c64>, Dynamic>, Dynamic>;
-pub type FftMatrixc64 = Vec<c64>;
-
-/// Type alias for complex coefficients for FFTW wrappers
-// pub type FftMatrixc32 = Matrix<c32, BaseMatrix<c32, VectorContainer<c32>, Dynamic>, Dynamic>;
-pub type FftMatrixc32 = Vec<c32>;
-
-/// Type alias for real coefficients for into FFTW wrappers
-// pub type FftMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
-pub type FftMatrix<T> = Vec<T>;
