@@ -87,7 +87,9 @@ pub struct TransferVector {
 pub struct FftM2lOperatorData<C> {
     // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set
     pub kernel_data: FftKernelData<C>,
-    pub kernel_data_rearranged: FftKernelData<C>,
+
+    // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set, re-arranged in frequency order
+    pub kernel_data_f: FftKernelData<C>,
 }
 
 /// Container to store precomputed data required for SVD field translations.

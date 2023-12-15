@@ -391,7 +391,7 @@ where
 
         FftM2lOperatorData {
             kernel_data,
-            kernel_data_rearranged,
+            kernel_data_f: kernel_data_rearranged,
         }
     }
 

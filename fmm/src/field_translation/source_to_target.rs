@@ -115,6 +115,10 @@ where
 
         let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
+        ////////////////////////////////////////////////////////////////////////////////////
+        // Pre-process to setup data structures for M2L kernel
+        ////////////////////////////////////////////////////////////////////////////////////
+
         // Allocation of FFT of multipoles on convolution grid, in frequency order
         let mut signals_hat_f_buffer = vec![U::zero(); size_real * (ntargets + nzeros) * 2];
         let signals_hat_f: &mut [Complex<U>];
@@ -219,25 +223,25 @@ where
         // M2L Kernel
         ////////////////////////////////////////////////////////////////////////////////////
         let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
-        let kernels_f = &self.fmm.m2l.operator_data.kernel_data_rearranged;
+        let kernel_data_f = &self.fmm.m2l.operator_data.kernel_data_f;
         let max_chunksize = 512;
 
         (0..size_real)
             .into_par_iter()
             .zip(signals_hat_f.par_chunks_exact(ntargets + nzeros))
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-            .for_each(|((freq, signal_freq), check_potentials_freq)| {
+            .for_each(|((freq, signal_f), check_potential_hat_f)| {
                 (0..nparents)
                     .step_by(max_chunksize)
                     .for_each(|chunk_start| {
                         let chunk_end = std::cmp::min(chunk_start + max_chunksize, nparents);
 
                         let save_locations =
-                            &mut check_potentials_freq[chunk_start * 8..(chunk_end) * 8];
+                            &mut check_potential_hat_f[chunk_start * 8..(chunk_end) * 8];
 
-                        for (i, kernel_f) in kernels_f.iter().enumerate().take(26) {
+                        for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
                             let frequency_offset = 64 * freq;
-                            let kernel_data_freq =
+                            let k_f =
                                 &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
 
                             // Lookup signals
@@ -245,12 +249,12 @@ where
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
-                                let signal = &signal_freq[displacement * 8..(displacement + 1) * 8];
+                                let s_f = &signal_f[displacement * 8..(displacement + 1) * 8];
 
                                 unsafe {
                                     matmul8x8x2(
-                                        kernel_data_freq,
-                                        signal,
+                                        k_f,
+                                        s_f,
                                         &mut save_locations[j * 8..(j + 1) * 8],
                                         scale,
                                     )
@@ -261,7 +265,7 @@ where
             });
 
         ////////////////////////////////////////////////////////////////////////////////////
-        // Post processing
+        // Post processing to find local expansions from check potentials
         ////////////////////////////////////////////////////////////////////////////////////
 
         // Get check potentials back into target order from frequency order
@@ -328,8 +332,6 @@ where
                         }
                     });
             });
-
-        ////////////////////////////////////////////////////////////////////////////////////
     }
 
     fn m2l_scale(&self, level: u64) -> U {
