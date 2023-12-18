@@ -850,7 +850,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `order` - The expansion order being used in the FMM simulation.
-    pub fn surface_grid<T>(order: usize) -> (Vec<T>, Vec<usize>)
+    pub fn surface_grid<T>(order: usize) -> Vec<T>
     where
         T: Float + std::ops::MulAssign + std::ops::SubAssign + ToPrimitive,
     {
@@ -883,12 +883,6 @@ impl MortonKey {
             }
         }
 
-        // Map surface points to multi-indices
-        let surface_idxs = surface
-            .iter()
-            .clone()
-            .map(|&x| x.to_usize().unwrap())
-            .collect();
         // Shift and scale surface so that it's centered at the origin and has side length of 1
         let two = T::from(2.0).unwrap();
 
@@ -898,7 +892,7 @@ impl MortonKey {
 
         surface.iter_mut().for_each(|point| *point -= T::one());
 
-        (surface, surface_idxs)
+        surface
     }
 
     /// Compute a surface grid centered at this Morton Key, used in the discretisation of Fast Multipole
@@ -951,7 +945,7 @@ impl MortonKey {
     where
         T: Float + std::ops::MulAssign + std::ops::SubAssign + Default + Scalar,
     {
-        let (surface, _) = MortonKey::surface_grid(order);
+        let surface = MortonKey::surface_grid(order);
 
         self.scale_surface::<T>(surface, domain, alpha)
     }
@@ -1385,13 +1379,18 @@ mod test {
             for i in 0..26 {
                 assert!(expected[i] == result[i]);
             }
+
+            // Test that they are in Morton order
+            for i in 0..25 {
+                assert!(expected[i + 1] >= expected[i])
+            }
         }
 
         // More complex case, in the middle of the tree
         {
             let parent = key.parent().parent().parent();
-            let mut result = parent.neighbors();
-            result.sort();
+            let result = parent.neighbors();
+            // result.sort();
 
             // Test that we get the expected number of neighbors
             assert!(result.len() == 26);
@@ -1449,7 +1448,13 @@ mod test {
             for i in 0..26 {
                 assert!(expected[i] == result[i]);
             }
+
+            // Test that they are in Morton order
+            for i in 0..25 {
+                assert!(result[i + 1] >= result[i])
+            }
         }
+        // assert!(false)
     }
 
     #[test]
@@ -1811,9 +1816,8 @@ mod test {
         let surface = key.compute_surface(&domain, order, alpha);
         assert_eq!(surface.len(), ncoeffs * dim);
 
-        let (surface, surface_idxs) = MortonKey::surface_grid::<f64>(order);
+        let surface = MortonKey::surface_grid::<f64>(order);
         assert_eq!(surface.len(), ncoeffs * dim);
-        assert_eq!(surface_idxs.len(), ncoeffs * dim);
 
         let mut expected = vec![[0usize; 3]; ncoeffs];
         let lower = 0;
@@ -1831,16 +1835,6 @@ mod test {
                     }
                 }
             }
-        }
-
-        // Test ordering.
-        for i in 0..ncoeffs {
-            let point = vec![
-                surface_idxs[i],
-                surface_idxs[i + ncoeffs],
-                surface_idxs[i + 2 * ncoeffs],
-            ];
-            assert_eq!(point, expected[i]);
         }
 
         // Test scaling

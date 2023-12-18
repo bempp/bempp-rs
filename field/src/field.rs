@@ -15,7 +15,7 @@ use rlst::{
         Shape, VectorContainer,
     },
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use bempp_tools::Array3D;
 use bempp_traits::{
@@ -26,12 +26,12 @@ use bempp_tree::{
 };
 
 use crate::{
-    array::{flip3, pad3},
+    array::flip3,
     fft::Fft,
     transfer_vector::compute_transfer_vectors,
     types::{
-        FftFieldTranslationKiFmm, FftM2lOperatorData, FftMatrix, SvdFieldTranslationKiFmm,
-        SvdM2lOperatorData, TransferVector,
+        FftFieldTranslationKiFmm, FftM2lOperatorData, SvdFieldTranslationKiFmm, SvdM2lOperatorData,
+        TransferVector,
     },
 };
 
@@ -218,7 +218,7 @@ where
 
 impl<T, U> FieldTranslationData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + Fft<FftMatrix<T>, FftMatrix<Complex<T>>>,
+    T: Scalar<Real = T> + Float + Default + Fft,
     Complex<T>: Scalar,
     U: Kernel<T = T> + Default,
 {
@@ -340,25 +340,20 @@ where
                     // Compute Green's fct evaluations
                     let kernel = self.compute_kernel(order, &conv_grid, kernel_point);
 
-                    let padded_kernel = pad3(&kernel, (p - m, p - m, p - m), (0, 0, 0));
-                    let mut padded_kernel = flip3(&padded_kernel);
+                    let mut kernel = flip3(&kernel);
 
                     // Compute FFT of padded kernel
-                    let mut padded_kernel_hat = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
+                    let mut kernel_hat = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
 
-                    T::rfft3_fftw(
-                        padded_kernel.get_data_mut(),
-                        padded_kernel_hat.get_data_mut(),
-                        &[p, p, p],
-                    );
+                    T::rfft3_fftw(kernel.get_data_mut(), kernel_hat.get_data_mut(), &[p, p, p]);
 
-                    kernel_data_vec[i].push(padded_kernel_hat);
+                    kernel_data_vec[i].push(kernel_hat);
                 } else {
                     // Fill with zeros when interaction doesn't exist
                     let n = 2 * order - 1;
                     let p = n + 1;
-                    let padded_kernel_hat_zeros = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
-                    kernel_data_vec[i].push(padded_kernel_hat_zeros);
+                    let kernel_hat_zeros = Array3D::<Complex<T>>::new((p, p, p / 2 + 1));
+                    kernel_data_vec[i].push(kernel_hat_zeros);
                 }
             }
         }
@@ -396,7 +391,7 @@ where
 
         FftM2lOperatorData {
             kernel_data,
-            kernel_data_rearranged,
+            kernel_data_f: kernel_data_rearranged,
         }
     }
 
@@ -407,7 +402,7 @@ where
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Float + Scalar<Real = T> + Default + Fft<FftMatrix<T>, FftMatrix<Complex<T>>>,
+    T: Float + Scalar<Real = T> + Default + Fft,
     Complex<T>: Scalar,
     U: Kernel<T = T> + Default,
 {
@@ -422,8 +417,8 @@ where
         let mut result = FftFieldTranslationKiFmm {
             alpha,
             kernel,
-            surf_to_conv_map: HashMap::default(),
-            conv_to_surf_map: HashMap::default(),
+            surf_to_conv_map: Vec::default(),
+            conv_to_surf_map: Vec::default(),
             operator_data: FftM2lOperatorData::default(),
             transfer_vectors: Vec::default(),
         };
@@ -445,33 +440,52 @@ where
     ///
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
-    pub fn compute_surf_to_conv_map(
-        order: usize,
-    ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
+    pub fn compute_surf_to_conv_map(order: usize) -> (Vec<usize>, Vec<usize>) {
         // Number of points along each axis of convolution grid
         let n = 2 * order - 1;
+        let npad = n + 1;
+
+        let nsurf_grid = 6 * (order - 1).pow(2) + 2;
 
         // Index maps between surface and convolution grids
-        let mut surf_to_conv: HashMap<usize, usize> = HashMap::new();
-        let mut conv_to_surf: HashMap<usize, usize> = HashMap::new();
+        let mut surf_to_conv = vec![0usize; nsurf_grid];
+        let mut conv_to_surf = vec![0usize; nsurf_grid];
 
         // Initialise surface grid index
         let mut surf_index = 0;
 
         // The boundaries of the surface grid when embedded within the convolution grid
-        let lower = order - 1;
-        let upper = 2 * order - 2;
+        let lower = order;
+        let upper = 2 * order - 1;
 
-        for k in 0..n {
-            for j in 0..n {
-                for i in 0..n {
-                    let conv_index = i + n * j + n * n * k;
+        for k in 0..npad {
+            for j in 0..npad {
+                for i in 0..npad {
+                    let conv_index = i + npad * j + npad * npad * k;
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
                     {
-                        surf_to_conv.insert(surf_index, conv_index);
-                        conv_to_surf.insert(conv_index, surf_index);
+                        surf_to_conv[surf_index] = conv_index;
+                        surf_index += 1;
+                    }
+                }
+            }
+        }
+
+        let lower = 0;
+        let upper = order - 1;
+        let mut surf_index = 0;
+
+        for k in 0..npad {
+            for j in 0..npad {
+                for i in 0..npad {
+                    let conv_index = i + npad * j + npad * npad * k;
+                    if (i <= upper && j <= upper && (k == lower || k == upper))
+                        || (j <= upper && k <= upper && (i == lower || i == upper))
+                        || (k <= upper && i <= upper && (j == lower || j == upper))
+                    {
+                        conv_to_surf[surf_index] = conv_index;
                         surf_index += 1;
                     }
                 }
@@ -494,11 +508,12 @@ where
         target_pt: [T; 3],
     ) -> Array3D<T> {
         let n = 2 * order - 1;
-        let mut result = Array3D::<T>::new((n, n, n));
+        let npad = n + 1;
+
+        let mut result = Array3D::<T>::new((npad, npad, npad));
+
         let nconv = n.pow(3);
-
         let mut kernel_evals = vec![T::zero(); nconv];
-
         self.kernel.assemble_st(
             EvalType::Value,
             convolution_grid,
@@ -506,7 +521,16 @@ where
             &mut kernel_evals[..],
         );
 
-        result.get_data_mut().copy_from_slice(&kernel_evals[..]);
+        for k in 0..n {
+            for j in 0..n {
+                for i in 0..n {
+                    let conv_idx = i + j * n + k * n * n;
+                    let save_idx = i + j * npad + k * npad * npad;
+                    result.get_data_mut()[save_idx..(save_idx + 1)]
+                        .copy_from_slice(&kernel_evals[(conv_idx)..(conv_idx + 1)]);
+                }
+            }
+        }
 
         result
     }
@@ -518,25 +542,13 @@ where
     /// * `charges` - A vector of charges.
     pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
         let n = 2 * order - 1;
-        let n_tot = n * n * n;
-        let mut result = Array3D::new((n, n, n));
+        let npad = n + 1;
 
-        let mut tmp = vec![T::zero(); n_tot];
+        let mut result = Array3D::new((npad, npad, npad));
 
-        for k in 0..n {
-            for j in 0..n {
-                for i in 0..n {
-                    let conv_index = i + n * j + n * n * k;
-                    if let Some(surf_index) = self.conv_to_surf_map.get(&conv_index) {
-                        tmp[conv_index] = charges[*surf_index];
-                    } else {
-                        tmp[conv_index] = T::zero();
-                    }
-                }
-            }
+        for (i, &j) in self.surf_to_conv_map.iter().enumerate() {
+            result.get_data_mut()[j] = charges[i];
         }
-
-        result.get_data_mut().copy_from_slice(&tmp[..]);
 
         result
     }
@@ -795,23 +807,19 @@ mod test {
 
         // Compute kernel from source/target pair
         let test_kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
-        let (m, n, o) = test_kernel.shape();
-        let p = m + 1;
-        let q = n + 1;
-        let r = o + 1;
+        let &(m, n, o) = test_kernel.shape();
 
-        let padded_kernel = pad3(&test_kernel, (p - m, q - n, r - o), (0, 0, 0));
-        let mut padded_kernel = flip3(&padded_kernel);
+        let mut test_kernel = flip3(&test_kernel);
 
         // Compute FFT of padded kernel
-        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        let mut test_kernel_hat = Array3D::<c64>::new((m, n, o / 2 + 1));
         f64::rfft3_fftw(
-            padded_kernel.get_data_mut(),
-            padded_kernel_hat.get_data_mut(),
-            &[p, q, r],
+            test_kernel.get_data_mut(),
+            test_kernel_hat.get_data_mut(),
+            &[m, n, o],
         );
 
-        for (p, t) in padded_kernel_hat.get_data().iter().zip(kernel_hat.iter()) {
+        for (p, t) in test_kernel_hat.get_data().iter().zip(kernel_hat.iter()) {
             assert!((p - t).norm() < 1e-6)
         }
     }
@@ -903,21 +911,11 @@ mod test {
         let transfer_vector = &all_transfer_vectors[idx];
 
         // Compute FFT of the representative signal
-        let signal = fft.compute_signal(order, multipole.data());
+        let mut signal = fft.compute_signal(order, multipole.data());
         let &(m, n, o) = signal.shape();
-        let p = m + 1;
-        let q = n + 1;
-        let r = o + 1;
-        let pad_size = (p - m, q - n, r - o);
-        let pad_index = (p - m, q - n, r - o);
-        let mut padded_signal = pad3(&signal, pad_size, pad_index);
-        let mut padded_signal_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
+        let mut signal_hat = Array3D::<c64>::new((m, n, o / 2 + 1));
 
-        f64::rfft3_fftw(
-            padded_signal.get_data_mut(),
-            padded_signal_hat.get_data_mut(),
-            &[p, q, r],
-        );
+        f64::rfft3_fftw(signal.get_data_mut(), signal_hat.get_data_mut(), &[m, n, o]);
 
         let source_equivalent_surface = transfer_vector
             .source
@@ -953,51 +951,35 @@ mod test {
 
         // Compute kernel
         let kernel = fft.compute_kernel(order, &conv_grid, kernel_point);
-        let (m, n, o) = kernel.shape();
-        let p = m + 1;
-        let q = n + 1;
-        let r = o + 1;
+        let &(m, n, o) = kernel.shape();
 
-        let padded_kernel = pad3(&kernel, (p - m, q - n, r - o), (0, 0, 0));
-        let mut padded_kernel = flip3(&padded_kernel);
+        let mut kernel = flip3(&kernel);
 
         // Compute FFT of padded kernel
-        let mut padded_kernel_hat = Array3D::<c64>::new((p, q, r / 2 + 1));
-        f64::rfft3_fftw(
-            padded_kernel.get_data_mut(),
-            padded_kernel_hat.get_data_mut(),
-            &[p, q, r],
-        );
+        let mut kernel_hat = Array3D::<c64>::new((m, n, o / 2 + 1));
+        f64::rfft3_fftw(kernel.get_data_mut(), kernel_hat.get_data_mut(), &[m, n, o]);
 
         // Compute convolution
-        let hadamard_product = padded_signal_hat
+        let hadamard_product = signal_hat
             .get_data()
             .iter()
-            .zip(padded_kernel_hat.get_data().iter())
+            .zip(kernel_hat.get_data().iter())
             .map(|(a, b)| a * b)
             .collect_vec();
 
-        let mut hadamard_product = Array3D::from_data(hadamard_product, (p, q, r / 2 + 1));
+        let mut hadamard_product = Array3D::from_data(hadamard_product, (m, n, o / 2 + 1));
 
-        let mut potentials = Array3D::new((p, q, r));
+        let mut potentials = Array3D::new((m, n, o));
 
         f64::irfft3_fftw(
             hadamard_product.get_data_mut(),
             potentials.get_data_mut(),
-            &[p, q, r],
+            &[m, n, o],
         );
 
-        let (_, multi_indices) = MortonKey::surface_grid::<f64>(order);
-
-        let mut tmp = Vec::new();
-        let ntargets = multi_indices.len() / 3;
-        let xs = &multi_indices[0..ntargets];
-        let ys = &multi_indices[ntargets..2 * ntargets];
-        let zs = &multi_indices[2 * ntargets..];
-
-        for i in 0..ntargets {
-            let val = potentials.get(zs[i], ys[i], xs[i]).unwrap();
-            tmp.push(*val);
+        let mut result = vec![0f64; ntargets];
+        for (i, &idx) in fft.conv_to_surf_map.iter().enumerate() {
+            result[i] = potentials.get_data()[idx];
         }
 
         // Get direct evaluations for testing
@@ -1010,7 +992,7 @@ mod test {
             &mut direct[..],
         );
 
-        let abs_error: f64 = tmp
+        let abs_error: f64 = result
             .iter()
             .zip(direct.iter())
             .map(|(a, b)| (a - b).abs())
