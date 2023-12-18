@@ -21,7 +21,6 @@ pub struct EvaluatorTdim2Gdim3<'a> {
     table: Array4D<f64>,
     npts: usize,
     axes: RefCell<Mat<f64>>,
-    js: RefCell<Mat<f64>>,
 }
 
 impl<'a> EvaluatorTdim2Gdim3<'a> {
@@ -36,7 +35,6 @@ impl<'a> EvaluatorTdim2Gdim3<'a> {
         let mut table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
         element.tabulate(points, 1, &mut table);
         let axes = RefCell::new(zero_matrix([2, 3]));
-        let js = RefCell::new(zero_matrix([npts, 6]));
 
         Self {
             geometry,
@@ -44,7 +42,6 @@ impl<'a> EvaluatorTdim2Gdim3<'a> {
             table,
             npts,
             axes,
-            js,
         }
     }
 }
@@ -76,105 +73,53 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
         }
     }
 
-    /*
-        fn compute_normals(&self, cell_index: usize, normals: &mut Mat<f64>) {
-            let mut axes = self.axes.borrow_mut();
-            for p in 0..self.npts {
-                for i in 0..2 {
-                    for j in 0..3 {
-                        unsafe {
-                            *axes.get_unchecked_mut([i, j]) = 0.0;
-                        }
-                    }
-                }
-                for i in 0..self.table.shape()[2] {
-                    let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
-                    for j in 0..3 {
-                        unsafe {
-                            *axes.get_unchecked_mut([0, j]) +=
-                                *self.geometry.coordinate_unchecked(v, j)
-                                    * self.table.get([1, p, i, 0]).unwrap();
-                            *axes.get_unchecked_mut([1, j]) +=
-                                *self.geometry.coordinate_unchecked(v, j)
-                                    * self.table.get([2, p, i, 0]).unwrap();
-                        }
-                    }
-                }
-                unsafe {
-                    *normals.get_unchecked_mut([p, 0]) = *axes.get_unchecked([0, 1])
-                        * *axes.get_unchecked([1, 2])
-                        - *axes.get_unchecked([0, 2]) * *axes.get_unchecked([1, 1]);
-                    *normals.get_unchecked_mut([p, 1]) = *axes.get_unchecked([0, 2])
-                        * *axes.get_unchecked([1, 0])
-                        - *axes.get_unchecked([0, 0]) * *axes.get_unchecked([1, 2]);
-                    *normals.get_unchecked_mut([p, 2]) = *axes.get_unchecked([0, 0])
-                        * *axes.get_unchecked([1, 1])
-                        - *axes.get_unchecked([0, 1]) * *axes.get_unchecked([1, 0]);
-                    let size = (*normals.get_unchecked([p, 0]) * *normals.get_unchecked([p, 0])
-                        + *normals.get_unchecked([p, 1]) * *normals.get_unchecked([p, 1])
-                        + *normals.get_unchecked([p, 2]) * *normals.get_unchecked([p, 2]))
-                    .sqrt();
-                    *normals.get_unchecked_mut([p, 0]) /= size;
-                    *normals.get_unchecked_mut([p, 1]) /= size;
-                    *normals.get_unchecked_mut([p, 2]) /= size;
-                }
-            }
-        }
-
-        fn compute_jacobians(&self, cell_index: usize, jacobians: &mut Mat<f64>) {
-            for i in 0..6 {
-                for p in 0..self.npts {
+    fn compute_normals_and_jacobian_determinants(
+        &self,
+        cell_index: usize,
+        normals: &mut Mat<f64>,
+        jdets: &mut [f64],
+    ) {
+        let mut axes = self.axes.borrow_mut();
+        for (p, jdet) in jdets.iter_mut().enumerate() {
+            for i in 0..2 {
+                for j in 0..3 {
                     unsafe {
-                        *jacobians.get_unchecked_mut([p, i]) = 0.0;
+                        *axes.get_unchecked_mut([i, j]) = 0.0;
                     }
                 }
             }
             for i in 0..self.table.shape()[2] {
                 let v = unsafe { *self.geometry.cells.get_unchecked(cell_index, i) };
                 for j in 0..3 {
-                    for k in 0..2 {
-                        for p in 0..self.npts {
-                            unsafe {
-                                *jacobians.get_unchecked_mut([p, k + 2 * j]) +=
-                                    *self.geometry.coordinate_unchecked(v, j)
-                                        * self.table.get([k + 1, p, i, 0]).unwrap();
-                            }
-                        }
+                    unsafe {
+                        *axes.get_unchecked_mut([0, j]) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * self.table.get([1, p, i, 0]).unwrap();
+                        *axes.get_unchecked_mut([1, j]) +=
+                            *self.geometry.coordinate_unchecked(v, j)
+                                * self.table.get([2, p, i, 0]).unwrap();
                     }
                 }
             }
-        }
-
-        fn compute_jacobian_determinants(&self, cell_index: usize, jdets: &mut [f64]) {
-            let mut js = self.js.borrow_mut();
-            self.compute_jacobians(cell_index, &mut js);
-            for (p, jdet) in jdets.iter_mut().enumerate() {
-                unsafe {
-                    *jdet = ((js.get_unchecked([p, 0]).powi(2)
-                        + js.get_unchecked([p, 2]).powi(2)
-                        + js.get_unchecked([p, 4]).powi(2))
-                        * (js.get_unchecked([p, 1]).powi(2)
-                            + js.get_unchecked([p, 3]).powi(2)
-                            + js.get_unchecked([p, 5]).powi(2))
-                        - (js.get_unchecked([p, 0]) * js.get_unchecked([p, 1])
-                            + js.get_unchecked([p, 2]) * js.get_unchecked([p, 3])
-                            + js.get_unchecked([p, 4]) * js.get_unchecked([p, 5]))
-                        .powi(2))
-                    .sqrt();
-                }
+            unsafe {
+                *normals.get_unchecked_mut([p, 0]) = *axes.get_unchecked([0, 1])
+                    * *axes.get_unchecked([1, 2])
+                    - *axes.get_unchecked([0, 2]) * *axes.get_unchecked([1, 1]);
+                *normals.get_unchecked_mut([p, 1]) = *axes.get_unchecked([0, 2])
+                    * *axes.get_unchecked([1, 0])
+                    - *axes.get_unchecked([0, 0]) * *axes.get_unchecked([1, 2]);
+                *normals.get_unchecked_mut([p, 2]) = *axes.get_unchecked([0, 0])
+                    * *axes.get_unchecked([1, 1])
+                    - *axes.get_unchecked([0, 1]) * *axes.get_unchecked([1, 0]);
+                *jdet = (*normals.get_unchecked([p, 0]) * *normals.get_unchecked([p, 0])
+                    + *normals.get_unchecked([p, 1]) * *normals.get_unchecked([p, 1])
+                    + *normals.get_unchecked([p, 2]) * *normals.get_unchecked([p, 2]))
+                .sqrt();
+                *normals.get_unchecked_mut([p, 0]) /= *jdet;
+                *normals.get_unchecked_mut([p, 1]) /= *jdet;
+                *normals.get_unchecked_mut([p, 2]) /= *jdet;
             }
         }
-        fn compute_jacobian_inverses(&self, _cell_index: usize, _jinvs: &mut Mat<f64>) {
-            panic!("Not implemented yet");
-        }
-    */
-    fn compute_normals_and_jacobian_determinants(
-        &self,
-        _cell_index: usize,
-        _normals: &mut Mat<f64>,
-        _jdets: &mut [f64],
-    ) {
-        panic!("Not implemented yet");
     }
 }
 
