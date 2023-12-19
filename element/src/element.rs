@@ -6,7 +6,7 @@ use bempp_tools::arrays::{AdjacencyList, Array3D, Mat};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
-use rlst_dense::linalg::Trans;
+use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut};
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3};
 pub mod lagrange;
@@ -150,11 +150,11 @@ impl CiarletElement {
             }
         }
 
-        let mut dual_matrix = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
+        let mut inverse = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
 
         for i in 0..dim {
             for j in 0..dim {
-                let entry = dual_matrix.get_mut([i, j]).unwrap();
+                let entry = inverse.get_mut([i, j]).unwrap();
                 *entry = 0.0;
                 for k in 0..value_size {
                     for l in 0..pdim {
@@ -171,8 +171,7 @@ impl CiarletElement {
                 *ident.get_unchecked_mut([i, i]) = 1.0;
             }
         }
-        let lu = dual_matrix.into_lu().unwrap();
-        let inverse = lu.solve(Trans::NoTrans, ident).unwrap();
+        inverse.view_mut().into_inverse_alloc().unwrap();
 
         let mut coefficients = rlst_dynamic_array3!(f64, [dim, value_size, pdim]);
         for i in 0..dim {
