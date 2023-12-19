@@ -170,9 +170,7 @@ fn assemble_batch_singular<'a>(
                             * trial_jdet[index]);
                 }
                 unsafe {
-                    *output.data.add(
-                        *test_dof + output.shape[0] * *trial_dof
-                    ) += sum;
+                    *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
                 }
             }
         }
@@ -314,9 +312,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     }
                     // TODO: should we write into a result array, then copy into output after this loop?
                     unsafe {
-                        *output
-                            .data
-                            .add(*test_dof + output.shape[0] * *trial_dof) += sum;
+                        *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
                     }
                 }
             }
