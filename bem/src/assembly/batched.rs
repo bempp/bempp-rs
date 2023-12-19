@@ -170,10 +170,8 @@ fn assemble_batch_singular<'a>(
                             * trial_jdet[index]);
                 }
                 unsafe {
-                    *output.data.offset(
-                        (*test_dof + output.shape[0] * *trial_dof)
-                            .try_into()
-                            .unwrap(),
+                    *output.data.add(
+                        *test_dof + output.shape[0] * *trial_dof
                     ) += sum;
                 }
             }
@@ -318,7 +316,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                     unsafe {
                         *output
                             .data
-                            .offset((*test_dof + output.shape[0] * *trial_dof) as isize) += sum;
+                            .add(*test_dof + output.shape[0] * *trial_dof) += sum;
                     }
                 }
             }
