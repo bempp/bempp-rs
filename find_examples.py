@@ -30,6 +30,8 @@ root_dir = os.path.dirname(os.path.realpath(__file__))
 files = []
 for folder in os.listdir(root_dir):
     if not folder.startswith("."):
+        if folder in ["tree", "fmm", "field", "hyksort"]:
+            continue
         sub_dir = os.path.join(root_dir, folder)
         example_dir = os.path.join(sub_dir, "examples")
         if os.path.isdir(sub_dir) and os.path.isdir(example_dir):
