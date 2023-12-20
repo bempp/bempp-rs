@@ -34,7 +34,6 @@ fn find_chunk_size(n: usize, max_chunk_size: usize) -> usize {
     1 // If no divisor is found greater than 1, return 1 as the GCD
 }
 
-// Try this two different ways, ignoring w,x lists and also including them
 impl<T, U, V> TargetTranslation for FmmDataLinear<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
@@ -211,7 +210,6 @@ where
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
                                         sources.data(),
-                                        // sources,
                                         targets.data(),
                                         charges,
                                         result,

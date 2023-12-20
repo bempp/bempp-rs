@@ -6,6 +6,7 @@ use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
+use rlst::dense::rlst_col_vec;
 use rlst::dense::{base_matrix::BaseMatrix, rlst_dynamic_mat, Dynamic, Matrix, VectorContainer};
 
 /// Alias for an rlst container for point data.
@@ -38,6 +39,41 @@ pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUn
         points[[i, 0]] = between.sample(&mut range);
         points[[i, 1]] = between.sample(&mut range);
         points[[i, 2]] = between.sample(&mut range);
+    }
+
+    points
+}
+
+/// Points fixture for testing, uniformly samples on surface of a sphere of diameter 1.
+///
+/// # Arguments
+/// * `npoints` - The number of points to sample.
+/// # `min` - The minumum coordinate value along each axis.
+/// # `max` - The maximum coordinate value along each axis.
+pub fn points_fixture_sphere<T: Scalar + rand::distributions::uniform::SampleUniform>(
+    npoints: usize,
+) -> PointsMat<T> {
+    // Generate a set of randomly distributed points
+    let mut range = StdRng::seed_from_u64(0);
+    let pi = T::from(3.134159).unwrap();
+    let two = T::from(2.0).unwrap();
+    let half = T::from(0.5).unwrap();
+
+    let between = rand::distributions::Uniform::from(T::zero()..T::one());
+
+    let mut points = rlst_dynamic_mat![T, (npoints, 3)];
+    let mut phi = rlst_col_vec![T, npoints];
+    let mut theta = rlst_col_vec![T, npoints];
+
+    for i in 0..npoints {
+        phi[[i, 0]] = between.sample(&mut range) * two * pi;
+        theta[[i, 0]] = ((between.sample(&mut range) - half) * two).acos();
+    }
+
+    for i in 0..npoints {
+        points[[i, 0]] = half * theta[[i, 0]].sin() * phi[[i, 0]].cos() + half;
+        points[[i, 1]] = half * theta[[i, 0]].sin() * phi[[i, 0]].sin() + half;
+        points[[i, 2]] = half * theta[[i, 0]].cos() + half;
     }
 
     points

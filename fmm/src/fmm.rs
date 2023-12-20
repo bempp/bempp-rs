@@ -184,7 +184,6 @@ where
         // Calculate M2M/L2L matrices
         let children = ROOT.children();
         let mut m2m = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
-        // let mut l2l = rlst_dynamic_mat![V, (nequiv_surface, 8 * nequiv_surface)];
         let mut l2l = Vec::new();
 
         for (i, child) in children.iter().enumerate() {
@@ -233,9 +232,6 @@ where
                 .iter_mut()
                 .for_each(|d| *d *= kernel.scale(child.level()));
 
-            // let l = i * nequiv_surface * nequiv_surface;
-            // let r = l + nequiv_surface * nequiv_surface;
-            // l2l.data_mut()[l..r].copy_from_slice(tmp.data());
             l2l.push(tmp);
         }
 
@@ -681,6 +677,7 @@ mod test {
     fn test_fmm_fft_f64() {
         let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None);
+
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
@@ -714,7 +711,7 @@ mod test {
         datatree.run(false);
 
         // Test that direct computation is close to the FMM.
-        let leaf = &datatree.fmm.tree.get_all_leaves().unwrap()[0];
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[2];
         let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
 
         let (l, r) = datatree.charge_index_pointer[*leaf_idx];
