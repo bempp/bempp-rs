@@ -26,17 +26,6 @@ use rlst::{
 
 use super::hadamard::matmul8x8x2;
 
-// pub fn size_real(order: usize) -> usize {
-//     let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
-//     let pad_size = 1;
-//     let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-//     p * p * (p / 2 + 1) // Number of Fourier coefficients when working with real data
-// }
-
-// pub fn nparents(level: usize) -> usize {
-//     8i32.pow((level - 1) as u32) as usize
-// }
-
 fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<usize>>
 where
     U: Float + Default + Scalar<Real = U>,
@@ -96,6 +85,7 @@ where
         let Some(targets) = self.fmm.tree().get_keys(level) else {
             return;
         };
+
         let n = 2 * self.fmm.order - 1;
         let npad = n + 1;
 
@@ -230,7 +220,7 @@ where
             .into_par_iter()
             .zip(signals_hat_f.par_chunks_exact(ntargets + nzeros))
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-            .for_each(|((freq, signal_f), check_potential_hat_f)| {
+            .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                 (0..nparents)
                     .step_by(max_chunksize)
                     .for_each(|chunk_start| {
@@ -248,7 +238,7 @@ where
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
-                                let s_f = &signal_f[displacement * 8..(displacement + 1) * 8];
+                                let s_f = &signal_hat_f[displacement * 8..(displacement + 1) * 8];
 
                                 unsafe {
                                     matmul8x8x2(
@@ -273,7 +263,7 @@ where
         let check_potential_hat_c;
         unsafe {
             let ptr = check_potential_hat.as_mut_ptr() as *mut Complex<U>;
-            check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_real)
+            check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_real * ntargets)
         }
 
         check_potential_hat_c
@@ -318,6 +308,7 @@ where
                     .dc2e_inv_1
                     .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
                     .eval();
+
 
                 local_chunk
                     .data()

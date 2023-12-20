@@ -374,7 +374,7 @@ where
 
         // We want to use this data by frequency in the implementation of FFT M2L
         // Rearrangement: Grouping by frequency, then halo child, then sibling
-        let mut kernel_data_rearranged = vec![Vec::new(); halo_children.len()];
+        let mut kernel_data_f = vec![Vec::new(); halo_children.len()];
         for i in 0..halo_children.len() {
             let current_vector = &kernel_data[i];
             for l in 0..size_real {
@@ -383,7 +383,7 @@ where
                     // sibling
                     for j in 0..8 {
                         let index = j * size_real * 8 + k * size_real + l;
-                        kernel_data_rearranged[i].push(current_vector[index]);
+                        kernel_data_f[i].push(current_vector[index]);
                     }
                 }
             }
@@ -391,7 +391,7 @@ where
 
         FftM2lOperatorData {
             kernel_data,
-            kernel_data_f: kernel_data_rearranged,
+            kernel_data_f,
         }
     }
 
