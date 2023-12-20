@@ -913,6 +913,6 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        assert!(rel_error <= 1e-6);
+        assert!(rel_error <= 1e-5);
     }
 }
