@@ -220,7 +220,7 @@ where
             .into_par_iter()
             .zip(signals_hat_f.par_chunks_exact(ntargets + nzeros))
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-            .for_each(|((freq, signal_f), check_potential_hat_f)| {
+            .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                 (0..nparents)
                     .step_by(max_chunksize)
                     .for_each(|chunk_start| {
@@ -238,7 +238,7 @@ where
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
-                                let s_f = &signal_f[displacement * 8..(displacement + 1) * 8];
+                                let s_f = &signal_hat_f[displacement * 8..(displacement + 1) * 8];
 
                                 unsafe {
                                     matmul8x8x2(
