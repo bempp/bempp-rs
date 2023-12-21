@@ -6,7 +6,9 @@ use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
 
-use rlst_dense::{array::Array, base_array::BaseArray, rlst_dynamic_array2, data_container::VectorContainer};
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+};
 
 /// Alias for an rlst container for point data.
 pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
