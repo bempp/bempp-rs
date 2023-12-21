@@ -28,10 +28,12 @@ bempp-kernel = { path = "../kernel" }
 bempp-tools = { path = "../tools" }
 itertools = "0.10"
 num = "0.4"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", branch = "legacy"}
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = {git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.*"
 dashmap = {version = "5.5.0", features=["rayon"]}
+approx = "0.5"
 rayon = "1.7"
 
 [dev-dependencies]

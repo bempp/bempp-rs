@@ -1,11 +1,7 @@
 //! Types for storing field translation data.
 use num::{Complex, Float};
-use rlst::{
-    common::traits::{Eval, NewLikeSelf},
-    dense::{
-        base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, rlst_dynamic_mat,
-        Dynamic,
-    },
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
 };
 
 use bempp_traits::kernel::Kernel;
@@ -13,7 +9,7 @@ use bempp_traits::types::Scalar;
 use bempp_tree::types::morton::MortonKey;
 
 /// Simple type alias for a 2D `Matrix<f64>`
-pub type SvdM2lEntry<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
+pub type SvdM2lEntry<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Simple type alias for pre-computed FFT of green's function evaluations computed for each transfer vector in a box's halo
 /// Each index corresponds to a halo position, and contains 64 convolutions, one for each of a box's siblings with each child
@@ -116,12 +112,10 @@ where
     T: Scalar,
 {
     fn default() -> Self {
-        let tmp = rlst_dynamic_mat![T, (1, 1)];
+        let u = rlst_dynamic_array2!(T, [1, 1]);
+        let st_block = rlst_dynamic_array2!(T, [1, 1]);
+        let c = rlst_dynamic_array2!(T, [1, 1]);
 
-        SvdM2lOperatorData {
-            u: tmp.new_like_self().eval(),
-            st_block: tmp.new_like_self().eval(),
-            c: tmp.new_like_self().eval(),
-        }
+        SvdM2lOperatorData { u, st_block, c }
     }
 }

@@ -5,7 +5,7 @@ use itertools::Itertools;
 use num::traits::Num;
 
 use bempp_tools::Array3D;
-use bempp_traits::arrays::Array3DAccess;
+use rlst_dense::rlst_dynamic_array2;
 
 /// Return indices that sort a vec.
 ///
@@ -41,7 +41,7 @@ where
     // Check that there is enough space for pad
     assert!(x + p <= m + p && y + q <= n + q && z + r <= o + r);
 
-    let mut padded = Array3D::new((p + m, q + n, r + o));
+    let mut padded = rlst_dynamic_array2!(T, [p + m, q + n, r + o]);
 
     for i in 0..m {
         for j in 0..n {
@@ -62,7 +62,7 @@ pub fn flip3<T>(arr: &Array3D<T>) -> Array3D<T>
 where
     T: Clone + Copy + Num,
 {
-    let mut flipped = Array3D::new(*arr.shape());
+    let mut flipped = rlst_dynamic_array2!(T, arr.shape());
 
     let &(m, n, o) = arr.shape();
 
@@ -82,6 +82,7 @@ where
 mod test {
 
     use super::*;
+    use approx::*;
 
     #[test]
     fn test_argsort() {
@@ -103,24 +104,26 @@ mod test {
     #[test]
     fn test_flip3() {
         let n = 2;
-        let mut arr: Array3D<usize> = Array3D::new((n, n, n));
+        let mut arr = rlst_dynamic_array2!(f64, [n, n, n]);
         for i in 0..n {
             for j in 0..n {
                 for k in 0..n {
-                    *arr.get_mut(i, j, k).unwrap() = i + j * n + k * n * n;
+                    *arr.get_mut(i, j, k).unwrap() = (i + j * n + k * n * n) as f64;
                 }
             }
         }
-        let expected = vec![7, 3, 5, 1, 6, 2, 4, 0];
+        let expected = vec![7.0, 3.0, 5.0, 1.0, 6.0, 2.0, 4.0, 0.0];
         let result = flip3(&arr).get_data().to_vec();
-        assert_eq!(result, expected);
+        for (i, j) in expected.zip(result) {
+            assert_relative_eq!(i, j);
+        }
     }
 
     #[test]
     fn test_pad3() {
         let dim = 3;
         // Initialise input data
-        let mut input = Array3D::new((dim, dim, dim));
+        let mut input = rlst_dynamic_array2!(f64, [dim, dim, dim]);
         for i in 0..dim {
             for j in 0..dim {
                 for k in 0..dim {
