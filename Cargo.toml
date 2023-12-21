@@ -9,7 +9,7 @@ members = [
     "hyksort",
     "quadrature",
     "tools",
-#    "tree",
+    "tree",
     "kernel",
     "traits",
 ]
@@ -25,7 +25,7 @@ default-members = [
     "hyksort",
     "quadrature",
     "tools",
-#    "tree",
+    "tree",
     "kernel",
     "traits",
 ]

@@ -1005,7 +1005,7 @@ impl MortonKeyInterface for MortonKey {
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
-    use rlst::dense::{RawAccess, Shape};
+    use rlst_dense::traits::{RawAccess, Shape};
     use std::vec;
 
     use crate::implementations::helpers::points_fixture;
@@ -1187,7 +1187,7 @@ mod test {
 
         let mut keys: Vec<MortonKey> = Vec::new();
 
-        for i in 0..points.shape().0 {
+        for i in 0..points.shape()[0] {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
 
             keys.push(MortonKey::from_point(&point, &domain, DEEPEST_LEVEL));
@@ -1471,7 +1471,7 @@ mod test {
 
         let mut keys = Vec::new();
 
-        for i in 0..points.shape().0 {
+        for i in 0..points.shape()[0] {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
             keys.push(MortonKey::from_point(&point, &domain, DEEPEST_LEVEL))
         }
