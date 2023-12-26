@@ -4,7 +4,7 @@ use bempp_traits::types::Scalar;
 use num::complex::Complex;
 
 #[inline(always)]
-pub unsafe fn matmul8x8x2<U>(
+pub fn matmul8x8x2<U>(
     kernel_data_freq: &[Complex<U>],
     signal: &[Complex<U>],
     save_locations: &mut [Complex<U>],

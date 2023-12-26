@@ -92,6 +92,8 @@ where
         let nparents = self.fmm.tree().get_keys(level - 1).unwrap().len();
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
         let nsiblings = 8;
+        let nsiblings_2 = 64;
+        let nneighbors = 26;
         let nzeros = 8;
         let size = npad * npad * npad;
         let size_real = npad * npad * (npad / 2 + 1);
@@ -226,28 +228,28 @@ where
                     .for_each(|chunk_start| {
                         let chunk_end = std::cmp::min(chunk_start + max_chunksize, nparents);
 
-                        let save_locations =
-                            &mut check_potential_hat_f[chunk_start * 8..(chunk_end) * 8];
+                        let save_locations = &mut check_potential_hat_f
+                            [chunk_start * nsiblings..(chunk_end) * nsiblings];
 
-                        for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
-                            let frequency_offset = 64 * freq;
-                            let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
+                        for (i, kernel_f) in kernel_data_f.iter().enumerate().take(nneighbors) {
+                            let frequency_offset = nsiblings_2 * freq;
+                            let k_f = &kernel_f[frequency_offset..(frequency_offset + nsiblings_2)]
+                                .to_vec();
 
                             // Lookup signals
                             let displacements = &all_displacements[i][chunk_start..chunk_end];
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
-                                let s_f = &signal_hat_f[displacement * 8..(displacement + 1) * 8];
+                                let s_f = &signal_hat_f
+                                    [displacement * nsiblings..(displacement + 1) * nsiblings];
 
-                                unsafe {
-                                    matmul8x8x2(
-                                        k_f,
-                                        s_f,
-                                        &mut save_locations[j * 8..(j + 1) * 8],
-                                        scale,
-                                    )
-                                }
+                                matmul8x8x2(
+                                    k_f,
+                                    s_f,
+                                    &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
+                                    scale,
+                                )
                             }
                         }
                     });
