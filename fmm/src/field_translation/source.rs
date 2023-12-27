@@ -12,11 +12,11 @@ use bempp_traits::{
     tree::Tree,
     types::EvalType,
 };
-use bempp_tree::types::{single_node::SingleNodeTree, morton::MortonKey};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use crate::{
-    constants::{L2L_MAX_CHUNK_SIZE, M2M_MAX_CHUNK_SIZE},
-    types::{FmmDataLinear, KiFmmLinear, FmmDataLinearSparse},
+    constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
+    types::{FmmDataLinear, FmmDataLinearSparse, KiFmmLinear},
 };
 use rlst::{
     common::traits::*,
@@ -24,7 +24,7 @@ use rlst::{
 };
 
 /// Euclidean algorithm to find greatest divisor of `n` less than or equal to `max_chunk_size`
-fn find_chunk_size(n: usize, max_chunk_size: usize) -> usize {
+pub fn find_chunk_size(n: usize, max_chunk_size: usize) -> usize {
     let max_divisor = max_chunk_size;
     for divisor in (1..=max_divisor).rev() {
         if n % divisor == 0 {
@@ -92,7 +92,7 @@ where
                 );
 
             // 2. Compute the multipole expansions, with each of chunk_size boxes at a time.
-            let chunk_size = find_chunk_size(nleaves, L2L_MAX_CHUNK_SIZE);
+            let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
 
             check_potentials
                 .data()
@@ -119,32 +119,32 @@ where
         }
     }
 
- /// Multipole to multipole translations, multithreaded over all boxes at a given level.
- fn m2m<'a>(&self, level: u64) {
-    if let Some(child_sources) = self.fmm.tree().get_keys(level) {
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+    /// Multipole to multipole translations, multithreaded over all boxes at a given level.
+    fn m2m<'a>(&self, level: u64) {
+        if let Some(child_sources) = self.fmm.tree().get_keys(level) {
+            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-        let n_child_sources = child_sources.len();
-        let min = &child_sources[0];
-        let max = &child_sources[n_child_sources - 1];
-        let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
-        let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
+            let n_child_sources = child_sources.len();
+            let min = &child_sources[0];
+            let max = &child_sources[n_child_sources - 1];
+            let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
+            let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
 
-        let child_multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+            let child_multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
-        let nsiblings = 8;
-        let mut nparents = 8_i32.pow((level - 1).try_into().unwrap()) as usize;
+            let nsiblings = 8;
+            let mut max_chunk_size = 8_i32.pow((level - 1).try_into().unwrap()) as usize;
 
-        if nparents > M2M_MAX_CHUNK_SIZE {
-            nparents = M2M_MAX_CHUNK_SIZE;
-        }
-        let chunk_size = find_chunk_size(n_child_sources, nparents);
+            if max_chunk_size > M2M_MAX_CHUNK_SIZE {
+                max_chunk_size = M2M_MAX_CHUNK_SIZE;
+            }
+            let chunk_size = find_chunk_size(n_child_sources, max_chunk_size);
 
-        let parent_targets = &self.level_multipoles[(level - 1) as usize];
+            let parent_multipoles = &self.level_multipoles[(level - 1) as usize];
 
-        child_multipoles
+            child_multipoles
             .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
-            .zip(parent_targets.par_chunks_exact(chunk_size))
+            .zip(parent_multipoles.par_chunks_exact(chunk_size))
             .for_each(|(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
 
                 unsafe {
@@ -160,10 +160,9 @@ where
                     }
                 }
             })
+        }
     }
 }
-}
-
 
 impl<T, U, V> SourceTranslation for FmmDataLinearSparse<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -223,7 +222,7 @@ where
                 );
 
             // 2. Compute the multipole expansions, with each of chunk_size boxes at a time.
-            let chunk_size = find_chunk_size(nleaves, L2L_MAX_CHUNK_SIZE);
+            let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
 
             check_potentials
                 .data()
@@ -258,13 +257,18 @@ where
 
             // 1. Lookup parents and corresponding children that exist for this set of sources
             //    Must explicitly lookup as boxes may be empty at this level, and the next.
-            let parent_targets: HashSet<MortonKey> = child_sources.iter().map(|source| source.parent()).collect();
+            let parent_targets: HashSet<MortonKey> =
+                child_sources.iter().map(|source| source.parent()).collect();
             let mut parent_targets = parent_targets.into_iter().collect_vec();
             parent_targets.sort();
+            let nparents = parent_targets.len();
             let mut parent_multipoles = Vec::new();
             for parent in parent_targets.iter() {
-                let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize].get(parent).unwrap();
-                let parent_multipole = self.level_multipoles[(level - 1) as usize][parent_index_pointer];
+                let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize]
+                    .get(parent)
+                    .unwrap();
+                let parent_multipole =
+                    self.level_multipoles[(level - 1) as usize][parent_index_pointer];
                 parent_multipoles.push(parent_multipole);
             }
 
@@ -276,27 +280,33 @@ where
 
             let child_multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
+            let mut max_chunk_size = nparents;
+            if max_chunk_size > M2M_MAX_CHUNK_SIZE {
+                max_chunk_size = M2M_MAX_CHUNK_SIZE
+            }
+            let chunk_size = find_chunk_size(n_child_sources, max_chunk_size);
+
             // 3. Compute M2M kernel over sets of siblings
             child_multipoles
-                .par_chunks_exact(nsiblings * ncoeffs)
-                .zip(parent_multipoles.into_par_iter())
-                .for_each(|(child_multipole, parent_multipole_pointer)| {
-
+                .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
+                .zip(parent_multipoles.par_chunks_exact(chunk_size))
+                .for_each(|(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
                     unsafe {
-                        let tmp = rlst_pointer_mat!['a, V, child_multipole.as_ptr(), (ncoeffs*nsiblings, 1), (1, ncoeffs*nsiblings)];
-                        let tmp = self.fmm.m2m.dot(&tmp).eval();
-                        let mut raw_ptr = parent_multipole_pointer.raw;
-                        for k in 0..ncoeffs {
-                            *raw_ptr += tmp.data()[k];
-                            raw_ptr = raw_ptr.add(1)
+                        let child_multipoles_chunk = rlst_pointer_mat!['a, V, child_multipoles_chunk.as_ptr(), (ncoeffs*nsiblings, chunk_size), (1, ncoeffs*nsiblings)];
+                        let parent_multipoles_chunk = self.fmm.m2m.dot(&child_multipoles_chunk).eval();
+
+                        for (chunk_idx, parent_multipole_pointer) in parent_multipole_pointers_chunk.iter().enumerate().take(chunk_size) {
+                            let mut parent_multipole_raw_pointer = parent_multipole_pointer.raw;
+                            for i in 0..ncoeffs {
+                                *parent_multipole_raw_pointer += parent_multipoles_chunk.data()[(chunk_idx*ncoeffs)+i];
+                                parent_multipole_raw_pointer = parent_multipole_raw_pointer.add(1)
+                            }
                         }
                     }
                 })
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -336,7 +346,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            false
+            false,
         );
 
         // Precompute the M2L data
@@ -421,7 +431,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            false
+            false,
         );
 
         println!("NLEAVES {:?}", tree.get_all_leaves().unwrap().len());
@@ -508,7 +518,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            true
+            true,
         );
 
         println!("NLEAVES {:?}", tree.get_all_leaves().unwrap().len());

@@ -1,6 +1,6 @@
 //! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Add};
 
 use itertools::Itertools;
 use num::Float;
@@ -13,16 +13,16 @@ use bempp_traits::{
     tree::Tree,
     types::EvalType,
 };
-use bempp_tree::types::{single_node::SingleNodeTree, morton::MortonKey};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use crate::{
-    constants::{P2M_MAX_CHUNK_SIZE, L2L_MAX_CHUNK_SIZE},
-    types::{FmmDataLinear, KiFmmLinear, FmmDataLinearSparse},
+    constants::{L2L_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
+    types::{FmmDataLinear, FmmDataLinearSparse, KiFmmLinear},
 };
 
 use rlst::{
     common::traits::*,
-    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer, rlst_dynamic_mat},
 };
 
 /// Euclidean algorithm to find greatest common divisor less than max
@@ -55,6 +55,7 @@ where
         if let Some(parent_sources) = self.fmm.tree().get_keys(level - 1) {
             if let Some(_child_targets) = self.fmm.tree().get_keys(level) {
                 let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+                let nsiblings = 8;
 
                 let nsources = parent_sources.len();
                 let min_parent = &parent_sources[0];
@@ -74,35 +75,34 @@ where
                     max_chunk_size = L2L_MAX_CHUNK_SIZE;
                 }
                 let chunk_size = find_chunk_size(nsources, max_chunk_size);
-                let nsiblings = 8;
 
                 parent_locals
-                .par_chunks_exact(ncoeffs*chunk_size)
-                .zip(child_locals.par_chunks_exact(chunk_size*nsiblings))
-                .for_each(|(parent_local_chunk, children_locals)| {
+                    .par_chunks_exact(ncoeffs*chunk_size)
+                    .zip(child_locals.par_chunks_exact(chunk_size*nsiblings))
+                    .for_each(|(parent_local_chunk, children_locals)| {
 
-                    let parent_local_chunk = unsafe { rlst_pointer_mat!['a, V, parent_local_chunk.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
+                        let parent_local_chunk = unsafe { rlst_pointer_mat!['a, V, parent_local_chunk.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
 
-                    for i in 0..8 {
-                        // Evaluate all L2L for this position in local chunk
-                        let tmp = self.fmm.l2l[i].dot(&parent_local_chunk).eval();
+                        for i in 0..8 {
+                            // Evaluate all L2L for this position in local chunk
+                            let tmp = self.fmm.l2l[i].dot(&parent_local_chunk).eval();
 
-                        // Assign for each child in this chunk at this position
-                        for j in 0..chunk_size {
-                            let chunk_displacement = j*nsiblings;
-                            let child_displacement = chunk_displacement + i;
-                            let mut ptr = children_locals[child_displacement].raw;
+                            // Assign for each child in this chunk at this position
+                            for j in 0..chunk_size {
+                                let chunk_displacement = j*nsiblings;
+                                let child_displacement = chunk_displacement + i;
+                                let mut ptr = children_locals[child_displacement].raw;
 
-                            unsafe {
-                                for k in 0..ncoeffs {
-                                    *ptr += tmp.data()[(j*ncoeffs)+k];
-                                    ptr = ptr.add(1);
+                                unsafe {
+                                    for k in 0..ncoeffs {
+                                        *ptr += tmp.data()[(j*ncoeffs)+k];
+                                        ptr = ptr.add(1);
+                                    }
                                 }
-                            }
 
+                            }
                         }
-                    }
-                });
+                    });
             }
         }
     }
@@ -240,47 +240,62 @@ where
         Dynamic,
     >,
 {
-
     fn l2l<'a>(&self, level: u64) {
         if let Some(child_targets) = self.fmm.tree().get_keys(level) {
-
             let nsiblings = 8;
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-            let parent_sources: HashSet<MortonKey> = child_targets.iter().map(|source| source.parent()).collect();
+            let parent_sources: HashSet<MortonKey> =
+                child_targets.iter().map(|source| source.parent()).collect();
             let mut parent_sources = parent_sources.into_iter().collect_vec();
             parent_sources.sort();
+            let nparents = parent_sources.len();
             let mut parent_locals = Vec::new();
             for parent in parent_sources.iter() {
-                let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize].get(parent).unwrap();
+                let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize]
+                    .get(parent)
+                    .unwrap();
                 let parent_local = self.level_locals[(level - 1) as usize][parent_index_pointer];
                 parent_locals.push(parent_local);
             }
-                
+
+            let mut max_chunk_size = nparents;
+            if max_chunk_size > L2L_MAX_CHUNK_SIZE {
+                max_chunk_size = L2L_MAX_CHUNK_SIZE
+            }
+            let chunk_size = find_chunk_size(nparents, max_chunk_size);
+
             let child_locals = &self.level_locals[level as usize];
 
             parent_locals
-                .into_par_iter()
-                .zip(child_locals.par_chunks_exact(nsiblings))
+                .par_chunks_exact(chunk_size)
+                .zip(child_locals.par_chunks_exact(nsiblings*chunk_size))
                 .for_each(|(parent_local_pointer, child_local_pointers)| {
 
-                    let parent_local = unsafe { rlst_pointer_mat!['a, V, parent_local_pointer.raw, (ncoeffs, 1), (1, ncoeffs)] };
+                    let mut parent_locals = rlst_dynamic_mat![V, (ncoeffs, chunk_size)];
+                    for chunk_idx in 0..chunk_size {
+                        let tmp = unsafe { rlst_pointer_mat!['a, V, parent_local_pointer[chunk_idx].raw, (ncoeffs, 1), (1, ncoeffs)] };
+                        parent_locals.data_mut()[chunk_idx*ncoeffs..(chunk_idx+1)*ncoeffs].copy_from_slice(tmp.data());
+                    }                    
 
                     for i in 0..8 {
-                        let tmp = self.fmm.l2l[i].dot(&parent_local).eval();
+                        let tmp = self.fmm.l2l[i].dot(&parent_locals).eval();
 
-                        let mut ptr = child_local_pointers[i].raw;
-
-                        unsafe {
-                            for j in 0..ncoeffs { 
-                                *ptr += tmp.data()[j];
-                                ptr = ptr.add(1);
+                        for j in 0..chunk_size {
+                            let chunk_displacement = j*nsiblings;
+                            let child_displacement = chunk_displacement + i;
+                            let mut ptr = child_local_pointers[child_displacement].raw;
+                            unsafe {
+                                for k in 0..ncoeffs {
+                                    *ptr += tmp.data()[(j*ncoeffs)+k];
+                                    ptr = ptr.add(1);
+                                }
                             }
                         }
                     }
                 });
-        }
 
+        }
     }
 
     fn m2p<'a>(&self) {}

@@ -15,16 +15,16 @@ use bempp_traits::{
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
 };
-use bempp_tree::types::{single_node::SingleNodeTree, morton::MortonKey};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::types::{FmmDataLinear, KiFmmLinear, SendPtrMut, FmmDataLinearSparse};
+use crate::types::{FmmDataLinear, FmmDataLinearSparse, KiFmmLinear, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
     dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-use super::hadamard::matmul8x8x2;
+use super::{hadamard::matmul8x8x2, source::find_chunk_size};
 
 fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<usize>>
 where
@@ -60,7 +60,8 @@ where
     result
 }
 
-impl<T, U> FmmDataLinearSparse<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U> 
+impl<T, U>
+    FmmDataLinearSparse<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
     T: Kernel<T = U>
         + ScaleInvariantKernel<T = U>
@@ -79,14 +80,12 @@ where
         Dynamic,
     >,
 {
-
     fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
-
         let nneighbors = 26;
         let nsiblings = 8;
 
         let sources = self.fmm.tree().get_keys(level).unwrap();
-        
+
         let parents: HashSet<MortonKey> = sources.iter().map(|source| source.parent()).collect();
         let mut parents = parents.into_iter().collect_vec();
         parents.sort();
@@ -103,9 +102,11 @@ where
             for all_neighbors in parent_neighbors.iter().take(nparents) {
                 // First check if neighbor exists is in the bounds of the tree
                 if let Some(neighbor) = all_neighbors[i] {
-                    let first_child = neighbor.first_child();                    
+                    let first_child = neighbor.first_child();
                     // Then need to check if first child exists in the tree
-                    if let Some(first_child_index) = self.level_index_pointer[level as usize].get(&first_child) {
+                    if let Some(first_child_index) =
+                        self.level_index_pointer[level as usize].get(&first_child)
+                    {
                         result[i].push(*first_child_index)
                     } else {
                         result[i].push(nparents * nsiblings)
@@ -118,7 +119,6 @@ where
 
         result
     }
-
 }
 
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
@@ -287,8 +287,8 @@ where
                     .for_each(|chunk_start| {
                         let chunk_end = std::cmp::min(chunk_start + max_chunksize, nparents);
 
-                        let save_locations =
-                            &mut check_potential_hat_f[chunk_start * nsiblings..(chunk_end) * nsiblings];
+                        let save_locations = &mut check_potential_hat_f
+                            [chunk_start * nsiblings..(chunk_end) * nsiblings];
 
                         for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
                             let frequency_offset = 64 * freq;
@@ -299,7 +299,8 @@ where
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
-                                let s_f = &signal_hat_f[displacement * nsiblings ..(displacement + 1) * nsiblings];
+                                let s_f = &signal_hat_f
+                                    [displacement * nsiblings..(displacement + 1) * nsiblings];
 
                                 matmul8x8x2(
                                     k_f,
@@ -426,7 +427,10 @@ where
         let npad = n + 1;
 
         // let nparents = self.fmm.tree().get_keys(level - 1).unwrap().len();
-        let parents: HashSet<MortonKey> = targets.iter().map(|target: &MortonKey| target.parent()).collect();
+        let parents: HashSet<MortonKey> = targets
+            .iter()
+            .map(|target: &MortonKey| target.parent())
+            .collect();
         let mut parents = parents.into_iter().collect_vec();
         parents.sort();
         let nparents = parents.len();
@@ -464,7 +468,16 @@ where
         let signals_hat_f_ptr = SendPtrMut { raw };
 
         // Pre processing chunk size, in terms of number of parents
-        let chunk_size = 1;
+        // let chunk_size = 1;
+        let max_chunk_size;
+        if level == 2 {
+            max_chunk_size = 8
+        } else if level == 3 {
+            max_chunk_size = 64
+        } else {
+            max_chunk_size = 128
+        }
+        let chunk_size = find_chunk_size(nparents, max_chunk_size);
 
         // Pre-processing to find FFT
         multipoles
@@ -549,7 +562,6 @@ where
         ////////////////////////////////////////////////////////////////////////////////////
         let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
         let kernel_data_f = &self.fmm.m2l.operator_data.kernel_data_f;
-        let max_chunk_size = 10;
 
         (0..size_real)
             .into_par_iter()
@@ -557,12 +569,12 @@ where
             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
             .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                 (0..nparents)
-                    .step_by(max_chunk_size)
+                    .step_by(chunk_size)
                     .for_each(|chunk_start| {
-                        let chunk_end = std::cmp::min(chunk_start + max_chunk_size, nparents);
+                        let chunk_end = std::cmp::min(chunk_start + chunk_size, nparents);
 
-                        let save_locations =
-                            &mut check_potential_hat_f[chunk_start * nsiblings..chunk_end * nsiblings];
+                        let save_locations = &mut check_potential_hat_f
+                            [chunk_start * nsiblings..chunk_end * nsiblings];
 
                         for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
                             let frequency_offset = 64 * freq;
@@ -574,7 +586,7 @@ where
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
                                 let s_f = &signal_hat_f[displacement..displacement + nsiblings];
-                                
+
                                 matmul8x8x2(
                                     k_f,
                                     s_f,

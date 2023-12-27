@@ -2,7 +2,7 @@
 use cauchy::Scalar;
 use itertools::Itertools;
 use num::{Float, ToPrimitive};
-use std::{time::Instant, collections::HashMap};
+use std::{collections::HashMap, time::Instant};
 
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
@@ -19,7 +19,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{ChargeDict, FmmDataLinear, SendPtrMut, FmmDataLinearSparse};
+use crate::types::{ChargeDict, FmmDataLinear, FmmDataLinearSparse, SendPtrMut};
 use crate::{
     pinv::{pinv, SvdScalar},
     types::KiFmmLinear,
@@ -298,7 +298,7 @@ where
 
             let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
             let mut level_locals = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
-            
+
             for level in 0..=fmm.tree().get_depth() {
                 let keys = fmm.tree().get_keys(level).unwrap();
 
@@ -421,7 +421,6 @@ where
     }
 }
 
-
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataLinearSparse<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -468,9 +467,9 @@ where
 
             let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
             let mut level_locals = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
-            let mut level_index_pointer = vec![HashMap::new(); (fmm.tree().get_depth() + 1) as usize];
+            let mut level_index_pointer =
+                vec![HashMap::new(); (fmm.tree().get_depth() + 1) as usize];
 
-            
             for level in 0..=fmm.tree().get_depth() {
                 let keys = fmm.tree().get_keys(level).unwrap();
 
@@ -749,7 +748,6 @@ where
     }
 }
 
-
 impl<T, U> FmmLoop for FmmDataLinear<T, U>
 where
     T: Fmm,
@@ -900,7 +898,7 @@ mod test {
                 Some(ncrit),
                 Some(depth),
                 &global_idxs[..],
-                false
+                false,
             );
 
             let m2l_data_fft = FftFieldTranslationKiFmm::new(
@@ -968,13 +966,13 @@ mod test {
     #[test]
     fn test_fmm_fft_f64() {
         let npoints = 1000000;
-        let points = points_fixture::<f64>(npoints, None, None);
-        // let points = points_fixture_sphere::<f64>(npoints);
+        // let points = points_fixture::<f64>(npoints, None, None);
+        let points = points_fixture_sphere::<f64>(npoints);
 
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
@@ -989,7 +987,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            false
+            false,
         );
 
         let m2l_data_fft =
@@ -1005,7 +1003,10 @@ mod test {
         let s = Instant::now();
         let times = datatree.run(true);
         println!("dense runtime {:?} {:?}", s.elapsed(), times);
-        println!("N LEAVES {:?}", datatree.fmm.tree().get_all_leaves().unwrap().len());
+        println!(
+            "N LEAVES {:?}",
+            datatree.fmm.tree().get_all_leaves().unwrap().len()
+        );
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[475];
@@ -1015,7 +1016,6 @@ mod test {
 
         // println!("{:?}", &datatree.charge_index_pointer[450..750]);
 
-        
         let potentials = &datatree.potentials[l..r];
 
         let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
@@ -1029,8 +1029,8 @@ mod test {
           }.eval();
 
         let mut direct = vec![0f64; ntargets];
-        let all_point_coordinates = points_fixture::<f64>(npoints, None, None);
-        // let all_point_coordinates = points_fixture_sphere::<f64>(npoints);
+        // let all_point_coordinates = points_fixture::<f64>(npoints, None, None);
+        let all_point_coordinates = points_fixture_sphere::<f64>(npoints);
 
         let all_charges = charge_dict.into_values().collect_vec();
 
@@ -1065,7 +1065,7 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 9;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = false;
@@ -1080,7 +1080,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            true
+            true,
         );
 
         let m2l_data_fft =
@@ -1097,7 +1097,10 @@ mod test {
         let times = datatree.run(true);
         println!("sparse runtime {:?} {:?}", s.elapsed(), times);
 
-        println!("N LEAVES {:?}", datatree.fmm.tree().get_all_leaves().unwrap().len());
+        println!(
+            "N LEAVES {:?}",
+            datatree.fmm.tree().get_all_leaves().unwrap().len()
+        );
 
         // Test that direct computation is close to the FMM.
         let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[7];
@@ -1105,7 +1108,6 @@ mod test {
 
         let (l, r) = datatree.charge_index_pointer[*leaf_idx];
 
-        
         let potentials = &datatree.potentials[l..r];
 
         let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
@@ -1168,7 +1170,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            false
+            false,
         );
 
         let m2l_data_fft =
@@ -1248,7 +1250,7 @@ mod test {
             Some(ncrit),
             Some(depth),
             &global_idxs[..],
-            false
+            false,
         );
 
         let m2l_data_svd = SvdFieldTranslationKiFmm::new(

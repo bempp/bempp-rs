@@ -82,7 +82,6 @@ where
     pub global_indices: Vec<usize>,
 }
 
-
 /// Don't process empty nodes
 pub struct FmmDataLinearSparse<T, U>
 where
