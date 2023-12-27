@@ -26,38 +26,56 @@ use rlst::{
 
 use super::{hadamard::matmul8x8x2, source::find_chunk_size};
 
-fn displacements<U>(tree: &SingleNodeTree<U>, level: u64) -> Vec<Vec<usize>>
+impl<T, U>
+    FmmDataLinear<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
-    U: Float + Default + Scalar<Real = U>,
+    T: Kernel<T = U>
+        + ScaleInvariantKernel<T = U>
+        + std::marker::Send
+        + std::marker::Sync
+        + Default,
+    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+    Complex<U>: Scalar,
+    U: MultiplyAdd<
+        U,
+        VectorContainer<U>,
+        VectorContainer<U>,
+        VectorContainer<U>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
 {
-    let parents = tree.get_keys(level - 1).unwrap();
-    let nparents = parents.len();
-    let nneighbors = 26; // Number of neighors for a given box
-
-    let mut target_map = HashMap::new();
-
-    for (i, parent) in parents.iter().enumerate() {
-        target_map.insert(parent, i);
-    }
-
-    let mut result = vec![Vec::new(); nneighbors];
-
-    let parent_neighbours = parents
-        .iter()
-        .map(|parent| parent.all_neighbors())
-        .collect_vec();
-
-    for i in 0..nneighbors {
-        for all_neighbours in parent_neighbours.iter().take(nparents) {
-            if let Some(neighbour) = all_neighbours[i] {
-                result[i].push(*target_map.get(&neighbour).unwrap())
-            } else {
-                result[i].push(nparents);
+    fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
+        let parents = self.fmm.tree().get_keys(level - 1).unwrap();
+        let nparents = parents.len();
+        let nneighbors = 26; // Number of neighors for a given box
+    
+        let mut target_map = HashMap::new();
+    
+        for (i, parent) in parents.iter().enumerate() {
+            target_map.insert(parent, i);
+        }
+    
+        let mut result = vec![Vec::new(); nneighbors];
+    
+        let parent_neighbours = parents
+            .iter()
+            .map(|parent| parent.all_neighbors())
+            .collect_vec();
+    
+        for i in 0..nneighbors {
+            for all_neighbours in parent_neighbours.iter().take(nparents) {
+                if let Some(neighbour) = all_neighbours[i] {
+                    result[i].push(*target_map.get(&neighbour).unwrap())
+                } else {
+                    result[i].push(nparents);
+                }
             }
         }
+    
+        result
     }
-
-    result
 }
 
 impl<T, U>
@@ -156,7 +174,7 @@ where
         let nzeros = 8;
         let size = npad * npad * npad;
         let size_real = npad * npad * (npad / 2 + 1);
-        let all_displacements = displacements(self.fmm.tree(), level);
+        let all_displacements = self.displacements(level);
 
         let ntargets = targets.len();
         let min = &targets[0];
