@@ -2,7 +2,7 @@
 use cauchy::Scalar;
 use itertools::Itertools;
 use num::{Float, ToPrimitive};
-use std::time::Instant;
+use std::{time::Instant, collections::HashMap};
 
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
@@ -298,12 +298,15 @@ where
 
             let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
             let mut level_locals = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
+            let mut level_index_pointer = vec![HashMap::new(); (fmm.tree().get_depth() + 1) as usize];
+
+            
             for level in 0..=fmm.tree().get_depth() {
                 let keys = fmm.tree().get_keys(level).unwrap();
 
                 let mut tmp_multipoles = Vec::new();
                 let mut tmp_locals = Vec::new();
-                for key in keys.iter() {
+                for (level_idx, key) in keys.iter().enumerate() {
                     let idx = fmm.tree().key_to_index.get(key).unwrap();
                     unsafe {
                         let raw = multipoles.as_ptr().add(ncoeffs * idx) as *mut V;
@@ -311,6 +314,7 @@ where
                         let raw = locals.as_ptr().add(ncoeffs * idx) as *mut V;
                         tmp_locals.push(SendPtrMut { raw })
                     }
+                    level_index_pointer[level as usize].insert(*key, level_idx);
                 }
                 level_multipoles[level as usize] = tmp_multipoles;
                 level_locals[level as usize] = tmp_locals;
@@ -403,6 +407,7 @@ where
                 locals,
                 level_locals,
                 leaf_locals,
+                level_index_pointer,
                 upward_surfaces,
                 downward_surfaces,
                 leaf_upward_surfaces,
@@ -581,7 +586,7 @@ mod test {
 
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::implementations::helpers::points_fixture;
+    use bempp_tree::implementations::helpers::{points_fixture, points_fixture_sphere};
 
     use crate::charge::build_charge_dict;
 
@@ -676,7 +681,8 @@ mod test {
     #[test]
     fn test_fmm_fft_f64() {
         let npoints = 10000;
-        let points = points_fixture::<f64>(npoints, None, None);
+        // let points = points_fixture::<f64>(npoints, None, None);
+        let points = points_fixture_sphere::<f64>(npoints);
 
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
@@ -710,12 +716,15 @@ mod test {
 
         datatree.run(false);
 
+        println!("N LEAVES {:?}", datatree.fmm.tree().get_all_leaves().unwrap().len());
+
         // Test that direct computation is close to the FMM.
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[2];
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[7];
         let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
 
         let (l, r) = datatree.charge_index_pointer[*leaf_idx];
 
+        
         let potentials = &datatree.potentials[l..r];
 
         let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
@@ -729,7 +738,8 @@ mod test {
           }.eval();
 
         let mut direct = vec![0f64; ntargets];
-        let all_point_coordinates = points_fixture::<f64>(npoints, None, None);
+        // let all_point_coordinates = points_fixture::<f64>(npoints, None, None);
+        let all_point_coordinates = points_fixture_sphere::<f64>(npoints);
 
         let all_charges = charge_dict.into_values().collect_vec();
 
@@ -751,6 +761,7 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
         assert!(rel_error <= 1e-6);
+        assert!(false);
     }
 
     #[test]

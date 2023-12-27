@@ -1,4 +1,7 @@
 //! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
+use std::collections::HashSet;
+
+use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
 
@@ -9,10 +12,10 @@ use bempp_traits::{
     tree::Tree,
     types::EvalType,
 };
-use bempp_tree::types::single_node::SingleNodeTree;
+use bempp_tree::types::{single_node::SingleNodeTree, morton::MortonKey};
 
 use crate::{
-    constants::P2M_MAX_CHUNK_SIZE,
+    constants::{P2M_MAX_CHUNK_SIZE, M2M_MAX_CHUNK_SIZE},
     types::{FmmDataLinear, KiFmmLinear},
 };
 use rlst::{
@@ -20,7 +23,7 @@ use rlst::{
     dense::{rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-/// Euclidean algorithm to find greatest common divisor less than max
+/// Euclidean algorithm to find greatest divisor of `n` less than or equal to `max_chunk_size`
 fn find_chunk_size(n: usize, max_chunk_size: usize) -> usize {
     let max_divisor = max_chunk_size;
     for divisor in (1..=max_divisor).rev() {
@@ -48,7 +51,6 @@ where
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
-        // Iterate over sibling sets
         if let Some(leaves) = self.fmm.tree().get_all_leaves() {
             let nleaves = leaves.len();
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
@@ -59,10 +61,10 @@ where
             let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
             let dim = self.fmm.kernel.space_dimension();
 
+            // 1. Compute the check potential for each box
             check_potentials
                 .data_mut()
                 .par_chunks_exact_mut(ncoeffs)
-                // .enumerate()
                 .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
                 .zip(&self.charge_index_pointer)
                 .for_each(
@@ -89,7 +91,7 @@ where
                     },
                 );
 
-            // Now compute the multipole expansions, with each of chunk_size boxes at a time.
+            // 2. Compute the multipole expansions, with each of chunk_size boxes at a time.
             let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
 
             check_potentials
@@ -121,6 +123,7 @@ where
     fn m2m<'a>(&self, level: u64) {
         if let Some(sources) = self.fmm.tree().get_keys(level) {
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+            let nsiblings = 8;
 
             let nsources = sources.len();
             let min = &sources[0];
@@ -128,19 +131,36 @@ where
             let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
             let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
 
-            let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+            // 1. Lookup parents that exist for this set of sources
+            //    Must explicitly lookup as boxes may be empty at this level, and the next.
+            let parents: HashSet<MortonKey> = sources.iter().map(|source| source.parent()).collect();
+            let mut parents = parents.into_iter().collect_vec();
+            parents.sort();
+            let nparents = parents.len();
+            let mut parent_multipoles = Vec::new();
+            for parent in parents.iter() {
+                // Find index pointer of parent
+                let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize].get(parent).unwrap();
 
-            let nsiblings = 8;
-            let mut max_chunk_size = 8_i32.pow((level - 1).try_into().unwrap()) as usize;
+                // Lookup reference to multipole expansion
+                let parent_multipole = self.level_multipoles[(level - 1) as usize][parent_index_pointer];
+                parent_multipoles.push(parent_multipole);
+            }
 
-            if max_chunk_size > P2M_MAX_CHUNK_SIZE {
-                max_chunk_size = P2M_MAX_CHUNK_SIZE;
+            let child_multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+
+            // 3. Estimate chunk size, which is at most equal to the number of parents that exist, bounded by a maximum
+            //    size that is chosen for cache affinity.
+            let mut max_chunk_size = nparents;
+            if max_chunk_size > M2M_MAX_CHUNK_SIZE {
+                max_chunk_size = M2M_MAX_CHUNK_SIZE;
             }
             let chunk_size = find_chunk_size(nsources, max_chunk_size);
 
-            multipoles
-                .par_chunks_exact(nsiblings * ncoeffs*chunk_size)
-                .zip(self.level_multipoles[(level - 1) as usize].par_chunks_exact(chunk_size))
+            // 4. Compute M2M kernel over chunks of siblings
+            child_multipoles
+                .par_chunks_exact(nsiblings * ncoeffs * chunk_size)
+                .zip(parent_multipoles.par_chunks_exact(chunk_size))
                 .for_each(|(multipole_chunk, parent)| {
 
                     unsafe {

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
+use bempp_tree::types::morton::MortonKey;
 use cauchy::Scalar;
 use num::{Complex, Float};
 use rlst::dense::traits::*;
@@ -49,6 +50,8 @@ where
 
     /// The local expansion data at each level.
     pub level_locals: Vec<Vec<SendPtrMut<U>>>,
+
+    pub level_index_pointer: Vec<HashMap<MortonKey, usize>>,
 
     /// The evaluated potentials at each leaf box.
     pub potentials: Vec<U>,

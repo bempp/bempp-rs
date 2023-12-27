@@ -15,7 +15,7 @@ use bempp_traits::{
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
 };
-use bempp_tree::types::single_node::SingleNodeTree;
+use bempp_tree::types::{single_node::SingleNodeTree, morton::MortonKey};
 
 use crate::types::{FmmDataLinear, KiFmmLinear, SendPtrMut};
 use rlst::{
@@ -60,6 +60,67 @@ where
     result
 }
 
+impl<T, U> FmmDataLinear<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U> 
+where
+    T: Kernel<T = U>
+        + ScaleInvariantKernel<T = U>
+        + std::marker::Send
+        + std::marker::Sync
+        + Default,
+    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+    Complex<U>: Scalar,
+    U: MultiplyAdd<
+        U,
+        VectorContainer<U>,
+        VectorContainer<U>,
+        VectorContainer<U>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
+{
+
+    fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
+
+        let nneighbors = 26;
+        let nsiblings = 8;
+
+        let sources = self.fmm.tree().get_keys(level).unwrap();
+        
+        let parents: HashSet<MortonKey> = sources.iter().map(|source| source.parent()).collect();
+        let mut parents = parents.into_iter().collect_vec();
+        parents.sort();
+        let nparents = parents.len();
+
+        let mut result = vec![Vec::new(); nneighbors];
+
+        let parent_neighbors = parents
+            .iter()
+            .map(|parent| parent.all_neighbors())
+            .collect_vec();
+
+        for i in 0..nneighbors {
+            for all_neighbors in parent_neighbors.iter().take(nparents) {
+                // First check if neighbor exists is in the bounds of the tree
+                if let Some(neighbor) = all_neighbors[i] {
+                    let first_child = neighbor.first_child();                    
+                    // Then need to check if first child exists in the tree
+                    if let Some(first_child_index) = self.level_index_pointer[level as usize].get(&first_child) {
+                        result[i].push(*first_child_index)
+                    } else {
+                        result[i].push(nparents * nsiblings)
+                    }
+                } else {
+                    result[i].push(nparents * nsiblings);
+                }
+            }
+        }
+
+        result
+    }
+
+}
+
 /// Implement the multipole to local translation operator for an FFT accelerated KiFMM on a single node.
 impl<T, U> FieldTranslation<U>
     for FmmDataLinear<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -97,7 +158,8 @@ where
         let nzeros = 8;
         let size = npad * npad * npad;
         let size_real = npad * npad * (npad / 2 + 1);
-        let all_displacements = displacements(self.fmm.tree(), level);
+        // let all_displacements = displacements(self.fmm.tree(), level);
+        let all_displacements = self.displacements(level);
 
         let ntargets = targets.len();
         let min = &targets[0];
@@ -229,7 +291,7 @@ where
                         let chunk_end = std::cmp::min(chunk_start + max_chunksize, nparents);
 
                         let save_locations = &mut check_potential_hat_f
-                            [chunk_start * nsiblings..(chunk_end) * nsiblings];
+                            [chunk_start * nsiblings..chunk_end * nsiblings];
 
                         for (i, kernel_f) in kernel_data_f.iter().enumerate().take(nneighbors) {
                             let frequency_offset = nsiblings_2 * freq;
@@ -241,8 +303,13 @@ where
 
                             for j in 0..(chunk_end - chunk_start) {
                                 let displacement = displacements[j];
+                                // let s_f = &signal_hat_f
+                                //     [displacement * nsiblings..(displacement + 1) * nsiblings]; 
+                                // This shouldn't be done this way
+                                // This wont work when number of boxes at parent level not nec. a multipole nsiblings * nboxes at 
+                                // child level
                                 let s_f = &signal_hat_f
-                                    [displacement * nsiblings..(displacement + 1) * nsiblings];
+                                    [displacement..displacement + nsiblings]; 
 
                                 matmul8x8x2(
                                     k_f,
