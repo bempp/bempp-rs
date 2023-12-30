@@ -51,4 +51,9 @@ where
     /// # Arguments
     /// * `level` - The level of the tree at which a field translation is being applied.
     fn m2l(&self, level: u64);
+
+    /// Particle to local translations, applies to leaf boxes when a source box is within
+    /// the far field of a target box, but is too large for the multipole expansion to converge
+    /// at the target, so instead its contribution is computed directly.
+    fn p2l(&self, level: u64);
 }

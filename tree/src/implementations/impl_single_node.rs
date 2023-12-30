@@ -176,7 +176,7 @@ where
         }
     }
 
-      /// Constructor for uniform trees on a single node refined to a user defined depth.
+    /// Constructor for uniform trees on a single node refined to a user defined depth.
     /// Returns a SingleNodeTree, with the leaves in sorted order.
     ///
     /// # Arguments
@@ -395,6 +395,9 @@ where
             }
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
+
+        // Adaptive tree needs a keys to points for X list computations
+
 
         // Add unmapped leaves
         let mut leaves = MortonKeys {
@@ -816,7 +819,7 @@ mod test {
 
     use rlst::dense::RawAccess;
 
-    use crate::implementations::helpers::{points_fixture, points_fixture_col};
+    use crate::implementations::helpers::{points_fixture, points_fixture_col, points_fixture_sphere};
 
     use super::*;
 
@@ -907,6 +910,29 @@ mod test {
                 assert!(l.abs_diff(node.level()) <= 1);
             }
         }
+
+        // Test that each key has all of its siblings
+        let npoints = 10000;
+        let points = points_fixture_sphere::<f64>(npoints);
+        let global_idxs = (0..npoints).collect_vec();
+
+        let adaptive = true;
+        let n_crit = 150;
+        let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None, &global_idxs, false);
+    
+        println!("nkeys {:?}", tree.get_all_keys().unwrap().len());
+        println!("nleaves {:?}", tree.get_all_leaves().unwrap().len());
+        for &key in tree.get_all_keys().unwrap().iter() {
+
+            if key != ROOT {
+                let siblings = key.siblings();
+                for sibling in siblings.iter() {
+                    assert!(tree.get_all_keys_set().contains(sibling));
+                }
+            }
+        }
+
+        assert!(false)
     }
 
     pub fn test_no_overlaps_helper(nodes: &[MortonKey]) {

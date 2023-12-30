@@ -61,19 +61,21 @@ fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
 /// * `keys` - A slice of Morton Keys to be balanced.
 fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
-    for level in (0..=DEEPEST_LEVEL).rev() {
-        let work_list: Vec<MortonKey> = balanced
+    let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
+
+    for level in (0..=deepest_level).rev() {
+        let work_list = balanced
             .iter()
             .filter(|&key| key.level() == level)
             .cloned()
-            .collect();
+            .collect_vec(); // each key has its siblings here at deepest level
 
         for key in work_list.iter() {
             let neighbors = key.neighbors();
-            for neighbor in neighbors {
+            for neighbor in neighbors.iter() {
                 let parent = neighbor.parent();
 
-                if !balanced.contains(&neighbor) && !balanced.contains(&parent) {
+                if !balanced.contains(neighbor) && !balanced.contains(&parent) {
                     balanced.insert(parent);
                     if parent.level() > 0 {
                         for sibling in parent.siblings() {
@@ -85,6 +87,37 @@ fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
         }
     }
     balanced
+}
+
+fn balance_keys_2(leaves: &[MortonKey], keys: &[MortonKey]) -> HashSet<MortonKey> {
+    
+    let leaves_set: HashSet<_> = leaves.iter().collect();
+    
+    let mut t: HashSet<MortonKey> = HashSet::new();
+    let mut s: HashSet<MortonKey> = HashSet::new();
+
+    for level in (0..=DEEPEST_LEVEL).rev() {
+        
+        // Non-leaves at this level
+        let mut n: HashSet<MortonKey> = keys
+            .iter()
+            .filter(|&key| (key.level() == level) && !leaves_set.contains(key))
+            .cloned()
+            .collect(); // each key has its siblings here at deepest level
+        n = n.union(&s).cloned().collect();
+
+        let tmp: HashSet<MortonKey> = n.iter().flat_map(|key| key.neighbors()).collect();
+        s = tmp.iter().map(|key| key.parent()).collect();
+        
+        for key in n.iter() {
+            for child in key.children() {
+                t.insert(child);
+            }
+        }
+    
+    }
+
+    t
 }
 
 /// Complete the region between two keys with the minimum spanning boxes that cover the region.

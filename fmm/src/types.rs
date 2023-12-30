@@ -25,7 +25,7 @@ pub type Potentials<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, D
 /// Type alias for approximation of FMM operator matrices.
 pub type C2EType<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
 
-pub struct FmmDataLinear<T, U>
+pub struct FmmData<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
@@ -83,7 +83,7 @@ where
 }
 
 /// Don't process empty nodes
-pub struct FmmDataLinearSparse<T, U>
+pub struct FmmDataSparse<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
@@ -142,6 +142,69 @@ where
     /// Global indices of each charge
     pub global_indices: Vec<usize>,
 }
+
+
+/// Testing for Adaptive trees
+pub struct FmmDataAdaptive<T, U>
+where
+    T: Fmm,
+    U: Scalar<Real = U> + Float + Default,
+{
+    /// The associated FMM object, which implements an FMM interface
+    pub fmm: T,
+
+    /// The multipole expansion data at each box.
+    pub multipoles: Vec<U>,
+
+    /// Multipole expansions at leaf level
+    pub leaf_multipoles: Vec<SendPtrMut<U>>,
+
+    /// Multipole expansions at each level
+    pub level_multipoles: Vec<Vec<SendPtrMut<U>>>,
+
+    /// The local expansion at each box
+    pub locals: Vec<U>,
+
+    /// Local expansions at the leaf level
+    pub leaf_locals: Vec<SendPtrMut<U>>,
+
+    /// The local expansion data at each level.
+    pub level_locals: Vec<Vec<SendPtrMut<U>>>,
+
+    /// Index pointers to each key at a given level, indexed by level.
+    pub level_index_pointer: Vec<HashMap<MortonKey, usize>>,
+
+    /// The evaluated potentials at each leaf box.
+    pub potentials: Vec<U>,
+
+    /// The evaluated potentials at each leaf box.
+    pub potentials_send_pointers: Vec<SendPtrMut<U>>,
+
+    /// All upward surfaces
+    pub upward_surfaces: Vec<U>,
+
+    /// All downward surfaces
+    pub downward_surfaces: Vec<U>,
+
+    /// Leaf upward surfaces
+    pub leaf_upward_surfaces: Vec<U>,
+
+    /// Leaf downward surfaces
+    pub leaf_downward_surfaces: Vec<U>,
+
+    /// The charge data at each leaf box.
+    pub charges: Vec<U>,
+
+    /// Index pointer between leaf keys and charges
+    pub charge_index_pointer: Vec<(usize, usize)>,
+
+    /// Scales of each leaf operator
+    pub scales: Vec<U>,
+
+    /// Global indices of each charge
+    pub global_indices: Vec<usize>,
+}
+
 
 /// Type to store data associated with the kernel independent (KiFMM) in.
 pub struct KiFmmLinear<T, U, V, W>

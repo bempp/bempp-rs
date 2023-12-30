@@ -3,7 +3,7 @@ use cauchy::Scalar;
 use itertools::Itertools;
 
 use bempp_traits::{
-    field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
+    field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::{Tree, MortonKeyInterface},
 };
 use bempp_tree::types::morton::{MortonKey, MortonKeys};
 use num::Float;
@@ -30,13 +30,13 @@ where
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_keys_set().contains(nc) && key.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && key.is_adjacent(nc))
             .collect();
 
         // Key level
         let mut neighbors_adj: Vec<MortonKey> = neighbours
             .iter()
-            .filter(|n| self.tree.get_all_keys_set().contains(n) && key.is_adjacent(n))
+            .filter(|n| self.tree.get_all_leaves_set().contains(n) && key.is_adjacent(n))
             .cloned()
             .collect();
 
@@ -45,13 +45,14 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_keys_set().contains(pn) && key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_leaves_set().contains(pn) && key.is_adjacent(pn))
             .collect();
 
         u_list.append(&mut neighbors_children_adj);
         u_list.append(&mut neighbors_adj);
         u_list.append(&mut parent_neighbours_adj);
         u_list.push(*key);
+
 
         if !u_list.is_empty() {
             Some(MortonKeys {
@@ -97,7 +98,7 @@ where
             .neighbors()
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_keys_set().contains(nc) && !key.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && !key.is_adjacent(nc))
             .collect_vec();
 
         if !w_list.is_empty() {
@@ -118,7 +119,7 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_keys_set().contains(pn) && !key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_leaves_set().contains(pn) && !key.is_adjacent(pn))
             .collect_vec();
 
         if !x_list.is_empty() {
