@@ -3,7 +3,7 @@ use cauchy::Scalar;
 use itertools::Itertools;
 
 use bempp_traits::{
-    field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::{Tree, MortonKeyInterface},
+    field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
 };
 use bempp_tree::types::morton::{MortonKey, MortonKeys};
 use num::Float;
@@ -53,7 +53,6 @@ where
         u_list.append(&mut parent_neighbours_adj);
         u_list.push(*key);
 
-
         if !u_list.is_empty() {
             Some(MortonKeys {
                 keys: u_list,
@@ -91,14 +90,14 @@ where
 
     fn get_w_list(
         &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
+        leaf: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<<Self::Tree as Tree>::NodeIndices> {
         // Child level
-        let w_list = key
+        let w_list = leaf
             .neighbors()
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && !key.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && !leaf.is_adjacent(nc))
             .collect_vec();
 
         if !w_list.is_empty() {

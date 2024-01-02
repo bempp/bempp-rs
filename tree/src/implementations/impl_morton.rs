@@ -89,37 +89,6 @@ fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     balanced
 }
 
-fn balance_keys_2(leaves: &[MortonKey], keys: &[MortonKey]) -> HashSet<MortonKey> {
-    
-    let leaves_set: HashSet<_> = leaves.iter().collect();
-    
-    let mut t: HashSet<MortonKey> = HashSet::new();
-    let mut s: HashSet<MortonKey> = HashSet::new();
-
-    for level in (0..=DEEPEST_LEVEL).rev() {
-        
-        // Non-leaves at this level
-        let mut n: HashSet<MortonKey> = keys
-            .iter()
-            .filter(|&key| (key.level() == level) && !leaves_set.contains(key))
-            .cloned()
-            .collect(); // each key has its siblings here at deepest level
-        n = n.union(&s).cloned().collect();
-
-        let tmp: HashSet<MortonKey> = n.iter().flat_map(|key| key.neighbors()).collect();
-        s = tmp.iter().map(|key| key.parent()).collect();
-        
-        for key in n.iter() {
-            for child in key.children() {
-                t.insert(child);
-            }
-        }
-    
-    }
-
-    t
-}
-
 /// Complete the region between two keys with the minimum spanning boxes that cover the region.
 /// Returns an owned vector of Morton Keys.
 ///

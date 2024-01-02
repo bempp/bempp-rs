@@ -225,11 +225,8 @@ where
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
         // Ensure that final leaf set contains siblings of all encoded keys
-        let leaves: HashSet<MortonKey> = leaves_to_points
-            .keys()
-            .into_iter()
-            .flat_map(|k| k.siblings())
-            .collect();
+        let leaves: HashSet<MortonKey> =
+            leaves_to_points.keys().flat_map(|k| k.siblings()).collect();
 
         // Store in a sorted vector
         let mut leaves = MortonKeys {
@@ -246,10 +243,12 @@ where
 
         let tmp: HashSet<MortonKey> = tmp
             .iter()
-            .flat_map(|key| if key.level() != 0 {
-                key.siblings()
-            } else {
-                vec![*key]
+            .flat_map(|key| {
+                if key.level() != 0 {
+                    key.siblings()
+                } else {
+                    vec![*key]
+                }
             })
             .collect();
 
@@ -396,9 +395,6 @@ where
         }
         leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
-        // Adaptive tree needs a keys to points for X list computations
-
-
         // Add unmapped leaves
         let mut leaves = MortonKeys {
             keys: leaves_to_points
@@ -519,13 +515,10 @@ where
 
         if adaptive {
             SingleNodeTree::adaptive_tree(points, &domain, n_crit, global_idxs)
+        } else if sparse {
+            SingleNodeTree::uniform_tree_sparse(points, &domain, depth, global_idxs)
         } else {
-            if sparse {
-                SingleNodeTree::uniform_tree_sparse(points, &domain, depth, global_idxs)
-            } else { 
-                SingleNodeTree::uniform_tree(points, &domain, depth, global_idxs)
-            }
-            
+            SingleNodeTree::uniform_tree(points, &domain, depth, global_idxs)
         }
     }
 
@@ -819,7 +812,9 @@ mod test {
 
     use rlst::dense::RawAccess;
 
-    use crate::implementations::helpers::{points_fixture, points_fixture_col, points_fixture_sphere};
+    use crate::implementations::helpers::{
+        points_fixture, points_fixture_col, points_fixture_sphere,
+    };
 
     use super::*;
 
@@ -831,7 +826,8 @@ mod test {
         // Test uniformly distributed data
         let points = points_fixture(npoints, Some(-1.0), Some(1.0));
         let global_idxs = (0..npoints).collect_vec();
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
+        let tree =
+            SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -849,7 +845,8 @@ mod test {
         // Test a column distribution of data
         let points = points_fixture_col::<f64>(npoints);
         let global_idxs = (0..npoints).collect_vec();
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
+        let tree =
+            SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -885,7 +882,14 @@ mod test {
 
         let adaptive = true;
         let n_crit = 150;
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None, &global_idxs, false);
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(n_crit),
+            None,
+            &global_idxs,
+            false,
+        );
 
         // Test that tree is not uniform
         let levels: Vec<u64> = tree
@@ -918,12 +922,16 @@ mod test {
 
         let adaptive = true;
         let n_crit = 150;
-        let tree = SingleNodeTree::new(points.data(), adaptive, Some(n_crit), None, &global_idxs, false);
-    
-        println!("nkeys {:?}", tree.get_all_keys().unwrap().len());
-        println!("nleaves {:?}", tree.get_all_leaves().unwrap().len());
-        for &key in tree.get_all_keys().unwrap().iter() {
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(n_crit),
+            None,
+            &global_idxs,
+            false,
+        );
 
+        for &key in tree.get_all_keys().unwrap().iter() {
             if key != ROOT {
                 let siblings = key.siblings();
                 for sibling in siblings.iter() {
@@ -931,8 +939,6 @@ mod test {
                 }
             }
         }
-
-        assert!(false)
     }
 
     pub fn test_no_overlaps_helper(nodes: &[MortonKey]) {
@@ -950,8 +956,16 @@ mod test {
         let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
-        let uniform = SingleNodeTree::new(points.data(), false, Some(150), Some(4), &global_idxs, false);
-        let adaptive = SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs, false);
+        let uniform = SingleNodeTree::new(
+            points.data(),
+            false,
+            Some(150),
+            Some(4),
+            &global_idxs,
+            false,
+        );
+        let adaptive =
+            SingleNodeTree::new(points.data(), true, Some(150), None, &global_idxs, false);
         test_no_overlaps_helper(uniform.get_all_leaves().unwrap());
         test_no_overlaps_helper(adaptive.get_all_leaves().unwrap());
     }
@@ -1105,7 +1119,8 @@ mod test {
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
+        let tree =
+            SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
 
         let keys = tree.get_all_keys().unwrap();
 
@@ -1171,7 +1186,8 @@ mod test {
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
+        let tree =
+            SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, false);
 
         let keys = tree.get_keys(3).unwrap();
 

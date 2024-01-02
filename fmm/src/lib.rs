@@ -2,10 +2,10 @@
 pub mod charge;
 pub mod constants;
 pub mod fmm;
+pub mod helpers;
 pub mod interaction_lists;
 pub mod pinv;
 pub mod types;
-pub mod helpers;
 
 mod field_translation {
     pub mod hadamard;
