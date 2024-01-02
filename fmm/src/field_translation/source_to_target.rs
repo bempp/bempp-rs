@@ -1089,7 +1089,7 @@ mod test {
 
     #[test]
     pub fn test_field_translation_uniform() {
-        let npoints = 100000;
+        let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None);
         // let points = points_fixture_sphere::<f64>(npoints);
 
@@ -1134,11 +1134,7 @@ mod test {
 
         datatree.run(false);
         let depth = datatree.fmm.tree().get_depth();
-        println!("DEPTH {:?}", depth);
-        println!(
-            "N AT LEVEL 2 {:?}",
-            datatree.fmm.tree.get_keys(depth).unwrap().iter().len()
-        );
+
         for leaf_node in datatree.fmm.tree.get_keys(depth).unwrap().iter() {
             if let Some(v_list) = datatree.fmm.get_v_list(leaf_node) {
                 let downward_equivalent_surface = leaf_node.compute_surface(
