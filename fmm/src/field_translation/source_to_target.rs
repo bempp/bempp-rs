@@ -288,16 +288,15 @@ where
                         let frequency_offset = i * (ntargets + nzeros);
 
                         // Head of buffer for each frequency
-                        let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
+                        let head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
+                        let signal_hat_f_chunk = std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
+                        
                         // Store results for this frequency for this sibling set chunk
                         let results_i = &signal_hat_chunk_f_c
                             [i * nsiblings * chunk_size..(i + 1) * nsiblings * chunk_size];
 
-                        for &res in results_i {
-                            *head += res;
-                            head = head.add(1);
-                        }
+                        signal_hat_f_chunk.iter_mut().zip(results_i).for_each(|(c, r)| *c += *r);
                     }
                 }
             });
@@ -649,16 +648,15 @@ where
                         let frequency_offset = i * (ntargets + nzeros);
 
                         // Head of buffer for each frequency
-                        let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
+                        let head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
+                        let signal_hat_f_chunk = std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
+                        
                         // Store results for this frequency for this sibling set chunk
                         let results_i = &signal_hat_chunk_f_c
                             [i * nsiblings * chunk_size..(i + 1) * nsiblings * chunk_size];
 
-                        for &res in results_i {
-                            *head += res;
-                            head = head.add(1);
-                        }
+                        signal_hat_f_chunk.iter_mut().zip(results_i).for_each(|(c, r)| *c += *r);
                     }
                 }
             });
@@ -1116,13 +1114,141 @@ mod test {
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        // let m2l_data = SvdFieldTranslationKiFmm::new(
-        //     kernel.clone(),
-        //     Some(1000),
-        //     order,
-        //     *tree.get_domain(),
-        //     alpha_inner,
-        // );
+        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+
+        let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+        // Form charge dict, matching charges with their associated global indices
+        let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+
+        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
+
+        datatree.run(false);
+        let depth = datatree.fmm.tree().get_depth();
+
+        for leaf_node in datatree.fmm.tree.get_keys(depth).unwrap().iter() {
+            if let Some(v_list) = datatree.fmm.get_v_list(leaf_node) {
+                let downward_equivalent_surface = leaf_node.compute_surface(
+                    datatree.fmm.tree.get_domain(),
+                    datatree.fmm.order,
+                    datatree.fmm.alpha_outer,
+                );
+
+                let downward_check_surface = leaf_node.compute_surface(
+                    datatree.fmm.tree.get_domain(),
+                    datatree.fmm.order,
+                    datatree.fmm.alpha_inner,
+                );
+
+                let leaf_level = leaf_node.level();
+                let &level_index = datatree.level_index_pointer[leaf_level as usize]
+                    .get(leaf_node)
+                    .unwrap();
+                let leaf_local = datatree.level_locals[leaf_level as usize][level_index];
+                let leaf_local = unsafe { std::slice::from_raw_parts_mut(leaf_local.raw, ncoeffs) };
+
+                let mut equivalent = vec![0f64; leaf_local.len()];
+                datatree.fmm.kernel().evaluate_st(
+                    bempp_traits::types::EvalType::Value,
+                    &downward_equivalent_surface,
+                    &downward_check_surface,
+                    leaf_local,
+                    &mut equivalent,
+                );
+
+                let mut direct = vec![0f64; leaf_local.len()];
+
+                for source in v_list.iter() {
+                    assert!(datatree.fmm.tree().get_all_keys_set().contains(source));
+                    let upward_equivalent_surface = source.compute_surface(
+                        datatree.fmm.tree.get_domain(),
+                        datatree.fmm.order,
+                        datatree.fmm.alpha_inner,
+                    );
+
+                    let source_level = source.level();
+                    let &level_index = datatree.level_index_pointer[source_level as usize]
+                        .get(source)
+                        .unwrap();
+                    let source_multipole =
+                        datatree.level_multipoles[source_level as usize][level_index];
+                    let source_multipole =
+                        unsafe { std::slice::from_raw_parts(source_multipole.raw, ncoeffs) };
+
+                    datatree.fmm.kernel().evaluate_st(
+                        bempp_traits::types::EvalType::Value,
+                        &upward_equivalent_surface,
+                        &downward_check_surface,
+                        source_multipole,
+                        &mut direct,
+                    )
+                }
+
+                // Add parent contribution
+                let mut l2l_idx = 0;
+                for (i, sib) in leaf_node.siblings().iter().enumerate() {
+                    if *sib == *leaf_node {
+                        l2l_idx = i;
+                        break;
+                    }
+                }
+
+                let parent = leaf_node.parent();
+                let &level_index = datatree.level_index_pointer[parent.level() as usize]
+                    .get(&parent)
+                    .unwrap();
+                let parent_local = datatree.level_locals[parent.level() as usize][level_index];
+                let parent_local = unsafe {
+                    rlst_pointer_mat!['_, f64, parent_local.raw, (ncoeffs, 1), (1, ncoeffs)]
+                };
+
+                // Parent contribution to check potential
+                let tmp = datatree.fmm.l2l[l2l_idx].dot(&parent_local).eval();
+
+                // Evaluate tmp at child equivalent surface to find potential
+                datatree.fmm.kernel().evaluate_st(
+                    bempp_traits::types::EvalType::Value,
+                    &downward_equivalent_surface,
+                    &downward_check_surface,
+                    tmp.data(),
+                    &mut direct,
+                );
+
+                // Compare check potential found directly, and via approximation
+                for (a, b) in equivalent.iter().zip(direct.iter()) {
+                    assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
+                }
+            }
+        }
+    }
+
+    #[test]
+    pub fn test_field_translation_adaptive() {
+        let npoints = 10000;
+        let points = points_fixture::<f64>(npoints, None, None);
+        // let points = points_fixture_sphere::<f64>(npoints);
+
+        let global_idxs = (0..npoints).collect_vec();
+        let charges = vec![1.0; npoints];
+
+        let order = 5;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.95;
+        let adaptive = true;
+        let ncrit = 100;
+
+        let kernel = Laplace3dKernel::default();
+
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            None,
+            &global_idxs[..],
+            true,
+        );
+
+        let m2l_data =
+            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
         let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
