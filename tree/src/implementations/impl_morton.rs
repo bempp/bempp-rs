@@ -61,19 +61,21 @@ fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
 /// * `keys` - A slice of Morton Keys to be balanced.
 fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
-    for level in (0..=DEEPEST_LEVEL).rev() {
-        let work_list: Vec<MortonKey> = balanced
+    let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
+
+    for level in (0..=deepest_level).rev() {
+        let work_list = balanced
             .iter()
             .filter(|&key| key.level() == level)
             .cloned()
-            .collect();
+            .collect_vec(); // each key has its siblings here at deepest level
 
         for key in work_list.iter() {
             let neighbors = key.neighbors();
-            for neighbor in neighbors {
+            for neighbor in neighbors.iter() {
                 let parent = neighbor.parent();
 
-                if !balanced.contains(&neighbor) && !balanced.contains(&parent) {
+                if !balanced.contains(neighbor) && !balanced.contains(&parent) {
                     balanced.insert(parent);
                     if parent.level() > 0 {
                         for sibling in parent.siblings() {

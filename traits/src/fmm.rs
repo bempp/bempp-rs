@@ -23,11 +23,6 @@ pub trait TargetTranslation {
     /// at the target box.
     fn m2p(&self);
 
-    /// Particle to local translations, applies to leaf boxes when a source box is within
-    /// the near field of a target box, but is too large for the multipole expansion to converge
-    /// at the target, so instead its contribution is computed directly.
-    fn p2l(&self);
-
     /// Local to particle translations, applies the local expansion accumulated at each leaf box to the
     /// target particles it contains.
     fn l2p(&self);
