@@ -472,6 +472,7 @@ where
         for (i, key) in leaves.iter().enumerate() {
             leaf_to_index.insert(*key, i);
         }
+
         SingleNodeTree {
             depth,
             points,
