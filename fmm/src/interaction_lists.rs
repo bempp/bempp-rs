@@ -97,7 +97,7 @@ where
             .neighbors()
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && !leaf.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_keys_set().contains(nc) && !leaf.is_adjacent(nc))
             .collect_vec();
 
         if !w_list.is_empty() {
@@ -118,7 +118,7 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_leaves_set().contains(pn) && !key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_keys_set().contains(pn) && !key.is_adjacent(pn))
             .collect_vec();
 
         if !x_list.is_empty() {

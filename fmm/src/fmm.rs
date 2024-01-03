@@ -1069,13 +1069,13 @@ mod test {
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 7;
+        let order = 6;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
         let adaptive = true;
-        let ncrit = 15;
+        let ncrit = 150;
         let sphere = true;
-        let sparse = true;
+        let sparse = false;
 
         let points;
         if sphere {
@@ -1090,7 +1090,7 @@ mod test {
             points.data(),
             adaptive,
             Some(ncrit),
-            Some(3),
+            None,
             &global_idxs[..],
             sparse,
         );
@@ -1098,13 +1098,13 @@ mod test {
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        // let m2l_data = SvdFieldTranslationKiFmm::new(
-        //     kernel.clone(),
-        //     Some(1000),
-        //     order,
-        //     *tree.get_domain(),
-        //     alpha_inner,
-        // );
+        let m2l_data = SvdFieldTranslationKiFmm::new(
+            kernel.clone(),
+            Some(1000),
+            order,
+            *tree.get_domain(),
+            alpha_inner,
+        );
 
         let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
@@ -1131,7 +1131,6 @@ mod test {
             keys_l2.len(),
             keys_l3.len()
         );
-        println!("DEPTH {:?}={:?}", datatree.fmm.tree().get_depth(), depth);
 
         // Test that direct computation is close to the FMM.
         // let mut test_idx = 0;
@@ -1146,6 +1145,9 @@ mod test {
         println!("test idx vec {:?}", test_idx_vec.len());
         let test_idx = test_idx_vec[123];
         let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx];
+        let leaf = &datatree.fmm.tree().get_all_keys().unwrap()[3316];
+        let leaf = &datatree.fmm.tree().get_all_keys().unwrap()[3305];
+        println!("DEPTH {:?}={:?}", datatree.fmm.tree().get_depth(), leaf.level());
 
         // Test that all points are contained in some leaf
         let mut total_points = 0;

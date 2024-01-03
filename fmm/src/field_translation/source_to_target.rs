@@ -507,6 +507,16 @@ where
                         .eval();
 
                         if nsources > 0 {
+                            if target.level() < self.fmm.tree.get_depth() && self.fmm.tree.leaves_set.contains(target) {
+                                let leaf_idx = self.fmm.tree().get_leaf_index(target).unwrap();
+
+                                let (l, r) = self.charge_index_pointer[*leaf_idx];
+
+                                if r - l > 0 {
+                                    println!("RUNNING P2L {:?}", self.fmm.tree.key_to_index.get(target));
+                                }
+                            }
+
                             let mut check_potential = rlst_col_vec![U, ncoeffs];
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
@@ -605,25 +615,25 @@ where
         let size_real = npad * npad * (npad / 2 + 1);
         let all_displacements = self.displacements(level);
 
-        // let ntargets = targets.len();
-        // let min = &targets[0];
-        // let max = &targets[ntargets - 1];
-
-        // let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
-        // let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
-
-
-        // let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
-        let mut targets = targets.iter().cloned().collect_vec();
         let ntargets = targets.len();
-        targets.sort();
+        let min = &targets[0];
+        let max = &targets[ntargets - 1];
 
-        let mut multipoles = Vec::new();
-        for target in targets.iter() {
-            let target_index_pointer = *self.level_index_pointer[level as usize].get(target).unwrap();
-            let multipole = self.level_multipoles[level as usize][target_index_pointer];
-            multipoles.push(multipole);
-        }
+        let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
+        let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
+
+
+        let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
+        // let mut targets = targets.iter().cloned().collect_vec();
+        // let ntargets = targets.len();
+        // targets.sort();
+
+        // let mut multipoles = Vec::new();
+        // for target in targets.iter() {
+        //     let target_index_pointer = *self.level_index_pointer[level as usize].get(target).unwrap();
+        //     let multipole = self.level_multipoles[level as usize][target_index_pointer];
+        //     multipoles.push(multipole);
+        // }
 
         ////////////////////////////////////////////////////////////////////////////////////
         // Pre-process to setup data structures for M2L kernel
@@ -655,16 +665,16 @@ where
 
         // Pre-processing to find FFT
         multipoles
-            // .par_chunks_exact(ncoeffs * nsiblings * chunk_size)
-            .par_chunks_exact(nsiblings * chunk_size)
+            .par_chunks_exact(ncoeffs * nsiblings * chunk_size)
+            // .par_chunks_exact(nsiblings * chunk_size)
             .enumerate()
             .for_each(|(i, multipole_chunk)| {
                 // Place Signal on convolution grid
                 let mut signal_chunk = vec![U::zero(); size * nsiblings * chunk_size];
 
                 for i in 0..nsiblings * chunk_size {
-                    // let multipole = &multipole_chunk[i * ncoeffs..(i + 1) * ncoeffs];
-                    let multipole = unsafe { std::slice::from_raw_parts(multipole_chunk[i].raw, ncoeffs) };
+                    let multipole = &multipole_chunk[i * ncoeffs..(i + 1) * ncoeffs];
+                    // let multipole = unsafe { std::slice::from_raw_parts(multipole_chunk[i].raw, ncoeffs) };
                     let signal = &mut signal_chunk[i * size..(i + 1) * size];
                     for (surf_idx, &conv_idx) in self.fmm.m2l.surf_to_conv_map.iter().enumerate() {
                         signal[conv_idx] = multipole[surf_idx]
@@ -878,7 +888,98 @@ where
         >,
     U: std::marker::Send + std::marker::Sync + Default,
 {
-    fn p2l(&self, _level: u64) {}
+    fn p2l<'a>(&self, level: u64) {
+
+        let Some(targets) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
+        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let dim = self.fmm.kernel().space_dimension();
+        let surface_size = ncoeffs * dim;
+        let min_idx = self.fmm.tree().key_to_index.get(&targets[0]).unwrap();
+        let max_idx = self
+            .fmm
+            .tree()
+            .key_to_index
+            .get(targets.last().unwrap())
+            .unwrap();
+        let downward_surfaces =
+            &self.downward_surfaces[min_idx * surface_size..(max_idx + 1) * surface_size];
+        let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
+
+        // assert_eq!(ntargets, downward_surfaces.len() / surface_size);
+        targets
+            .par_iter()
+            .zip(downward_surfaces.par_chunks_exact(surface_size))
+            .zip(self.level_locals[level as usize].par_iter())
+            .for_each(|((target, downward_surface), local_ptr)| {
+                // Find check potential
+                if let Some(x_list) = self.fmm.get_x_list(target) {
+                    let x_list_indices = x_list
+                        .iter()
+                        .filter_map(|k| self.fmm.tree().get_leaf_index(k));
+                    let charges = x_list_indices
+                        .clone()
+                        .map(|&idx| {
+                            let index_pointer = &self.charge_index_pointer[idx];
+                            &self.charges[index_pointer.0..index_pointer.1]
+                        })
+                        .collect_vec();
+
+                    let sources_coordinates = x_list_indices
+                        .into_iter()
+                        .map(|&idx| {
+                            let index_pointer = &self.charge_index_pointer[idx];
+                            &coordinates[index_pointer.0 * dim..index_pointer.1 * dim]
+                        })
+                        .collect_vec();
+
+                    let target_local =
+                        unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
+
+                    for (&charges, sources) in charges.iter().zip(sources_coordinates) {
+                        let nsources = sources.len() / dim;
+                        let sources = unsafe {
+                            rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                        }
+                        .eval();
+
+                        if nsources > 0 {
+                            // if target.level() < self.fmm.tree.get_depth() && self.fmm.tree.leaves_set.contains(target) {
+                            //     let leaf_idx = self.fmm.tree().get_leaf_index(target).unwrap();
+
+                            //     let (l, r) = self.charge_index_pointer[*leaf_idx];
+
+                            //     // if r - l > 0 {
+                            //     //     println!("RUNNING P2L {:?}", self.fmm.tree.key_to_index.get(target));
+                            //     // }
+                            // }
+
+                            let mut check_potential = rlst_col_vec![U, ncoeffs];
+                            self.fmm.kernel.evaluate_st(
+                                EvalType::Value,
+                                sources.data(),
+                                downward_surface,
+                                charges,
+                                check_potential.data_mut(),
+                            );
+                            let scale = self.fmm.kernel().scale(target.level());
+                            let mut tmp = self
+                                .fmm
+                                .dc2e_inv_1
+                                .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                            tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
+
+                            target_local
+                                .iter_mut()
+                                .zip(tmp.data())
+                                .for_each(|(r, &t)| *r += t);
+                        }
+                    }
+                }
+            });
+    }
 
     fn m2l<'a>(&self, level: u64) {
         let Some(sources) = self.fmm.tree().get_keys(level) else {
