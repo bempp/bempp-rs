@@ -303,7 +303,6 @@ where
                                 .iter()
                                 .filter_map(|k| self.fmm.tree().get_leaf_index(k))
                                 .collect_vec();
-                            // println!("leaf {:?} w list {:?}={:?}", leaf.anchor, w_list.len(), w_list_indices.len());
 
                             for &source_index in w_list_indices {
                                 let multipole_send_ptr = self.leaf_multipoles[source_index];

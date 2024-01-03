@@ -263,6 +263,7 @@ where
         // Group by level to perform efficient lookup of nodes
         keys.sort_by_key(|a| a.level());
 
+
         let mut levels_to_keys = HashMap::new();
         let mut curr = keys[0];
         let mut curr_idx = 0;
