@@ -7,7 +7,7 @@ use std::{collections::HashMap, time::Instant};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::{Eval, Transpose},
-    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer, global},
 };
 
 use bempp_traits::{
@@ -19,7 +19,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{ChargeDict, FmmDataAdaptive, FmmDataUniform, SendPtrMut};
+use crate::types::{ChargeDict, FmmDataAdaptive, FmmDataUniform, SendPtrMut, FmmDataUniformMatrix};
 use crate::{
     pinv::{pinv, SvdScalar},
     types::KiFmmLinear,
@@ -423,6 +423,185 @@ where
         }
 
         Err("Not a valid tree".to_string())
+    }
+}
+
+/// Implementation of the data structure to store the data for the single node KiFMM.
+impl<T, U, V> FmmDataUniformMatrix<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+where
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
+    U: FieldTranslationData<T>,
+    V: Float + Scalar<Real = V> + Default,
+{
+    /// Constructor fo the KiFMM's associated FmmData on a single node.
+    ///
+    /// # Arguments
+    /// `fmm` - A single node KiFMM object.
+    /// `global_charges` - The charge data associated to the point data via unique global indices.
+    pub fn new(
+        fmm: KiFmmLinear<SingleNodeTree<V>, T, U, V>,
+        global_charges: &[ChargeDict<V>],
+    )
+    //  -> Result<Self, String> 
+    {
+        if let Some(keys) = fmm.tree().get_all_keys() {
+            let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+            let nkeys = keys.len();
+            let leaves = fmm.tree().get_all_leaves().unwrap();
+            let nleaves = leaves.len();
+            let npoints = fmm.tree().get_all_points().unwrap().len();
+            let ncharge_vectors = global_charges.len();
+
+            let multipoles = vec![V::default(); ncoeffs * nkeys * ncharge_vectors];
+            let locals = vec![V::default(); ncoeffs * nkeys * ncharge_vectors];
+
+            let mut potentials = vec![V::default(); npoints * ncharge_vectors];
+            // let mut potentials_send_pointers = vec![SendPtrMut::default(); nleaves * ncharge_vectors];
+
+            let mut charges = vec![V::default(); npoints * ncharge_vectors];
+            let global_indices = vec![0usize; npoints];
+
+            // Lookup leaf coordinates, and assign charges from within the data tree.
+            for (i, charge_dict) in global_charges.iter().enumerate() {
+                for (j, g_idx) in fmm
+                    .tree()
+                    .get_all_global_indices()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                {
+                    let charge = charge_dict.get(g_idx).unwrap();
+                    charges[i*npoints+j] = *charge;
+                }
+            }
+
+            let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
+            let mut level_locals = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
+            let mut level_index_pointer =
+                vec![HashMap::new(); (fmm.tree().get_depth() + 1) as usize];
+
+            for level in 0..=fmm.tree().get_depth() {
+                let keys = fmm.tree().get_keys(level).unwrap();
+
+                let mut tmp_multipoles = Vec::new();
+                let mut tmp_locals = Vec::new();
+                for (level_idx, key) in keys.iter().enumerate() {
+                    let idx = fmm.tree().key_to_index.get(key).unwrap();
+                    unsafe {
+                        let raw = multipoles.as_ptr().add(ncoeffs * idx) as *mut V;
+                        tmp_multipoles.push(SendPtrMut { raw });
+                        let raw = locals.as_ptr().add(ncoeffs * idx) as *mut V;
+                        tmp_locals.push(SendPtrMut { raw })
+                    }
+                    level_index_pointer[level as usize].insert(*key, level_idx);
+                }
+                level_multipoles[level as usize] = tmp_multipoles;
+                level_locals[level as usize] = tmp_locals;
+            }
+
+            // let mut leaf_multipoles = Vec::new();
+            // let mut leaf_locals = Vec::new();
+
+            // for leaf in fmm.tree.get_all_leaves().unwrap().iter() {
+            //     let i = fmm.tree.key_to_index.get(leaf).unwrap();
+            //     unsafe {
+            //         let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
+            //         leaf_multipoles.push(SendPtrMut { raw });
+
+            //         let raw = locals.as_ptr().add(i * ncoeffs) as *mut V;
+            //         leaf_locals.push(SendPtrMut { raw });
+            //     }
+            // }
+
+            // // Create an index pointer for the charge data
+            // let mut index_pointer = 0;
+            // let mut charge_index_pointer = vec![(0usize, 0usize); nleaves];
+
+            // let mut potential_raw_pointer = potentials.as_mut_ptr();
+
+            // let mut scales = vec![V::default(); nleaves * ncoeffs];
+            // for (i, leaf) in leaves.iter().enumerate() {
+            //     // Assign scales
+            //     let l = i * ncoeffs;
+            //     let r = l + ncoeffs;
+            //     scales[l..r]
+            //         .copy_from_slice(vec![fmm.kernel.scale(leaf.level()); ncoeffs].as_slice());
+
+            //     // Assign potential pointers
+            //     let npoints;
+            //     if let Some(points) = fmm.tree().get_points(leaf) {
+            //         npoints = points.len();
+            //     } else {
+            //         npoints = 0;
+            //     }
+
+            //     potentials_send_pointers[i] = SendPtrMut {
+            //         raw: potential_raw_pointer,
+            //     };
+
+            //     let bounds = (index_pointer, index_pointer + npoints);
+            //     charge_index_pointer[i] = bounds;
+            //     index_pointer += npoints;
+            //     unsafe { potential_raw_pointer = potential_raw_pointer.add(npoints) };
+            // }
+
+            // let dim = fmm.kernel().space_dimension();
+            // let mut upward_surfaces = vec![V::default(); ncoeffs * nkeys * dim];
+            // let mut downward_surfaces = vec![V::default(); ncoeffs * nkeys * dim];
+
+            // // For each key form both upward and downward check surfaces
+            // for (i, key) in keys.iter().enumerate() {
+            //     let upward_surface =
+            //         key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+
+            //     let downward_surface =
+            //         key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
+
+            //     let l = i * ncoeffs * dim;
+            //     let r = l + ncoeffs * dim;
+
+            //     upward_surfaces[l..r].copy_from_slice(&upward_surface);
+            //     downward_surfaces[l..r].copy_from_slice(&downward_surface);
+            // }
+
+            // let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
+            // let mut leaf_downward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
+            // for (i, leaf) in leaves.iter().enumerate() {
+            //     let upward_surface =
+            //         leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+
+            //     let downward_surface =
+            //         leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+
+            //     let l = i * ncoeffs * dim;
+            //     let r = l + ncoeffs * dim;
+            //     leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
+            //     leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
+            // }
+
+            // return Ok(Self {
+            //     fmm,
+            //     multipoles,
+            //     level_multipoles,
+            //     leaf_multipoles,
+            //     locals,
+            //     level_locals,
+            //     leaf_locals,
+            //     level_index_pointer,
+            //     upward_surfaces,
+            //     downward_surfaces,
+            //     leaf_upward_surfaces,
+            //     leaf_downward_surfaces,
+            //     potentials,
+            //     potentials_send_pointers,
+            //     charges,
+            //     charge_index_pointer,
+            //     scales,
+            //     global_indices,
+            // });
+        }
+
+        // Err("Not a valid tree".to_string())
     }
 }
 
