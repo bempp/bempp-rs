@@ -1,4 +1,4 @@
-//! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
+//! Field translations for Uniform and Adaptive Kernel Indepenent FMMs
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -27,7 +27,7 @@ use rlst::{
     dense::{rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-use super::hadamard::matmul8x8x2;
+use super::hadamard::matmul8x8;
 
 impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
@@ -290,13 +290,17 @@ where
                         // Head of buffer for each frequency
                         let head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
-                        let signal_hat_f_chunk = std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
-                        
+                        let signal_hat_f_chunk =
+                            std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
+
                         // Store results for this frequency for this sibling set chunk
                         let results_i = &signal_hat_chunk_f_c
                             [i * nsiblings * chunk_size..(i + 1) * nsiblings * chunk_size];
 
-                        signal_hat_f_chunk.iter_mut().zip(results_i).for_each(|(c, r)| *c += *r);
+                        signal_hat_f_chunk
+                            .iter_mut()
+                            .zip(results_i)
+                            .for_each(|(c, r)| *c += *r);
                     }
                 }
             });
@@ -337,7 +341,7 @@ where
                             let displacement = displacements[j];
                             let s_f = &signal_hat_f[displacement..displacement + nsiblings];
 
-                            matmul8x8x2(
+                            matmul8x8(
                                 k_f,
                                 s_f,
                                 &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
@@ -507,16 +511,6 @@ where
                         .eval();
 
                         if nsources > 0 {
-                            if target.level() < self.fmm.tree.get_depth() && self.fmm.tree.leaves_set.contains(target) {
-                                let leaf_idx = self.fmm.tree().get_leaf_index(target).unwrap();
-
-                                let (l, r) = self.charge_index_pointer[*leaf_idx];
-
-                                if r - l > 0 {
-                                    println!("RUNNING P2L {:?}", self.fmm.tree.key_to_index.get(target));
-                                }
-                            }
-
                             let mut check_potential = rlst_col_vec![U, ncoeffs];
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
@@ -547,56 +541,6 @@ where
             return;
         };
 
-        // for target in targets.iter() {
-        //     assert!(target.level() == level)
-        // }
-
-        // let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        // targets.par_iter().for_each(|target| {
-
-        //     let downward_check_surface = target.compute_surface(
-        //         self.fmm.tree().get_domain(), self.fmm.order, self.fmm.alpha_inner
-        //     );
-
-        //     // Calculate check potential directly
-        //     if let Some(v_list) = self.fmm.get_v_list(target) {
-        //         assert!(v_list.len() <= 189);
-        //         // println!("level {:?} v list {:?}", level, v_list.len());
-        //         let mut check_potential = rlst_col_vec![U, ncoeffs];
-        //         for source in v_list.iter() {
-        //             let upward_equivalent_surface = source.compute_surface(
-        //                 self.fmm.tree().get_domain(), self.fmm.order, self.fmm.alpha_inner
-        //             );
-        //             let source_index_pointer = *self.level_index_pointer[level as usize].get(source).unwrap();
-        //             let multipole = self.level_multipoles[level as usize][source_index_pointer];
-        //             let multipole = unsafe { std::slice::from_raw_parts(multipole.raw, ncoeffs) };
-        //             // let source_index_pointer = *self.fmm.tree.key_to_index.get(source).unwrap();
-        //             // let multipole = &self.multipoles[source_index_pointer*ncoeffs..(source_index_pointer+1)*ncoeffs];
-        //             self.fmm.kernel.evaluate_st(
-        //                 EvalType::Value, 
-        //                 &upward_equivalent_surface, 
-        //                 &downward_check_surface, 
-        //                 multipole, 
-        //              check_potential.data_mut()
-        //             )
-        //         }
-
-        //         // Compute local expansion from check potential and add 
-        //         let target_index_pointer = *self.level_index_pointer[level as usize].get(target).unwrap();
-        //         let target_ptr = self.level_locals[level as usize][target_index_pointer];
-        //         let local = unsafe { std::slice::from_raw_parts_mut(target_ptr.raw, ncoeffs) }; 
-
-        //         let scale = self.fmm.kernel.scale(target.level());
-        //         // let scale = self.m2l_scale(level);
-        //         let mut tmp = self.fmm.dc2e_inv_1.dot(&self.fmm.dc2e_inv_2.dot(&check_potential)).eval();
-        //         tmp.data_mut().iter_mut().for_each(|t| *t *= scale);
-
-        //         local.iter_mut().zip(tmp.data()).for_each(|(l, t)| *l += *t);
-        //     }
-        // })
-
-        // // println!("LEVEL {:?} N BOXES {:?} DEPTH {:?}", level, targets.len(), self.fmm.tree().get_depth());
-
         let n = 2 * self.fmm.order - 1;
         let npad = n + 1;
 
@@ -622,18 +566,7 @@ where
         let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
         let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
 
-
         let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
-        // let mut targets = targets.iter().cloned().collect_vec();
-        // let ntargets = targets.len();
-        // targets.sort();
-
-        // let mut multipoles = Vec::new();
-        // for target in targets.iter() {
-        //     let target_index_pointer = *self.level_index_pointer[level as usize].get(target).unwrap();
-        //     let multipole = self.level_multipoles[level as usize][target_index_pointer];
-        //     multipoles.push(multipole);
-        // }
 
         ////////////////////////////////////////////////////////////////////////////////////
         // Pre-process to setup data structures for M2L kernel
@@ -723,13 +656,17 @@ where
                         // Head of buffer for each frequency
                         let head = ptr.raw.add(frequency_offset).add(sibling_offset);
 
-                        let signal_hat_f_chunk = std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
-                        
+                        let signal_hat_f_chunk =
+                            std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
+
                         // Store results for this frequency for this sibling set chunk
                         let results_i = &signal_hat_chunk_f_c
                             [i * nsiblings * chunk_size..(i + 1) * nsiblings * chunk_size];
 
-                        signal_hat_f_chunk.iter_mut().zip(results_i).for_each(|(c, r)| *c += *r);
+                        signal_hat_f_chunk
+                            .iter_mut()
+                            .zip(results_i)
+                            .for_each(|(c, r)| *c += *r);
                     }
                 }
             });
@@ -747,8 +684,6 @@ where
         ////////////////////////////////////////////////////////////////////////////////////
         let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
         let kernel_data_f = &self.fmm.m2l.operator_data.kernel_data_f;
-
-        println!("LEVEL {:?} nparents {:?} ntargets {:?}", level, nparents, ntargets);
 
         (0..size_real)
             .into_par_iter()
@@ -772,7 +707,7 @@ where
                             let displacement = displacements[j];
                             let s_f = &signal_hat_f[displacement..displacement + nsiblings];
 
-                            matmul8x8x2(
+                            matmul8x8(
                                 k_f,
                                 s_f,
                                 &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
@@ -889,7 +824,6 @@ where
     U: std::marker::Send + std::marker::Sync + Default,
 {
     fn p2l<'a>(&self, level: u64) {
-
         let Some(targets) = self.fmm.tree().get_keys(level) else {
             return;
         };
@@ -908,7 +842,6 @@ where
             &self.downward_surfaces[min_idx * surface_size..(max_idx + 1) * surface_size];
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
-        // assert_eq!(ntargets, downward_surfaces.len() / surface_size);
         targets
             .par_iter()
             .zip(downward_surfaces.par_chunks_exact(surface_size))
@@ -946,16 +879,6 @@ where
                         .eval();
 
                         if nsources > 0 {
-                            // if target.level() < self.fmm.tree.get_depth() && self.fmm.tree.leaves_set.contains(target) {
-                            //     let leaf_idx = self.fmm.tree().get_leaf_index(target).unwrap();
-
-                            //     let (l, r) = self.charge_index_pointer[*leaf_idx];
-
-                            //     // if r - l > 0 {
-                            //     //     println!("RUNNING P2L {:?}", self.fmm.tree.key_to_index.get(target));
-                            //     // }
-                            // }
-
                             let mut check_potential = rlst_col_vec![U, ncoeffs];
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
@@ -1228,13 +1151,15 @@ mod test {
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{
-        implementations::helpers::{points_fixture, points_fixture_sphere}, types::single_node::SingleNodeTree,
+        implementations::helpers::{points_fixture, points_fixture_sphere},
+        types::single_node::SingleNodeTree,
     };
     use float_cmp::assert_approx_eq;
 
     use crate::{
         charge::build_charge_dict,
-        types::{FmmDataUniform, KiFmmLinear, FmmDataAdaptive}, field_translation::source,
+        field_translation::source,
+        types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear},
     };
 
     use bempp_traits::{field::FieldTranslationData, kernel::ScaleInvariantKernel};
@@ -1244,7 +1169,7 @@ mod test {
         tree::Tree,
     };
     use itertools::Itertools;
-    use rlst::dense::{rlst_pointer_mat, RawAccess, rlst_col_vec};
+    use rlst::dense::{rlst_col_vec, rlst_pointer_mat, RawAccess};
 
     use rlst::{
         common::traits::*,
@@ -1517,7 +1442,6 @@ mod test {
                 );
 
                 if let Some(x_list) = datatree.fmm.get_x_list(leaf_node) {
-
                     let x_list_indices = x_list
                         .iter()
                         .filter_map(|k| datatree.fmm.tree().get_leaf_index(k));
@@ -1533,7 +1457,8 @@ mod test {
                         .into_iter()
                         .map(|&idx| {
                             let index_pointer = &datatree.charge_index_pointer[idx];
-                            &datatree.fmm.tree().coordinates[index_pointer.0 * dim..index_pointer.1 * dim]
+                            &datatree.fmm.tree().coordinates
+                                [index_pointer.0 * dim..index_pointer.1 * dim]
                         })
                         .collect_vec();
 
@@ -1546,14 +1471,16 @@ mod test {
                         if nsources > 0 {
                             let mut check_potential = rlst_col_vec![f64, ncoeffs];
                             datatree.fmm.kernel.evaluate_st(
-                                bempp_traits::types::EvalType::Value, 
-                                sources.data(), 
-                                &downward_check_surface, 
-                                charges, 
-                                check_potential.data_mut()
+                                bempp_traits::types::EvalType::Value,
+                                sources.data(),
+                                &downward_check_surface,
+                                charges,
+                                check_potential.data_mut(),
                             );
-                            let mut tmp = datatree.fmm
-                                .dc2e_inv_1.dot(&datatree.fmm.dc2e_inv_2.dot(&check_potential));
+                            let mut tmp = datatree
+                                .fmm
+                                .dc2e_inv_1
+                                .dot(&datatree.fmm.dc2e_inv_2.dot(&check_potential));
                             let scale = datatree.fmm.kernel.scale(leaf_node.level());
                             tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 
@@ -1564,7 +1491,7 @@ mod test {
                                 &downward_check_surface,
                                 tmp.data(),
                                 &mut direct,
-                            ); 
+                            );
                         }
                     }
                 }

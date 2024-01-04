@@ -1,4 +1,4 @@
-//! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
+//! Multipole field translations for uniform and adaptive Kernel Indepenent FMMs
 use std::collections::HashSet;
 
 use itertools::Itertools;
@@ -299,7 +299,7 @@ mod test {
     use itertools::Itertools;
 
     use crate::charge::build_charge_dict;
-    use bempp_field::types::{SvdFieldTranslationKiFmm, FftFieldTranslationKiFmm};
+    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{
         constants::ROOT,
@@ -517,7 +517,7 @@ mod test {
 
         // Upward pass
         datatree.p2m();
-        
+
         let mut test_idx = 0;
         for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
             if index_pointer.1 - index_pointer.0 > 0 {
@@ -533,7 +533,7 @@ mod test {
         let multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
         // let level_index_pointer = datatree.level_index_pointer[leaf.level() as usize].get(leaf).unwrap();
         // let multipole_ptr = datatree.level_multipoles[leaf.level() as usize][*level_index_pointer];
-        // let multipole = unsafe { std::slice::from_raw_parts(multipole_ptr.raw, ncoeffs)}; 
+        // let multipole = unsafe { std::slice::from_raw_parts(multipole_ptr.raw, ncoeffs)};
         // // println!("level index pointer {:?}", datatree.level_index_pointer[leaf.level() as usize]);
         // // println!("multipole wrong {:?}", multipole_ptr.raw);
 
@@ -555,7 +555,7 @@ mod test {
 
         let mut expected = vec![0.];
         let mut found = vec![0.];
-        
+
         let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
         let (l, r) = datatree.charge_index_pointer[*leaf_idx];
         let leaf_coordinates = &coordinates[l * 3..r * 3];
@@ -569,7 +569,7 @@ mod test {
         let charges = &datatree.charges[l..r];
 
         let kernel = Laplace3dKernel::<f64>::default();
-        
+
         kernel.evaluate_st(
             EvalType::Value,
             leaf_coordinates.data(),

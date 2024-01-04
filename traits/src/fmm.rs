@@ -6,16 +6,22 @@ use crate::tree::Tree;
 
 /// Interface for source box translations.
 pub trait SourceTranslation {
-    /// Point to multipole translations, applied at leaf level.
+    /// Particle to multipole translations, applied at leaf level.
     fn p2m(&self);
 
     /// Multipole to multipole translations, applied during upward pass, level by level.
+    /// 
+    /// # Arguments
+    /// * `level` - The child level at which this kernel is being applied.
     fn m2m(&self, level: u64);
 }
 
 /// Interface for target box translations.
 pub trait TargetTranslation {
     /// Local to local translations, applied during downward pass.
+    /// 
+    /// # Arguments
+    /// * `level` - The child level at which this kernel is being applied.
     fn l2l(&self, level: u64);
 
     /// Multipole to particle translations, applies to leaf boxes when a source box is within
@@ -53,8 +59,10 @@ pub trait KiFmm
 where
     Self: Fmm,
 {
+    /// Scaling of inner check or equivalent surface with respect to a box.
     fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
 
+    /// Scaling of outer check or equivalent surface with respect to a box.
     fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
 }
 
@@ -86,25 +94,40 @@ pub trait FmmLoop {
 pub trait InteractionLists {
     type Tree: Tree;
 
-    /// The interaction list defining multipole to local translations.
+    /// The interaction list defining multipole to local translations, i.e. for well separated boxes.
+    /// 
+    /// # Arguments
+    /// * `key` - The target key for which this interaction list is being calculated.
     fn get_v_list(
         &self,
         key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 
-    /// The interaction list defining particle to local translations.
+    /// The interaction list defining particle to local translations, i.e. where the box in the in
+    /// the interaction list is too large for the multipole expansion to apply at the target box
+    /// specified by `key`.
+    /// 
+    /// # Arguments
+    /// * `key` - The target key for which this interaction list is being calculated.
     fn get_x_list(
         &self,
         key: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 
-    /// The interaction list defining multiopole to particle translations.
+    /// The interaction list defining multiopole to particle translations, i.e. where the multipole
+    /// expansion of the source key applies at the target key, only applies to leaf nodes.
+    /// 
+    /// # Arguments
+    /// * `leaf` - The target leaf key for which this interaction list is being calculated.
     fn get_w_list(
         &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
+        leaf: &<Self::Tree as Tree>::NodeIndex,
     ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 
-    /// The interaction list defining the near field of each leaf box.
+    /// The interaction list defining the near field of each leaf box, i.e. adjacent boxes.
+    /// 
+    /// # Arguments
+    /// * `key` - The target key for which this interaction list is being calculated.
     fn get_u_list(
         &self,
         key: &<Self::Tree as Tree>::NodeIndex,

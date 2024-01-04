@@ -1,5 +1,4 @@
-//! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
-
+//! Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use std::collections::HashSet;
 
 use itertools::Itertools;
