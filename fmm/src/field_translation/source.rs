@@ -479,7 +479,6 @@ mod test {
     #[test]
     fn test_p2m_adaptive() {
         let npoints: usize = 10000;
-        // let points = points_fixture_sphere(npoints);
         let points = points_fixture(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
