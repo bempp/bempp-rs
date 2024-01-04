@@ -287,12 +287,13 @@ where
                     let targets =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
                     let ntargets = targets.len() / dim;
-                    let targets = unsafe {
-                        rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
-                    }
-                    .eval();
 
                     if ntargets > 0 {
+                        let targets = unsafe {
+                            rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
+                        }
+                        .eval();
+
                         if let Some(w_list) = self.fmm.get_w_list(leaf) {
                             let result = unsafe {
                                 std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)
@@ -347,22 +348,23 @@ where
                         let target_coordinates = &coordinates
                             [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
                         let ntargets = target_coordinates.len() / dim;
-                        let target_coordinates = unsafe {
-                            rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, dim), (dim, 1)]
-                        }.eval();
 
                         let local_expansion =
                             unsafe { rlst_pointer_mat!['a, V, local_ptr.raw, (ncoeffs, 1), (1, ncoeffs) ]};
 
-
                         // Compute direct
                         if ntargets > 0 {
+
+                            let targets = unsafe {
+                                rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, dim), (dim, 1)]
+                            }.eval();
+
                             let result = unsafe { std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)};
 
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
-                                target_coordinates.data(),
+                                targets.data(),
                                 local_expansion.data(),
                                 result,
                             );
@@ -387,11 +389,12 @@ where
                     let targets =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
                     let ntargets = targets.len() / dim;
-                    let targets = unsafe {
-                        rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
-                    }.eval();
 
                     if ntargets > 0 {
+
+                        let targets = unsafe {
+                            rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
+                        }.eval();
 
                         if let Some(u_list) = self.fmm.get_u_list(leaf) {
 
@@ -418,12 +421,13 @@ where
 
                             for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                                 let nsources = sources.len() / dim;
-                                let sources = unsafe {
-                                    rlst_pointer_mat!['a, V, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                                }.eval();
-
 
                                 if nsources > 0 {
+
+                                    let sources = unsafe {
+                                        rlst_pointer_mat!['a, V, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                                    }.eval();
+
                                     let result = unsafe { std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)};
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,

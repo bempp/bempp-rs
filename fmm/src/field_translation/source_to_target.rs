@@ -505,12 +505,14 @@ where
 
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
-                        let sources = unsafe {
-                            rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                        }
-                        .eval();
 
                         if nsources > 0 {
+
+                            let sources = unsafe {
+                                rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                            }
+                            .eval();
+
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 sources.data(),
@@ -886,12 +888,14 @@ where
 
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
-                        let sources = unsafe {
-                            rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                        }
-                        .eval();
 
                         if nsources > 0 {
+
+                            let sources = unsafe {
+                                rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                            }
+                            .eval();
+
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 sources.data(),
@@ -1488,11 +1492,12 @@ mod test {
 
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
-                        let sources = unsafe {
-                            rlst_pointer_mat!['_, f64, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                        }
-                        .eval();
                         if nsources > 0 {
+                            let sources = unsafe {
+                                rlst_pointer_mat!['_, f64, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                            }
+                            .eval();
+
                             let mut check_potential = rlst_col_vec![f64, ncoeffs];
                             datatree.fmm.kernel.evaluate_st(
                                 bempp_traits::types::EvalType::Value,
