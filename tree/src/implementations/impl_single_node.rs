@@ -176,7 +176,7 @@ where
         }
     }
 
-    /// Constructor for uniform trees on a single node refined to a user defined depth.
+    /// Constructor for uniform trees on a single node refined to a user defined depth, however excludes empty nodes which don't contain particles.
     /// Returns a SingleNodeTree, with the leaves in sorted order.
     ///
     /// # Arguments
@@ -471,6 +471,7 @@ where
         for (i, key) in leaves.iter().enumerate() {
             leaf_to_index.insert(*key, i);
         }
+
         SingleNodeTree {
             depth,
             points,

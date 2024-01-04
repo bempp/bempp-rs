@@ -1,4 +1,4 @@
-//! kiFMM based on simple linear data structures that minimises memory allocations, maximises cache re-use.
+//! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -24,10 +24,10 @@ use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
-    dense::{rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
-use super::hadamard::matmul8x8x2;
+use super::hadamard::matmul8x8;
 
 impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
 where
@@ -288,16 +288,19 @@ where
                         let frequency_offset = i * (ntargets + nzeros);
 
                         // Head of buffer for each frequency
-                        let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
+                        let head = ptr.raw.add(frequency_offset).add(sibling_offset);
+
+                        let signal_hat_f_chunk =
+                            std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
 
                         // Store results for this frequency for this sibling set chunk
                         let results_i = &signal_hat_chunk_f_c
                             [i * nsiblings * chunk_size..(i + 1) * nsiblings * chunk_size];
 
-                        for &res in results_i {
-                            *head += res;
-                            head = head.add(1);
-                        }
+                        signal_hat_f_chunk
+                            .iter_mut()
+                            .zip(results_i)
+                            .for_each(|(c, r)| *c += *r);
                     }
                 }
             });
@@ -338,7 +341,7 @@ where
                             let displacement = displacements[j];
                             let s_f = &signal_hat_f[displacement..displacement + nsiblings];
 
-                            matmul8x8x2(
+                            matmul8x8(
                                 k_f,
                                 s_f,
                                 &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
@@ -470,12 +473,15 @@ where
             &self.downward_surfaces[min_idx * surface_size..(max_idx + 1) * surface_size];
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
-        // assert_eq!(ntargets, downward_surfaces.len() / surface_size);
+        let ntargets = targets.len();
+        let mut check_potentials = vec![U::zero(); ncoeffs * ntargets];
+
+        // 1. Compute check potentials from x list of each target
         targets
             .par_iter()
             .zip(downward_surfaces.par_chunks_exact(surface_size))
-            .zip(self.level_locals[level as usize].par_iter())
-            .for_each(|((target, downward_surface), local_ptr)| {
+            .zip(check_potentials.par_chunks_exact_mut(ncoeffs))
+            .for_each(|((target, downward_surface), check_potential)| {
                 // Find check potential
                 if let Some(x_list) = self.fmm.get_x_list(target) {
                     let x_list_indices = x_list
@@ -497,39 +503,50 @@ where
                         })
                         .collect_vec();
 
-                    let target_local =
-                        unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
-                        let sources = unsafe {
-                            rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                        }
-                        .eval();
 
                         if nsources > 0 {
-                            let mut check_potential = rlst_col_vec![U, ncoeffs];
+
+                            let sources = unsafe {
+                                rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                            }
+                            .eval();
+
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 sources.data(),
                                 downward_surface,
                                 charges,
-                                check_potential.data_mut(),
+                                check_potential,
                             );
-                            let scale = self.fmm.kernel().scale(target.level());
-                            let mut tmp = self
-                                .fmm
-                                .dc2e_inv_1
-                                .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
-                            tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
-
-                            target_local
-                                .iter_mut()
-                                .zip(tmp.data())
-                                .for_each(|(r, &t)| *r += t);
                         }
                     }
                 }
+            });
+
+        // 2. Compute local expansion from check potential
+        self.level_locals[level as usize]
+            .par_iter()
+            .zip(check_potentials.par_chunks_exact(ncoeffs))
+            .for_each(|(local_ptr, check_potential)| {
+                let target_local =
+                    unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
+                let check_potential = unsafe {
+                    rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
+                };
+
+                let scale = self.fmm.kernel().scale(level);
+                let mut tmp = self
+                    .fmm
+                    .dc2e_inv_1
+                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
+
+                target_local
+                    .iter_mut()
+                    .zip(tmp.data())
+                    .for_each(|(r, &t)| *r += t);
             });
     }
 
@@ -596,6 +613,7 @@ where
         // Pre-processing to find FFT
         multipoles
             .par_chunks_exact(ncoeffs * nsiblings * chunk_size)
+            // .par_chunks_exact(nsiblings * chunk_size)
             .enumerate()
             .for_each(|(i, multipole_chunk)| {
                 // Place Signal on convolution grid
@@ -603,6 +621,7 @@ where
 
                 for i in 0..nsiblings * chunk_size {
                     let multipole = &multipole_chunk[i * ncoeffs..(i + 1) * ncoeffs];
+                    // let multipole = unsafe { std::slice::from_raw_parts(multipole_chunk[i].raw, ncoeffs) };
                     let signal = &mut signal_chunk[i * size..(i + 1) * size];
                     for (surf_idx, &conv_idx) in self.fmm.m2l.surf_to_conv_map.iter().enumerate() {
                         signal[conv_idx] = multipole[surf_idx]
@@ -649,16 +668,19 @@ where
                         let frequency_offset = i * (ntargets + nzeros);
 
                         // Head of buffer for each frequency
-                        let mut head = ptr.raw.add(frequency_offset).add(sibling_offset);
+                        let head = ptr.raw.add(frequency_offset).add(sibling_offset);
+
+                        let signal_hat_f_chunk =
+                            std::slice::from_raw_parts_mut(head, nsiblings * chunk_size);
 
                         // Store results for this frequency for this sibling set chunk
                         let results_i = &signal_hat_chunk_f_c
                             [i * nsiblings * chunk_size..(i + 1) * nsiblings * chunk_size];
 
-                        for &res in results_i {
-                            *head += res;
-                            head = head.add(1);
-                        }
+                        signal_hat_f_chunk
+                            .iter_mut()
+                            .zip(results_i)
+                            .for_each(|(c, r)| *c += *r);
                     }
                 }
             });
@@ -699,7 +721,7 @@ where
                             let displacement = displacements[j];
                             let s_f = &signal_hat_f[displacement..displacement + nsiblings];
 
-                            matmul8x8x2(
+                            matmul8x8(
                                 k_f,
                                 s_f,
                                 &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
@@ -815,7 +837,101 @@ where
         >,
     U: std::marker::Send + std::marker::Sync + Default,
 {
-    fn p2l(&self, _level: u64) {}
+    fn p2l<'a>(&self, level: u64) {
+        let Some(targets) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
+        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let dim = self.fmm.kernel().space_dimension();
+        let surface_size = ncoeffs * dim;
+        let min_idx = self.fmm.tree().key_to_index.get(&targets[0]).unwrap();
+        let max_idx = self
+            .fmm
+            .tree()
+            .key_to_index
+            .get(targets.last().unwrap())
+            .unwrap();
+        let downward_surfaces =
+            &self.downward_surfaces[min_idx * surface_size..(max_idx + 1) * surface_size];
+        let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
+
+        let ntargets = targets.len();
+        let mut check_potentials = vec![U::zero(); ncoeffs * ntargets];
+
+        // 1. Compute check potentials from x list of each target
+        targets
+            .par_iter()
+            .zip(downward_surfaces.par_chunks_exact(surface_size))
+            .zip(check_potentials.par_chunks_exact_mut(ncoeffs))
+            .for_each(|((target, downward_surface), check_potential)| {
+                // Find check potential
+                if let Some(x_list) = self.fmm.get_x_list(target) {
+                    let x_list_indices = x_list
+                        .iter()
+                        .filter_map(|k| self.fmm.tree().get_leaf_index(k));
+                    let charges = x_list_indices
+                        .clone()
+                        .map(|&idx| {
+                            let index_pointer = &self.charge_index_pointer[idx];
+                            &self.charges[index_pointer.0..index_pointer.1]
+                        })
+                        .collect_vec();
+
+                    let sources_coordinates = x_list_indices
+                        .into_iter()
+                        .map(|&idx| {
+                            let index_pointer = &self.charge_index_pointer[idx];
+                            &coordinates[index_pointer.0 * dim..index_pointer.1 * dim]
+                        })
+                        .collect_vec();
+
+                    for (&charges, sources) in charges.iter().zip(sources_coordinates) {
+                        let nsources = sources.len() / dim;
+
+                        if nsources > 0 {
+
+                            let sources = unsafe {
+                                rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                            }
+                            .eval();
+
+                            self.fmm.kernel.evaluate_st(
+                                EvalType::Value,
+                                sources.data(),
+                                downward_surface,
+                                charges,
+                                check_potential,
+                            );
+                        }
+                    }
+                }
+            });
+
+        // 2. Compute local expansion from check potential
+        self.level_locals[level as usize]
+            .par_iter()
+            .zip(check_potentials.par_chunks_exact(ncoeffs))
+            .for_each(|(local_ptr, check_potential)| {
+                let target_local =
+                    unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
+                let check_potential = unsafe {
+                    rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
+                };
+
+                let scale = self.fmm.kernel().scale(level);
+                let mut tmp = self
+                    .fmm
+                    .dc2e_inv_1
+                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
+
+                target_local
+                    .iter_mut()
+                    .zip(tmp.data())
+                    .for_each(|(r, &t)| *r += t);
+            });
+    }
 
     fn m2l<'a>(&self, level: u64) {
         let Some(sources) = self.fmm.tree().get_keys(level) else {
@@ -1064,23 +1180,24 @@ mod test {
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{
-        implementations::helpers::points_fixture, types::single_node::SingleNodeTree,
+        implementations::helpers::{points_fixture, points_fixture_sphere},
+        types::single_node::SingleNodeTree,
     };
     use float_cmp::assert_approx_eq;
 
     use crate::{
         charge::build_charge_dict,
-        types::{FmmDataUniform, KiFmmLinear},
+        types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear},
     };
 
-    use bempp_traits::field::FieldTranslationData;
+    use bempp_traits::{field::FieldTranslationData, kernel::ScaleInvariantKernel};
     use bempp_traits::{
         fmm::{Fmm, FmmLoop, InteractionLists},
         kernel::Kernel,
         tree::Tree,
     };
     use itertools::Itertools;
-    use rlst::dense::{rlst_pointer_mat, RawAccess};
+    use rlst::dense::{rlst_col_vec, rlst_pointer_mat, RawAccess};
 
     use rlst::{
         common::traits::*,
@@ -1115,14 +1232,6 @@ mod test {
 
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-
-        // let m2l_data = SvdFieldTranslationKiFmm::new(
-        //     kernel.clone(),
-        //     Some(1000),
-        //     order,
-        //     *tree.get_domain(),
-        //     alpha_inner,
-        // );
 
         let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
@@ -1222,6 +1331,199 @@ mod test {
                     tmp.data(),
                     &mut direct,
                 );
+
+                // Compare check potential found directly, and via approximation
+                for (a, b) in equivalent.iter().zip(direct.iter()) {
+                    assert_approx_eq!(f64, *a, *b, epsilon = 1e-5);
+                }
+            }
+        }
+    }
+
+    #[test]
+    pub fn test_field_translation_adaptive() {
+        let npoints = 100000;
+        // let points = points_fixture::<f64>(npoints, None, None);
+        let points = points_fixture_sphere::<f64>(npoints);
+
+        let global_idxs = (0..npoints).collect_vec();
+        let charges = vec![1.0; npoints];
+
+        let order = 5;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.95;
+        let adaptive = true;
+        let ncrit = 150;
+
+        let kernel = Laplace3dKernel::default();
+
+        let tree = SingleNodeTree::new(
+            points.data(),
+            adaptive,
+            Some(ncrit),
+            None,
+            &global_idxs[..],
+            true,
+        );
+
+        let m2l_data =
+            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+
+        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+
+        let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+        // Form charge dict, matching charges with their associated global indices
+        let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
+
+        let datatree = FmmDataAdaptive::new(fmm, &charge_dict).unwrap();
+
+        datatree.run(false);
+        let depth = datatree.fmm.tree().get_depth();
+        let dim = 3;
+
+        for leaf_node in datatree.fmm.tree.get_keys(depth).unwrap().iter() {
+            if let Some(v_list) = datatree.fmm.get_v_list(leaf_node) {
+                let downward_equivalent_surface = leaf_node.compute_surface(
+                    datatree.fmm.tree.get_domain(),
+                    datatree.fmm.order,
+                    datatree.fmm.alpha_outer,
+                );
+
+                let downward_check_surface = leaf_node.compute_surface(
+                    datatree.fmm.tree.get_domain(),
+                    datatree.fmm.order,
+                    datatree.fmm.alpha_inner,
+                );
+
+                let leaf_level = leaf_node.level();
+                let &level_index = datatree.level_index_pointer[leaf_level as usize]
+                    .get(leaf_node)
+                    .unwrap();
+                let leaf_local = datatree.level_locals[leaf_level as usize][level_index];
+                let leaf_local = unsafe { std::slice::from_raw_parts_mut(leaf_local.raw, ncoeffs) };
+
+                let mut equivalent = vec![0f64; leaf_local.len()];
+                datatree.fmm.kernel().evaluate_st(
+                    bempp_traits::types::EvalType::Value,
+                    &downward_equivalent_surface,
+                    &downward_check_surface,
+                    leaf_local,
+                    &mut equivalent,
+                );
+
+                let mut direct = vec![0f64; leaf_local.len()];
+
+                for source in v_list.iter() {
+                    assert!(datatree.fmm.tree().get_all_keys_set().contains(source));
+                    let upward_equivalent_surface = source.compute_surface(
+                        datatree.fmm.tree.get_domain(),
+                        datatree.fmm.order,
+                        datatree.fmm.alpha_inner,
+                    );
+
+                    let source_level = source.level();
+                    let &level_index = datatree.level_index_pointer[source_level as usize]
+                        .get(source)
+                        .unwrap();
+                    let source_multipole =
+                        datatree.level_multipoles[source_level as usize][level_index];
+                    let source_multipole =
+                        unsafe { std::slice::from_raw_parts(source_multipole.raw, ncoeffs) };
+
+                    datatree.fmm.kernel().evaluate_st(
+                        bempp_traits::types::EvalType::Value,
+                        &upward_equivalent_surface,
+                        &downward_check_surface,
+                        source_multipole,
+                        &mut direct,
+                    )
+                }
+
+                // Add parent contribution
+                let mut l2l_idx = 0;
+                for (i, sib) in leaf_node.siblings().iter().enumerate() {
+                    if *sib == *leaf_node {
+                        l2l_idx = i;
+                        break;
+                    }
+                }
+
+                let parent = leaf_node.parent();
+                let &level_index = datatree.level_index_pointer[parent.level() as usize]
+                    .get(&parent)
+                    .unwrap();
+                let parent_local = datatree.level_locals[parent.level() as usize][level_index];
+                let parent_local = unsafe {
+                    rlst_pointer_mat!['_, f64, parent_local.raw, (ncoeffs, 1), (1, ncoeffs)]
+                };
+
+                // Parent contribution to check potential
+                let tmp = datatree.fmm.l2l[l2l_idx].dot(&parent_local).eval();
+
+                // Evaluate tmp at child equivalent surface to find potential
+                datatree.fmm.kernel().evaluate_st(
+                    bempp_traits::types::EvalType::Value,
+                    &downward_equivalent_surface,
+                    &downward_check_surface,
+                    tmp.data(),
+                    &mut direct,
+                );
+
+                if let Some(x_list) = datatree.fmm.get_x_list(leaf_node) {
+                    let x_list_indices = x_list
+                        .iter()
+                        .filter_map(|k| datatree.fmm.tree().get_leaf_index(k));
+                    let charges = x_list_indices
+                        .clone()
+                        .map(|&idx| {
+                            let index_pointer = &datatree.charge_index_pointer[idx];
+                            &datatree.charges[index_pointer.0..index_pointer.1]
+                        })
+                        .collect_vec();
+
+                    let sources_coordinates = x_list_indices
+                        .into_iter()
+                        .map(|&idx| {
+                            let index_pointer = &datatree.charge_index_pointer[idx];
+                            &datatree.fmm.tree().coordinates
+                                [index_pointer.0 * dim..index_pointer.1 * dim]
+                        })
+                        .collect_vec();
+
+                    for (&charges, sources) in charges.iter().zip(sources_coordinates) {
+                        let nsources = sources.len() / dim;
+                        if nsources > 0 {
+                            let sources = unsafe {
+                                rlst_pointer_mat!['_, f64, sources.as_ptr(), (nsources, dim), (dim, 1)]
+                            }
+                            .eval();
+
+                            let mut check_potential = rlst_col_vec![f64, ncoeffs];
+                            datatree.fmm.kernel.evaluate_st(
+                                bempp_traits::types::EvalType::Value,
+                                sources.data(),
+                                &downward_check_surface,
+                                charges,
+                                check_potential.data_mut(),
+                            );
+                            let mut tmp = datatree
+                                .fmm
+                                .dc2e_inv_1
+                                .dot(&datatree.fmm.dc2e_inv_2.dot(&check_potential));
+                            let scale = datatree.fmm.kernel.scale(leaf_node.level());
+                            tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
+
+                            // Evaluate tmp at child equivalent surface to find potential
+                            datatree.fmm.kernel().evaluate_st(
+                                bempp_traits::types::EvalType::Value,
+                                &downward_equivalent_surface,
+                                &downward_check_surface,
+                                tmp.data(),
+                                &mut direct,
+                            );
+                        }
+                    }
+                }
 
                 // Compare check potential found directly, and via approximation
                 for (a, b) in equivalent.iter().zip(direct.iter()) {
