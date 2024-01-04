@@ -327,10 +327,10 @@ where
                 let i = fmm.tree.key_to_index.get(leaf).unwrap();
                 unsafe {
                     let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
-                    leaf_multipoles.push(SendPtrMut { raw: raw.clone() });
+                    leaf_multipoles.push(SendPtrMut { raw });
 
                     let raw = locals.as_ptr().add(i * ncoeffs) as *mut V;
-                    leaf_locals.push(SendPtrMut { raw: raw.clone() });
+                    leaf_locals.push(SendPtrMut { raw });
                 }
             }
 
@@ -502,10 +502,10 @@ where
                 let i = fmm.tree.key_to_index.get(leaf).unwrap();
                 unsafe {
                     let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
-                    leaf_multipoles.push(SendPtrMut { raw: raw.clone() });
+                    leaf_multipoles.push(SendPtrMut { raw });
 
                     let raw = locals.as_ptr().add(i * ncoeffs) as *mut V;
-                    leaf_locals.push(SendPtrMut { raw: raw.clone() });
+                    leaf_locals.push(SendPtrMut { raw });
                 }
             }
 
