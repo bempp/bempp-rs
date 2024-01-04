@@ -24,7 +24,7 @@ use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::*,
-    dense::{rlst_col_vec, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
 use super::hadamard::matmul8x8;
@@ -473,12 +473,15 @@ where
             &self.downward_surfaces[min_idx * surface_size..(max_idx + 1) * surface_size];
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
-        // assert_eq!(ntargets, downward_surfaces.len() / surface_size);
+        let ntargets = targets.len();
+        let mut check_potentials = vec![U::zero(); ncoeffs * ntargets];
+
+        // 1. Compute check potentials from x list of each target
         targets
             .par_iter()
             .zip(downward_surfaces.par_chunks_exact(surface_size))
-            .zip(self.level_locals[level as usize].par_iter())
-            .for_each(|((target, downward_surface), local_ptr)| {
+            .zip(check_potentials.par_chunks_exact_mut(ncoeffs))
+            .for_each(|((target, downward_surface), check_potential)| {
                 // Find check potential
                 if let Some(x_list) = self.fmm.get_x_list(target) {
                     let x_list_indices = x_list
@@ -500,9 +503,6 @@ where
                         })
                         .collect_vec();
 
-                    let target_local =
-                        unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
                         let sources = unsafe {
@@ -511,28 +511,40 @@ where
                         .eval();
 
                         if nsources > 0 {
-                            let mut check_potential = rlst_col_vec![U, ncoeffs];
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 sources.data(),
                                 downward_surface,
                                 charges,
-                                check_potential.data_mut(),
+                                check_potential,
                             );
-                            let scale = self.fmm.kernel().scale(target.level());
-                            let mut tmp = self
-                                .fmm
-                                .dc2e_inv_1
-                                .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
-                            tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
-
-                            target_local
-                                .iter_mut()
-                                .zip(tmp.data())
-                                .for_each(|(r, &t)| *r += t);
                         }
                     }
                 }
+            });
+
+        // 2. Compute local expansion from check potential
+        self.level_locals[level as usize]
+            .par_iter()
+            .zip(check_potentials.par_chunks_exact(ncoeffs))
+            .for_each(|(local_ptr, check_potential)| {
+                let target_local =
+                    unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
+                let check_potential = unsafe {
+                    rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
+                };
+
+                let scale = self.fmm.kernel().scale(level);
+                let mut tmp = self
+                    .fmm
+                    .dc2e_inv_1
+                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
+
+                target_local
+                    .iter_mut()
+                    .zip(tmp.data())
+                    .for_each(|(r, &t)| *r += t);
             });
     }
 
@@ -842,11 +854,15 @@ where
             &self.downward_surfaces[min_idx * surface_size..(max_idx + 1) * surface_size];
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
+        let ntargets = targets.len();
+        let mut check_potentials = vec![U::zero(); ncoeffs * ntargets];
+
+        // 1. Compute check potentials from x list of each target
         targets
             .par_iter()
             .zip(downward_surfaces.par_chunks_exact(surface_size))
-            .zip(self.level_locals[level as usize].par_iter())
-            .for_each(|((target, downward_surface), local_ptr)| {
+            .zip(check_potentials.par_chunks_exact_mut(ncoeffs))
+            .for_each(|((target, downward_surface), check_potential)| {
                 // Find check potential
                 if let Some(x_list) = self.fmm.get_x_list(target) {
                     let x_list_indices = x_list
@@ -868,9 +884,6 @@ where
                         })
                         .collect_vec();
 
-                    let target_local =
-                        unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
                         let sources = unsafe {
@@ -879,28 +892,40 @@ where
                         .eval();
 
                         if nsources > 0 {
-                            let mut check_potential = rlst_col_vec![U, ncoeffs];
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 sources.data(),
                                 downward_surface,
                                 charges,
-                                check_potential.data_mut(),
+                                check_potential,
                             );
-                            let scale = self.fmm.kernel().scale(target.level());
-                            let mut tmp = self
-                                .fmm
-                                .dc2e_inv_1
-                                .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
-                            tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
-
-                            target_local
-                                .iter_mut()
-                                .zip(tmp.data())
-                                .for_each(|(r, &t)| *r += t);
                         }
                     }
                 }
+            });
+
+        // 2. Compute local expansion from check potential
+        self.level_locals[level as usize]
+            .par_iter()
+            .zip(check_potentials.par_chunks_exact(ncoeffs))
+            .for_each(|(local_ptr, check_potential)| {
+                let target_local =
+                    unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
+                let check_potential = unsafe {
+                    rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
+                };
+
+                let scale = self.fmm.kernel().scale(level);
+                let mut tmp = self
+                    .fmm
+                    .dc2e_inv_1
+                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
+
+                target_local
+                    .iter_mut()
+                    .zip(tmp.data())
+                    .for_each(|(r, &t)| *r += t);
             });
     }
 

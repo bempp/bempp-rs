@@ -524,7 +524,7 @@ mod test {
         }
         let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx];
         let leaf_idx = datatree.fmm.tree.get_leaf_index(leaf).unwrap();
-        let midx = datatree.fmm.tree().key_to_index.get(&leaf).unwrap();
+        let midx = datatree.fmm.tree().key_to_index.get(leaf).unwrap();
 
         let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
         let multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
@@ -555,7 +555,7 @@ mod test {
             EvalType::Value,
             leaf_coordinates.data(),
             &test_point,
-            &charges,
+            charges,
             &mut expected,
         );
 
