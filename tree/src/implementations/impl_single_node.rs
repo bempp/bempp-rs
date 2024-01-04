@@ -176,7 +176,7 @@ where
         }
     }
 
-    /// Constructor for uniform trees on a single node refined to a user defined depth.
+    /// Constructor for uniform trees on a single node refined to a user defined depth, however excludes empty nodes which don't contain particles.
     /// Returns a SingleNodeTree, with the leaves in sorted order.
     ///
     /// # Arguments
@@ -262,7 +262,6 @@ where
 
         // Group by level to perform efficient lookup of nodes
         keys.sort_by_key(|a| a.level());
-
 
         let mut levels_to_keys = HashMap::new();
         let mut curr = keys[0];

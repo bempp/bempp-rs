@@ -17,12 +17,6 @@ pub type GlobalIdx = usize;
 /// Type alias for mapping charge data to global indices.
 pub type ChargeDict<T> = HashMap<GlobalIdx, Charge<T>>;
 
-/// Type alias for multipole/local expansion containers.
-pub type Expansions<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
-
-/// Type alias for potential containers.
-pub type Potentials<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
-
 /// Type alias for approximation of FMM operator matrices.
 pub type C2EType<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
 
@@ -226,16 +220,20 @@ impl<T> Default for SendPtr<T> {
 #[cfg(test)]
 mod test {
 
-
+    use crate::{
+        charge::build_charge_dict,
+        types::{FmmDataUniform, KiFmmLinear},
+    };
     use bempp_field::types::FftFieldTranslationKiFmm;
-    use itertools::Itertools;
-    use bempp_tree::{implementations::helpers::points_fixture, types::single_node::SingleNodeTree};
-    use bempp_traits::tree::Tree;
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_traits::field::FieldTranslationData;
     use bempp_traits::fmm::Fmm;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use bempp_traits::tree::Tree;
+    use bempp_tree::{
+        implementations::helpers::points_fixture, types::single_node::SingleNodeTree,
+    };
+    use itertools::Itertools;
     use rlst::dense::RawAccess;
-    use crate::{charge::build_charge_dict, types::{FmmDataUniform, KiFmmLinear}};
 
     #[test]
     fn test_fmm_data_uniform() {

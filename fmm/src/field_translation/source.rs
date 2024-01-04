@@ -474,9 +474,6 @@ mod test {
         let abs_error = (expected[0] - found[0]).abs();
         let rel_error = abs_error / expected[0];
         assert!(rel_error <= 1e-5);
-
-        println!("multipole {:?}", rel_error);
-        assert!(false);
     }
 
     #[test]
@@ -531,22 +528,6 @@ mod test {
 
         let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
         let multipole = &datatree.multipoles[midx * ncoeffs..(midx + 1) * ncoeffs];
-        // let level_index_pointer = datatree.level_index_pointer[leaf.level() as usize].get(leaf).unwrap();
-        // let multipole_ptr = datatree.level_multipoles[leaf.level() as usize][*level_index_pointer];
-        // let multipole = unsafe { std::slice::from_raw_parts(multipole_ptr.raw, ncoeffs)};
-        // // println!("level index pointer {:?}", datatree.level_index_pointer[leaf.level() as usize]);
-        // // println!("multipole wrong {:?}", multipole_ptr.raw);
-
-        // // println!("leaf idx {:?}", leaf_idx);
-        // // println!("HERE {:?}", &datatree.multipoles[midx * ncoeffs]);
-
-        // let multipole_ptr = datatree.leaf_multipoles[*leaf_idx];
-        // let multipole = unsafe { std::slice::from_raw_parts(multipole_ptr.raw, ncoeffs)};
-        // println!("multipole right {:?}", multipole_ptr.raw);
-        // let keys = datatree.fmm.tree.get_all_keys().unwrap();
-        // let levels= keys.iter().map(|k| k.level()).collect_vec();
-        // println!("HERE {:?} {:?}", keys[73], leaf);
-        // assert!(false);
 
         let surface =
             leaf.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
@@ -588,7 +569,6 @@ mod test {
 
         let abs_error = (expected[0] - found[0]).abs();
         let rel_error = abs_error / expected[0];
-        println!("rel error {:?} {:?} {:?}", rel_error, expected, found);
         assert!(rel_error <= 1e-5);
     }
 
@@ -668,8 +648,6 @@ mod test {
         let abs_error = (expected[0] - found[0]).abs();
         let rel_error = abs_error / expected[0];
         assert!(rel_error <= 1e-5);
-        println!("multipole adaptive {:?}", rel_error);
-        assert!(false);
     }
 
     #[test]

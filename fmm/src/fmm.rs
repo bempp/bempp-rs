@@ -906,13 +906,13 @@ mod test {
 
         let m2l_data_fft =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-            // let m2l_data_svd = SvdFieldTranslationKiFmm::new(
-            //     kernel.clone(),
-            //     Some(1000),
-            //     order,
-            //     *tree.get_domain(),
-            //     alpha_inner,
-            // );
+        // let m2l_data_svd = SvdFieldTranslationKiFmm::new(
+        //     kernel.clone(),
+        //     Some(1000),
+        //     order,
+        //     *tree.get_domain(),
+        //     alpha_inner,
+        // );
 
         let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 

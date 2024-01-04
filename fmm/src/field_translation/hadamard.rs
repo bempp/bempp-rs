@@ -2,9 +2,8 @@
 use bempp_traits::types::Scalar;
 use num::complex::Complex;
 
-
 /// The 8x8 operation computed naively with Rust iterators, always inlined.
-/// 
+///
 /// # Arguments
 /// * - `kernel` - The kernel data for a specific translation for a specific frequency for a set of 8 siblings.
 /// * - `signal` - The signal data at a specific frequencty for a set of 8 siblings.

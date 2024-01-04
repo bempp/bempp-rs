@@ -1,4 +1,4 @@
-//! Field translations for Uniform and Adaptive Kernel Indepenent FMMs
+//! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -1158,7 +1158,6 @@ mod test {
 
     use crate::{
         charge::build_charge_dict,
-        field_translation::source,
         types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear},
     };
 

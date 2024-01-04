@@ -7,7 +7,7 @@ use num::Float;
 use crate::types::{Charge, ChargeDict, GlobalIdx};
 
 /// Zip together ordered list of global indices with their associated charges in a dictionary.
-/// 
+///
 /// # Arguments
 /// * `global_idxs` - Unique global index associated with charge.
 /// * `charges` - The charge associated with each unique global index.
