@@ -92,19 +92,19 @@ where
     pub multipoles: Vec<U>,
 
     /// Multipole expansions at leaf level
-    pub leaf_multipoles: Vec<SendPtrMut<U>>,
+    pub leaf_multipoles: Vec<Vec<SendPtrMut<U>>>,
 
     /// Multipole expansions at each level
-    pub level_multipoles: Vec<Vec<SendPtrMut<U>>>,
+    pub level_multipoles: Vec<Vec<Vec<SendPtrMut<U>>>>,
 
     /// The local expansion at each box
     pub locals: Vec<U>,
 
     /// Local expansions at the leaf level
-    pub leaf_locals: Vec<SendPtrMut<U>>,
+    pub leaf_locals: Vec<Vec<SendPtrMut<U>>>,
 
     /// The local expansion data at each level.
-    pub level_locals: Vec<Vec<SendPtrMut<U>>>,
+    pub level_locals: Vec<Vec<Vec<SendPtrMut<U>>>>,
 
     /// Index pointers to each key at a given level, indexed by level.
     pub level_index_pointer: Vec<HashMap<MortonKey, usize>>,

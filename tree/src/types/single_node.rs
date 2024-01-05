@@ -19,6 +19,9 @@ where
     /// Depth of a tree.
     pub depth: u64,
 
+    /// Whether the tree is adaptive.
+    pub adaptive: bool,
+
     /// Domain spanned by the points.
     pub domain: Domain<T>,
 
