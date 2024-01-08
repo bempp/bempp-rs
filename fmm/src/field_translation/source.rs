@@ -539,8 +539,7 @@ mod test {
         let kernel = Laplace3dKernel::default();
 
         // Create a tree
-        let tree =
-            SingleNodeTree::new(points, adaptive, None, Some(depth), global_idxs, false);
+        let tree = SingleNodeTree::new(points, adaptive, None, Some(depth), global_idxs, false);
 
         // Precompute the M2L data
         let m2l_data =
@@ -551,7 +550,7 @@ mod test {
         let charge_dicts: Vec<_> = (0..ncharge_vecs)
             .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
             .collect();
-        
+
         // Associate data with the FMM
         let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
 
@@ -680,7 +679,7 @@ mod test {
                 .iter_mut()
                 .enumerate()
                 .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
-            
+
             test_upward_pass_matrix_f64(points.data(), &global_idxs, &charge_mat)
         }
     }
@@ -879,14 +878,7 @@ mod test {
         let kernel = Laplace3dKernel::default();
 
         // Create a tree
-        let tree = SingleNodeTree::new(
-            points,
-            adaptive,
-            None,
-            Some(depth),
-            global_idxs,
-            sparse,
-        );
+        let tree = SingleNodeTree::new(points, adaptive, None, Some(depth), global_idxs, sparse);
 
         // Precompute the M2L data
         let m2l_data =
@@ -897,7 +889,7 @@ mod test {
         let charge_dicts: Vec<_> = (0..ncharge_vecs)
             .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
             .collect();
-        
+
         // Associate data with the FMM
         let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
 
@@ -1087,7 +1079,6 @@ mod test {
                 .iter_mut()
                 .enumerate()
                 .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
-
 
             test_p2m_matrix_f64(points.data(), &global_idxs, &charge_mat, false);
             test_p2m_matrix_f64(points.data(), &global_idxs, &charge_mat, true);
