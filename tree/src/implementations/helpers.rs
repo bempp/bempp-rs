@@ -17,8 +17,8 @@ pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 ///
 /// # Arguments
 /// * `npoints` - The number of points to sample.
-/// # `min` - The minumum coordinate value along each axis.
-/// # `max` - The maximum coordinate value along each axis.
+/// * `min` - The minumum coordinate value along each axis.
+/// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUniform>(
     npoints: usize,
     min: Option<T>,
@@ -49,8 +49,8 @@ pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUn
 ///
 /// # Arguments
 /// * `npoints` - The number of points to sample.
-/// # `min` - The minumum coordinate value along each axis.
-/// # `max` - The maximum coordinate value along each axis.
+/// * `min` - The minumum coordinate value along each axis.
+/// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture_sphere<T: Scalar + rand::distributions::uniform::SampleUniform>(
     npoints: usize,
 ) -> PointsMat<T> {

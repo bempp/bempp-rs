@@ -1,4 +1,4 @@
-/// Euclidean algorithm to find greatest common divisor less than max
+/// Euclidean algorithm to find greatest divisor of `n` less than or equal to `max_chunk_size`
 pub fn find_chunk_size(n: usize, max_chunk_size: usize) -> usize {
     let max_divisor = max_chunk_size;
     for divisor in (1..=max_divisor).rev() {
