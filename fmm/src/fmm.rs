@@ -7,7 +7,10 @@ use std::time::Instant;
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::{Eval, Transpose},
-    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer, DataContainer},
+    dense::{
+        rlst_dynamic_mat, rlst_pointer_mat, traits::*, DataContainer, Dot, MultiplyAdd,
+        VectorContainer,
+    },
 };
 
 use bempp_traits::{
@@ -553,7 +556,6 @@ where
         &self.tree
     }
 }
-
 
 impl<T, U> FmmLoop for FmmDataAdaptive<T, U>
 where

@@ -229,7 +229,7 @@ where
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_1: C2EType<W>,
-    
+
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_2: C2EType<W>,
@@ -237,7 +237,7 @@ where
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_1: C2EType<W>,
-    
+
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_2: C2EType<W>,
@@ -264,7 +264,6 @@ where
     pub m2l: V,
 }
 
-
 /// Type to store data associated with the kernel independent (KiFMM) in for matrix input FMMs.
 pub struct KiFmmLinearMatrix<T, U, V, W>
 where
@@ -279,7 +278,7 @@ where
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_1: C2EType<W>,
-    
+
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_2: C2EType<W>,
@@ -287,7 +286,7 @@ where
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_1: C2EType<W>,
-    
+
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_2: C2EType<W>,
@@ -313,7 +312,6 @@ where
     /// The M2L operator matrices, as well as metadata associated with this FMM.
     pub m2l: V,
 }
-
 
 /// A threadsafe mutable raw pointer
 #[derive(Clone, Debug, Copy)]
@@ -552,7 +550,7 @@ where
 
                 // Indexed by charge vec idx, then leaf
                 let mut potentials = vec![V::default(); npoints * ncharge_vectors];
-                
+
                 // Indexed by charge vec idx, then leaf.
                 let mut potentials_send_pointers =
                     vec![SendPtrMut::default(); nleaves * ncharge_vectors];
@@ -576,10 +574,8 @@ where
                 }
 
                 // Indexed by level, then by box, then by charge vec.
-                let mut level_multipoles =
-                    vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
-                let mut level_locals =
-                    vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
+                let mut level_multipoles = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
+                let mut level_locals = vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
 
                 // Indexed by level, gives key level index
                 let mut level_index_pointer =
@@ -597,10 +593,20 @@ where
                         let mut key_locals = Vec::new();
                         for charge_vec_idx in 0..ncharge_vectors {
                             let charge_vec_displacement = charge_vec_idx * ncoeffs;
-                            let raw = unsafe { multipoles.as_ptr().add(key_displacement + charge_vec_displacement) as *mut V };
+                            let raw = unsafe {
+                                multipoles
+                                    .as_ptr()
+                                    .add(key_displacement + charge_vec_displacement)
+                                    as *mut V
+                            };
                             key_multipoles.push(SendPtrMut { raw });
 
-                            let raw = unsafe { locals.as_ptr().add(key_displacement + charge_vec_displacement ) as *mut V};
+                            let raw = unsafe {
+                                locals
+                                    .as_ptr()
+                                    .add(key_displacement + charge_vec_displacement)
+                                    as *mut V
+                            };
                             key_locals.push(SendPtrMut { raw });
                         }
                         tmp_multipoles.push(key_multipoles);
@@ -626,18 +632,20 @@ where
                     let key_displacement = ncharge_vectors * ncoeffs * key_idx;
                     for charge_vec_idx in 0..ncharge_vectors {
                         let charge_vec_displacement = charge_vec_idx * ncoeffs;
-                        let raw = unsafe { multipoles
-                            .as_ptr()
-                            .add(charge_vec_displacement + key_displacement)
-                            as *mut V
+                        let raw = unsafe {
+                            multipoles
+                                .as_ptr()
+                                .add(charge_vec_displacement + key_displacement)
+                                as *mut V
                         };
 
                         leaf_multipoles[leaf_idx].push(SendPtrMut { raw });
-                        
-                        let raw = unsafe { locals
-                            .as_ptr()
-                            .add(charge_vec_displacement + key_displacement)
-                            as *mut V
+
+                        let raw = unsafe {
+                            locals
+                                .as_ptr()
+                                .add(charge_vec_displacement + key_displacement)
+                                as *mut V
                         };
                         leaf_locals[leaf_idx].push(SendPtrMut { raw });
                     }
@@ -650,8 +658,9 @@ where
                 // Get raw pointers to the head of each potential vector
                 let mut potential_raw_pointers = vec![potentials.as_mut_ptr(); ncharge_vectors];
                 for charge_vec_idx in 0..ncharge_vectors {
-                    potential_raw_pointers[charge_vec_idx] =
-                        unsafe { potential_raw_pointers[charge_vec_idx].add(charge_vec_idx * npoints) };
+                    potential_raw_pointers[charge_vec_idx] = unsafe {
+                        potential_raw_pointers[charge_vec_idx].add(charge_vec_idx * npoints)
+                    };
                 }
 
                 for (i, leaf) in leaves.iter().enumerate() {
@@ -1011,7 +1020,8 @@ mod test {
                 alpha_inner,
             );
 
-            let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+            let fmm =
+                KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
             // Form charge dicts, matching all charges with their associated global indices
             let mut charge_dicts = Vec::new();
@@ -1022,47 +1032,57 @@ mod test {
             let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
 
             // Test that the number of coefficients is being correctly assigned
-            assert_eq!(datatree.multipoles.len(), datatree.ncoeffs * datatree.nkeys * ncharge_vecs);
+            assert_eq!(
+                datatree.multipoles.len(),
+                datatree.ncoeffs * datatree.nkeys * ncharge_vecs
+            );
             assert_eq!(datatree.leaf_multipoles.len(), datatree.nleaves);
             for i in 0..datatree.nleaves {
                 assert_eq!(datatree.leaf_multipoles[i].len(), ncharge_vecs)
             }
-            assert_eq!(datatree.locals.len(), datatree.ncoeffs * datatree.nkeys * ncharge_vecs);
+            assert_eq!(
+                datatree.locals.len(),
+                datatree.ncoeffs * datatree.nkeys * ncharge_vecs
+            );
             assert_eq!(datatree.leaf_locals.len(), datatree.nleaves);
             for i in 0..datatree.nleaves {
                 assert_eq!(datatree.leaf_locals[i].len(), ncharge_vecs)
             }
 
             // Test that the leaf indices are being mapped correctly to leaf multipoles and locals
-            for (i, leaf_key) in datatree.fmm.tree().get_all_leaves().unwrap().iter().enumerate() { 
-                    
+            for (i, leaf_key) in datatree
+                .fmm
+                .tree()
+                .get_all_leaves()
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
                 let key_idx = datatree.fmm.tree().get_index(leaf_key).unwrap();
                 let key_displacement = key_idx * datatree.ncoeffs * ncharge_vecs;
-                
+
                 for charge_vec_idx in 0..ncharge_vecs {
                     let charge_vec_displacement = charge_vec_idx * datatree.ncoeffs;
-    
+
                     unsafe {
-    
-                        let result = datatree.leaf_multipoles[i][charge_vec_idx].raw as * const f64;
+                        let result = datatree.leaf_multipoles[i][charge_vec_idx].raw as *const f64;
                         let expected = datatree
                             .multipoles
                             .as_ptr()
                             .add(charge_vec_displacement + key_displacement);
-    
+
                         assert_eq!(result, expected);
-                        
-                        let result = datatree.leaf_locals[i][charge_vec_idx].raw as * const f64;
+
+                        let result = datatree.leaf_locals[i][charge_vec_idx].raw as *const f64;
                         let expected = datatree
                             .locals
                             .as_ptr()
                             .add(charge_vec_displacement + key_displacement);
-    
+
                         assert_eq!(result, expected);
                     }
                 }
             }
-          
 
             // Test that the level expansion information is referring to the correct memory, and is in correct shape
             assert_eq!(
@@ -1071,22 +1091,29 @@ mod test {
             );
 
             for level in 0..datatree.fmm.tree().get_depth() {
-                assert_eq!(datatree.level_multipoles[level as usize].len(), datatree.fmm.tree().get_keys(level).unwrap().len());
-                assert_eq!(datatree.level_multipoles[level as usize][0].len(), ncharge_vecs);
+                assert_eq!(
+                    datatree.level_multipoles[level as usize].len(),
+                    datatree.fmm.tree().get_keys(level).unwrap().len()
+                );
+                assert_eq!(
+                    datatree.level_multipoles[level as usize][0].len(),
+                    ncharge_vecs
+                );
             }
-            
+
             assert_eq!(
                 datatree.level_locals.len() as u64,
                 datatree.fmm.tree().get_depth() + 1
             );
 
             for level in 0..datatree.fmm.tree().get_depth() {
-                assert_eq!(datatree.level_locals[level as usize].len(), datatree.fmm.tree().get_keys(level).unwrap().len());
+                assert_eq!(
+                    datatree.level_locals[level as usize].len(),
+                    datatree.fmm.tree().get_keys(level).unwrap().len()
+                );
                 assert_eq!(datatree.level_locals[level as usize][0].len(), ncharge_vecs);
             }
-
         }
-
     }
 
     #[test]
