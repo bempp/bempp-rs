@@ -7,10 +7,7 @@ use std::time::Instant;
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::{Eval, Transpose},
-    dense::{
-        rlst_dynamic_mat, rlst_pointer_mat, traits::*, DataContainer, Dot, MultiplyAdd,
-        VectorContainer,
-    },
+    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
 use bempp_traits::{
@@ -22,7 +19,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
+use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinearMatrix};
 use crate::{
     pinv::{pinv, SvdScalar},
     types::KiFmmLinear,
@@ -455,7 +452,7 @@ where
         let mut m2m = Vec::new();
         let mut l2l = Vec::new();
 
-        for (i, child) in children.iter().enumerate() {
+        for child in children.iter() {
             let child_upward_equivalent_surface =
                 child.compute_surface(tree.get_domain(), order, alpha_inner);
             let child_downward_check_surface =

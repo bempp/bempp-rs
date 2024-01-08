@@ -656,11 +656,10 @@ where
                 let mut charge_index_pointer = vec![(0usize, 0usize); nleaves];
 
                 // Get raw pointers to the head of each potential vector
-                let mut potential_raw_pointers = vec![potentials.as_mut_ptr(); ncharge_vectors];
-                for charge_vec_idx in 0..ncharge_vectors {
-                    potential_raw_pointers[charge_vec_idx] = unsafe {
-                        potential_raw_pointers[charge_vec_idx].add(charge_vec_idx * npoints)
-                    };
+                let mut potential_raw_pointers = Vec::with_capacity(ncharge_vectors);
+                for (charge_vec_idx, _) in (0..ncharge_vectors).enumerate() {
+                    let ptr = unsafe { potentials.as_mut_ptr().add(charge_vec_idx * npoints) };
+                    potential_raw_pointers.push(ptr);
                 }
 
                 for (i, leaf) in leaves.iter().enumerate() {
@@ -690,10 +689,8 @@ where
                     index_pointer += npoints;
 
                     // Update raw pointers with the number of points at this leaf
-                    for j in 0..ncharge_vectors {
-                        unsafe {
-                            potential_raw_pointers[j] = potential_raw_pointers[j].add(npoints)
-                        };
+                    for ptr in potential_raw_pointers.iter_mut() {
+                        *ptr = unsafe { ptr.add(npoints) };
                     }
                 }
 
@@ -989,9 +986,10 @@ mod test {
         let points = points_fixture::<f64>(npoints, None, None);
         let global_idxs = (0..npoints).collect_vec();
         let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
-        for i in 0..ncharge_vecs {
-            charge_mat[i] = vec![i as f64 + 1.0; npoints]
-        }
+        charge_mat
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
 
         let order = 8;
         let alpha_inner = 1.05;
@@ -1024,10 +1022,9 @@ mod test {
                 KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
             // Form charge dicts, matching all charges with their associated global indices
-            let mut charge_dicts = Vec::new();
-            for i in 0..ncharge_vecs {
-                charge_dicts.push(build_charge_dict(&global_idxs, &charge_mat[i]))
-            }
+            let charge_dicts: Vec<_> = (0..ncharge_vecs)
+                .map(|i| build_charge_dict(&global_idxs, &charge_mat[i]))
+                .collect();
 
             let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
 
