@@ -7,7 +7,7 @@ use std::time::Instant;
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::{Eval, Transpose},
-    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer, DataContainer},
 };
 
 use bempp_traits::{
@@ -19,7 +19,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix};
+use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
 use crate::{
     pinv::{pinv, SvdScalar},
     types::KiFmmLinear,
@@ -290,6 +290,270 @@ where
         &self.tree
     }
 }
+
+/// Implementation of constructor for single node KiFMM
+impl<'a, T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
+where
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
+    U: FieldTranslationData<T>,
+    V: Scalar<Real = V> + Default + Float,
+    SvdScalar<V>: PartialOrd,
+    SvdScalar<V>: Scalar + Float + ToPrimitive,
+    DenseMatrixLinAlgBuilder<V>: Svd,
+    V: MultiplyAdd<
+        V,
+        VectorContainer<V>,
+        VectorContainer<V>,
+        VectorContainer<V>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
+    SvdScalar<V>: MultiplyAdd<
+        SvdScalar<V>,
+        VectorContainer<SvdScalar<V>>,
+        VectorContainer<SvdScalar<V>>,
+        VectorContainer<SvdScalar<V>>,
+        Dynamic,
+        Dynamic,
+        Dynamic,
+    >,
+{
+    /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
+    /// the associated single node octree, and the associated kernel function.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `alpha_inner` - The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    /// * `alpha_order` - The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    /// * `kernel` - The kernel function for this FMM.
+    /// * `tree` - The type of tree associated with this FMM, can be single or multi node.
+    /// * `m2l` - The M2L operator matrices, as well as metadata associated with this FMM.
+    pub fn new(
+        order: usize,
+        alpha_inner: V,
+        alpha_outer: V,
+        kernel: T,
+        tree: SingleNodeTree<V>,
+        m2l: U,
+    ) -> Self {
+        let upward_equivalent_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
+        let upward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
+        let downward_equivalent_surface =
+            ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
+        let downward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
+
+        let nequiv_surface = upward_equivalent_surface.len() / kernel.space_dimension();
+        let ncheck_surface = upward_check_surface.len() / kernel.space_dimension();
+
+        // Store in RLST matrices
+        let upward_equivalent_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, upward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
+        };
+        let upward_check_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, upward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
+        };
+        let downward_equivalent_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, downward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
+        };
+        let downward_check_surface = unsafe {
+            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
+        };
+
+        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
+        // as well as their inverses using DGESVD.
+        let mut uc2e = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+        kernel.assemble_st(
+            EvalType::Value,
+            upward_equivalent_surface.data(),
+            upward_check_surface.data(),
+            uc2e.data_mut(),
+        );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let uc2e = uc2e.transpose().eval();
+
+        let mut dc2e = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+        kernel.assemble_st(
+            EvalType::Value,
+            downward_equivalent_surface.data(),
+            downward_check_surface.data(),
+            dc2e.data_mut(),
+        );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let dc2e = dc2e.transpose().eval();
+
+        let (s, ut, v) = pinv::<V>(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_mat![SvdScalar<V>, (s.len(), s.len())];
+        for i in 0..s.len() {
+            mat_s[[i, i]] = SvdScalar::<V>::from_real(s[i]);
+        }
+        let uc2e_inv_1 = v.dot(&mat_s);
+        let uc2e_inv_2 = ut;
+
+        let uc2e_inv_1_shape = uc2e_inv_1.shape();
+        let uc2e_inv_2_shape = uc2e_inv_2.shape();
+
+        let uc2e_inv_1 = uc2e_inv_1
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let uc2e_inv_1 = unsafe {
+            rlst_pointer_mat!['a, V, uc2e_inv_1.as_ptr(), uc2e_inv_1_shape, (1, uc2e_inv_1_shape.0)]
+        }
+        .eval();
+        let uc2e_inv_2 = uc2e_inv_2
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let uc2e_inv_2 = unsafe {
+            rlst_pointer_mat!['a, V, uc2e_inv_2.as_ptr(), uc2e_inv_2_shape, (1, uc2e_inv_2_shape.0)]
+        }
+        .eval();
+
+        let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_mat![SvdScalar<V>, (s.len(), s.len())];
+        for i in 0..s.len() {
+            mat_s[[i, i]] = SvdScalar::<V>::from_real(s[i]);
+        }
+
+        let dc2e_inv_1 = v.dot(&mat_s);
+        let dc2e_inv_2 = ut;
+
+        let dc2e_inv_1_shape = dc2e_inv_1.shape();
+        let dc2e_inv_2_shape = dc2e_inv_2.shape();
+
+        let dc2e_inv_1 = dc2e_inv_1
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let dc2e_inv_1 = unsafe {
+            rlst_pointer_mat!['a, V, dc2e_inv_1.as_ptr(), dc2e_inv_1_shape, (1, dc2e_inv_1_shape.0)]
+        }
+        .eval();
+        let dc2e_inv_2 = dc2e_inv_2
+            .data()
+            .iter()
+            .map(|x| V::from(*x).unwrap())
+            .collect_vec();
+        let dc2e_inv_2 = unsafe {
+            rlst_pointer_mat!['a, V, dc2e_inv_2.as_ptr(), dc2e_inv_2_shape, (1, dc2e_inv_2_shape.0)]
+        }
+        .eval();
+
+        // Calculate M2M/L2L matrices
+        let children = ROOT.children();
+        let mut m2m = Vec::new();
+        let mut l2l = Vec::new();
+
+        for (i, child) in children.iter().enumerate() {
+            let child_upward_equivalent_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_downward_check_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_upward_equivalent_surface = unsafe {
+                rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, child_upward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
+            };
+            let child_downward_check_surface = unsafe {
+                rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, child_downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
+            };
+
+            let mut pc2ce = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+
+            kernel.assemble_st(
+                EvalType::Value,
+                child_upward_equivalent_surface.data(),
+                upward_check_surface.data(),
+                pc2ce.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let pc2ce = pc2ce.transpose().eval();
+
+            let tmp = uc2e_inv_1.dot(&uc2e_inv_2.dot(&pc2ce)).eval();
+            m2m.push(tmp);
+
+            let mut cc2pe = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+
+            kernel.assemble_st(
+                EvalType::Value,
+                downward_equivalent_surface.data(),
+                child_downward_check_surface.data(),
+                cc2pe.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let cc2pe = cc2pe.transpose().eval();
+            let mut tmp = dc2e_inv_1.dot(&dc2e_inv_2.dot(&cc2pe)).eval();
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|d| *d *= kernel.scale(child.level()));
+
+            l2l.push(tmp);
+        }
+
+        Self {
+            order,
+            uc2e_inv_1,
+            uc2e_inv_2,
+            dc2e_inv_1,
+            dc2e_inv_2,
+            alpha_inner,
+            alpha_outer,
+            m2m,
+            l2l,
+            kernel,
+            tree,
+            m2l,
+        }
+    }
+}
+
+impl<T, U, V, W> KiFmmTrait for KiFmmLinearMatrix<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_inner
+    }
+
+    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_outer
+    }
+}
+
+impl<T, U, V, W> Fmm for KiFmmLinearMatrix<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    type Tree = T;
+    type Kernel = U;
+
+    fn order(&self) -> usize {
+        self.order
+    }
+
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
+
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
+    }
+}
+
 
 impl<T, U> FmmLoop for FmmDataAdaptive<T, U>
 where

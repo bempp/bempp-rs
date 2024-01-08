@@ -229,11 +229,17 @@ where
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_1: C2EType<W>,
+    
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_2: C2EType<W>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_1: C2EType<W>,
+    
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_2: C2EType<W>,
 
     /// The ratio of the inner check surface diamater in comparison to the surface discretising a box.
@@ -257,6 +263,57 @@ where
     /// The M2L operator matrices, as well as metadata associated with this FMM.
     pub m2l: V,
 }
+
+
+/// Type to store data associated with the kernel independent (KiFMM) in for matrix input FMMs.
+pub struct KiFmmLinearMatrix<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    /// The expansion order
+    pub order: usize,
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_1: C2EType<W>,
+    
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_2: C2EType<W>,
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_1: C2EType<W>,
+    
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_2: C2EType<W>,
+
+    /// The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    pub alpha_inner: W,
+
+    /// The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    pub alpha_outer: W,
+
+    /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
+    pub m2m: Vec<C2EType<W>>,
+
+    /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
+    pub l2l: Vec<C2EType<W>>,
+
+    /// The tree (single or multi node) associated with this FMM
+    pub tree: T,
+
+    /// The kernel associated with this FMM.
+    pub kernel: U,
+
+    /// The M2L operator matrices, as well as metadata associated with this FMM.
+    pub m2l: V,
+}
+
 
 /// A threadsafe mutable raw pointer
 #[derive(Clone, Debug, Copy)]
@@ -466,7 +523,7 @@ where
 }
 
 /// Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U, V> FmmDataUniformMatrix<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
@@ -478,7 +535,7 @@ where
     /// `fmm` - A single node KiFMM object.
     /// `global_charges` - The charge data associated to the point data via unique global indices.
     pub fn new(
-        fmm: KiFmmLinear<SingleNodeTree<V>, T, U, V>,
+        fmm: KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>,
         global_charges: &[ChargeDict<V>],
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
@@ -903,7 +960,7 @@ where
 mod test {
     use crate::{
         charge::build_charge_dict,
-        types::{FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear},
+        types::{FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix},
     };
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -954,7 +1011,7 @@ mod test {
                 alpha_inner,
             );
 
-            let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+            let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
             // Form charge dicts, matching all charges with their associated global indices
             let mut charge_dicts = Vec::new();
