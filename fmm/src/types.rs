@@ -1,9 +1,9 @@
 //! Data structures FMM data and metadata.
 use std::collections::HashMap;
 
+use bempp_traits::fmm::KiFmm;
 use bempp_traits::kernel::ScaleInvariantKernel;
 use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
-use bempp_traits::fmm::KiFmm;
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
 use cauchy::Scalar;
@@ -135,6 +135,18 @@ where
 
     /// Index pointer between leaf keys and charges
     pub charge_index_pointer: Vec<(usize, usize)>,
+
+    /// Number of charge vectors being processed
+    pub ncharge_vectors: usize,
+
+    /// Number of keys
+    pub nkeys: usize,
+
+    /// Number of leaves
+    pub nleaves: usize,
+
+    /// Number of coefficients in local and multipole expansions
+    pub ncoeffs: usize,
 
     /// Scales of each leaf operator
     pub scales: Vec<U>,
@@ -279,7 +291,6 @@ impl<T> Default for SendPtr<T> {
     }
 }
 
-
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
@@ -335,7 +346,7 @@ where
                 let mut tmp_multipoles = Vec::new();
                 let mut tmp_locals = Vec::new();
                 for (level_idx, key) in keys.iter().enumerate() {
-                    let idx = fmm.tree().key_to_index.get(key).unwrap();
+                    let idx = fmm.tree().get_index(key).unwrap();
                     unsafe {
                         let raw = multipoles.as_ptr().add(ncoeffs * idx) as *mut V;
                         tmp_multipoles.push(SendPtrMut { raw });
@@ -352,7 +363,7 @@ where
             let mut leaf_locals = Vec::new();
 
             for leaf in fmm.tree.get_all_leaves().unwrap().iter() {
-                let i = fmm.tree.key_to_index.get(leaf).unwrap();
+                let i = fmm.tree.get_index(leaf).unwrap();
                 unsafe {
                     let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
                     leaf_multipoles.push(SendPtrMut { raw });
@@ -482,10 +493,13 @@ where
                 let multipoles = vec![V::default(); ncoeffs * nkeys * ncharge_vectors];
                 let locals = vec![V::default(); ncoeffs * nkeys * ncharge_vectors];
 
+                // Indexed by charge vec idx, then leaf
                 let mut potentials = vec![V::default(); npoints * ncharge_vectors];
+                
+                // Indexed by charge vec idx, then leaf.
                 let mut potentials_send_pointers =
                     vec![SendPtrMut::default(); nleaves * ncharge_vectors];
-                let mut scales = vec![V::default(); nleaves * ncoeffs];
+                let mut scales = vec![V::default(); nleaves * ncoeffs * ncharge_vectors];
 
                 let mut charges = vec![V::default(); npoints * ncharge_vectors];
                 let global_indices = vec![0usize; npoints];
@@ -504,11 +518,11 @@ where
                     }
                 }
 
-                // Indexed by level, then by charge vector
+                // Indexed by level, then by box, then by charge vec.
                 let mut level_multipoles =
-                    vec![vec![Vec::new(); ncharge_vectors]; (fmm.tree().get_depth() + 1) as usize];
+                    vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
                 let mut level_locals =
-                    vec![vec![Vec::new(); ncharge_vectors]; (fmm.tree().get_depth() + 1) as usize];
+                    vec![Vec::new(); (fmm.tree().get_depth() + 1) as usize];
 
                 // Indexed by level, gives key level index
                 let mut level_index_pointer =
@@ -517,29 +531,26 @@ where
                 for level in 0..=fmm.tree().get_depth() {
                     let keys = fmm.tree().get_keys(level).unwrap();
 
-                    for charge_vec_idx in 0..ncharge_vectors {
-                        let mut tmp_multipoles = Vec::new();
-                        let mut tmp_locals = Vec::new();
-                        for key in keys.iter() {
-                            let key_idx = fmm.tree().key_to_index.get(key).unwrap();
-                            let charge_vec_displacement = charge_vec_idx * ncoeffs * nkeys;
-                            let expansion_displacement = ncoeffs * key_idx;
-                            unsafe {
-                                let raw = multipoles
-                                    .as_ptr()
-                                    .add(charge_vec_displacement + expansion_displacement)
-                                    as *mut V;
-                                tmp_multipoles.push(SendPtrMut { raw });
-                                let raw = locals
-                                    .as_ptr()
-                                    .add(charge_vec_displacement + expansion_displacement)
-                                    as *mut V;
-                                tmp_locals.push(SendPtrMut { raw })
-                            }
+                    let mut tmp_multipoles = Vec::new();
+                    let mut tmp_locals = Vec::new();
+                    for key in keys.iter() {
+                        let &key_idx = fmm.tree().get_index(key).unwrap();
+                        let key_displacement = key_idx * ncoeffs * ncharge_vectors;
+                        let mut key_multipoles = Vec::new();
+                        let mut key_locals = Vec::new();
+                        for charge_vec_idx in 0..ncharge_vectors {
+                            let charge_vec_displacement = charge_vec_idx * ncoeffs;
+                            let raw = unsafe { multipoles.as_ptr().add(key_displacement + charge_vec_displacement) as *mut V };
+                            key_multipoles.push(SendPtrMut { raw });
+
+                            let raw = unsafe { locals.as_ptr().add(key_displacement + charge_vec_displacement ) as *mut V};
+                            key_locals.push(SendPtrMut { raw });
                         }
-                        level_multipoles[level as usize][charge_vec_idx] = tmp_multipoles;
-                        level_locals[level as usize][charge_vec_idx] = tmp_locals;
+                        tmp_multipoles.push(key_multipoles);
+                        tmp_locals.push(key_locals);
                     }
+                    level_multipoles[level as usize] = tmp_multipoles;
+                    level_locals[level as usize] = tmp_locals;
                 }
 
                 for level in 0..=fmm.tree().get_depth() {
@@ -549,28 +560,29 @@ where
                     }
                 }
 
-                // Indexed by charge vector
-                let mut leaf_multipoles = vec![Vec::new(); ncharge_vectors];
-                let mut leaf_locals = vec![Vec::new(); ncharge_vectors];
+                // Indexed by leaf
+                let mut leaf_multipoles = vec![Vec::new(); nleaves];
+                let mut leaf_locals = vec![Vec::new(); nleaves];
 
-                for charge_vec_idx in 0..ncharge_vectors {
-                    for leaf in fmm.tree().get_all_leaves().unwrap().iter() {
-                        let key_idx = fmm.tree().key_to_index.get(leaf).unwrap();
-                        let charge_vec_displacement = charge_vec_idx * ncoeffs * nkeys;
-                        let expansion_displacement = ncoeffs * key_idx;
-                        unsafe {
-                            let raw = multipoles
-                                .as_ptr()
-                                .add(charge_vec_displacement + expansion_displacement)
-                                as *mut V;
-                            leaf_multipoles[charge_vec_idx].push(SendPtrMut { raw });
+                for (leaf_idx, leaf) in fmm.tree().get_all_leaves().unwrap().iter().enumerate() {
+                    let key_idx = fmm.tree().get_index(leaf).unwrap();
+                    let key_displacement = ncharge_vectors * ncoeffs * key_idx;
+                    for charge_vec_idx in 0..ncharge_vectors {
+                        let charge_vec_displacement = charge_vec_idx * ncoeffs;
+                        let raw = unsafe { multipoles
+                            .as_ptr()
+                            .add(charge_vec_displacement + key_displacement)
+                            as *mut V
+                        };
 
-                            let raw = locals
-                                .as_ptr()
-                                .add(charge_vec_displacement + expansion_displacement)
-                                as *mut V;
-                            leaf_locals[charge_vec_idx].push(SendPtrMut { raw });
-                        }
+                        leaf_multipoles[leaf_idx].push(SendPtrMut { raw });
+                        
+                        let raw = unsafe { locals
+                            .as_ptr()
+                            .add(charge_vec_displacement + key_displacement)
+                            as *mut V
+                        };
+                        leaf_locals[leaf_idx].push(SendPtrMut { raw });
                     }
                 }
 
@@ -580,9 +592,9 @@ where
 
                 // Get raw pointers to the head of each potential vector
                 let mut potential_raw_pointers = vec![potentials.as_mut_ptr(); ncharge_vectors];
-                for i in 0..ncharge_vectors {
-                    potential_raw_pointers[i] =
-                        unsafe { potential_raw_pointers[i].add(i * npoints) };
+                for charge_vec_idx in 0..ncharge_vectors {
+                    potential_raw_pointers[charge_vec_idx] =
+                        unsafe { potential_raw_pointers[charge_vec_idx].add(charge_vec_idx * npoints) };
                 }
 
                 for (i, leaf) in leaves.iter().enumerate() {
@@ -682,6 +694,10 @@ where
                     potentials_send_pointers,
                     charges,
                     charge_index_pointer,
+                    ncharge_vectors,
+                    nkeys,
+                    nleaves,
+                    ncoeffs,
                     scales,
                     global_indices,
                 });
@@ -749,7 +765,7 @@ where
                     let mut tmp_multipoles = Vec::new();
                     let mut tmp_locals = Vec::new();
                     for (level_idx, key) in keys.iter().enumerate() {
-                        let &idx = fmm.tree().key_to_index.get(key).unwrap();
+                        let &idx = fmm.tree().get_index(key).unwrap();
                         unsafe {
                             let raw = multipoles.as_ptr().add(idx * ncoeffs) as *mut V;
                             tmp_multipoles.push(SendPtrMut { raw });
@@ -767,7 +783,7 @@ where
                 let mut leaf_locals = Vec::new();
 
                 for leaf in fmm.tree.get_all_leaves().unwrap().iter() {
-                    let i = fmm.tree.key_to_index.get(leaf).unwrap();
+                    let i = fmm.tree.get_index(leaf).unwrap();
                     unsafe {
                         let raw = multipoles.as_ptr().add(i * ncoeffs) as *mut V;
                         leaf_multipoles.push(SendPtrMut { raw });
@@ -883,12 +899,11 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::{
         charge::build_charge_dict,
-        types::{FmmDataUniform, KiFmmLinear},
+        types::{FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear},
     };
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -900,6 +915,122 @@ mod test {
     };
     use itertools::Itertools;
     use rlst::dense::RawAccess;
+
+    #[test]
+    fn test_fmm_data_uniform_matrix() {
+        let npoints = 10000;
+        let ncharge_vecs = 10;
+        let points = points_fixture::<f64>(npoints, None, None);
+        let global_idxs = (0..npoints).collect_vec();
+        let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
+        for i in 0..ncharge_vecs {
+            charge_mat[i] = vec![i as f64 + 1.0; npoints]
+        }
+
+        let order = 8;
+        let alpha_inner = 1.05;
+        let alpha_outer = 2.95;
+        let ncrit = 150;
+        let depth = 3;
+
+        // Uniform trees, with matrix of charges
+        {
+            let adaptive = false;
+            let kernel = Laplace3dKernel::default();
+
+            let tree = SingleNodeTree::new(
+                points.data(),
+                adaptive,
+                Some(ncrit),
+                Some(depth),
+                &global_idxs[..],
+                false,
+            );
+
+            let m2l_data = FftFieldTranslationKiFmm::new(
+                kernel.clone(),
+                order,
+                *tree.get_domain(),
+                alpha_inner,
+            );
+
+            let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+
+            // Form charge dicts, matching all charges with their associated global indices
+            let mut charge_dicts = Vec::new();
+            for i in 0..ncharge_vecs {
+                charge_dicts.push(build_charge_dict(&global_idxs, &charge_mat[i]))
+            }
+
+            let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
+
+            // Test that the number of coefficients is being correctly assigned
+            assert_eq!(datatree.multipoles.len(), datatree.ncoeffs * datatree.nkeys * ncharge_vecs);
+            assert_eq!(datatree.leaf_multipoles.len(), datatree.nleaves);
+            for i in 0..datatree.nleaves {
+                assert_eq!(datatree.leaf_multipoles[i].len(), ncharge_vecs)
+            }
+            assert_eq!(datatree.locals.len(), datatree.ncoeffs * datatree.nkeys * ncharge_vecs);
+            assert_eq!(datatree.leaf_locals.len(), datatree.nleaves);
+            for i in 0..datatree.nleaves {
+                assert_eq!(datatree.leaf_locals[i].len(), ncharge_vecs)
+            }
+
+            // Test that the leaf indices are being mapped correctly to leaf multipoles and locals
+            for (i, leaf_key) in datatree.fmm.tree().get_all_leaves().unwrap().iter().enumerate() { 
+                    
+                let key_idx = datatree.fmm.tree().get_index(leaf_key).unwrap();
+                let key_displacement = key_idx * datatree.ncoeffs * ncharge_vecs;
+                
+                for charge_vec_idx in 0..ncharge_vecs {
+                    let charge_vec_displacement = charge_vec_idx * datatree.ncoeffs;
+    
+                    unsafe {
+    
+                        let result = datatree.leaf_multipoles[i][charge_vec_idx].raw as * const f64;
+                        let expected = datatree
+                            .multipoles
+                            .as_ptr()
+                            .add(charge_vec_displacement + key_displacement);
+    
+                        assert_eq!(result, expected);
+                        
+                        let result = datatree.leaf_locals[i][charge_vec_idx].raw as * const f64;
+                        let expected = datatree
+                            .locals
+                            .as_ptr()
+                            .add(charge_vec_displacement + key_displacement);
+    
+                        assert_eq!(result, expected);
+                    }
+                }
+            }
+          
+
+            // Test that the level expansion information is referring to the correct memory, and is in correct shape
+            assert_eq!(
+                datatree.level_multipoles.len() as u64,
+                datatree.fmm.tree().get_depth() + 1
+            );
+
+            for level in 0..datatree.fmm.tree().get_depth() {
+                assert_eq!(datatree.level_multipoles[level as usize].len(), datatree.fmm.tree().get_keys(level).unwrap().len());
+                assert_eq!(datatree.level_multipoles[level as usize][0].len(), ncharge_vecs);
+            }
+            
+            assert_eq!(
+                datatree.level_locals.len() as u64,
+                datatree.fmm.tree().get_depth() + 1
+            );
+
+            for level in 0..datatree.fmm.tree().get_depth() {
+                assert_eq!(datatree.level_locals[level as usize].len(), datatree.fmm.tree().get_keys(level).unwrap().len());
+                assert_eq!(datatree.level_locals[level as usize][0].len(), ncharge_vecs);
+            }
+
+        }
+
+    }
 
     #[test]
     fn test_fmm_data_uniform() {
@@ -936,6 +1067,7 @@ mod test {
             );
 
             let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+
             // Form charge dict, matching charges with their associated global indices
             let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);
 
@@ -948,6 +1080,8 @@ mod test {
             // Test that the number of of coefficients is being correctly assigned
             assert_eq!(datatree.multipoles.len(), ncoeffs * nkeys);
             assert_eq!(datatree.leaf_multipoles.len(), nleaves);
+            assert_eq!(datatree.locals.len(), ncoeffs * nkeys);
+            assert_eq!(datatree.leaf_locals.len(), nleaves);
 
             // Test that leaf indices are being mapped correctly to leaf multipoles
             let idx = 0;

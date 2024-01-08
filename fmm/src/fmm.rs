@@ -7,9 +7,7 @@ use std::time::Instant;
 use rlst::{
     algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
     common::traits::{Eval, Transpose},
-    dense::{
-        rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer,
-    },
+    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
 };
 
 use bempp_traits::{
@@ -253,8 +251,6 @@ where
         }
     }
 }
-
-
 
 impl<T, U, V, W> KiFmmTrait for KiFmmLinear<T, U, V, W>
 where
