@@ -6,7 +6,10 @@ use num::traits::Num;
 
 use bempp_tools::Array3D;
 use rlst_common::types::Scalar;
-use rlst_dense::{rlst_dynamic_array3, traits::{Shape, RandomAccessByRef, RandomAccessMut}};
+use rlst_dense::{
+    rlst_dynamic_array3,
+    traits::{RandomAccessByRef, RandomAccessMut, Shape},
+};
 
 /// Return indices that sort a vec.
 ///
@@ -114,14 +117,14 @@ mod test {
             }
         }
         let result = flip3(&arr);
-        assert_relative_eq!(*arr.get([0, 0, 0]).unwrap(), 7.0);
-        assert_relative_eq!(*arr.get([0, 0, 1]).unwrap(), 3.0);
-        assert_relative_eq!(*arr.get([0, 1, 0]).unwrap(), 5.0);
-        assert_relative_eq!(*arr.get([0, 1, 1]).unwrap(), 1.0);
-        assert_relative_eq!(*arr.get([1, 0, 0]).unwrap(), 6.0);
-        assert_relative_eq!(*arr.get([1, 0, 1]).unwrap(), 2.0);
-        assert_relative_eq!(*arr.get([1, 1, 0]).unwrap(), 4.0);
-        assert_relative_eq!(*arr.get([1, 1, 1]).unwrap(), 0.0);
+        assert_relative_eq!(*result.get([0, 0, 0]).unwrap(), 7.0);
+        assert_relative_eq!(*result.get([0, 0, 1]).unwrap(), 3.0);
+        assert_relative_eq!(*result.get([0, 1, 0]).unwrap(), 5.0);
+        assert_relative_eq!(*result.get([0, 1, 1]).unwrap(), 1.0);
+        assert_relative_eq!(*result.get([1, 0, 0]).unwrap(), 6.0);
+        assert_relative_eq!(*result.get([1, 0, 1]).unwrap(), 2.0);
+        assert_relative_eq!(*result.get([1, 1, 0]).unwrap(), 4.0);
+        assert_relative_eq!(*result.get([1, 1, 1]).unwrap(), 0.0);
     }
 
     #[test]
@@ -161,7 +164,10 @@ mod test {
         for i in 0..dim {
             for j in 0..dim {
                 for k in 0..dim {
-                    assert_eq!(*padded.get([i, j, k]).unwrap(), *input.get([i, j, k]).unwrap())
+                    assert_eq!(
+                        *padded.get([i, j, k]).unwrap(),
+                        *input.get([i, j, k]).unwrap()
+                    )
                 }
             }
         }
