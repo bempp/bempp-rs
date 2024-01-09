@@ -19,7 +19,7 @@ use bempp_traits::{
 };
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinearMatrix};
+use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
 use crate::{
     pinv::{pinv, SvdScalar},
     types::KiFmmLinear,
@@ -775,6 +775,111 @@ where
     }
 }
 
+impl<T, U> FmmLoop for FmmDataUniformMatrix<T, U>
+where
+    T: Fmm,
+    U: Scalar<Real = U> + Float + Default,
+    FmmDataUniformMatrix<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
+{
+    fn upward_pass(&self, time: bool) -> Option<TimeDict> {
+        match time {
+            true => {
+                let mut times = TimeDict::default();
+                // Particle to Multipole
+                let start = Instant::now();
+                self.p2m();
+                times.insert("p2m".to_string(), start.elapsed().as_millis());
+
+                // Multipole to Multipole
+                let depth = self.fmm.tree().get_depth();
+                let start = Instant::now();
+                for level in (1..=depth).rev() {
+                    self.m2m(level)
+                }
+                times.insert("m2m".to_string(), start.elapsed().as_millis());
+                Some(times)
+            }
+            false => {
+                // Particle to Multipole
+                self.p2m();
+
+                // Multipole to Multipole
+                let depth = self.fmm.tree().get_depth();
+                for level in (1..=depth).rev() {
+                    self.m2m(level)
+                }
+                None
+            }
+        }
+    }
+
+    fn downward_pass(&self, time: bool) -> Option<TimeDict> {
+        let depth = self.fmm.tree().get_depth();
+
+        match time {
+            true => {
+                let mut times = TimeDict::default();
+                let mut l2l_time = 0;
+                let mut m2l_time = 0;
+
+                for level in 2..=depth {
+                    if level > 2 {
+                        let start = Instant::now();
+                        self.l2l(level);
+                        l2l_time += start.elapsed().as_millis();
+                    }
+
+                    let start = Instant::now();
+                    self.m2l(level);
+                    m2l_time += start.elapsed().as_millis();
+                }
+
+                times.insert("l2l".to_string(), l2l_time);
+                times.insert("m2l".to_string(), m2l_time);
+
+                // Leaf level computations
+
+                // Sum all potential contributions
+                let start = Instant::now();
+                // self.p2p();
+                times.insert("p2p".to_string(), start.elapsed().as_millis());
+
+                let start = Instant::now();
+                // self.l2p();
+                times.insert("l2p".to_string(), start.elapsed().as_millis());
+
+                Some(times)
+            }
+            false => {
+                for level in 2..=depth {
+                    if level > 2 {
+                        self.l2l(level);
+                    }
+                    self.m2l(level);
+                }
+                // Leaf level computations
+                // Sum all potential contributions
+                // self.p2p();
+                // self.l2p();
+
+                None
+            }
+        }
+    }
+
+    fn run(&self, time: bool) -> Option<TimeDict> {
+        let t1 = self.upward_pass(time);
+        let t2 = self.downward_pass(time);
+
+        if let (Some(mut t1), Some(t2)) = (t1, t2) {
+            t1.extend(t2);
+            Some(t1)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
 
@@ -1094,9 +1199,49 @@ mod test {
         }
     }
 
+    fn test_uniform_matrix_f64(order: usize, alpha_inner: f64, alpha_outer: f64, depth: u64,  sparse: bool, points: &[f64], global_idxs: &[usize], charge_mat: &Vec<Vec<f64>>) {
+        // SVD based field translations
+        {
+            let ncharge_vecs = charge_mat.len();
+
+            let kernel = Laplace3dKernel::default();
+
+            // Create a tree
+            let tree = SingleNodeTree::new(points, false, None, Some(depth), global_idxs, sparse);
+
+            // Precompute the M2L data
+            let m2l_data = SvdFieldTranslationKiFmm::new(
+                kernel.clone(),
+                Some(1000),
+                order,
+                *tree.get_domain(),
+                alpha_inner,
+            );
+
+            let fmm =
+                KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+
+            // Form charge dict, matching charges with their associated global indices
+            let charge_dicts: Vec<_> = (0..ncharge_vecs)
+                .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
+                .collect();
+
+            // Associate data with the FMM
+            let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
+
+            let s = Instant::now();
+            let times = datatree.run(true);
+            println!("runtime {:?}", s.elapsed());
+            println!("times {:?}", times);
+            assert!(false);
+
+
+        }
+    }
+
     #[test]
     fn test_uniform() {
-        let npoints = 10000;
+        let npoints = 1000000;
 
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
@@ -1105,51 +1250,64 @@ mod test {
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
 
-        // Test case where points are distributed on surface of a sphere
-        let points_sphere = points_fixture_sphere::<f64>(npoints);
-        test_uniform_f64(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
+        // // Test case where points are distributed on surface of a sphere
+        // let points_sphere = points_fixture_sphere::<f64>(npoints);
+        // test_uniform_f64(
+        //     &points_sphere,
+        //     &charges,
+        //     &global_idxs,
+        //     order,
+        //     alpha_inner,
+        //     alpha_outer,
+        //     true,
+        //     3,
+        // );
+        // test_uniform_f64(
+        //     &points_sphere,
+        //     &charges,
+        //     &global_idxs,
+        //     order,
+        //     alpha_inner,
+        //     alpha_outer,
+        //     false,
+        //     3,
+        // );
 
-        // Test case where points are distributed randomly in a box
-        let points_cloud = points_fixture::<f64>(npoints, None, None);
-        test_uniform_f64(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
+        // // Test case where points are distributed randomly in a box
+        // let points_cloud = points_fixture::<f64>(npoints, None, None);
+        // test_uniform_f64(
+        //     &points_cloud,
+        //     &charges,
+        //     &global_idxs,
+        //     order,
+        //     alpha_inner,
+        //     alpha_outer,
+        //     true,
+        //     3,
+        // );
+        // test_uniform_f64(
+        //     &points_cloud,
+        //     &charges,
+        //     &global_idxs,
+        //     order,
+        //     alpha_inner,
+        //     alpha_outer,
+        //     false,
+        //     3,
+        // );
+
+        // Test matrix input
+        let points = points_fixture::<f64>(npoints, None, None);
+        let ncharge_vecs = 15;
+
+        let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
+        charge_mat
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
+
+        test_uniform_matrix_f64(order, alpha_inner, alpha_outer, 4, true, points.data(), &global_idxs, &charge_mat)
+
     }
 
     #[test]

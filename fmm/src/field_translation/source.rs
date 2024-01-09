@@ -420,12 +420,12 @@ where
                         let sibling_displacement = i * self.ncoeffs * self.ncharge_vectors;
                         let ptr = unsafe { child_multipoles.as_ptr().add(sibling_displacement) };
                         let child_multipoles_i = unsafe { rlst_pointer_mat!['a, V, ptr, (self.ncoeffs, self.ncharge_vectors), (1, self.ncoeffs)] };
-                        let parent_multipole_i = self.fmm.m2m[i].dot(&child_multipoles_i).eval();
+                        let result_i = self.fmm.m2m[i].dot(&child_multipoles_i).eval();
 
                         for (j, send_ptr) in parent_multipole_pointers.iter().enumerate().take(self.ncharge_vectors) {
                             let raw = send_ptr.raw;
                             let parent_multipole_j = unsafe { std::slice::from_raw_parts_mut(raw, self.ncoeffs) };
-                            let parent_multipole_ij = &parent_multipole_i.data()[j*self.ncoeffs..(j+1)*self.ncoeffs];
+                            let parent_multipole_ij = &result_i.data()[j*self.ncoeffs..(j+1)*self.ncoeffs];
                             parent_multipole_j.iter_mut().zip(parent_multipole_ij.iter()).for_each(|(p, r)| *p += *r);
                         }
                     }
