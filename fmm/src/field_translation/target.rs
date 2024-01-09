@@ -67,22 +67,36 @@ where
 
         parent_locals
             .par_chunks_exact(chunk_size)
-            .zip(child_locals.par_chunks_exact(nsiblings*chunk_size))
+            .zip(child_locals.par_chunks_exact(nsiblings * chunk_size))
             .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-
                 let mut parent_locals = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
-                for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk.iter().enumerate().take(chunk_size) {
-                    parent_locals.data_mut()[chunk_idx*ncoeffs..(chunk_idx+1)*ncoeffs].copy_from_slice(unsafe{std::slice::from_raw_parts_mut(parent_local_pointer.raw, ncoeffs)});
+                for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
+                    .iter()
+                    .enumerate()
+                    .take(chunk_size)
+                {
+                    parent_locals.data_mut()[chunk_idx * ncoeffs..(chunk_idx + 1) * ncoeffs]
+                        .copy_from_slice(unsafe {
+                            std::slice::from_raw_parts_mut(parent_local_pointer.raw, ncoeffs)
+                        });
                 }
 
                 for i in 0..nsiblings {
                     let tmp = self.fmm.l2l[i].dot(&parent_locals).eval();
 
                     for j in 0..chunk_size {
-                        let chunk_displacement = j*nsiblings;
+                        let chunk_displacement = j * nsiblings;
                         let child_displacement = chunk_displacement + i;
-                        let child_local = unsafe { std::slice::from_raw_parts_mut(child_local_pointers_chunk[child_displacement].raw, ncoeffs)};
-                        child_local.iter_mut().zip(&tmp.data()[j*ncoeffs..(j+1)*ncoeffs]).for_each(|(l, t)| *l += *t);
+                        let child_local = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                child_local_pointers_chunk[child_displacement].raw,
+                                ncoeffs,
+                            )
+                        };
+                        child_local
+                            .iter_mut()
+                            .zip(&tmp.data()[j * ncoeffs..(j + 1) * ncoeffs])
+                            .for_each(|(l, t)| *l += *t);
                     }
                 }
             });
@@ -482,7 +496,8 @@ where
             .into_par_iter()
             .zip(child_locals.par_chunks_exact(nsiblings))
             .for_each(|(parent_local_pointers, child_locals_pointers)| {
-                let mut parent_locals = rlst_dynamic_array2!(V, [self.ncoeffs, self.ncharge_vectors]);
+                let mut parent_locals =
+                    rlst_dynamic_array2!(V, [self.ncoeffs, self.ncharge_vectors]);
 
                 for (charge_vec_idx, parent_local_pointer) in parent_local_pointers
                     .iter()
@@ -575,7 +590,7 @@ where
             leaves
                 .par_iter()
                 .zip(&self.charge_index_pointer)
-                .zip(&self.potentials_send_pointers[i*self.nleaves..(i+1)*self.nleaves])
+                .zip(&self.potentials_send_pointers[i * self.nleaves..(i + 1) * self.nleaves])
                 .for_each(|((leaf, charge_index_pointer), potential_send_pointer)| {
                     let targets =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
@@ -592,7 +607,8 @@ where
                                 .clone()
                                 .map(|&idx| {
                                     let index_pointer = &self.charge_index_pointer[idx];
-                                    &self.charges[charge_vec_displacement + index_pointer.0..charge_vec_displacement + index_pointer.1]
+                                    &self.charges[charge_vec_displacement + index_pointer.0
+                                        ..charge_vec_displacement + index_pointer.1]
                                 })
                                 .collect_vec();
 

@@ -320,32 +320,33 @@ pub mod uniform {
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
                 .for_each(|(check_potential_chunk, local_ptrs)| {
                     // Map to surface grid
-                    let mut potential_buffer = vec![U::zero(); ncoeffs * nsiblings];
+                    let mut potential_chunk = rlst_dynamic_array2!(U, [ncoeffs, nsiblings]);
+
                     for i in 0..nsiblings {
-                        let tmp = &mut potential_buffer[i * ncoeffs..(i + 1) * ncoeffs];
-                        let check_potential = &check_potential_chunk[i * size..(i + 1) * size];
-                        for (surf_idx, &conv_idx) in self.fmm.m2l.conv_to_surf_map.iter().enumerate() {
-                            tmp[surf_idx] = check_potential[conv_idx];
+                        for (surf_idx, &conv_idx) in
+                            self.fmm.m2l.conv_to_surf_map.iter().enumerate()
+                        {
+                            unsafe {
+                                *potential_chunk.get_unchecked_mut([surf_idx, i]) =
+                                    check_potential_chunk[i * size + conv_idx];
+                            }
                         }
                     }
 
                     // Can now find local expansion coefficients
-                    let potential_chunk = unsafe {
-                        rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
-                    };
-
-                    let local_chunk = self
-                        .fmm
-                        .dc2e_inv_1
-                        .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
-                        .eval();
+                    let local_chunk = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>()
+                            .simple_mult_into_resize(self.fmm.dc2e_inv_2.view(), potential_chunk),
+                    );
 
                     local_chunk
                         .data()
                         .chunks_exact(ncoeffs)
                         .zip(local_ptrs)
                         .for_each(|(result, local)| {
-                            let local = unsafe { std::slice::from_raw_parts_mut(local.raw, ncoeffs) };
+                            let local =
+                                unsafe { std::slice::from_raw_parts_mut(local.raw, ncoeffs) };
                             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                         });
                 });
@@ -376,8 +377,7 @@ pub mod uniform {
             + Default,
         DenseMatrixLinAlgBuilder<U>: Svd,
         U: Scalar<Real = U>,
-        U: Float
-            + Default,
+        U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
     {
         fn p2l(&self, _level: u64) {}
@@ -428,12 +428,22 @@ pub mod uniform {
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-            let multipoles = unsafe {
-                rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
-            };
 
-            let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-            let c_dim = (nrows, self.fmm.m2l.k);
+            // TODO: remove memory assignment?
+            let mut multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
+            for j in 0..nsources {
+                for i in 0..ncoeffs {
+                    unsafe {
+                        *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles
+                            [level as usize][0]
+                            .raw
+                            .add(j * ncoeffs + i);
+                    }
+                }
+            }
+
+            let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+            let c_dim = [nrows, self.fmm.m2l.k];
 
             let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
 
@@ -506,8 +516,7 @@ pub mod uniform {
                 + Default,
             DenseMatrixLinAlgBuilder<U>: Svd,
             U: Scalar<Real = U>,
-            U: Float
-                + Default,
+            U: Float + Default,
             U: std::marker::Send + std::marker::Sync + Default,
         {
             fn p2l(&self, _level: u64) {}
@@ -558,12 +567,23 @@ pub mod uniform {
                 }
 
                 // Interpret multipoles as a matrix
-                let multipoles = unsafe {
-                    rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0][0].raw, (self.ncoeffs, nsources * self.ncharge_vectors), (1, self.ncoeffs)]
-                };
 
-                let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-                let c_dim = (nrows, self.fmm.m2l.k);
+                // TODO: remove memory assignment
+                let mut multipoles =
+                    rlst_dynamic_array2!(U, [self.ncoeffs, nsources * self.ncharge_vectors]);
+                for j in 0..nsources * self.ncharge_vectors {
+                    for i in 0..self.ncoeffs {
+                        unsafe {
+                            *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles
+                                [level as usize][0][0]
+                                .raw
+                                .add(j * ncoeffs * self.ncharge_vectors + i);
+                        }
+                    }
+                }
+
+                let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+                let c_dim = [nrows, self.fmm.m2l.k];
 
                 let mut compressed_multipoles =
                     self.fmm.m2l.operator_data.st_block.dot(&multipoles);
@@ -750,15 +770,9 @@ pub mod adaptive {
                             let nsources = sources.len() / dim;
 
                             if nsources > 0 {
-
-                                let sources = unsafe {
-                                    rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                                }
-                                .eval();
-
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    sources.data(),
+                                    &sources,
                                     downward_surface,
                                     charges,
                                     check_potential,
@@ -775,15 +789,19 @@ pub mod adaptive {
                 .for_each(|(local_ptr, check_potential)| {
                     let target_local =
                         unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-                    let check_potential = unsafe {
-                        rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
-                    };
+
+                    // TODO: remove memory assignment
+                    let check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
+                    check_potential_mat.fill_from_slice(check_potential);
 
                     let scale = self.fmm.kernel().scale(level);
-                    let mut tmp = self
-                        .fmm
-                        .dc2e_inv_1
-                        .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                    let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.dc2e_inv_2.view(),
+                            check_potential_mat,
+                        ),
+                    );
                     tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 
                     target_local
@@ -1070,8 +1088,7 @@ pub mod adaptive {
             + Default,
         DenseMatrixLinAlgBuilder<U>: Svd,
         U: Scalar<Real = U>,
-        U: Float
-            + Default,
+        U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
     {
         fn p2l<'a>(&self, level: u64) {
