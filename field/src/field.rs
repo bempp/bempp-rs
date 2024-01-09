@@ -112,9 +112,9 @@ where
 
         u.fill_from(u_big.into_subview([0, 0], [mu, self.k]));
         vt.fill_from(vt_big.into_subview([0, 0], [self.k, nvt]));
-        for j in 0..self.k {
+        for (j, s) in sigma.iter().enumerate() {
             unsafe {
-                *sigma_mat.get_unchecked_mut([j, j]) = T::from(sigma[j]).unwrap();
+                *sigma_mat.get_unchecked_mut([j, j]) = T::from(*s).unwrap();
             }
         }
 
