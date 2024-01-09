@@ -546,7 +546,7 @@ where
     fn m2p<'a>(&self) {}
 
     fn l2p<'a>(&self) {
-        let Some(_leaves) = self.fmm.tree().get_all_leaves()  else {
+        let Some(_leaves) = self.fmm.tree().get_all_leaves() else {
             return;
         };
 
