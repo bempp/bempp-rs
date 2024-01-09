@@ -43,7 +43,10 @@ where
     >,
 {
     fn l2l<'a>(&self, level: u64) {
-        let Some(child_targets) = self.fmm.tree().get_keys(level) else { return; };
+        let Some(child_targets) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
         let nsiblings = 8;
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
@@ -96,7 +99,10 @@ where
     fn m2p<'a>(&self) {}
 
     fn l2p<'a>(&self) {
-        let Some(_leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(_leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
@@ -143,7 +149,10 @@ where
     }
 
     fn p2p<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let dim = self.fmm.kernel.space_dimension();
 
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
@@ -226,7 +235,10 @@ where
     >,
 {
     fn l2l<'a>(&self, level: u64) {
-        let Some(child_targets) = self.fmm.tree().get_keys(level) else { return; };
+        let Some(child_targets) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
         let nsiblings = 8;
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
@@ -275,7 +287,10 @@ where
     }
 
     fn m2p<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let dim = self.fmm.kernel.space_dimension();
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
@@ -328,7 +343,10 @@ where
     }
 
     fn l2p<'a>(&self) {
-        let Some(_leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(_leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
@@ -375,7 +393,10 @@ where
     }
 
     fn p2p<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let dim = self.fmm.kernel.space_dimension();
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
         leaves
@@ -458,7 +479,10 @@ where
     >,
 {
     fn l2l<'a>(&self, level: u64) {
-        let Some(child_targets) = self.fmm.tree().get_keys(level) else { return; };
+        let Some(child_targets) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
         let nsiblings = 8;
 
         let parent_sources: HashSet<MortonKey> =
@@ -522,7 +546,9 @@ where
     fn m2p<'a>(&self) {}
 
     fn l2p<'a>(&self) {
-        let Some(_leaves) = self.fmm.tree().get_all_leaves()  else { return; };
+        let Some(_leaves) = self.fmm.tree().get_all_leaves()  else {
+            return;
+        };
 
         let surface_size = self.ncoeffs * self.fmm.kernel.space_dimension();
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
@@ -563,7 +589,9 @@ where
     }
 
     fn p2p<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
 
         let dim = self.fmm.kernel.space_dimension();
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();

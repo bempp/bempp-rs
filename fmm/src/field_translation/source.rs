@@ -43,7 +43,10 @@ where
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let nleaves = leaves.len();
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
@@ -107,7 +110,10 @@ where
 
     /// Multipole to multipole translations, multithreaded over all boxes at a given level.
     fn m2m<'a>(&self, level: u64) {
-        let Some(child_sources) = self.fmm.tree().get_keys(level) else { return; };
+        let Some(child_sources) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
         let nsiblings = 8;
 
@@ -175,7 +181,10 @@ where
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let nleaves = leaves.len();
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
@@ -238,7 +247,10 @@ where
 
     /// Multipole to multipole translations, multithreaded over all boxes at a given level.
     fn m2m<'a>(&self, level: u64) {
-        let Some(child_sources) = self.fmm.tree().get_keys(level) else { return; };
+        let Some(child_sources) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
         let nsiblings = 8;
 
@@ -307,7 +319,10 @@ where
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
-        let Some(_leaves) = self.fmm.tree().get_all_leaves() else { return; };
+        let Some(_leaves) = self.fmm.tree().get_all_leaves() else {
+            return;
+        };
+
         let surface_size = self.ncoeffs * self.fmm.kernel.space_dimension();
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
         let dim = self.fmm.kernel.space_dimension();
@@ -373,7 +388,10 @@ where
 
     /// Multipole to multipole translations, multithreaded over all boxes at a given level.
     fn m2m<'a>(&self, level: u64) {
-        let Some(child_sources) = self.fmm.tree().get_keys(level) else { return; };
+        let Some(child_sources) = self.fmm.tree().get_keys(level) else {
+            return;
+        };
+
         let nsiblings = 8;
 
         // 1. Lookup parents and corresponding children that exist for this set of sources
