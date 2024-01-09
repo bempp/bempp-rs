@@ -95,14 +95,14 @@ where
 
         let mut u_big = rlst_dynamic_array2!(T, [mu, mu]);
         let mut sigma = vec![T::zero(); mu];
-        let mut vt_big = rlst_dynamic_array2!(T, [nvt, nvt]);
+        let mut vt_big = rlst_dynamic_array2!(T, [mu, nvt]);
 
         se2tc_fat
             .into_svd_alloc(
                 u_big.view_mut(),
                 vt_big.view_mut(),
                 &mut sigma[..],
-                SvdMode::Full,
+                SvdMode::Reduced,
             )
             .unwrap();
 
@@ -121,12 +121,17 @@ where
         // Store compressed M2L operators
         let thin_nrows = se2tc_thin.shape()[0];
         let nst = se2tc_thin.shape()[1];
-        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, thin_nrows]);
+        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, nst]);
         let mut _r = vec![T::zero(); nst];
         let mut st = rlst_dynamic_array2!(T, [nst, nst]);
 
         se2tc_thin
-            .into_svd_alloc(_gamma.view_mut(), st.view_mut(), &mut _r[..], SvdMode::Full)
+            .into_svd_alloc(
+                _gamma.view_mut(),
+                st.view_mut(),
+                &mut _r[..],
+                SvdMode::Reduced,
+            )
             .unwrap();
 
         let mut s_block = rlst_dynamic_array2!(T, [nst, self.k]);
@@ -184,7 +189,6 @@ where
             operator_data: SvdM2lOperatorData::default(),
             transfer_vectors: vec![],
         };
-
         let ncoeffs = result.ncoeffs(order);
         if let Some(k) = k {
             // Compression rank <= number of coefficients
@@ -196,7 +200,6 @@ where
         } else {
             result.k = 50;
         }
-
         result.transfer_vectors = compute_transfer_vectors();
         result.operator_data = result.compute_m2l_operators(order, domain);
 
