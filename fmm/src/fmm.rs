@@ -841,11 +841,11 @@ where
 
                 // Sum all potential contributions
                 let start = Instant::now();
-                // self.p2p();
+                self.p2p();
                 times.insert("p2p".to_string(), start.elapsed().as_millis());
 
                 let start = Instant::now();
-                // self.l2p();
+                self.l2p();
                 times.insert("l2p".to_string(), start.elapsed().as_millis());
 
                 Some(times)
@@ -859,8 +859,8 @@ where
                 }
                 // Leaf level computations
                 // Sum all potential contributions
-                // self.p2p();
-                // self.l2p();
+                self.p2p();
+                self.l2p();
 
                 None
             }
@@ -1027,9 +1027,7 @@ mod test {
 
             let all_charges = charge_dict.into_values().collect_vec();
 
-            let kernel = Laplace3dKernel::default();
-
-            kernel.evaluate_st(
+            datatree.fmm.kernel().evaluate_st(
                 EvalType::Value,
                 points.data(),
                 leaf_coordinates.data(),
@@ -1086,6 +1084,7 @@ mod test {
                     test_idx_vec.push(idx);
                 }
             }
+
             let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
 
             let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
@@ -1199,7 +1198,16 @@ mod test {
         }
     }
 
-    fn test_uniform_matrix_f64(order: usize, alpha_inner: f64, alpha_outer: f64, depth: u64,  sparse: bool, points: &[f64], global_idxs: &[usize], charge_mat: &Vec<Vec<f64>>) {
+    fn test_uniform_matrix_f64(
+        order: usize,
+        alpha_inner: f64,
+        alpha_outer: f64,
+        depth: u64,
+        sparse: bool,
+        points: &[f64],
+        global_idxs: &[usize],
+        charge_mat: &Vec<Vec<f64>>,
+    ) {
         // SVD based field translations
         {
             let ncharge_vecs = charge_mat.len();
@@ -1233,9 +1241,54 @@ mod test {
             let times = datatree.run(true);
             println!("runtime {:?}", s.elapsed());
             println!("times {:?}", times);
-            assert!(false);
+            // assert!(false);
+            // Test that direct computation is close to the FMM.
+            let mut test_idx_vec = Vec::new();
+            for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
+                if index_pointer.1 - index_pointer.0 > 0 {
+                    test_idx_vec.push(idx);
+                }
+            }
+            let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
+
+            let &leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
+            let (l, r) = datatree.charge_index_pointer[leaf_idx];
+
+            let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
+            let (l, r) = datatree.charge_index_pointer[leaf_idx];
+            let leaf_coordinates = &coordinates[l * 3..r * 3];
+
+            let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+
+            let leaf_coordinates = unsafe {
+                rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
+            }.eval();
 
 
+            for i in 0..datatree.ncharge_vectors {
+                let potentials_ptr = datatree.potentials_send_pointers[i*datatree.nleaves + leaf_idx].raw;
+                let potentials = unsafe { std::slice::from_raw_parts(potentials_ptr, ntargets) };
+
+                let all_charges = &charge_dicts[i].values().cloned().collect_vec();
+
+                let mut direct = vec![0f64; ntargets];
+
+                datatree.fmm.kernel().evaluate_st(
+                    EvalType::Value,
+                    points,
+                    leaf_coordinates.data(),
+                    &all_charges,
+                    &mut direct
+                );
+
+                let abs_error: f64 = potentials
+                    .iter()
+                    .zip(direct.iter())
+                    .map(|(a, b)| (a - b).abs())
+                    .sum();
+                let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+                assert!(rel_error <= 1e-5);
+            }
         }
     }
 
@@ -1298,7 +1351,7 @@ mod test {
 
         // Test matrix input
         let points = points_fixture::<f64>(npoints, None, None);
-        let ncharge_vecs = 15;
+        let ncharge_vecs = 3;
 
         let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
         charge_mat
@@ -1306,8 +1359,16 @@ mod test {
             .enumerate()
             .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
 
-        test_uniform_matrix_f64(order, alpha_inner, alpha_outer, 4, true, points.data(), &global_idxs, &charge_mat)
-
+        test_uniform_matrix_f64(
+            order,
+            alpha_inner,
+            alpha_outer,
+            4,
+            true,
+            points.data(),
+            &global_idxs,
+            &charge_mat,
+        )
     }
 
     #[test]

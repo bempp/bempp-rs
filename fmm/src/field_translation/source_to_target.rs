@@ -636,7 +636,8 @@ pub mod uniform {
                                     result_idx * self.ncoeffs * self.ncharge_vectors;
                                 let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
 
-                                let result = &locals.data()[key_displacement + charge_vec_displacement
+                                let result = &locals.data()[key_displacement
+                                    + charge_vec_displacement
                                     ..key_displacement + charge_vec_displacement + self.ncoeffs];
                                 local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                             }
