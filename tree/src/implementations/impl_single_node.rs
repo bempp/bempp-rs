@@ -161,6 +161,7 @@ where
 
         SingleNodeTree {
             depth,
+            adaptive: false,
             points,
             coordinates,
             global_indices,
@@ -304,6 +305,7 @@ where
         }
         SingleNodeTree {
             depth,
+            adaptive: false,
             points,
             coordinates,
             global_indices,
@@ -474,6 +476,7 @@ where
 
         SingleNodeTree {
             depth,
+            adaptive: true,
             points,
             coordinates,
             global_indices,
