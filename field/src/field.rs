@@ -79,34 +79,23 @@ where
             let mut tmp_gram = rlst_dynamic_array2!(T, [nsources, ntargets]);
             tmp_gram.fill_from(tmp_gram_t.transpose());
 
-            let block_size = nrows * ncols;
-            let start_idx = i * block_size;
-            let end_idx = start_idx + block_size;
             let mut block = se2tc_fat
                 .view_mut()
-                .into_subview([0, nrows], [start_idx, end_idx]);
+                .into_subview([0, i * ncols], [nrows, ncols]);
             block.fill_from(tmp_gram.view());
 
-            for j in 0..ncols {
-                let start_idx = j * ntransfer_vectors * nrows + i * nrows;
-                let end_idx = start_idx + nrows;
-                let mut block_column = se2tc_thin
-                    .view_mut()
-                    .into_subview([start_idx, end_idx], [0, ncols]);
-                let gram_column = tmp_gram
-                    .view()
-                    .into_subview([j * ncols, j * ncols + ncols], [0, ntargets]);
-                block_column.fill_from(gram_column);
-            }
+            let mut block_column = se2tc_thin
+                .view_mut()
+                .into_subview([i * nrows, 0], [nrows, ncols]);
+            block_column.fill_from(tmp_gram.view());
         }
 
         let mu = se2tc_fat.shape()[0];
         let nvt = se2tc_fat.shape()[1];
-        let b = std::cmp::min(mu, nvt);
 
-        let mut u_big = rlst_dynamic_array2!(T, [mu, b]);
-        let mut sigma = vec![T::zero(); b];
-        let mut vt_big = rlst_dynamic_array2!(T, [b, nvt]);
+        let mut u_big = rlst_dynamic_array2!(T, [mu, mu]);
+        let mut sigma = vec![T::zero(); mu];
+        let mut vt_big = rlst_dynamic_array2!(T, [nvt, nvt]);
 
         se2tc_fat
             .into_svd_alloc(
@@ -119,19 +108,11 @@ where
 
         let mut u = rlst_dynamic_array2!(T, [mu, self.k]);
         let mut sigma_mat = rlst_dynamic_array2!(T, [self.k, self.k]);
-        let mut vt = rlst_dynamic_array2!(T, [mu, self.k]);
+        let mut vt = rlst_dynamic_array2!(T, [self.k, nvt]);
 
+        u.fill_from(u_big.into_subview([0, 0], [mu, self.k]));
+        vt.fill_from(vt_big.into_subview([0, 0], [self.k, nvt]));
         for j in 0..self.k {
-            for i in 0..mu {
-                unsafe {
-                    *u.get_unchecked_mut([i, j]) = *u_big.get_unchecked([i, j]);
-                }
-            }
-            for i in 0..nvt {
-                unsafe {
-                    *vt.get_unchecked_mut([j, i]) = *vt_big.get_unchecked([j, i]);
-                }
-            }
             unsafe {
                 *sigma_mat.get_unchecked_mut([j, j]) = T::from(sigma[j]).unwrap();
             }
@@ -140,10 +121,9 @@ where
         // Store compressed M2L operators
         let thin_nrows = se2tc_thin.shape()[0];
         let nst = se2tc_thin.shape()[1];
-        let c = std::cmp::min(thin_nrows, nst);
-        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, c]);
-        let mut st = rlst_dynamic_array2!(T, [c, nst]);
-        let mut _r = vec![T::zero(); c];
+        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, thin_nrows]);
+        let mut _r = vec![T::zero(); nst];
+        let mut st = rlst_dynamic_array2!(T, [nst, nst]);
 
         se2tc_thin
             .into_svd_alloc(_gamma.view_mut(), st.view_mut(), &mut _r[..], SvdMode::Full)
@@ -159,9 +139,7 @@ where
         let mut c = rlst_dynamic_array2!(T, [self.k, self.k * ntransfer_vectors]);
 
         for i in 0..self.transfer_vectors.len() {
-            let vt_block = vt
-                .view()
-                .into_subview([0, self.k], [i * ncols, (i + 1) * ncols]);
+            let vt_block = vt.view().into_subview([0, i * ncols], [self.k, ncols]);
 
             let mut tmp0 = rlst_dynamic_array2!(T, [vt_block.shape()[0], s_block.shape()[1]]);
             tmp0.view_mut()
@@ -172,7 +150,7 @@ where
                 .simple_mult_into(sigma_mat.view(), tmp0.view());
 
             c.view_mut()
-                .into_subview([0, self.k], [i * self.k, (i + 1) * self.k])
+                .into_subview([0, i * self.k], [self.k, self.k])
                 .fill_from(tmp);
         }
 
@@ -692,7 +670,7 @@ mod test {
         let c_sub = svd
             .operator_data
             .c
-            .into_subview([0, nrows], [c_idx * svd.k, (c_idx + 1) * svd.k]);
+            .into_subview([0, c_idx * svd.k], [nrows, svd.k]);
 
         let mut compressed_multipole = rlst_dynamic_array2!(
             f64,
