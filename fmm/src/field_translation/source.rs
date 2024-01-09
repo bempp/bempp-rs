@@ -419,13 +419,14 @@ where
             .zip(self.leaf_multipoles.into_par_iter())
             .zip(self.scales.par_chunks_exact(self.ncoeffs))
             .for_each(|((check_potential, multipole_ptrs), scale)| {
-                let mut scaled_check_potential = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
-                for j in 0..chunk_size {
-                    for i in 0..ncoeffs {
+                let mut scaled_check_potential =
+                    rlst_dynamic_array2!(V, [self.ncoeffs, self.ncharge_vectors]);
+                for j in 0..self.ncharge_vectors {
+                    for i in 0..self.ncoeffs {
                         unsafe {
                             // TODO: scale[i] or scale[j]
                             *scaled_check_potential.get_unchecked_mut([i, j]) =
-                                check_potential[j * ncoeffs + i] * scale[0];
+                                check_potential[j * self.ncoeffs + i] * scale[0];
                         }
                     }
                 }
