@@ -3,7 +3,7 @@
 members = [
     "bem",
     "element",
-#    "fmm",
+    "fmm",
     "field",
     "grid",
     "hyksort",
@@ -19,7 +19,7 @@ resolver = "2"
 default-members = [
     "bem",
     "element",
-#    "fmm",
+    "fmm",
     "field",
     "grid",
     "hyksort",

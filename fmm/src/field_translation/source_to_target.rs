@@ -14,17 +14,20 @@ use bempp_traits::{
     fmm::{Fmm, InteractionLists},
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::EvalType,
+    types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use crate::helpers::find_chunk_size;
 use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
 
-use rlst::{
-    algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
-    common::traits::*,
-    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+use rlst_blis::interface::gemm::Gemm;
+use rlst_dense::{
+    array::{empty_array, Array},
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    rlst_dynamic_array2,
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut},
 };
 
 use super::hadamard::matmul8x8;
@@ -38,15 +41,6 @@ where
         + Default,
     U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
     Complex<U>: Scalar,
-    U: MultiplyAdd<
-        U,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        Dynamic,
-        Dynamic,
-        Dynamic,
-    >,
 {
     fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
         let nneighbors = 26;
@@ -98,15 +92,6 @@ where
         + Default,
     U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
     Complex<U>: Scalar,
-    U: MultiplyAdd<
-        U,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        Dynamic,
-        Dynamic,
-        Dynamic,
-    >,
 {
     fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
         let nneighbors = 26;
@@ -156,18 +141,11 @@ where
         + ScaleInvariantKernel<T = U>
         + std::marker::Send
         + std::marker::Sync
-        + Default,
-    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        + Default
+        + Scalar
+        + Gemm,
+    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
     Complex<U>: Scalar,
-    U: MultiplyAdd<
-        U,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        Dynamic,
-        Dynamic,
-        Dynamic,
-    >,
 {
     fn p2l(&self, _level: u64) {}
 
@@ -388,26 +366,25 @@ where
             .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
             .for_each(|(check_potential_chunk, local_ptrs)| {
                 // Map to surface grid
-                let mut potential_buffer = vec![U::zero(); ncoeffs * nsiblings];
+                let mut potential_chunk = rlst_dynamic_array2!(U, [ncoeffs, nsiblings]);
+
                 for i in 0..nsiblings {
-                    let tmp = &mut potential_buffer[i * ncoeffs..(i + 1) * ncoeffs];
-                    let check_potential = &check_potential_chunk[i * size..(i + 1) * size];
                     for (surf_idx, &conv_idx) in self.fmm.m2l.conv_to_surf_map.iter().enumerate() {
-                        tmp[surf_idx] = check_potential[conv_idx];
+                        unsafe {
+                            *potential_chunk.get_unchecked_mut([surf_idx, i]) =
+                                check_potential_chunk[i * size + conv_idx];
+                        }
                     }
                 }
 
                 // Can now find local expansion coefficients
-                let potential_chunk = unsafe {
-                    rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
-                };
-
-                let local_chunk = self
-                    .fmm
-                    .dc2e_inv_1
-                    .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
-                    .eval();
-
+                let local_chunk = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_2.view(),
+                        potential_chunk.view(),
+                    ),
+                );
 
                 local_chunk
                     .data()
@@ -442,17 +419,8 @@ where
         + std::marker::Send
         + std::marker::Sync
         + Default,
-    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+    U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
     Complex<U>: Scalar,
-    U: MultiplyAdd<
-        U,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        VectorContainer<U>,
-        Dynamic,
-        Dynamic,
-        Dynamic,
-    >,
 {
     fn p2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -507,15 +475,9 @@ where
                         let nsources = sources.len() / dim;
 
                         if nsources > 0 {
-
-                            let sources = unsafe {
-                                rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                            }
-                            .eval();
-
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
-                                sources.data(),
+                                sources,
                                 downward_surface,
                                 charges,
                                 check_potential,
@@ -525,6 +487,10 @@ where
                 }
             });
 
+        // TODO: remove this
+        let mut dc2e_inv_2 = rlst_dynamic_array2!(U, self.fmm.dc2e_inv_2.shape());
+        dc2e_inv_2.fill_from(self.fmm.dc2e_inv_2.view());
+
         // 2. Compute local expansion from check potential
         self.level_locals[level as usize]
             .par_iter()
@@ -532,15 +498,21 @@ where
             .for_each(|(local_ptr, check_potential)| {
                 let target_local =
                     unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-                let check_potential = unsafe {
-                    rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
-                };
+
+                // TODO: remove this memory assignment
+                let mut check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
+                for i in 0..ncoeffs {
+                    unsafe {
+                        *check_potential_mat.get_unchecked_mut([i, 0]) = check_potential[i];
+                    }
+                }
 
                 let scale = self.fmm.kernel().scale(level);
-                let mut tmp = self
-                    .fmm
-                    .dc2e_inv_1
-                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>()
+                        .simple_mult_into_resize(dc2e_inv_2.view(), check_potential_mat.view()),
+                );
                 tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 
                 target_local
@@ -762,31 +734,31 @@ where
             &[npad, npad, npad],
         );
 
+        // TODO: remove this
+        let mut dc2e_inv_2 = rlst_dynamic_array2!(U, self.fmm.dc2e_inv_2.shape());
+        dc2e_inv_2.fill_from(self.fmm.dc2e_inv_2.view());
+
         // TODO: Experiment with chunk size for post processing
         check_potential
             .par_chunks_exact(nsiblings * size)
             .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
             .for_each(|(check_potential_chunk, local_ptrs)| {
                 // Map to surface grid
-                let mut potential_buffer = vec![U::zero(); ncoeffs * nsiblings];
+                let mut potential_chunk = rlst_dynamic_array2!(U, [ncoeffs, nsiblings]);
                 for i in 0..nsiblings {
-                    let tmp = &mut potential_buffer[i * ncoeffs..(i + 1) * ncoeffs];
-                    let check_potential = &check_potential_chunk[i * size..(i + 1) * size];
                     for (surf_idx, &conv_idx) in self.fmm.m2l.conv_to_surf_map.iter().enumerate() {
-                        tmp[surf_idx] = check_potential[conv_idx];
+                        unsafe {
+                            *potential_chunk.get_unchecked_mut([surf_idx, i]) =
+                                check_potential_chunk[i * size + conv_idx];
+                        }
                     }
                 }
 
-                // Can now find local expansion coefficients
-                let potential_chunk = unsafe {
-                    rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
-                };
-
-                let local_chunk = self
-                    .fmm
-                    .dc2e_inv_1
-                    .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
-                    .eval();
+                let local_chunk = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>()
+                        .simple_mult_into_resize(dc2e_inv_2.view(), potential_chunk.view()),
+                );
 
                 local_chunk
                     .data()
@@ -822,20 +794,11 @@ where
         + std::marker::Send
         + std::marker::Sync
         + Default,
-    DenseMatrixLinAlgBuilder<U>: Svd,
+    //DenseMatrixLinAlgBuilder<U>: Svd,
     U: Scalar<Real = U>,
-    U: Float
-        + Default
-        + MultiplyAdd<
-            U,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            Dynamic,
-            Dynamic,
-            Dynamic,
-        >,
+    U: Float + Default + Gemm,
     U: std::marker::Send + std::marker::Sync + Default,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
 {
     fn p2l<'a>(&self, level: u64) {
         let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -890,15 +853,9 @@ where
                         let nsources = sources.len() / dim;
 
                         if nsources > 0 {
-
-                            let sources = unsafe {
-                                rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                            }
-                            .eval();
-
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
-                                sources.data(),
+                                sources,
                                 downward_surface,
                                 charges,
                                 check_potential,
@@ -908,6 +865,10 @@ where
                 }
             });
 
+        // TODO: remove this
+        let mut dc2e_inv_2 = rlst_dynamic_array2!(U, self.fmm.dc2e_inv_2.shape());
+        dc2e_inv_2.fill_from(self.fmm.dc2e_inv_2.view());
+
         // 2. Compute local expansion from check potential
         self.level_locals[level as usize]
             .par_iter()
@@ -915,15 +876,20 @@ where
             .for_each(|(local_ptr, check_potential)| {
                 let target_local =
                     unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-                let check_potential = unsafe {
-                    rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
-                };
+
+                let mut check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
+                for i in 0..ncoeffs {
+                    unsafe {
+                        *check_potential_mat.get_unchecked_mut([i, 0]) = check_potential[i];
+                    }
+                }
 
                 let scale = self.fmm.kernel().scale(level);
-                let mut tmp = self
-                    .fmm
-                    .dc2e_inv_1
-                    .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>()
+                        .simple_mult_into_resize(dc2e_inv_2.view(), check_potential_mat.view()),
+                );
                 tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 
                 target_local
@@ -983,32 +949,54 @@ where
 
         // Interpret multipoles as a matrix
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        let multipoles = unsafe {
-            rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
-        };
+        let mut multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
+        for j in 0..nsources {
+            for i in 0..ncoeffs {
+                unsafe {
+                    *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles[level as usize]
+                        [0]
+                    .raw
+                    .add(j * ncoeffs + i);
+                }
+            }
+        }
 
-        let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-        let dim = (nrows, self.fmm.m2l.k);
+        let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+        let dim = [nrows, self.fmm.m2l.k];
 
-        let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+        let mut compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
+            self.fmm.m2l.operator_data.st_block.view(),
+            multipoles.view(),
+        );
 
         compressed_multipoles
             .data_mut()
             .iter_mut()
             .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-        (0..316).into_par_iter().for_each(|c_idx| {
-            let top_left = (0, c_idx * self.fmm.m2l.k);
-            let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);
+        // TODO: remove this
+        let mut dc2e_inv_2 = rlst_dynamic_array2!(U, self.fmm.dc2e_inv_2.shape());
+        dc2e_inv_2.fill_from(self.fmm.dc2e_inv_2.view());
 
-            let locals = self.fmm.dc2e_inv_1.dot(
-                &self.fmm.dc2e_inv_2.dot(
-                    &self
-                        .fmm
-                        .m2l
-                        .operator_data
-                        .u
-                        .dot(&c_sub.dot(&compressed_multipoles)),
+        (0..316).into_par_iter().for_each(|c_idx| {
+            let top_left = [0, c_idx * self.fmm.m2l.k];
+            let c_sub = self
+                .fmm
+                .m2l
+                .operator_data
+                .c
+                .view()
+                .into_subview(top_left, dim);
+
+            let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                self.fmm.dc2e_inv_1.view(),
+                empty_array::<U, 2>().simple_mult_into_resize(
+                    dc2e_inv_2.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.m2l.operator_data.u.view(),
+                        empty_array::<U, 2>()
+                            .simple_mult_into_resize(c_sub.view(), compressed_multipoles.view()),
+                    ),
                 ),
             );
 
@@ -1050,20 +1038,11 @@ where
         + std::marker::Send
         + std::marker::Sync
         + Default,
-    DenseMatrixLinAlgBuilder<U>: Svd,
+    //    DenseMatrixLinAlgBuilder<U>: Svd,
     U: Scalar<Real = U>,
-    U: Float
-        + Default
-        + MultiplyAdd<
-            U,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            Dynamic,
-            Dynamic,
-            Dynamic,
-        >,
+    U: Float + Default + Gemm,
     U: std::marker::Send + std::marker::Sync + Default,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
 {
     fn p2l(&self, _level: u64) {}
 
@@ -1117,32 +1096,52 @@ where
 
         // Interpret multipoles as a matrix
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        let multipoles = unsafe {
-            rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
-        };
+        let mut multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
+        for j in 0..nsources {
+            for i in 0..ncoeffs {
+                unsafe {
+                    *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles[level as usize]
+                        [0]
+                    .raw
+                    .add(j * ncoeffs + i);
+                }
+            }
+        }
 
-        let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-        let dim = (nrows, self.fmm.m2l.k);
+        let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+        let dim = [nrows, self.fmm.m2l.k];
 
-        let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+        let mut compressed_multipoles = empty_array::<U, 2>()
+            .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
 
         compressed_multipoles
             .data_mut()
             .iter_mut()
             .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-        (0..316).into_par_iter().for_each(|c_idx| {
-            let top_left = (0, c_idx * self.fmm.m2l.k);
-            let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);
+        // TODO: remove this
+        let mut dc2e_inv_2 = rlst_dynamic_array2!(U, self.fmm.dc2e_inv_2.shape());
+        dc2e_inv_2.fill_from(self.fmm.dc2e_inv_2.view());
 
-            let locals = self.fmm.dc2e_inv_1.dot(
-                &self.fmm.dc2e_inv_2.dot(
-                    &self
-                        .fmm
-                        .m2l
-                        .operator_data
-                        .u
-                        .dot(&c_sub.dot(&compressed_multipoles)),
+        (0..316).into_par_iter().for_each(|c_idx| {
+            let top_left = [0, c_idx * self.fmm.m2l.k];
+            let c_sub = self
+                .fmm
+                .m2l
+                .operator_data
+                .c
+                .view()
+                .into_subview(top_left, dim);
+
+            let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                self.fmm.dc2e_inv_1.view(),
+                empty_array::<U, 2>().simple_mult_into_resize(
+                    dc2e_inv_2.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.m2l.operator_data.u.view(),
+                        empty_array::<U, 2>()
+                            .simple_mult_into_resize(c_sub.view(), compressed_multipoles.view()),
+                    ),
                 ),
             );
 
@@ -1177,6 +1176,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{
@@ -1197,13 +1197,7 @@ mod test {
         tree::Tree,
     };
     use itertools::Itertools;
-    use rlst::dense::{rlst_col_vec, rlst_pointer_mat, RawAccess};
-
-    use rlst::{
-        common::traits::*,
-        dense::{traits::*, Dot},
-    };
-
+    use rlst_dense::{array::empty_array, rlst_dynamic_array2, traits::RawAccess};
     #[test]
     pub fn test_field_translation_uniform() {
         let npoints = 10000;
@@ -1316,12 +1310,16 @@ mod test {
                     .get(&parent)
                     .unwrap();
                 let parent_local = datatree.level_locals[parent.level() as usize][level_index];
-                let parent_local = unsafe {
-                    rlst_pointer_mat!['_, f64, parent_local.raw, (ncoeffs, 1), (1, ncoeffs)]
-                };
+                let parent_local_mat = rlst_dynamic_array2!(f64, [ncoeffs, 1]);
+                for i in 0..ncoeffs {
+                    unsafe {
+                        *parent_local_mat.get_unchecked_mut([i, 0]) = *parent_local.raw.add(i);
+                    }
+                }
 
                 // Parent contribution to check potential
-                let tmp = datatree.fmm.l2l[l2l_idx].dot(&parent_local).eval();
+                let tmp = empty_array::<f64, 2>()
+                    .simple_mult_into_resize(datatree.fmm.l2l[l2l_idx].view(), parent_local_mat);
 
                 // Evaluate tmp at child equivalent surface to find potential
                 datatree.fmm.kernel().evaluate_st(
@@ -1453,12 +1451,16 @@ mod test {
                     .get(&parent)
                     .unwrap();
                 let parent_local = datatree.level_locals[parent.level() as usize][level_index];
-                let parent_local = unsafe {
-                    rlst_pointer_mat!['_, f64, parent_local.raw, (ncoeffs, 1), (1, ncoeffs)]
-                };
+                let parent_local_mat = rlst_dynamic_array2!(f64, [ncoeffs, 1]);
+                for i in 0..ncoeffs {
+                    unsafe {
+                        *parent_local_mat.get_unchecked_mut([i, 0]) = *parent_local.raw.add(i);
+                    }
+                }
 
                 // Parent contribution to check potential
-                let tmp = datatree.fmm.l2l[l2l_idx].dot(&parent_local).eval();
+                let tmp = empty_array::<f64, 2>()
+                    .simple_mult_into_resize(datatree.fmm.l2l[l2l_idx].view(), parent_local_mat);
 
                 // Evaluate tmp at child equivalent surface to find potential
                 datatree.fmm.kernel().evaluate_st(
@@ -1493,23 +1495,21 @@ mod test {
                     for (&charges, sources) in charges.iter().zip(sources_coordinates) {
                         let nsources = sources.len() / dim;
                         if nsources > 0 {
-                            let sources = unsafe {
-                                rlst_pointer_mat!['_, f64, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                            }
-                            .eval();
-
-                            let mut check_potential = rlst_col_vec![f64, ncoeffs];
+                            let mut check_potential = rlst_dynamic_array2!(f64, [ncoeffs, 1]);
                             datatree.fmm.kernel.evaluate_st(
                                 bempp_traits::types::EvalType::Value,
-                                sources.data(),
+                                sources,
                                 &downward_check_surface,
                                 charges,
                                 check_potential.data_mut(),
                             );
-                            let mut tmp = datatree
-                                .fmm
-                                .dc2e_inv_1
-                                .dot(&datatree.fmm.dc2e_inv_2.dot(&check_potential));
+                            let mut tmp = empty_array::<f64, 2>().simple_mult_into_resize(
+                                datatree.fmm.dc2e_inv_1.view(),
+                                empty_array::<f64, 2>().simple_mult_into_resize(
+                                    datatree.fmm.dc2e_inv_2.view(),
+                                    check_potential.view(),
+                                ),
+                            );
                             let scale = datatree.fmm.kernel.scale(leaf_node.level());
                             tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 

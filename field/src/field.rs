@@ -4,7 +4,6 @@ use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
 use rlst_blis::interface::gemm::Gemm;
-use rlst_dense::traits::MatrixSvd;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -13,7 +12,7 @@ use rlst_dense::{
     rlst_dynamic_array2, rlst_dynamic_array3,
     traits::{
         MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
-        UnsafeRandomAccessMut,
+        UnsafeRandomAccessMut, MatrixSvd,
     },
 };
 use std::collections::HashSet;

@@ -10,7 +10,7 @@ use bempp_traits::{
     fmm::{Fmm, InteractionLists, TargetTranslation},
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::EvalType,
+    types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
@@ -20,17 +20,19 @@ use crate::{
     types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear},
 };
 
-use rlst::{
-    common::traits::*,
-    dense::{rlst_dynamic_mat, rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+use rlst_blis::interface::gemm::Gemm;
+use rlst_dense::{
+    array::empty_array,
+    rlst_dynamic_array2,
+    traits::{MultIntoResize, RawAccess, RawAccessMut, UnsafeRandomAccessMut},
 };
 
 impl<T, U, V> TargetTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
-    V: MultiplyAdd<
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    /*V: MultiplyAdd<
         V,
         VectorContainer<V>,
         VectorContainer<V>,
@@ -38,7 +40,7 @@ where
         Dynamic,
         Dynamic,
         Dynamic,
-    >,
+    >,*/
 {
     fn l2l<'a>(&self, level: u64) {
         if let Some(child_targets) = self.fmm.tree().get_keys(level) {
@@ -69,23 +71,37 @@ where
 
             parent_locals
                 .par_chunks_exact(chunk_size)
-                .zip(child_locals.par_chunks_exact(nsiblings*chunk_size))
+                .zip(child_locals.par_chunks_exact(nsiblings * chunk_size))
                 .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-
-                    let mut parent_locals = rlst_dynamic_mat![V, (ncoeffs, chunk_size)];
-                    for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk.iter().enumerate().take(chunk_size) {
-                        let tmp = unsafe { rlst_pointer_mat!['a, V, parent_local_pointer.raw, (ncoeffs, 1), (1, ncoeffs)] };
-                        parent_locals.data_mut()[chunk_idx*ncoeffs..(chunk_idx+1)*ncoeffs].copy_from_slice(tmp.data());
+                    let mut parent_locals = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
+                    for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
+                        .iter()
+                        .enumerate()
+                        .take(chunk_size)
+                    {
+                        parent_locals.data_mut()[chunk_idx * ncoeffs..(chunk_idx + 1) * ncoeffs]
+                            .copy_from_slice(unsafe {
+                                std::slice::from_raw_parts(parent_local_pointer.raw, ncoeffs)
+                            });
                     }
 
                     for i in 0..nsiblings {
-                        let tmp = self.fmm.l2l[i].dot(&parent_locals).eval();
+                        let tmp = empty_array::<V, 2>()
+                            .simple_mult_into_resize(self.fmm.l2l[i].view(), parent_locals.view());
 
                         for j in 0..chunk_size {
-                            let chunk_displacement = j*nsiblings;
+                            let chunk_displacement = j * nsiblings;
                             let child_displacement = chunk_displacement + i;
-                            let child_local = unsafe { std::slice::from_raw_parts_mut(child_local_pointers_chunk[child_displacement].raw, ncoeffs)};
-                            child_local.iter_mut().zip(&tmp.data()[j*ncoeffs..(j+1)*ncoeffs]).for_each(|(l, t)| *l += *t);
+                            let child_local = unsafe {
+                                std::slice::from_raw_parts_mut(
+                                    child_local_pointers_chunk[child_displacement].raw,
+                                    ncoeffs,
+                                )
+                            };
+                            child_local
+                                .iter_mut()
+                                .zip(&tmp.data()[j * ncoeffs..(j + 1) * ncoeffs])
+                                .for_each(|(l, t)| *l += *t);
                         }
                     }
                 });
@@ -112,30 +128,23 @@ where
                         ((leaf_downward_equivalent_surface, local_ptr), charge_index_pointer),
                         potential_send_ptr,
                     )| {
-                        let target_coordinates = &coordinates
-                            [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                        let ntargets = target_coordinates.len() / dim;
-
+                        let ntargets = charge_index_pointer.1 - charge_index_pointer.0;
                         // Compute direct
                         if ntargets > 0 {
+                            let target_coordinates = &coordinates
+                                [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
 
-                            let target_coordinates = unsafe {
-                                rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, dim), (dim, 1)]
-                            }.eval();
-
-                            let local_expansion =
-                                unsafe { rlst_pointer_mat!['a, V, local_ptr.raw, (ncoeffs, 1), (1, ncoeffs) ]};
-
-                            let result = unsafe { std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)};
+                            let result = unsafe {
+                                std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)
+                            };
 
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
-                                target_coordinates.data(),
-                                local_expansion.data(),
+                                target_coordinates,
+                                unsafe { std::slice::from_raw_parts(local_ptr.raw, ncoeffs) },
                                 result,
                             );
-
                         }
                     },
                 );
@@ -158,13 +167,7 @@ where
                     let ntargets = targets.len() / dim;
 
                     if ntargets > 0 {
-
-                        let targets = unsafe {
-                            rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
-                        }.eval();
-
                         if let Some(u_list) = self.fmm.get_u_list(leaf) {
-
                             let u_list_indices = u_list
                                 .iter()
                                 .filter_map(|k| self.fmm.tree().get_leaf_index(k));
@@ -189,16 +192,16 @@ where
                                 let nsources = sources.len() / dim;
 
                                 if nsources > 0 {
-
-                                    let sources = unsafe {
-                                        rlst_pointer_mat!['a, V, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                                    }.eval();
-
-                                    let result = unsafe { std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)};
+                                    let result = unsafe {
+                                        std::slice::from_raw_parts_mut(
+                                            potential_send_pointer.raw,
+                                            ntargets,
+                                        )
+                                    };
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
-                                        sources.data(),
-                                        targets.data(),
+                                        sources,
+                                        targets,
                                         charges,
                                         result,
                                     );
@@ -215,8 +218,8 @@ impl<T, U, V> TargetTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
-    V: MultiplyAdd<
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    /*V: MultiplyAdd<
         V,
         VectorContainer<V>,
         VectorContainer<V>,
@@ -224,7 +227,7 @@ where
         Dynamic,
         Dynamic,
         Dynamic,
-    >,
+    >,*/
 {
     fn l2l<'a>(&self, level: u64) {
         if let Some(child_targets) = self.fmm.tree().get_keys(level) {
@@ -260,13 +263,28 @@ where
                 .into_par_iter()
                 .zip(child_locals.par_chunks_exact(nsiblings))
                 .for_each(|(parent_local_pointer, child_local_pointers)| {
+                    // TODO: remove memory assignment
+                    let mut parent_local_mat = rlst_dynamic_array2!(V, [ncoeffs, 1]);
+                    for i in 0..ncoeffs {
+                        unsafe {
+                            *parent_local_mat.get_unchecked_mut([i, 0]) =
+                                *parent_local_pointer.raw.add(i);
+                        }
+                    }
 
-                    let parent_local = unsafe { rlst_pointer_mat!['a, V, parent_local_pointer.raw, (ncoeffs, 1), (1, ncoeffs)] };
-
-                    for (i, child_local_pointer) in child_local_pointers.iter().enumerate().take(8) {
-                        let tmp = self.fmm.l2l[i].dot(&parent_local).eval();
-                        let child_local = unsafe { std::slice::from_raw_parts_mut(child_local_pointer.raw, ncoeffs)};
-                        child_local.iter_mut().zip(tmp.data()).for_each(|(c, p)| *c += *p);
+                    for (i, child_local_pointer) in child_local_pointers.iter().enumerate().take(8)
+                    {
+                        let tmp = empty_array::<V, 2>().simple_mult_into_resize(
+                            self.fmm.l2l[i].view(),
+                            parent_local_mat.view(),
+                        );
+                        let child_local = unsafe {
+                            std::slice::from_raw_parts_mut(child_local_pointer.raw, ncoeffs)
+                        };
+                        child_local
+                            .iter_mut()
+                            .zip(tmp.data())
+                            .for_each(|(c, p)| *c += *p);
                     }
                 });
         }
@@ -289,11 +307,6 @@ where
                     let ntargets = targets.len() / dim;
 
                     if ntargets > 0 {
-                        let targets = unsafe {
-                            rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
-                        }
-                        .eval();
-
                         if let Some(w_list) = self.fmm.get_w_list(leaf) {
                             let result = unsafe {
                                 std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)
@@ -316,7 +329,7 @@ where
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
                                     surface,
-                                    targets.data(),
+                                    targets,
                                     multipole,
                                     result,
                                 )
@@ -349,26 +362,19 @@ where
                             [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
                         let ntargets = target_coordinates.len() / dim;
 
-                        let local_expansion =
-                            unsafe { rlst_pointer_mat!['a, V, local_ptr.raw, (ncoeffs, 1), (1, ncoeffs) ]};
-
                         // Compute direct
                         if ntargets > 0 {
-
-                            let targets = unsafe {
-                                rlst_pointer_mat!['a, V, target_coordinates.as_ptr(), (ntargets, dim), (dim, 1)]
-                            }.eval();
-
-                            let result = unsafe { std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)};
+                            let result = unsafe {
+                                std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)
+                            };
 
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
-                                targets.data(),
-                                local_expansion.data(),
+                                target_coordinates,
+                                unsafe { std::slice::from_raw_parts(local_ptr.raw, ncoeffs) },
                                 result,
                             );
-
                         }
                     },
                 );
@@ -391,14 +397,7 @@ where
                     let ntargets = targets.len() / dim;
 
                     if ntargets > 0 {
-
-                        let targets = unsafe {
-                            rlst_pointer_mat!['a, V, targets.as_ptr(), (ntargets, dim), (dim, 1)]
-                        }.eval();
-
                         if let Some(u_list) = self.fmm.get_u_list(leaf) {
-
-
                             let u_list_indices = u_list
                                 .iter()
                                 .filter_map(|k| self.fmm.tree().get_leaf_index(k));
@@ -423,16 +422,16 @@ where
                                 let nsources = sources.len() / dim;
 
                                 if nsources > 0 {
-
-                                    let sources = unsafe {
-                                        rlst_pointer_mat!['a, V, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                                    }.eval();
-
-                                    let result = unsafe { std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)};
+                                    let result = unsafe {
+                                        std::slice::from_raw_parts_mut(
+                                            potential_send_pointer.raw,
+                                            ntargets,
+                                        )
+                                    };
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
-                                        sources.data(),
-                                        targets.data(),
+                                        sources,
+                                        targets,
                                         charges,
                                         result,
                                     );

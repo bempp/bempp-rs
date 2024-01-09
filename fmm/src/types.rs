@@ -5,8 +5,7 @@ use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::
 use bempp_tree::types::morton::MortonKey;
 use cauchy::Scalar;
 use num::{Complex, Float};
-use rlst::dense::traits::*;
-use rlst::dense::{base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix};
+use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 
 /// Type alias for charge data
 pub type Charge<T> = T;
@@ -18,7 +17,7 @@ pub type GlobalIdx = usize;
 pub type ChargeDict<T> = HashMap<GlobalIdx, Charge<T>>;
 
 /// Type alias for approximation of FMM operator matrices.
-pub type C2EType<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
+pub type C2EType<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 pub struct FmmDataUniform<T, U>
 where
@@ -219,6 +218,7 @@ impl<T> Default for SendPtr<T> {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{
         charge::build_charge_dict,
         types::{FmmDataUniform, KiFmmLinear},
@@ -232,7 +232,7 @@ mod test {
         implementations::helpers::points_fixture, types::single_node::SingleNodeTree,
     };
     use itertools::Itertools;
-    use rlst::dense::RawAccess;
+    use rlst_dense::traits::RawAccess;
 
     #[test]
     fn test_fmm_data_uniform() {
