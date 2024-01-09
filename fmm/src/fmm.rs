@@ -1198,6 +1198,7 @@ mod test {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn test_uniform_matrix_f64(
         order: usize,
         alpha_inner: f64,
@@ -1237,11 +1238,8 @@ mod test {
             // Associate data with the FMM
             let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
 
-            let s = Instant::now();
-            let times = datatree.run(true);
-            println!("runtime {:?}", s.elapsed());
-            println!("times {:?}", times);
-            // assert!(false);
+            datatree.run(false);
+
             // Test that direct computation is close to the FMM.
             let mut test_idx_vec = Vec::new();
             for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
@@ -1255,7 +1253,6 @@ mod test {
             let (l, r) = datatree.charge_index_pointer[leaf_idx];
 
             let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-            let (l, r) = datatree.charge_index_pointer[leaf_idx];
             let leaf_coordinates = &coordinates[l * 3..r * 3];
 
             let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
@@ -1264,12 +1261,16 @@ mod test {
                 rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
             }.eval();
 
-
-            for i in 0..datatree.ncharge_vectors {
-                let potentials_ptr = datatree.potentials_send_pointers[i*datatree.nleaves + leaf_idx].raw;
+            for (i, charge_dict) in charge_dicts
+                .iter()
+                .enumerate()
+                .take(datatree.ncharge_vectors)
+            {
+                let potentials_ptr =
+                    datatree.potentials_send_pointers[i * datatree.nleaves + leaf_idx].raw;
                 let potentials = unsafe { std::slice::from_raw_parts(potentials_ptr, ntargets) };
 
-                let all_charges = &charge_dicts[i].values().cloned().collect_vec();
+                let all_charges = &charge_dict.values().cloned().collect_vec();
 
                 let mut direct = vec![0f64; ntargets];
 
@@ -1277,8 +1278,8 @@ mod test {
                     EvalType::Value,
                     points,
                     leaf_coordinates.data(),
-                    &all_charges,
-                    &mut direct
+                    all_charges,
+                    &mut direct,
                 );
 
                 let abs_error: f64 = potentials
@@ -1294,60 +1295,60 @@ mod test {
 
     #[test]
     fn test_uniform() {
-        let npoints = 1000000;
+        let npoints = 10000;
 
         let global_idxs = (0..npoints).collect_vec();
         let charges = vec![1.0; npoints];
 
-        let order = 6;
+        let order = 5;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
 
-        // // Test case where points are distributed on surface of a sphere
-        // let points_sphere = points_fixture_sphere::<f64>(npoints);
-        // test_uniform_f64(
-        //     &points_sphere,
-        //     &charges,
-        //     &global_idxs,
-        //     order,
-        //     alpha_inner,
-        //     alpha_outer,
-        //     true,
-        //     3,
-        // );
-        // test_uniform_f64(
-        //     &points_sphere,
-        //     &charges,
-        //     &global_idxs,
-        //     order,
-        //     alpha_inner,
-        //     alpha_outer,
-        //     false,
-        //     3,
-        // );
+        // Test case where points are distributed on surface of a sphere
+        let points_sphere = points_fixture_sphere::<f64>(npoints);
+        test_uniform_f64(
+            &points_sphere,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            true,
+            3,
+        );
+        test_uniform_f64(
+            &points_sphere,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            false,
+            3,
+        );
 
-        // // Test case where points are distributed randomly in a box
-        // let points_cloud = points_fixture::<f64>(npoints, None, None);
-        // test_uniform_f64(
-        //     &points_cloud,
-        //     &charges,
-        //     &global_idxs,
-        //     order,
-        //     alpha_inner,
-        //     alpha_outer,
-        //     true,
-        //     3,
-        // );
-        // test_uniform_f64(
-        //     &points_cloud,
-        //     &charges,
-        //     &global_idxs,
-        //     order,
-        //     alpha_inner,
-        //     alpha_outer,
-        //     false,
-        //     3,
-        // );
+        // Test case where points are distributed randomly in a box
+        let points_cloud = points_fixture::<f64>(npoints, None, None);
+        test_uniform_f64(
+            &points_cloud,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            true,
+            3,
+        );
+        test_uniform_f64(
+            &points_cloud,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            false,
+            3,
+        );
 
         // Test matrix input
         let points = points_fixture::<f64>(npoints, None, None);
@@ -1363,7 +1364,7 @@ mod test {
             order,
             alpha_inner,
             alpha_outer,
-            4,
+            3,
             true,
             points.data(),
             &global_idxs,

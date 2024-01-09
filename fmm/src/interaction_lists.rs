@@ -132,7 +132,6 @@ where
     }
 }
 
-
 impl<T, U, V, W> InteractionLists for KiFmmLinearMatrix<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
