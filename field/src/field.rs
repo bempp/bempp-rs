@@ -6,13 +6,14 @@ use num::{Complex, Float};
 use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::traits::MatrixSvd;
 use rlst_dense::{
-    array::Array,
+    array::{empty_array, Array},
     base_array::BaseArray,
     data_container::VectorContainer,
     linalg::svd::SvdMode,
     rlst_dynamic_array2, rlst_dynamic_array3,
     traits::{
-        MultInto, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
+        MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
+        UnsafeRandomAccessMut,
     },
 };
 use std::collections::HashSet;
@@ -146,13 +147,10 @@ where
         for i in 0..self.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [self.k, ncols]);
 
-            let mut tmp0 = rlst_dynamic_array2!(T, [vt_block.shape()[0], s_block.shape()[1]]);
-            tmp0.view_mut()
-                .simple_mult_into(vt_block.view(), s_block.view());
-
-            let mut tmp = rlst_dynamic_array2!(T, [sigma_mat.shape()[0], tmp0.shape()[1]]);
-            tmp.view_mut()
-                .simple_mult_into(sigma_mat.view(), tmp0.view());
+            let tmp = empty_array::<T, 2>().simple_mult_into_resize(
+                sigma_mat.view(),
+                empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_block.view()),
+            );
 
             c.view_mut()
                 .into_subview([0, i * self.k], [self.k, self.k])
@@ -675,29 +673,14 @@ mod test {
             .c
             .into_subview([0, c_idx * svd.k], [nrows, svd.k]);
 
-        let mut compressed_multipole = rlst_dynamic_array2!(
-            f64,
-            [svd.operator_data.st_block.shape()[0], multipole.shape()[1]]
-        );
-        compressed_multipole
-            .view_mut()
-            .simple_mult_into(svd.operator_data.st_block.view(), multipole.view());
+        let compressed_multipole = empty_array::<f64, 2>()
+            .simple_mult_into_resize(svd.operator_data.st_block.view(), multipole.view());
 
-        let mut compressed_check_potential =
-            rlst_dynamic_array2!(f64, [c_sub.shape()[0], compressed_multipole.shape()[1]]);
-        compressed_check_potential
-            .view_mut()
-            .simple_mult_into(c_sub.view(), compressed_multipole.view());
+        let compressed_check_potential = empty_array::<f64, 2>()
+            .simple_mult_into_resize(c_sub.view(), compressed_multipole.view());
 
         // Post process to find check potential
-        let mut check_potential = rlst_dynamic_array2!(
-            f64,
-            [
-                svd.operator_data.u.shape()[0],
-                compressed_check_potential.shape()[1]
-            ]
-        );
-        check_potential.view_mut().simple_mult_into(
+        let check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
             svd.operator_data.u.view(),
             compressed_check_potential.view(),
         );
