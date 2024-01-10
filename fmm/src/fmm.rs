@@ -866,6 +866,7 @@ mod test {
         assert!(rel_error <= 1e-5);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn test_uniform_f64_svd(
         points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         charges: &[f64],
@@ -952,6 +953,7 @@ mod test {
         assert!(rel_error <= 1e-3);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn test_adaptive_f64_fft(
         points: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         charges: &[f64],
@@ -1034,6 +1036,7 @@ mod test {
         assert!(rel_error <= 1e-5);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn test_adaptive_f64_svd(
         points: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         charges: &[f64],
