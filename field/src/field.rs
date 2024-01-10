@@ -1,9 +1,9 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use rlst_common::types::Scalar;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
 use rlst_blis::interface::gemm::Gemm;
+use rlst_common::types::Scalar;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
