@@ -9,7 +9,7 @@ use rlst_dense::{
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut},
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
 };
 
 use bempp_traits::{
