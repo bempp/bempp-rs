@@ -25,7 +25,7 @@ use bempp_traits::types::Scalar;
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RandomAccessMut, RawAccess, RawAccessMut},
+    traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
 impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
@@ -336,14 +336,11 @@ where
             .zip(parent_multipoles.par_chunks_exact(chunk_size))
             .for_each(
                 |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
-                    let mut child_multipoles_chunk_mat =
-                        rlst_dynamic_array2!(V, [ncoeffs * nsiblings, chunk_size]);
-                    for j in 0..chunk_size {
-                        for i in 0..ncoeffs * nsiblings {
-                            *child_multipoles_chunk_mat.get_mut([i, j]).unwrap() =
-                                child_multipoles_chunk[j * ncoeffs * nsiblings + i];
-                        }
-                    }
+                    let child_multipoles_chunk_mat = rlst_array_from_slice2!(
+                        V,
+                        child_multipoles_chunk,
+                        [ncoeffs * nsiblings, chunk_size]
+                    );
                     let parent_multipoles_chunk = empty_array::<V, 2>()
                         .simple_mult_into_resize(self.fmm.m2m.view(), child_multipoles_chunk_mat);
 
