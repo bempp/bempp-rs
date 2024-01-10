@@ -6,7 +6,7 @@ use bempp_traits::kernel::ScaleInvariantKernel;
 use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
-use cauchy::Scalar;
+use rlst_common::types::Scalar;
 use num::{Complex, Float};
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 

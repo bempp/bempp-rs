@@ -1,5 +1,5 @@
 //! Implementation of interaction lists for FMMs (single and multi node)
-use cauchy::Scalar;
+use rlst_common::types::Scalar;
 use itertools::Itertools;
 
 use bempp_traits::{

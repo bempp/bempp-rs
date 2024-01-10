@@ -1,5 +1,5 @@
 //! Implementation of FmmData and Fmm traits.
-use cauchy::Scalar;
+use rlst_common::types::Scalar;
 use itertools::Itertools;
 use num::Float;
 use std::{collections::HashMap, time::Instant};
