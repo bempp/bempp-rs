@@ -130,12 +130,22 @@ where
                     ((leaf_downward_equivalent_surface, local_ptr), charge_index_pointer),
                     potential_send_ptr,
                 )| {
-                    let target_coordinates =
+                    let target_coordinates_row_major =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                    let ntargets = target_coordinates.len() / dim;
+                    let ntargets = target_coordinates_row_major.len() / dim;
 
                     // Compute direct
                     if ntargets > 0 {
+                        let target_coordinates_row_major = rlst_array_from_slice2!(
+                            V,
+                            target_coordinates_row_major,
+                            [ntargets, dim],
+                            [dim, 1]
+                        );
+                        let mut target_coordinates_col_major =
+                            rlst_dynamic_array2!(V, [ntargets, dim]);
+                        target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+
                         let result = unsafe {
                             std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)
                         };
@@ -143,7 +153,7 @@ where
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
                             leaf_downward_equivalent_surface,
-                            target_coordinates,
+                            target_coordinates_col_major.data(),
                             unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) },
                             result,
                         );
@@ -166,11 +176,20 @@ where
             .zip(&self.charge_index_pointer)
             .zip(&self.potentials_send_pointers)
             .for_each(|((leaf, charge_index_pointer), potential_send_pointer)| {
-                let targets =
+                let target_coordinates_row_major =
                     &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                let ntargets = targets.len() / dim;
+                let ntargets = target_coordinates_row_major.len() / dim;
 
                 if ntargets > 0 {
+                    let target_coordinates_row_major = rlst_array_from_slice2!(
+                        V,
+                        target_coordinates_row_major,
+                        [ntargets, dim],
+                        [dim, 1]
+                    );
+                    let mut target_coordinates_col_major = rlst_dynamic_array2!(V, [ntargets, dim]);
+                    target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+
                     if let Some(u_list) = self.fmm.get_u_list(leaf) {
                         let u_list_indices = u_list
                             .iter()
@@ -192,10 +211,23 @@ where
                             })
                             .collect_vec();
 
-                        for (&charges, sources) in charges.iter().zip(sources_coordinates) {
-                            let nsources = sources.len() / dim;
+                        for (&charges, source_coordinates_row_major) in
+                            charges.iter().zip(sources_coordinates)
+                        {
+                            let nsources = source_coordinates_row_major.len() / dim;
 
                             if nsources > 0 {
+                                let source_coordinates_row_major = rlst_array_from_slice2!(
+                                    V,
+                                    source_coordinates_row_major,
+                                    [nsources, dim],
+                                    [dim, 1]
+                                );
+                                let mut source_coordinates_col_major =
+                                    rlst_dynamic_array2!(V, [nsources, dim]);
+                                source_coordinates_col_major
+                                    .fill_from(source_coordinates_row_major.view());
+
                                 let result = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         potential_send_pointer.raw,
@@ -204,8 +236,8 @@ where
                                 };
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    sources,
-                                    targets,
+                                    source_coordinates_col_major.data(),
+                                    target_coordinates_col_major.data(),
                                     charges,
                                     result,
                                 );
@@ -298,11 +330,20 @@ where
             .zip(&self.charge_index_pointer)
             .zip(&self.potentials_send_pointers)
             .for_each(|((leaf, charge_index_pointer), potential_send_pointer)| {
-                let targets =
+                let target_coordinates_row_major =
                     &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                let ntargets = targets.len() / dim;
+                let ntargets = target_coordinates_row_major.len() / dim;
 
                 if ntargets > 0 {
+                    let target_coordinates_row_major = rlst_array_from_slice2!(
+                        V,
+                        target_coordinates_row_major,
+                        [ntargets, dim],
+                        [dim, 1]
+                    );
+                    let mut target_coordinates_col_major = rlst_dynamic_array2!(V, [ntargets, dim]);
+                    target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+
                     if let Some(w_list) = self.fmm.get_w_list(leaf) {
                         let result = unsafe {
                             std::slice::from_raw_parts_mut(potential_send_pointer.raw, ntargets)
@@ -324,7 +365,7 @@ where
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 surface,
-                                targets,
+                                target_coordinates_col_major.data(),
                                 multipole,
                                 result,
                             )
@@ -355,12 +396,22 @@ where
                     ((leaf_downward_equivalent_surface, local_ptr), charge_index_pointer),
                     potential_send_ptr,
                 )| {
-                    let target_coordinates =
+                    let target_coordinates_row_major =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                    let ntargets = target_coordinates.len() / dim;
+                    let ntargets = target_coordinates_row_major.len() / dim;
 
                     // Compute direct
                     if ntargets > 0 {
+                        let target_coordinates_row_major = rlst_array_from_slice2!(
+                            V,
+                            target_coordinates_row_major,
+                            [ntargets, dim],
+                            [dim, 1]
+                        );
+                        let mut target_coordinates_col_major =
+                            rlst_dynamic_array2!(V, [ntargets, dim]);
+                        target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+
                         let result = unsafe {
                             std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets)
                         };
@@ -368,7 +419,7 @@ where
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
                             leaf_downward_equivalent_surface,
-                            target_coordinates,
+                            target_coordinates_col_major.data(),
                             unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) },
                             result,
                         );
@@ -389,11 +440,20 @@ where
             .zip(&self.charge_index_pointer)
             .zip(&self.potentials_send_pointers)
             .for_each(|((leaf, charge_index_pointer), potential_send_pointer)| {
-                let targets =
+                let target_coordinates_row_major =
                     &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                let ntargets = targets.len() / dim;
+                let ntargets = target_coordinates_row_major.len() / dim;
 
                 if ntargets > 0 {
+                    let target_coordinates_row_major = rlst_array_from_slice2!(
+                        V,
+                        target_coordinates_row_major,
+                        [ntargets, dim],
+                        [dim, 1]
+                    );
+                    let mut target_coordinates_col_major = rlst_dynamic_array2!(V, [ntargets, dim]);
+                    target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+
                     if let Some(u_list) = self.fmm.get_u_list(leaf) {
                         let u_list_indices = u_list
                             .iter()
@@ -415,10 +475,23 @@ where
                             })
                             .collect_vec();
 
-                        for (&charges, sources) in charges.iter().zip(sources_coordinates) {
-                            let nsources = sources.len() / dim;
+                        for (&charges, source_coordinates_row_major) in
+                            charges.iter().zip(sources_coordinates)
+                        {
+                            let nsources = source_coordinates_row_major.len() / dim;
 
                             if nsources > 0 {
+                                let source_coordinates_row_major = rlst_array_from_slice2!(
+                                    V,
+                                    source_coordinates_row_major,
+                                    [nsources, dim],
+                                    [dim, 1]
+                                );
+                                let mut source_coordinates_col_major =
+                                    rlst_dynamic_array2!(V, [nsources, dim]);
+                                source_coordinates_col_major
+                                    .fill_from(source_coordinates_row_major.view());
+
                                 let result = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         potential_send_pointer.raw,
@@ -427,8 +500,8 @@ where
                                 };
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    sources,
-                                    targets,
+                                    source_coordinates_col_major.data(),
+                                    target_coordinates_col_major.data(),
                                     charges,
                                     result,
                                 );
@@ -541,11 +614,22 @@ where
                         ((leaf_downward_equivalent_surface, leaf_locals), charge_index_pointer),
                         potential_send_pointer,
                     )| {
-                        let target_coordinates = &coordinates
+                        let target_coordinates_row_major = &coordinates
                             [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                        let ntargets = target_coordinates.len() / dim;
+                        let ntargets = target_coordinates_row_major.len() / dim;
 
                         if ntargets > 0 {
+                            let target_coordinates_row_major = rlst_array_from_slice2!(
+                                V,
+                                target_coordinates_row_major,
+                                [ntargets, dim],
+                                [dim, 1]
+                            );
+                            let mut target_coordinates_col_major =
+                                rlst_dynamic_array2!(V, [ntargets, dim]);
+                            target_coordinates_col_major
+                                .fill_from(target_coordinates_row_major.view());
+
                             let local_expansion_ptr = leaf_locals[i].raw;
                             let local_expansion = unsafe {
                                 std::slice::from_raw_parts(local_expansion_ptr, self.ncoeffs)
@@ -557,7 +641,7 @@ where
                             self.fmm.kernel().evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
-                                target_coordinates,
+                                target_coordinates_col_major.data(),
                                 local_expansion,
                                 result,
                             );
@@ -582,11 +666,21 @@ where
                 .zip(&self.charge_index_pointer)
                 .zip(&self.potentials_send_pointers[i * self.nleaves..(i + 1) * self.nleaves])
                 .for_each(|((leaf, charge_index_pointer), potential_send_pointer)| {
-                    let targets =
+                    let target_coordinates_row_major =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                    let ntargets = targets.len() / dim;
+                    let ntargets = target_coordinates_row_major.len() / dim;
 
                     if ntargets > 0 {
+                        let target_coordinates_row_major = rlst_array_from_slice2!(
+                            V,
+                            target_coordinates_row_major,
+                            [ntargets, dim],
+                            [dim, 1]
+                        );
+                        let mut target_coordinates_col_major =
+                            rlst_dynamic_array2!(V, [ntargets, dim]);
+                        target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+
                         if let Some(u_list) = self.fmm.get_u_list(leaf) {
                             let u_list_indices = u_list
                                 .iter()
@@ -610,8 +704,20 @@ where
                                 })
                                 .collect_vec();
 
-                            for (&charges, sources) in charges.iter().zip(sources_coordinates) {
-                                let nsources = sources.len() / dim;
+                            for (&charges, source_coordinates_row_major) in
+                                charges.iter().zip(sources_coordinates)
+                            {
+                                let nsources = source_coordinates_row_major.len() / dim;
+                                let source_coordinates_row_major = rlst_array_from_slice2!(
+                                    V,
+                                    source_coordinates_row_major,
+                                    [nsources, dim],
+                                    [dim, 1]
+                                );
+                                let mut source_coordinates_col_major =
+                                    rlst_dynamic_array2!(V, [nsources, dim]);
+                                source_coordinates_col_major
+                                    .fill_from(source_coordinates_row_major.view());
 
                                 if nsources > 0 {
                                     let result = unsafe {
@@ -622,8 +728,8 @@ where
                                     };
                                     self.fmm.kernel.evaluate_st(
                                         EvalType::Value,
-                                        sources,
-                                        targets,
+                                        source_coordinates_col_major.data(),
+                                        target_coordinates_col_major.data(),
                                         charges,
                                         result,
                                     );

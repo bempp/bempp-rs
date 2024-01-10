@@ -775,6 +775,7 @@ where
 mod test {
 
     use super::*;
+    use rlst_dense::rlst_array_from_slice2;
 
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -833,9 +834,15 @@ mod test {
 
             let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
             let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-            let leaf_coordinates = &coordinates[l * 3..r * 3];
+            let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
 
-            let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+            let dim = datatree.fmm.kernel.space_dimension();
+            let ntargets = leaf_coordinates_row_major.len() / dim;
+
+            let leaf_coordinates_row_major =
+                rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+            let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
             let mut direct = vec![0f64; ntargets];
 
@@ -846,7 +853,7 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                leaf_coordinates,
+                leaf_coordinates_col_major.data(),
                 &all_charges,
                 &mut direct,
             );
@@ -857,6 +864,7 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+            println!("{rel_error}");
             assert!(rel_error <= 1e-5);
         }
 
@@ -901,9 +909,15 @@ mod test {
 
             let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
             let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-            let leaf_coordinates = &coordinates[l * 3..r * 3];
+            let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
 
-            let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+            let dim = datatree.fmm.kernel.space_dimension();
+            let ntargets = leaf_coordinates_row_major.len() / dim;
+
+            let leaf_coordinates_row_major =
+                rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+            let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
             let mut direct = vec![0f64; ntargets];
 
@@ -912,7 +926,7 @@ mod test {
             datatree.fmm.kernel().evaluate_st(
                 EvalType::Value,
                 points.data(),
-                leaf_coordinates,
+                leaf_coordinates_col_major.data(),
                 &all_charges,
                 &mut direct,
             );
@@ -977,9 +991,15 @@ mod test {
 
             let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
             let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-            let leaf_coordinates = &coordinates[l * 3..r * 3];
+            let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
 
-            let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+            let dim = datatree.fmm.kernel.space_dimension();
+            let ntargets = leaf_coordinates_row_major.len() / dim;
+
+            let leaf_coordinates_row_major =
+                rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+            let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
             let mut direct = vec![0f64; ntargets];
 
@@ -990,7 +1010,7 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                leaf_coordinates,
+                leaf_coordinates_col_major.data(),
                 &all_charges,
                 &mut direct,
             );
@@ -1001,6 +1021,7 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+            println!("{rel_error}");
             assert!(rel_error <= 1e-5);
         }
 
@@ -1044,9 +1065,15 @@ mod test {
 
             let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
             let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-            let leaf_coordinates = &coordinates[l * 3..r * 3];
+            let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
 
-            let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+            let dim = datatree.fmm.kernel.space_dimension();
+            let ntargets = leaf_coordinates_row_major.len() / dim;
+
+            let leaf_coordinates_row_major =
+                rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+            let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
             let mut direct = vec![0f64; ntargets];
 
@@ -1057,7 +1084,7 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                leaf_coordinates,
+                leaf_coordinates_col_major.data(),
                 &all_charges,
                 &mut direct,
             );
@@ -1068,6 +1095,7 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+            println!("{rel_error}");
             assert!(rel_error <= 1e-5);
         }
     }
@@ -1127,9 +1155,15 @@ mod test {
             let (l, r) = datatree.charge_index_pointer[leaf_idx];
 
             let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-            let leaf_coordinates = &coordinates[l * 3..r * 3];
+            let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
 
-            let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
+            let dim = datatree.fmm.kernel.space_dimension();
+            let ntargets = leaf_coordinates_row_major.len() / dim;
+
+            let leaf_coordinates_row_major =
+                rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+            let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
             for (i, charge_dict) in charge_dicts
                 .iter()
@@ -1147,7 +1181,7 @@ mod test {
                 datatree.fmm.kernel().evaluate_st(
                     EvalType::Value,
                     points,
-                    leaf_coordinates,
+                    leaf_coordinates_col_major.data(),
                     all_charges,
                     &mut direct,
                 );
@@ -1196,7 +1230,6 @@ mod test {
             false,
             3,
         );
-
         // Test case where points are distributed randomly in a box
         let points_cloud = points_fixture::<f64>(npoints, None, None);
         test_uniform_f64(
@@ -1219,7 +1252,6 @@ mod test {
             false,
             3,
         );
-
         // Test matrix input
         let points = points_fixture::<f64>(npoints, None, None);
         let ncharge_vecs = 3;

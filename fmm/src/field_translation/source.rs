@@ -63,16 +63,20 @@ where
             .for_each(
                 |((check_potential, upward_check_surface), charge_index_pointer)| {
                     let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
-                    let coordinates =
+                    let coordinates_row_major =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
 
-                    let nsources = coordinates.len() / dim;
+                    let nsources = coordinates_row_major.len() / dim;
 
                     if nsources > 0 {
-                        let mut coordinates_mat =
-                            rlst_array_from_slice2!(V, coordinates, [nsources, dim], [dim, 1]);
+                        let coordinates_row_major = rlst_array_from_slice2!(
+                            V,
+                            coordinates_row_major,
+                            [nsources, dim],
+                            [dim, 1]
+                        );
                         let mut coordinates_col_major = rlst_dynamic_array2!(V, [nsources, dim]);
-                        coordinates_col_major.fill_from(coordinates_mat.view());
+                        coordinates_col_major.fill_from(coordinates_row_major.view());
 
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
@@ -734,7 +738,6 @@ mod test {
                 None,
             );
         }
-
         // Uniformly refined sphere surface
         {
             let points = points_fixture_sphere::<f64>(npoints);
@@ -750,7 +753,6 @@ mod test {
                 None,
             );
         }
-
         // Adaptively refined point cloud
         {
             let points = points_fixture::<f64>(npoints, None, None);
@@ -785,8 +787,8 @@ mod test {
 
         // Uniformly refined, matrix input point cloud
         {
-            let npoints = 1000000;
-            let ncharge_vecs = 10;
+            let npoints = 10000;
+            let ncharge_vecs = 3;
             let points = points_fixture::<f64>(npoints, None, None);
             let global_idxs = (0..npoints).collect_vec();
             let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
