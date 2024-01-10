@@ -69,9 +69,14 @@ where
                     let nsources = coordinates.len() / dim;
 
                     if nsources > 0 {
+                        let mut coordinates_mat =
+                            rlst_array_from_slice2!(V, coordinates, [nsources, dim], [dim, 1]);
+                        let mut coordinates_col_major = rlst_dynamic_array2!(V, [nsources, dim]);
+                        coordinates_col_major.fill_from(coordinates_mat.view());
+
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
-                            coordinates,
+                            coordinates_col_major.data(),
                             upward_check_surface,
                             charges,
                             check_potential,
@@ -223,15 +228,24 @@ where
             .for_each(
                 |((check_potential, upward_check_surface), charge_index_pointer)| {
                     let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
-                    let coordinates =
+                    let coordinates_row_major =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
 
-                    let nsources = coordinates.len() / dim;
+                    let nsources = coordinates_row_major.len() / dim;
 
                     if nsources > 0 {
+                        let coordinates_mat = rlst_array_from_slice2!(
+                            V,
+                            coordinates_row_major,
+                            [nsources, dim],
+                            [dim, 1]
+                        );
+                        let mut coordinates_col_major = rlst_dynamic_array2!(V, [nsources, dim]);
+                        coordinates_col_major.fill_from(coordinates_mat.view());
+
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
-                            coordinates,
+                            coordinates_col_major.data(),
                             upward_check_surface,
                             charges,
                             check_potential,
@@ -386,9 +400,9 @@ where
             .zip(&self.charge_index_pointer)
             .for_each(
                 |((check_potential, upward_check_surface), charge_index_pointer)| {
-                    let coordinates =
+                    let coordinates_row_major =
                         &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                    let nsources = coordinates.len() / dim;
+                    let nsources = coordinates_row_major.len() / dim;
 
                     if nsources > 0 {
                         for i in 0..self.ncharge_vectors {
@@ -399,9 +413,19 @@ where
                             let check_potential_i =
                                 &mut check_potential[i * self.ncoeffs..(i + 1) * self.ncoeffs];
 
+                            let coordinates_mat = rlst_array_from_slice2!(
+                                V,
+                                coordinates_row_major,
+                                [nsources, dim],
+                                [dim, 1]
+                            );
+                            let mut coordinates_col_major =
+                                rlst_dynamic_array2!(V, [nsources, dim]);
+                            coordinates_col_major.fill_from(coordinates_mat.view());
+
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
-                                coordinates,
+                                coordinates_col_major.data(),
                                 upward_check_surface,
                                 charges_i,
                                 check_potential_i,
@@ -610,6 +634,8 @@ mod test {
 
         let abs_error = num::Float::abs(expected[0] - found[0]);
         let rel_error = abs_error / expected[0];
+
+        println!("{}", rel_error);
         assert!(rel_error <= 1e-5);
     }
 
