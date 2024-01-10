@@ -1,6 +1,6 @@
 //! Implementation of interaction lists for FMMs (single and multi node)
-use rlst_common::types::Scalar;
 use itertools::Itertools;
+use rlst_common::types::Scalar;
 
 use bempp_traits::{
     field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
