@@ -89,9 +89,6 @@ where
             .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
             .zip(self.scales.par_chunks_exact(ncoeffs * chunk_size))
             .for_each(|((check_potential, multipole_ptrs), scale)| {
-                //let check_potential = unsafe { rlst_pointer_mat!['a, V, check_potential.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
-                //let scale = unsafe {rlst_pointer_mat!['a, V, scale.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)]}.eval();
-
                 let check_potential =
                     rlst_array_from_slice2!(V, check_potential, [ncoeffs, chunk_size]);
                 let scale = rlst_array_from_slice2!(V, scale, [ncoeffs, chunk_size]);
@@ -162,17 +159,12 @@ where
             .zip(parent_multipoles.par_chunks_exact(chunk_size))
             .for_each(
                 |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
-                    // TODO: remove memory assignment here
-                    let mut child_multipoles_chunk_mat =
-                        rlst_dynamic_array2!(V, [ncoeffs * nsiblings, chunk_size]);
-                    for j in 0..chunk_size {
-                        for i in 0..ncoeffs * nsiblings {
-                            unsafe {
-                                *child_multipoles_chunk_mat.get_unchecked_mut([i, j]) =
-                                    child_multipoles_chunk[j * ncoeffs * nsiblings + i];
-                            }
-                        }
-                    }
+                    let child_multipoles_chunk_mat = rlst_array_from_slice2!(
+                        V,
+                        child_multipoles_chunk,
+                        [ncoeffs * nsiblings, chunk_size]
+                    );
+
                     let parent_multipoles_chunk = empty_array::<V, 2>()
                         .simple_mult_into_resize(self.fmm.m2m.view(), child_multipoles_chunk_mat);
 
@@ -257,23 +249,17 @@ where
             .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
             .zip(self.scales.par_chunks_exact(ncoeffs * chunk_size))
             .for_each(|((check_potential, multipole_ptrs), scale)| {
-                let mut scaled_check_potential = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
-                for j in 0..chunk_size {
-                    for i in 0..ncoeffs {
-                        unsafe {
-                            // TODO: scale[i] or scale[j]
-                            *scaled_check_potential.get_unchecked_mut([i, j]) =
-                                check_potential[j * ncoeffs + i] * scale[i];
-                        }
-                    }
-                }
+                let check_potential =
+                    rlst_array_from_slice2!(V, check_potential, [ncoeffs, chunk_size]);
+                let scale = rlst_array_from_slice2!(V, scale, [ncoeffs, chunk_size]);
+
+                let mut cmp_prod = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
+                cmp_prod.fill_from(check_potential * scale);
 
                 let tmp = empty_array::<V, 2>().simple_mult_into_resize(
                     self.fmm.uc2e_inv_1.view(),
-                    empty_array::<V, 2>().simple_mult_into_resize(
-                        self.fmm.uc2e_inv_2.view(),
-                        scaled_check_potential,
-                    ),
+                    empty_array::<V, 2>()
+                        .simple_mult_into_resize(self.fmm.uc2e_inv_2.view(), cmp_prod),
                 );
                 for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size) {
                     let multipole =
@@ -432,17 +418,16 @@ where
             .zip(self.leaf_multipoles.into_par_iter())
             .zip(self.scales.par_chunks_exact(self.ncoeffs))
             .for_each(|((check_potential, multipole_ptrs), scale)| {
+                let check_potential = rlst_array_from_slice2!(
+                    V,
+                    check_potential,
+                    [self.ncoeffs, self.ncharge_vectors]
+                );
+
                 let mut scaled_check_potential =
                     rlst_dynamic_array2!(V, [self.ncoeffs, self.ncharge_vectors]);
-                for j in 0..self.ncharge_vectors {
-                    for i in 0..self.ncoeffs {
-                        unsafe {
-                            // TODO: scale[i] or scale[j]
-                            *scaled_check_potential.get_unchecked_mut([i, j]) =
-                                check_potential[j * self.ncoeffs + i] * scale[0];
-                        }
-                    }
-                }
+                scaled_check_potential.fill_from(check_potential);
+                scaled_check_potential.scale_in_place(scale[0]);
 
                 let tmp = empty_array::<V, 2>().simple_mult_into_resize(
                     self.fmm.uc2e_inv_1.view(),
@@ -510,17 +495,12 @@ where
                 for i in 0..nsiblings {
                     let sibling_displacement = i * self.ncoeffs * self.ncharge_vectors;
 
-                    // TODO: remove memory assignment here
-                    let mut child_multipoles_i =
-                        rlst_dynamic_array2!(V, [self.ncoeffs, self.ncharge_vectors]);
-                    for j in 0..self.ncharge_vectors {
-                        for i in 0..self.ncoeffs {
-                            unsafe {
-                                *child_multipoles_i.get_unchecked_mut([i, j]) =
-                                    child_multipoles[sibling_displacement + j * self.ncoeffs + i];
-                            }
-                        }
-                    }
+                    let child_multipoles_i = rlst_array_from_slice2!(
+                        V,
+                        &child_multipoles[sibling_displacement
+                            ..sibling_displacement + self.ncoeffs * self.ncharge_vectors],
+                        [self.ncoeffs, self.ncharge_vectors]
+                    );
 
                     let result_i = empty_array::<V, 2>()
                         .simple_mult_into_resize(self.fmm.m2m[i].view(), child_multipoles_i);

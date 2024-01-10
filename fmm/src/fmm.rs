@@ -290,7 +290,7 @@ where
         let uc2e_inv_1_shape = uc2e_inv_1.shape();
         let uc2e_inv_2_shape = uc2e_inv_2.shape();
 
-        // TODO: this can be simplified
+        // TODO: Remove copy
         let uc2e_inv_1 = uc2e_inv_1
             .data()
             .iter()

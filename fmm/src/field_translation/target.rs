@@ -24,8 +24,8 @@ use crate::{
 
 use rlst_dense::{
     array::empty_array,
-    rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut, UnsafeRandomAccessMut},
+    rlst_array_from_slice2, rlst_dynamic_array2,
+    traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
 impl<T, U, V> TargetTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
@@ -264,13 +264,11 @@ where
             .into_par_iter()
             .zip(child_locals.par_chunks_exact(nsiblings))
             .for_each(|(parent_local_pointer, child_local_pointers)| {
-                // TODO: remove memory assignment
-                let mut parent_local = rlst_dynamic_array2!(V, [ncoeffs, 1]);
-                for i in 0..ncoeffs {
-                    unsafe {
-                        *parent_local.get_unchecked_mut([i, 0]) = *parent_local_pointer.raw.add(i)
-                    }
-                }
+                let parent_local = rlst_array_from_slice2!(
+                    V,
+                    unsafe { std::slice::from_raw_parts(parent_local_pointer.raw, ncoeffs) },
+                    [ncoeffs, 1]
+                );
 
                 for (i, child_local_pointer) in child_local_pointers.iter().enumerate().take(8) {
                     let tmp = empty_array::<V, 2>()

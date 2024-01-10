@@ -33,6 +33,8 @@ use super::hadamard::matmul8x8;
 
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
+    use rlst_dense::rlst_array_from_slice2;
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -436,18 +438,16 @@ pub mod uniform {
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
-            // TODO: remove memory assignment?
-            let mut multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
-            for j in 0..nsources {
-                for i in 0..ncoeffs {
-                    unsafe {
-                        *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles
-                            [level as usize][0]
-                            .raw
-                            .add(j * ncoeffs + i);
-                    }
-                }
-            }
+            let multipoles = rlst_array_from_slice2!(
+                U,
+                unsafe {
+                    std::slice::from_raw_parts(
+                        self.level_multipoles[level as usize][0].raw,
+                        ncoeffs * nsources,
+                    )
+                },
+                [ncoeffs, nsources]
+            );
 
             let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
             let c_dim = [nrows, self.fmm.m2l.k];
@@ -585,19 +585,16 @@ pub mod uniform {
 
                 // Interpret multipoles as a matrix
 
-                // TODO: remove memory assignment
-                let mut multipoles =
-                    rlst_dynamic_array2!(U, [self.ncoeffs, nsources * self.ncharge_vectors]);
-                for j in 0..nsources * self.ncharge_vectors {
-                    for i in 0..self.ncoeffs {
-                        unsafe {
-                            *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles
-                                [level as usize][0][0]
-                                .raw
-                                .add(j * self.ncoeffs * self.ncharge_vectors + i);
-                        }
-                    }
-                }
+                let multipoles = rlst_array_from_slice2!(
+                    U,
+                    unsafe {
+                        std::slice::from_raw_parts(
+                            self.level_multipoles[level as usize][0][0].raw,
+                            self.ncoeffs * nsources * self.ncharge_vectors,
+                        )
+                    },
+                    [self.ncoeffs, nsources * self.ncharge_vectors]
+                );
 
                 let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
                 let c_dim = [nrows, self.fmm.m2l.k];
@@ -680,6 +677,8 @@ pub mod uniform {
 
 /// Field translations defined on adaptively refined
 pub mod adaptive {
+    use rlst_dense::rlst_array_from_slice2;
+
     use super::*;
 
     impl<T, U> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -832,11 +831,8 @@ pub mod adaptive {
                     let target_local =
                         unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
 
-                    // TODO: remove memory assignment
-                    let mut check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
-                    check_potential_mat
-                        .data_mut()
-                        .copy_from_slice(check_potential);
+                    let check_potential_mat =
+                        rlst_array_from_slice2!(U, check_potential, [ncoeffs, 1]);
 
                     let scale = self.fmm.kernel().scale(level);
                     let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
@@ -1207,13 +1203,8 @@ pub mod adaptive {
                     let target_local =
                         unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
 
-                    // TODO: remove memory assignment
-                    let mut check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
-                    for (i, &elem) in check_potential.iter().enumerate() {
-                        unsafe {
-                            *check_potential_mat.get_unchecked_mut([i, 0]) = elem;
-                        }
-                    }
+                    let check_potential_mat =
+                        rlst_array_from_slice2!(U, check_potential, [ncoeffs, 1]);
 
                     let scale = self.fmm.kernel().scale(level);
                     let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
