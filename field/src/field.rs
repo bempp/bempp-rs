@@ -1,5 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use cauchy::Scalar;
+use rlst_common::types::Scalar;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
