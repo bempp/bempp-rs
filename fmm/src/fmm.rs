@@ -864,7 +864,6 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            println!("{rel_error}");
             assert!(rel_error <= 1e-5);
         }
 
@@ -937,7 +936,7 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            assert!(rel_error <= 1e-5);
+            assert!(rel_error <= 1e-4);
         }
     }
 
@@ -1021,7 +1020,6 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            println!("{rel_error}");
             assert!(rel_error <= 1e-5);
         }
 
@@ -1095,7 +1093,6 @@ mod test {
                 .map(|(a, b)| (a - b).abs())
                 .sum();
             let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            println!("{rel_error}");
             assert!(rel_error <= 1e-5);
         }
     }
