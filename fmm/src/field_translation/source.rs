@@ -24,7 +24,7 @@ use crate::{
 use bempp_traits::types::Scalar;
 use rlst_dense::{
     array::empty_array,
-    rlst_dynamic_array2,
+    rlst_array_from_slice2, rlst_dynamic_array2,
     traits::{MultIntoResize, RawAccess, RawAccessMut, UnsafeRandomAccessMut},
 };
 
@@ -71,7 +71,7 @@ where
                     if nsources > 0 {
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
-                            &coordinates,
+                            coordinates,
                             upward_check_surface,
                             charges,
                             check_potential,
@@ -89,23 +89,20 @@ where
             .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
             .zip(self.scales.par_chunks_exact(ncoeffs * chunk_size))
             .for_each(|((check_potential, multipole_ptrs), scale)| {
-                let mut scaled_check_potential = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
-                for j in 0..chunk_size {
-                    for i in 0..ncoeffs {
-                        // TODO: should it be scale[i] or scale[j] in the following line?
-                        unsafe {
-                            *scaled_check_potential.get_unchecked_mut([i, j]) =
-                                scale[i] * *check_potential.get_unchecked(j * ncoeffs + i);
-                        }
-                    }
-                }
+                //let check_potential = unsafe { rlst_pointer_mat!['a, V, check_potential.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)] };
+                //let scale = unsafe {rlst_pointer_mat!['a, V, scale.as_ptr(), (ncoeffs, chunk_size), (1, ncoeffs)]}.eval();
+
+                let check_potential =
+                    rlst_array_from_slice2!(V, check_potential, [ncoeffs, chunk_size]);
+                let scale = rlst_array_from_slice2!(V, scale, [ncoeffs, chunk_size]);
+
+                let mut cmp_prod = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
+                cmp_prod.fill_from(check_potential * scale);
 
                 let tmp = empty_array::<V, 2>().simple_mult_into_resize(
                     self.fmm.uc2e_inv_1.view(),
-                    empty_array::<V, 2>().simple_mult_into_resize(
-                        self.fmm.uc2e_inv_2.view(),
-                        scaled_check_potential.view(),
-                    ),
+                    empty_array::<V, 2>()
+                        .simple_mult_into_resize(self.fmm.uc2e_inv_2.view(), cmp_prod),
                 );
 
                 for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size) {
@@ -418,7 +415,7 @@ where
 
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
-                                &coordinates,
+                                coordinates,
                                 upward_check_surface,
                                 charges_i,
                                 check_potential_i,
@@ -854,8 +851,6 @@ mod test {
         let (l, r) = datatree.charge_index_pointer[leaf_idx];
         let leaf_coordinates = &coordinates[l * 3..r * 3];
 
-        let nsources = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
-
         let charges = &datatree.charges[l..r];
 
         let kernel = Laplace3dKernel::<f64>::default();
@@ -939,15 +934,13 @@ mod test {
         let (l, r) = datatree.charge_index_pointer[leaf_idx];
         let leaf_coordinates = &coordinates[l * 3..r * 3];
 
-        let nsources = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
-
         let charges = &datatree.charges[l..r];
 
         let kernel = Laplace3dKernel::<f64>::default();
 
         kernel.evaluate_st(
             EvalType::Value,
-            &leaf_coordinates,
+            leaf_coordinates,
             &test_point,
             charges,
             &mut expected,
@@ -1025,7 +1018,6 @@ mod test {
         let ncoordinates = coordinates.len() / datatree.fmm.kernel.space_dimension();
         let (l, r) = datatree.charge_index_pointer[leaf_idx];
         let leaf_coordinates = &coordinates[l * 3..r * 3];
-        let nsources = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
         for i in 0..ncharge_vecs {
             let charge_vec_displacement = i * ncoordinates;
@@ -1034,7 +1026,7 @@ mod test {
 
             datatree.fmm.kernel.evaluate_st(
                 EvalType::Value,
-                &leaf_coordinates,
+                leaf_coordinates,
                 &test_point,
                 charges,
                 &mut expected[i..i + 1],

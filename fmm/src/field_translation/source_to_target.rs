@@ -814,7 +814,7 @@ pub mod adaptive {
                             if nsources > 0 {
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    &sources,
+                                    sources,
                                     downward_surface,
                                     charges,
                                     check_potential,
@@ -1189,7 +1189,7 @@ pub mod adaptive {
                             if nsources > 0 {
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    &sources,
+                                    sources,
                                     downward_surface,
                                     charges,
                                     check_potential,
@@ -1209,9 +1209,9 @@ pub mod adaptive {
 
                     // TODO: remove memory assignment
                     let mut check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
-                    for i in 0..ncoeffs {
+                    for (i, &elem) in check_potential.iter().enumerate() {
                         unsafe {
-                            *check_potential_mat.get_unchecked_mut([i, 0]) = check_potential[i];
+                            *check_potential_mat.get_unchecked_mut([i, 0]) = elem;
                         }
                     }
 

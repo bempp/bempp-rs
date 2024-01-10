@@ -2,7 +2,7 @@
 use itertools::Itertools;
 use num::Float;
 use rlst_common::types::Scalar;
-use std::{collections::HashMap, time::Instant};
+use std::time::Instant;
 
 use rlst_dense::{
     array::{empty_array, Array},
@@ -26,7 +26,7 @@ use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmL
 use crate::{pinv::pinv, types::KiFmmLinear};
 
 /// Implementation of constructor for single node KiFMM
-impl<'a, T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
+impl<T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
@@ -218,7 +218,7 @@ where
 }
 
 /// Implementation of constructor for single node KiFMM
-impl<'a, T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
+impl<T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
@@ -875,9 +875,9 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                &leaf_coordinates[..],
-                &all_charges[..],
-                &mut direct[..],
+                leaf_coordinates,
+                &all_charges,
+                &mut direct,
             );
 
             let abs_error: f64 = potentials
@@ -941,9 +941,9 @@ mod test {
             datatree.fmm.kernel().evaluate_st(
                 EvalType::Value,
                 points.data(),
-                &leaf_coordinates,
-                &all_charges[..],
-                &mut direct[..],
+                leaf_coordinates,
+                &all_charges,
+                &mut direct,
             );
 
             let abs_error: f64 = potentials
@@ -1019,9 +1019,9 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                &leaf_coordinates,
-                &all_charges[..],
-                &mut direct[..],
+                leaf_coordinates,
+                &all_charges,
+                &mut direct,
             );
 
             let abs_error: f64 = potentials
@@ -1086,9 +1086,9 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                &leaf_coordinates[..],
-                &all_charges[..],
-                &mut direct[..],
+                leaf_coordinates,
+                &all_charges,
+                &mut direct,
             );
 
             let abs_error: f64 = potentials
@@ -1176,7 +1176,7 @@ mod test {
                 datatree.fmm.kernel().evaluate_st(
                     EvalType::Value,
                     points,
-                    &leaf_coordinates,
+                    leaf_coordinates,
                     all_charges,
                     &mut direct,
                 );

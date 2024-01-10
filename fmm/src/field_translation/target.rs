@@ -143,7 +143,7 @@ where
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
                             leaf_downward_equivalent_surface,
-                            &target_coordinates,
+                            target_coordinates,
                             unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) },
                             result,
                         );
@@ -204,8 +204,8 @@ where
                                 };
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    &sources,
-                                    &targets,
+                                    sources,
+                                    targets,
                                     charges,
                                     result,
                                 );
@@ -326,7 +326,7 @@ where
                             self.fmm.kernel.evaluate_st(
                                 EvalType::Value,
                                 surface,
-                                &targets,
+                                targets,
                                 multipole,
                                 result,
                             )
@@ -370,7 +370,7 @@ where
                         self.fmm.kernel.evaluate_st(
                             EvalType::Value,
                             leaf_downward_equivalent_surface,
-                            &target_coordinates,
+                            target_coordinates,
                             unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) },
                             result,
                         );
@@ -429,8 +429,8 @@ where
                                 };
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    &sources,
-                                    &targets,
+                                    sources,
+                                    targets,
                                     charges,
                                     result,
                                 );
@@ -559,7 +559,7 @@ where
                             self.fmm.kernel().evaluate_st(
                                 EvalType::Value,
                                 leaf_downward_equivalent_surface,
-                                &target_coordinates,
+                                target_coordinates,
                                 local_expansion,
                                 result,
                             );
