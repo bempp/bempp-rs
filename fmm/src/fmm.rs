@@ -10,7 +10,7 @@ use rlst_dense::{
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut},
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut},
 };
 
 use bempp_traits::{
@@ -24,10 +24,7 @@ use bempp_traits::{
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
 use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
-use crate::{
-    pinv::{pinv, SvdScalar},
-    types::KiFmmLinear,
-};
+use crate::{pinv::pinv, types::KiFmmLinear};
 
 /// Implementation of constructor for single node KiFMM
 impl<'a, T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
@@ -226,9 +223,8 @@ impl<'a, T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float,
-    SvdScalar<V>: PartialOrd,
-    SvdScalar<V>: Scalar + Float + ToPrimitive,
+    V: Scalar<Real = V> + Default + Float + Gemm,
+    Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
     /// the associated single node octree, and the associated kernel function.
@@ -257,83 +253,84 @@ where
         let nequiv_surface = upward_equivalent_surface.len() / kernel.space_dimension();
         let ncheck_surface = upward_check_surface.len() / kernel.space_dimension();
 
-        // Store in RLST matrices
-        let upward_equivalent_surface = unsafe {
-            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, upward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
-        };
-        let upward_check_surface = unsafe {
-            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, upward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
-        };
-        let downward_equivalent_surface = unsafe {
-            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, downward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
-        };
-        let downward_check_surface = unsafe {
-            rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
-        };
-
         // Compute upward check to equivalent, and downward check to equivalent Gram matrices
         // as well as their inverses using DGESVD.
-        let mut uc2e = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+        let mut uc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
         kernel.assemble_st(
             EvalType::Value,
-            upward_equivalent_surface.data(),
-            upward_check_surface.data(),
-            uc2e.data_mut(),
+            &upward_equivalent_surface,
+            &upward_check_surface,
+            uc2e_t.data_mut(),
         );
 
         // Need to tranapose so that rows correspond to targets and columns to sources
-        let uc2e = uc2e.transpose().eval();
+        let mut uc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+        uc2e.fill_from(uc2e_t.transpose());
 
-        let mut dc2e = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+        let mut dc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
         kernel.assemble_st(
             EvalType::Value,
-            downward_equivalent_surface.data(),
-            downward_check_surface.data(),
-            dc2e.data_mut(),
+            &downward_equivalent_surface,
+            &downward_check_surface,
+            dc2e_t.data_mut(),
         );
 
         // Need to tranapose so that rows correspond to targets and columns to sources
-        let dc2e = dc2e.transpose().eval();
+        let mut dc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+        dc2e.fill_from(dc2e_t.transpose());
 
         let (s, ut, v) = pinv::<V>(&uc2e, None, None).unwrap();
 
-        let mut mat_s = rlst_dynamic_mat![SvdScalar<V>, (s.len(), s.len())];
+        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
         for i in 0..s.len() {
-            mat_s[[i, i]] = SvdScalar::<V>::from_real(s[i]);
+            mat_s[[i, i]] = V::from_real(s[i]);
         }
-        let uc2e_inv_1 = v.dot(&mat_s);
+        let uc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
         let uc2e_inv_2 = ut;
 
         let uc2e_inv_1_shape = uc2e_inv_1.shape();
         let uc2e_inv_2_shape = uc2e_inv_2.shape();
 
+        // TODO: this can be simplified
         let uc2e_inv_1 = uc2e_inv_1
             .data()
             .iter()
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
-        let uc2e_inv_1 = unsafe {
-            rlst_pointer_mat!['a, V, uc2e_inv_1.as_ptr(), uc2e_inv_1_shape, (1, uc2e_inv_1_shape.0)]
+        let mut uc2e_inv_1_mat = rlst_dynamic_array2!(V, uc2e_inv_1_shape);
+        for j in 0..uc2e_inv_1_shape[1] {
+            for i in 0..uc2e_inv_1_shape[0] {
+                unsafe {
+                    *uc2e_inv_1_mat.get_unchecked_mut([i, j]) =
+                        uc2e_inv_1[uc2e_inv_1_shape[0] * j + i]
+                }
+            }
         }
-        .eval();
+
         let uc2e_inv_2 = uc2e_inv_2
             .data()
             .iter()
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
-        let uc2e_inv_2 = unsafe {
-            rlst_pointer_mat!['a, V, uc2e_inv_2.as_ptr(), uc2e_inv_2_shape, (1, uc2e_inv_2_shape.0)]
+
+        let mut uc2e_inv_2_mat = rlst_dynamic_array2!(V, uc2e_inv_2_shape);
+        for j in 0..uc2e_inv_2_shape[1] {
+            for i in 0..uc2e_inv_2_shape[0] {
+                unsafe {
+                    *uc2e_inv_2_mat.get_unchecked_mut([i, j]) =
+                        uc2e_inv_2[uc2e_inv_2_shape[0] * j + i]
+                }
+            }
         }
-        .eval();
 
         let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
 
-        let mut mat_s = rlst_dynamic_mat![SvdScalar<V>, (s.len(), s.len())];
+        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
         for i in 0..s.len() {
-            mat_s[[i, i]] = SvdScalar::<V>::from_real(s[i]);
+            mat_s[[i, i]] = V::from_real(s[i]);
         }
 
-        let dc2e_inv_1 = v.dot(&mat_s);
+        let dc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
         let dc2e_inv_2 = ut;
 
         let dc2e_inv_1_shape = dc2e_inv_1.shape();
@@ -344,19 +341,30 @@ where
             .iter()
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
-        let dc2e_inv_1 = unsafe {
-            rlst_pointer_mat!['a, V, dc2e_inv_1.as_ptr(), dc2e_inv_1_shape, (1, dc2e_inv_1_shape.0)]
+        let mut dc2e_inv_1_mat = rlst_dynamic_array2!(V, dc2e_inv_1_shape);
+        for j in 0..dc2e_inv_1_shape[1] {
+            for i in 0..dc2e_inv_1_shape[0] {
+                unsafe {
+                    *dc2e_inv_1_mat.get_unchecked_mut([i, j]) =
+                        dc2e_inv_1[dc2e_inv_1_shape[0] * j + i]
+                }
+            }
         }
-        .eval();
+
         let dc2e_inv_2 = dc2e_inv_2
             .data()
             .iter()
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
-        let dc2e_inv_2 = unsafe {
-            rlst_pointer_mat!['a, V, dc2e_inv_2.as_ptr(), dc2e_inv_2_shape, (1, dc2e_inv_2_shape.0)]
+        let mut dc2e_inv_2_mat = rlst_dynamic_array2!(V, dc2e_inv_2_shape);
+        for j in 0..dc2e_inv_2_shape[1] {
+            for i in 0..dc2e_inv_2_shape[0] {
+                unsafe {
+                    *dc2e_inv_2_mat.get_unchecked_mut([i, j]) =
+                        dc2e_inv_2[dc2e_inv_2_shape[0] * j + i]
+                }
+            }
         }
-        .eval();
 
         // Calculate M2M/L2L matrices
         let children = ROOT.children();
@@ -368,40 +376,42 @@ where
                 child.compute_surface(tree.get_domain(), order, alpha_inner);
             let child_downward_check_surface =
                 child.compute_surface(tree.get_domain(), order, alpha_inner);
-            let child_upward_equivalent_surface = unsafe {
-                rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, child_upward_equivalent_surface.as_ptr(), (nequiv_surface, kernel.space_dimension()), (1, nequiv_surface)]
-            };
-            let child_downward_check_surface = unsafe {
-                rlst_pointer_mat!['a, <V as cauchy::Scalar>::Real, child_downward_check_surface.as_ptr(), (ncheck_surface, kernel.space_dimension()), (1, ncheck_surface)]
-            };
 
-            let mut pc2ce = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+            let mut pc2ce_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
 
             kernel.assemble_st(
                 EvalType::Value,
-                child_upward_equivalent_surface.data(),
-                upward_check_surface.data(),
-                pc2ce.data_mut(),
+                &child_upward_equivalent_surface,
+                &upward_check_surface,
+                pc2ce_t.data_mut(),
             );
 
             // Need to transpose so that rows correspond to targets, and columns to sources
-            let pc2ce = pc2ce.transpose().eval();
+            let mut pc2ce = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+            pc2ce.fill_from(pc2ce_t.transpose());
 
-            let tmp = uc2e_inv_1.dot(&uc2e_inv_2.dot(&pc2ce)).eval();
+            let tmp = empty_array::<V, 2>().simple_mult_into_resize(
+                uc2e_inv_1_mat.view(),
+                empty_array::<V, 2>().simple_mult_into_resize(uc2e_inv_2_mat.view(), pc2ce.view()),
+            );
             m2m.push(tmp);
 
-            let mut cc2pe = rlst_dynamic_mat![V, (ncheck_surface, nequiv_surface)];
+            let mut cc2pe_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
 
             kernel.assemble_st(
                 EvalType::Value,
-                downward_equivalent_surface.data(),
-                child_downward_check_surface.data(),
-                cc2pe.data_mut(),
+                &downward_equivalent_surface,
+                &child_downward_check_surface,
+                cc2pe_t.data_mut(),
             );
 
             // Need to transpose so that rows correspond to targets, and columns to sources
-            let cc2pe = cc2pe.transpose().eval();
-            let mut tmp = dc2e_inv_1.dot(&dc2e_inv_2.dot(&cc2pe)).eval();
+            let mut cc2pe = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+            cc2pe.fill_from(cc2pe_t.transpose());
+            let mut tmp = empty_array::<V, 2>().simple_mult_into_resize(
+                dc2e_inv_1_mat.view(),
+                empty_array::<V, 2>().simple_mult_into_resize(dc2e_inv_2_mat.view(), cc2pe.view()),
+            );
             tmp.data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= kernel.scale(child.level()));
@@ -411,10 +421,10 @@ where
 
         Self {
             order,
-            uc2e_inv_1,
-            uc2e_inv_2,
-            dc2e_inv_1,
-            dc2e_inv_2,
+            uc2e_inv_1: uc2e_inv_1_mat,
+            uc2e_inv_2: uc2e_inv_2_mat,
+            dc2e_inv_1: dc2e_inv_1_mat,
+            dc2e_inv_2: dc2e_inv_2_mat,
             alpha_inner,
             alpha_outer,
             m2m,
@@ -925,10 +935,6 @@ mod test {
 
             let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
-            let leaf_coordinates = unsafe {
-                rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
-            }.eval();
-
             let mut direct = vec![0f64; ntargets];
 
             let all_charges = charge_dict.into_values().collect_vec();
@@ -936,7 +942,7 @@ mod test {
             datatree.fmm.kernel().evaluate_st(
                 EvalType::Value,
                 points.data(),
-                leaf_coordinates.data(),
+                &leaf_coordinates,
                 &all_charges[..],
                 &mut direct[..],
             );
@@ -1005,10 +1011,6 @@ mod test {
 
             let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
-            let leaf_coordinates = unsafe {
-                rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
-            }.eval();
-
             let mut direct = vec![0f64; ntargets];
 
             let all_charges = charge_dict.into_values().collect_vec();
@@ -1018,7 +1020,7 @@ mod test {
             kernel.evaluate_st(
                 EvalType::Value,
                 points.data(),
-                leaf_coordinates.data(),
+                &leaf_coordinates,
                 &all_charges[..],
                 &mut direct[..],
             );
@@ -1159,10 +1161,6 @@ mod test {
 
             let ntargets = leaf_coordinates.len() / datatree.fmm.kernel.space_dimension();
 
-            let leaf_coordinates = unsafe {
-                rlst_pointer_mat!['static, f64, leaf_coordinates.as_ptr(), (ntargets, datatree.fmm.kernel.space_dimension()), (datatree.fmm.kernel.space_dimension(), 1)]
-            }.eval();
-
             for (i, charge_dict) in charge_dicts
                 .iter()
                 .enumerate()
@@ -1179,7 +1177,7 @@ mod test {
                 datatree.fmm.kernel().evaluate_st(
                     EvalType::Value,
                     points,
-                    leaf_coordinates.data(),
+                    &leaf_coordinates,
                     all_charges,
                     &mut direct,
                 );

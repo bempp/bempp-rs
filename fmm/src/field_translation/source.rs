@@ -46,7 +46,7 @@ where
 
         let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
 
-        let mut check_potentials = rlst_col_vec![V, nleaves * ncoeffs];
+        let mut check_potentials = rlst_dynamic_array2!(V, [nleaves * ncoeffs, 1]);
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
         let dim = self.fmm.kernel.space_dimension();
 
@@ -212,6 +212,8 @@ where
         let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
         let mut check_potentials = rlst_dynamic_array2!(V, [nleaves * ncoeffs, 1]);
+        let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
+        let dim = self.fmm.kernel.space_dimension();
         let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
 
         // 1. Compute the check potential for each box
@@ -363,7 +365,7 @@ impl<T, U, V> SourceTranslation
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
@@ -377,7 +379,7 @@ where
         let ncoordinates = coordinates.len() / dim;
 
         let mut check_potentials =
-            rlst_col_vec![V, self.nleaves * self.ncoeffs * self.ncharge_vectors];
+            rlst_dynamic_array2!(V, [self.nleaves * self.ncoeffs * self.ncharge_vectors, 1]);
 
         // 1. Compute the check potential for each box for each charge vector
         check_potentials
@@ -496,7 +498,6 @@ where
             .for_each(|(child_multipoles, parent_multipole_pointers)| {
                 for i in 0..nsiblings {
                     let sibling_displacement = i * self.ncoeffs * self.ncharge_vectors;
-                    let ptr = unsafe { child_multipoles.as_ptr().add(sibling_displacement) };
 
                     // TODO: remove memory assignment here
                     let mut child_multipoles_i =
@@ -511,7 +512,7 @@ where
                     }
 
                     let result_i = empty_array::<V, 2>()
-                        .simple_mult_into_resize(self.fmm.m2m[i].vire(), child_multipoles_i);
+                        .simple_mult_into_resize(self.fmm.m2m[i].view(), child_multipoles_i);
 
                     for (j, send_ptr) in parent_multipole_pointers
                         .iter()

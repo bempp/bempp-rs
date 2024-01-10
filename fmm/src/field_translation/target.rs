@@ -82,7 +82,8 @@ where
                 }
 
                 for i in 0..nsiblings {
-                    let tmp = self.fmm.l2l[i].dot(&parent_locals).eval();
+                    let tmp = empty_array::<V, 2>()
+                        .simple_mult_into_resize(self.fmm.l2l[i].view(), parent_locals.view());
 
                     for j in 0..chunk_size {
                         let chunk_displacement = j * nsiblings;
@@ -263,7 +264,8 @@ where
                 }
 
                 for (i, child_local_pointer) in child_local_pointers.iter().enumerate().take(8) {
-                    let tmp = self.fmm.l2l[i].dot(&parent_local).eval();
+                    let tmp = empty_array::<V, 2>()
+                        .simple_mult_into_resize(self.fmm.l2l[i].view(), parent_local.view());
                     let child_local =
                         unsafe { std::slice::from_raw_parts_mut(child_local_pointer.raw, ncoeffs) };
                     child_local
@@ -436,7 +438,7 @@ impl<T, U, V> TargetTranslation
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {
@@ -486,7 +488,8 @@ where
 
                 for (i, child_locals_i) in child_locals_pointers.iter().enumerate().take(nsiblings)
                 {
-                    let result_i = self.fmm.l2l[i].dot(&parent_locals).eval();
+                    let result_i = empty_array::<V, 2>()
+                        .simple_mult_into_resize(self.fmm.l2l[i].view(), parent_locals.view());
 
                     for (j, child_locals_ij) in
                         child_locals_i.iter().enumerate().take(self.ncharge_vectors)

@@ -43,8 +43,9 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
         Complex<U>: Scalar,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
             let nneighbors = 26;
@@ -96,8 +97,9 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
         Complex<U>: Scalar,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l(&self, _level: u64) {}
 
@@ -376,8 +378,9 @@ pub mod uniform {
             + std::marker::Sync
             + Default,
         U: Scalar<Real = U>,
-        U: Float + Default,
+        U: Float + Default + Gemm,
         U: std::marker::Send + std::marker::Sync + Default,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l(&self, _level: u64) {}
 
@@ -444,7 +447,8 @@ pub mod uniform {
             let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
             let c_dim = [nrows, self.fmm.m2l.k];
 
-            let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+            let mut compressed_multipoles = empty_array::<U, 2>()
+                .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
 
             compressed_multipoles
                 .data_mut()
@@ -452,17 +456,26 @@ pub mod uniform {
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
             (0..316).into_par_iter().for_each(|c_idx| {
-                let top_left = (0, c_idx * self.fmm.m2l.k);
-                let c_sub = self.fmm.m2l.operator_data.c.block(top_left, c_dim);
+                let top_left = [0, c_idx * self.fmm.m2l.k];
+                let c_sub = self
+                    .fmm
+                    .m2l
+                    .operator_data
+                    .c
+                    .view()
+                    .into_subview(top_left, c_dim);
 
-                let locals = self.fmm.dc2e_inv_1.dot(
-                    &self.fmm.dc2e_inv_2.dot(
-                        &self
-                            .fmm
-                            .m2l
-                            .operator_data
-                            .u
-                            .dot(&c_sub.dot(&compressed_multipoles)),
+                let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_2.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.m2l.operator_data.u.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                c_sub.view(),
+                                compressed_multipoles.view(),
+                            ),
+                        ),
                     ),
                 );
 
@@ -514,8 +527,9 @@ pub mod uniform {
                 + std::marker::Sync
                 + Default,
             U: Scalar<Real = U>,
-            U: Float + Default,
+            U: Float + Default + Gemm,
             U: std::marker::Send + std::marker::Sync + Default,
+            Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
         {
             fn p2l(&self, _level: u64) {}
 
@@ -575,7 +589,7 @@ pub mod uniform {
                             *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles
                                 [level as usize][0][0]
                                 .raw
-                                .add(j * ncoeffs * self.ncharge_vectors + i);
+                                .add(j * self.ncoeffs * self.ncharge_vectors + i);
                         }
                     }
                 }
@@ -583,8 +597,10 @@ pub mod uniform {
                 let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
                 let c_dim = [nrows, self.fmm.m2l.k];
 
-                let mut compressed_multipoles =
-                    self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+                let mut compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.m2l.operator_data.st_block.view(),
+                    multipoles,
+                );
 
                 compressed_multipoles
                     .data_mut()
@@ -592,17 +608,26 @@ pub mod uniform {
                     .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
                 (0..316).into_par_iter().for_each(|c_idx| {
-                    let top_left = (0, c_idx * self.fmm.m2l.k);
-                    let c_sub = self.fmm.m2l.operator_data.c.block(top_left, c_dim);
+                    let top_left = [0, c_idx * self.fmm.m2l.k];
+                    let c_sub = self
+                        .fmm
+                        .m2l
+                        .operator_data
+                        .c
+                        .view()
+                        .into_subview(top_left, c_dim);
 
-                    let locals = self.fmm.dc2e_inv_1.dot(
-                        &self.fmm.dc2e_inv_2.dot(
-                            &self
-                                .fmm
-                                .m2l
-                                .operator_data
-                                .u
-                                .dot(&c_sub.dot(&compressed_multipoles)),
+                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.dc2e_inv_2.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                self.fmm.m2l.operator_data.u.view(),
+                                empty_array::<U, 2>().simple_mult_into_resize(
+                                    c_sub.view(),
+                                    compressed_multipoles.view(),
+                                ),
+                            ),
                         ),
                     );
 
@@ -659,8 +684,9 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
         Complex<U>: Scalar,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
             let nneighbors = 26;
@@ -711,9 +737,11 @@ pub mod adaptive {
             + ScaleInvariantKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
-            + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+            + Default
+            + Gemm,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
         Complex<U>: Scalar,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l<'a>(&self, level: u64) {
             let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -789,8 +817,10 @@ pub mod adaptive {
                         unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
 
                     // TODO: remove memory assignment
-                    let check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
-                    check_potential_mat.fill_from_slice(check_potential);
+                    let mut check_potential_mat = rlst_dynamic_array2!(U, [ncoeffs, 1]);
+                    check_potential_mat
+                        .data_mut()
+                        .copy_from_slice(check_potential);
 
                     let scale = self.fmm.kernel().scale(level);
                     let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
@@ -1030,7 +1060,7 @@ pub mod adaptive {
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
                 .for_each(|(check_potential_chunk, local_ptrs)| {
                     // Map to surface grid
-                    let mut potential_chunk = rlst_dynamic_array2!(T, [ncoeffs, nsiblings]);
+                    let mut potential_chunk = rlst_dynamic_array2!(U, [ncoeffs, nsiblings]);
                     for i in 0..nsiblings {
                         for (surf_idx, &conv_idx) in
                             self.fmm.m2l.conv_to_surf_map.iter().enumerate()
@@ -1084,8 +1114,9 @@ pub mod adaptive {
             + std::marker::Sync
             + Default,
         U: Scalar<Real = U>,
-        U: Float + Default,
+        U: Float + Default + Gemm,
         U: std::marker::Send + std::marker::Sync + Default,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l<'a>(&self, level: u64) {
             let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -1235,7 +1266,7 @@ pub mod adaptive {
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-            let multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
+            let mut multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
             for j in 0..nsources {
                 for i in 0..ncoeffs {
                     unsafe {
@@ -1261,17 +1292,26 @@ pub mod adaptive {
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
             (0..316).into_par_iter().for_each(|c_idx| {
-                let top_left = (0, c_idx * self.fmm.m2l.k);
-                let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);
+                let top_left = [0, c_idx * self.fmm.m2l.k];
+                let c_sub = self
+                    .fmm
+                    .m2l
+                    .operator_data
+                    .c
+                    .view()
+                    .into_subview(top_left, dim);
 
-                let locals = self.fmm.dc2e_inv_1.dot(
-                    &self.fmm.dc2e_inv_2.dot(
-                        &self
-                            .fmm
-                            .m2l
-                            .operator_data
-                            .u
-                            .dot(&c_sub.dot(&compressed_multipoles)),
+                let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_2.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.m2l.operator_data.u.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                c_sub.view(),
+                                compressed_multipoles.view(),
+                            ),
+                        ),
                     ),
                 );
 
