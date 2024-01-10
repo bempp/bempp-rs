@@ -44,7 +44,7 @@ where
 /// A type to store the M2L field translation meta-data  and datafor an SVD based sparsification in the kernel independent FMM.
 pub struct SvdFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default,
+    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
     U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by when computing operator.

@@ -1,7 +1,7 @@
 //! Implementation of FmmData and Fmm traits.
-use rlst_common::types::Scalar;
 use itertools::Itertools;
 use num::Float;
+use rlst_common::types::Scalar;
 use std::{collections::HashMap, time::Instant};
 
 use rlst_dense::{
@@ -30,7 +30,7 @@ impl<'a, T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float,
+    V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
@@ -222,7 +222,7 @@ impl<'a, T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float,
+    V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to

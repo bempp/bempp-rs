@@ -3,6 +3,7 @@ use rlst_common::types::Scalar;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
+use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -10,8 +11,8 @@ use rlst_dense::{
     linalg::svd::SvdMode,
     rlst_dynamic_array2, rlst_dynamic_array3,
     traits::{
-        MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
-        UnsafeRandomAccessMut, MatrixSvd,
+        MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
+        UnsafeRandomAccessMut,
     },
 };
 use std::collections::HashSet;
@@ -35,7 +36,7 @@ use crate::{
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T>,
+    T: Scalar<Real = T> + Gemm,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -165,7 +166,7 @@ where
 impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T>,
+    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {

@@ -96,7 +96,13 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -376,7 +382,7 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U>,
+        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
         U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
@@ -525,7 +531,7 @@ pub mod uniform {
                 + std::marker::Send
                 + std::marker::Sync
                 + Default,
-            U: Scalar<Real = U>,
+            U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
             U: Float + Default,
             U: std::marker::Send + std::marker::Sync + Default,
             Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
@@ -683,7 +689,13 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -737,7 +749,13 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -1111,7 +1129,7 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U>,
+        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
         U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,

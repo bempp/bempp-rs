@@ -99,7 +99,7 @@ mod test {
     #[test]
     fn test_pinv() {
         let dim: usize = 5;
-        let mat = rlst_dynamic_array2!(f64, [dim, dim]);
+        let mut mat = rlst_dynamic_array2!(f64, [dim, dim]);
         mat.fill_from_seed_equally_distributed(0);
 
         let (s, ut, v) = pinv::<f64>(&mat, None, None).unwrap();
