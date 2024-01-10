@@ -3,7 +3,6 @@ use cauchy::Scalar;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
-use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -35,7 +34,7 @@ use crate::{
 
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
 where
-    T: Float + Default + Gemm,
+    T: Float + Default,
     T: Scalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
@@ -165,7 +164,7 @@ where
 
 impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
-    T: Float + Default + Gemm,
+    T: Float + Default,
     T: Scalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
