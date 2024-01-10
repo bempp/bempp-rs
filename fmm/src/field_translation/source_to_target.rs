@@ -26,8 +26,10 @@ use rlst_dense::{
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessMut},
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
 };
+
+use rlst_dense::traits::RandomAccessMut;
 
 use super::hadamard::matmul8x8;
 
@@ -335,10 +337,8 @@ pub mod uniform {
                         for (surf_idx, &conv_idx) in
                             self.fmm.m2l.conv_to_surf_map.iter().enumerate()
                         {
-                            unsafe {
-                                *potential_chunk.get_unchecked_mut([surf_idx, i]) =
-                                    check_potential_chunk[i * size + conv_idx];
-                            }
+                            *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                                check_potential_chunk[i * size + conv_idx];
                         }
                     }
 
@@ -1077,10 +1077,8 @@ pub mod adaptive {
                         for (surf_idx, &conv_idx) in
                             self.fmm.m2l.conv_to_surf_map.iter().enumerate()
                         {
-                            unsafe {
-                                *potential_chunk.get_unchecked_mut([surf_idx, i]) =
-                                    check_potential_chunk[i * size + conv_idx];
-                            }
+                            *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                                check_potential_chunk[i * size + conv_idx];
                         }
                     }
 
@@ -1273,17 +1271,16 @@ pub mod adaptive {
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-            let mut multipoles = rlst_dynamic_array2!(U, [ncoeffs, nsources]);
-            for j in 0..nsources {
-                for i in 0..ncoeffs {
-                    unsafe {
-                        *multipoles.get_unchecked_mut([i, j]) = *self.level_multipoles
-                            [level as usize][0]
-                            .raw
-                            .add(j * ncoeffs + i);
-                    }
-                }
-            }
+            let multipoles = rlst_array_from_slice2!(
+                U,
+                unsafe {
+                    std::slice::from_raw_parts(
+                        self.level_multipoles[level as usize][0].raw,
+                        ncoeffs * nsources,
+                    )
+                },
+                [ncoeffs, nsources]
+            );
 
             let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
             let dim = [nrows, self.fmm.m2l.k];

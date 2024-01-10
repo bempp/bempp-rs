@@ -92,10 +92,11 @@ where
 
         let mu = se2tc_fat.shape()[0];
         let nvt = se2tc_fat.shape()[1];
+        let k = std::cmp::min(mu, nvt);
 
-        let mut u_big = rlst_dynamic_array2!(T, [mu, mu]);
-        let mut sigma = vec![T::zero(); mu];
-        let mut vt_big = rlst_dynamic_array2!(T, [mu, nvt]);
+        let mut u_big = rlst_dynamic_array2!(T, [mu, k]);
+        let mut sigma = vec![T::zero(); k];
+        let mut vt_big = rlst_dynamic_array2!(T, [k, nvt]);
 
         se2tc_fat
             .into_svd_alloc(
@@ -121,9 +122,10 @@ where
         // Store compressed M2L operators
         let thin_nrows = se2tc_thin.shape()[0];
         let nst = se2tc_thin.shape()[1];
-        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, nst]);
-        let mut _r = vec![T::zero(); nst];
-        let mut st = rlst_dynamic_array2!(T, [nst, nst]);
+        let k = std::cmp::min(thin_nrows, nst);
+        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, k]);
+        let mut _r = vec![T::zero(); k];
+        let mut st = rlst_dynamic_array2!(T, [k, nst]);
 
         se2tc_thin
             .into_svd_alloc(

@@ -50,12 +50,13 @@ where
         })
     } else {
         // For matrices compute the full SVD
-        let mut u = rlst_dynamic_array2!(T, [shape[0], shape[0]]);
-        let mut s = vec![T::zero(); shape[0]];
-        let mut vt = rlst_dynamic_array2!(T, [shape[0], shape[1]]);
+        let k = std::cmp::min(shape[0], shape[1]);
+        let mut u = rlst_dynamic_array2!(T, [shape[0], k]);
+        let mut s = vec![T::zero(); k];
+        let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
 
         // TODO: work out why it fails without this copy and remove this copy
-        let mut mat_copy = rlst_dynamic_array2!(T, mat.shape());
+        let mut mat_copy = rlst_dynamic_array2!(T, shape);
         mat_copy.fill_from(mat.view());
         mat_copy
             .into_svd_alloc(u.view_mut(), vt.view_mut(), &mut s[..], SvdMode::Reduced)

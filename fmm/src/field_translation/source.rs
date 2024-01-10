@@ -25,7 +25,7 @@ use bempp_traits::types::Scalar;
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut, UnsafeRandomAccessMut},
+    traits::{MultIntoResize, RandomAccessMut, RawAccess, RawAccessMut},
 };
 
 impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
@@ -340,10 +340,8 @@ where
                         rlst_dynamic_array2!(V, [ncoeffs * nsiblings, chunk_size]);
                     for j in 0..chunk_size {
                         for i in 0..ncoeffs * nsiblings {
-                            unsafe {
-                                *child_multipoles_chunk_mat.get_unchecked_mut([i, j]) =
-                                    child_multipoles_chunk[j * ncoeffs * nsiblings + i];
-                            }
+                            *child_multipoles_chunk_mat.get_mut([i, j]).unwrap() =
+                                child_multipoles_chunk[j * ncoeffs * nsiblings + i];
                         }
                     }
                     let parent_multipoles_chunk = empty_array::<V, 2>()
