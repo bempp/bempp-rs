@@ -290,37 +290,22 @@ where
         let uc2e_inv_1_shape = uc2e_inv_1.shape();
         let uc2e_inv_2_shape = uc2e_inv_2.shape();
 
-        // TODO: Remove copy
+        // TODO: Can this be reduced to one copy?
         let uc2e_inv_1 = uc2e_inv_1
             .data()
             .iter()
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
         let mut uc2e_inv_1_mat = rlst_dynamic_array2!(V, uc2e_inv_1_shape);
-        for j in 0..uc2e_inv_1_shape[1] {
-            for i in 0..uc2e_inv_1_shape[0] {
-                unsafe {
-                    *uc2e_inv_1_mat.get_unchecked_mut([i, j]) =
-                        uc2e_inv_1[uc2e_inv_1_shape[0] * j + i]
-                }
-            }
-        }
+        uc2e_inv_1_mat.data_mut().copy_from_slice(&uc2e_inv_1);
 
         let uc2e_inv_2 = uc2e_inv_2
             .data()
             .iter()
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
-
         let mut uc2e_inv_2_mat = rlst_dynamic_array2!(V, uc2e_inv_2_shape);
-        for j in 0..uc2e_inv_2_shape[1] {
-            for i in 0..uc2e_inv_2_shape[0] {
-                unsafe {
-                    *uc2e_inv_2_mat.get_unchecked_mut([i, j]) =
-                        uc2e_inv_2[uc2e_inv_2_shape[0] * j + i]
-                }
-            }
-        }
+        uc2e_inv_2_mat.data_mut().copy_from_slice(&uc2e_inv_2);
 
         let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
 
@@ -341,14 +326,7 @@ where
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
         let mut dc2e_inv_1_mat = rlst_dynamic_array2!(V, dc2e_inv_1_shape);
-        for j in 0..dc2e_inv_1_shape[1] {
-            for i in 0..dc2e_inv_1_shape[0] {
-                unsafe {
-                    *dc2e_inv_1_mat.get_unchecked_mut([i, j]) =
-                        dc2e_inv_1[dc2e_inv_1_shape[0] * j + i]
-                }
-            }
-        }
+        dc2e_inv_1_mat.data_mut().copy_from_slice(&dc2e_inv_1);
 
         let dc2e_inv_2 = dc2e_inv_2
             .data()
@@ -356,14 +334,7 @@ where
             .map(|x| V::from(*x).unwrap())
             .collect_vec();
         let mut dc2e_inv_2_mat = rlst_dynamic_array2!(V, dc2e_inv_2_shape);
-        for j in 0..dc2e_inv_2_shape[1] {
-            for i in 0..dc2e_inv_2_shape[0] {
-                unsafe {
-                    *dc2e_inv_2_mat.get_unchecked_mut([i, j]) =
-                        dc2e_inv_2[dc2e_inv_2_shape[0] * j + i]
-                }
-            }
-        }
+        dc2e_inv_2_mat.data_mut().copy_from_slice(&dc2e_inv_2);
 
         // Calculate M2M/L2L matrices
         let children = ROOT.children();
