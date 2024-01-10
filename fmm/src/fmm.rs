@@ -4,7 +4,6 @@ use itertools::Itertools;
 use num::Float;
 use std::{collections::HashMap, time::Instant};
 
-use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -31,7 +30,7 @@ impl<'a, T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float + Gemm,
+    V: Scalar<Real = V> + Default + Float,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
@@ -223,7 +222,7 @@ impl<'a, T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float + Gemm,
+    V: Scalar<Real = V> + Default + Float,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to

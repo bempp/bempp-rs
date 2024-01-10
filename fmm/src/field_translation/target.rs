@@ -22,7 +22,6 @@ use crate::{
     },
 };
 
-use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
     array::empty_array,
     rlst_dynamic_array2,
@@ -33,7 +32,7 @@ impl<T, U, V> TargetTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {
@@ -217,7 +216,7 @@ impl<T, U, V> TargetTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {
@@ -438,7 +437,7 @@ impl<T, U, V> TargetTranslation
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {

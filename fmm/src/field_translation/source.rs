@@ -22,7 +22,6 @@ use crate::{
     },
 };
 use bempp_traits::types::Scalar;
-use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
     array::empty_array,
     rlst_dynamic_array2,
@@ -33,7 +32,7 @@ impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
@@ -200,7 +199,7 @@ impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
@@ -365,7 +364,7 @@ impl<T, U, V> SourceTranslation
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send + Gemm,
+    V: Scalar<Real = V> + Float + Default + std::marker::Sync + std::marker::Send,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {

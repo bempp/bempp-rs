@@ -1,6 +1,5 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use num::{Float, Zero};
-use rlst_blis::interface::gemm::Gemm;
 use rlst_common::types::{RlstError, RlstResult, Scalar};
 use rlst_dense::{
     array::{empty_array, Array},
@@ -34,7 +33,7 @@ pub fn pinv<T>(
 ) -> PinvReturnType<T>
 where
     //DenseMatrixLinAlgBuilder<T>: Svd,
-    T: Scalar<Real = T> + Float + Gemm,
+    T: Scalar<Real = T> + Float,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     let shape = mat.shape();

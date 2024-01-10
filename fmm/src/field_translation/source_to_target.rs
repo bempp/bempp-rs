@@ -21,7 +21,6 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use crate::helpers::find_chunk_size;
 use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
 
-use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -43,7 +42,7 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -97,7 +96,7 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -378,7 +377,7 @@ pub mod uniform {
             + std::marker::Sync
             + Default,
         U: Scalar<Real = U>,
-        U: Float + Default + Gemm,
+        U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -527,7 +526,7 @@ pub mod uniform {
                 + std::marker::Sync
                 + Default,
             U: Scalar<Real = U>,
-            U: Float + Default + Gemm,
+            U: Float + Default,
             U: std::marker::Send + std::marker::Sync + Default,
             Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
         {
@@ -684,7 +683,7 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -737,9 +736,8 @@ pub mod adaptive {
             + ScaleInvariantKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
-            + Default
-            + Gemm,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft + Gemm,
+            + Default,
+        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
         Complex<U>: Scalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
@@ -1114,7 +1112,7 @@ pub mod adaptive {
             + std::marker::Sync
             + Default,
         U: Scalar<Real = U>,
-        U: Float + Default + Gemm,
+        U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
