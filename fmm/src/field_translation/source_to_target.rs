@@ -651,8 +651,9 @@ pub mod uniform {
                     for (result_idx, &save_idx) in displacements.iter().enumerate() {
                         if save_idx > -1 {
                             let save_idx = save_idx as usize;
+                            let local_lock = level_locals[save_idx].lock().unwrap();
+
                             for charge_vec_idx in 0..self.ncharge_vectors {
-                                let local_lock = level_locals[save_idx].lock().unwrap();
                                 let local_send_ptr = local_lock[charge_vec_idx];
                                 let local_ptr = local_send_ptr.raw;
 
