@@ -464,7 +464,7 @@ pub mod uniform {
 
             let level_locals = self.level_locals[level as usize]
                 .iter()
-                .map(|l| Mutex::new(l))
+                .map(Mutex::new)
                 .collect_vec();
 
             (0..316).into_par_iter().for_each(|c_idx| {
@@ -619,7 +619,7 @@ pub mod uniform {
 
                 let level_locals = self.level_locals[level as usize]
                     .iter()
-                    .map(|inner_vec| Mutex::new(inner_vec))
+                    .map(Mutex::new)
                     .collect_vec();
 
                 (0..316).into_par_iter().for_each(|c_idx| {
@@ -652,8 +652,6 @@ pub mod uniform {
                         if save_idx > -1 {
                             let save_idx = save_idx as usize;
                             for charge_vec_idx in 0..self.ncharge_vectors {
-                                // let local_ptr =
-                                //     self.level_locals[level as usize][save_idx][charge_vec_idx].raw;
                                 let local_lock = level_locals[save_idx].lock().unwrap();
                                 let local_send_ptr = local_lock[charge_vec_idx];
                                 let local_ptr = local_send_ptr.raw;
