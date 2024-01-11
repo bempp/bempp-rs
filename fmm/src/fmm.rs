@@ -818,7 +818,7 @@ mod test {
                 test_idx_vec.push(idx);
             }
         }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
 
         let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
 
@@ -907,7 +907,7 @@ mod test {
                 test_idx_vec.push(idx);
             }
         }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
 
         let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
 
@@ -950,7 +950,7 @@ mod test {
             "rel_error = {rel_error} = {abs_error} / {}",
             direct.iter().sum::<f64>()
         );
-        assert!(rel_error <= 1e-3);
+        assert!(rel_error <= 1e-5);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1169,7 +1169,7 @@ mod test {
                 test_idx_vec.push(idx);
             }
         }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
 
         let &leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
         let (l, r) = datatree.charge_index_pointer[leaf_idx];
