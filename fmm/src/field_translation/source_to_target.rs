@@ -462,7 +462,10 @@ pub mod uniform {
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-            let level_locals = self.level_locals[level as usize].iter().map(|l| Mutex::new(l)).collect_vec();
+            let level_locals = self.level_locals[level as usize]
+                .iter()
+                .map(|l| Mutex::new(l))
+                .collect_vec();
 
             (0..316).into_par_iter().for_each(|c_idx| {
                 let top_left = [0, c_idx * self.fmm.m2l.k];
@@ -614,6 +617,11 @@ pub mod uniform {
                     .iter_mut()
                     .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
+                let level_locals = self.level_locals[level as usize]
+                    .iter()
+                    .map(|inner_vec| Mutex::new(inner_vec))
+                    .collect_vec();
+
                 (0..316).into_par_iter().for_each(|c_idx| {
                     let top_left = [0, c_idx * self.fmm.m2l.k];
                     let c_sub = self
@@ -640,22 +648,15 @@ pub mod uniform {
 
                     let displacements = &all_displacements[c_idx];
 
-                    let level_locals = self.level_locals[level as usize]
-                        .iter()
-                        .map(|inner_vec|
-                            inner_vec
-                            .into_iter()
-                            .map(|ptr| Mutex::new(ptr.clone())).collect_vec()
-                            ).collect_vec();
-
                     for (result_idx, &save_idx) in displacements.iter().enumerate() {
                         if save_idx > -1 {
                             let save_idx = save_idx as usize;
                             for charge_vec_idx in 0..self.ncharge_vectors {
                                 // let local_ptr =
                                 //     self.level_locals[level as usize][save_idx][charge_vec_idx].raw;
-                                let local_lock = level_locals[save_idx][charge_vec_idx].lock().unwrap();
-                                let local_ptr = local_lock.raw;
+                                let local_lock = level_locals[save_idx].lock().unwrap();
+                                let local_send_ptr = local_lock[charge_vec_idx];
+                                let local_ptr = local_send_ptr.raw;
 
                                 let local = unsafe {
                                     std::slice::from_raw_parts_mut(local_ptr, self.ncoeffs)
