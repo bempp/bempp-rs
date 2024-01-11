@@ -67,7 +67,7 @@ mod test {
     use bempp_traits::element::{Continuity, ElementFamily};
     // use num::complex::Complex;
     use bempp_traits::bem::FunctionSpace;
-    use rlst_dense::RandomAccessByRef;
+    use rlst_dense::traits::RandomAccessByRef;
 
     #[test]
     fn test_laplace_single_layer() {
@@ -88,7 +88,7 @@ mod test {
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 
         let mut matrix =
-            zero_matrix::<f64>((space1.dofmap().global_size(), space0.dofmap().global_size()));
+            zero_matrix::<f64>([space1.dofmap().global_size(), space0.dofmap().global_size()]);
         batched::assemble(
             &mut matrix,
             &Laplace3dKernel::new(),
@@ -99,7 +99,7 @@ mod test {
         );
 
         let mut matrix2 =
-            zero_matrix::<f64>((space1.dofmap().global_size(), space0.dofmap().global_size()));
+            zero_matrix::<f64>([space1.dofmap().global_size(), space0.dofmap().global_size()]);
 
         assemble_batched(
             &mut matrix2,
@@ -112,8 +112,8 @@ mod test {
         for i in 0..space1.dofmap().global_size() {
             for j in 0..space0.dofmap().global_size() {
                 assert_relative_eq!(
-                    *matrix.get(i, j).unwrap(),
-                    *matrix2.get(i, j).unwrap(),
+                    *matrix.get([i, j]).unwrap(),
+                    *matrix2.get([i, j]).unwrap(),
                     epsilon = 0.0001
                 );
             }

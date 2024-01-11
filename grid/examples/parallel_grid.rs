@@ -15,7 +15,7 @@ use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, request::WaitGuard, topology::Communicator, traits::*};
 #[cfg(feature = "mpi")]
-use rlst_dense::RandomAccessMut;
+use rlst_dense::traits::RandomAccessMut;
 
 #[cfg(feature = "mpi")]
 fn test_parallel_grid() {
@@ -29,13 +29,13 @@ fn test_parallel_grid() {
     let n = 10;
 
     let grid = if rank == 0 {
-        let mut pts = zero_matrix((n * n, 3));
+        let mut pts = zero_matrix([n * n, 3]);
         let mut i = 0;
         for y in 0..n {
             for x in 0..n {
-                *pts.get_mut(i, 0).unwrap() = x as f64 / (n - 1) as f64;
-                *pts.get_mut(i, 1).unwrap() = y as f64 / (n - 1) as f64;
-                *pts.get_mut(i, 2).unwrap() = 0.0;
+                *pts.get_mut([i, 0]).unwrap() = x as f64 / (n - 1) as f64;
+                *pts.get_mut([i, 1]).unwrap() = y as f64 / (n - 1) as f64;
+                *pts.get_mut([i, 2]).unwrap() = 0.0;
                 i += 1;
             }
         }

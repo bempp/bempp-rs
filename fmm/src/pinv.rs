@@ -1,20 +1,20 @@
 //! Implementation of Moore-Penrose PseudoInverse
-use num::{Float, Zero};
-use rlst::algorithms::linalg::{DenseMatrixLinAlgBuilder, LinAlg};
-use rlst::algorithms::traits::svd::{Mode, Svd};
-use rlst::dense::{
-    base_matrix::BaseMatrix, data_container::VectorContainer, matrix::Matrix, Dynamic, Shape,
+use num::Float;
+use rlst_common::types::{RlstError, RlstResult, Scalar};
+use rlst_dense::{
+    array::Array,
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    linalg::svd::SvdMode,
+    rlst_dynamic_array2,
+    traits::{MatrixSvd, Shape},
 };
-// use rlst_common::traits::*;
-use rlst::common::traits::{Eval, Transpose};
-use rlst::common::types::{RlstError, RlstResult, Scalar};
-use rlst::dense::MatrixD;
 
-pub type PinvMatrix<T> = Matrix<T, BaseMatrix<T, VectorContainer<T>, Dynamic>, Dynamic>;
+pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-type PinvReturnType<T> = RlstResult<(Vec<<T as Scalar>::Real>, MatrixD<T>, MatrixD<T>)>;
+type PinvReturnType<T> = RlstResult<(Vec<<T as Scalar>::Real>, PinvMatrix<T>, PinvMatrix<T>)>;
 
-pub type SvdScalar<T> = <DenseMatrixLinAlgBuilder<T> as Svd>::T;
+//pub type SvdScalar<T> = <DenseMatrixLinAlgBuilder<T> as Svd>::T;
 
 /// Compute the (Moore-Penrose) pseudo-inverse of a matrix.
 ///
@@ -30,52 +30,61 @@ pub fn pinv<T>(
     mat: &PinvMatrix<T>,
     atol: Option<T::Real>,
     rtol: Option<T::Real>,
-) -> PinvReturnType<SvdScalar<T>>
+) -> PinvReturnType<T>
 where
-    DenseMatrixLinAlgBuilder<T>: Svd,
-    SvdScalar<T>: PartialOrd,
-    SvdScalar<T>: Scalar + Float,
-    T: Scalar + Float,
+    //DenseMatrixLinAlgBuilder<T>: Svd,
+    T: Scalar<Real = T> + Float,
+    Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     let shape = mat.shape();
 
-    if shape.0 == 0 || shape.1 == 0 {
-        return Err(RlstError::MatrixIsEmpty(shape));
+    if shape[0] == 0 || shape[1] == 0 {
+        return Err(RlstError::MatrixIsEmpty((shape[0], shape[1])));
     }
 
     // If we have a vector return error
-    if shape.0 == 1 || shape.1 == 1 {
+    if shape[0] == 1 || shape[1] == 1 {
         Err(RlstError::SingleDimensionError {
             expected: 2,
             actual: 1,
         })
     } else {
         // For matrices compute the full SVD
-        let (mut s, u, vt) = mat.linalg().svd(Mode::All, Mode::All)?;
-        let u = u.unwrap();
-        let vt = vt.unwrap();
+        let k = std::cmp::min(shape[0], shape[1]);
+        let mut u = rlst_dynamic_array2!(T, [shape[0], k]);
+        let mut s = vec![T::zero(); k];
+        let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
+
+        // TODO: work out why it fails without this copy and remove this copy
+        let mut mat_copy = rlst_dynamic_array2!(T, shape);
+        mat_copy.fill_from(mat.view());
+        mat_copy
+            .into_svd_alloc(u.view_mut(), vt.view_mut(), &mut s[..], SvdMode::Reduced)
+            .unwrap();
 
         let eps = T::real(T::epsilon());
-        let max_dim = T::real(std::cmp::max(shape.0, shape.1));
+        let max_dim = T::real(std::cmp::max(shape[0], shape[1]));
 
         let atol = atol.unwrap_or(T::Real::zero());
         let rtol = rtol.unwrap_or(max_dim * eps);
 
         let max_s = s[0];
-        let threshold = SvdScalar::<T>::real(atol + rtol) * SvdScalar::<T>::real(max_s);
+        let threshold = T::real(atol + rtol) * T::real(max_s);
 
         // Filter singular values below this threshold
         for s in s.iter_mut() {
             if *s > threshold {
-                *s = SvdScalar::<T>::real(1.0) / SvdScalar::<T>::real(*s);
+                *s = T::real(1.0) / T::real(*s);
             } else {
-                *s = SvdScalar::<T>::real(0.)
+                *s = T::real(0.)
             }
         }
 
         // Return pseudo-inverse in component form
-        let v = vt.transpose().eval();
-        let ut = u.transpose().eval();
+        let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
+        let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
+        v.fill_from(vt.transpose());
+        ut.fill_from(u.transpose());
 
         Ok((s, ut, v))
     }
@@ -86,34 +95,46 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::common::traits::ColumnMajorIterator;
-    use rlst::common::traits::NewLikeSelf;
-    use rlst::dense::{rlst_dynamic_mat, rlst_rand_mat, Dot};
+    use rlst_dense::{
+        array::empty_array,
+        rlst_dynamic_array2,
+        traits::{MultIntoResize, RandomAccessByRef},
+    };
 
     #[test]
     fn test_pinv() {
         let dim: usize = 5;
-        let mat = rlst_rand_mat![f64, (dim, dim)];
+        let mut mat = rlst_dynamic_array2!(f64, [dim, dim]);
+        mat.fill_from_seed_equally_distributed(0);
 
         let (s, ut, v) = pinv::<f64>(&mat, None, None).unwrap();
 
-        let mut mat_s = rlst_dynamic_mat![f64, (s.len(), s.len())];
+        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
 
-        let inv = v.dot(&mat_s).dot(&ut);
+        let inv = empty_array::<f64, 2>().simple_mult_into_resize(
+            v.view(),
+            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.view(), ut.view()),
+        );
 
-        let actual = inv.dot(&mat);
+        let actual = empty_array::<f64, 2>().simple_mult_into_resize(inv.view(), mat.view());
 
         // Expect the identity matrix
-        let mut expected = actual.new_like_self();
+        let mut expected = rlst_dynamic_array2!(f64, actual.shape());
         for i in 0..dim {
             expected[[i, i]] = 1.0
         }
 
-        for (a, e) in actual.iter_col_major().zip(expected.iter_col_major()) {
-            assert_relative_eq!(a, e, epsilon = 1E-13);
+        for i in 0..actual.shape()[0] {
+            for j in 0..actual.shape()[1] {
+                assert_relative_eq!(
+                    *actual.get([i, j]).unwrap(),
+                    *expected.get([i, j]).unwrap(),
+                    epsilon = 1E-13
+                );
+            }
         }
     }
 }

@@ -29,6 +29,8 @@ root_dir = os.path.dirname(os.path.realpath(__file__))
 
 files = []
 for folder in os.listdir(root_dir):
+    if folder in ["fmm"]:
+        continue
     if not folder.startswith("."):
         sub_dir = os.path.join(root_dir, folder)
         example_dir = os.path.join(sub_dir, "examples")

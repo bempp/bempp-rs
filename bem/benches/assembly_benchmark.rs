@@ -24,7 +24,7 @@ pub fn full_assembly_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
 
         group.bench_function(
             &format!(
@@ -62,7 +62,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix((space.dofmap().global_size(), space.dofmap().global_size()));
+        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
 
         let colouring = space.compute_cell_colouring();
 
@@ -101,8 +101,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                     batched::assemble_nonsingular::<16, 16>(
                         &mut matrix,
                         &laplace_3d::Laplace3dKernel::new(),
-                        false,
-                        false,
                         &space,
                         &space,
                         &colouring,

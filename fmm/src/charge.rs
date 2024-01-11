@@ -1,8 +1,8 @@
 //! Helper functions to handle charge data.
 use std::collections::HashMap;
 
-use cauchy::Scalar;
 use num::Float;
+use rlst_common::types::Scalar;
 
 use crate::types::{Charge, ChargeDict, GlobalIdx};
 

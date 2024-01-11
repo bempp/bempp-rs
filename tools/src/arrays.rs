@@ -1,176 +1,38 @@
 //! Containers to store multi-dimensional data
-use bempp_traits::arrays::{AdjacencyListAccess, Array3DAccess, Array4DAccess};
+use bempp_traits::arrays::AdjacencyListAccess;
 use num::Num;
-use rlst_dense::{operations::transpose::Scalar, rlst_dynamic_mat, UnsafeRandomAccessMut};
-use std::clone::Clone;
+use rlst_common::types::Scalar;
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+    traits::UnsafeRandomAccessMut,
+};
 
-pub type Mat<T> = rlst_dense::Matrix<
-    T,
-    rlst_dense::base_matrix::BaseMatrix<T, rlst_dense::VectorContainer<T>, rlst_dense::Dynamic>,
-    rlst_dense::Dynamic,
->;
+pub type Mat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type Array3D<T> = Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>;
+pub type Array4D<T> = Array<T, BaseArray<T, VectorContainer<T>, 4>, 4>;
 
-pub fn to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
-    let mut mat = rlst_dynamic_mat![T, shape];
+pub fn to_matrix<T: Scalar>(data: &[T], shape: [usize; 2]) -> Mat<T> {
+    let mut mat = rlst_dynamic_array2![T, shape];
     for (i, d) in data.iter().enumerate() {
         unsafe {
-            *mat.get_unchecked_mut(i % shape.0, i / shape.0) = *d;
+            *mat.get_unchecked_mut([i % shape[0], i / shape[0]]) = *d;
         }
     }
     mat
 }
 
-pub fn transpose_to_matrix<T: Scalar>(data: &[T], shape: (usize, usize)) -> Mat<T> {
-    let mut mat = rlst_dynamic_mat![T, shape];
+pub fn transpose_to_matrix<T: Scalar>(data: &[T], shape: [usize; 2]) -> Mat<T> {
+    let mut mat = rlst_dynamic_array2![T, shape];
     for (i, d) in data.iter().enumerate() {
         unsafe {
-            *mat.get_unchecked_mut(i / shape.1, i % shape.1) = *d;
+            *mat.get_unchecked_mut([i / shape[1], i % shape[1]]) = *d;
         }
     }
     mat
 }
 
-pub fn zero_matrix<T: Scalar>(shape: (usize, usize)) -> Mat<T> {
-    rlst_dynamic_mat![T, shape]
-}
-
-/// A three-dimensional rectangular array
-#[derive(Clone)]
-pub struct Array3D<T: Num> {
-    /// The data in the array, in row-major order
-    data: Vec<T>,
-    /// The shape of the array
-    shape: (usize, usize, usize),
-}
-
-impl<T: Num + Clone> Array3D<T> {
-    /// Create an array from a data vector
-    pub fn new(shape: (usize, usize, usize)) -> Self {
-        Self {
-            data: vec![T::zero(); shape.0 * shape.1 * shape.2],
-            shape,
-        }
-    }
-    /// Create an array from a data vector
-    pub fn from_data(data: Vec<T>, shape: (usize, usize, usize)) -> Self {
-        assert_eq!(data.len(), shape.0 * shape.1 * shape.2);
-        Self { data, shape }
-    }
-}
-
-impl<T: Num> Array3DAccess<T> for Array3D<T> {
-    fn get(&self, index0: usize, index1: usize, index2: usize) -> Option<&T> {
-        if index0 >= self.shape.0 || index1 >= self.shape.1 || index2 >= self.shape.2 {
-            None
-        } else {
-            unsafe { Some(self.get_unchecked(index0, index1, index2)) }
-        }
-    }
-    fn get_mut(&mut self, index0: usize, index1: usize, index2: usize) -> Option<&mut T> {
-        if index0 >= self.shape.0 || index1 >= self.shape.1 || index2 >= self.shape.2 {
-            None
-        } else {
-            unsafe { Some(self.get_unchecked_mut(index0, index1, index2)) }
-        }
-    }
-    unsafe fn get_unchecked(&self, index0: usize, index1: usize, index2: usize) -> &T {
-        self.data
-            .get_unchecked((index0 * self.shape.1 + index1) * self.shape.2 + index2)
-    }
-    unsafe fn get_unchecked_mut(&mut self, index0: usize, index1: usize, index2: usize) -> &mut T {
-        self.data
-            .get_unchecked_mut((index0 * self.shape.1 + index1) * self.shape.2 + index2)
-    }
-    fn shape(&self) -> &(usize, usize, usize) {
-        &self.shape
-    }
-
-    fn get_data(&self) -> &[T] {
-        &self.data
-    }
-
-    fn get_data_mut(&mut self) -> &mut [T] {
-        &mut self.data
-    }
-}
-
-/// A four-dimensional rectangular array
-pub struct Array4D<T: Num> {
-    /// The data in the array, in row-major order
-    data: Vec<T>,
-    /// The shape of the array
-    shape: (usize, usize, usize, usize),
-}
-
-impl<T: Num + Clone> Array4D<T> {
-    /// Create an array from a data vector
-    pub fn new(shape: (usize, usize, usize, usize)) -> Self {
-        Self {
-            data: vec![T::zero(); shape.0 * shape.1 * shape.2 * shape.3],
-            shape,
-        }
-    }
-    /// Create an array from a data vector
-    pub fn from_data(data: Vec<T>, shape: (usize, usize, usize, usize)) -> Self {
-        assert_eq!(data.len(), shape.0 * shape.1 * shape.2 * shape.3);
-        Self { data, shape }
-    }
-}
-
-impl<T: Num> Array4DAccess<T> for Array4D<T> {
-    fn get(&self, index0: usize, index1: usize, index2: usize, index3: usize) -> Option<&T> {
-        if index0 >= self.shape.0
-            || index1 >= self.shape.1
-            || index2 >= self.shape.2
-            || index3 >= self.shape.3
-        {
-            None
-        } else {
-            unsafe { Some(self.get_unchecked(index0, index1, index2, index3)) }
-        }
-    }
-    fn get_mut(
-        &mut self,
-        index0: usize,
-        index1: usize,
-        index2: usize,
-        index3: usize,
-    ) -> Option<&mut T> {
-        if index0 >= self.shape.0
-            || index1 >= self.shape.1
-            || index2 >= self.shape.2
-            || index3 >= self.shape.3
-        {
-            None
-        } else {
-            unsafe { Some(self.get_unchecked_mut(index0, index1, index2, index3)) }
-        }
-    }
-    unsafe fn get_unchecked(
-        &self,
-        index0: usize,
-        index1: usize,
-        index2: usize,
-        index3: usize,
-    ) -> &T {
-        self.data.get_unchecked(
-            ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
-        )
-    }
-    unsafe fn get_unchecked_mut(
-        &mut self,
-        index0: usize,
-        index1: usize,
-        index2: usize,
-        index3: usize,
-    ) -> &mut T {
-        self.data.get_unchecked_mut(
-            ((index0 * self.shape.1 + index1) * self.shape.2 + index2) * self.shape.3 + index3,
-        )
-    }
-    fn shape(&self) -> &(usize, usize, usize, usize) {
-        &self.shape
-    }
+pub fn zero_matrix<T: Scalar>(shape: [usize; 2]) -> Mat<T> {
+    rlst_dynamic_array2![T, shape]
 }
 
 /// An adjacency list

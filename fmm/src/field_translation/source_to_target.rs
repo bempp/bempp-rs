@@ -14,23 +14,29 @@ use bempp_traits::{
     fmm::{Fmm, InteractionLists},
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::EvalType,
+    types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use crate::helpers::find_chunk_size;
 use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
 
-use rlst::{
-    algorithms::{linalg::DenseMatrixLinAlgBuilder, traits::svd::Svd},
-    common::traits::*,
-    dense::{rlst_pointer_mat, traits::*, Dot, MultiplyAdd, VectorContainer},
+use rlst_dense::{
+    array::{empty_array, Array},
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    rlst_dynamic_array2,
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
 };
+
+use rlst_dense::traits::RandomAccessMut;
 
 use super::hadamard::matmul8x8;
 
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
+    use rlst_dense::rlst_array_from_slice2;
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -42,15 +48,7 @@ pub mod uniform {
             + Default,
         U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
         Complex<U>: Scalar,
-        U: MultiplyAdd<
-            U,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            Dynamic,
-            Dynamic,
-            Dynamic,
-        >,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
             let nneighbors = 26;
@@ -102,17 +100,15 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        U: MultiplyAdd<
-            U,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            Dynamic,
-            Dynamic,
-            Dynamic,
-        >,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l(&self, _level: u64) {}
 
@@ -335,33 +331,31 @@ pub mod uniform {
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
                 .for_each(|(check_potential_chunk, local_ptrs)| {
                     // Map to surface grid
-                    let mut potential_buffer = vec![U::zero(); ncoeffs * nsiblings];
+                    let mut potential_chunk = rlst_dynamic_array2!(U, [ncoeffs, nsiblings]);
+
                     for i in 0..nsiblings {
-                        let tmp = &mut potential_buffer[i * ncoeffs..(i + 1) * ncoeffs];
-                        let check_potential = &check_potential_chunk[i * size..(i + 1) * size];
-                        for (surf_idx, &conv_idx) in self.fmm.m2l.conv_to_surf_map.iter().enumerate() {
-                            tmp[surf_idx] = check_potential[conv_idx];
+                        for (surf_idx, &conv_idx) in
+                            self.fmm.m2l.conv_to_surf_map.iter().enumerate()
+                        {
+                            *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                                check_potential_chunk[i * size + conv_idx];
                         }
                     }
 
                     // Can now find local expansion coefficients
-                    let potential_chunk = unsafe {
-                        rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
-                    };
-
-                    let local_chunk = self
-                        .fmm
-                        .dc2e_inv_1
-                        .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
-                        .eval();
-
+                    let local_chunk = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>()
+                            .simple_mult_into_resize(self.fmm.dc2e_inv_2.view(), potential_chunk),
+                    );
 
                     local_chunk
                         .data()
                         .chunks_exact(ncoeffs)
                         .zip(local_ptrs)
                         .for_each(|(result, local)| {
-                            let local = unsafe { std::slice::from_raw_parts_mut(local.raw, ncoeffs) };
+                            let local =
+                                unsafe { std::slice::from_raw_parts_mut(local.raw, ncoeffs) };
                             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                         });
                 });
@@ -390,20 +384,10 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        DenseMatrixLinAlgBuilder<U>: Svd,
-        U: Scalar<Real = U>,
-        U: Float
-            + Default
-            + MultiplyAdd<
-                U,
-                VectorContainer<U>,
-                VectorContainer<U>,
-                VectorContainer<U>,
-                Dynamic,
-                Dynamic,
-                Dynamic,
-            >,
+        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l(&self, _level: u64) {}
 
@@ -453,32 +437,50 @@ pub mod uniform {
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-            let multipoles = unsafe {
-                rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
-            };
 
-            let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-            let c_dim = (nrows, self.fmm.m2l.k);
+            let multipoles = rlst_array_from_slice2!(
+                U,
+                unsafe {
+                    std::slice::from_raw_parts(
+                        self.level_multipoles[level as usize][0].raw,
+                        ncoeffs * nsources,
+                    )
+                },
+                [ncoeffs, nsources]
+            );
 
-            let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+            let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+            let c_dim = [nrows, self.fmm.m2l.k];
+
+            let mut compressed_multipoles = empty_array::<U, 2>()
+                .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
 
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-            (0..316).into_par_iter().for_each(|c_idx| {
-                let top_left = (0, c_idx * self.fmm.m2l.k);
-                let c_sub = self.fmm.m2l.operator_data.c.block(top_left, c_dim);
+            (0..316).for_each(|c_idx| {
+                let top_left = [0, c_idx * self.fmm.m2l.k];
+                let c_sub = self
+                    .fmm
+                    .m2l
+                    .operator_data
+                    .c
+                    .view()
+                    .into_subview(top_left, c_dim);
 
-                let locals = self.fmm.dc2e_inv_1.dot(
-                    &self.fmm.dc2e_inv_2.dot(
-                        &self
-                            .fmm
-                            .m2l
-                            .operator_data
-                            .u
-                            .dot(&c_sub.dot(&compressed_multipoles)),
+                let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_2.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.m2l.operator_data.u.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                c_sub.view(),
+                                compressed_multipoles.view(),
+                            ),
+                        ),
                     ),
                 );
 
@@ -529,20 +531,10 @@ pub mod uniform {
                 + std::marker::Send
                 + std::marker::Sync
                 + Default,
-            DenseMatrixLinAlgBuilder<U>: Svd,
-            U: Scalar<Real = U>,
-            U: Float
-                + Default
-                + MultiplyAdd<
-                    U,
-                    VectorContainer<U>,
-                    VectorContainer<U>,
-                    VectorContainer<U>,
-                    Dynamic,
-                    Dynamic,
-                    Dynamic,
-                >,
+            U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+            U: Float + Default,
             U: std::marker::Send + std::marker::Sync + Default,
+            Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
         {
             fn p2l(&self, _level: u64) {}
 
@@ -592,33 +584,52 @@ pub mod uniform {
                 }
 
                 // Interpret multipoles as a matrix
-                let multipoles = unsafe {
-                    rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0][0].raw, (self.ncoeffs, nsources * self.ncharge_vectors), (1, self.ncoeffs)]
-                };
 
-                let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-                let c_dim = (nrows, self.fmm.m2l.k);
+                let multipoles = rlst_array_from_slice2!(
+                    U,
+                    unsafe {
+                        std::slice::from_raw_parts(
+                            self.level_multipoles[level as usize][0][0].raw,
+                            self.ncoeffs * nsources * self.ncharge_vectors,
+                        )
+                    },
+                    [self.ncoeffs, nsources * self.ncharge_vectors]
+                );
 
-                let mut compressed_multipoles =
-                    self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+                let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+                let c_dim = [nrows, self.fmm.m2l.k];
+
+                let mut compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.m2l.operator_data.st_block.view(),
+                    multipoles,
+                );
 
                 compressed_multipoles
                     .data_mut()
                     .iter_mut()
                     .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-                (0..316).into_par_iter().for_each(|c_idx| {
-                    let top_left = (0, c_idx * self.fmm.m2l.k);
-                    let c_sub = self.fmm.m2l.operator_data.c.block(top_left, c_dim);
+                (0..316).for_each(|c_idx| {
+                    let top_left = [0, c_idx * self.fmm.m2l.k];
+                    let c_sub = self
+                        .fmm
+                        .m2l
+                        .operator_data
+                        .c
+                        .view()
+                        .into_subview(top_left, c_dim);
 
-                    let locals = self.fmm.dc2e_inv_1.dot(
-                        &self.fmm.dc2e_inv_2.dot(
-                            &self
-                                .fmm
-                                .m2l
-                                .operator_data
-                                .u
-                                .dot(&c_sub.dot(&compressed_multipoles)),
+                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.dc2e_inv_2.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                self.fmm.m2l.operator_data.u.view(),
+                                empty_array::<U, 2>().simple_mult_into_resize(
+                                    c_sub.view(),
+                                    compressed_multipoles.view(),
+                                ),
+                            ),
                         ),
                     );
 
@@ -666,6 +677,8 @@ pub mod uniform {
 
 /// Field translations defined on adaptively refined
 pub mod adaptive {
+    use rlst_dense::rlst_array_from_slice2;
+
     use super::*;
 
     impl<T, U> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -675,17 +688,15 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        U: MultiplyAdd<
-            U,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            Dynamic,
-            Dynamic,
-            Dynamic,
-        >,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
             let nneighbors = 26;
@@ -737,17 +748,15 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        U: MultiplyAdd<
-            U,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            VectorContainer<U>,
-            Dynamic,
-            Dynamic,
-            Dynamic,
-        >,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l<'a>(&self, level: u64) {
             let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -802,15 +811,9 @@ pub mod adaptive {
                             let nsources = sources.len() / dim;
 
                             if nsources > 0 {
-
-                                let sources = unsafe {
-                                    rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                                }
-                                .eval();
-
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    sources.data(),
+                                    sources,
                                     downward_surface,
                                     charges,
                                     check_potential,
@@ -827,15 +830,18 @@ pub mod adaptive {
                 .for_each(|(local_ptr, check_potential)| {
                     let target_local =
                         unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-                    let check_potential = unsafe {
-                        rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
-                    };
+
+                    let check_potential_mat =
+                        rlst_array_from_slice2!(U, check_potential, [ncoeffs, 1]);
 
                     let scale = self.fmm.kernel().scale(level);
-                    let mut tmp = self
-                        .fmm
-                        .dc2e_inv_1
-                        .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                    let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.dc2e_inv_2.view(),
+                            check_potential_mat,
+                        ),
+                    );
                     tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 
                     target_local
@@ -1066,32 +1072,29 @@ pub mod adaptive {
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
                 .for_each(|(check_potential_chunk, local_ptrs)| {
                     // Map to surface grid
-                    let mut potential_buffer = vec![U::zero(); ncoeffs * nsiblings];
+                    let mut potential_chunk = rlst_dynamic_array2!(U, [ncoeffs, nsiblings]);
                     for i in 0..nsiblings {
-                        let tmp = &mut potential_buffer[i * ncoeffs..(i + 1) * ncoeffs];
-                        let check_potential = &check_potential_chunk[i * size..(i + 1) * size];
-                        for (surf_idx, &conv_idx) in self.fmm.m2l.conv_to_surf_map.iter().enumerate() {
-                            tmp[surf_idx] = check_potential[conv_idx];
+                        for (surf_idx, &conv_idx) in
+                            self.fmm.m2l.conv_to_surf_map.iter().enumerate()
+                        {
+                            *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                                check_potential_chunk[i * size + conv_idx];
                         }
                     }
 
-                    // Can now find local expansion coefficients
-                    let potential_chunk = unsafe {
-                        rlst_pointer_mat!['a, U, potential_buffer.as_ptr(), (ncoeffs, nsiblings), (1, ncoeffs)]
-                    };
-
-                    let local_chunk = self
-                        .fmm
-                        .dc2e_inv_1
-                        .dot(&self.fmm.dc2e_inv_2.dot(&potential_chunk))
-                        .eval();
+                    let local_chunk = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>()
+                            .simple_mult_into_resize(self.fmm.dc2e_inv_2.view(), potential_chunk),
+                    );
 
                     local_chunk
                         .data()
                         .chunks_exact(ncoeffs)
                         .zip(local_ptrs)
                         .for_each(|(result, local)| {
-                            let local = unsafe { std::slice::from_raw_parts_mut(local.raw, ncoeffs) };
+                            let local =
+                                unsafe { std::slice::from_raw_parts_mut(local.raw, ncoeffs) };
                             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                         });
                 });
@@ -1120,20 +1123,10 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        DenseMatrixLinAlgBuilder<U>: Svd,
-        U: Scalar<Real = U>,
-        U: Float
-            + Default
-            + MultiplyAdd<
-                U,
-                VectorContainer<U>,
-                VectorContainer<U>,
-                VectorContainer<U>,
-                Dynamic,
-                Dynamic,
-                Dynamic,
-            >,
+        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l<'a>(&self, level: u64) {
             let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -1188,15 +1181,9 @@ pub mod adaptive {
                             let nsources = sources.len() / dim;
 
                             if nsources > 0 {
-
-                                let sources = unsafe {
-                                    rlst_pointer_mat!['a, U, sources.as_ptr(), (nsources, dim), (dim, 1)]
-                                }
-                                .eval();
-
                                 self.fmm.kernel.evaluate_st(
                                     EvalType::Value,
-                                    sources.data(),
+                                    sources,
                                     downward_surface,
                                     charges,
                                     check_potential,
@@ -1213,15 +1200,18 @@ pub mod adaptive {
                 .for_each(|(local_ptr, check_potential)| {
                     let target_local =
                         unsafe { std::slice::from_raw_parts_mut(local_ptr.raw, ncoeffs) };
-                    let check_potential = unsafe {
-                        rlst_pointer_mat!['a, U, check_potential.as_ptr(), (ncoeffs, 1), (1, ncoeffs)]
-                    };
+
+                    let check_potential_mat =
+                        rlst_array_from_slice2!(U, check_potential, [ncoeffs, 1]);
 
                     let scale = self.fmm.kernel().scale(level);
-                    let mut tmp = self
-                        .fmm
-                        .dc2e_inv_1
-                        .dot(&self.fmm.dc2e_inv_2.dot(&check_potential));
+                    let mut tmp = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.dc2e_inv_2.view(),
+                            check_potential_mat,
+                        ),
+                    );
                     tmp.data_mut().iter_mut().for_each(|val| *val *= scale);
 
                     target_local
@@ -1281,32 +1271,51 @@ pub mod adaptive {
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-            let multipoles = unsafe {
-                rlst_pointer_mat!['a, U, self.level_multipoles[level as usize][0].raw, (ncoeffs, nsources), (1, ncoeffs)]
-            };
+            let multipoles = rlst_array_from_slice2!(
+                U,
+                unsafe {
+                    std::slice::from_raw_parts(
+                        self.level_multipoles[level as usize][0].raw,
+                        ncoeffs * nsources,
+                    )
+                },
+                [ncoeffs, nsources]
+            );
 
-            let (nrows, _) = self.fmm.m2l.operator_data.c.shape();
-            let dim = (nrows, self.fmm.m2l.k);
+            let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
+            let dim = [nrows, self.fmm.m2l.k];
 
-            let mut compressed_multipoles = self.fmm.m2l.operator_data.st_block.dot(&multipoles);
+            let mut compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
+                self.fmm.m2l.operator_data.st_block.view(),
+                multipoles.view(),
+            );
 
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-            (0..316).into_par_iter().for_each(|c_idx| {
-                let top_left = (0, c_idx * self.fmm.m2l.k);
-                let c_sub = self.fmm.m2l.operator_data.c.block(top_left, dim);
+            (0..316).for_each(|c_idx| {
+                let top_left = [0, c_idx * self.fmm.m2l.k];
+                let c_sub = self
+                    .fmm
+                    .m2l
+                    .operator_data
+                    .c
+                    .view()
+                    .into_subview(top_left, dim);
 
-                let locals = self.fmm.dc2e_inv_1.dot(
-                    &self.fmm.dc2e_inv_2.dot(
-                        &self
-                            .fmm
-                            .m2l
-                            .operator_data
-                            .u
-                            .dot(&c_sub.dot(&compressed_multipoles)),
+                let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_1.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_2.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.m2l.operator_data.u.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                c_sub.view(),
+                                compressed_multipoles.view(),
+                            ),
+                        ),
                     ),
                 );
 
