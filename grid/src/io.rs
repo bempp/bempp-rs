@@ -122,8 +122,21 @@ mod test {
     use crate::grid::SerialGrid;
     use crate::io::*;
     use crate::shapes::regular_sphere;
-    use bempp_tools::arrays::{to_matrix, AdjacencyList};
+    use bempp_tools::arrays::AdjacencyList;
     use bempp_traits::cell::ReferenceCellType;
+    use rlst_dense::{
+        array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+        traits::RawAccessMut,
+    };
+
+    fn to_matrix(
+        slice: &[f64],
+        shape: [usize; 2],
+    ) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
+        let mut mat = rlst_dynamic_array2!(f64, shape);
+        mat.data_mut().copy_from_slice(slice);
+        mat
+    }
 
     #[test]
     fn test_gmsh_output_regular_sphere() {

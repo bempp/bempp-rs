@@ -17,7 +17,6 @@ use rlst_dense::{
 };
 use std::collections::HashSet;
 
-use bempp_tools::arrays::Array3D;
 use bempp_traits::{field::FieldTranslationData, kernel::Kernel, types::EvalType};
 use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
@@ -504,7 +503,7 @@ where
         order: usize,
         convolution_grid: &[T],
         target_pt: [T; 3],
-    ) -> Array3D<T> {
+    ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3> {
         let n = 2 * order - 1;
         let npad = n + 1;
 
@@ -538,7 +537,11 @@ where
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `charges` - A vector of charges.
-    pub fn compute_signal(&self, order: usize, charges: &[T]) -> Array3D<T> {
+    pub fn compute_signal(
+        &self,
+        order: usize,
+        charges: &[T],
+    ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3> {
         let n = 2 * order - 1;
         let npad = n + 1;
 

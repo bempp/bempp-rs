@@ -2,11 +2,14 @@
 
 use crate::grid::SerialGrid;
 use bempp_element::cell::Triangle;
-use bempp_tools::arrays::{to_matrix, zero_matrix, AdjacencyList};
+use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::grid::{Geometry, Grid, Topology};
-use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut};
+use rlst_dense::{
+    rlst_dynamic_array2,
+    traits::{RandomAccessByRef, RandomAccessMut, RawAccessMut},
+};
 
 /// Create a regular sphere
 ///
@@ -14,14 +17,12 @@ use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut};
 /// Each time the grid is refined, each triangle is split into four triangles (by adding lines connecting the midpoints of
 /// each edge). The new points are then scaled so that they are a distance of 1 from the origin.
 pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
+    let mut points = rlst_dynamic_array2!(f64, [6, 3]);
+    points.data_mut().copy_from_slice(&[
+        0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0,
+    ]);
     let mut g = SerialGrid::new(
-        to_matrix(
-            &[
-                0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                0.0, -1.0,
-            ],
-            [6, 3],
-        ),
+        points,
         AdjacencyList::from_data(
             vec![
                 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
@@ -35,7 +36,7 @@ pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
         let nvertices_old = g.topology().entity_count(0);
         let ncells_old = g.topology().entity_count(2);
         let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
-        let mut coordinates = zero_matrix([nvertices, 3]);
+        let mut coordinates = rlst_dynamic_array2!(f64, [nvertices, 3]);
         let mut cells = AdjacencyList::<usize>::new();
 
         for i in 0..ncells_old {
@@ -109,10 +110,12 @@ mod test {
     fn test_normal_is_outward() {
         for i in 0..3 {
             let g = regular_sphere(i);
-            let points = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], [1, 2]);
+            let mut points = rlst_dynamic_array2!(f64, [1, 2]);
+            *points.get_mut([0, 0]).unwrap() = 1.0 / 3.0;
+            *points.get_mut([0, 1]).unwrap() = 1.0 / 3.0;
 
-            let mut mapped_pt = zero_matrix([1, 3]);
-            let mut normal = zero_matrix([1, 3]);
+            let mut mapped_pt = rlst_dynamic_array2!(f64, [1, 3]);
+            let mut normal = rlst_dynamic_array2!(f64, [1, 3]);
 
             for i in 0..g.geometry().cell_count() {
                 g.geometry().compute_points(&points, i, &mut mapped_pt);

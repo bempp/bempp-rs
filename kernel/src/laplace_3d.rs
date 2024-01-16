@@ -365,13 +365,19 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use bempp_tools::arrays::Mat;
     use bempp_traits::types::Scalar;
     use rand::prelude::*;
-    use rlst_dense::rlst_dynamic_array2;
-    use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape};
+    use rlst_dense::{
+        array::Array,
+        base_array::BaseArray,
+        data_container::VectorContainer,
+        rlst_dynamic_array2,
+        traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
+    };
 
-    fn copy(m_in: &Mat<f64>) -> Mat<f64> {
+    fn copy(
+        m_in: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    ) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
         let mut m = rlst_dynamic_array2!(f64, m_in.shape());
         for i in 0..m_in.shape()[0] {
             for j in 0..m_in.shape()[1] {
@@ -381,7 +387,7 @@ mod test {
         m
     }
 
-    fn rand_mat(shape: [usize; 2]) -> Mat<f64> {
+    fn rand_mat(shape: [usize; 2]) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
         let mut m = rlst_dynamic_array2!(f64, shape);
         let mut rng = rand::thread_rng();
         for i in 0..shape[0] {
@@ -392,7 +398,7 @@ mod test {
         m
     }
 
-    fn rand_vec(size: usize) -> Mat<f64> {
+    fn rand_vec(size: usize) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
         let mut v = rlst_dynamic_array2!(f64, [size, 1]);
         let mut rng = rand::thread_rng();
         for i in 0..size {

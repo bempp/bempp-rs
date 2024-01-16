@@ -2,11 +2,9 @@
 
 use crate::element::{create_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_tools::arrays::zero_matrix;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
-use rlst_dense::rlst_dynamic_array3;
-use rlst_dense::traits::RandomAccessMut;
+use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
 /// Create a Raviart-Thomas element
 pub fn create(
@@ -46,12 +44,12 @@ pub fn create(
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
     for _e in 0..cell.entity_count(0) {
-        x[0].push(zero_matrix([0, tdim]));
+        x[0].push(rlst_dynamic_array2!(f64, [0, tdim]));
         m[0].push(rlst_dynamic_array3!(f64, [0, 2, 0]));
     }
 
     for e in 0..cell.entity_count(1) {
-        let mut pts = zero_matrix([1, tdim]);
+        let mut pts = rlst_dynamic_array2!(f64, [1, tdim]);
         let mut mat = rlst_dynamic_array3!(f64, [1, 2, 1]);
         let vn0 = cell.edges()[2 * e];
         let vn1 = cell.edges()[2 * e + 1];
@@ -67,7 +65,7 @@ pub fn create(
     }
 
     for _e in 0..cell.entity_count(2) {
-        x[2].push(zero_matrix([0, tdim]));
+        x[2].push(rlst_dynamic_array2!(f64, [0, tdim]));
         m[2].push(rlst_dynamic_array3!(f64, [0, 2, 0]))
     }
 
@@ -90,7 +88,6 @@ mod test {
     use crate::cell::*;
     use crate::element::raviart_thomas::*;
     use approx::*;
-    use bempp_tools::arrays::to_matrix;
     use bempp_traits::element::FiniteElement;
     use rlst_dense::rlst_dynamic_array4;
     use rlst_dense::traits::RandomAccessByRef;
@@ -130,10 +127,19 @@ mod test {
         let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 2);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let points = to_matrix(
-            &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            [6, 2],
-        );
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {

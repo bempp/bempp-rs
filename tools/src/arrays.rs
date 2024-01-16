@@ -1,39 +1,6 @@
 //! Containers to store multi-dimensional data
 use bempp_traits::arrays::AdjacencyListAccess;
 use num::Num;
-use rlst_common::types::Scalar;
-use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
-    traits::UnsafeRandomAccessMut,
-};
-
-pub type Mat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
-pub type Array3D<T> = Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>;
-pub type Array4D<T> = Array<T, BaseArray<T, VectorContainer<T>, 4>, 4>;
-
-pub fn to_matrix<T: Scalar>(data: &[T], shape: [usize; 2]) -> Mat<T> {
-    let mut mat = rlst_dynamic_array2![T, shape];
-    for (i, d) in data.iter().enumerate() {
-        unsafe {
-            *mat.get_unchecked_mut([i % shape[0], i / shape[0]]) = *d;
-        }
-    }
-    mat
-}
-
-pub fn transpose_to_matrix<T: Scalar>(data: &[T], shape: [usize; 2]) -> Mat<T> {
-    let mut mat = rlst_dynamic_array2![T, shape];
-    for (i, d) in data.iter().enumerate() {
-        unsafe {
-            *mat.get_unchecked_mut([i / shape[1], i % shape[1]]) = *d;
-        }
-    }
-    mat
-}
-
-pub fn zero_matrix<T: Scalar>(shape: [usize; 2]) -> Mat<T> {
-    rlst_dynamic_array2![T, shape]
-}
 
 /// An adjacency list
 ///

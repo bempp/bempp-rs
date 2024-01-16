@@ -2,11 +2,11 @@ use bempp_bem::assembly::{assemble_batched, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
-use bempp_tools::arrays::zero_matrix;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily};
+use rlst_dense::rlst_dynamic_array2;
 
 fn main() {
     println!("Creating grid");
@@ -33,8 +33,10 @@ fn main() {
         space1.dofmap().global_size(),
         space0.dofmap().global_size()
     );
-    let mut matrix =
-        zero_matrix::<f64>([space1.dofmap().global_size(), space0.dofmap().global_size()]);
+    let mut matrix = rlst_dynamic_array2!(
+        f64,
+        [space1.dofmap().global_size(), space0.dofmap().global_size()]
+    );
 
     println!("Assembling dense matrix (complex)");
     assemble_batched(
