@@ -77,8 +77,7 @@ impl CiarletElement {
         }
 
         let new_pts = if continuity == Continuity::Discontinuous {
-            let mut new_pts: EntityPoints =
-                [vec![], vec![], vec![], vec![]];
+            let mut new_pts: EntityPoints = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut all_pts = rlst_dynamic_array2![f64, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
