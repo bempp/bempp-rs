@@ -15,7 +15,7 @@ use bempp_traits::grid::{Geometry, Grid, Ownership, Topology};
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, request::WaitGuard, topology::Communicator, traits::*};
 #[cfg(feature = "mpi")]
-use rlst_dense::{traits::RandomAccessMut, rlst_dynamic_array2};
+use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessMut};
 
 #[cfg(feature = "mpi")]
 fn test_parallel_grid() {
