@@ -47,6 +47,8 @@ jobs:
         run: cargo test --lib --release --features "mpi,strict"
       - name: Run tests
         run: cargo test --examples --release --features "mpi,strict"
+      - name: Test benchmarks build
+        run: cargo bench --no-run --features "mpi,strict"
       - name: Run examples
         run: |
           python3 find_examples.py
