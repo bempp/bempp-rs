@@ -41,6 +41,8 @@ jobs:
         run: cargo test --lib --release ${{ matrix.feature-flags }}
       - name: Run tests
         run: cargo test --examples --release ${{ matrix.feature-flags }}
+      - name: Test benchmarks build
+        run: cargo bench --no-run
       - name: Run examples
         run: |
           python3 find_examples.py
