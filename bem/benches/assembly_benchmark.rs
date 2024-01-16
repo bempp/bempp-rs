@@ -66,7 +66,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
 
         let colouring = space.compute_cell_colouring();
 
-        /*
         group.bench_function(
             &format!(
                 "Assembly of singular terms of {}x{} matrix",
@@ -89,7 +88,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 })
             },
         );
-        */
         group.bench_function(
             &format!(
                 "Assembly of non-singular terms of {}x{} matrix",
