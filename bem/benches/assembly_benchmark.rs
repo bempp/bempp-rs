@@ -3,12 +3,12 @@ use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d;
-use bempp_tools::arrays::zero_matrix;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily};
 use criterion::{criterion_group, criterion_main, Criterion};
+use rlst_dense::rlst_dynamic_array2;
 
 pub fn full_assembly_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("assembly");
@@ -24,7 +24,7 @@ pub fn full_assembly_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
+        let mut matrix = rlst_dynamic_array2!(f64, [space.dofmap().global_size(), space.dofmap().global_size()]);
 
         group.bench_function(
             &format!(
@@ -62,7 +62,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = zero_matrix([space.dofmap().global_size(), space.dofmap().global_size()]);
+        let mut matrix = rlst_dynamic_array2!(f64, [space.dofmap().global_size(), space.dofmap().global_size()]);
 
         let colouring = space.compute_cell_colouring();
 
