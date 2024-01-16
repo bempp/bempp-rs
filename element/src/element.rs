@@ -2,15 +2,23 @@
 
 use crate::cell::create_cell;
 use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
-use bempp_tools::arrays::{AdjacencyList, Array3D, Mat};
+use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
 use rlst_dense::linalg::inverse::MatrixInverse;
-use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut};
+use rlst_dense::{
+    array::Array,
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut},
+};
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3};
 pub mod lagrange;
 pub mod raviart_thomas;
+
+type EntityPoints = [Vec<Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>>; 4];
+type EntityWeights = [Vec<Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>>; 4];
 
 pub struct CiarletElement {
     cell_type: ReferenceCellType,
@@ -22,10 +30,10 @@ pub struct CiarletElement {
     family: ElementFamily,
     continuity: Continuity,
     dim: usize,
-    coefficients: Array3D<f64>,
+    coefficients: Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
     entity_dofs: [AdjacencyList<usize>; 4],
-    // interpolation_points: [Vec<Array2D<f64>>; 4],
-    // interpolation_weights: [Vec<Array3D<f64>>; 4],
+    // interpolation_points: EntityPoints,
+    // interpolation_weights: EntityWeights,
 }
 
 impl CiarletElement {
@@ -36,9 +44,9 @@ impl CiarletElement {
         cell_type: ReferenceCellType,
         degree: usize,
         value_shape: Vec<usize>,
-        polynomial_coeffs: Array3D<f64>,
-        interpolation_points: [Vec<Mat<f64>>; 4],
-        interpolation_weights: [Vec<Array3D<f64>>; 4],
+        polynomial_coeffs: Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
+        interpolation_points: EntityPoints,
+        interpolation_weights: EntityWeights,
         map_type: MapType,
         continuity: Continuity,
         highest_degree: usize,
@@ -69,7 +77,7 @@ impl CiarletElement {
         }
 
         let new_pts = if continuity == Continuity::Discontinuous {
-            let mut new_pts: [Vec<Mat<f64>>; 4] = [vec![], vec![], vec![], vec![]];
+            let mut new_pts: EntityPoints = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut all_pts = rlst_dynamic_array2![f64, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {

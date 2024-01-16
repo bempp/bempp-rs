@@ -4,9 +4,11 @@
 use itertools::Itertools;
 use num::traits::Num;
 
-use bempp_tools::Array3D;
 use rlst_common::types::Scalar;
 use rlst_dense::{
+    array::Array,
+    base_array::BaseArray,
+    data_container::VectorContainer,
     rlst_dynamic_array3,
     traits::{RandomAccessByRef, RandomAccessMut, Shape},
 };
@@ -30,10 +32,10 @@ pub fn argsort<T: Ord>(arr: &[T]) -> Vec<usize> {
 /// * `pad_size` - The amount of padding to be added along each axis.
 /// * `pad_index` - The position in the array to start the padding from.
 pub fn pad3<T: Scalar>(
-    arr: &Array3D<T>,
+    arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
     pad_size: (usize, usize, usize),
     pad_index: (usize, usize, usize),
-) -> Array3D<T>
+) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
     T: Clone + Copy + Num,
 {
@@ -62,7 +64,9 @@ where
 ///
 /// # Arguments
 /// * `arr` - An array to be flipped.
-pub fn flip3<T: Scalar>(arr: &Array3D<T>) -> Array3D<T>
+pub fn flip3<T: Scalar>(
+    arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
+) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
     T: Clone + Copy + Num,
 {

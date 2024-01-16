@@ -444,16 +444,18 @@ mod test {
     use crate::polynomials::*;
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
-    use bempp_tools::arrays::{transpose_to_matrix, zero_matrix};
-    use rlst_dense::rlst_dynamic_array3;
-    use rlst_dense::traits::RandomAccessMut;
+    use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
     #[test]
     fn test_legendre_interval() {
         let degree = 6;
 
         let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
-        let points = transpose_to_matrix(&rule.points, [rule.npoints, 1]);
+
+        let mut points = rlst_dynamic_array2!(f64, [rule.npoints, 1]);
+        for (i, j) in rule.points.iter().enumerate() {
+            *points.get_mut([i, 0]).unwrap() = *j;
+        }
 
         let mut data = rlst_dynamic_array3!(
             f64,
@@ -483,7 +485,12 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
-        let points = transpose_to_matrix(&rule.points, [rule.npoints, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [rule.npoints, 2]);
+        for i in 0..rule.npoints {
+            for j in 0..2 {
+                *points.get_mut([i, j]).unwrap() = rule.points[i * 2 + j];
+            }
+        }
 
         let mut data = rlst_dynamic_array3!(
             f64,
@@ -513,7 +520,12 @@ mod test {
         let degree = 5;
 
         let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
-        let points = transpose_to_matrix(&rule.points, [rule.npoints, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [rule.npoints, 2]);
+        for i in 0..rule.npoints {
+            for j in 0..2 {
+                *points.get_mut([i, j]).unwrap() = rule.points[i * 2 + j];
+            }
+        }
 
         let mut data = rlst_dynamic_array3!(
             f64,
@@ -549,7 +561,7 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut points = zero_matrix([20, 1]);
+        let mut points = rlst_dynamic_array2!(f64, [20, 1]);
         for i in 0..10 {
             *points.get_mut([2 * i, 0]).unwrap() = i as f64 / 10.0;
             *points.get_mut([2 * i + 1, 0]).unwrap() = points.get([2 * i, 0]).unwrap() + epsilon;
@@ -578,7 +590,7 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut points = zero_matrix([165, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [165, 2]);
         let mut index = 0;
         for i in 0..10 {
             for j in 0..10 - i {
@@ -623,7 +635,7 @@ mod test {
         let degree = 6;
 
         let epsilon = 1e-10;
-        let mut points = zero_matrix([300, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [300, 2]);
         for i in 0..10 {
             for j in 0..10 {
                 let index = 10 * i + j;
@@ -672,7 +684,7 @@ mod test {
     fn test_legendre_interval_against_known_polynomials() {
         let degree = 3;
 
-        let mut points = zero_matrix([11, 1]);
+        let mut points = rlst_dynamic_array2!(f64, [11, 1]);
         for i in 0..11 {
             *points.get_mut([i, 0]).unwrap() = i as f64 / 10.0;
         }
@@ -752,7 +764,7 @@ mod test {
     fn test_legendre_quadrilateral_against_known_polynomials() {
         let degree = 2;
 
-        let mut points = zero_matrix([121, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [121, 2]);
         for i in 0..11 {
             for j in 0..11 {
                 *points.get_mut([11 * i + j, 0]).unwrap() = i as f64 / 10.0;

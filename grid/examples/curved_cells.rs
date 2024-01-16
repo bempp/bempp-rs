@@ -1,21 +1,21 @@
 use bempp_grid::grid::SerialGrid;
 use bempp_grid::io::export_as_gmsh;
-use bempp_tools::arrays::{to_matrix, AdjacencyList};
+use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::grid::{Geometry, Grid, Topology};
+use rlst_dense::{rlst_dynamic_array2, traits::RawAccessMut};
 
 fn main() {
     // Create a grid of three cells. One cell is a curved triangle, one cell is a flat triangle, the other is a curved quadrilateral
+    let mut points = rlst_dynamic_array2!(f64, [13, 3]);
+    points.data_mut().copy_from_slice(&vec![
+        0.0, 0.5, 1.0, 1.5, 0.0, 0.5, 1.0, 2.0, 1.5, 0.0, 0.5, 1.0, 2.0, 0.0, 0.0, 0.0, 0.25, 0.5,
+        0.5, 0.5, 0.5, 0.75, 1.0, 1.0, 1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+    ]);
     let grid = SerialGrid::new(
-        to_matrix(
-            &vec![
-                0.0, 0.5, 1.0, 1.5, 0.0, 0.5, 1.0, 2.0, 1.5, 0.0, 0.5, 1.0, 2.0, 0.0, 0.0, 0.0,
-                0.25, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0, 1.0, 1.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5,
-                0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            ],
-            [13, 3],
-        ),
+        points,
         AdjacencyList::from_data(
             vec![2, 7, 12, 0, 2, 9, 11, 1, 4, 6, 10, 5, 2, 7, 11, 8, 6, 3],
             vec![0, 3, 12, 18],

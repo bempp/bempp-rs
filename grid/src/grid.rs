@@ -1,15 +1,20 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
 use bempp_element::element::{create_element, CiarletElement};
-use bempp_tools::arrays::{zero_matrix, AdjacencyList, Array4D, Mat};
+use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
 use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use itertools::izip;
-use rlst_dense::rlst_dynamic_array4;
-use rlst_dense::traits::{
-    RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
+use rlst_dense::{
+    array::Array,
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    rlst_dynamic_array2, rlst_dynamic_array4,
+    traits::{
+        RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
+    },
 };
 use rlst_proc_macro::rlst_static_array;
 use std::cell::RefCell;
@@ -17,24 +22,24 @@ use std::ptr;
 
 pub struct EvaluatorTdim2Gdim3<'a> {
     geometry: &'a SerialGeometry,
-    points: &'a Mat<f64>,
-    table: Array4D<f64>,
+    points: &'a Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    table: Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
     npts: usize,
-    axes: RefCell<Mat<f64>>,
+    axes: RefCell<Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>>,
 }
 
 impl<'a> EvaluatorTdim2Gdim3<'a> {
     pub fn new(
         geometry: &'a SerialGeometry,
         element: &impl FiniteElement,
-        points: &'a Mat<f64>,
+        points: &'a Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     ) -> Self {
         let npts = points.shape()[0];
         assert_eq!(points.shape()[1], 2);
         assert_eq!(geometry.dim(), 3);
         let mut table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
         element.tabulate(points, 1, &mut table);
-        let axes = RefCell::new(zero_matrix([2, 3]));
+        let axes = RefCell::new(rlst_dynamic_array2!(f64, [2, 3]));
 
         Self {
             geometry,
@@ -46,12 +51,21 @@ impl<'a> EvaluatorTdim2Gdim3<'a> {
     }
 }
 
-impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
-    fn points(&self) -> &Mat<f64> {
+impl<'a>
+    GeometryEvaluator<
+        Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    > for EvaluatorTdim2Gdim3<'a>
+{
+    fn points(&self) -> &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
         self.points
     }
 
-    fn compute_points(&self, cell_index: usize, points: &mut Mat<f64>) {
+    fn compute_points(
+        &self,
+        cell_index: usize,
+        points: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    ) {
         for i in 0..3 {
             for p in 0..self.npts {
                 unsafe {
@@ -76,7 +90,7 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
     fn compute_normals_and_jacobian_determinants(
         &self,
         cell_index: usize,
-        normals: &mut Mat<f64>,
+        normals: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         jdets: &mut [f64],
     ) {
         let mut axes = self.axes.borrow_mut();
@@ -125,8 +139,8 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for EvaluatorTdim2Gdim3<'a> {
 
 pub struct LinearSimplexEvaluatorTdim2Gdim3<'a> {
     geometry: &'a SerialGeometry,
-    points: &'a Mat<f64>,
-    table: Array4D<f64>,
+    points: &'a Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    table: Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
     npts: usize,
     js: RefCell<[f64; 6]>,
 }
@@ -135,7 +149,7 @@ impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
     pub fn new(
         geometry: &'a SerialGeometry,
         element: &impl FiniteElement,
-        points: &'a Mat<f64>,
+        points: &'a Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     ) -> Self {
         let npts = points.shape()[0];
         assert_eq!(points.shape()[1], 2);
@@ -172,12 +186,21 @@ impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
     }
 }
 
-impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gdim3<'a> {
-    fn points(&self) -> &Mat<f64> {
+impl<'a>
+    GeometryEvaluator<
+        Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    > for LinearSimplexEvaluatorTdim2Gdim3<'a>
+{
+    fn points(&self) -> &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
         self.points
     }
 
-    fn compute_points(&self, cell_index: usize, points: &mut Mat<f64>) {
+    fn compute_points(
+        &self,
+        cell_index: usize,
+        points: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    ) {
         for j in 0..3 {
             for p in 0..self.npts {
                 let mut sum = 0.0;
@@ -198,7 +221,7 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
     fn compute_normals_and_jacobian_determinants(
         &self,
         cell_index: usize,
-        normals: &mut Mat<f64>,
+        normals: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         jdets: &mut [f64],
     ) {
         self.single_jacobian(cell_index);
@@ -234,7 +257,7 @@ impl<'a> GeometryEvaluator<Mat<f64>, Mat<f64>> for LinearSimplexEvaluatorTdim2Gd
 /// Geometry of a serial grid
 pub struct SerialGeometry {
     coordinate_elements: Vec<CiarletElement>,
-    coordinates: Mat<f64>,
+    coordinates: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     cells: AdjacencyList<usize>,
     element_changes: Vec<usize>,
     index_map: Vec<usize>,
@@ -257,7 +280,7 @@ fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElemen
 
 impl SerialGeometry {
     pub fn new(
-        coordinates: Mat<f64>,
+        coordinates: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         cells: &AdjacencyList<usize>,
         cell_types: &[ReferenceCellType],
     ) -> Self {
@@ -317,8 +340,8 @@ impl SerialGeometry {
     }
 }
 impl Geometry for SerialGeometry {
-    type T = Mat<f64>;
-    type TMut = Mat<f64>;
+    type T = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
+    type TMut = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
     fn dim(&self) -> usize {
         self.coordinates.shape()[1]
     }
@@ -501,7 +524,7 @@ impl Geometry for SerialGeometry {
         if points.shape()[0] != jacobian_determinants.len() {
             panic!("jacobian_determinants has wrong length.");
         }
-        let mut js = zero_matrix([npts, gdim * tdim]);
+        let mut js = rlst_dynamic_array2!(f64, [npts, gdim * tdim]);
         self.compute_jacobians(points, cell, &mut js);
 
         for (p, jdet) in jacobian_determinants.iter_mut().enumerate() {
@@ -584,7 +607,7 @@ impl Geometry for SerialGeometry {
             && element.degree() == 1
         {
             // Map is affine
-            let mut js = zero_matrix([npts, gdim * tdim]);
+            let mut js = rlst_dynamic_array2!(f64, [npts, gdim * tdim]);
             self.compute_jacobians(points, cell, &mut js);
 
             for p in 0..npts {
@@ -988,7 +1011,7 @@ pub struct SerialGrid {
 
 impl SerialGrid {
     pub fn new(
-        coordinates: Mat<f64>,
+        coordinates: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         cells: AdjacencyList<usize>,
         cell_types: Vec<ReferenceCellType>,
     ) -> Self {
@@ -1029,7 +1052,16 @@ mod test {
     use crate::grid::*;
     use crate::shapes::regular_sphere;
     use approx::*;
-    use bempp_tools::arrays::to_matrix;
+    use rlst_dense::traits::RawAccessMut;
+
+    fn to_matrix(
+        slice: &[f64],
+        shape: [usize; 2],
+    ) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
+        let mut mat = rlst_dynamic_array2!(f64, shape);
+        mat.data_mut().copy_from_slice(slice);
+        mat
+    }
 
     #[test]
     fn test_connectivity() {
@@ -1287,7 +1319,7 @@ mod test {
         );
 
         // Test compute_points
-        let mut physical_points = zero_matrix([points.shape()[0], 3]);
+        let mut physical_points = rlst_dynamic_array2!(f64, [points.shape()[0], 3]);
         g.geometry()
             .compute_points(&points, 0, &mut physical_points);
         assert_relative_eq!(
@@ -1414,7 +1446,7 @@ mod test {
         );
 
         // Test compute_jacobians
-        let mut jacobians = zero_matrix([points.shape()[0], 6]);
+        let mut jacobians = rlst_dynamic_array2!(f64, [points.shape()[0], 6]);
         g.geometry().compute_jacobians(&points, 0, &mut jacobians);
         for i in 0..3 {
             assert_relative_eq!(*jacobians.get([i, 0]).unwrap(), 2.0, max_relative = 1e-14);
@@ -1448,7 +1480,7 @@ mod test {
         }
 
         // Test compute_jacobian_inverses
-        let mut jinvs = zero_matrix([points.shape()[0], 6]);
+        let mut jinvs = rlst_dynamic_array2!(f64, [points.shape()[0], 6]);
         g.geometry()
             .compute_jacobian_inverses(&points, 0, &mut jinvs);
         for i in 0..3 {
@@ -1492,7 +1524,7 @@ mod test {
 
         let pt = to_matrix(&[1.0 / 3.0, 1.0 / 3.0], [1, 2]);
 
-        let mut normal = zero_matrix([1, 3]);
+        let mut normal = rlst_dynamic_array2!(f64, [1, 3]);
 
         g.geometry().compute_normals(&pt, 0, &mut normal);
         assert_relative_eq!(*normal.get([0, 0]).unwrap(), 0.0);
@@ -1524,7 +1556,7 @@ mod test {
         );
 
         let points = to_matrix(&[0.0, 0.2, 0.5, 0.7, 1.0, 0.0, 0.3, 0.9, 1.0, 0.3], [5, 2]);
-        let mut normals = zero_matrix([5, 3]);
+        let mut normals = rlst_dynamic_array2!(f64, [5, 3]);
 
         curved_g
             .geometry()
@@ -1595,8 +1627,8 @@ mod test {
         let pts = to_matrix(&[0.1, 0.2, 0.6, 0.1, 0.4, 0.2], [3, 2]);
         let e = grid.geometry().get_evaluator(&element, &pts);
 
-        let mut points0 = zero_matrix([3, 3]);
-        let mut points1 = zero_matrix([3, 3]);
+        let mut points0 = rlst_dynamic_array2!(f64, [3, 3]);
+        let mut points1 = rlst_dynamic_array2!(f64, [3, 3]);
         for c in 0..grid.geometry().cell_count() {
             grid.geometry().compute_points(&pts, c, &mut points0);
             e.compute_points(c, &mut points1);
@@ -1624,8 +1656,8 @@ mod test {
         let pts = to_matrix(&[0.1, 0.2, 0.6, 0.1, 0.4, 0.2], [3, 2]);
         let e = grid.geometry().get_evaluator(&element, &pts);
 
-        let mut normals0 = zero_matrix([3, 3]);
-        let mut normals1 = zero_matrix([3, 3]);
+        let mut normals0 = rlst_dynamic_array2!(f64, [3, 3]);
+        let mut normals1 = rlst_dynamic_array2!(f64, [3, 3]);
         let mut jacobian_determinants0 = vec![0.0; 3];
         let mut jacobian_determinants1 = vec![0.0; 3];
 

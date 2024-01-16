@@ -3,7 +3,6 @@ use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use bempp_tools::arrays::{transpose_to_matrix, zero_matrix, Array4D, Mat};
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
@@ -13,9 +12,14 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::Scalar;
 use rayon::prelude::*;
-use rlst_dense::rlst_dynamic_array4;
-use rlst_dense::traits::{
-    RandomAccessByRef, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
+use rlst_dense::{
+    array::Array,
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    rlst_dynamic_array2, rlst_dynamic_array4,
+    traits::{
+        RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
+    },
 };
 
 fn get_quadrature_rule(
@@ -88,11 +92,11 @@ fn assemble_batch_singular<'a>(
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
     cell_pairs: &[(usize, usize)],
-    trial_points: &Mat<f64>,
-    test_points: &Mat<f64>,
+    trial_points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    test_points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     weights: &[f64],
-    trial_table: &Array4D<f64>,
-    test_table: &Array4D<f64>,
+    trial_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
+    test_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
 ) -> usize {
     let grid = test_space.grid();
     let mut k = vec![0.0];
@@ -100,10 +104,10 @@ fn assemble_batch_singular<'a>(
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut test_jdet = vec![0.0; test_points.shape()[0]];
     let mut trial_jdet = vec![0.0; trial_points.shape()[0]];
-    let mut test_mapped_pts = zero_matrix([test_points.shape()[0], 3]);
-    let mut trial_mapped_pts = zero_matrix([trial_points.shape()[0], 3]);
-    let mut test_normals = zero_matrix([test_points.shape()[0], 3]);
-    let mut trial_normals = zero_matrix([trial_points.shape()[0], 3]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(f64, [test_points.shape()[0], 3]);
+    let mut trial_mapped_pts = rlst_dynamic_array2!(f64, [trial_points.shape()[0], 3]);
+    let mut test_normals = rlst_dynamic_array2!(f64, [test_points.shape()[0], 3]);
+    let mut trial_normals = rlst_dynamic_array2!(f64, [trial_points.shape()[0], 3]);
 
     for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
@@ -186,12 +190,12 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     trial_cells: &[usize],
     test_space: &SerialFunctionSpace<'a>,
     test_cells: &[usize],
-    trial_points: &Mat<f64>,
+    trial_points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     trial_weights: &[f64],
-    test_points: &Mat<f64>,
+    test_points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     test_weights: &[f64],
-    trial_table: &Array4D<f64>,
-    test_table: &Array4D<f64>,
+    trial_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
+    test_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
 ) -> usize {
     debug_assert!(test_weights.len() == NPTS_TEST);
     debug_assert!(test_points.shape()[0] == NPTS_TEST);
@@ -205,7 +209,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
     let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
     let mut test_jdet = [0.0; NPTS_TEST];
-    let mut test_normals = zero_matrix([NPTS_TEST, 3]);
+    let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
 
     let mut test_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TEST, 3]];
 
@@ -223,8 +227,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let mut trial_mapped_pts = vec![];
     let mut trial_normals = vec![];
     for _i in 0..trial_cells.len() {
-        trial_mapped_pts.push(zero_matrix([NPTS_TRIAL, 3]));
-        trial_normals.push(zero_matrix([NPTS_TRIAL, 3]));
+        trial_mapped_pts.push(rlst_dynamic_array2!(f64, [NPTS_TRIAL, 3]));
+        trial_normals.push(rlst_dynamic_array2!(f64, [NPTS_TRIAL, 3]));
     }
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
@@ -322,7 +326,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 }
 
 pub fn assemble<'a>(
-    output: &mut Mat<f64>,
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
@@ -358,7 +362,7 @@ pub fn assemble<'a>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
-    output: &mut Mat<f64>,
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
@@ -381,10 +385,20 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
     // TODO: pass cell types into this function
     let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
-    let qpoints_test = transpose_to_matrix(&qrule_test.points, [NPTS_TEST, 2]);
+    let mut qpoints_test = rlst_dynamic_array2!(f64, [NPTS_TEST, 2]);
+    for i in 0..NPTS_TEST {
+        for j in 0..2 {
+            *qpoints_test.get_mut([i, j]).unwrap() = qrule_test.points[2 * i + j];
+        }
+    }
     let qweights_test = qrule_test.weights;
     let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
-    let qpoints_trial = transpose_to_matrix(&qrule_trial.points, [NPTS_TRIAL, 2]);
+    let mut qpoints_trial = rlst_dynamic_array2!(f64, [NPTS_TRIAL, 2]);
+    for i in 0..NPTS_TRIAL {
+        for j in 0..2 {
+            *qpoints_trial.get_mut([i, j]).unwrap() = qrule_trial.points[2 * i + j];
+        }
+    }
     let qweights_trial = qrule_trial.weights;
 
     let mut test_table =
@@ -460,7 +474,7 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
 #[allow(clippy::too_many_arguments)]
 pub fn assemble_singular<'a>(
-    output: &mut Mat<f64>,
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
     needs_test_normal: bool,
@@ -534,7 +548,12 @@ pub fn assemble_singular<'a>(
             npoints,
         );
 
-        let points = transpose_to_matrix(&qrule.trial_points, [qrule.npoints, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [qrule.npoints, 2]);
+        for i in 0..qrule.npoints {
+            for j in 0..2 {
+                *points.get_mut([i, j]).unwrap() = qrule.trial_points[2 * i + j];
+            }
+        }
         let mut table = rlst_dynamic_array4!(
             f64,
             trial_space
@@ -545,7 +564,12 @@ pub fn assemble_singular<'a>(
         trial_points.push(points);
         trial_tables.push(table);
 
-        let points = transpose_to_matrix(&qrule.test_points, [qrule.npoints, 2]);
+        let mut points = rlst_dynamic_array2!(f64, [qrule.npoints, 2]);
+        for i in 0..qrule.npoints {
+            for j in 0..2 {
+                *points.get_mut([i, j]).unwrap() = qrule.test_points[2 * i + j];
+            }
+        }
         let mut table = rlst_dynamic_array4!(
             f64,
             test_space
@@ -644,7 +668,7 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let mut matrix = zero_matrix::<f64>([ndofs, ndofs]);
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
         assemble(
             &mut matrix,
             &Laplace3dKernel::new(),

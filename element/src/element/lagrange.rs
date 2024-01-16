@@ -2,11 +2,9 @@
 
 use crate::element::{create_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_tools::arrays::{to_matrix, zero_matrix};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily, MapType};
-use rlst_dense::rlst_dynamic_array3;
-use rlst_dense::traits::RandomAccessMut;
+use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
 /// Create a Lagrange element
 pub fn create(
@@ -30,18 +28,22 @@ pub fn create(
         }
         for d in 0..tdim {
             for _e in 0..cell.entity_count(d) {
-                x[d].push(zero_matrix([0, tdim]));
+                x[d].push(rlst_dynamic_array2!(f64, [0, tdim]));
                 m[d].push(rlst_dynamic_array3!(f64, [0, 1, 0]));
             }
         }
-        x[tdim].push(to_matrix(&cell.midpoint(), [1, tdim]));
+        let mut midp = rlst_dynamic_array2!(f64, [1, tdim]);
+        for (i, j) in cell.midpoint().iter().enumerate() {
+            *midp.get_mut([0, i]).unwrap() = *j;
+        }
+        x[tdim].push(midp);
         let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
         *mentry.get_mut([0, 0, 0]).unwrap() = 1.0;
         m[tdim].push(mentry);
     } else {
         // TODO: GLL points
         for e in 0..cell.entity_count(0) {
-            let mut pts = zero_matrix([1, tdim]);
+            let mut pts = rlst_dynamic_array2!(f64, [1, tdim]);
             for i in 0..tdim {
                 *pts.get_mut([0, i]).unwrap() = cell.vertices()[e * tdim + i];
             }
@@ -51,7 +53,7 @@ pub fn create(
             m[0].push(mentry);
         }
         for e in 0..cell.entity_count(1) {
-            let mut pts = zero_matrix([degree - 1, tdim]);
+            let mut pts = rlst_dynamic_array2!(f64, [degree - 1, tdim]);
             let vn0 = cell.edges()[2 * e];
             let vn1 = cell.edges()[2 * e + 1];
             let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
@@ -82,7 +84,7 @@ pub fn create(
             } else {
                 panic!("Unsupported face type");
             };
-            let mut pts = zero_matrix([npts, tdim]);
+            let mut pts = rlst_dynamic_array2!(f64, [npts, tdim]);
 
             let vn0 = cell.faces()[start];
             let vn1 = cell.faces()[start + 1];
@@ -188,7 +190,11 @@ mod test {
         let e = create(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
-        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], [4, 1]);
+        let mut points = rlst_dynamic_array2!(f64, [4, 1]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 0.2;
+        *points.get_mut([2, 0]).unwrap() = 0.4;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -202,7 +208,11 @@ mod test {
         let e = create(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
-        let points = to_matrix(&[0.0, 0.2, 0.4, 1.0], [4, 1]);
+        let mut points = rlst_dynamic_array2!(f64, [4, 1]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 0.2;
+        *points.get_mut([2, 0]).unwrap() = 0.4;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..4 {
@@ -223,10 +233,21 @@ mod test {
         let e = create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let points = to_matrix(
-            &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            [6, 2],
-        );
+
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
+
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
@@ -240,10 +261,19 @@ mod test {
         let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let points = to_matrix(
-            &[0.0, 1.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            [6, 2],
-        );
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
@@ -327,10 +357,19 @@ mod test {
         );
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let points = to_matrix(
-            &[0.0, 1.0, 0.0, 1.0, 0.25, 0.3, 0.0, 0.0, 1.0, 1.0, 0.5, 0.2],
-            [6, 2],
-        );
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
@@ -344,10 +383,20 @@ mod test {
         let e = create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let points = to_matrix(
-            &[0.0, 1.0, 0.0, 1.0, 0.25, 0.3, 0.0, 0.0, 1.0, 1.0, 0.5, 0.2],
-            [6, 2],
-        );
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
+        *points.get_mut([3, 1]).unwrap() = 1.0;
+        *points.get_mut([4, 0]).unwrap() = 0.25;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.3;
+        *points.get_mut([5, 1]).unwrap() = 0.2;
+
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {
@@ -376,10 +425,19 @@ mod test {
         let e = create(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let points = to_matrix(
-            &[0.0, 1.0, 0.0, 1.0, 0.25, 0.3, 0.0, 0.0, 1.0, 1.0, 0.5, 0.2],
-            [6, 2],
-        );
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
+        *points.get_mut([3, 1]).unwrap() = 1.0;
+        *points.get_mut([4, 0]).unwrap() = 0.25;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.3;
+        *points.get_mut([5, 1]).unwrap() = 0.2;
         e.tabulate(&points, 0, &mut data);
 
         for pt in 0..6 {

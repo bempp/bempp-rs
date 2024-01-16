@@ -1,7 +1,7 @@
 pub mod batched;
 use crate::function_space::SerialFunctionSpace;
 use bempp_kernel::laplace_3d;
-use bempp_tools::arrays::Mat;
+use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -24,7 +24,7 @@ pub enum PDEType {
 /// Assemble an operator into a dense matrix using batched parallelisation
 pub fn assemble_batched<'a>(
     // TODO: ouput should be `&mut impl ArrayAccess2D` once such a trait exists
-    output: &mut Mat<f64>,
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     operator: BoundaryOperator,
     pde: PDEType,
     trial_space: &SerialFunctionSpace<'a>,
@@ -61,13 +61,12 @@ mod test {
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tools::arrays::zero_matrix;
     use bempp_traits::bem::DofMap;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::{Continuity, ElementFamily};
     // use num::complex::Complex;
     use bempp_traits::bem::FunctionSpace;
-    use rlst_dense::traits::RandomAccessByRef;
+    use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
 
     #[test]
     fn test_laplace_single_layer() {
@@ -87,8 +86,10 @@ mod test {
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 
-        let mut matrix =
-            zero_matrix::<f64>([space1.dofmap().global_size(), space0.dofmap().global_size()]);
+        let mut matrix = rlst_dynamic_array2!(
+            f64,
+            [space1.dofmap().global_size(), space0.dofmap().global_size()]
+        );
         batched::assemble(
             &mut matrix,
             &Laplace3dKernel::new(),
@@ -98,8 +99,10 @@ mod test {
             &space1,
         );
 
-        let mut matrix2 =
-            zero_matrix::<f64>([space1.dofmap().global_size(), space0.dofmap().global_size()]);
+        let mut matrix2 = rlst_dynamic_array2!(
+            f64,
+            [space1.dofmap().global_size(), space0.dofmap().global_size()]
+        );
 
         assemble_batched(
             &mut matrix2,

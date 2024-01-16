@@ -1,13 +1,19 @@
 //! A parallel implementation of a grid
 use crate::grid::{SerialGeometry, SerialTopology};
 use bempp_element::element::CiarletElement;
-use bempp_tools::arrays::{zero_matrix, AdjacencyList, Mat};
+use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
-use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::{
+    array::Array,
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    rlst_dynamic_array2,
+    traits::{RandomAccessByRef, RandomAccessMut, Shape},
+};
 
 /// Geometry of a parallel grid
 pub struct ParallelGeometry<'a, C: Communicator> {
@@ -18,7 +24,7 @@ pub struct ParallelGeometry<'a, C: Communicator> {
 impl<'a, C: Communicator> ParallelGeometry<'a, C> {
     pub fn new(
         comm: &'a C,
-        coordinates: Mat<f64>,
+        coordinates: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         cells: &AdjacencyList<usize>,
         cell_types: &Vec<ReferenceCellType>,
     ) -> Self {
@@ -42,8 +48,8 @@ impl<'a, C: Communicator> ParallelGeometry<'a, C> {
 }
 
 impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
-    type T = Mat<f64>;
-    type TMut = Mat<f64>;
+    type T = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
+    type TMut = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
 
     fn dim(&self) -> usize {
         self.serial_geometry.dim()
@@ -203,7 +209,7 @@ pub struct ParallelGrid<'a, C: Communicator> {
 impl<'a, C: Communicator> ParallelGrid<'a, C> {
     pub fn new(
         comm: &'a C,
-        coordinates: Mat<f64>,
+        coordinates: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         cells: AdjacencyList<usize>,
         cell_types: Vec<ReferenceCellType>,
         cell_owners: Vec<usize>,
@@ -403,7 +409,7 @@ impl<'a, C: Communicator> ParallelGrid<'a, C> {
                 panic!("Unsupported cell type");
             });
         }
-        let mut coordinates = zero_matrix([vertex_indices.len(), gdim]);
+        let mut coordinates = rlst_dynamic_array2!(f64, [vertex_indices.len(), gdim]);
         for i in 0..vertex_indices.len() {
             for j in 0..gdim {
                 *coordinates.get_mut([i, j]).unwrap() = flat_coordinates[i * gdim + j];
