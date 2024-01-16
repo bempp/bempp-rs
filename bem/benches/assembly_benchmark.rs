@@ -24,7 +24,10 @@ pub fn full_assembly_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = rlst_dynamic_array2!(f64, [space.dofmap().global_size(), space.dofmap().global_size()]);
+        let mut matrix = rlst_dynamic_array2!(
+            f64,
+            [space.dofmap().global_size(), space.dofmap().global_size()]
+        );
 
         group.bench_function(
             &format!(
@@ -62,7 +65,10 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = rlst_dynamic_array2!(f64, [space.dofmap().global_size(), space.dofmap().global_size()]);
+        let mut matrix = rlst_dynamic_array2!(
+            f64,
+            [space.dofmap().global_size(), space.dofmap().global_size()]
+        );
 
         let colouring = space.compute_cell_colouring();
 
