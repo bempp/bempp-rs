@@ -402,16 +402,10 @@ pub mod uniform {
 
             let all_displacements = vec![vec![-1i64; nsources]; 316];
 
-            let all_displacements = all_displacements
-                .into_iter()
-                .map(Mutex::new)
-                .collect_vec();
+            let all_displacements = all_displacements.into_iter().map(Mutex::new).collect_vec();
 
-            sources
-                .into_par_iter()
-                .enumerate()
-                .for_each(|(j, source)| {
-                    let v_list = source
+            sources.into_par_iter().enumerate().for_each(|(j, source)| {
+                let v_list = source
                     .parent()
                     .neighbors()
                     .iter()
@@ -421,29 +415,29 @@ pub mod uniform {
                     })
                     .collect_vec();
 
-                    let transfer_vectors = v_list
-                        .iter()
-                        .map(|target| target.find_transfer_vector(source))
-                        .collect_vec();
+                let transfer_vectors = v_list
+                    .iter()
+                    .map(|target| target.find_transfer_vector(source))
+                    .collect_vec();
 
-                    let mut transfer_vectors_map = HashMap::new();
-                    for (i, v) in transfer_vectors.iter().enumerate() {
-                        transfer_vectors_map.insert(v, i);
+                let mut transfer_vectors_map = HashMap::new();
+                for (i, v) in transfer_vectors.iter().enumerate() {
+                    transfer_vectors_map.insert(v, i);
+                }
+
+                let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
+
+                for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+                    let mut all_displacements_lock = all_displacements[i].lock().unwrap();
+
+                    if transfer_vectors_set.contains(&tv.hash) {
+                        let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                        let target_index = self.level_index_pointer[level as usize]
+                            .get(target)
+                            .unwrap();
+                        all_displacements_lock[j] = *target_index as i64;
                     }
-
-                    let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
-
-                    for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
-                        let mut all_displacements_lock = all_displacements[i].lock().unwrap();
-
-                        if transfer_vectors_set.contains(&tv.hash) {
-                            let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                            let target_index = self.level_index_pointer[level as usize]
-                                .get(target)
-                                .unwrap();
-                            all_displacements_lock[j] = *target_index as i64;
-                        }
-                    }
+                }
             });
 
             // let mut total_valid = 0;
@@ -454,7 +448,6 @@ pub mod uniform {
             // }
 
             // println!("level {:?} mean_valid {:?}", level, (total_valid as f64) / (sources.len() as f64 * 316.0));
-
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
@@ -486,11 +479,6 @@ pub mod uniform {
                 .map(Mutex::new)
                 .collect_vec();
 
-            // if level == 3 {
-            //     let lock =  &all_displacements[0].lock().unwrap();
-            //     println!("level {:?} {:?} {:?}", level, lock,  lock.len());
-            // }
-
             (0..316).into_par_iter().for_each(|c_idx| {
                 let top_left = [0, c_idx * self.fmm.m2l.k];
                 let c_sub = self
@@ -503,30 +491,25 @@ pub mod uniform {
 
                 let displacements = &all_displacements[c_idx].lock().unwrap();
 
-                let multipole_idxs = displacements.iter().enumerate().filter(|(_, &d)| d != -1 ).map(|(i, _)| i).collect_vec();
-                // println!("{:?} {:?}", multipole_idxs.len(), displacements.len());
-                let local_idxs = displacements.iter().enumerate().filter(|(_, &d)| d != -1 ).map(|(_, &j)| j).collect_vec();
-                let mut compressed_multipoles_subset =rlst_dynamic_array2!(U, [nrows, multipole_idxs.len()]);
+                // TODO: Can do this outside of the loop
+                let multipole_idxs = displacements
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &d)| d != -1)
+                    .map(|(i, _)| i)
+                    .collect_vec();
+
+                let mut compressed_multipoles_subset =
+                    rlst_dynamic_array2!(U, [nrows, multipole_idxs.len()]);
+
                 for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                    compressed_multipoles_subset
-                        .data_mut()[i*nrows..(i+1)*nrows].copy_from_slice(&compressed_multipoles.data()[(multipole_idx as usize) * nrows .. (multipole_idx as usize + 1) * nrows]);
+                    compressed_multipoles_subset.data_mut()[i * nrows..(i + 1) * nrows]
+                        .copy_from_slice(
+                            &compressed_multipoles.data()
+                                [(multipole_idx) * nrows..(multipole_idx + 1) * nrows],
+                        );
                 }
-                // println!("here {:?}", compressed_multipoles_subset.shape());
 
-
-                // let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                //     self.fmm.dc2e_inv_1.view(),
-                //     empty_array::<U, 2>().simple_mult_into_resize(
-                //         self.fmm.dc2e_inv_2.view(),
-                //         empty_array::<U, 2>().simple_mult_into_resize(
-                //             self.fmm.m2l.operator_data.u.view(),
-                //             empty_array::<U, 2>().simple_mult_into_resize(
-                //                 c_sub.view(),
-                //                 compressed_multipoles.view(),
-                //             ),
-                //         ),
-                //     ),
-                // );
                 let locals = empty_array::<U, 2>().simple_mult_into_resize(
                     self.fmm.dc2e_inv_1.view(),
                     empty_array::<U, 2>().simple_mult_into_resize(
@@ -541,34 +524,24 @@ pub mod uniform {
                     ),
                 );
 
-                for (multipole_idx, &local_idx )in local_idxs.iter().enumerate() {
-                    if local_idx > -1 {
-                        let save_idx = local_idx as usize;
-                        let local_lock = level_locals[save_idx].lock().unwrap();
-                        let local_ptr = local_lock.raw;
-                        let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
+                // TODO: Can do this outside of the loop
+                let local_idxs = displacements
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &d)| d != -1)
+                    .map(|(_, &j)| j as usize)
+                    .collect_vec();
 
-                        let res = &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
-                        local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
-                    }
+                for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
+                    let local_lock = level_locals[local_idx].lock().unwrap();
+                    let local_ptr = local_lock.raw;
+                    let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
+
+                    let res =
+                        &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
+                    local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
                 }
-
-
-
-                // for (result_idx, &save_idx) in displacements.iter().enumerate() {
-                //     if save_idx > -1 {
-                //         let save_idx = save_idx as usize;
-                //         let local_lock = level_locals[save_idx].lock().unwrap();
-                //         let local_ptr = local_lock.raw;
-                //         let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
-
-                //         let res = &locals.data()[result_idx * ncoeffs..(result_idx + 1) * ncoeffs];
-                //         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
-                //     }
-                // }
             })
-
-
         }
 
         fn m2l_scale(&self, level: u64) -> U {
