@@ -21,7 +21,7 @@ use bempp_traits::{
 
 fn main () {
 
-        let npoints = 1000000;
+        let npoints = 100000;
 
         let points = points_fixture::<f32>(npoints, None, None);
 
@@ -40,7 +40,7 @@ fn main () {
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
         let m2l_data = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
-            Some(80),
+            Some(1000),
             order,
             *tree.get_domain(),
             alpha_inner,
