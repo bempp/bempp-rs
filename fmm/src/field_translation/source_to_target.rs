@@ -503,11 +503,13 @@ pub mod uniform {
 
                 let displacements = &all_displacements[c_idx].lock().unwrap();
 
-                let idxs = displacements.iter().filter(|&&d| d != -1 ).collect_vec();
-                let mut compressed_multipoles_subset =rlst_dynamic_array2!(U, [ncoeffs, idxs.len()]);
-                for (i, &&idx) in idxs.iter().enumerate() {
+                let multipole_idxs = displacements.iter().enumerate().filter(|(_, &d)| d != -1 ).map(|(i, _)| i).collect_vec();
+                // println!("{:?} {:?}", multipole_idxs.len(), displacements.len());
+                let local_idxs = displacements.iter().enumerate().filter(|(_, &d)| d != -1 ).map(|(_, &j)| j).collect_vec();
+                let mut compressed_multipoles_subset =rlst_dynamic_array2!(U, [nrows, multipole_idxs.len()]);
+                for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                     compressed_multipoles_subset
-                        .data_mut()[i*ncoeffs..(i+1)*ncoeffs].copy_from_slice(&compressed_multipoles.data()[(idx as usize) * ncoeffs .. (idx as usize + 1) * ncoeffs]);
+                        .data_mut()[i*nrows..(i+1)*nrows].copy_from_slice(&compressed_multipoles.data()[(multipole_idx as usize) * nrows .. (multipole_idx as usize + 1) * nrows]);
                 }
                 // println!("here {:?}", compressed_multipoles_subset.shape());
 
@@ -538,6 +540,19 @@ pub mod uniform {
                         ),
                     ),
                 );
+
+                for (multipole_idx, &local_idx )in local_idxs.iter().enumerate() {
+                    if local_idx > -1 {
+                        let save_idx = local_idx as usize;
+                        let local_lock = level_locals[save_idx].lock().unwrap();
+                        let local_ptr = local_lock.raw;
+                        let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
+
+                        let res = &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
+                        local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
+                    }
+                }
+
 
 
                 // for (result_idx, &save_idx) in displacements.iter().enumerate() {
