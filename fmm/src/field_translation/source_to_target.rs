@@ -402,9 +402,16 @@ pub mod uniform {
 
             let mut all_displacements = vec![vec![-1i64; nsources]; 316];
 
-            // Need to identify all save locations in a pre-processing step.
-            for (j, source) in sources.iter().enumerate() {
-                let v_list = source
+            let mut all_displacements = all_displacements
+                .into_iter()
+                .map(Mutex::new)
+                .collect_vec();
+
+            sources
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(j, source)| {
+                    let v_list = source
                     .parent()
                     .neighbors()
                     .iter()
@@ -414,28 +421,65 @@ pub mod uniform {
                     })
                     .collect_vec();
 
-                let transfer_vectors = v_list
-                    .iter()
-                    .map(|target| target.find_transfer_vector(source))
-                    .collect_vec();
+                    let transfer_vectors = v_list
+                        .iter()
+                        .map(|target| target.find_transfer_vector(source))
+                        .collect_vec();
 
-                let mut transfer_vectors_map = HashMap::new();
-                for (i, v) in transfer_vectors.iter().enumerate() {
-                    transfer_vectors_map.insert(v, i);
-                }
-
-                let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
-
-                for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
-                    if transfer_vectors_set.contains(&tv.hash) {
-                        let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                        let target_index = self.level_index_pointer[level as usize]
-                            .get(target)
-                            .unwrap();
-                        all_displacements[i][j] = *target_index as i64;
+                    let mut transfer_vectors_map = HashMap::new();
+                    for (i, v) in transfer_vectors.iter().enumerate() {
+                        transfer_vectors_map.insert(v, i);
                     }
-                }
-            }
+
+                    let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
+
+                    for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+                        let mut all_displacements_lock = all_displacements[i].lock().unwrap();
+
+                        if transfer_vectors_set.contains(&tv.hash) {
+                            let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                            let target_index = self.level_index_pointer[level as usize]
+                                .get(target)
+                                .unwrap();
+                            all_displacements_lock[j] = *target_index as i64;
+                        }
+                    }
+            });
+
+            // // Need to identify all save locations in a pre-processing step.
+            // for (j, source) in sources.iter().enumerate() {
+            //     let v_list = source
+            //         .parent()
+            //         .neighbors()
+            //         .iter()
+            //         .flat_map(|pn| pn.children())
+            //         .filter(|pnc| {
+            //             !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().contains(pnc)
+            //         })
+            //         .collect_vec();
+
+            //     let transfer_vectors = v_list
+            //         .iter()
+            //         .map(|target| target.find_transfer_vector(source))
+            //         .collect_vec();
+
+            //     let mut transfer_vectors_map = HashMap::new();
+            //     for (i, v) in transfer_vectors.iter().enumerate() {
+            //         transfer_vectors_map.insert(v, i);
+            //     }
+
+            //     let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
+
+            //     for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+            //         if transfer_vectors_set.contains(&tv.hash) {
+            //             let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+            //             let target_index = self.level_index_pointer[level as usize]
+            //                 .get(target)
+            //                 .unwrap();
+            //             all_displacements[i][j] = *target_index as i64;
+            //         }
+            //     }
+            // }
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
@@ -467,7 +511,7 @@ pub mod uniform {
                 .map(Mutex::new)
                 .collect_vec();
 
-            (0..316).into_par_iter().for_each(|c_idx| {
+            (0..16).into_par_iter().for_each(|c_idx| {
                 let top_left = [0, c_idx * self.fmm.m2l.k];
                 let c_sub = self
                     .fmm
@@ -491,7 +535,7 @@ pub mod uniform {
                     ),
                 );
 
-                let displacements = &all_displacements[c_idx];
+                let displacements = &all_displacements[c_idx].lock().unwrap();
 
                 for (result_idx, &save_idx) in displacements.iter().enumerate() {
                     if save_idx > -1 {
