@@ -34,7 +34,7 @@ fn main() {
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
     let m2l_data = SvdFieldTranslationKiFmm::new(
         kernel.clone(),
-        Some(800),
+        Some(75),
         order,
         *tree.get_domain(),
         alpha_inner,

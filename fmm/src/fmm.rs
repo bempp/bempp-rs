@@ -885,7 +885,7 @@ mod test {
 
         let m2l_data = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
-            Some(1000),
+            Some(50),
             order,
             *tree.get_domain(),
             alpha_inner,

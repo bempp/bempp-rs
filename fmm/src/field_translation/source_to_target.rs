@@ -440,15 +440,6 @@ pub mod uniform {
                 }
             });
 
-            // let mut total_valid = 0;
-            // for i in 0..316 {
-            //     let displacements_lock = all_displacements[i].lock().unwrap();
-            //     let nvalid = displacements_lock.iter().filter(|&&d| d != -1).collect_vec().len();
-            //     total_valid += nvalid;
-            // }
-
-            // println!("level {:?} mean_valid {:?}", level, (total_valid as f64) / (sources.len() as f64 * 316.0));
-
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
@@ -500,13 +491,14 @@ pub mod uniform {
                     .collect_vec();
 
                 let mut compressed_multipoles_subset =
-                    rlst_dynamic_array2!(U, [nrows, multipole_idxs.len()]);
+                    rlst_dynamic_array2!(U, [self.fmm.m2l.k, multipole_idxs.len()]);
 
                 for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                    compressed_multipoles_subset.data_mut()[i * nrows..(i + 1) * nrows]
+                    compressed_multipoles_subset.data_mut()
+                        [i * self.fmm.m2l.k..(i + 1) * self.fmm.m2l.k]
                         .copy_from_slice(
-                            &compressed_multipoles.data()
-                                [(multipole_idx) * nrows..(multipole_idx + 1) * nrows],
+                            &compressed_multipoles.data()[(multipole_idx) * self.fmm.m2l.k
+                                ..(multipole_idx + 1) * self.fmm.m2l.k],
                         );
                 }
 
