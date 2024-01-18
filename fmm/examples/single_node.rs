@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
+use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::{
     charge::build_charge_dict,
     types::{FmmDataUniform, KiFmmLinear},
