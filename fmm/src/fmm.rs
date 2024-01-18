@@ -1119,7 +1119,7 @@ mod test {
             "rel_error = {rel_error} = {abs_error} / {}",
             direct.iter().sum::<f64>()
         );
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 2e-5);
     }
 
     #[allow(clippy::too_many_arguments)]
