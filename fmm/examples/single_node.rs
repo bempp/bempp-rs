@@ -25,20 +25,20 @@ fn main() {
     let order = 6;
     let alpha_inner = 1.05;
     let alpha_outer = 2.95;
-    let depth = 6;
+    let depth = 4;
 
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
     let kernel = Laplace3dKernel::default();
     let m2l_data: FftFieldTranslationKiFmm<f32, Laplace3dKernel<f32>> =
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-    let m2l_data = SvdFieldTranslationKiFmm::new(
-        kernel.clone(),
-        Some(759),
-        order,
-        *tree.get_domain(),
-        alpha_inner,
-    );
+    // let m2l_data = SvdFieldTranslationKiFmm::new(
+    //     kernel.clone(),
+    //     Some(80),
+    //     order,
+    //     *tree.get_domain(),
+    //     alpha_inner,
+    // );
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
