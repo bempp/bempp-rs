@@ -1389,52 +1389,7 @@ pub mod adaptive {
                         all_displacements_lock[j] = *target_index as i64;
                     }
                 }
-
-                // for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
-                //     let mut all_displacements_lock = all_displacements[i].lock().unwrap();
-
-                //     if transfer_vectors_set.contains(&tv.hash) {
-                //         let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                //         let target_index = self.level_index_pointer[level as usize]
-                //             .get(target)
-                //             .unwrap();
-                //         all_displacements_lock[j] = *target_index as i64;
-                //     }
-                // }
             });
-
-            // Need to identify all save locations in a pre-processing step.
-            // for (j, source) in sources.iter().enumerate() {
-            //     let v_list = source
-            //         .parent()
-            //         .neighbors()
-            //         .iter()
-            //         .flat_map(|pn| pn.children())
-            //         .filter(|pnc| {
-            //             !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().contains(pnc)
-            //         })
-            //         .collect_vec();
-
-            //     let transfer_vectors = v_list
-            //         .iter()
-            //         .map(|target| target.find_transfer_vector(source))
-            //         .collect_vec();
-
-            //     let mut transfer_vectors_map = HashMap::new();
-            //     for (i, v) in transfer_vectors.iter().enumerate() {
-            //         transfer_vectors_map.insert(v, i);
-            //     }
-
-            //     let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
-
-            //     for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
-            //         if transfer_vectors_set.contains(&tv.hash) {
-            //             let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-            //             let target_index = source_map.get(target).unwrap();
-            //             all_displacements[i][j] = *target_index as i64;
-            //         }
-            //     }
-            // }
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
@@ -1540,44 +1495,6 @@ pub mod adaptive {
                         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
                     }
                 })
-
-            // (0..316).for_each(|c_idx| {
-            //     let top_left = [0, c_idx * self.fmm.m2l.k];
-            //     let c_sub = self
-            //         .fmm
-            //         .m2l
-            //         .operator_data
-            //         .c
-            //         .view()
-            //         .into_subview(top_left, dim);
-
-            //     let locals = empty_array::<U, 2>().simple_mult_into_resize(
-            //         self.fmm.dc2e_inv_1.view(),
-            //         empty_array::<U, 2>().simple_mult_into_resize(
-            //             self.fmm.dc2e_inv_2.view(),
-            //             empty_array::<U, 2>().simple_mult_into_resize(
-            //                 self.fmm.m2l.operator_data.u.view(),
-            //                 empty_array::<U, 2>().simple_mult_into_resize(
-            //                     c_sub.view(),
-            //                     compressed_multipoles.view(),
-            //                 ),
-            //             ),
-            //         ),
-            //     );
-
-            //     let displacements = &all_displacements[c_idx];
-
-            //     for (result_idx, &save_idx) in displacements.iter().enumerate() {
-            //         if save_idx > -1 {
-            //             let save_idx = save_idx as usize;
-            //             let local_ptr = self.level_locals[(level) as usize][save_idx].raw;
-            //             let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
-
-            //             let res = &locals.data()[result_idx * ncoeffs..(result_idx + 1) * ncoeffs];
-            //             local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
-            //         }
-            //     }
-            // })
         }
 
         fn m2l_scale(&self, level: u64) -> U {
