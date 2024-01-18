@@ -1,4 +1,5 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
+use std::time::Instant;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -470,70 +471,87 @@ pub mod uniform {
                 .map(Mutex::new)
                 .collect_vec();
 
-            (0..316).into_par_iter().for_each(|c_idx| {
-                let top_left = [0, c_idx * self.fmm.m2l.k];
-                let c_sub = self
-                    .fmm
-                    .m2l
-                    .operator_data
-                    .c
-                    .view()
-                    .into_subview(top_left, c_dim);
+            let multipole_idxs = all_displacements
+                .iter()
+                .map(|displacements| {
+                    displacements
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &d)| d != -1)
+                        .map(|(i, _)| i)
+                        .collect_vec()
+                })
+                .collect_vec();
 
-                let displacements = &all_displacements[c_idx].lock().unwrap();
+            let local_idxs = all_displacements
+                .iter()
+                .map(|displacements| {
+                    displacements
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &d)| d != -1)
+                        .map(|(_, &j)| j as usize)
+                        .collect_vec()
+                })
+                .collect_vec();
 
-                // TODO: Can do this outside of the loop
-                let multipole_idxs = displacements
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, &d)| d != -1)
-                    .map(|(i, _)| i)
-                    .collect_vec();
+            let s = Instant::now();
+            (0..316)
+                .into_par_iter()
+                .zip(multipole_idxs)
+                .zip(local_idxs)
+                .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                    let top_left = [0, c_idx * self.fmm.m2l.k];
+                    let c_sub = self
+                        .fmm
+                        .m2l
+                        .operator_data
+                        .c
+                        .view()
+                        .into_subview(top_left, c_dim);
 
-                let mut compressed_multipoles_subset =
-                    rlst_dynamic_array2!(U, [self.fmm.m2l.k, multipole_idxs.len()]);
+                    let mut compressed_multipoles_subset =
+                        rlst_dynamic_array2!(U, [self.fmm.m2l.k, multipole_idxs.len()]);
 
-                for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                    compressed_multipoles_subset.data_mut()
-                        [i * self.fmm.m2l.k..(i + 1) * self.fmm.m2l.k]
-                        .copy_from_slice(
-                            &compressed_multipoles.data()[(multipole_idx) * self.fmm.m2l.k
-                                ..(multipole_idx + 1) * self.fmm.m2l.k],
-                        );
-                }
+                    for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
+                        compressed_multipoles_subset.data_mut()
+                            [i * self.fmm.m2l.k..(i + 1) * self.fmm.m2l.k]
+                            .copy_from_slice(
+                                &compressed_multipoles.data()[(multipole_idx) * self.fmm.m2l.k
+                                    ..(multipole_idx + 1) * self.fmm.m2l.k],
+                            );
+                    }
 
-                let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                    self.fmm.dc2e_inv_1.view(),
-                    empty_array::<U, 2>().simple_mult_into_resize(
-                        self.fmm.dc2e_inv_2.view(),
+                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
-                            self.fmm.m2l.operator_data.u.view(),
+                            self.fmm.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                c_sub.view(),
-                                compressed_multipoles_subset.view(),
+                                self.fmm.m2l.operator_data.u.view(),
+                                empty_array::<U, 2>().simple_mult_into_resize(
+                                    c_sub.view(),
+                                    compressed_multipoles_subset.view(),
+                                ),
                             ),
                         ),
-                    ),
-                );
+                    );
 
-                // TODO: Can do this outside of the loop
-                let local_idxs = displacements
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, &d)| d != -1)
-                    .map(|(_, &j)| j as usize)
-                    .collect_vec();
+                    for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
+                        let local_lock = level_locals[local_idx].lock().unwrap();
+                        let local_ptr = local_lock.raw;
+                        let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
 
-                for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                    let local_lock = level_locals[local_idx].lock().unwrap();
-                    let local_ptr = local_lock.raw;
-                    let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
+                        let res =
+                            &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
+                        local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
+                    }
+                });
 
-                    let res =
-                        &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
-                    local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
-                }
-            })
+            println!("level {:?} kernel time {:?}", level, s.elapsed());
         }
 
         fn m2l_scale(&self, level: u64) -> U {

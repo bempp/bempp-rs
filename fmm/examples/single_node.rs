@@ -25,7 +25,7 @@ fn main() {
     let order = 6;
     let alpha_inner = 1.05;
     let alpha_outer = 2.95;
-    let depth = 5;
+    let depth = 6;
 
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
@@ -34,7 +34,7 @@ fn main() {
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
     let m2l_data = SvdFieldTranslationKiFmm::new(
         kernel.clone(),
-        Some(75),
+        Some(759),
         order,
         *tree.get_domain(),
         alpha_inner,
