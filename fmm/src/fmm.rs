@@ -1369,7 +1369,7 @@ mod test {
 
         // Test matrix input
         let points = points_fixture::<f64>(npoints, None, None);
-        let ncharge_vecs = 3;
+        let ncharge_vecs = 6;
 
         let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
         charge_mat

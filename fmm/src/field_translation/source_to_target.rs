@@ -3,7 +3,6 @@ use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
 
 use bempp_field::{
     fft::Fft,
@@ -498,7 +497,6 @@ pub mod uniform {
                 })
                 .collect_vec();
 
-            // let s = Instant::now();
             (0..316)
                 .into_par_iter()
                 .zip(multipole_idxs)
@@ -549,8 +547,6 @@ pub mod uniform {
                         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
                     }
                 });
-
-            // println!("level {:?} kernel time {:?}", level, s.elapsed());
         }
 
         fn m2l_scale(&self, level: u64) -> U {
@@ -599,43 +595,6 @@ pub mod uniform {
 
                 let nsources = sources.len();
 
-                // let mut all_displacements = vec![vec![-1i64; nsources]; 316];
-
-                // // Need to identify all save locations in a pre-processing step.
-                // for (j, source) in sources.iter().enumerate() {
-                //     let v_list = source
-                //         .parent()
-                //         .neighbors()
-                //         .iter()
-                //         .flat_map(|pn| pn.children())
-                //         .filter(|pnc| {
-                //             !source.is_adjacent(pnc)
-                //                 && self.fmm.tree().get_all_keys_set().contains(pnc)
-                //         })
-                //         .collect_vec();
-
-                //     let transfer_vectors = v_list
-                //         .iter()
-                //         .map(|target| target.find_transfer_vector(source))
-                //         .collect_vec();
-
-                //     let mut transfer_vectors_map = HashMap::new();
-                //     for (i, v) in transfer_vectors.iter().enumerate() {
-                //         transfer_vectors_map.insert(v, i);
-                //     }
-
-                //     let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
-
-                //     for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
-                //         if transfer_vectors_set.contains(&tv.hash) {
-                //             let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                //             let target_index = self.level_index_pointer[level as usize]
-                //                 .get(target)
-                //                 .unwrap();
-                //             all_displacements[i][j] = *target_index as i64;
-                //         }
-                //     }
-                // }
                 let all_displacements = vec![vec![-1i64; nsources]; 316];
                 let all_displacements = all_displacements.into_iter().map(Mutex::new).collect_vec();
 
@@ -740,52 +699,65 @@ pub mod uniform {
                     .zip(multipole_idxs)
                     .zip(local_idxs)
                     .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                        let top_left = [0, c_idx * self.fmm.m2l.k];
+                        let c_sub = self
+                            .fmm
+                            .m2l
+                            .operator_data
+                            .c
+                            .view()
+                            .into_subview(top_left, c_dim);
 
-                    let top_left = [0, c_idx * self.fmm.m2l.k];
-                    let c_sub = self
-                        .fmm
-                        .m2l
-                        .operator_data
-                        .c
-                        .view()
-                        .into_subview(top_left, c_dim);
+                        let mut compressed_multipoles_subset = rlst_dynamic_array2!(
+                            U,
+                            [self.fmm.m2l.k, multipole_idxs.len() * self.ncharge_vectors]
+                        );
 
-                    let mut compressed_multipoles_subset =
-                        rlst_dynamic_array2!(U, [self.fmm.m2l.k, multipole_idxs.len() * self.ncharge_vectors]);
+                        for (local_multipole_idx, &global_multipole_idx) in
+                            multipole_idxs.iter().enumerate()
+                        {
+                            let key_displacement_global =
+                                global_multipole_idx * self.fmm.m2l.k * self.ncharge_vectors;
 
-                    for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
+                            let key_displacement_local =
+                                local_multipole_idx * self.fmm.m2l.k * self.ncharge_vectors;
 
-                        let key_displacement = multipole_idx * self.fmm.m2l.k * self.ncharge_vectors;
-                        let key_displacement_i = i * self.fmm.m2l.k * self.ncharge_vectors;
-                        for charge_vec_idx in 0..self.ncharge_vectors {
-                            let charge_vec_displacement = charge_vec_idx * self.fmm.m2l.k;
+                            for charge_vec_idx in 0..self.ncharge_vectors {
+                                let charge_vec_displacement = charge_vec_idx * self.fmm.m2l.k;
 
-                            compressed_multipoles_subset.data_mut()
-                                [key_displacement_i + charge_vec_displacement .. key_displacement_i + charge_vec_displacement + self.fmm.m2l.k]
-                                .copy_from_slice(
-                                    &compressed_multipoles.data()[key_displacement + charge_vec_displacement .. key_displacement + charge_vec_displacement + self.fmm.m2l.k]
-                                );
+                                compressed_multipoles_subset.data_mut()[key_displacement_local
+                                    + charge_vec_displacement
+                                    ..key_displacement_local
+                                        + charge_vec_displacement
+                                        + self.fmm.m2l.k]
+                                    .copy_from_slice(
+                                        &compressed_multipoles.data()[key_displacement_global
+                                            + charge_vec_displacement
+                                            ..key_displacement_global
+                                                + charge_vec_displacement
+                                                + self.fmm.m2l.k],
+                                    );
+                            }
                         }
-                    }
 
-                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.fmm.dc2e_inv_1.view(),
-                        empty_array::<U, 2>().simple_mult_into_resize(
-                            self.fmm.dc2e_inv_2.view(),
+                        let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                            self.fmm.dc2e_inv_1.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                self.fmm.m2l.operator_data.u.view(),
+                                self.fmm.dc2e_inv_2.view(),
                                 empty_array::<U, 2>().simple_mult_into_resize(
-                                    c_sub.view(),
-                                    compressed_multipoles_subset.view(),
+                                    self.fmm.m2l.operator_data.u.view(),
+                                    empty_array::<U, 2>().simple_mult_into_resize(
+                                        c_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
                                 ),
                             ),
-                        ),
-                    );
+                        );
 
-                    // let displacements = &all_displacements[c_idx];
-
-                    for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                            let local_lock = level_locals[local_idx].lock().unwrap();
+                        for (local_multipole_idx, &global_local_idx) in
+                            local_idxs.iter().enumerate()
+                        {
+                            let local_lock = level_locals[global_local_idx].lock().unwrap();
                             for charge_vec_idx in 0..self.ncharge_vectors {
                                 let local_send_ptr = local_lock[charge_vec_idx];
                                 let local_ptr = local_send_ptr.raw;
@@ -795,7 +767,7 @@ pub mod uniform {
                                 };
 
                                 let key_displacement =
-                                    multipole_idx * self.ncoeffs * self.ncharge_vectors;
+                                    local_multipole_idx * self.ncoeffs * self.ncharge_vectors;
                                 let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
 
                                 let result = &locals.data()[key_displacement
@@ -803,34 +775,8 @@ pub mod uniform {
                                     ..key_displacement + charge_vec_displacement + self.ncoeffs];
                                 local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                             }
-
-                    }
-
-                    // for (result_idx, &save_idx) in displacements.iter().enumerate() {
-                    //     if save_idx > -1 {
-                    //         let save_idx = save_idx as usize;
-                    //         let local_lock = level_locals[save_idx].lock().unwrap();
-
-                    //         for charge_vec_idx in 0..self.ncharge_vectors {
-                    //             let local_send_ptr = local_lock[charge_vec_idx];
-                    //             let local_ptr = local_send_ptr.raw;
-
-                    //             let local = unsafe {
-                    //                 std::slice::from_raw_parts_mut(local_ptr, self.ncoeffs)
-                    //             };
-
-                    //             let key_displacement =
-                    //                 result_idx * self.ncoeffs * self.ncharge_vectors;
-                    //             let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
-
-                    //             let result = &locals.data()[key_displacement
-                    //                 + charge_vec_displacement
-                    //                 ..key_displacement + charge_vec_displacement + self.ncoeffs];
-                    //             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
-                    //         }
-                    //     }
-                    // }
-                })
+                        }
+                    })
             }
 
             fn m2l_scale(&self, level: u64) -> U {
@@ -851,6 +797,8 @@ pub mod uniform {
 
 /// Field translations defined on adaptively refined
 pub mod adaptive {
+    use std::sync::Mutex;
+
     use rlst_dense::rlst_array_from_slice2;
 
     use super::*;
@@ -1408,10 +1356,10 @@ pub mod adaptive {
                 source_map.insert(t, i);
             }
 
-            let mut target_indices = vec![vec![-1i64; nsources]; 316];
+            let all_displacements = vec![vec![-1i64; nsources]; 316];
+            let all_displacements = all_displacements.into_iter().map(Mutex::new).collect_vec();
 
-            // Need to identify all save locations in a pre-processing step.
-            for (j, source) in sources.iter().enumerate() {
+            sources.into_par_iter().enumerate().for_each(|(j, source)| {
                 let v_list = source
                     .parent()
                     .neighbors()
@@ -1432,16 +1380,61 @@ pub mod adaptive {
                     transfer_vectors_map.insert(v, i);
                 }
 
-                let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
-
+                let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
                 for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+                    let mut all_displacements_lock = all_displacements[i].lock().unwrap();
                     if transfer_vectors_set.contains(&tv.hash) {
                         let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
                         let target_index = source_map.get(target).unwrap();
-                        target_indices[i][j] = *target_index as i64;
+                        all_displacements_lock[j] = *target_index as i64;
                     }
                 }
-            }
+
+                // for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+                //     let mut all_displacements_lock = all_displacements[i].lock().unwrap();
+
+                //     if transfer_vectors_set.contains(&tv.hash) {
+                //         let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                //         let target_index = self.level_index_pointer[level as usize]
+                //             .get(target)
+                //             .unwrap();
+                //         all_displacements_lock[j] = *target_index as i64;
+                //     }
+                // }
+            });
+
+            // Need to identify all save locations in a pre-processing step.
+            // for (j, source) in sources.iter().enumerate() {
+            //     let v_list = source
+            //         .parent()
+            //         .neighbors()
+            //         .iter()
+            //         .flat_map(|pn| pn.children())
+            //         .filter(|pnc| {
+            //             !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().contains(pnc)
+            //         })
+            //         .collect_vec();
+
+            //     let transfer_vectors = v_list
+            //         .iter()
+            //         .map(|target| target.find_transfer_vector(source))
+            //         .collect_vec();
+
+            //     let mut transfer_vectors_map = HashMap::new();
+            //     for (i, v) in transfer_vectors.iter().enumerate() {
+            //         transfer_vectors_map.insert(v, i);
+            //     }
+
+            //     let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().collect();
+
+            //     for (i, tv) in self.fmm.m2l.transfer_vectors.iter().enumerate() {
+            //         if transfer_vectors_set.contains(&tv.hash) {
+            //             let target = &v_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+            //             let target_index = source_map.get(target).unwrap();
+            //             all_displacements[i][j] = *target_index as i64;
+            //         }
+            //     }
+            // }
 
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
@@ -1457,7 +1450,7 @@ pub mod adaptive {
             );
 
             let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
-            let dim = [nrows, self.fmm.m2l.k];
+            let c_dim = [nrows, self.fmm.m2l.k];
 
             let mut compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
                 self.fmm.m2l.operator_data.st_block.view(),
@@ -1469,43 +1462,122 @@ pub mod adaptive {
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-            (0..316).for_each(|c_idx| {
-                let top_left = [0, c_idx * self.fmm.m2l.k];
-                let c_sub = self
-                    .fmm
-                    .m2l
-                    .operator_data
-                    .c
-                    .view()
-                    .into_subview(top_left, dim);
+            let multipole_idxs = all_displacements
+                .iter()
+                .map(|displacements| {
+                    displacements
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &d)| d != -1)
+                        .map(|(i, _)| i)
+                        .collect_vec()
+                })
+                .collect_vec();
 
-                let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                    self.fmm.dc2e_inv_1.view(),
-                    empty_array::<U, 2>().simple_mult_into_resize(
-                        self.fmm.dc2e_inv_2.view(),
+            let local_idxs = all_displacements
+                .iter()
+                .map(|displacements| {
+                    displacements
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &d)| d != -1)
+                        .map(|(_, &j)| j as usize)
+                        .collect_vec()
+                })
+                .collect_vec();
+
+            (0..316)
+                .into_par_iter()
+                .zip(multipole_idxs)
+                .zip(local_idxs)
+                .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                    let top_left = [0, c_idx * self.fmm.m2l.k];
+                    let c_sub = self
+                        .fmm
+                        .m2l
+                        .operator_data
+                        .c
+                        .view()
+                        .into_subview(top_left, c_dim);
+
+                    let mut compressed_multipoles_subset =
+                        rlst_dynamic_array2!(U, [self.fmm.m2l.k, multipole_idxs.len()]);
+
+                    for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
+                        compressed_multipoles_subset.data_mut()
+                            [i * self.fmm.m2l.k..(i + 1) * self.fmm.m2l.k]
+                            .copy_from_slice(
+                                &compressed_multipoles.data()[(multipole_idx) * self.fmm.m2l.k
+                                    ..(multipole_idx + 1) * self.fmm.m2l.k],
+                            );
+                    }
+
+                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.dc2e_inv_1.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
-                            self.fmm.m2l.operator_data.u.view(),
+                            self.fmm.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                c_sub.view(),
-                                compressed_multipoles.view(),
+                                self.fmm.m2l.operator_data.u.view(),
+                                empty_array::<U, 2>().simple_mult_into_resize(
+                                    c_sub.view(),
+                                    compressed_multipoles_subset.view(),
+                                ),
                             ),
                         ),
-                    ),
-                );
+                    );
 
-                let displacements = &target_indices[c_idx];
-
-                for (result_idx, &save_idx) in displacements.iter().enumerate() {
-                    if save_idx > -1 {
-                        let save_idx = save_idx as usize;
-                        let local_ptr = self.level_locals[(level) as usize][save_idx].raw;
+                    for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
+                        let local_lock = self.level_locals[level as usize][local_idx];
+                        let local_ptr = local_lock.raw;
                         let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
 
-                        let res = &locals.data()[result_idx * ncoeffs..(result_idx + 1) * ncoeffs];
+                        let res =
+                            &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
                         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
                     }
-                }
-            })
+                })
+
+            // (0..316).for_each(|c_idx| {
+            //     let top_left = [0, c_idx * self.fmm.m2l.k];
+            //     let c_sub = self
+            //         .fmm
+            //         .m2l
+            //         .operator_data
+            //         .c
+            //         .view()
+            //         .into_subview(top_left, dim);
+
+            //     let locals = empty_array::<U, 2>().simple_mult_into_resize(
+            //         self.fmm.dc2e_inv_1.view(),
+            //         empty_array::<U, 2>().simple_mult_into_resize(
+            //             self.fmm.dc2e_inv_2.view(),
+            //             empty_array::<U, 2>().simple_mult_into_resize(
+            //                 self.fmm.m2l.operator_data.u.view(),
+            //                 empty_array::<U, 2>().simple_mult_into_resize(
+            //                     c_sub.view(),
+            //                     compressed_multipoles.view(),
+            //                 ),
+            //             ),
+            //         ),
+            //     );
+
+            //     let displacements = &all_displacements[c_idx];
+
+            //     for (result_idx, &save_idx) in displacements.iter().enumerate() {
+            //         if save_idx > -1 {
+            //             let save_idx = save_idx as usize;
+            //             let local_ptr = self.level_locals[(level) as usize][save_idx].raw;
+            //             let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
+
+            //             let res = &locals.data()[result_idx * ncoeffs..(result_idx + 1) * ncoeffs];
+            //             local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
+            //         }
+            //     }
+            // })
         }
 
         fn m2l_scale(&self, level: u64) -> U {
