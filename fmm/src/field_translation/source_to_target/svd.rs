@@ -655,8 +655,8 @@ pub mod uniform {
 
         fn m2l<'a>(&self, level: u64) {
             let Some(sources) = self.fmm.tree().get_keys(level) else {
-          return;
-      };
+                return;
+            };
 
             let nsources = sources.len();
 
