@@ -329,8 +329,6 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 pub fn assemble<'a, const BLOCKSIZE: usize>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
-    needs_trial_normal: bool,
-    needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
 ) {
@@ -652,14 +650,7 @@ mod test {
         let ndofs = space.dofmap().global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        assemble::<128>(
-            &mut matrix,
-            &Laplace3dKernel::new(),
-            false,
-            false,
-            &space,
-            &space,
-        );
+        assemble::<128>(&mut matrix, &Laplace3dKernel::new(), &space, &space);
 
         // Compare to result from bempp-cl
         #[rustfmt::skip]
