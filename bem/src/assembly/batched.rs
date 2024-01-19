@@ -21,6 +21,7 @@ use rlst_dense::{
         RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
     },
 };
+use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -531,6 +532,56 @@ pub fn assemble_singular_into_dense<'a, const QDEGREE: usize, const BLOCKSIZE: u
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn assemble_singular_into_csr<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+    kernel: &impl Kernel<T = f64>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+    trial_colouring: &Vec<Vec<usize>>,
+    test_colouring: &Vec<Vec<usize>>,
+) -> CsrMatrix<f64> {
+    let shape = [
+        test_space.dofmap().global_size(),
+        trial_space.dofmap().global_size(),
+    ];
+    let sparse_matrix = assemble_singular::<QDEGREE, BLOCKSIZE>(
+        shape,
+        kernel,
+        trial_space,
+        test_space,
+        trial_colouring,
+        test_colouring,
+    );
+
+    let mut rows = vec![];
+    let mut cols = vec![];
+    let mut data = vec![];
+
+    for ((i, j), value) in sparse_matrix
+        .rows
+        .iter()
+        .zip(&sparse_matrix.cols)
+        .zip(&sparse_matrix.data)
+    {
+        let mut found = false;
+        for ((i2, j2), value2) in rows.iter().zip(&cols).zip(data.iter_mut()) {
+            if *i == *i2 && *j == *j2 {
+                *value2 += *value;
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            rows.push(*i);
+            cols.push(*j);
+            data.push(*value);
+        }
+    }
+
+    CsrMatrix::<f64>::from_aij(shape, &rows, &cols, &data).unwrap()
+}
+
+#[allow(clippy::too_many_arguments)]
 fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     shape: [usize; 2],
     kernel: &impl Kernel<T = f64>,
@@ -700,6 +751,51 @@ mod test {
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::{Continuity, ElementFamily};
+
+    #[test]
+    fn test_singular() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
+
+        let colouring = space.compute_cell_colouring();
+
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+        assemble_singular_into_dense::<4, 128>(
+            &mut matrix,
+            &Laplace3dKernel::new(),
+            &space,
+            &space,
+            &colouring,
+            &colouring,
+        );
+        let csr = assemble_singular_into_csr::<4, 128>(
+            &Laplace3dKernel::new(),
+            &space,
+            &space,
+            &colouring,
+            &colouring,
+        );
+
+        let indptr = csr.indptr();
+        let indices = csr.indices();
+        let data = csr.data();
+
+        let mut row = 0;
+        for (i, j) in indices.iter().enumerate() {
+            while i >= indptr[row + 1] {
+                row += 1;
+            }
+            assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
+        }
+    }
 
     #[test]
     fn test_laplace_single_layer_dp0_dp0() {
