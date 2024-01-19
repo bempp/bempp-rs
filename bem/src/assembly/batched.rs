@@ -87,8 +87,6 @@ unsafe impl<T: Scalar> Sync for RawData2D<T> {}
 fn assemble_batch_singular<'a>(
     output: &RawData2D<f64>,
     kernel: &impl Kernel<T = f64>,
-    needs_trial_normal: bool,
-    needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
     cell_pairs: &[(usize, usize)],
@@ -98,16 +96,31 @@ fn assemble_batch_singular<'a>(
     trial_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
     test_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
 ) -> usize {
+    let npts = weights.len();
+    debug_assert!(weights.len() == npts);
+    debug_assert!(test_points.shape()[0] == npts);
+    debug_assert!(trial_points.shape()[0] == npts);
+
     let grid = test_space.grid();
-    let mut k = vec![0.0];
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut test_jdet = vec![0.0; test_points.shape()[0]];
-    let mut trial_jdet = vec![0.0; trial_points.shape()[0]];
-    let mut test_mapped_pts = rlst_dynamic_array2!(f64, [test_points.shape()[0], 3]);
-    let mut trial_mapped_pts = rlst_dynamic_array2!(f64, [trial_points.shape()[0], 3]);
-    let mut test_normals = rlst_dynamic_array2!(f64, [test_points.shape()[0], 3]);
-    let mut trial_normals = rlst_dynamic_array2!(f64, [trial_points.shape()[0], 3]);
+    let mut k = vec![0.0];
+    let mut test_jdet = vec![0.0; npts];
+    let mut test_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
+    let mut test_normals = rlst_dynamic_array2!(f64, [npts, 3]);
+
+    let mut trial_jdet = vec![0.0; npts];
+    let mut trial_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
+    let mut trial_normals = rlst_dynamic_array2!(f64, [npts, 3]);
+
+    let mut test_row = vec![0.0; 3];
+    let mut trial_row = vec![0.0; 3];
+
+    let test_element = grid.geometry().element(cell_pairs[0].0);
+    let trial_element = grid.geometry().element(cell_pairs[0].1);
+
+    let test_evaluator = grid.geometry().get_evaluator(test_element, test_points);
+    let trial_evaluator = grid.geometry().get_evaluator(trial_element, trial_points);
 
     for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
@@ -115,29 +128,19 @@ fn assemble_batch_singular<'a>(
         let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
         let trial_cell_gindex = grid.geometry().index_map()[*trial_cell];
 
-        grid.geometry().compute_jacobian_determinants(
-            test_points,
+        test_evaluator.compute_normals_and_jacobian_determinants(
             test_cell_gindex,
+            &mut test_normals,
             &mut test_jdet,
         );
-        grid.geometry()
-            .compute_points(test_points, test_cell_gindex, &mut test_mapped_pts);
-        if needs_test_normal {
-            grid.geometry()
-                .compute_normals(test_points, test_cell_gindex, &mut test_normals);
-        }
+        test_evaluator.compute_points(test_cell_gindex, &mut test_mapped_pts);
 
-        grid.geometry().compute_jacobian_determinants(
-            trial_points,
+        trial_evaluator.compute_normals_and_jacobian_determinants(
             trial_cell_gindex,
+            &mut trial_normals,
             &mut trial_jdet,
         );
-        grid.geometry()
-            .compute_points(trial_points, trial_cell_gindex, &mut trial_mapped_pts);
-        if needs_trial_normal {
-            grid.geometry()
-                .compute_normals(trial_points, trial_cell_gindex, &mut trial_normals);
-        }
+        trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
 
         for (test_i, test_dof) in test_space
             .dofmap()
@@ -156,16 +159,15 @@ fn assemble_batch_singular<'a>(
                 let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    let mut test_row = vec![0.0; test_mapped_pts.shape()[1]];
                     for (i, ti) in test_row.iter_mut().enumerate() {
                         *ti = *test_mapped_pts.get([index, i]).unwrap();
                     }
-                    let mut trial_row = vec![0.0; trial_mapped_pts.shape()[1]];
                     for (i, ti) in trial_row.iter_mut().enumerate() {
                         *ti = *trial_mapped_pts.get([index, i]).unwrap();
                     }
 
                     kernel.assemble_st(EvalType::Value, &test_row, &trial_row, &mut k);
+
                     sum += k[0]
                         * (wt
                             * test_table.get([0, index, test_i, 0]).unwrap()
@@ -209,9 +211,8 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
 
     let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
     let mut test_jdet = [0.0; NPTS_TEST];
-    let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
-
     let mut test_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TEST, 3]];
+    let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
 
     let test_element = test_grid.geometry().element(test_cells[0]);
     let trial_element = trial_grid.geometry().element(trial_cells[0]);
@@ -325,7 +326,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     1
 }
 
-pub fn assemble<'a>(
+pub fn assemble<'a, const BLOCKSIZE: usize>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     needs_trial_normal: bool,
@@ -335,53 +336,47 @@ pub fn assemble<'a>(
 ) {
     let test_colouring = test_space.compute_cell_colouring();
     let trial_colouring = trial_space.compute_cell_colouring();
-    // TODO: make these configurable
-    let blocksize = 128;
 
-    assemble_nonsingular::<16, 16>(
+    assemble_nonsingular::<16, 16, BLOCKSIZE>(
         output,
         kernel,
         trial_space,
         test_space,
         &trial_colouring,
         &test_colouring,
-        blocksize,
     );
-    assemble_singular(
+    assemble_singular::<4, BLOCKSIZE>(
         output,
         kernel,
-        needs_trial_normal,
-        needs_test_normal,
         trial_space,
         test_space,
         &trial_colouring,
         &test_colouring,
-        blocksize,
     );
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
+pub fn assemble_nonsingular<
+    'a,
+    const NPTS_TEST: usize,
+    const NPTS_TRIAL: usize,
+    const BLOCKSIZE: usize,
+>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
     trial_colouring: &Vec<Vec<usize>>,
     test_colouring: &Vec<Vec<usize>>,
-    blocksize: usize,
 ) {
     if !trial_space.is_serial() || !test_space.is_serial() {
-        panic!("Dense assemble can only be used for function spaces stored in serial");
+        panic!("Dense assembly can only be used for function spaces stored in serial");
     }
     if output.shape()[0] != test_space.dofmap().global_size()
         || output.shape()[1] != trial_space.dofmap().global_size()
     {
         panic!("Matrix has wrong shape");
     }
-
-    // Size of this might not be known at compile time
-    // let test_dofs_per_cell = 1;
-    // let trial_dofs_per_cell = 1;
 
     // TODO: pass cell types into this function
     let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
@@ -427,16 +422,16 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 
             let mut test_start = 0;
             while test_start < test_c.len() {
-                let test_end = if test_start + blocksize < test_c.len() {
-                    test_start + blocksize
+                let test_end = if test_start + BLOCKSIZE < test_c.len() {
+                    test_start + BLOCKSIZE
                 } else {
                     test_c.len()
                 };
 
                 let mut trial_start = 0;
                 while trial_start < trial_c.len() {
-                    let trial_end = if trial_start + blocksize < trial_c.len() {
-                        trial_start + blocksize
+                    let trial_end = if trial_start + BLOCKSIZE < trial_c.len() {
+                        trial_start + BLOCKSIZE
                     } else {
                         trial_c.len()
                     };
@@ -473,16 +468,13 @@ pub fn assemble_nonsingular<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn assemble_singular<'a>(
+pub fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
-    needs_trial_normal: bool,
-    needs_test_normal: bool,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
     trial_colouring: &Vec<Vec<usize>>,
     test_colouring: &Vec<Vec<usize>>,
-    blocksize: usize,
 ) {
     if test_space.grid() != trial_space.grid() {
         // If the test and trial grids are different, there are no neighbouring triangles
@@ -490,20 +482,13 @@ pub fn assemble_singular<'a>(
     }
 
     if !trial_space.is_serial() || !test_space.is_serial() {
-        panic!("Dense assemble can only be used for function spaces stored in serial");
+        panic!("Dense assembly can only be used for function spaces stored in serial");
     }
     if output.shape()[0] != test_space.dofmap().global_size()
         || output.shape()[1] != trial_space.dofmap().global_size()
     {
         panic!("Matrix has wrong shape");
     }
-
-    // Size of this might not be known at compile time
-    // let test_dofs_per_cell = 1;
-    // let trial_dofs_per_cell = 1;
-
-    // TODO: allow user to configure this
-    let npoints = 4;
 
     let output_raw = RawData2D {
         data: output.data_mut().as_mut_ptr(),
@@ -545,11 +530,12 @@ pub fn assemble_singular<'a>(
             ReferenceCellType::Triangle,
             ReferenceCellType::Triangle,
             pairs,
-            npoints,
+            QDEGREE,
         );
+        let npts = qrule.weights.len();
 
-        let mut points = rlst_dynamic_array2!(f64, [qrule.npoints, 2]);
-        for i in 0..qrule.npoints {
+        let mut points = rlst_dynamic_array2!(f64, [npts, 2]);
+        for i in 0..npts {
             for j in 0..2 {
                 *points.get_mut([i, j]).unwrap() = qrule.trial_points[2 * i + j];
             }
@@ -564,8 +550,8 @@ pub fn assemble_singular<'a>(
         trial_points.push(points);
         trial_tables.push(table);
 
-        let mut points = rlst_dynamic_array2!(f64, [qrule.npoints, 2]);
-        for i in 0..qrule.npoints {
+        let mut points = rlst_dynamic_array2!(f64, [npts, 2]);
+        for i in 0..npts {
             for j in 0..2 {
                 *points.get_mut([i, j]).unwrap() = qrule.test_points[2 * i + j];
             }
@@ -581,7 +567,6 @@ pub fn assemble_singular<'a>(
         test_tables.push(table);
         qweights.push(qrule.weights);
     }
-
     for test_c in test_colouring {
         for trial_c in trial_colouring {
             let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
@@ -610,8 +595,8 @@ pub fn assemble_singular<'a>(
                 let mut start = 0;
                 let mut cell_blocks = vec![];
                 while start < cells.len() {
-                    let end = if start + blocksize < cells.len() {
-                        start + blocksize
+                    let end = if start + BLOCKSIZE < cells.len() {
+                        start + BLOCKSIZE
                     } else {
                         cells.len()
                     };
@@ -626,8 +611,6 @@ pub fn assemble_singular<'a>(
                         assemble_batch_singular(
                             &output_raw,
                             kernel,
-                            needs_trial_normal,
-                            needs_test_normal,
                             trial_space,
                             test_space,
                             cell_blocks[t],
@@ -669,7 +652,7 @@ mod test {
         let ndofs = space.dofmap().global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        assemble(
+        assemble::<128>(
             &mut matrix,
             &Laplace3dKernel::new(),
             false,

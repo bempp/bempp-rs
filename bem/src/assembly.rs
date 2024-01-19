@@ -33,7 +33,7 @@ pub fn assemble_batched<'a>(
     match pde {
         PDEType::Laplace => match operator {
             BoundaryOperator::SingleLayer => {
-                batched::assemble(
+                batched::assemble::<128>(
                     output,
                     &laplace_3d::Laplace3dKernel::new(),
                     false,
@@ -90,7 +90,7 @@ mod test {
             f64,
             [space1.dofmap().global_size(), space0.dofmap().global_size()]
         );
-        batched::assemble(
+        batched::assemble::<128>(
             &mut matrix,
             &Laplace3dKernel::new(),
             false,
