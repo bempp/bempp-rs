@@ -80,7 +80,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    batched::assemble_singular::<4, 128>(
+                    batched::assemble_singular_into_dense::<4, 128>(
                         &mut matrix,
                         &laplace_3d::Laplace3dKernel::new(),
                         &space,

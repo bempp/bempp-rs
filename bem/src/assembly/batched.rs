@@ -82,10 +82,49 @@ pub struct RawData2D<T: Scalar> {
 
 unsafe impl<T: Scalar> Sync for RawData2D<T> {}
 
+pub struct SparseMatrixData<T: Scalar> {
+    pub data: Vec<T>,
+    pub rows: Vec<usize>,
+    pub cols: Vec<usize>,
+    pub shape: [usize; 2],
+}
+
+impl<T: Scalar> SparseMatrixData<T> {
+    fn new(shape: [usize; 2]) -> Self {
+        Self {
+            data: vec![],
+            rows: vec![],
+            cols: vec![],
+            shape,
+        }
+    }
+    fn add(&mut self, other: SparseMatrixData<T>) {
+        debug_assert!(self.shape[0] == other.shape[0]);
+        debug_assert!(self.shape[1] == other.shape[1]);
+        self.rows.extend(&other.rows);
+        self.cols.extend(&other.cols);
+        self.data.extend(&other.data);
+    }
+    fn sum(&self, other: SparseMatrixData<T>) -> SparseMatrixData<T> {
+        debug_assert!(self.shape[0] == other.shape[0]);
+        debug_assert!(self.shape[1] == other.shape[1]);
+        let mut out = SparseMatrixData::<T>::new(self.shape);
+        out.rows.extend(&self.rows);
+        out.cols.extend(&self.cols);
+        out.data.extend(&self.data);
+        out.rows.extend(&other.rows);
+        out.cols.extend(&other.cols);
+        out.data.extend(&other.data);
+        out
+    }
+}
+
+unsafe impl<T: Scalar> Sync for SparseMatrixData<T> {}
+
 // TODO: use T not f64
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<'a>(
-    output: &RawData2D<f64>,
+    shape: [usize; 2],
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
@@ -95,7 +134,8 @@ fn assemble_batch_singular<'a>(
     weights: &[f64],
     trial_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
     test_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
-) -> usize {
+) -> SparseMatrixData<f64> {
+    let mut output = SparseMatrixData::<f64>::new(shape);
     let npts = weights.len();
     debug_assert!(weights.len() == npts);
     debug_assert!(test_points.shape()[0] == npts);
@@ -175,13 +215,13 @@ fn assemble_batch_singular<'a>(
                             * trial_table.get([0, index, trial_i, 0]).unwrap()
                             * trial_jdet[index]);
                 }
-                unsafe {
-                    *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
-                }
+                output.rows.push(*test_dof);
+                output.cols.push(*trial_dof);
+                output.data.push(sum);
             }
         }
     }
-    1
+    output
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -343,7 +383,7 @@ pub fn assemble<'a, const BLOCKSIZE: usize>(
         &trial_colouring,
         &test_colouring,
     );
-    assemble_singular::<4, BLOCKSIZE>(
+    assemble_singular_into_dense::<4, BLOCKSIZE>(
         output,
         kernel,
         trial_space,
@@ -466,7 +506,7 @@ pub fn assemble_nonsingular<
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+pub fn assemble_singular_into_dense<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
@@ -474,24 +514,46 @@ pub fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     trial_colouring: &Vec<Vec<usize>>,
     test_colouring: &Vec<Vec<usize>>,
 ) {
+    let sparse_matrix = assemble_singular::<QDEGREE, BLOCKSIZE>(
+        output.shape(),
+        kernel,
+        trial_space,
+        test_space,
+        trial_colouring,
+        test_colouring,
+    );
+    let data = sparse_matrix.data;
+    let rows = sparse_matrix.rows;
+    let cols = sparse_matrix.cols;
+    for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
+        *output.get_mut([*i, *j]).unwrap() += *value;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+    shape: [usize; 2],
+    kernel: &impl Kernel<T = f64>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+    trial_colouring: &Vec<Vec<usize>>,
+    test_colouring: &Vec<Vec<usize>>,
+) -> SparseMatrixData<f64> {
+    let mut output = SparseMatrixData::new(shape);
+
     if test_space.grid() != trial_space.grid() {
         // If the test and trial grids are different, there are no neighbouring triangles
-        return;
+        return output;
     }
 
     if !trial_space.is_serial() || !test_space.is_serial() {
         panic!("Dense assembly can only be used for function spaces stored in serial");
     }
-    if output.shape()[0] != test_space.dofmap().global_size()
-        || output.shape()[1] != trial_space.dofmap().global_size()
+    if shape[0] != test_space.dofmap().global_size()
+        || shape[1] != trial_space.dofmap().global_size()
     {
         panic!("Matrix has wrong shape");
     }
-
-    let output_raw = RawData2D {
-        data: output.data_mut().as_mut_ptr(),
-        shape: output.shape(),
-    };
 
     let grid = test_space.grid();
     let c20 = grid.topology().connectivity(2, 0);
@@ -603,11 +665,11 @@ pub fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
                 }
 
                 let numtasks = cell_blocks.len();
-                let r: usize = (0..numtasks)
+                let r: SparseMatrixData<f64> = (0..numtasks)
                     .into_par_iter()
                     .map(&|t| {
                         assemble_batch_singular(
-                            &output_raw,
+                            shape,
                             kernel,
                             trial_space,
                             test_space,
@@ -619,11 +681,14 @@ pub fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
                             &test_tables[i],
                         )
                     })
-                    .sum();
-                assert_eq!(r, numtasks);
+                    .reduce(|| SparseMatrixData::<f64>::new(shape), |a, b| a.sum(b));
+
+                //    let even_sum = (1..=10).fold(0, |acc, num| if num % 2 == 0 { acc + num } else { acc });
+                output.add(r);
             }
         }
     }
+    output
 }
 #[cfg(test)]
 mod test {
