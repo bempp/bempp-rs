@@ -156,5 +156,5 @@ where
     pub u: Vec<SvdM2lEntry<T>>,
 
     /// Right singular vectors from SVD of thin M2L matrix, cutoff to a maximum rank of 'k'.
-    pub vt: Vec<SvdM2lEntry<T>>,
+    pub vt: Vec<Vec<SvdM2lEntry<T>>>,
 }

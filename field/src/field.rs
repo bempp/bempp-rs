@@ -1,4 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
+use bempp_traits::kernel::ScaleInvariantKernel;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
@@ -48,7 +49,7 @@ where
         6 * (order - 1).pow(2) + 2
     }
 
-    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
+    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain, depth: u64) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -169,7 +170,7 @@ impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
-    U: Kernel<T = T> + Default,
+    U: Kernel<T = T> + ScaleInvariantKernel<T=T> +  Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type TransferVector = Vec<TransferVector>;
@@ -180,7 +181,7 @@ where
         6 * (order - 1).pow(2) + 2
     }
 
-    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
+    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain, depth: u64) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -188,9 +189,21 @@ where
         let ncols = self.ncoeffs(order);
 
         let mut u = Vec::new();
+
         let mut vt = Vec::new();
 
-        for (_i, t) in self.transfer_vectors.iter().enumerate() {
+        for i in 2..=depth {
+            let mut tmp_i = Vec::new();
+            for j in 0..316 {
+            let tmp_ij = rlst_dynamic_array2!(T, [1,1]);
+            tmp_i.push(tmp_ij);
+            }
+            vt.push(tmp_i)
+        }
+        // let mut vt = vec![vec![tmp; 316]; (depth - 1) as usize];
+
+
+        for (c_idx, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
             let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
 
@@ -219,9 +232,6 @@ where
             // Retain such that 95% of energy of singular values is retained.
             let rank = retain_energy(&sigma_i, self.threshold);
 
-            // let rank = 30;
-            // println!("{:?} rank {:?}", _i, rank);
-
             let mut u_i_compressed = rlst_dynamic_array2!(T, [nrows, rank]);
             let mut vt_i_compressed_= rlst_dynamic_array2!(T, [rank, ncols]);
 
@@ -241,17 +251,47 @@ where
                 sigma_mat_i_compressed.view(), vt_i_compressed_.view()
             );
 
+            for (level_idx, level) in (2..=depth).enumerate() {
+                let scale = self.kernel.scale(level) * m2l_scale(level);
+
+                // let mut vt_i_compressed_scaled = vec![T::zero(); vt_i_compressed.data().len()];
+                let mut vt_i_compressed_scaled = rlst_dynamic_array2!(T, vt_i_compressed.shape());
+                vt_i_compressed_scaled.data_mut().iter_mut().zip(vt_i_compressed.data()).for_each(|(v, v_)| *v = scale * *v_);
+                // println!("HERE {:?} {:?}", vt_i_compressed.shape(), scale_mat.shape());
+
+                vt[level_idx][c_idx] = vt_i_compressed_scaled
+            }
+
             // Store compressed M2L oeprators
             u.push(u_i_compressed);
-            vt.push(vt_i_compressed);
+            // vt.push(vt_i_compressed);
         }
 
         SvdM2lOperatorDataIA { u, vt }
     }
 }
 
+
+fn m2l_scale<T>(level: u64) -> T
+where
+    T: Float + Default,
+    T: Scalar<Real = T> + Gemm,
+{
+    if level < 2 {
+        panic!("M2L only perfomed on level 2 and below")
+    }
+
+    if level == 2 {
+        T::from(1. / 2.).unwrap()
+    } else {
+        let two = T::from(2.0).unwrap();
+        Scalar::powf(two, T::from(level - 3).unwrap())
+    }
+}
+
+
 fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
-    singular_values: &Vec<T>,
+    singular_values: &[T],
     percentage: T,
 ) -> usize {
     // Calculate the total energy.
@@ -310,7 +350,7 @@ where
             result.k = 50;
         }
         result.transfer_vectors = compute_transfer_vectors();
-        result.operator_data = result.compute_m2l_operators(order, domain);
+        result.operator_data = result.compute_m2l_operators(order, domain, 0);
 
         result
     }
@@ -320,7 +360,7 @@ impl<T, U> SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
-    U: Kernel<T = T> + Default,
+    U: Kernel<T = T> + Default + ScaleInvariantKernel<T = T>,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
@@ -331,7 +371,7 @@ where
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: U, threshold: T, order: usize, domain: Domain<T>, alpha: T) -> Self {
+    pub fn new(kernel: U, threshold: T, order: usize, domain: Domain<T>, alpha: T, depth: u64) -> Self {
         let mut result = SvdFieldTranslationKiFmmIA {
             alpha,
             k: 0,
@@ -344,7 +384,7 @@ where
         let ncoeffs = result.ncoeffs(order);
         result.k = ncoeffs;
         result.transfer_vectors = compute_transfer_vectors();
-        result.operator_data = result.compute_m2l_operators(order, domain);
+        result.operator_data = result.compute_m2l_operators(order, domain, depth);
 
         result
     }
@@ -362,7 +402,7 @@ where
 
     type TransferVector = Vec<TransferVector>;
 
-    fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
+    fn compute_m2l_operators(&self, order: usize, domain: Self::Domain, depth: u64) -> Self::M2LOperators {
         // Parameters related to the FFT and Tree
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
@@ -573,7 +613,7 @@ where
         result.conv_to_surf_map = conv_to_surf;
         result.transfer_vectors = compute_transfer_vectors();
 
-        result.operator_data = result.compute_m2l_operators(order, domain);
+        result.operator_data = result.compute_m2l_operators(order, domain, 0);
 
         result
     }
@@ -722,7 +762,7 @@ mod test {
         let k = 60;
         let ntransfer_vectors = 316;
         let svd = SvdFieldTranslationKiFmm::new(kernel.clone(), Some(k), order, domain, alpha);
-        let m2l = svd.compute_m2l_operators(order, domain);
+        let m2l = svd.compute_m2l_operators(order, domain, 0);
 
         // Test that the rank cutoff has been taken correctly (k < ncoeffs)
         assert_eq!(m2l.st_block.shape(), [k, svd.ncoeffs(order)]);
@@ -732,7 +772,7 @@ mod test {
         // Test that the rank cutoff has been taken correctly (k > ncoeffs)
         let k = 100;
         let svd = SvdFieldTranslationKiFmm::new(kernel.clone(), Some(k), order, domain, alpha);
-        let m2l = svd.compute_m2l_operators(order, domain);
+        let m2l = svd.compute_m2l_operators(order, domain, 0);
         assert_eq!(
             m2l.st_block.shape(),
             [svd.ncoeffs(order), svd.ncoeffs(order)]
@@ -747,7 +787,7 @@ mod test {
         let k = None;
         let default_k = 50;
         let svd = SvdFieldTranslationKiFmm::new(kernel, k, order, domain, alpha);
-        let m2l = svd.compute_m2l_operators(order, domain);
+        let m2l = svd.compute_m2l_operators(order, domain, 0);
         assert_eq!(m2l.st_block.shape(), [default_k, svd.ncoeffs(order)]);
         assert_eq!(m2l.c.shape(), [default_k, default_k * ntransfer_vectors]);
         assert_eq!(m2l.u.shape(), [svd.ncoeffs(order), default_k]);
@@ -766,7 +806,7 @@ mod test {
         let fft = FftFieldTranslationKiFmm::new(kernel, order, domain, alpha);
 
         // Create a random point in the middle of the domain
-        let m2l: FftM2lOperatorData<c32> = fft.compute_m2l_operators(order, domain);
+        let m2l: FftM2lOperatorData<c32> = fft.compute_m2l_operators(order, domain, 0);
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
         let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
