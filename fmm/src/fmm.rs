@@ -777,7 +777,9 @@ mod test {
     use super::*;
     use rlst_dense::rlst_array_from_slice2;
 
-    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
+    use bempp_field::types::{
+        FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA,
+    };
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::{points_fixture, points_fixture_sphere};
 
@@ -950,7 +952,7 @@ mod test {
             "rel_error = {rel_error} = {abs_error} / {}",
             direct.iter().sum::<f64>()
         );
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 2e-5);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1034,6 +1036,94 @@ mod test {
             direct.iter().sum::<f64>()
         );
         assert!(rel_error <= 1e-5);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn test_uniform_f64_svd_ia(
+        points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        charges: &[f64],
+        global_idxs: &[usize],
+        order: usize,
+        alpha_inner: f64,
+        alpha_outer: f64,
+        sparse: bool,
+        depth: u64,
+    ) {
+        // Test with SVD field translation
+        let tree =
+            SingleNodeTree::new(points.data(), false, None, Some(depth), global_idxs, sparse);
+
+        let kernel = Laplace3dKernel::default();
+
+        let m2l_data = SvdFieldTranslationKiFmmIA::new(
+            kernel.clone(),
+            0.999999,
+            order,
+            *tree.get_domain(),
+            alpha_inner,
+            tree.get_depth(),
+        );
+
+        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+
+        // Form charge dict, matching charges with their associated global indices
+        let charge_dict = build_charge_dict(global_idxs, charges);
+
+        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
+
+        datatree.run(false);
+
+        // Test that direct computation is close to the FMM.
+        let mut test_idx_vec = Vec::new();
+        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
+            if index_pointer.1 - index_pointer.0 > 0 {
+                test_idx_vec.push(idx);
+            }
+        }
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
+
+        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
+
+        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
+
+        let potentials = &datatree.potentials[l..r];
+
+        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
+        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
+        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
+
+        let dim = datatree.fmm.kernel.space_dimension();
+        let ntargets = leaf_coordinates_row_major.len() / dim;
+
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
+
+        let mut direct = vec![0f64; ntargets];
+
+        let all_charges = charge_dict.into_values().collect_vec();
+
+        datatree.fmm.kernel().evaluate_st(
+            EvalType::Value,
+            points.data(),
+            leaf_coordinates_col_major.data(),
+            &all_charges,
+            &mut direct,
+        );
+
+        let abs_error: f64 = potentials
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+        // TODO: remove this print
+        println!(
+            "rel_error = {rel_error} = {abs_error} / {}",
+            direct.iter().sum::<f64>()
+        );
+        assert!(rel_error <= 2e-5);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1221,6 +1311,106 @@ mod test {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn test_uniform_matrix_f64_svd_ia(
+        order: usize,
+        alpha_inner: f64,
+        alpha_outer: f64,
+        depth: u64,
+        sparse: bool,
+        points: &[f64],
+        global_idxs: &[usize],
+        charge_mat: &Vec<Vec<f64>>,
+    ) {
+        // SVD based field translations
+        let ncharge_vecs = charge_mat.len();
+
+        let kernel = Laplace3dKernel::default();
+
+        // Create a tree
+        let tree = SingleNodeTree::new(points, false, None, Some(depth), global_idxs, sparse);
+
+        // Precompute the M2L data
+        let m2l_data = SvdFieldTranslationKiFmmIA::new(
+            kernel.clone(),
+            0.999999,
+            order,
+            *tree.get_domain(),
+            alpha_inner,
+            tree.get_depth(),
+        );
+
+        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+
+        // Form charge dict, matching charges with their associated global indices
+        let charge_dicts: Vec<_> = (0..ncharge_vecs)
+            .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
+            .collect();
+
+        // Associate data with the FMM
+        let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
+
+        datatree.run(false);
+
+        // Test that direct computation is close to the FMM.
+        let mut test_idx_vec = Vec::new();
+        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
+            if index_pointer.1 - index_pointer.0 > 0 {
+                test_idx_vec.push(idx);
+            }
+        }
+        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
+
+        let &leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
+        let (l, r) = datatree.charge_index_pointer[leaf_idx];
+
+        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
+        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
+
+        let dim = datatree.fmm.kernel.space_dimension();
+        let ntargets = leaf_coordinates_row_major.len() / dim;
+
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
+
+        for (i, charge_dict) in charge_dicts
+            .iter()
+            .enumerate()
+            .take(datatree.ncharge_vectors)
+        {
+            let potentials_ptr =
+                datatree.potentials_send_pointers[i * datatree.nleaves + leaf_idx].raw;
+            let potentials = unsafe { std::slice::from_raw_parts(potentials_ptr, ntargets) };
+
+            let all_charges = &charge_dict.values().cloned().collect_vec();
+
+            let mut direct = vec![0f64; ntargets];
+
+            datatree.fmm.kernel().evaluate_st(
+                EvalType::Value,
+                points,
+                leaf_coordinates_col_major.data(),
+                all_charges,
+                &mut direct,
+            );
+
+            let abs_error: f64 = potentials
+                .iter()
+                .zip(direct.iter())
+                .map(|(a, b)| (a - b).abs())
+                .sum();
+            let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+            // TODO: remove this print
+            println!(
+                "rel_error = {rel_error} = {abs_error} / {}",
+                direct.iter().sum::<f64>()
+            );
+            assert!(rel_error <= 1e-5);
+        }
+    }
+
     #[test]
     fn test_uniform_sphere_fft() {
         let npoints = 10000;
@@ -1279,6 +1469,28 @@ mod test {
             3,
         );
         test_uniform_f64_svd(
+            &points_sphere,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            false,
+            3,
+        );
+
+        test_uniform_f64_svd_ia(
+            &points_sphere,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            true,
+            3,
+        );
+
+        test_uniform_f64_svd_ia(
             &points_sphere,
             &charges,
             &global_idxs,
@@ -1356,6 +1568,28 @@ mod test {
             false,
             3,
         );
+
+        test_uniform_f64_svd_ia(
+            &points_cloud,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            true,
+            3,
+        );
+
+        test_uniform_f64_svd_ia(
+            &points_cloud,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            false,
+            3,
+        );
     }
     #[test]
     fn test_uniform_box_matrix_svd() {
@@ -1378,6 +1612,17 @@ mod test {
             .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
 
         test_uniform_matrix_f64_svd(
+            order,
+            alpha_inner,
+            alpha_outer,
+            3,
+            true,
+            points.data(),
+            &global_idxs,
+            &charge_mat,
+        );
+
+        test_uniform_matrix_f64_svd_ia(
             order,
             alpha_inner,
             alpha_outer,

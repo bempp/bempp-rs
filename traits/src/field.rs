@@ -24,7 +24,12 @@ where
     /// # Arguments
     /// * `order` - the order of expansions used in constructing the surface grid
     /// * `domain` - Domain associated with the global point set.
-    fn compute_m2l_operators(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators;
+    fn compute_m2l_operators(
+        &self,
+        order: usize,
+        domain: Self::Domain,
+        depth: u64,
+    ) -> Self::M2LOperators;
 
     /// Number of coefficients for a given expansion order in a given FMM scheme.
     ///

@@ -1,10 +1,11 @@
+//! Single Node FMM using an SVD based M2L translation operator
 use std::time::Instant;
 
 use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::FftFieldTranslationKiFmm;
+use bempp_field::types::SvdFieldTranslationKiFmm;
 use bempp_fmm::{
     charge::build_charge_dict,
     types::{FmmDataUniform, KiFmmLinear},
@@ -15,7 +16,7 @@ use bempp_tree::implementations::helpers::points_fixture;
 use bempp_tree::types::single_node::SingleNodeTree;
 
 fn main() {
-    let npoints = 1000000;
+    let npoints = 10000;
 
     let points = points_fixture::<f32>(npoints, None, None);
 
@@ -25,20 +26,14 @@ fn main() {
     let order = 6;
     let alpha_inner = 1.05;
     let alpha_outer = 2.95;
-    let depth = 4;
+    let depth = 3;
 
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
     let kernel = Laplace3dKernel::default();
-    let m2l_data: FftFieldTranslationKiFmm<f32, Laplace3dKernel<f32>> =
-        FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-    // let m2l_data = SvdFieldTranslationKiFmm::new(
-    //     kernel.clone(),
-    //     Some(80),
-    //     order,
-    //     *tree.get_domain(),
-    //     alpha_inner,
-    // );
+
+    let m2l_data =
+        SvdFieldTranslationKiFmm::new(kernel.clone(), None, order, *tree.get_domain(), alpha_inner);
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
