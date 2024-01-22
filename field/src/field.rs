@@ -49,7 +49,12 @@ where
         6 * (order - 1).pow(2) + 2
     }
 
-    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain, depth: u64) -> Self::M2LOperators {
+    fn compute_m2l_operators<'a>(
+        &self,
+        order: usize,
+        domain: Self::Domain,
+        _depth: u64,
+    ) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -170,7 +175,7 @@ impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
-    U: Kernel<T = T> + ScaleInvariantKernel<T=T> +  Default,
+    U: Kernel<T = T> + ScaleInvariantKernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type TransferVector = Vec<TransferVector>;
@@ -181,7 +186,12 @@ where
         6 * (order - 1).pow(2) + 2
     }
 
-    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain, depth: u64) -> Self::M2LOperators {
+    fn compute_m2l_operators<'a>(
+        &self,
+        order: usize,
+        domain: Self::Domain,
+        depth: u64,
+    ) -> Self::M2LOperators {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -192,16 +202,15 @@ where
 
         let mut vt = Vec::new();
 
-        for i in 2..=depth {
+        for _i in 2..=depth {
             let mut tmp_i = Vec::new();
-            for j in 0..316 {
-            let tmp_ij = rlst_dynamic_array2!(T, [1,1]);
-            tmp_i.push(tmp_ij);
+            for _j in 0..316 {
+                let tmp_ij = rlst_dynamic_array2!(T, [1, 1]);
+                tmp_i.push(tmp_ij);
             }
             vt.push(tmp_i)
         }
         // let mut vt = vec![vec![tmp; 316]; (depth - 1) as usize];
-
 
         for (c_idx, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
@@ -221,19 +230,14 @@ where
             let mut vt_i = rlst_dynamic_array2!(T, [self.k, ncols]);
 
             tmp_gram_t
-                .into_svd_alloc(
-                    u_i.view_mut(),
-                    vt_i.view_mut(),
-                    &mut sigma_i,
-                    SvdMode::Full,
-                )
+                .into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
 
             // Retain such that 95% of energy of singular values is retained.
             let rank = retain_energy(&sigma_i, self.threshold);
 
             let mut u_i_compressed = rlst_dynamic_array2!(T, [nrows, rank]);
-            let mut vt_i_compressed_= rlst_dynamic_array2!(T, [rank, ncols]);
+            let mut vt_i_compressed_ = rlst_dynamic_array2!(T, [rank, ncols]);
 
             let mut sigma_mat_i_compressed = rlst_dynamic_array2!(T, [rank, rank]);
 
@@ -247,16 +251,18 @@ where
             }
 
             let vt_i_compressed = empty_array::<T, 2>()
-            .simple_mult_into_resize(
-                sigma_mat_i_compressed.view(), vt_i_compressed_.view()
-            );
+                .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
 
             for (level_idx, level) in (2..=depth).enumerate() {
                 let scale = self.kernel.scale(level) * m2l_scale(level);
 
                 // let mut vt_i_compressed_scaled = vec![T::zero(); vt_i_compressed.data().len()];
                 let mut vt_i_compressed_scaled = rlst_dynamic_array2!(T, vt_i_compressed.shape());
-                vt_i_compressed_scaled.data_mut().iter_mut().zip(vt_i_compressed.data()).for_each(|(v, v_)| *v = scale * *v_);
+                vt_i_compressed_scaled
+                    .data_mut()
+                    .iter_mut()
+                    .zip(vt_i_compressed.data())
+                    .for_each(|(v, v_)| *v = scale * *v_);
                 // println!("HERE {:?} {:?}", vt_i_compressed.shape(), scale_mat.shape());
 
                 vt[level_idx][c_idx] = vt_i_compressed_scaled
@@ -270,7 +276,6 @@ where
         SvdM2lOperatorDataIA { u, vt }
     }
 }
-
 
 fn m2l_scale<T>(level: u64) -> T
 where
@@ -288,7 +293,6 @@ where
         Scalar::powf(two, T::from(level - 3).unwrap())
     }
 }
-
 
 fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
     singular_values: &[T],
@@ -371,7 +375,14 @@ where
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: U, threshold: T, order: usize, domain: Domain<T>, alpha: T, depth: u64) -> Self {
+    pub fn new(
+        kernel: U,
+        threshold: T,
+        order: usize,
+        domain: Domain<T>,
+        alpha: T,
+        depth: u64,
+    ) -> Self {
         let mut result = SvdFieldTranslationKiFmmIA {
             alpha,
             k: 0,
@@ -402,7 +413,12 @@ where
 
     type TransferVector = Vec<TransferVector>;
 
-    fn compute_m2l_operators(&self, order: usize, domain: Self::Domain, depth: u64) -> Self::M2LOperators {
+    fn compute_m2l_operators(
+        &self,
+        order: usize,
+        domain: Self::Domain,
+        _depth: u64,
+    ) -> Self::M2LOperators {
         // Parameters related to the FFT and Tree
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
