@@ -52,7 +52,8 @@ fn main() {
         0.9999,
         order,
         *tree.get_domain(),
-        alpha_inner
+        alpha_inner,
+        depth
     );
 
     let fmm = bempp_fmm::types::KiFmmLinearMatrix::new(

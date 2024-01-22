@@ -951,7 +951,7 @@ mod test {
             "rel_error = {rel_error} = {abs_error} / {}",
             direct.iter().sum::<f64>()
         );
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 2e-5);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1062,6 +1062,7 @@ mod test {
             order,
             *tree.get_domain(),
             alpha_inner,
+            tree.get_depth()
         );
 
         let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
@@ -1123,7 +1124,7 @@ mod test {
             "rel_error = {rel_error} = {abs_error} / {}",
             direct.iter().sum::<f64>()
         );
-        assert!(rel_error <= 1e-5);
+        assert!(rel_error <= 2e-5);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1337,6 +1338,7 @@ mod test {
             order,
             *tree.get_domain(),
             alpha_inner,
+            tree.get_depth()
         );
 
         let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);

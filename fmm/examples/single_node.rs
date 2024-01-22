@@ -41,13 +41,14 @@ fn main() {
     //     alpha_inner,
     // );
 
-    // let m2l_data = SvdFieldTranslationKiFmmIA::new(
-    //     kernel.clone(),
-    //     0.9999,
-    //     order,
-    //     *tree.get_domain(),
-    //     alpha_inner
-    // );
+    let m2l_data = SvdFieldTranslationKiFmmIA::new(
+        kernel.clone(),
+        0.9999,
+        order,
+        *tree.get_domain(),
+        alpha_inner,
+        tree.get_depth()
+    );
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
