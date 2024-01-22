@@ -5,25 +5,24 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
-use bempp_field::types::SvdFieldTranslationKiFmm;
 
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
-    fmm::{Fmm, InteractionLists},
+    fmm::Fmm,
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::{EvalType, Scalar},
+    types::Scalar,
 };
 use bempp_tree::types::single_node::SingleNodeTree;
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear};
+use crate::types::{FmmDataUniform, KiFmmLinear};
 
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut},
 };
 
 pub mod matrix {
@@ -136,17 +135,6 @@ pub mod matrix {
                 [self.ncoeffs, nsources * self.ncharge_vectors]
             );
 
-            // let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
-            // let c_dim = [nrows, self.fmm.m2l.k];
-
-            // let mut compressed_multipoles = empty_array::<U, 2>()
-            //     .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
-
-            // compressed_multipoles
-            //     .data_mut()
-            //     .iter_mut()
-            //     .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
-
             let level_locals = self.level_locals[level as usize]
                 .iter()
                 .map(Mutex::new)
@@ -180,24 +168,19 @@ pub mod matrix {
                 })
                 .collect_vec();
 
+            let scale = self.fmm.kernel.scale(level) * self.m2l_scale(level);
+
             (0..316)
                 .into_par_iter()
                 .zip(multipole_idxs)
                 .zip(local_idxs)
                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                    // let top_left = [0, c_idx * self.fmm.m2l.k];
-                    // let c_sub = self
-                    //     .fmm
-                    //     .m2l
-                    //     .operator_data
-                    //     .c
-                    //     .view()
-                    //     .into_subview(top_left, c_dim);
 
                     let mut multipoles_subset = rlst_dynamic_array2!(
                         U,
                         [self.ncoeffs, multipole_idxs.len() * self.ncharge_vectors]
                     );
+
 
                     for (local_multipole_idx, &global_multipole_idx) in
                         multipole_idxs.iter().enumerate()
@@ -226,19 +209,8 @@ pub mod matrix {
                         }
                     }
 
-                    // let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                    //     self.fmm.dc2e_inv_1.view(),
-                    //     empty_array::<U, 2>().simple_mult_into_resize(
-                    //         self.fmm.dc2e_inv_2.view(),
-                    //         empty_array::<U, 2>().simple_mult_into_resize(
-                    //             self.fmm.m2l.operator_data.u.view(),
-                    //             empty_array::<U, 2>().simple_mult_into_resize(
-                    //                 c_sub.view(),
-                    //                 compressed_multipoles_subset.view(),
-                    //             ),
-                    //         ),
-                    //     ),
-                    // );
+                    multipoles_subset.data_mut().iter_mut().for_each(|m| *m *= scale);
+
                     let u_sub = &self.fmm.m2l.operator_data.u[c_idx];
                     let vt_sub = &self.fmm.m2l.operator_data.vt[c_idx];
 
@@ -399,11 +371,6 @@ pub mod uniform {
                 },
                 [ncoeffs, nsources]
             );
-
-            //    multipoles
-            //         .data_mut()
-            //         .iter_mut()
-            //         .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
             let level_locals = self.level_locals[level as usize]
                 .iter()
