@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::FftFieldTranslationKiFmm;
+use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA};
 use bempp_fmm::{
     charge::build_charge_dict,
     types::{FmmDataUniform, KiFmmLinear},
@@ -32,12 +32,21 @@ fn main() {
     let kernel = Laplace3dKernel::default();
     let m2l_data: FftFieldTranslationKiFmm<f32, Laplace3dKernel<f32>> =
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+
     // let m2l_data = SvdFieldTranslationKiFmm::new(
     //     kernel.clone(),
     //     Some(80),
     //     order,
     //     *tree.get_domain(),
     //     alpha_inner,
+    // );
+
+    // let m2l_data = SvdFieldTranslationKiFmmIA::new(
+    //     kernel.clone(),
+    //     0.9999,
+    //     order,
+    //     *tree.get_domain(),
+    //     alpha_inner
     // );
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);

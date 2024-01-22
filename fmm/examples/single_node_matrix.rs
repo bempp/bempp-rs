@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::SvdFieldTranslationKiFmm;
+use bempp_field::types::{SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA};
 use bempp_fmm::charge::build_charge_dict;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::{fmm::FmmLoop, tree::Tree};
@@ -23,7 +23,7 @@ fn main() {
 
     // Test matrix input
     let points = points_fixture::<f32>(npoints, None, None);
-    let ncharge_vecs = 3;
+    let ncharge_vecs = 5;
     let depth = 4;
 
     let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
@@ -39,12 +39,19 @@ fn main() {
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
     // Precompute the M2L data
-    let m2l_data = SvdFieldTranslationKiFmm::new(
+    // let m2l_data = SvdFieldTranslationKiFmm::new(
+    //     kernel.clone(),
+    //     Some(80),
+    //     order,
+    //     *tree.get_domain(),
+    //     alpha_inner,
+    // );
+    let m2l_data = SvdFieldTranslationKiFmmIA::new(
         kernel.clone(),
-        Some(80),
+        0.9999,
         order,
         *tree.get_domain(),
-        alpha_inner,
+        alpha_inner
     );
 
     let fmm = bempp_fmm::types::KiFmmLinearMatrix::new(

@@ -13,6 +13,7 @@ mod field_translation {
     pub mod source_to_target {
         pub mod fft;
         pub mod svd;
+        pub mod svd_ia;
     }
     pub mod target;
 }

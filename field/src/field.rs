@@ -22,6 +22,7 @@ use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
 
+use crate::types::{SvdFieldTranslationKiFmmIA, SvdM2lOperatorDataIA};
 use crate::{
     array::flip3,
     fft::Fft,
@@ -164,6 +165,116 @@ where
     }
 }
 
+impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmIA<T, U>
+where
+    T: Float + Default,
+    T: Scalar<Real = T> + Gemm,
+    U: Kernel<T = T> + Default,
+    Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
+{
+    type TransferVector = Vec<TransferVector>;
+    type M2LOperators = SvdM2lOperatorDataIA<T>;
+    type Domain = Domain<T>;
+
+    fn ncoeffs(&self, order: usize) -> usize {
+        6 * (order - 1).pow(2) + 2
+    }
+
+    fn compute_m2l_operators<'a>(&self, order: usize, domain: Self::Domain) -> Self::M2LOperators {
+        // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
+
+        // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
+        let nrows = self.ncoeffs(order);
+        let ncols = self.ncoeffs(order);
+
+        let mut u = Vec::new();
+        let mut vt = Vec::new();
+
+        for (_i, t) in self.transfer_vectors.iter().enumerate() {
+            let source_equivalent_surface = t.source.compute_surface(&domain, order, self.alpha);
+            let target_check_surface = t.target.compute_surface(&domain, order, self.alpha);
+
+            let mut tmp_gram_t = rlst_dynamic_array2!(T, [nrows, ncols]);
+
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &target_check_surface[..],
+                &source_equivalent_surface[..],
+                tmp_gram_t.data_mut(),
+            );
+
+            let mut u_i = rlst_dynamic_array2!(T, [nrows, self.k]);
+            let mut sigma_i = vec![T::zero(); self.k];
+            let mut vt_i = rlst_dynamic_array2!(T, [self.k, ncols]);
+
+            tmp_gram_t
+                .into_svd_alloc(
+                    u_i.view_mut(),
+                    vt_i.view_mut(),
+                    &mut sigma_i,
+                    SvdMode::Full,
+                )
+                .unwrap();
+
+            // Retain such that 95% of energy of singular values is retained.
+            let rank = retain_energy(&sigma_i, self.threshold);
+
+            // let rank = 30;
+            // println!("{:?} rank {:?}", _i, rank);
+
+            let mut u_i_compressed = rlst_dynamic_array2!(T, [nrows, rank]);
+            let mut vt_i_compressed_= rlst_dynamic_array2!(T, [rank, ncols]);
+
+            let mut sigma_mat_i_compressed = rlst_dynamic_array2!(T, [rank, rank]);
+
+            u_i_compressed.fill_from(u_i.into_subview([0, 0], [nrows, rank]));
+            vt_i_compressed_.fill_from(vt_i.into_subview([0, 0], [rank, ncols]));
+
+            for (j, s) in sigma_i.iter().enumerate().take(rank) {
+                unsafe {
+                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = T::from(*s).unwrap();
+                }
+            }
+
+            let vt_i_compressed = empty_array::<T, 2>()
+            .simple_mult_into_resize(
+                sigma_mat_i_compressed.view(), vt_i_compressed_.view()
+            );
+
+            // Store compressed M2L oeprators
+            u.push(u_i_compressed);
+            vt.push(vt_i_compressed);
+        }
+
+        SvdM2lOperatorDataIA { u, vt }
+    }
+}
+
+fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
+    singular_values: &Vec<T>,
+    percentage: T,
+) -> usize {
+    // Calculate the total energy.
+    let total_energy: T = singular_values.iter().map(|&s| s * s).sum();
+
+    // Calculate the threshold energy to retain.
+    let threshold_energy = total_energy * (percentage / T::one());
+
+    // Iterate over singular values to find the minimum set that retains the desired energy.
+    let mut cumulative_energy = T::zero();
+    let mut significant_values = Vec::new();
+
+    for (i, &value) in singular_values.iter().enumerate() {
+        cumulative_energy += value * value;
+        significant_values.push(value);
+        if cumulative_energy >= threshold_energy {
+            return i + 1;
+        }
+    }
+
+    significant_values.len()
+}
+
 impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
@@ -198,6 +309,40 @@ where
         } else {
             result.k = 50;
         }
+        result.transfer_vectors = compute_transfer_vectors();
+        result.operator_data = result.compute_m2l_operators(order, domain);
+
+        result
+    }
+}
+
+impl<T, U> SvdFieldTranslationKiFmmIA<T, U>
+where
+    T: Float + Default,
+    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
+    U: Kernel<T = T> + Default,
+    Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
+{
+    /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
+    ///
+    /// # Arguments
+    /// * `kernel` - The kernel being used, only compatible with homogenous, translationally invariant kernels.
+    /// * `k` - The maximum rank to be used in SVD compression for the translation operators, if none is specified will be taken as  max({50, max_column_rank})
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    pub fn new(kernel: U, threshold: T, order: usize, domain: Domain<T>, alpha: T) -> Self {
+        let mut result = SvdFieldTranslationKiFmmIA {
+            alpha,
+            k: 0,
+            threshold,
+            kernel,
+            operator_data: SvdM2lOperatorDataIA::default(),
+            transfer_vectors: vec![],
+        };
+
+        let ncoeffs = result.ncoeffs(order);
+        result.k = ncoeffs;
         result.transfer_vectors = compute_transfer_vectors();
         result.operator_data = result.compute_m2l_operators(order, domain);
 

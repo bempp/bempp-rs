@@ -63,6 +63,31 @@ where
     pub kernel: U,
 }
 
+/// A type to store the M2L field translation meta-data  and datafor an SVD based sparsification in the kernel independent FMM.
+pub struct SvdFieldTranslationKiFmmIA<T, U>
+where
+    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    U: Kernel<T = T> + Default,
+{
+    /// Amount to dilate inner check surface by when computing operator.
+    pub alpha: T,
+
+    /// Maximum rank taken for SVD compression
+    pub k: usize,
+
+    /// Amount of energy of each M2L operator retained in SVD compression
+    pub threshold: T,
+
+    /// Precomputed data required for SVD compressed M2L interaction.
+    pub operator_data: SvdM2lOperatorDataIA<T>,
+
+    /// Unique transfer vectors to lookup m2l unique kernel interactions.
+    pub transfer_vectors: Vec<TransferVector>,
+
+    /// The associated kernel with this translation operator.
+    pub kernel: U,
+}
+
 /// A type to store a transfer vector between a `source` and `target` Morton key.
 #[derive(Debug)]
 pub struct TransferVector {
@@ -118,4 +143,18 @@ where
 
         SvdM2lOperatorData { u, st_block, c }
     }
+}
+
+/// Container to store precomputed data required for SVD field translations.
+/// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
+#[derive(Default)]
+pub struct SvdM2lOperatorDataIA<T>
+where
+    T: Scalar,
+{
+    /// Left singular vectors from SVD of fat M2L matrix.
+    pub u: Vec<SvdM2lEntry<T>>,
+
+    /// Right singular vectors from SVD of thin M2L matrix, cutoff to a maximum rank of 'k'.
+    pub vt: Vec<SvdM2lEntry<T>>,
 }
