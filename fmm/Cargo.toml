@@ -40,3 +40,21 @@ rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = { git = "https://github.com/skailasa/fftw.git" }
 rayon = "1.7"
+
+[[example]]
+name = "single_node_fft"
+path = "examples/single_node/fft.rs"
+
+[[example]]
+name = "single_node_svd"
+path = "examples/single_node/svd.rs"
+
+
+[[example]]
+name = "single_node_svd_ia"
+path = "examples/single_node/svd_ia.rs"
+
+
+[[example]]
+name = "single_node_svd_ia_matrix"
+path = "examples/single_node/matrix_svd_ia.rs"

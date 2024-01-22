@@ -1,3 +1,6 @@
+//! Single Node FMM using an SVD based M2L operator with individual SVDs found
+//! for each M2L operator for an FMM taking matrix input.
+
 use std::time::Instant;
 
 use bempp_fmm::types::FmmDataUniformMatrix;
@@ -5,7 +8,7 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::{SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA};
+use bempp_field::types::SvdFieldTranslationKiFmmIA;
 use bempp_fmm::charge::build_charge_dict;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::{fmm::FmmLoop, tree::Tree};
@@ -13,7 +16,7 @@ use bempp_tree::implementations::helpers::points_fixture;
 use bempp_tree::types::single_node::SingleNodeTree;
 
 fn main() {
-    let npoints = 1000000;
+    let npoints = 10000;
 
     let global_idxs = (0..npoints).collect_vec();
 
@@ -24,7 +27,11 @@ fn main() {
     // Test matrix input
     let points = points_fixture::<f32>(npoints, None, None);
     let ncharge_vecs = 5;
-    let depth = 4;
+    let depth = 3;
+
+    // The fraction of the total energy of each M2L matrix as measured by the
+    // square sum of the singular values retained after compression.
+    let threshold = 0.9999;
 
     let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
     charge_mat
@@ -38,18 +45,9 @@ fn main() {
     // Create a tree
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
-    // Precompute the M2L data
-    // let m2l_data = SvdFieldTranslationKiFmm::new(
-    //     kernel.clone(),
-    //     Some(80),
-    //     order,
-    //     *tree.get_domain(),
-    //     alpha_inner,
-    // );
-
     let m2l_data = SvdFieldTranslationKiFmmIA::new(
         kernel.clone(),
-        0.9999,
+        threshold,
         order,
         *tree.get_domain(),
         alpha_inner,
