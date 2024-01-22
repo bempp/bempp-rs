@@ -124,7 +124,7 @@ pub mod matrix {
             let all_displacements = self.displacements(level);
 
             // Interpret multipoles as a matrix
-            let multipoles = rlst_array_from_slice2!(
+            let multipoles_ = rlst_array_from_slice2!(
                 U,
                 unsafe {
                     std::slice::from_raw_parts(
@@ -134,6 +134,10 @@ pub mod matrix {
                 },
                 [self.ncoeffs, nsources * self.ncharge_vectors]
             );
+
+            let scale = self.fmm.kernel.scale(level) * self.m2l_scale(level);
+            let mut multipoles = vec![U::zero(); multipoles_.data().len()];
+            multipoles.iter_mut().zip(multipoles_.data()).for_each(|(m, m_)| *m = *m_ * scale);
 
             let level_locals = self.level_locals[level as usize]
                 .iter()
@@ -168,7 +172,6 @@ pub mod matrix {
                 })
                 .collect_vec();
 
-            let scale = self.fmm.kernel.scale(level) * self.m2l_scale(level);
 
             (0..316)
                 .into_par_iter()
@@ -200,7 +203,7 @@ pub mod matrix {
                                     + charge_vec_displacement
                                     + self.ncoeffs]
                                 .copy_from_slice(
-                                    &multipoles.data()[key_displacement_global
+                                    &multipoles[key_displacement_global
                                         + charge_vec_displacement
                                         ..key_displacement_global
                                             + charge_vec_displacement
@@ -209,7 +212,7 @@ pub mod matrix {
                         }
                     }
 
-                    multipoles_subset.data_mut().iter_mut().for_each(|m| *m *= scale);
+                    // multipoles_subset.data_mut().iter_mut().for_each(|m| *m *= scale);
 
                     let u_sub = &self.fmm.m2l.operator_data.u[c_idx];
                     let vt_sub = &self.fmm.m2l.operator_data.vt[c_idx];
