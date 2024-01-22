@@ -777,7 +777,9 @@ mod test {
     use super::*;
     use rlst_dense::rlst_array_from_slice2;
 
-    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA};
+    use bempp_field::types::{
+        FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA,
+    };
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::{points_fixture, points_fixture_sphere};
 
@@ -865,7 +867,6 @@ mod test {
         );
         assert!(rel_error <= 1e-5);
     }
-
 
     #[allow(clippy::too_many_arguments)]
     fn test_uniform_f64_svd(
@@ -1037,8 +1038,6 @@ mod test {
         assert!(rel_error <= 1e-5);
     }
 
-
-
     #[allow(clippy::too_many_arguments)]
     fn test_uniform_f64_svd_ia(
         points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
@@ -1062,7 +1061,7 @@ mod test {
             order,
             *tree.get_domain(),
             alpha_inner,
-            tree.get_depth()
+            tree.get_depth(),
         );
 
         let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
@@ -1338,7 +1337,7 @@ mod test {
             order,
             *tree.get_domain(),
             alpha_inner,
-            tree.get_depth()
+            tree.get_depth(),
         );
 
         let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
@@ -1501,7 +1500,6 @@ mod test {
             false,
             3,
         );
-
     }
     #[test]
     fn test_uniform_box_fft() {

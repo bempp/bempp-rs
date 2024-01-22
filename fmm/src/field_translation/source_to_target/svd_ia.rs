@@ -5,7 +5,6 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
-
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
     fmm::Fmm,
@@ -27,7 +26,6 @@ use rlst_dense::{
 
 pub mod matrix {
     use bempp_field::types::SvdFieldTranslationKiFmmIA;
-    use rlst_dense::traits::DefaultIteratorMut;
 
     use crate::types::{FmmDataUniformMatrix, KiFmmLinearMatrix};
 
@@ -125,16 +123,6 @@ pub mod matrix {
             let all_displacements = self.displacements(level);
 
             // Interpret multipoles as a matrix
-            // let multipoles_ = rlst_array_from_slice2!(
-            //     U,
-            //     unsafe {
-            //         std::slice::from_raw_parts(
-            //             self.level_multipoles[level as usize][0][0].raw,
-            //             self.ncoeffs * nsources * self.ncharge_vectors,
-            //         )
-            //     },
-            //     [self.ncoeffs, nsources * self.ncharge_vectors]
-            // );
             let multipoles = rlst_array_from_slice2!(
                 U,
                 unsafe {
@@ -145,10 +133,6 @@ pub mod matrix {
                 },
                 [self.ncoeffs, nsources * self.ncharge_vectors]
             );
-
-            // let scale = self.fmm.kernel.scale(level) * self.m2l_scale(level);
-            // let mut multipoles = vec![U::zero(); multipoles_.data().len()];
-            // multipoles.iter_mut().zip(multipoles_.data()).for_each(|(m, m_)| *m = *m_ * scale);
 
             let level_locals = self.level_locals[level as usize]
                 .iter()
@@ -190,9 +174,7 @@ pub mod matrix {
                 .zip(multipole_idxs)
                 .zip(local_idxs)
                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-
                     let u_sub = &self.fmm.m2l.operator_data.u[c_idx];
-                    // let vt_sub = &self.fmm.m2l.operator_data.vt[c_idx];
                     let vt_sub = &level_vt[c_idx];
 
                     let mut multipoles_subset = rlst_dynamic_array2!(
@@ -214,9 +196,7 @@ pub mod matrix {
 
                             multipoles_subset.data_mut()[key_displacement_local
                                 + charge_vec_displacement
-                                ..key_displacement_local
-                                    + charge_vec_displacement
-                                    + self.ncoeffs]
+                                ..key_displacement_local + charge_vec_displacement + self.ncoeffs]
                                 .copy_from_slice(
                                     &multipoles.data()[key_displacement_global
                                         + charge_vec_displacement
@@ -226,8 +206,6 @@ pub mod matrix {
                                 );
                         }
                     }
-
-                    // multipoles_subset.data_mut().iter_mut().for_each(|m| *m *= scale);
 
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
                         self.fmm.dc2e_inv_1.view(),
@@ -279,10 +257,8 @@ pub mod matrix {
     }
 }
 
-
 pub mod uniform {
     use bempp_field::types::SvdFieldTranslationKiFmmIA;
-    use rlst_dense::traits::DefaultIteratorMut;
 
     use super::*;
 
@@ -420,7 +396,6 @@ pub mod uniform {
                 })
                 .collect_vec();
 
-            // let scale = self.fmm.kernel.scale(level) * self.m2l_scale(level);
             let level_vt = &self.fmm.m2l.operator_data.vt[(level - 2) as usize];
 
             (0..316)
@@ -428,7 +403,6 @@ pub mod uniform {
                 .zip(multipole_idxs)
                 .zip(local_idxs)
                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-
                     let mut multipoles_subset =
                         rlst_dynamic_array2!(U, [ncoeffs, multipole_idxs.len()]);
 
@@ -440,10 +414,7 @@ pub mod uniform {
                             );
                     }
 
-                    // multipoles_subset.iter_mut().for_each(|m| *m *= scale);
-
                     let u_sub = &self.fmm.m2l.operator_data.u[c_idx];
-                    // let vt_sub = &self.fmm.m2l.operator_data.vt[c_idx];
                     let vt_sub = &level_vt[c_idx];
 
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(

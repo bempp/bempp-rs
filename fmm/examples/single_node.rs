@@ -4,7 +4,9 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA};
+use bempp_field::types::{
+    FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA,
+};
 use bempp_fmm::{
     charge::build_charge_dict,
     types::{FmmDataUniform, KiFmmLinear},
@@ -47,7 +49,7 @@ fn main() {
         order,
         *tree.get_domain(),
         alpha_inner,
-        tree.get_depth()
+        tree.get_depth(),
     );
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
