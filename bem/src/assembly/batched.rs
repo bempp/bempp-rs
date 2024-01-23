@@ -156,7 +156,7 @@ fn assemble_batch_singular<'a>(
     let grid = test_space.grid();
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut k_all = vec![0.0; npts];
+    let mut k = vec![0.0; npts];
     let mut test_jdet = vec![0.0; npts];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [npts, 3]);
@@ -195,7 +195,7 @@ fn assemble_batch_singular<'a>(
             EvalType::Value,
             test_mapped_pts.data(),
             trial_mapped_pts.data(),
-            &mut k_all,
+            &mut k,
         );
 
         for (test_i, test_dof) in test_space
@@ -215,7 +215,7 @@ fn assemble_batch_singular<'a>(
                 let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    sum += k_all[index]
+                    sum += k[index]
                         * (wt
                             * test_table.get([0, index, test_i, 0]).unwrap()
                             * test_jdet[index]
