@@ -44,8 +44,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                         &laplace_3d::Laplace3dKernel::new(),
                         &space,
                         &space,
-                        &colouring,
-                        &colouring,
                     )
                 })
             },
