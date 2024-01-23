@@ -395,14 +395,7 @@ pub fn assemble<'a, const BLOCKSIZE: usize>(
         &trial_colouring,
         &test_colouring,
     );
-    assemble_singular_into_dense::<4, BLOCKSIZE>(
-        output,
-        kernel,
-        trial_space,
-        test_space,
-        &trial_colouring,
-        &test_colouring,
-    );
+    assemble_singular_into_dense::<4, BLOCKSIZE>(output, kernel, trial_space, test_space);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -517,23 +510,14 @@ pub fn assemble_nonsingular<
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn assemble_singular_into_dense<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
-    trial_colouring: &Vec<Vec<usize>>,
-    test_colouring: &Vec<Vec<usize>>,
 ) {
-    let sparse_matrix = assemble_singular::<QDEGREE, BLOCKSIZE>(
-        output.shape(),
-        kernel,
-        trial_space,
-        test_space,
-        trial_colouring,
-        test_colouring,
-    );
+    let sparse_matrix =
+        assemble_singular::<QDEGREE, BLOCKSIZE>(output.shape(), kernel, trial_space, test_space);
     let data = sparse_matrix.data;
     let rows = sparse_matrix.rows;
     let cols = sparse_matrix.cols;
@@ -542,26 +526,17 @@ pub fn assemble_singular_into_dense<'a, const QDEGREE: usize, const BLOCKSIZE: u
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn assemble_singular_into_csr<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
-    trial_colouring: &Vec<Vec<usize>>,
-    test_colouring: &Vec<Vec<usize>>,
 ) -> CsrMatrix<f64> {
     let shape = [
         test_space.dofmap().global_size(),
         trial_space.dofmap().global_size(),
     ];
-    let sparse_matrix = assemble_singular::<QDEGREE, BLOCKSIZE>(
-        shape,
-        kernel,
-        trial_space,
-        test_space,
-        trial_colouring,
-        test_colouring,
-    );
+    let sparse_matrix =
+        assemble_singular::<QDEGREE, BLOCKSIZE>(shape, kernel, trial_space, test_space);
 
     CsrMatrix::<f64>::from_aij(
         sparse_matrix.shape,
@@ -572,14 +547,11 @@ pub fn assemble_singular_into_csr<'a, const QDEGREE: usize, const BLOCKSIZE: usi
     .unwrap()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     shape: [usize; 2],
     kernel: &impl Kernel<T = f64>,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
-    trial_colouring: &Vec<Vec<usize>>,
-    test_colouring: &Vec<Vec<usize>>,
 ) -> SparseMatrixData<f64> {
     let mut output = SparseMatrixData::new(shape);
 
@@ -669,66 +641,61 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
         test_tables.push(table);
         qweights.push(qrule.weights);
     }
-    for test_c in test_colouring {
-        for trial_c in trial_colouring {
-            let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
-            for test_cell in test_c {
-                let test_cell_tindex = grid.topology().index_map()[*test_cell];
-                let test_vertices = c20.row(test_cell_tindex).unwrap();
-                for trial_cell in trial_c {
-                    let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
-                    let trial_vertices = c20.row(trial_cell_tindex).unwrap();
+    let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
+    for test_cell in 0..grid.topology().entity_count(grid.topology().dim()) {
+        let test_cell_tindex = grid.topology().index_map()[test_cell];
+        let test_vertices = c20.row(test_cell_tindex).unwrap();
+        for trial_cell in 0..grid.topology().entity_count(grid.topology().dim()) {
+            let trial_cell_tindex = grid.topology().index_map()[trial_cell];
+            let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
-                    let mut pairs = vec![];
-                    for (test_i, test_v) in test_vertices.iter().enumerate() {
-                        for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                            if test_v == trial_v {
-                                pairs.push((test_i, trial_i));
-                            }
-                        }
-                    }
-                    if !pairs.is_empty() {
-                        cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
-                            .push((*trial_cell, *test_cell))
+            let mut pairs = vec![];
+            for (test_i, test_v) in test_vertices.iter().enumerate() {
+                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                    if test_v == trial_v {
+                        pairs.push((test_i, trial_i));
                     }
                 }
             }
-            for (i, cells) in cell_pairs.iter().enumerate() {
-                let mut start = 0;
-                let mut cell_blocks = vec![];
-                while start < cells.len() {
-                    let end = if start + BLOCKSIZE < cells.len() {
-                        start + BLOCKSIZE
-                    } else {
-                        cells.len()
-                    };
-                    cell_blocks.push(&cells[start..end]);
-                    start = end;
-                }
-
-                let numtasks = cell_blocks.len();
-                let r: SparseMatrixData<f64> = (0..numtasks)
-                    .into_par_iter()
-                    .map(&|t| {
-                        assemble_batch_singular(
-                            shape,
-                            kernel,
-                            trial_space,
-                            test_space,
-                            cell_blocks[t],
-                            &trial_points[i],
-                            &test_points[i],
-                            &qweights[i],
-                            &trial_tables[i],
-                            &test_tables[i],
-                        )
-                    })
-                    .reduce(|| SparseMatrixData::<f64>::new(shape), |a, b| a.sum(b));
-
-                //    let even_sum = (1..=10).fold(0, |acc, num| if num % 2 == 0 { acc + num } else { acc });
-                output.add(r);
+            if !pairs.is_empty() {
+                cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
+                    .push((trial_cell, test_cell))
             }
         }
+    }
+    for (i, cells) in cell_pairs.iter().enumerate() {
+        let mut start = 0;
+        let mut cell_blocks = vec![];
+        while start < cells.len() {
+            let end = if start + BLOCKSIZE < cells.len() {
+                start + BLOCKSIZE
+            } else {
+                cells.len()
+            };
+            cell_blocks.push(&cells[start..end]);
+            start = end;
+        }
+
+        let numtasks = cell_blocks.len();
+        let r: SparseMatrixData<f64> = (0..numtasks)
+            .into_par_iter()
+            .map(&|t| {
+                assemble_batch_singular(
+                    shape,
+                    kernel,
+                    trial_space,
+                    test_space,
+                    cell_blocks[t],
+                    &trial_points[i],
+                    &test_points[i],
+                    &qweights[i],
+                    &trial_tables[i],
+                    &test_tables[i],
+                )
+            })
+            .reduce(|| SparseMatrixData::<f64>::new(shape), |a, b| a.sum(b));
+
+        output.add(r);
     }
     output
 }
@@ -744,7 +711,7 @@ mod test {
     use bempp_traits::element::{Continuity, ElementFamily};
 
     #[test]
-    fn test_singular() {
+    fn test_singular_dp0() {
         let grid = regular_sphere(0);
         let element = create_element(
             ElementFamily::Lagrange,
@@ -756,7 +723,40 @@ mod test {
 
         let ndofs = space.dofmap().global_size();
 
-        let colouring = space.compute_cell_colouring();
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+        assemble_singular_into_dense::<4, 128>(
+            &mut matrix,
+            &Laplace3dKernel::new(),
+            &space,
+            &space,
+        );
+        let csr = assemble_singular_into_csr::<4, 128>(&Laplace3dKernel::new(), &space, &space);
+
+        let indptr = csr.indptr();
+        let indices = csr.indices();
+        let data = csr.data();
+
+        let mut row = 0;
+        for (i, j) in indices.iter().enumerate() {
+            while i >= indptr[row + 1] {
+                row += 1;
+            }
+            assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
+        }
+    }
+
+    #[test]
+    fn test_singular_p1() {
+        let grid = regular_sphere(0);
+        let element = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            Continuity::Continuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.dofmap().global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
         assemble_singular_into_dense::<4, 128>(
@@ -764,16 +764,8 @@ mod test {
             &Laplace3dKernel::new(),
             &space,
             &space,
-            &colouring,
-            &colouring,
         );
-        let csr = assemble_singular_into_csr::<4, 128>(
-            &Laplace3dKernel::new(),
-            &space,
-            &space,
-            &colouring,
-            &colouring,
-        );
+        let csr = assemble_singular_into_csr::<4, 128>(&Laplace3dKernel::new(), &space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
