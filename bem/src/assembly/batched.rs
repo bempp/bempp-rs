@@ -558,33 +558,13 @@ pub fn assemble_singular_into_csr<'a, const QDEGREE: usize, const BLOCKSIZE: usi
         test_colouring,
     );
 
-    let mut rows = vec![];
-    let mut cols = vec![];
-    let mut data = vec![];
-
-    for ((i, j), value) in sparse_matrix
-        .rows
-        .iter()
-        .zip(&sparse_matrix.cols)
-        .zip(&sparse_matrix.data)
-    {
-        let mut found = false;
-        for ((i2, j2), value2) in rows.iter().zip(&cols).zip(data.iter_mut()) {
-            if *i == *i2 && *j == *j2 {
-                *value2 += *value;
-                found = true;
-                break;
-            }
-        }
-
-        if !found {
-            rows.push(*i);
-            cols.push(*j);
-            data.push(*value);
-        }
-    }
-
-    CsrMatrix::<f64>::from_aij(shape, &rows, &cols, &data).unwrap()
+    CsrMatrix::<f64>::from_aij(
+        sparse_matrix.shape,
+        &sparse_matrix.rows,
+        &sparse_matrix.cols,
+        &sparse_matrix.data,
+    )
+    .unwrap()
 }
 
 #[allow(clippy::too_many_arguments)]
