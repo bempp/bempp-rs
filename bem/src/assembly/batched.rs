@@ -99,6 +99,14 @@ impl<T: Scalar> SparseMatrixData<T> {
             shape,
         }
     }
+    fn new_known_size(shape: [usize; 2], size: usize) -> Self {
+        Self {
+            data: Vec::with_capacity(size),
+            rows: Vec::with_capacity(size),
+            cols: Vec::with_capacity(size),
+            shape,
+        }
+    }
     fn add(&mut self, other: SparseMatrixData<T>) {
         debug_assert!(self.shape[0] == other.shape[0]);
         debug_assert!(self.shape[1] == other.shape[1]);
@@ -136,7 +144,10 @@ fn assemble_batch_singular<'a>(
     trial_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
     test_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
 ) -> SparseMatrixData<f64> {
-    let mut output = SparseMatrixData::<f64>::new(shape);
+    let mut output = SparseMatrixData::<f64>::new_known_size(
+        shape,
+        cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
+    );
     let npts = weights.len();
     debug_assert!(weights.len() == npts);
     debug_assert!(test_points.shape()[0] == npts);
