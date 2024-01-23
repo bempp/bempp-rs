@@ -156,7 +156,7 @@ fn assemble_batch_singular<'a>(
     let grid = test_space.grid();
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut k = vec![0.0];
+    let mut k_all = vec![0.0; npts];
     let mut test_jdet = vec![0.0; npts];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [npts, 3]);
@@ -164,9 +164,6 @@ fn assemble_batch_singular<'a>(
     let mut trial_jdet = vec![0.0; npts];
     let mut trial_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut trial_normals = rlst_dynamic_array2!(f64, [npts, 3]);
-
-    let mut test_row = vec![0.0; 3];
-    let mut trial_row = vec![0.0; 3];
 
     let test_element = grid.geometry().element(cell_pairs[0].0);
     let trial_element = grid.geometry().element(cell_pairs[0].1);
@@ -194,6 +191,13 @@ fn assemble_batch_singular<'a>(
         );
         trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
 
+        kernel.assemble_diagonal_st(
+            EvalType::Value,
+            test_mapped_pts.data(),
+            trial_mapped_pts.data(),
+            &mut k_all,
+        );
+
         for (test_i, test_dof) in test_space
             .dofmap()
             .cell_dofs(test_cell_tindex)
@@ -211,16 +215,7 @@ fn assemble_batch_singular<'a>(
                 let mut sum = 0.0;
 
                 for (index, wt) in weights.iter().enumerate() {
-                    for (i, ti) in test_row.iter_mut().enumerate() {
-                        *ti = *test_mapped_pts.get([index, i]).unwrap();
-                    }
-                    for (i, ti) in trial_row.iter_mut().enumerate() {
-                        *ti = *trial_mapped_pts.get([index, i]).unwrap();
-                    }
-
-                    kernel.assemble_st(EvalType::Value, &test_row, &trial_row, &mut k);
-
-                    sum += k[0]
+                    sum += k_all[index]
                         * (wt
                             * test_table.get([0, index, test_i, 0]).unwrap()
                             * test_jdet[index]
