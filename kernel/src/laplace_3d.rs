@@ -2,7 +2,9 @@
 use num;
 use std::marker::PhantomData;
 
-use crate::helpers::{check_dimensions_assemble, check_dimensions_evaluate};
+use crate::helpers::{
+    check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
+};
 use bempp_traits::{
     kernel::{Kernel, ScaleInvariantKernel},
     types::{EvalType, KernelType, Scalar},
@@ -162,6 +164,35 @@ where
                 ];
 
                 assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+            });
+    }
+
+    fn assemble_diagonal_st(
+        &self,
+        eval_type: bempp_traits::types::EvalType,
+        sources: &[<Self::T as Scalar>::Real],
+        targets: &[<Self::T as Scalar>::Real],
+        result: &mut [Self::T],
+    ) {
+        check_dimensions_assemble_diagonal(self, eval_type, sources, targets, result);
+        let ntargets = targets.len() / self.space_dimension();
+        let range_dim = self.range_component_count(eval_type);
+
+        result
+            .chunks_exact_mut(range_dim)
+            .enumerate()
+            .for_each(|(target_index, my_chunk)| {
+                let target = [
+                    targets[target_index],
+                    targets[ntargets + target_index],
+                    targets[2 * ntargets + target_index],
+                ];
+                let source = [
+                    sources[target_index],
+                    sources[ntargets + target_index],
+                    sources[2 * ntargets + target_index],
+                ];
+                assemble_laplace_one_target(eval_type, &target, &source, my_chunk)
             });
     }
 

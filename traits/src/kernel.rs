@@ -75,6 +75,15 @@ pub trait Kernel: Sync {
         result: &mut [Self::T],
     );
 
+    /// Single threaded assembly of the diagonal of a kernel matrix
+    fn assemble_diagonal_st(
+        &self,
+        eval_type: EvalType,
+        sources: &[<Self::T as Scalar>::Real],
+        targets: &[<Self::T as Scalar>::Real],
+        result: &mut [Self::T],
+    );
+
     /// Return the type of the kernel.
     fn kernel_type(&self) -> &KernelType;
 
