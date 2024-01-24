@@ -774,4 +774,46 @@ mod test {
             assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
         }
     }
+
+    #[test]
+    fn test_singular_dp0_p1() {
+        let grid = regular_sphere(0);
+        let element0 = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let element1 = create_element(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            Continuity::Continuous,
+        );
+        let space0 = SerialFunctionSpace::new(&grid, &element0);
+        let space1 = SerialFunctionSpace::new(&grid, &element1);
+
+        let ndofs0 = space0.dofmap().global_size();
+        let ndofs1 = space1.dofmap().global_size();
+
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
+        assemble_singular_into_dense::<4, 128>(
+            &mut matrix,
+            &Laplace3dKernel::new(),
+            &space0,
+            &space1,
+        );
+        let csr = assemble_singular_into_csr::<4, 128>(&Laplace3dKernel::new(), &space0, &space1);
+        let indptr = csr.indptr();
+        let indices = csr.indices();
+        let data = csr.data();
+
+        let mut row = 0;
+        for (i, j) in indices.iter().enumerate() {
+            while i >= indptr[row + 1] {
+                row += 1;
+            }
+            assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
+        }
+    }
 }
