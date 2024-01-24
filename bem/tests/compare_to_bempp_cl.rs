@@ -1,13 +1,13 @@
-use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_traits::bem::{DofMap, FunctionSpace};
-use bempp_traits::cell::ReferenceCellType;
-use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
-use bempp_bem::assembly::batched;
 use approx::*;
+use bempp_bem::assembly::batched;
+use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
+use bempp_traits::bem::{DofMap, FunctionSpace};
+use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily};
+use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
 
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {
