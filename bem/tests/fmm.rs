@@ -38,8 +38,6 @@ fn test_fmm_prototype_dp0_dp0() {
     batched::assemble::<128>(&mut matrix, &kernel, &space, &space);
 
     // Compute using FMM method
-    let mut matrix2 = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-
     const NPTS: usize = 16;
 
     let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(&space);
@@ -59,12 +57,15 @@ fn test_fmm_prototype_dp0_dp0() {
         k.data_mut(),
     );
 
-    batched::assemble_singular_into_dense::<4, 128>(&mut matrix2, &kernel, &space, &space);
     let correction =
         batched::assemble_singular_correction_into_csr::<NPTS, NPTS, 128>(&kernel, &space, &space);
 
     let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128>(&space);
     let p = fmm_tools::basis_to_quadrature_into_csr::<NPTS, 128>(&space);
+
+    // matrix 2 = p_t @ k @ p - c + singular
+    let mut matrix2 = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+    batched::assemble_singular_into_dense::<4, 128>(&mut matrix2, &kernel, &space, &space);
 
     let mut temp = rlst_dynamic_array2!(f64, [p_t.shape()[0], k.shape()[1]]);
     // temp = p_t @ k
@@ -98,6 +99,7 @@ fn test_fmm_prototype_dp0_dp0() {
         *matrix2.get_mut([row, *j]).unwrap() -= correction.data()[i];
     }
 
+    // Check two matrices are equal
     for i in 0..ndofs {
         for j in 0..ndofs {
             assert_relative_eq!(
