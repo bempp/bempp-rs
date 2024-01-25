@@ -165,13 +165,13 @@ fn assemble_batch_singular<'a>(
     let mut trial_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut trial_normals = rlst_dynamic_array2!(f64, [npts, 3]);
 
-    let test_element = grid.geometry().element(cell_pairs[0].0);
-    let trial_element = grid.geometry().element(cell_pairs[0].1);
+    let trial_element = grid.geometry().element(cell_pairs[0].0);
+    let test_element = grid.geometry().element(cell_pairs[0].1);
 
     let test_evaluator = grid.geometry().get_evaluator(test_element, test_points);
     let trial_evaluator = grid.geometry().get_evaluator(trial_element, trial_points);
 
-    for (test_cell, trial_cell) in cell_pairs {
+    for (trial_cell, test_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
         let test_cell_gindex = grid.geometry().index_map()[*test_cell];
         let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
@@ -371,6 +371,120 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
         }
     }
     1
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
+    shape: [usize; 2],
+    kernel: &impl Kernel<T = f64>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+    cell_pairs: &[(usize, usize)],
+    trial_points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    trial_weights: &[f64],
+    test_points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    test_weights: &[f64],
+    trial_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
+    test_table: &Array<f64, BaseArray<f64, VectorContainer<f64>, 4>, 4>,
+) -> SparseMatrixData<f64> {
+    let mut output = SparseMatrixData::<f64>::new_known_size(
+        shape,
+        cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
+    );
+    debug_assert!(test_weights.len() == NPTS_TEST);
+    debug_assert!(test_points.shape()[0] == NPTS_TEST);
+    debug_assert!(trial_weights.len() == NPTS_TRIAL);
+    debug_assert!(trial_points.shape()[0] == NPTS_TRIAL);
+
+    let grid = test_space.grid();
+
+    let mut k = vec![0.0; NPTS_TEST * NPTS_TRIAL];
+    let mut test_jdet = [0.0; NPTS_TEST];
+    let mut test_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TEST, 3]];
+    let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
+
+    let trial_element = grid.geometry().element(cell_pairs[0].0);
+    let test_element = grid.geometry().element(cell_pairs[0].1);
+
+    let test_evaluator = grid.geometry().get_evaluator(test_element, test_points);
+    let trial_evaluator = grid.geometry().get_evaluator(trial_element, trial_points);
+
+    let mut trial_jdet = [0.0; NPTS_TRIAL];
+    let mut trial_mapped_pts = rlst_dense::rlst_dynamic_array2![f64, [NPTS_TRIAL, 3]];
+    let mut trial_normals = rlst_dynamic_array2!(f64, [NPTS_TRIAL, 3]);
+
+    let mut sum: f64;
+    let mut trial_integrands = [0.0; NPTS_TRIAL];
+
+    for (trial_cell, test_cell) in cell_pairs {
+        let test_cell_tindex = grid.topology().index_map()[*test_cell];
+        let test_cell_gindex = grid.geometry().index_map()[*test_cell];
+
+        test_evaluator.compute_normals_and_jacobian_determinants(
+            test_cell_gindex,
+            &mut test_normals,
+            &mut test_jdet,
+        );
+        test_evaluator.compute_points(test_cell_gindex, &mut test_mapped_pts);
+
+        let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
+        let trial_cell_gindex = grid.geometry().index_map()[*trial_cell];
+
+        trial_evaluator.compute_normals_and_jacobian_determinants(
+            trial_cell_gindex,
+            &mut trial_normals,
+            &mut trial_jdet,
+        );
+        trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
+
+        kernel.assemble_st(
+            EvalType::Value,
+            test_mapped_pts.data(),
+            trial_mapped_pts.data(),
+            &mut k,
+        );
+
+        for (test_i, test_dof) in test_space
+            .dofmap()
+            .cell_dofs(test_cell_tindex)
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            for (trial_i, trial_dof) in trial_space
+                .dofmap()
+                .cell_dofs(trial_cell_tindex)
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
+                for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
+                    unsafe {
+                        trial_integrands[trial_index] = trial_wt
+                            * trial_jdet[trial_index]
+                            * trial_table.get_unchecked([0, trial_index, trial_i, 0]);
+                    }
+                }
+                sum = 0.0;
+                for (test_index, test_wt) in test_weights.iter().enumerate() {
+                    let test_integrand = unsafe {
+                        test_wt
+                            * test_jdet[test_index]
+                            * test_table.get_unchecked([0, test_index, test_i, 0])
+                    };
+                    for trial_index in 0..NPTS_TRIAL {
+                        sum += k[test_index * trial_weights.len() + trial_index]
+                            * test_integrand
+                            * trial_integrands[trial_index];
+                    }
+                }
+                output.rows.push(*test_dof);
+                output.cols.push(*trial_dof);
+                output.data.push(sum);
+            }
+        }
+    }
+    output
 }
 
 pub fn assemble<'a, const BLOCKSIZE: usize>(
@@ -580,7 +694,7 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
             for k in 0..3 {
                 for l in 0..3 {
                     if k != l {
-                        possible_pairs.push(vec![(i, k), (j, l)]);
+                        possible_pairs.push(vec![(k, i), (l, j)]);
                     }
                 }
             }
@@ -648,7 +762,7 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
             for (test_i, test_v) in test_vertices.iter().enumerate() {
                 for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
                     if test_v == trial_v {
-                        pairs.push((test_i, trial_i));
+                        pairs.push((trial_i, test_i));
                     }
                 }
             }
@@ -694,6 +808,303 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
     }
     output
 }
+
+pub fn assemble_singular_correction_into_dense<
+    'a,
+    const NPTS_TEST: usize,
+    const NPTS_TRIAL: usize,
+    const BLOCKSIZE: usize,
+>(
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    kernel: &impl Kernel<T = f64>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+) {
+    let sparse_matrix = assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE>(
+        output.shape(),
+        kernel,
+        trial_space,
+        test_space,
+    );
+    let data = sparse_matrix.data;
+    let rows = sparse_matrix.rows;
+    let cols = sparse_matrix.cols;
+    for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
+        *output.get_mut([*i, *j]).unwrap() += *value;
+    }
+}
+
+pub fn assemble_singular_correction_into_csr<
+    'a,
+    const NPTS_TEST: usize,
+    const NPTS_TRIAL: usize,
+    const BLOCKSIZE: usize,
+>(
+    kernel: &impl Kernel<T = f64>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+) -> CsrMatrix<f64> {
+    let shape = [
+        test_space.dofmap().global_size(),
+        trial_space.dofmap().global_size(),
+    ];
+    let sparse_matrix = assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE>(
+        shape,
+        kernel,
+        trial_space,
+        test_space,
+    );
+
+    CsrMatrix::<f64>::from_aij(
+        sparse_matrix.shape,
+        &sparse_matrix.rows,
+        &sparse_matrix.cols,
+        &sparse_matrix.data,
+    )
+    .unwrap()
+}
+
+fn assemble_singular_correction<
+    'a,
+    const NPTS_TEST: usize,
+    const NPTS_TRIAL: usize,
+    const BLOCKSIZE: usize,
+>(
+    shape: [usize; 2],
+    kernel: &impl Kernel<T = f64>,
+    trial_space: &SerialFunctionSpace<'a>,
+    test_space: &SerialFunctionSpace<'a>,
+) -> SparseMatrixData<f64> {
+    if !trial_space.is_serial() || !test_space.is_serial() {
+        panic!("Dense assembly can only be used for function spaces stored in serial");
+    }
+    if shape[0] != test_space.dofmap().global_size()
+        || shape[1] != trial_space.dofmap().global_size()
+    {
+        panic!("Matrix has wrong shape");
+    }
+
+    if NPTS_TEST != NPTS_TRIAL {
+        panic!("FMM with different test and trial quadrature rules not yet supported");
+    }
+
+    let grid = test_space.grid();
+    let c20 = grid.topology().connectivity(2, 0);
+
+    // TODO: pass cell types into this function
+    let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
+    let mut qpoints_test = rlst_dynamic_array2!(f64, [NPTS_TEST, 2]);
+    for i in 0..NPTS_TEST {
+        for j in 0..2 {
+            *qpoints_test.get_mut([i, j]).unwrap() = qrule_test.points[2 * i + j];
+        }
+    }
+    let qweights_test = qrule_test.weights;
+    let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
+    let mut qpoints_trial = rlst_dynamic_array2!(f64, [NPTS_TRIAL, 2]);
+    for i in 0..NPTS_TRIAL {
+        for j in 0..2 {
+            *qpoints_trial.get_mut([i, j]).unwrap() = qrule_trial.points[2 * i + j];
+        }
+    }
+    let qweights_trial = qrule_trial.weights;
+
+    let mut test_table =
+        rlst_dynamic_array4!(f64, test_space.element().tabulate_array_shape(0, NPTS_TEST));
+    test_space
+        .element()
+        .tabulate(&qpoints_test, 0, &mut test_table);
+
+    let mut trial_table = rlst_dynamic_array4!(
+        f64,
+        trial_space.element().tabulate_array_shape(0, NPTS_TRIAL)
+    );
+    trial_space
+        .element()
+        .tabulate(&qpoints_test, 0, &mut trial_table);
+
+    let mut cell_pairs: Vec<(usize, usize)> = vec![];
+    for test_cell in 0..grid.topology().entity_count(grid.topology().dim()) {
+        let test_cell_tindex = grid.topology().index_map()[test_cell];
+        let test_vertices = c20.row(test_cell_tindex).unwrap();
+        for trial_cell in 0..grid.topology().entity_count(grid.topology().dim()) {
+            let trial_cell_tindex = grid.topology().index_map()[trial_cell];
+            let trial_vertices = c20.row(trial_cell_tindex).unwrap();
+
+            let mut pairs = vec![];
+            for (test_i, test_v) in test_vertices.iter().enumerate() {
+                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                    if test_v == trial_v {
+                        pairs.push((trial_i, test_i));
+                    }
+                }
+            }
+            if !pairs.is_empty() {
+                cell_pairs.push((trial_cell, test_cell))
+            }
+        }
+    }
+
+    let mut start = 0;
+    let mut cell_blocks = vec![];
+    while start < cell_pairs.len() {
+        let end = if start + BLOCKSIZE < cell_pairs.len() {
+            start + BLOCKSIZE
+        } else {
+            cell_pairs.len()
+        };
+        cell_blocks.push(&cell_pairs[start..end]);
+        start = end;
+    }
+
+    let numtasks = cell_blocks.len();
+    (0..numtasks)
+        .into_par_iter()
+        .map(&|t| {
+            assemble_batch_singular_correction::<NPTS_TEST, NPTS_TRIAL>(
+                shape,
+                kernel,
+                trial_space,
+                test_space,
+                cell_blocks[t],
+                &qpoints_trial,
+                &qweights_trial,
+                &qpoints_test,
+                &qweights_test,
+                &trial_table,
+                &test_table,
+            )
+        })
+        .reduce(|| SparseMatrixData::<f64>::new(shape), |a, b| a.sum(b))
+}
+
+pub fn assemble_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize>(
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    space: &SerialFunctionSpace,
+) {
+    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(output.shape(), space);
+    let data = sparse_matrix.data;
+    let rows = sparse_matrix.rows;
+    let cols = sparse_matrix.cols;
+    for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
+        *output.get_mut([*i, *j]).unwrap() += *value;
+    }
+}
+
+pub fn assemble_basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
+    space: &SerialFunctionSpace,
+) -> CsrMatrix<f64> {
+    let grid = space.grid();
+    let ncells = grid.topology().entity_count(grid.topology().dim());
+    let shape = [ncells * NPTS, space.dofmap().global_size()];
+    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(shape, space);
+
+    CsrMatrix::<f64>::from_aij(
+        sparse_matrix.shape,
+        &sparse_matrix.rows,
+        &sparse_matrix.cols,
+        &sparse_matrix.data,
+    )
+    .unwrap()
+}
+
+pub fn assemble_tranpose_basis_to_quadrature_into_dense<
+    const NPTS: usize,
+    const BLOCKSIZE: usize,
+>(
+    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    space: &SerialFunctionSpace,
+) {
+    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(output.shape(), space);
+    let data = sparse_matrix.data;
+    let rows = sparse_matrix.rows;
+    let cols = sparse_matrix.cols;
+    for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
+        *output.get_mut([*j, *i]).unwrap() += *value;
+    }
+}
+
+pub fn assemble_transpose_basis_to_quadrature_into_csr<
+    const NPTS: usize,
+    const BLOCKSIZE: usize,
+>(
+    space: &SerialFunctionSpace,
+) -> CsrMatrix<f64> {
+    let grid = space.grid();
+    let ncells = grid.topology().entity_count(grid.topology().dim());
+    let shape = [ncells * NPTS, space.dofmap().global_size()];
+    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(shape, space);
+
+    CsrMatrix::<f64>::from_aij(
+        [space.dofmap().global_size(), ncells * NPTS],
+        &sparse_matrix.cols,
+        &sparse_matrix.rows,
+        &sparse_matrix.data,
+    )
+    .unwrap()
+}
+
+fn assemble_basis_to_quadrature<const NPTS: usize, const BLOCKSIZE: usize>(
+    shape: [usize; 2],
+    space: &SerialFunctionSpace,
+) -> SparseMatrixData<f64> {
+    if !space.is_serial() {
+        panic!("Dense assembly can only be used for function spaces stored in serial");
+    }
+    let grid = space.grid();
+    let ncells = grid.topology().entity_count(grid.topology().dim());
+    if shape[0] != ncells * NPTS || shape[1] != space.dofmap().global_size() {
+        panic!("Matrix has wrong shape");
+    }
+
+    // TODO: pass cell types into this function
+    let qrule = simplex_rule(ReferenceCellType::Triangle, NPTS).unwrap();
+    let mut qpoints = rlst_dynamic_array2!(f64, [NPTS, 2]);
+    for i in 0..NPTS {
+        for j in 0..2 {
+            *qpoints.get_mut([i, j]).unwrap() = qrule.points[2 * i + j];
+        }
+    }
+    let qweights = qrule.weights;
+
+    let mut table = rlst_dynamic_array4!(f64, space.element().tabulate_array_shape(0, NPTS));
+    space.element().tabulate(&qpoints, 0, &mut table);
+
+    let mut output =
+        SparseMatrixData::<f64>::new_known_size(shape, ncells * space.element().dim() * NPTS);
+    debug_assert!(qpoints.shape()[0] == NPTS);
+
+    let element = grid.geometry().element(0);
+
+    let evaluator = grid.geometry().get_evaluator(element, &qpoints);
+
+    let mut jdets = vec![0.0; NPTS];
+    let mut normals = rlst_dynamic_array2!(f64, [NPTS, 3]);
+
+    // TODO: batch this?
+    for cell in 0..ncells {
+        let cell_tindex = grid.topology().index_map()[cell];
+        let cell_gindex = grid.geometry().index_map()[cell];
+        evaluator.compute_normals_and_jacobian_determinants(cell_gindex, &mut normals, &mut jdets);
+        for (qindex, (w, jdet)) in qweights.iter().zip(&jdets).enumerate() {
+            for (i, dof) in space
+                .dofmap()
+                .cell_dofs(cell_tindex)
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
+                output.rows.push(cell * NPTS + qindex);
+                output.cols.push(*dof);
+                output
+                    .data
+                    .push(jdet * w * table.get([0, qindex, i, 0]).unwrap());
+            }
+        }
+    }
+    output
+}
+
 #[cfg(test)]
 mod test {
     use crate::assembly::batched::*;
