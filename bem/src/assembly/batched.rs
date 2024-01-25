@@ -10,7 +10,6 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
-use bempp_traits::types::Scalar;
 use rayon::prelude::*;
 use rlst_dense::{
     array::Array,
@@ -22,6 +21,7 @@ use rlst_dense::{
     },
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
+use crate::assembly::common::{SparseMatrixData, RawData2D};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -75,60 +75,6 @@ fn get_quadrature_rule(
         }
     }
 }
-
-pub struct RawData2D<T: Scalar> {
-    pub data: *mut T,
-    pub shape: [usize; 2],
-}
-
-unsafe impl<T: Scalar> Sync for RawData2D<T> {}
-
-pub struct SparseMatrixData<T: Scalar> {
-    pub data: Vec<T>,
-    pub rows: Vec<usize>,
-    pub cols: Vec<usize>,
-    pub shape: [usize; 2],
-}
-
-impl<T: Scalar> SparseMatrixData<T> {
-    fn new(shape: [usize; 2]) -> Self {
-        Self {
-            data: vec![],
-            rows: vec![],
-            cols: vec![],
-            shape,
-        }
-    }
-    fn new_known_size(shape: [usize; 2], size: usize) -> Self {
-        Self {
-            data: Vec::with_capacity(size),
-            rows: Vec::with_capacity(size),
-            cols: Vec::with_capacity(size),
-            shape,
-        }
-    }
-    fn add(&mut self, other: SparseMatrixData<T>) {
-        debug_assert!(self.shape[0] == other.shape[0]);
-        debug_assert!(self.shape[1] == other.shape[1]);
-        self.rows.extend(&other.rows);
-        self.cols.extend(&other.cols);
-        self.data.extend(&other.data);
-    }
-    fn sum(&self, other: SparseMatrixData<T>) -> SparseMatrixData<T> {
-        debug_assert!(self.shape[0] == other.shape[0]);
-        debug_assert!(self.shape[1] == other.shape[1]);
-        let mut out = SparseMatrixData::<T>::new(self.shape);
-        out.rows.extend(&self.rows);
-        out.cols.extend(&self.cols);
-        out.data.extend(&self.data);
-        out.rows.extend(&other.rows);
-        out.cols.extend(&other.cols);
-        out.data.extend(&other.data);
-        out
-    }
-}
-
-unsafe impl<T: Scalar> Sync for SparseMatrixData<T> {}
 
 // TODO: use T not f64
 #[allow(clippy::too_many_arguments)]
@@ -976,133 +922,6 @@ fn assemble_singular_correction<
             )
         })
         .reduce(|| SparseMatrixData::<f64>::new(shape), |a, b| a.sum(b))
-}
-
-pub fn assemble_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize>(
-    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    space: &SerialFunctionSpace,
-) {
-    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(output.shape(), space);
-    let data = sparse_matrix.data;
-    let rows = sparse_matrix.rows;
-    let cols = sparse_matrix.cols;
-    for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
-        *output.get_mut([*i, *j]).unwrap() += *value;
-    }
-}
-
-pub fn assemble_basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
-    space: &SerialFunctionSpace,
-) -> CsrMatrix<f64> {
-    let grid = space.grid();
-    let ncells = grid.topology().entity_count(grid.topology().dim());
-    let shape = [ncells * NPTS, space.dofmap().global_size()];
-    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(shape, space);
-
-    CsrMatrix::<f64>::from_aij(
-        sparse_matrix.shape,
-        &sparse_matrix.rows,
-        &sparse_matrix.cols,
-        &sparse_matrix.data,
-    )
-    .unwrap()
-}
-
-pub fn assemble_tranpose_basis_to_quadrature_into_dense<
-    const NPTS: usize,
-    const BLOCKSIZE: usize,
->(
-    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    space: &SerialFunctionSpace,
-) {
-    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(output.shape(), space);
-    let data = sparse_matrix.data;
-    let rows = sparse_matrix.rows;
-    let cols = sparse_matrix.cols;
-    for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
-        *output.get_mut([*j, *i]).unwrap() += *value;
-    }
-}
-
-pub fn assemble_transpose_basis_to_quadrature_into_csr<
-    const NPTS: usize,
-    const BLOCKSIZE: usize,
->(
-    space: &SerialFunctionSpace,
-) -> CsrMatrix<f64> {
-    let grid = space.grid();
-    let ncells = grid.topology().entity_count(grid.topology().dim());
-    let shape = [ncells * NPTS, space.dofmap().global_size()];
-    let sparse_matrix = assemble_basis_to_quadrature::<NPTS, BLOCKSIZE>(shape, space);
-
-    CsrMatrix::<f64>::from_aij(
-        [space.dofmap().global_size(), ncells * NPTS],
-        &sparse_matrix.cols,
-        &sparse_matrix.rows,
-        &sparse_matrix.data,
-    )
-    .unwrap()
-}
-
-fn assemble_basis_to_quadrature<const NPTS: usize, const BLOCKSIZE: usize>(
-    shape: [usize; 2],
-    space: &SerialFunctionSpace,
-) -> SparseMatrixData<f64> {
-    if !space.is_serial() {
-        panic!("Dense assembly can only be used for function spaces stored in serial");
-    }
-    let grid = space.grid();
-    let ncells = grid.topology().entity_count(grid.topology().dim());
-    if shape[0] != ncells * NPTS || shape[1] != space.dofmap().global_size() {
-        panic!("Matrix has wrong shape");
-    }
-
-    // TODO: pass cell types into this function
-    let qrule = simplex_rule(ReferenceCellType::Triangle, NPTS).unwrap();
-    let mut qpoints = rlst_dynamic_array2!(f64, [NPTS, 2]);
-    for i in 0..NPTS {
-        for j in 0..2 {
-            *qpoints.get_mut([i, j]).unwrap() = qrule.points[2 * i + j];
-        }
-    }
-    let qweights = qrule.weights;
-
-    let mut table = rlst_dynamic_array4!(f64, space.element().tabulate_array_shape(0, NPTS));
-    space.element().tabulate(&qpoints, 0, &mut table);
-
-    let mut output =
-        SparseMatrixData::<f64>::new_known_size(shape, ncells * space.element().dim() * NPTS);
-    debug_assert!(qpoints.shape()[0] == NPTS);
-
-    let element = grid.geometry().element(0);
-
-    let evaluator = grid.geometry().get_evaluator(element, &qpoints);
-
-    let mut jdets = vec![0.0; NPTS];
-    let mut normals = rlst_dynamic_array2!(f64, [NPTS, 3]);
-
-    // TODO: batch this?
-    for cell in 0..ncells {
-        let cell_tindex = grid.topology().index_map()[cell];
-        let cell_gindex = grid.geometry().index_map()[cell];
-        evaluator.compute_normals_and_jacobian_determinants(cell_gindex, &mut normals, &mut jdets);
-        for (qindex, (w, jdet)) in qweights.iter().zip(&jdets).enumerate() {
-            for (i, dof) in space
-                .dofmap()
-                .cell_dofs(cell_tindex)
-                .unwrap()
-                .iter()
-                .enumerate()
-            {
-                output.rows.push(cell * NPTS + qindex);
-                output.cols.push(*dof);
-                output
-                    .data
-                    .push(jdet * w * table.get([0, qindex, i, 0]).unwrap());
-            }
-        }
-    }
-    output
 }
 
 #[cfg(test)]

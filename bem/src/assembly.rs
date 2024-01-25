@@ -1,4 +1,6 @@
+pub mod common;
 pub mod batched;
+pub mod fmm_tools;
 use crate::function_space::SerialFunctionSpace;
 use bempp_kernel::laplace_3d;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
