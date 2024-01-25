@@ -1,5 +1,5 @@
-pub mod common;
 pub mod batched;
+pub mod common;
 pub mod fmm_tools;
 use crate::function_space::SerialFunctionSpace;
 use bempp_kernel::laplace_3d;

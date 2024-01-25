@@ -53,4 +53,3 @@ impl<T: Scalar> SparseMatrixData<T> {
 }
 
 unsafe impl<T: Scalar> Sync for SparseMatrixData<T> {}
-

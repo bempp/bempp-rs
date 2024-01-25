@@ -1,19 +1,16 @@
+use crate::assembly::common::SparseMatrixData;
 use crate::function_space::SerialFunctionSpace;
 use bempp_quadrature::simplex_rules::simplex_rule;
-use bempp_traits::bem::{FunctionSpace, DofMap};
+use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
-use crate::assembly::common::SparseMatrixData;
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
     data_container::VectorContainer,
-    rlst_dynamic_array2,
-    rlst_dynamic_array4,
-    traits::{
-        RandomAccessByRef, RandomAccessMut, Shape
-    },
+    rlst_dynamic_array2, rlst_dynamic_array4,
+    traits::{RandomAccessByRef, RandomAccessMut, Shape},
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
@@ -86,11 +83,7 @@ pub fn basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
     .unwrap()
 }
 
-
-pub fn transpose_basis_to_quadrature_into_dense<
-    const NPTS: usize,
-    const BLOCKSIZE: usize,
->(
+pub fn transpose_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     space: &SerialFunctionSpace,
 ) {
@@ -103,10 +96,7 @@ pub fn transpose_basis_to_quadrature_into_dense<
     }
 }
 
-pub fn transpose_basis_to_quadrature_into_csr<
-    const NPTS: usize,
-    const BLOCKSIZE: usize,
->(
+pub fn transpose_basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
     space: &SerialFunctionSpace,
 ) -> CsrMatrix<f64> {
     let grid = space.grid();
@@ -183,4 +173,3 @@ fn basis_to_quadrature<const NPTS: usize, const BLOCKSIZE: usize>(
     }
     output
 }
-

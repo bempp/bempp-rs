@@ -1,3 +1,4 @@
+use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
@@ -21,7 +22,6 @@ use rlst_dense::{
     },
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
-use crate::assembly::common::{SparseMatrixData, RawData2D};
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
