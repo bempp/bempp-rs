@@ -23,7 +23,10 @@ use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
 
-use crate::types::{SvdFieldTranslationKiFmmIA, SvdFieldTranslationKiFmmRcmp, SvdM2lOperatorDataIA, SvdM2lOperatorDataRcmp};
+use crate::types::{
+    SvdFieldTranslationKiFmmIA, SvdFieldTranslationKiFmmRcmp, SvdM2lOperatorDataIA,
+    SvdM2lOperatorDataRcmp,
+};
 use crate::{
     array::flip3,
     fft::Fft,
@@ -171,7 +174,6 @@ where
     }
 }
 
-
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmRcmp<T, U>
 where
     T: Float + Default,
@@ -287,7 +289,6 @@ where
             }
         }
 
-        // let mut c = rlst_dynamic_array2!(T, [self.k, self.k * ntransfer_vectors]);
         let mut c_u = Vec::new();
         let mut c_vt = Vec::new();
 
@@ -299,21 +300,14 @@ where
                 empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_block.view()),
             );
 
-            let tmp_ = empty_array::<T, 2>().simple_mult_into_resize(
-                sigma_mat.view(),
-                empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_block.view()),
-            );
-
-
             let mut u_i = rlst_dynamic_array2!(T, [self.k, self.k]);
             let mut sigma_i = vec![T::zero(); self.k];
             let mut vt_i = rlst_dynamic_array2!(T, [self.k, self.k]);
 
-            tmp_
-                .into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+            tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
 
-            let rank = retain_energy(&sigma_i, T::from(0.999999999).unwrap());
+            let rank = retain_energy(&sigma_i, self.threshold);
 
             let mut u_i_compressed = rlst_dynamic_array2!(T, [self.k, rank]);
             let mut vt_i_compressed_ = rlst_dynamic_array2!(T, [rank, self.k]);
@@ -332,23 +326,21 @@ where
             let vt_i_compressed = empty_array::<T, 2>()
                 .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
 
-
-            // println!("RANK U {:?} VT {:?}", u_i_compressed.shape(), vt_i_compressed.shape());
             c_u.push(u_i_compressed);
             c_vt.push(vt_i_compressed);
-
-            // c.view_mut()
-            //     .into_subview([0, i * self.k], [self.k, self.k])
-            //     .fill_from(tmp);
         }
 
         let mut st_block = rlst_dynamic_array2!(T, [self.k, nst]);
         st_block.fill_from(s_block.transpose());
 
-        SvdM2lOperatorDataRcmp { u, st_block, c_u, c_vt }
+        SvdM2lOperatorDataRcmp {
+            u,
+            st_block,
+            c_u,
+            c_vt,
+        }
     }
 }
-
 
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmIA<T, U>
 where
@@ -539,7 +531,6 @@ where
     }
 }
 
-
 impl<T, U> SvdFieldTranslationKiFmmRcmp<T, U>
 where
     T: Float + Default,
@@ -551,14 +542,23 @@ where
     ///
     /// # Arguments
     /// * `kernel` - The kernel being used, only compatible with homogenous, translationally invariant kernels.
-    /// * `k` - The maximum rank to be used in SVD compression for the translation operators, if none is specified will be taken as  max({50, max_column_rank})
+    /// * `k` - The maximum rank to be used in SVD compression for the translation operators before recompression, if none is specified will be taken as  max({50, max_column_rank})
+    /// * `threshold` - Percentage of energy to be retained from SVD of a given M2L operator, calculated from sum of squares of singular values during recompression.
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn new(kernel: U, k: Option<usize>, order: usize, domain: Domain<T>, alpha: T) -> Self {
+    pub fn new(
+        kernel: U,
+        k: Option<usize>,
+        threshold: T,
+        order: usize,
+        domain: Domain<T>,
+        alpha: T,
+    ) -> Self {
         let mut result = SvdFieldTranslationKiFmmRcmp {
             alpha,
             k: 0,
+            threshold,
             kernel,
             operator_data: SvdM2lOperatorDataRcmp::default(),
             transfer_vectors: vec![],
@@ -581,7 +581,6 @@ where
     }
 }
 
-
 impl<T, U> SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
@@ -593,7 +592,7 @@ where
     ///
     /// # Arguments
     /// * `kernel` - The kernel being used, only compatible with homogenous, translationally invariant kernels.
-    /// * `k` - The maximum rank to be used in SVD compression for the translation operators, if none is specified will be taken as  max({50, max_column_rank})
+    /// * `threshold` - Percentage of energy to be retained from SVD of a given M2L operator, calculated from sum of squares of singular values.
     /// * `order` - The expansion order for the multipole and local expansions.
     /// * `domain` - Domain associated with the global point set.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.

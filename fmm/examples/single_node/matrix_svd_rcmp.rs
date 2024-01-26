@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::{SvdFieldTranslationKiFmmIA, SvdFieldTranslationKiFmmRcmp};
+use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 use bempp_fmm::charge::build_charge_dict;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::{fmm::FmmLoop, tree::Tree};
@@ -41,9 +41,14 @@ fn main() {
     // Create a tree
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
-    let m2l_data =
-        SvdFieldTranslationKiFmmRcmp::new(kernel.clone(), Some(70), order, *tree.get_domain(), alpha_inner);
-
+    let m2l_data = SvdFieldTranslationKiFmmRcmp::new(
+        kernel.clone(),
+        Some(70),
+        0.99999,
+        order,
+        *tree.get_domain(),
+        alpha_inner,
+    );
 
     let fmm = bempp_fmm::types::KiFmmLinearMatrix::new(
         order,

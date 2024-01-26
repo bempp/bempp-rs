@@ -5,25 +5,23 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
-use bempp_field::types::SvdFieldTranslationKiFmm;
-
 use bempp_traits::{
     field::{FieldTranslation, FieldTranslationData},
-    fmm::{Fmm, InteractionLists},
+    fmm::Fmm,
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::{EvalType, Scalar},
+    types::Scalar,
 };
 use bempp_tree::types::single_node::SingleNodeTree;
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear};
+use crate::types::{FmmDataUniform, KiFmmLinear};
 
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut},
 };
 
 /// Field translations for uniformly refined trees that take matrix input for charges.
@@ -186,15 +184,6 @@ pub mod matrix {
                 .zip(multipole_idxs)
                 .zip(local_idxs)
                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                    let top_left = [0, c_idx * self.fmm.m2l.k];
-                    // let c_sub = self
-                    //     .fmm
-                    //     .m2l
-                    //     .operator_data
-                    //     .c
-                    //     .view()
-                    //     .into_subview(top_left, c_dim);
-
                     let c_u_sub = &self.fmm.m2l.operator_data.c_u[c_idx];
                     let c_vt_sub = &self.fmm.m2l.operator_data.c_vt[c_idx];
 
@@ -252,8 +241,9 @@ pub mod matrix {
                                 empty_array::<U, 2>().simple_mult_into_resize(
                                     c_u_sub.view(),
                                     empty_array::<U, 2>().simple_mult_into_resize(
-                                        c_vt_sub.view(),                                     compressed_multipoles_subset.view(),
-                                    )
+                                        c_vt_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
                                 ),
                             ),
                         ),
@@ -300,7 +290,8 @@ pub mod uniform {
 
     use super::*;
 
-    impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>, U>
+    impl<T, U>
+        FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantKernel<T = U>
@@ -361,7 +352,10 @@ pub mod uniform {
 
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
     impl<T, U> FieldTranslation<U>
-        for FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>, U>
+        for FmmDataUniform<
+            KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>,
+            U,
+        >
     where
         T: Kernel<T = U>
             + ScaleInvariantKernel<T = U>
@@ -459,7 +453,6 @@ pub mod uniform {
                     let c_u_sub = &self.fmm.m2l.operator_data.c_u[c_idx];
                     let c_vt_sub = &self.fmm.m2l.operator_data.c_vt[c_idx];
 
-
                     let mut compressed_multipoles_subset =
                         rlst_dynamic_array2!(U, [self.fmm.m2l.k, multipole_idxs.len()]);
 
@@ -481,8 +474,9 @@ pub mod uniform {
                                 empty_array::<U, 2>().simple_mult_into_resize(
                                     c_u_sub.view(),
                                     empty_array::<U, 2>().simple_mult_into_resize(
-                                        c_vt_sub.view(),                                     compressed_multipoles_subset.view(),
-                                    )
+                                        c_vt_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
                                 ),
                             ),
                         ),
