@@ -156,6 +156,7 @@ impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
         assert_eq!(geometry.dim(), 3);
         let mut table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(1, npts));
         element.tabulate(points, 1, &mut table);
+
         let js = RefCell::new([0.0; 6]);
 
         Self {
