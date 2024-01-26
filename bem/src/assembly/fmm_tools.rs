@@ -1,5 +1,6 @@
 use crate::assembly::common::SparseMatrixData;
 use crate::function_space::SerialFunctionSpace;
+use bempp_grid::grid::SerialGrid;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
@@ -16,9 +17,8 @@ use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
 // TODO: use T not f64
 pub fn get_all_quadrature_points<const NPTS: usize>(
-    space: &SerialFunctionSpace,
+    grid: &SerialGrid,
 ) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
-    let grid = space.grid();
     let qrule = simplex_rule(ReferenceCellType::Triangle, NPTS).unwrap();
     let mut qpoints = rlst_dynamic_array2!(f64, [NPTS, 2]);
     for i in 0..NPTS {
