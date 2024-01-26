@@ -87,7 +87,8 @@ pub fn transpose_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSI
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     space: &SerialFunctionSpace,
 ) {
-    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE>(output.shape(), space);
+    let shape = [output.shape()[1], output.shape()[0]];
+    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE>(shape, space);
     let data = sparse_matrix.data;
     let rows = sparse_matrix.rows;
     let cols = sparse_matrix.cols;

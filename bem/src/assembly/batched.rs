@@ -303,7 +303,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                                 * test_table.get_unchecked([0, test_index, test_i, 0])
                         };
                         for trial_index in 0..NPTS_TRIAL {
-                            sum += k[test_index * trial_weights.len() + trial_index]
+                            sum += k[trial_index * test_weights.len() + test_index]
                                 * test_integrand
                                 * trial_integrands[trial_index];
                         }
@@ -419,7 +419,7 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
                             * test_table.get_unchecked([0, test_index, test_i, 0])
                     };
                     for trial_index in 0..NPTS_TRIAL {
-                        sum += k[test_index * trial_weights.len() + trial_index]
+                        sum += k[trial_index * test_weights.len() + test_index]
                             * test_integrand
                             * trial_integrands[trial_index];
                     }
