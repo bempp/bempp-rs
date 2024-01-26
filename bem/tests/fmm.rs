@@ -55,12 +55,7 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
     let mut matrix2 = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
 
     // matrix 2 = singular
-    batched::assemble_singular_into_dense::<4, 128>(
-        &mut matrix2,
-        &kernel,
-        trial_space,
-        test_space,
-    );
+    batched::assemble_singular_into_dense::<4, 128>(&mut matrix2, &kernel, trial_space, test_space);
 
     let mut correction = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
     batched::assemble_singular_correction_into_dense::<NPTS, NPTS, 128>(
