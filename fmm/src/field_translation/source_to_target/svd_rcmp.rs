@@ -135,9 +135,6 @@ pub mod matrix {
                 [self.ncoeffs, nsources * self.ncharge_vectors]
             );
 
-            // let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
-            // let c_dim = [nrows, self.fmm.m2l.k];
-
             let mut compressed_multipoles = empty_array::<U, 2>()
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
 
@@ -219,19 +216,6 @@ pub mod matrix {
                         }
                     }
 
-                    // let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                    //     self.fmm.dc2e_inv_1.view(),
-                    //     empty_array::<U, 2>().simple_mult_into_resize(
-                    //         self.fmm.dc2e_inv_2.view(),
-                    //         empty_array::<U, 2>().simple_mult_into_resize(
-                    //             self.fmm.m2l.operator_data.u.view(),
-                    //             empty_array::<U, 2>().simple_mult_into_resize(
-                    //                 c_sub.view(),
-                    //                 compressed_multipoles_subset.view(),
-                    //             ),
-                    //         ),
-                    //     ),
-                    // );
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
                         self.fmm.dc2e_inv_1.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
@@ -392,9 +376,6 @@ pub mod uniform {
                 [ncoeffs, nsources]
             );
 
-            // let [nrows, _] = self.fmm.m2l.operator_data.c.shape();
-            // let c_dim = [nrows, self.fmm.m2l.k];
-
             let mut compressed_multipoles = empty_array::<U, 2>()
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
 
@@ -441,15 +422,6 @@ pub mod uniform {
                 .zip(multipole_idxs)
                 .zip(local_idxs)
                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                    // let top_left = [0, c_idx * self.fmm.m2l.k];
-                    // let c_sub = self
-                    //     .fmm
-                    //     .m2l
-                    //     .operator_data
-                    //     .c
-                    //     .view()
-                    //     .into_subview(top_left, c_dim);
-
                     let c_u_sub = &self.fmm.m2l.operator_data.c_u[c_idx];
                     let c_vt_sub = &self.fmm.m2l.operator_data.c_vt[c_idx];
 
