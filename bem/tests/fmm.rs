@@ -32,9 +32,9 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    batched::assemble::<128>(&mut matrix, &kernel, &trial_space, &test_space);
+    batched::assemble::<128>(&mut matrix, &kernel, trial_space, test_space);
     // Compute using FMM method
-    let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(&grid);
+    let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
 
     // k is the matrix that FMM will give us
     let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
@@ -46,10 +46,10 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
     );
 
     let mut p_t = rlst_dynamic_array2!(f64, [test_ndofs, nqpts]);
-    fmm_tools::transpose_basis_to_quadrature_into_dense::<NPTS, 128>(&mut p_t, &test_space);
+    fmm_tools::transpose_basis_to_quadrature_into_dense::<NPTS, 128>(&mut p_t, test_space);
 
     let mut p = rlst_dynamic_array2!(f64, [nqpts, trial_ndofs]);
-    fmm_tools::basis_to_quadrature_into_dense::<NPTS, 128>(&mut p, &trial_space);
+    fmm_tools::basis_to_quadrature_into_dense::<NPTS, 128>(&mut p, trial_space);
 
     // matrix 2 = p_t @ k @ p - c + singular
     let mut matrix2 = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
@@ -58,16 +58,16 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
     batched::assemble_singular_into_dense::<4, 128>(
         &mut matrix2,
         &kernel,
-        &trial_space,
-        &test_space,
+        trial_space,
+        test_space,
     );
 
     let mut correction = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
     batched::assemble_singular_correction_into_dense::<NPTS, NPTS, 128>(
         &mut correction,
         &kernel,
-        &trial_space,
-        &test_space,
+        trial_space,
+        test_space,
     );
 
     let temp = empty_array::<f64, 2>()
