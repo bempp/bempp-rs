@@ -447,7 +447,7 @@ pub mod uniform {
                 .zip(multipole_idxs)
                 .zip(local_idxs)
                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                    let top_left = [0, c_idx * self.fmm.m2l.k];
+                    // let top_left = [0, c_idx * self.fmm.m2l.k];
                     // let c_sub = self
                     //     .fmm
                     //     .m2l

@@ -62,3 +62,9 @@ path = "examples/single_node/matrix_svd_ia.rs"
 [[example]]
 name = "single_node_svd_rcmp"
 path = "examples/single_node/svd_rcmp.rs"
+
+
+[[example]]
+name = "single_node_svd_rcmp_matrix"
+path = "examples/single_node/matrix_svd_rcmp.rs"
+

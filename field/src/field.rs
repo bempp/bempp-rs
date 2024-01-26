@@ -333,7 +333,7 @@ where
                 .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
 
 
-            println!("RANK U {:?} VT {:?}", u_i_compressed.shape(), vt_i_compressed.shape());
+            // println!("RANK U {:?} VT {:?}", u_i_compressed.shape(), vt_i_compressed.shape());
             c_u.push(u_i_compressed);
             c_vt.push(vt_i_compressed);
 
