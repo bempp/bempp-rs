@@ -88,6 +88,31 @@ where
     pub kernel: U,
 }
 
+/// A type to store the M2L field translation meta-data  and datafor an SVD based sparsification in the kernel independent FMM.
+pub struct SvdFieldTranslationKiFmmRcmp<T, U>
+where
+    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    U: Kernel<T = T> + Default,
+{
+    /// Amount to dilate inner check surface by when computing operator.
+    pub alpha: T,
+
+    /// Maximum rank taken for SVD compression
+    pub k: usize,
+
+    /// Amount of energy of each M2L operator retained in SVD compression
+    pub threshold: T,
+
+    /// Precomputed data required for SVD compressed M2L interaction.
+    pub operator_data: SvdM2lOperatorDataRcmp<T>,
+
+    /// Unique transfer vectors to lookup m2l unique kernel interactions.
+    pub transfer_vectors: Vec<TransferVector>,
+
+    /// The associated kernel with this translation operator.
+    pub kernel: U,
+}
+
 /// A type to store a transfer vector between a `source` and `target` Morton key.
 #[derive(Debug)]
 pub struct TransferVector {
@@ -157,4 +182,35 @@ where
 
     /// Right singular vectors from SVD of thin M2L matrix, cutoff to a maximum rank of 'k'.
     pub vt: Vec<Vec<SvdM2lEntry<T>>>,
+}
+
+/// Container to store precomputed data required for SVD field translations.
+/// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
+// #[derive(Default)]
+pub struct SvdM2lOperatorDataRcmp<T>
+where
+    T: Scalar,
+{
+    /// Left singular vectors from SVD of fat M2L matrix.
+    pub u: SvdM2lEntry<T>,
+
+    /// Right singular vectors from SVD of thin M2L matrix, cutoff to a maximum rank of 'k'.
+    pub st_block: SvdM2lEntry<T>,
+
+    pub c_u: Vec<SvdM2lEntry<T>>,
+
+    /// Right singular vectors from SVD of thin M2L matrix, cutoff to a maximum rank of 'k'.
+    pub c_vt: Vec<SvdM2lEntry<T>>,
+}
+
+impl<T> Default for SvdM2lOperatorDataRcmp<T>
+where
+    T: Scalar,
+{
+    fn default() -> Self {
+        let u = rlst_dynamic_array2!(T, [1, 1]);
+        let st_block = rlst_dynamic_array2!(T, [1, 1]);
+
+        SvdM2lOperatorDataRcmp { u, st_block, c_u: Vec::default(), c_vt: Vec::default() }
+    }
 }

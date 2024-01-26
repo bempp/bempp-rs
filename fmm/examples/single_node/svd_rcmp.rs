@@ -33,7 +33,7 @@ fn main() {
     let kernel = Laplace3dKernel::default();
 
     let m2l_data =
-        SvdFieldTranslationKiFmm::new(kernel.clone(), Some(70), order, *tree.get_domain(), alpha_inner);
+        SvdFieldTranslationKiFmmRcmp::new(kernel.clone(), Some(70), order, *tree.get_domain(), alpha_inner);
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
