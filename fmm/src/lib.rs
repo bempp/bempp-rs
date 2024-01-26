@@ -14,6 +14,7 @@ mod field_translation {
         pub mod fft;
         pub mod svd;
         pub mod svd_ia;
+        pub mod svd_rcmp;
     }
     pub mod target;
 }

@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 use rlst_dense::traits::RawAccess;
 
-use bempp_field::types::SvdFieldTranslationKiFmm;
+use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 use bempp_fmm::{
     charge::build_charge_dict,
     types::{FmmDataUniform, KiFmmLinear},
@@ -32,9 +32,10 @@ fn main() {
 
     let kernel = Laplace3dKernel::default();
 
-    let m2l_data = SvdFieldTranslationKiFmm::new(
+    let m2l_data = SvdFieldTranslationKiFmmRcmp::new(
         kernel.clone(),
         Some(70),
+        0.99999,
         order,
         *tree.get_domain(),
         alpha_inner,
