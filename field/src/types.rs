@@ -101,7 +101,7 @@ where
     pub k: usize,
 
     /// Amount of energy of each M2L operator retained in SVD compression
-    pub threshold: T,
+    // pub threshold: T,
 
     /// Precomputed data required for SVD compressed M2L interaction.
     pub operator_data: SvdM2lOperatorDataRcmp<T>,

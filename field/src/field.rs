@@ -539,6 +539,49 @@ where
     }
 }
 
+
+impl<T, U> SvdFieldTranslationKiFmmRcmp<T, U>
+where
+    T: Float + Default,
+    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
+    U: Kernel<T = T> + Default,
+    Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
+{
+    /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
+    ///
+    /// # Arguments
+    /// * `kernel` - The kernel being used, only compatible with homogenous, translationally invariant kernels.
+    /// * `k` - The maximum rank to be used in SVD compression for the translation operators, if none is specified will be taken as  max({50, max_column_rank})
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `domain` - Domain associated with the global point set.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    pub fn new(kernel: U, k: Option<usize>, order: usize, domain: Domain<T>, alpha: T) -> Self {
+        let mut result = SvdFieldTranslationKiFmmRcmp {
+            alpha,
+            k: 0,
+            kernel,
+            operator_data: SvdM2lOperatorDataRcmp::default(),
+            transfer_vectors: vec![],
+        };
+        let ncoeffs = result.ncoeffs(order);
+        if let Some(k) = k {
+            // Compression rank <= number of coefficients
+            if k <= ncoeffs {
+                result.k = k;
+            } else {
+                result.k = ncoeffs
+            }
+        } else {
+            result.k = 50;
+        }
+        result.transfer_vectors = compute_transfer_vectors();
+        result.operator_data = result.compute_m2l_operators(order, domain, 0);
+
+        result
+    }
+}
+
+
 impl<T, U> SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
