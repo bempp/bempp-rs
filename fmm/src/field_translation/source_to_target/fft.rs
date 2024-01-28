@@ -115,7 +115,6 @@ pub mod uniform {
             let n = 2 * self.fmm.order - 1;
             let npad = n + 1;
 
-            // let nparents = self.fmm.tree().get_keys(level - 1).unwrap().len();
             let parents: HashSet<MortonKey> = targets
                 .iter()
                 .map(|target: &MortonKey| target.parent())
@@ -157,7 +156,6 @@ pub mod uniform {
             let signals_hat_f_ptr = SendPtrMut { raw };
 
             // Pre processing chunk size, in terms of number of parents
-            // let chunk_size = 1;
             let max_chunk_size;
             if level == 2 {
                 max_chunk_size = 8
@@ -320,7 +318,6 @@ pub mod uniform {
                 &[npad, npad, npad],
             );
 
-            // TODO: Experiment with chunk size for post processing
             check_potential
                 .par_chunks_exact(nsiblings * size)
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
@@ -597,7 +594,6 @@ pub mod adaptive {
             let signals_hat_f_ptr = SendPtrMut { raw };
 
             // Pre processing chunk size, in terms of number of parents
-            // let chunk_size = 1;
             let max_chunk_size;
             if level == 2 {
                 max_chunk_size = 8
@@ -762,7 +758,6 @@ pub mod adaptive {
                 &[npad, npad, npad],
             );
 
-            // TODO: Experiment with chunk size for post processing
             check_potential
                 .par_chunks_exact(nsiblings * size)
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
