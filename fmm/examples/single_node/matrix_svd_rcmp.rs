@@ -16,7 +16,7 @@ use bempp_tree::implementations::helpers::points_fixture;
 use bempp_tree::types::single_node::SingleNodeTree;
 
 fn main() {
-    let npoints = 10000;
+    let npoints = 1000000;
 
     let global_idxs = (0..npoints).collect_vec();
 
@@ -27,7 +27,7 @@ fn main() {
     // Test matrix input
     let points = points_fixture::<f32>(npoints, None, None);
     let ncharge_vecs = 5;
-    let depth = 3;
+    let depth = 4;
 
     let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
     charge_mat

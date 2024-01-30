@@ -28,7 +28,7 @@ use rlst_dense::{
 pub mod matrix {
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 
-    use crate::types::{FmmDataUniformMatrix, KiFmmLinearMatrix};
+    use crate::types::{FmmDataUniformMatrix, KiFmmLinearMatrix, SendPtrMut};
 
     use super::*;
 
@@ -143,10 +143,38 @@ pub mod matrix {
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-            let level_locals = self.level_locals[level as usize]
-                .iter()
-                .map(Mutex::new)
-                .collect_vec();
+            let compressed_locals_ = vec![U::zero(); nsources * self.ncharge_vectors * self.fmm.m2l.k as usize];
+            let compressed_locals = rlst_array_from_slice2!(
+                U,
+                compressed_locals_.as_slice(),
+                [self.fmm.m2l.k, nsources * self.ncharge_vectors ]
+            );
+
+            let mut compressed_locals_ptrs = Vec::new();
+
+            for (i, target) in sources.iter().enumerate() {
+                let key_displacement = i * self.fmm.m2l.k * self.ncharge_vectors;
+                let mut tmp = Vec::new();
+                for charge_vec_idx in 0..self.ncharge_vectors {
+                    let charge_vec_displacement = charge_vec_idx * self.fmm.m2l.k;
+
+                    let raw =
+                        unsafe { compressed_locals.data().as_ptr().add(key_displacement + charge_vec_displacement) as *mut U };
+                    let send_ptr = SendPtrMut { raw };
+                    tmp.push(send_ptr)
+
+                }
+                compressed_locals_ptrs.push(tmp);
+            }
+
+            let compressed_level_locals =
+                compressed_locals_ptrs.iter().map(Mutex::new).collect_vec();
+
+
+            // let level_locals = self.level_locals[level as usize]
+            //     .iter()
+            //     .map(Mutex::new)
+            //     .collect_vec();
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -216,42 +244,87 @@ pub mod matrix {
                         }
                     }
 
+                    // let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    //     self.fmm.dc2e_inv_1.view(),
+                    //     empty_array::<U, 2>().simple_mult_into_resize(
+                    //         self.fmm.dc2e_inv_2.view(),
+                    //         empty_array::<U, 2>().simple_mult_into_resize(
+                    //             self.fmm.m2l.operator_data.u.view(),
+                    //             empty_array::<U, 2>().simple_mult_into_resize(
+                    //                 c_u_sub.view(),
+                    //                 empty_array::<U, 2>().simple_mult_into_resize(
+                    //                     c_vt_sub.view(),
+                    //                     compressed_multipoles_subset.view(),
+                    //                 ),
+                    //             ),
+                    //         ),
+                    //     ),
+                    // );
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.fmm.dc2e_inv_1.view(),
+                        c_u_sub.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
-                            self.fmm.dc2e_inv_2.view(),
-                            empty_array::<U, 2>().simple_mult_into_resize(
-                                self.fmm.m2l.operator_data.u.view(),
-                                empty_array::<U, 2>().simple_mult_into_resize(
-                                    c_u_sub.view(),
-                                    empty_array::<U, 2>().simple_mult_into_resize(
-                                        c_vt_sub.view(),
-                                        compressed_multipoles_subset.view(),
-                                    ),
-                                ),
-                            ),
+                            c_vt_sub.view(),
+                            compressed_multipoles_subset.view(),
                         ),
                     );
 
                     for (local_multipole_idx, &global_local_idx) in local_idxs.iter().enumerate() {
-                        let local_lock = level_locals[global_local_idx].lock().unwrap();
+                        let local_lock = compressed_level_locals[global_local_idx].lock().unwrap();
+
                         for charge_vec_idx in 0..self.ncharge_vectors {
                             let local_send_ptr = local_lock[charge_vec_idx];
                             let local_ptr = local_send_ptr.raw;
-
                             let local =
-                                unsafe { std::slice::from_raw_parts_mut(local_ptr, self.ncoeffs) };
+                                unsafe { std::slice::from_raw_parts_mut(local_ptr, self.fmm.m2l.k) };
 
                             let key_displacement =
-                                local_multipole_idx * self.ncoeffs * self.ncharge_vectors;
-                            let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
+                                local_multipole_idx * self.fmm.m2l.k * self.ncharge_vectors;
+                            let charge_vec_displacement = charge_vec_idx * self.fmm.m2l.k;
 
                             let result = &locals.data()[key_displacement + charge_vec_displacement
-                                ..key_displacement + charge_vec_displacement + self.ncoeffs];
+                                ..key_displacement + charge_vec_displacement + self.fmm.m2l.k];
                             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                         }
+
                     }
-                })
+                    // for (local_multipole_idx, &global_local_idx) in local_idxs.iter().enumerate() {
+                    //     let local_lock = level_locals[global_local_idx].lock().unwrap();
+                    //     for charge_vec_idx in 0..self.ncharge_vectors {
+                    //         let local_send_ptr = local_lock[charge_vec_idx];
+                    //         let local_ptr = local_send_ptr.raw;
+
+                    //         let local =
+                    //             unsafe { std::slice::from_raw_parts_mut(local_ptr, self.ncoeffs) };
+
+                    //         let key_displacement =
+                    //             local_multipole_idx * self.ncoeffs * self.ncharge_vectors;
+                    //         let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
+
+                    //         let result = &locals.data()[key_displacement + charge_vec_displacement
+                    //             ..key_displacement + charge_vec_displacement + self.ncoeffs];
+                    //         local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
+                    //     }
+                    // }
+                });
+
+            rlst_blis::interface::threading::set_num_threads(8);
+            let result = empty_array::<U, 2>().simple_mult_into_resize(
+                self.fmm.dc2e_inv_1.view(),
+                empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_2.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.m2l.operator_data.u.view(),
+                        compressed_locals,
+                    ),
+                ),
+            );
+            rlst_blis::interface::threading::disable_threading();
+            let ptr = self.level_locals[level as usize][0][0].raw;
+            let all_locals = unsafe { std::slice::from_raw_parts_mut(ptr, nsources * self.ncoeffs * self.ncharge_vectors)};
+            all_locals.iter_mut().zip(result.data().iter()).for_each(|(l, r)| *l += *r);
+
+
+
         }
 
         fn m2l_scale(&self, level: u64) -> U {
@@ -269,8 +342,15 @@ pub mod matrix {
     }
 }
 
+use rlst_dense::traits::Shape;
+
 pub mod uniform {
+    // use core::slice::SlicePattern;
+
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
+    use rlst_dense::rlst_array_from_slice1;
+
+    use crate::types::SendPtrMut;
 
     use super::*;
 
@@ -376,18 +456,20 @@ pub mod uniform {
                 [ncoeffs, nsources]
             );
 
+            // rlst_blis::interface::threading::set_num_threads(4);
             let mut compressed_multipoles = empty_array::<U, 2>()
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
+            // rlst_blis::interface::threading::disable_threading();
 
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
-            let level_locals = self.level_locals[level as usize]
-                .iter()
-                .map(Mutex::new)
-                .collect_vec();
+            // let level_locals = self.level_locals[level as usize]
+            //     .iter()
+            //     .map(Mutex::new)
+            //     .collect_vec();
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -417,6 +499,24 @@ pub mod uniform {
                 })
                 .collect_vec();
 
+            let compressed_locals_ = vec![U::zero(); nsources * self.fmm.m2l.k as usize];
+            let compressed_locals = rlst_array_from_slice2!(
+                U,
+                compressed_locals_.as_slice(),
+                [self.fmm.m2l.k, nsources ]
+            );
+            let mut compressed_locals_ptrs = Vec::new();
+
+            for (i, target) in sources.iter().enumerate() {
+                let raw =
+                    unsafe { compressed_locals.data().as_ptr().add(i * self.fmm.m2l.k) as *mut U };
+                let send_ptr = SendPtrMut { raw };
+                compressed_locals_ptrs.push(send_ptr);
+            }
+
+            let compressed_level_locals =
+                compressed_locals_ptrs.iter().map(Mutex::new).collect_vec();
+
             (0..316)
                 .into_par_iter()
                 .zip(multipole_idxs)
@@ -438,32 +538,44 @@ pub mod uniform {
                     }
 
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.fmm.dc2e_inv_1.view(),
+                        c_u_sub.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
-                            self.fmm.dc2e_inv_2.view(),
-                            empty_array::<U, 2>().simple_mult_into_resize(
-                                self.fmm.m2l.operator_data.u.view(),
-                                empty_array::<U, 2>().simple_mult_into_resize(
-                                    c_u_sub.view(),
-                                    empty_array::<U, 2>().simple_mult_into_resize(
-                                        c_vt_sub.view(),
-                                        compressed_multipoles_subset.view(),
-                                    ),
-                                ),
-                            ),
+                            c_vt_sub.view(),
+                            compressed_multipoles_subset.view(),
                         ),
                     );
 
-                    for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                        let local_lock = level_locals[local_idx].lock().unwrap();
-                        let local_ptr = local_lock.raw;
-                        let local = unsafe { std::slice::from_raw_parts_mut(local_ptr, ncoeffs) };
 
-                        let res =
-                            &locals.data()[multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
+                    for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
+                        let local_lock = compressed_level_locals[local_idx].lock().unwrap();
+                        let local_ptr = local_lock.raw;
+                        let local =
+                            unsafe { std::slice::from_raw_parts_mut(local_ptr, self.fmm.m2l.k) };
+                        let res = &locals.data()
+                            [multipole_idx * self.fmm.m2l.k..(multipole_idx + 1) * self.fmm.m2l.k];
                         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
                     }
+
                 });
+
+            // Post process compressed locals
+            rlst_blis::interface::threading::set_num_threads(8);
+            let result = empty_array::<U, 2>().simple_mult_into_resize(
+                self.fmm.dc2e_inv_1.view(),
+                empty_array::<U, 2>().simple_mult_into_resize(
+                    self.fmm.dc2e_inv_2.view(),
+                    empty_array::<U, 2>().simple_mult_into_resize(
+                        self.fmm.m2l.operator_data.u.view(),
+                        compressed_locals,
+                    ),
+                ),
+            );
+            rlst_blis::interface::threading::disable_threading();
+
+            let ptr = self.level_locals[level as usize][0].raw;
+            let all_locals = unsafe { std::slice::from_raw_parts_mut(ptr, nsources * ncoeffs)};
+            all_locals.iter_mut().zip(result.data().iter()).for_each(|(l, r)| *l += *r);
+
         }
 
         fn m2l_scale(&self, level: u64) -> U {
