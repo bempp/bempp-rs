@@ -26,7 +26,7 @@ fn main() {
     let order = 6;
     let alpha_inner = 1.05;
     let alpha_outer = 2.95;
-    let depth = 4;
+    let depth = 5;
 
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
