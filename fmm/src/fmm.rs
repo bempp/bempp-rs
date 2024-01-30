@@ -1689,6 +1689,28 @@ mod test {
             false,
             3,
         );
+
+        test_uniform_f64_svd_rcmp(
+            &points_sphere,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            false,
+            3,
+        );
+
+        test_uniform_f64_svd_rcmp(
+            &points_sphere,
+            &charges,
+            &global_idxs,
+            order,
+            alpha_inner,
+            alpha_outer,
+            true,
+            3,
+        );
     }
     #[test]
     fn test_uniform_box_fft() {
