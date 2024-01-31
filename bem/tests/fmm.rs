@@ -200,7 +200,7 @@ fn fmm_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpac
             tree,
             m2l_data,
         );
-        let charge_dict = build_charge_dict(&global_idxs, &temp0.data());
+        let charge_dict = build_charge_dict(&global_idxs, temp0.data());
         let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
         datatree.run(false);
 
@@ -401,7 +401,7 @@ fn test_fmm_result() {
         tree,
         m2l_data,
     );
-    let charge_dict = build_charge_dict(&global_idxs, &vec.data());
+    let charge_dict = build_charge_dict(&global_idxs, vec.data());
     let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
     datatree.run(false);
 
