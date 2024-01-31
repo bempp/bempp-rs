@@ -1,4 +1,5 @@
 use approx::*;
+use rand::prelude::*;
 use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
@@ -12,8 +13,9 @@ use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use rlst_dense::{
     array::empty_array,
+    rlst_dynamic_array1,
     rlst_dynamic_array2,
-    traits::{MultIntoResize, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut},
+    traits::{MultIntoResize, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
 };
 
 fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpace) {
@@ -86,6 +88,93 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
     }
 }
 
+fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpace) {
+    const NPTS: usize = 16;
+
+    if test_space.grid() != trial_space.grid() {
+        panic!("Assembly on different grid not yet supported");
+    }
+
+    let grid = trial_space.grid();
+
+    let test_ndofs = test_space.dofmap().global_size();
+    let trial_ndofs = trial_space.dofmap().global_size();
+    let nqpts = NPTS * grid.topology().entity_count(grid.topology().dim());
+    let kernel = Laplace3dKernel::new();
+    // Compute dense
+    let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
+    batched::assemble::<128>(&mut matrix, &kernel, trial_space, test_space);
+
+    // Compute using FMM method
+    let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
+
+    // k is the matrix that FMM will give us
+    let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
+    kernel.assemble_st(
+        EvalType::Value,
+        all_points.data(),
+        all_points.data(),
+        k.data_mut(),
+    );
+
+    let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128>(test_space);
+    let p = fmm_tools::basis_to_quadrature_into_csr::<NPTS, 128>(trial_space);
+    let singular = batched::assemble_singular_into_csr::<4, 128>(&kernel, trial_space, test_space);
+
+    let mut correction = batched::assemble_singular_correction_into_csr::<NPTS, NPTS, 128>(
+        &kernel,
+        trial_space,
+        test_space,
+    );
+    
+    // matrix2 = p_t @ k @ p - c + singular
+    let mut rng = rand::thread_rng();
+    for _ in 0..10 {
+
+        let mut vec = rlst_dynamic_array2!(f64, [trial_ndofs, 1]);
+        for i in 0..trial_ndofs {
+            *vec.get_mut([i, 0]).unwrap() = rng.gen();
+        }
+        let dense_result = empty_array::<f64, 2>().simple_mult_into_resize(
+            matrix.view(), vec.view());
+
+
+        let mut fmm_result = rlst_dynamic_array2!(f64, [test_ndofs, 1]);
+        // (p_t @ k @ p - c + singular) @ vec
+        let mut row = 0;
+        for (i, (index, data)) in singular.indices().iter().zip(singular.data()).enumerate() {
+            while i >= singular.indptr()[row + 1] { row += 1; }
+            *fmm_result.get_mut([row, 0]).unwrap() += data * vec.get([*index, 0]).unwrap();
+        }
+        let mut row = 0;
+        for (i, (index, data)) in correction.indices().iter().zip(correction.data()).enumerate() {
+            while i >= correction.indptr()[row + 1] { row += 1; }
+            *fmm_result.get_mut([row, 0]).unwrap() -= data * vec.get([*index, 0]).unwrap();
+        }
+
+        let mut temp0 = rlst_dynamic_array2!(f64, [nqpts, 1]);
+        let mut row = 0;
+        for (i, (index, data)) in p.indices().iter().zip(p.data()).enumerate() {
+            while i >= p.indptr()[row + 1] { row += 1; }
+            *temp0.get_mut([row, 0]).unwrap() += data * vec.get([*index, 0]).unwrap();
+        }
+        let mut temp1 = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), temp0);
+        let mut row = 0;
+        for (i, (index, data)) in p_t.indices().iter().zip(p_t.data()).enumerate() {
+            while i >= p_t.indptr()[row + 1] { row += 1; }
+            *fmm_result.get_mut([row, 0]).unwrap() += data * temp1.get([*index, 0]).unwrap();
+        }
+
+        for i in 0..test_ndofs {
+            assert_relative_eq!(
+                *dense_result.get([i, 0]).unwrap(),
+                *fmm_result.get([i, 0]).unwrap(),
+                epsilon = 1e-8
+            );
+        }
+    }
+}
+
 #[test]
 fn test_fmm_prototype_dp0_dp0() {
     #[cfg(debug_assertions)]
@@ -102,6 +191,7 @@ fn test_fmm_prototype_dp0_dp0() {
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_prototype(&space, &space);
+    fmm_prototype_matvec(&space, &space);
 }
 
 #[test]
