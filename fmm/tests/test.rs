@@ -1,27 +1,27 @@
+use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::charge::build_charge_dict;
 use bempp_fmm::types::FmmDataUniform;
 use bempp_fmm::types::KiFmmLinear;
-use bempp_traits::fmm::Fmm;
-use bempp_tree::types::single_node::SingleNodeTree;
-use rand::Rng;
 use bempp_grid::shapes::regular_sphere;
-use rlst_dense::array::empty_array;
-use rlst_dense::rlst_array_from_slice2;
-use rlst_dense::traits::MultIntoResize;
-use bempp_traits::types::EvalType;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
-use rlst_dense::traits::RandomAccessByRef;
-use bempp_traits::kernel::Kernel;
-use rlst_dense::rlst_dynamic_array2;
-use rlst_dense::traits::RandomAccessMut;
-use rlst_dense::traits::RawAccessMut;
-use rlst_dense::traits::RawAccess;
-use bempp_bem::assembly::{batched, fmm_tools};
+use bempp_traits::fmm::Fmm;
+use bempp_traits::fmm::FmmLoop;
 use bempp_traits::grid::Grid;
 use bempp_traits::grid::Topology;
-use bempp_traits::fmm::FmmLoop;
+use bempp_traits::kernel::Kernel;
 use bempp_traits::tree::Tree;
+use bempp_traits::types::EvalType;
+use bempp_tree::types::single_node::SingleNodeTree;
+use rand::Rng;
+use rlst_dense::array::empty_array;
+use rlst_dense::rlst_array_from_slice2;
+use rlst_dense::rlst_dynamic_array2;
+use rlst_dense::traits::MultIntoResize;
+use rlst_dense::traits::RandomAccessByRef;
+use rlst_dense::traits::RandomAccessMut;
+use rlst_dense::traits::RawAccess;
+use rlst_dense::traits::RawAccessMut;
 
 #[test]
 fn test_fmm_result() {
@@ -57,20 +57,36 @@ fn test_fmm_result() {
     for i in 0..nqpts {
         *vec.get_mut([i, 0]).unwrap() = rng.gen();
     }
-    let dense_result = empty_array::<f64, 2>().simple_mult_into_resize(
-        k.view(), vec.view());
+    let dense_result = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), vec.view());
 
-    let tree = SingleNodeTree::new(all_points.data(), false, None, Some(depth), &global_idxs, true);
+    let tree = SingleNodeTree::new(
+        all_points.data(),
+        false,
+        None,
+        Some(depth),
+        &global_idxs,
+        true,
+    );
 
     let m2l_data =
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-    let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel.clone(), tree, m2l_data);
+    let fmm = KiFmmLinear::new(
+        order,
+        alpha_inner,
+        alpha_outer,
+        kernel.clone(),
+        tree,
+        m2l_data,
+    );
     // let charges = vec![1f64; nqpts];
     let charge_dict = build_charge_dict(&global_idxs, &vec.data());
     let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
     datatree.run(false);
 
-    println!("fmm points {:?}", &datatree.fmm.tree().get_all_coordinates().unwrap()[0..9]);
+    println!(
+        "fmm points {:?}",
+        &datatree.fmm.tree().get_all_coordinates().unwrap()[0..9]
+    );
     println!("global indices {:?}", &datatree.fmm.tree().global_indices);
 
     let indices = &datatree.fmm.tree().global_indices;
@@ -83,8 +99,11 @@ fn test_fmm_result() {
     //let fmm_result = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
 
     for i in 0..nqpts {
-
-        println!("{} {}", dense_result.get([i,0]).unwrap(), fmm_result.get([i,0]).unwrap());
-     }
+        println!(
+            "{} {}",
+            dense_result.get([i, 0]).unwrap(),
+            fmm_result.get([i, 0]).unwrap()
+        );
+    }
     assert_eq!(1, 0);
 }
