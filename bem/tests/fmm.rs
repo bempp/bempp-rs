@@ -128,7 +128,7 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         k.data_mut(),
     );
 
-    /// FMM
+    ////////////////// // FMM
     let order = 6;
     let alpha_inner = 1.05;
     let alpha_outer = 2.95;
@@ -136,7 +136,7 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
     let global_idxs: Vec<_> = (0..nqpts).collect();
 
 
-    ///////
+    ////////////////
 
     let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128>(test_space);
     let p = fmm_tools::basis_to_quadrature_into_csr::<NPTS, 128>(trial_space);
@@ -190,7 +190,7 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         let charge_dict = build_charge_dict(&global_idxs, &temp0.data());
         let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
         datatree.run(false);
-        ///
+        ////
 
         // let mut temp1 = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), temp0);
         let temp1: rlst::Array<f64, rlst_dense::base_array::BaseArray<f64, rlst_dense::data_container::SliceContainer<'_, f64>, 2>, 2> = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
