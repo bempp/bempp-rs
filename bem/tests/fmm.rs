@@ -24,7 +24,7 @@ use rlst_dense::{
     rlst_dynamic_array2,
     traits::{MultIntoResize, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
 };
-
+use bempp_traits::fmm::Fmm;
 fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpace) {
     const NPTS: usize = 16;
 
@@ -192,8 +192,18 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         datatree.run(false);
         ////
 
-        // let mut temp1 = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), temp0);
-        let temp1: rlst::Array<f64, rlst_dense::base_array::BaseArray<f64, rlst_dense::data_container::SliceContainer<'_, f64>, 2>, 2> = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
+        let mut temp1 = rlst_dynamic_array2!(f64, [nqpts, 1]);
+        let indices = &datatree.fmm.tree().global_indices;
+        for (i, j) in indices.iter().enumerate() {
+            *temp1.get_mut([*j, 0]).unwrap() = datatree.potentials[i];
+        }
+        println!("{:?}", temp0.data());
+        println!();
+        println!("{:?}", datatree.potentials);
+        println!();
+        println!("{:?}", temp1.data());
+
+        //let temp1: rlst::Array<f64, rlst_dense::base_array::BaseArray<f64, rlst_dense::data_container::SliceContainer<'_, f64>, 2>, 2> = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
         let mut row = 0;
         for (i, (index, data)) in p_t.indices().iter().zip(p_t.data()).enumerate() {
             while i >= p_t.indptr()[row + 1] { row += 1; }
@@ -201,6 +211,7 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         }
 
         for i in 0..test_ndofs {
+            println!("{i}");
             assert_relative_eq!(
                 *dense_result.get([i, 0]).unwrap(),
                 *fmm_result.get([i, 0]).unwrap(),

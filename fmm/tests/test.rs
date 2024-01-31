@@ -73,12 +73,18 @@ fn test_fmm_result() {
     println!("fmm points {:?}", &datatree.fmm.tree().get_all_coordinates().unwrap()[0..9]);
     println!("global indices {:?}", &datatree.fmm.tree().global_indices);
 
-    // let fmm_result = rlst_dynamic_array2!(f64, [nqpts, 1]);
-    let fmm_result = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
+    let indices = &datatree.fmm.tree().global_indices;
 
-    // for i in 0..nqpts {
+    let mut fmm_result = rlst_dynamic_array2!(f64, [nqpts, 1]);
+    for (i, j) in indices.iter().enumerate() {
+        *fmm_result.get_mut([*j, 0]).unwrap() = datatree.potentials[i];
+    }
 
-    //     println!("{} {}", dense_result.get([i,0]).unwrap(), fmm_result.get([i,0]).unwrap());
-    // }
+    //let fmm_result = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
+
+    for i in 0..nqpts {
+
+        println!("{} {}", dense_result.get([i,0]).unwrap(), fmm_result.get([i,0]).unwrap());
+     }
     assert_eq!(1, 0);
 }
