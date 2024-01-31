@@ -45,6 +45,10 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
     // Compute using FMM method
     let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
 
+//    for i in 0..nqpts {
+ //       println!("{:?}", &all_points.data()[3*i..3*i+3]);
+  //  }
+
     // k is the matrix that FMM will give us
     let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
     kernel.assemble_st(
@@ -113,11 +117,11 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
     batched::assemble::<128>(&mut matrix, &kernel, trial_space, test_space);
 
     // Compute using FMM method
-    let all_points_t = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
+    let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
     // println!("shape {:?}", all_points.shape());
 
-    let mut all_points = rlst_dynamic_array2!(f64, [all_points_t.shape()[1], all_points_t.shape()[0]]);
-    all_points.view_mut().fill_from(all_points_t.transpose());
+    //let mut all_points = rlst_dynamic_array2!(f64, [all_points_t.shape()[1], all_points_t.shape()[0]]);
+    //all_points.view_mut().fill_from(all_points_t.transpose());
 
     // k is the matrix that FMM will give us
     let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
@@ -192,17 +196,21 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         datatree.run(false);
         ////
 
+        for i in 0..nqpts {
+            println!("{:?}", &all_points.data()[3*i..3*i+3]);
+        }
+        println!();
+        for i in 0..nqpts {
+            println!("{:?}", &datatree.fmm.tree().get_all_coordinates().unwrap()[3*i..3*i+3]);
+        }
+        println!();
+
+
         let mut temp1 = rlst_dynamic_array2!(f64, [nqpts, 1]);
         let indices = &datatree.fmm.tree().global_indices;
         for (i, j) in indices.iter().enumerate() {
             *temp1.get_mut([*j, 0]).unwrap() = datatree.potentials[i];
         }
-        println!("{:?}", temp0.data());
-        println!();
-        println!("{:?}", datatree.potentials);
-        println!();
-        println!("{:?}", temp1.data());
-
         //let temp1: rlst::Array<f64, rlst_dense::base_array::BaseArray<f64, rlst_dense::data_container::SliceContainer<'_, f64>, 2>, 2> = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
         let mut row = 0;
         for (i, (index, data)) in p_t.indices().iter().zip(p_t.data()).enumerate() {
@@ -211,11 +219,15 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         }
 
         for i in 0..test_ndofs {
+            println!("{i} {} {}", *dense_result.get([i, 0]).unwrap(),
+                *fmm_result.get([i, 0]).unwrap());
+        }
+        for i in 0..test_ndofs {
             println!("{i}");
             assert_relative_eq!(
                 *dense_result.get([i, 0]).unwrap(),
                 *fmm_result.get([i, 0]).unwrap(),
-                epsilon = 1e-6
+                epsilon = 1e-5
             );
         }
     }
@@ -281,4 +293,64 @@ fn test_fmm_prototype_dp0_p1() {
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 
     fmm_prototype(&space0, &space1);
+}
+
+#[test]
+fn test_fmm_result() {
+    let grid = regular_sphere(2);
+
+    const NPTS: usize = 1;
+
+    let nqpts = NPTS * grid.topology().entity_count(grid.topology().dim());
+    let kernel = Laplace3dKernel::new();
+
+    let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(&grid);
+
+    let order = 6;
+    let alpha_inner = 1.05;
+    let alpha_outer = 2.95;
+    let depth = 3;
+    let global_idxs: Vec<_> = (0..nqpts).collect();
+
+    let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
+    kernel.assemble_st(
+        EvalType::Value,
+        all_points.data(),
+        all_points.data(),
+        k.data_mut(),
+    );
+
+    let mut rng = rand::thread_rng();
+
+    let mut vec = rlst_dynamic_array2!(f64, [nqpts, 1]);
+    for i in 0..nqpts {
+        *vec.get_mut([i, 0]).unwrap() = rng.gen();
+    }
+    let dense_result = empty_array::<f64, 2>().simple_mult_into_resize(
+        k.view(), vec.view());
+
+    let tree = SingleNodeTree::new(all_points.data(), false, None, Some(depth), &global_idxs, true);
+
+    let m2l_data =
+        FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+    let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel.clone(), tree, m2l_data);
+    let charge_dict = build_charge_dict(&global_idxs, &vec.data());
+    let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
+    datatree.run(false);
+
+
+    let indices = &datatree.fmm.tree().global_indices;
+
+    let mut fmm_result = rlst_dynamic_array2!(f64, [nqpts, 1]);
+    for (i, j) in indices.iter().enumerate() {
+        *fmm_result.get_mut([*j, 0]).unwrap() = datatree.potentials[i];
+    }
+
+    for i in 0..nqpts {
+        assert_relative_eq!(
+            *dense_result.get([i, 0]).unwrap(),
+            *fmm_result.get([i, 0]).unwrap(),
+            epsilon = 1e-5
+        );
+     }
 }
