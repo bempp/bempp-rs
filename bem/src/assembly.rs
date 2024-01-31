@@ -1,4 +1,5 @@
 pub mod batched;
+pub mod batched_double_layer;
 pub mod common;
 pub mod fmm_tools;
 use crate::function_space::SerialFunctionSpace;
@@ -43,6 +44,14 @@ pub fn assemble<'a>(
             PDEType::Laplace => match operator {
                 BoundaryOperator::SingleLayer => {
                     batched::assemble::<128>(
+                        output,
+                        &laplace_3d::Laplace3dKernel::new(),
+                        trial_space,
+                        test_space,
+                    );
+                }
+                BoundaryOperator::DoubleLayer => {
+                    batched_double_layer::assemble::<128>(
                         output,
                         &laplace_3d::Laplace3dKernel::new(),
                         trial_space,
