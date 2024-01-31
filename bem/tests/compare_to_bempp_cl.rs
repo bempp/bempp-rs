@@ -44,6 +44,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 
 /*
 
+
 #[test]
 fn test_laplace_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -58,8 +59,14 @@ fn test_laplace_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::DoubleLayer,
-             PDEType::Laplace, &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::DoubleLayer,
+        PDEType::Laplace,
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -86,8 +93,14 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::AdjointDoubleLayer,
-             PDEType::Laplace, &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::AdjointDoubleLayer,
+        PDEType::Laplace,
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -114,8 +127,14 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::Hypersingular,
-             PDEType::Laplace, &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::Hypersingular,
+        PDEType::Laplace,
+        &space,
+        &space,
+    );
 
     for i in 0..ndofs {
         for j in 0..ndofs {
@@ -138,8 +157,14 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::Hypersingular,
-             PDEType::Laplace, &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::Hypersingular,
+        PDEType::Laplace,
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -172,8 +197,14 @@ fn test_helmholtz_single_layer_real_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::SingleLayer,
-             PDEType::Helmholtz(3.0), &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::SingleLayer,
+        PDEType::Helmholtz(3.0),
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -199,8 +230,14 @@ fn test_helmholtz_single_layer_complex_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::SingleLayer,
-             PDEType::Helmholtz(3.0), &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::SingleLayer,
+        PDEType::Helmholtz(3.0),
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -227,8 +264,14 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::DoubleLayer,
-             PDEType::Helmholtz(3.0), &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::DoubleLayer,
+        PDEType::Helmholtz(3.0),
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -256,8 +299,14 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::AdjointDoubleLayer,
-             PDEType::Helmholtz(3.0), &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::AdjointDoubleLayer,
+        PDEType::Helmholtz(3.0),
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -285,8 +334,14 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::Hypersingular,
-             PDEType::Helmholtz(3.0), &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::Hypersingular,
+        PDEType::Helmholtz(3.0),
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
