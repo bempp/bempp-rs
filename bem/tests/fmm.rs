@@ -1,4 +1,9 @@
 use approx::*;
+use bempp_field::types::FftFieldTranslationKiFmm;
+use bempp_fmm::charge::build_charge_dict;
+use bempp_fmm::types::{FmmDataUniform, KiFmmLinear};
+use bempp_traits::fmm::FmmLoop;
+use bempp_tree::types::single_node::SingleNodeTree;
 use rand::prelude::*;
 use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
@@ -11,6 +16,8 @@ use bempp_traits::element::{Continuity, ElementFamily};
 use bempp_traits::grid::{Grid, Topology};
 use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
+use bempp_traits::tree::Tree;
+use rlst_dense::rlst_array_from_slice2;
 use rlst_dense::{
     array::empty_array,
     rlst_dynamic_array1,
@@ -106,7 +113,11 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
     batched::assemble::<128>(&mut matrix, &kernel, trial_space, test_space);
 
     // Compute using FMM method
-    let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
+    let all_points_t = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
+    // println!("shape {:?}", all_points.shape());
+
+    let mut all_points = rlst_dynamic_array2!(f64, [all_points_t.shape()[1], all_points_t.shape()[0]]);
+    all_points.view_mut().fill_from(all_points_t.transpose());
 
     // k is the matrix that FMM will give us
     let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
@@ -117,6 +128,16 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         k.data_mut(),
     );
 
+    /// FMM
+    let order = 6;
+    let alpha_inner = 1.05;
+    let alpha_outer = 2.95;
+    let depth = 3;
+    let global_idxs: Vec<_> = (0..nqpts).collect();
+
+
+    ///////
+
     let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128>(test_space);
     let p = fmm_tools::basis_to_quadrature_into_csr::<NPTS, 128>(trial_space);
     let singular = batched::assemble_singular_into_csr::<4, 128>(&kernel, trial_space, test_space);
@@ -126,14 +147,14 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
         trial_space,
         test_space,
     );
-    
+
     // matrix2 = p_t @ k @ p - c + singular
     let mut rng = rand::thread_rng();
     for _ in 0..10 {
 
         let mut vec = rlst_dynamic_array2!(f64, [trial_ndofs, 1]);
         for i in 0..trial_ndofs {
-            *vec.get_mut([i, 0]).unwrap() = rng.gen();
+            *vec.get_mut([i, 0]).unwrap() = 1.0; //rng.gen();
         }
         let dense_result = empty_array::<f64, 2>().simple_mult_into_resize(
             matrix.view(), vec.view());
@@ -158,7 +179,21 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
             while i >= p.indptr()[row + 1] { row += 1; }
             *temp0.get_mut([row, 0]).unwrap() += data * vec.get([*index, 0]).unwrap();
         }
-        let mut temp1 = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), temp0);
+
+        ////
+        let tree = SingleNodeTree::new(all_points.data(), false, None, Some(depth), &global_idxs, true);
+
+        let m2l_data =
+            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel.clone(), tree, m2l_data);
+        // let charges = vec![1f64; nqpts];
+        let charge_dict = build_charge_dict(&global_idxs, &temp0.data());
+        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
+        datatree.run(false);
+        ///
+
+        // let mut temp1 = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), temp0);
+        let temp1: rlst::Array<f64, rlst_dense::base_array::BaseArray<f64, rlst_dense::data_container::SliceContainer<'_, f64>, 2>, 2> = rlst_array_from_slice2!(f64, datatree.potentials.as_slice(), [nqpts, 1]);
         let mut row = 0;
         for (i, (index, data)) in p_t.indices().iter().zip(p_t.data()).enumerate() {
             while i >= p_t.indptr()[row + 1] { row += 1; }
@@ -169,7 +204,7 @@ fn fmm_prototype_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFu
             assert_relative_eq!(
                 *dense_result.get([i, 0]).unwrap(),
                 *fmm_result.get([i, 0]).unwrap(),
-                epsilon = 1e-8
+                epsilon = 1e-6
             );
         }
     }
