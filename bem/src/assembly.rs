@@ -23,33 +23,41 @@ pub enum PDEType {
     Helmholtz(f64),
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(u8)]
+pub enum AssemblyType {
+    Dense,
+}
+
 /// Assemble an operator into a dense matrix using batched parallelisation
-pub fn assemble_batched<'a>(
-    // TODO: ouput should be `&mut impl ArrayAccess2D` once such a trait exists
+pub fn assemble<'a>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    atype: AssemblyType,
     operator: BoundaryOperator,
     pde: PDEType,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
 ) {
-    match pde {
-        PDEType::Laplace => match operator {
-            BoundaryOperator::SingleLayer => {
-                batched::assemble::<128>(
-                    output,
-                    &laplace_3d::Laplace3dKernel::new(),
-                    trial_space,
-                    test_space,
-                );
-            }
+    match atype {
+        AssemblyType::Dense => match pde {
+            PDEType::Laplace => match operator {
+                BoundaryOperator::SingleLayer => {
+                    batched::assemble::<128>(
+                        output,
+                        &laplace_3d::Laplace3dKernel::new(),
+                        trial_space,
+                        test_space,
+                    );
+                }
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
             _ => {
-                panic!("Invalid operator");
+                panic!("Invalid PDE");
             }
         },
-        _ => {
-            panic!("Invalid PDE");
-        }
-    };
+    }
 }
 
 #[cfg(test)]
@@ -97,8 +105,9 @@ mod test {
             [space1.dofmap().global_size(), space0.dofmap().global_size()]
         );
 
-        assemble_batched(
+        assemble(
             &mut matrix2,
+            AssemblyType::Dense,
             BoundaryOperator::SingleLayer,
             PDEType::Laplace,
             &space0,

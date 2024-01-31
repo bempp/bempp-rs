@@ -1,9 +1,8 @@
 use approx::*;
-use bempp_bem::assembly::batched;
+use bempp_bem::assembly::{assemble, AssemblyType, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
-use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, ElementFamily};
@@ -23,7 +22,14 @@ fn test_laplace_single_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    batched::assemble::<128>(&mut matrix, &Laplace3dKernel::new(), &space, &space);
+    assemble(
+        &mut matrix,
+        AssemblyType::Dense,
+        BoundaryOperator::SingleLayer,
+        PDEType::Laplace,
+        &space,
+        &space,
+    );
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -35,6 +41,7 @@ fn test_laplace_single_layer_dp0_dp0() {
         }
     }
 }
+
 /*
 
 #[test]
@@ -50,15 +57,9 @@ fn test_laplace_double_layer_dp0_dp0() {
 
     let ndofs = space.dofmap().global_size();
 
-    let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    batched::assemble(
-        &mut matrix,
-        &green::LaplaceGreenDyKernel {},
-        true,
-        false,
-        &space,
-        &space,
-    );
+    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::DoubleLayer,
+             PDEType::Laplace, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -66,7 +67,7 @@ fn test_laplace_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            assert_relative_eq!(*matrix.get([i, j]).unwrap(), entry, epsilon = 1e-4);
         }
     }
 }
@@ -85,14 +86,8 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    batched::assemble(
-        &mut matrix,
-        &green::LaplaceGreenDxKernel {},
-        false,
-        true,
-        &space,
-        &space,
-    );
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::AdjointDoubleLayer,
+             PDEType::Laplace, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -100,7 +95,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            assert_relative_eq!(*matrix.get([i, j]).unwrap(), entry, epsilon = 1e-4);
         }
     }
 }
@@ -119,11 +114,12 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    laplace_hypersingular_assemble(&mut matrix, &space, &space);
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::Hypersingular,
+             PDEType::Laplace, &space, &space);
 
     for i in 0..ndofs {
         for j in 0..ndofs {
-            assert_relative_eq!(*matrix.get(i, j).unwrap(), 0.0, epsilon = 1e-4);
+            assert_relative_eq!(*matrix.get([i, j]).unwrap(), 0.0, epsilon = 1e-4);
         }
     }
 }
@@ -142,8 +138,8 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-
-    laplace_hypersingular_assemble(&mut matrix, &space, &space);
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::Hypersingular,
+             PDEType::Laplace, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -154,7 +150,7 @@ fn test_laplace_hypersingular_p1_p1() {
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
-                *matrix.get(i, j).unwrap(),
+                *matrix.get([i, j]).unwrap(),
                 from_cl[*pi][*pj],
                 epsilon = 1e-4
             );
@@ -176,14 +172,8 @@ fn test_helmholtz_single_layer_real_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
-    batched::assemble(
-        &mut matrix,
-        &green::HelmholtzGreenKernel { k: 3.0 },
-        false,
-        false,
-        &space,
-        &space,
-    );
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::SingleLayer,
+             PDEType::Helmholtz(3.0), &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -191,7 +181,7 @@ fn test_helmholtz_single_layer_real_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(*matrix.get(i, j).unwrap(), entry, epsilon = 1e-4);
+            assert_relative_eq!(*matrix.get([i, j]).unwrap(), entry, epsilon = 1e-4);
         }
     }
 }
@@ -209,22 +199,16 @@ fn test_helmholtz_single_layer_complex_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    batched::assemble(
-        &mut matrix,
-        &green::HelmholtzGreenKernel { k: 3.0 },
-        false,
-        false,
-        &space,
-        &space,
-    );
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::SingleLayer,
+             PDEType::Helmholtz(3.0), &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
     let from_cl = vec![vec![Complex::new(0.08742460357596939, 0.11004203436820102), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.003720159902487029), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.023327911481921364, 0.04919102584271124), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.04211947809894265, 0.0037201599024870254)], vec![Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.04211947809894265, 0.0037201599024870254), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.03447046598405515, -0.028165446806261072)], vec![Complex::new(-0.04211947809894265, 0.003720159902487029), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820102), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.04211947809894265, 0.0037201599024870254), Complex::new(-0.023327911481921364, 0.04919102584271124), Complex::new(-0.042119478098942634, 0.003720159902487025)], vec![Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.03447046598405515, -0.028165446806261072), Complex::new(-0.04211947809894265, 0.0037201599024870254), Complex::new(-0.02332791148192136, 0.04919102584271125)], vec![Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(-0.04211947809894265, 0.0037201599024870267), Complex::new(-0.023327911481921364, 0.04919102584271125)], vec![Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.034470465984055156, -0.028165446806261075), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870237)], vec![Complex::new(-0.03447046598405515, -0.02816544680626108), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.04211947809894265, 0.0037201599024870267), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(0.08742460357596939, 0.11004203436820104), Complex::new(-0.02332791148192136, 0.04919102584271124)], vec![Complex::new(-0.04211947809894265, 0.0037201599024870263), Complex::new(-0.034470465984055156, -0.028165446806261075), Complex::new(-0.042119478098942634, 0.003720159902487025), Complex::new(-0.02332791148192136, 0.04919102584271125), Complex::new(-0.023327911481921364, 0.04919102584271125), Complex::new(-0.04211947809894265, 0.0037201599024870237), Complex::new(-0.02332791148192136, 0.04919102584271124), Complex::new(0.08742460357596939, 0.11004203436820104)]];
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
-            assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap().re, entry.re, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap().im, entry.im, epsilon = 1e-4);
         }
     }
 }
@@ -243,14 +227,8 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    batched::assemble(
-        &mut matrix,
-        &green::HelmholtzGreenDyKernel { k: 3.0 },
-        true,
-        false,
-        &space,
-        &space,
-    );
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::DoubleLayer,
+             PDEType::Helmholtz(3.0), &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -258,8 +236,8 @@ fn test_helmholtz_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
-            assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap().re, entry.re, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap().im, entry.im, epsilon = 1e-4);
         }
     }
 }
@@ -278,14 +256,8 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    batched::assemble(
-        &mut matrix,
-        &green::HelmholtzGreenDxKernel { k: 3.0 },
-        false,
-        true,
-        &space,
-        &space,
-    );
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::AdjointDoubleLayer,
+             PDEType::Helmholtz(3.0), &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -293,8 +265,8 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(matrix.get(i, j).unwrap().re, entry.re, epsilon = 1e-4);
-            assert_relative_eq!(matrix.get(i, j).unwrap().im, entry.im, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap().re, entry.re, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap().im, entry.im, epsilon = 1e-4);
         }
     }
 }
@@ -313,8 +285,8 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let ndofs = space.dofmap().global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-
-    helmholtz_hypersingular_assemble(&mut matrix, &space, &space, 3.0);
+    assemble(&mut matrix, AssemblyType::Dense, BoundaryOperator::Hypersingular,
+             PDEType::Helmholtz(3.0), &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -325,12 +297,12 @@ fn test_helmholtz_hypersingular_p1_p1() {
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
-                matrix.get(i, j).unwrap().re,
+                matrix.get([i, j]).unwrap().re,
                 from_cl[*pi][*pj].re,
                 epsilon = 1e-3
             );
             assert_relative_eq!(
-                matrix.get(i, j).unwrap().im,
+                matrix.get([i, j]).unwrap().im,
                 from_cl[*pi][*pj].im,
                 epsilon = 1e-3
             );
