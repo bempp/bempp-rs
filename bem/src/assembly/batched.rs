@@ -115,7 +115,7 @@ fn assemble_batch_singular<'a>(
     let test_evaluator = grid.geometry().get_evaluator(test_element, test_points);
     let trial_evaluator = grid.geometry().get_evaluator(trial_element, trial_points);
 
-    for (trial_cell, test_cell) in cell_pairs {
+    for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
         let test_cell_gindex = grid.geometry().index_map()[*test_cell];
         let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
@@ -364,7 +364,7 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
     let mut sum: f64;
     let mut trial_integrands = [0.0; NPTS_TRIAL];
 
-    for (trial_cell, test_cell) in cell_pairs {
+    for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
         let test_cell_gindex = grid.geometry().index_map()[*test_cell];
 
@@ -709,16 +709,16 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
             let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
             let mut pairs = vec![];
-            for (test_i, test_v) in test_vertices.iter().enumerate() {
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+            for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                for (test_i, test_v) in test_vertices.iter().enumerate() {
                     if test_v == trial_v {
-                        pairs.push((trial_i, test_i));
+                        pairs.push((test_i, trial_i));
                     }
                 }
             }
             if !pairs.is_empty() {
                 cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
-                    .push((trial_cell, test_cell))
+                    .push((test_cell, trial_cell))
             }
         }
     }
@@ -882,15 +882,15 @@ fn assemble_singular_correction<
             let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
             let mut pairs = vec![];
-            for (test_i, test_v) in test_vertices.iter().enumerate() {
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+            for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                for (test_i, test_v) in test_vertices.iter().enumerate() {
                     if test_v == trial_v {
-                        pairs.push((trial_i, test_i));
+                        pairs.push((test_i, trial_i));
                     }
                 }
             }
             if !pairs.is_empty() {
-                cell_pairs.push((trial_cell, test_cell))
+                cell_pairs.push((test_cell, trial_cell))
             }
         }
     }

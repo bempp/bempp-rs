@@ -100,7 +100,8 @@ fn assemble_batch_singular<'a>(
     let grid = test_space.grid();
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut k = rlst_dynamic_array2!(f64, [npts, 4]);
+    let mut k = rlst_dynamic_array2!(f64, [4, npts]);
+    let mut k2 = rlst_dynamic_array2!(f64, [1, npts]);
     let mut test_jdet = vec![0.0; npts];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [npts, 3]);
@@ -115,7 +116,7 @@ fn assemble_batch_singular<'a>(
     let test_evaluator = grid.geometry().get_evaluator(test_element, test_points);
     let trial_evaluator = grid.geometry().get_evaluator(trial_element, trial_points);
 
-    for (trial_cell, test_cell) in cell_pairs {
+    for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
         let test_cell_gindex = grid.geometry().index_map()[*test_cell];
         let trial_cell_tindex = grid.topology().index_map()[*trial_cell];
@@ -134,6 +135,13 @@ fn assemble_batch_singular<'a>(
             &mut trial_jdet,
         );
         trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
+
+        kernel.assemble_diagonal_st(
+            EvalType::Value,
+            test_mapped_pts.data(),
+            trial_mapped_pts.data(),
+            k2.data_mut(),
+        );
 
         kernel.assemble_diagonal_st(
             EvalType::ValueDeriv,
@@ -161,14 +169,14 @@ fn assemble_batch_singular<'a>(
                 for (index, wt) in weights.iter().enumerate() {
                     unsafe {
                         sum += (
-                            k.get_unchecked([index, 1]) * trial_normals.get_unchecked([index, 0])
-                            + k.get_unchecked([index, 2]) * trial_normals.get_unchecked([index, 1])
-                            + k.get_unchecked([index, 3]) * trial_normals.get_unchecked([index, 2])
-                        ) * (wt
+                            k.get_unchecked([1, index]) * trial_normals.get_unchecked([index, 0])
+                            + k.get_unchecked([2, index]) * trial_normals.get_unchecked([index, 1])
+                            + k.get_unchecked([3, index]) * trial_normals.get_unchecked([index, 2])
+                        ) * wt
                             * test_table.get_unchecked([0, index, test_i, 0])
                             * test_jdet.get_unchecked(index)
                             * trial_table.get_unchecked([0, index, trial_i, 0])
-                            * trial_jdet.get_unchecked(index));
+                            * trial_jdet.get_unchecked(index);
                     }
                 }
                 output.rows.push(*test_dof);
@@ -205,7 +213,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let trial_grid = trial_space.grid();
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
 
-    let mut k = rlst_dynamic_array3!(f64, [4, NPTS_TEST, NPTS_TRIAL]);
+    let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, 4, NPTS_TRIAL]);
     let mut test_jdet = [0.0; NPTS_TEST];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -308,35 +316,15 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                         for trial_index in 0..NPTS_TRIAL {
                             unsafe {
                                 sum += (
-                                    k.get_unchecked([1, test_index, trial_index]) * trial_normals[*trial_cell].get_unchecked([trial_index, 0])
-                                    + k.get_unchecked([2, test_index, trial_index]) * trial_normals[*trial_cell].get_unchecked([trial_index, 1])
-                                    + k.get_unchecked([3, test_index, trial_index]) * trial_normals[*trial_cell].get_unchecked([trial_index, 2])
+                                    k.get_unchecked([test_index, 1, trial_index]) * trial_normals[trial_cell_i].get_unchecked([trial_index, 0])
+                                    + k.get_unchecked([test_index, 2, trial_index]) * trial_normals[trial_cell_i].get_unchecked([trial_index, 1])
+                                    + k.get_unchecked([test_index, 3, trial_index]) * trial_normals[trial_cell_i].get_unchecked([trial_index, 2])
                                 )
                                     * test_integrand
                                     * trial_integrands.get_unchecked(trial_index);
                             }
                         }
                     }
-                    let mut sum2 = 0.0;
-                    for (test_index, test_wt) in test_weights.iter().enumerate() {
-                        let test_integrand = unsafe {
-                            test_wt
-                                * test_jdet[test_index]
-                                * test_table.get_unchecked([0, test_index, test_i, 0])
-                        };
-                        for trial_index in 0..NPTS_TRIAL {
-                            unsafe {
-                                sum2 += (
-                                    k.data()[1 + 4 * (test_index + NPTS_TRIAL * trial_index)] * trial_normals[*trial_cell].get_unchecked([trial_index, 0])
-                                    + k.data()[2 + 4 * (test_index + NPTS_TRIAL * trial_index)] * trial_normals[*trial_cell].get_unchecked([trial_index, 1])
-                                    + k.data()[3 + 4 * (test_index + NPTS_TRIAL * trial_index)] * trial_normals[*trial_cell].get_unchecked([trial_index, 2])
-                                )
-                                    * test_integrand
-                                    * trial_integrands.get_unchecked(trial_index);
-                            }
-                        }
-                    }
-                    println!("{sum} {sum2}");
                     // TODO: should we write into a result array, then copy into output after this loop?
                     unsafe {
                         *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
@@ -373,7 +361,7 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
 
     let grid = test_space.grid();
 
-    let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, NPTS_TRIAL, 4]);
+    let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, 4, NPTS_TRIAL]);
     let mut test_jdet = [0.0; NPTS_TEST];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -391,7 +379,7 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
     let mut sum: f64;
     let mut trial_integrands = [0.0; NPTS_TRIAL];
 
-    for (trial_cell, test_cell) in cell_pairs {
+    for (test_cell, trial_cell) in cell_pairs {
         let test_cell_tindex = grid.topology().index_map()[*test_cell];
         let test_cell_gindex = grid.geometry().index_map()[*test_cell];
 
@@ -450,9 +438,9 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
                     for trial_index in 0..NPTS_TRIAL {
                         unsafe {
                         sum += (
-                            k.get_unchecked([test_index, trial_index, 1]) * trial_normals.get_unchecked([trial_index, 0])
-                            + k.get_unchecked([test_index, trial_index, 2]) * trial_normals.get_unchecked([trial_index, 1])
-                            + k.get_unchecked([test_index, trial_index, 3]) * trial_normals.get_unchecked([trial_index, 2])
+                            k.get_unchecked([test_index, 1, trial_index]) * trial_normals.get_unchecked([trial_index, 0])
+                            + k.get_unchecked([test_index, 2, trial_index]) * trial_normals.get_unchecked([trial_index, 1])
+                            + k.get_unchecked([test_index, 3, trial_index]) * trial_normals.get_unchecked([trial_index, 2])
                         )
                                 * test_integrand
                                 * trial_integrands.get_unchecked(trial_index);
@@ -485,7 +473,8 @@ pub fn assemble<'a, const BLOCKSIZE: usize>(
         &trial_colouring,
         &test_colouring,
     );
-//    assemble_singular_into_dense::<4, BLOCKSIZE>(output, kernel, trial_space, test_space);
+    assemble_singular_into_dense::<4, BLOCKSIZE>(output, kernel, trial_space, test_space);
+    // assemble_singular_into_dense::<1, BLOCKSIZE>(output, kernel, trial_space, test_space);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -740,16 +729,16 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
             let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
             let mut pairs = vec![];
-            for (test_i, test_v) in test_vertices.iter().enumerate() {
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+            for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                for (test_i, test_v) in test_vertices.iter().enumerate() {
                     if test_v == trial_v {
-                        pairs.push((trial_i, test_i));
+                        pairs.push((test_i, trial_i));
                     }
                 }
             }
             if !pairs.is_empty() {
                 cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
-                    .push((trial_cell, test_cell))
+                    .push((test_cell, trial_cell))
             }
         }
     }
@@ -913,15 +902,15 @@ fn assemble_singular_correction<
             let trial_vertices = c20.row(trial_cell_tindex).unwrap();
 
             let mut pairs = vec![];
-            for (test_i, test_v) in test_vertices.iter().enumerate() {
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+            for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                for (test_i, test_v) in test_vertices.iter().enumerate() {
                     if test_v == trial_v {
-                        pairs.push((trial_i, test_i));
+                        pairs.push((test_i, trial_i));
                     }
                 }
             }
             if !pairs.is_empty() {
-                cell_pairs.push((trial_cell, test_cell))
+                cell_pairs.push((test_cell, trial_cell))
             }
         }
     }

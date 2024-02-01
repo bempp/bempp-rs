@@ -71,12 +71,6 @@ fn test_laplace_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            println!("{} {}", *matrix.get([i, j]).unwrap(), entry);
-        }
-        println!();
-    }
-    for (i, row) in from_cl.iter().enumerate() {
-        for (j, entry) in row.iter().enumerate() {
             assert_relative_eq!(*matrix.get([i, j]).unwrap(), entry, epsilon = 1e-4);
         }
     }
