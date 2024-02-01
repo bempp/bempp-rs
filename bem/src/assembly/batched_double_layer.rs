@@ -101,7 +101,6 @@ fn assemble_batch_singular<'a>(
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut k = rlst_dynamic_array2!(f64, [4, npts]);
-    let mut k2 = rlst_dynamic_array2!(f64, [1, npts]);
     let mut test_jdet = vec![0.0; npts];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [npts, 3]);
@@ -135,13 +134,6 @@ fn assemble_batch_singular<'a>(
             &mut trial_jdet,
         );
         trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
-
-        kernel.assemble_diagonal_st(
-            EvalType::Value,
-            test_mapped_pts.data(),
-            trial_mapped_pts.data(),
-            k2.data_mut(),
-        );
 
         kernel.assemble_diagonal_st(
             EvalType::ValueDeriv,
@@ -480,7 +472,6 @@ pub fn assemble<'a, const BLOCKSIZE: usize>(
         &test_colouring,
     );
     assemble_singular_into_dense::<4, BLOCKSIZE>(output, kernel, trial_space, test_space);
-    // assemble_singular_into_dense::<1, BLOCKSIZE>(output, kernel, trial_space, test_space);
 }
 
 #[allow(clippy::too_many_arguments)]

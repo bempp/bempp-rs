@@ -16,7 +16,7 @@ use rlst_dense::{
     array::Array,
     base_array::BaseArray,
     data_container::VectorContainer,
-    rlst_dynamic_array2, rlst_dynamic_array4,
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4,
     traits::{RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef},
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
@@ -100,7 +100,7 @@ fn assemble_batch_singular<'a>(
     let grid = test_space.grid();
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
-    let mut k = vec![0.0; npts];
+    let mut k = rlst_dynamic_array2!(f64, [1, npts]);
     let mut test_jdet = vec![0.0; npts];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [npts, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [npts, 3]);
@@ -139,7 +139,7 @@ fn assemble_batch_singular<'a>(
             EvalType::Value,
             test_mapped_pts.data(),
             trial_mapped_pts.data(),
-            &mut k,
+            k.data_mut(),
         );
 
         for (test_i, test_dof) in test_space
@@ -160,12 +160,12 @@ fn assemble_batch_singular<'a>(
 
                 for (index, wt) in weights.iter().enumerate() {
                     unsafe {
-                        sum += k.get_unchecked(index)
-                            * (wt
-                                * test_table.get_unchecked([0, index, test_i, 0])
-                                * test_jdet.get_unchecked(index)
-                                * trial_table.get_unchecked([0, index, trial_i, 0])
-                                * trial_jdet.get_unchecked(index));
+                        sum += k.get_unchecked([0, index])
+                            * wt
+                            * test_table.get_unchecked([0, index, test_i, 0])
+                            * test_jdet.get_unchecked(index)
+                            * trial_table.get_unchecked([0, index, trial_i, 0])
+                            * trial_jdet.get_unchecked(index);
                     }
                 }
                 output.rows.push(*test_dof);
@@ -202,7 +202,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let trial_grid = trial_space.grid();
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
 
-    let mut k = rlst_dynamic_array2!(f64, [NPTS_TEST, NPTS_TRIAL]);
+    let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, 1, NPTS_TRIAL]);
     let mut test_jdet = [0.0; NPTS_TEST];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -304,7 +304,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                         };
                         for trial_index in 0..NPTS_TRIAL {
                             unsafe {
-                                sum += k.get_unchecked([test_index, trial_index])
+                                sum += k.get_unchecked([test_index, 0, trial_index])
                                     * test_integrand
                                     * trial_integrands.get_unchecked(trial_index);
                             }
@@ -346,7 +346,7 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
 
     let grid = test_space.grid();
 
-    let mut k = rlst_dynamic_array2!(f64, [NPTS_TEST, NPTS_TRIAL]);
+    let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, 1, NPTS_TRIAL]);
     let mut test_jdet = [0.0; NPTS_TEST];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -422,7 +422,7 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
                     };
                     for trial_index in 0..NPTS_TRIAL {
                         unsafe {
-                            sum += k.get_unchecked([test_index, trial_index])
+                            sum += k.get_unchecked([test_index, 0, trial_index])
                                 * test_integrand
                                 * trial_integrands.get_unchecked(trial_index);
                         }
