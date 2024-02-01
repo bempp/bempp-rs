@@ -76,8 +76,6 @@ fn test_laplace_double_layer_dp0_dp0() {
     }
 }
 
-/*
-
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -91,7 +89,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
 
     let ndofs = space.dofmap().global_size();
 
-    let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
+    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
         &mut matrix,
         AssemblyType::Dense,
@@ -112,6 +110,8 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     }
 }
 
+/*
+
 #[test]
 fn test_laplace_hypersingular_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -125,7 +125,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
 
     let ndofs = space.dofmap().global_size();
 
-    let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
+    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
         &mut matrix,
         AssemblyType::Dense,
@@ -155,7 +155,7 @@ fn test_laplace_hypersingular_p1_p1() {
 
     let ndofs = space.dofmap().global_size();
 
-    let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
+    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
         &mut matrix,
         AssemblyType::Dense,
@@ -195,7 +195,7 @@ fn test_helmholtz_single_layer_real_dp0_dp0() {
 
     let ndofs = space.dofmap().global_size();
 
-    let mut matrix = Array2D::<f64>::new([ndofs, ndofs]);
+    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
         &mut matrix,
         AssemblyType::Dense,

@@ -81,6 +81,30 @@ unsafe fn nonsingular_double_layer_kernel_value(
             * *trial_normals.get_unchecked([trial_index, 2])
 }
 
+unsafe fn singular_adjoint_double_layer_kernel_value(
+    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    index: usize,
+) -> f64 {
+    -*k.get_unchecked([1, index]) * *test_normals.get_unchecked([index, 0])
+        - *k.get_unchecked([2, index]) * *test_normals.get_unchecked([index, 1])
+        - *k.get_unchecked([3, index]) * *test_normals.get_unchecked([index, 2])
+}
+unsafe fn nonsingular_adjoint_double_layer_kernel_value(
+    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
+    test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+    test_index: usize,
+    trial_index: usize,
+) -> f64 {
+    -*k.get_unchecked([test_index, 1, trial_index]) * *test_normals.get_unchecked([test_index, 0])
+        - *k.get_unchecked([test_index, 2, trial_index])
+            * *test_normals.get_unchecked([test_index, 1])
+        - *k.get_unchecked([test_index, 3, trial_index])
+            * *test_normals.get_unchecked([test_index, 2])
+}
+
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
     trial_celltype: ReferenceCellType,
@@ -608,6 +632,10 @@ fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
             EvalType::ValueDeriv,
             singular_double_layer_kernel_value as SingularKernelValueFunction,
         ),
+        BoundaryOperator::AdjointDoubleLayer => (
+            EvalType::ValueDeriv,
+            singular_adjoint_double_layer_kernel_value as SingularKernelValueFunction,
+        ),
         _ => {
             panic!("Unsupported operator.");
         }
@@ -848,6 +876,10 @@ fn assemble_singular_correction<
             EvalType::ValueDeriv,
             nonsingular_double_layer_kernel_value as NonSingularKernelValueFunction,
         ),
+        BoundaryOperator::AdjointDoubleLayer => (
+            EvalType::ValueDeriv,
+            nonsingular_adjoint_double_layer_kernel_value as NonSingularKernelValueFunction,
+        ),
         _ => {
             panic!("Unsupported operator.");
         }
@@ -1004,6 +1036,10 @@ pub fn assemble_nonsingular_into_dense<
         BoundaryOperator::DoubleLayer => (
             EvalType::ValueDeriv,
             nonsingular_double_layer_kernel_value as NonSingularKernelValueFunction,
+        ),
+        BoundaryOperator::AdjointDoubleLayer => (
+            EvalType::ValueDeriv,
+            nonsingular_adjoint_double_layer_kernel_value as NonSingularKernelValueFunction,
         ),
         _ => {
             panic!("Unsupported operator.");
