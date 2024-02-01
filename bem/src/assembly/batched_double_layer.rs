@@ -168,11 +168,13 @@ fn assemble_batch_singular<'a>(
 
                 for (index, wt) in weights.iter().enumerate() {
                     unsafe {
-                        sum += (
-                            k.get_unchecked([1, index]) * trial_normals.get_unchecked([index, 0])
-                            + k.get_unchecked([2, index]) * trial_normals.get_unchecked([index, 1])
-                            + k.get_unchecked([3, index]) * trial_normals.get_unchecked([index, 2])
-                        ) * wt
+                        sum += (k.get_unchecked([1, index])
+                            * trial_normals.get_unchecked([index, 0])
+                            + k.get_unchecked([2, index])
+                                * trial_normals.get_unchecked([index, 1])
+                            + k.get_unchecked([3, index])
+                                * trial_normals.get_unchecked([index, 2]))
+                            * wt
                             * test_table.get_unchecked([0, index, test_i, 0])
                             * test_jdet.get_unchecked(index)
                             * trial_table.get_unchecked([0, index, trial_i, 0])
@@ -315,11 +317,14 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                         };
                         for trial_index in 0..NPTS_TRIAL {
                             unsafe {
-                                sum += (
-                                    k.get_unchecked([test_index, 1, trial_index]) * trial_normals[trial_cell_i].get_unchecked([trial_index, 0])
-                                    + k.get_unchecked([test_index, 2, trial_index]) * trial_normals[trial_cell_i].get_unchecked([trial_index, 1])
-                                    + k.get_unchecked([test_index, 3, trial_index]) * trial_normals[trial_cell_i].get_unchecked([trial_index, 2])
-                                )
+                                sum += (k.get_unchecked([test_index, 1, trial_index])
+                                    * trial_normals[trial_cell_i].get_unchecked([trial_index, 0])
+                                    + k.get_unchecked([test_index, 2, trial_index])
+                                        * trial_normals[trial_cell_i]
+                                            .get_unchecked([trial_index, 1])
+                                    + k.get_unchecked([test_index, 3, trial_index])
+                                        * trial_normals[trial_cell_i]
+                                            .get_unchecked([trial_index, 2]))
                                     * test_integrand
                                     * trial_integrands.get_unchecked(trial_index);
                             }
@@ -437,11 +442,12 @@ fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRI
                     };
                     for trial_index in 0..NPTS_TRIAL {
                         unsafe {
-                        sum += (
-                            k.get_unchecked([test_index, 1, trial_index]) * trial_normals.get_unchecked([trial_index, 0])
-                            + k.get_unchecked([test_index, 2, trial_index]) * trial_normals.get_unchecked([trial_index, 1])
-                            + k.get_unchecked([test_index, 3, trial_index]) * trial_normals.get_unchecked([trial_index, 2])
-                        )
+                            sum += (k.get_unchecked([test_index, 1, trial_index])
+                                * trial_normals.get_unchecked([trial_index, 0])
+                                + k.get_unchecked([test_index, 2, trial_index])
+                                    * trial_normals.get_unchecked([trial_index, 1])
+                                + k.get_unchecked([test_index, 3, trial_index])
+                                    * trial_normals.get_unchecked([trial_index, 2]))
                                 * test_integrand
                                 * trial_integrands.get_unchecked(trial_index);
                         }
