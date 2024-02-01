@@ -205,7 +205,7 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
     let trial_grid = trial_space.grid();
     let trial_c20 = trial_grid.topology().connectivity(2, 0);
 
-    let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, NPTS_TRIAL, 4]);
+    let mut k = rlst_dynamic_array3!(f64, [4, NPTS_TEST, NPTS_TRIAL]);
     let mut test_jdet = [0.0; NPTS_TEST];
     let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
     let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -307,16 +307,36 @@ fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usiz
                         };
                         for trial_index in 0..NPTS_TRIAL {
                             unsafe {
-                        sum += (
-                            k.get_unchecked([test_index, trial_index, 1]) * trial_normals[*trial_cell].get_unchecked([trial_index, 0])
-                            + k.get_unchecked([test_index, trial_index, 2]) * trial_normals[*trial_cell].get_unchecked([trial_index, 1])
-                            + k.get_unchecked([test_index, trial_index, 3]) * trial_normals[*trial_cell].get_unchecked([trial_index, 2])
-                        )
+                                sum += (
+                                    k.get_unchecked([1, test_index, trial_index]) * trial_normals[*trial_cell].get_unchecked([trial_index, 0])
+                                    + k.get_unchecked([2, test_index, trial_index]) * trial_normals[*trial_cell].get_unchecked([trial_index, 1])
+                                    + k.get_unchecked([3, test_index, trial_index]) * trial_normals[*trial_cell].get_unchecked([trial_index, 2])
+                                )
                                     * test_integrand
                                     * trial_integrands.get_unchecked(trial_index);
                             }
                         }
                     }
+                    let mut sum2 = 0.0;
+                    for (test_index, test_wt) in test_weights.iter().enumerate() {
+                        let test_integrand = unsafe {
+                            test_wt
+                                * test_jdet[test_index]
+                                * test_table.get_unchecked([0, test_index, test_i, 0])
+                        };
+                        for trial_index in 0..NPTS_TRIAL {
+                            unsafe {
+                                sum2 += (
+                                    k.data()[1 + 4 * (test_index + NPTS_TRIAL * trial_index)] * trial_normals[*trial_cell].get_unchecked([trial_index, 0])
+                                    + k.data()[2 + 4 * (test_index + NPTS_TRIAL * trial_index)] * trial_normals[*trial_cell].get_unchecked([trial_index, 1])
+                                    + k.data()[3 + 4 * (test_index + NPTS_TRIAL * trial_index)] * trial_normals[*trial_cell].get_unchecked([trial_index, 2])
+                                )
+                                    * test_integrand
+                                    * trial_integrands.get_unchecked(trial_index);
+                            }
+                        }
+                    }
+                    println!("{sum} {sum2}");
                     // TODO: should we write into a result array, then copy into output after this loop?
                     unsafe {
                         *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
@@ -465,7 +485,7 @@ pub fn assemble<'a, const BLOCKSIZE: usize>(
         &trial_colouring,
         &test_colouring,
     );
-    assemble_singular_into_dense::<4, BLOCKSIZE>(output, kernel, trial_space, test_space);
+//    assemble_singular_into_dense::<4, BLOCKSIZE>(output, kernel, trial_space, test_space);
 }
 
 #[allow(clippy::too_many_arguments)]
