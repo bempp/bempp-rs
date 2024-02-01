@@ -1,9 +1,7 @@
 pub mod batched;
-pub mod batched_double_layer;
 pub mod common;
 pub mod fmm_tools;
 use crate::function_space::SerialFunctionSpace;
-use bempp_kernel::laplace_3d;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -40,32 +38,9 @@ pub fn assemble<'a>(
     test_space: &SerialFunctionSpace<'a>,
 ) {
     match atype {
-        AssemblyType::Dense => match pde {
-            PDEType::Laplace => match operator {
-                BoundaryOperator::SingleLayer => {
-                    batched::assemble::<128>(
-                        output,
-                        &laplace_3d::Laplace3dKernel::new(),
-                        trial_space,
-                        test_space,
-                    );
-                }
-                BoundaryOperator::DoubleLayer => {
-                    batched_double_layer::assemble::<128>(
-                        output,
-                        &laplace_3d::Laplace3dKernel::new(),
-                        trial_space,
-                        test_space,
-                    );
-                }
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            _ => {
-                panic!("Invalid PDE");
-            }
-        },
+        AssemblyType::Dense => {
+            batched::assemble_into_dense::<128>(output, operator, pde, trial_space, test_space)
+        }
     }
 }
 
@@ -77,7 +52,6 @@ mod test {
     use approx::*;
     use bempp_element::element::create_element;
     use bempp_grid::shapes::regular_sphere;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_traits::bem::DofMap;
     use bempp_traits::cell::ReferenceCellType;
     use bempp_traits::element::{Continuity, ElementFamily};
@@ -107,7 +81,13 @@ mod test {
             f64,
             [space1.dofmap().global_size(), space0.dofmap().global_size()]
         );
-        batched::assemble::<128>(&mut matrix, &Laplace3dKernel::new(), &space0, &space1);
+        batched::assemble_into_dense::<128>(
+            &mut matrix,
+            BoundaryOperator::SingleLayer,
+            PDEType::Laplace,
+            &space0,
+            &space1,
+        );
 
         let mut matrix2 = rlst_dynamic_array2!(
             f64,
