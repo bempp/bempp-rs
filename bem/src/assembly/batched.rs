@@ -997,12 +997,17 @@ pub fn assemble_into_dense<'a, const BLOCKSIZE: usize>(
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
 ) {
+    let test_colouring = test_space.compute_cell_colouring();
+    let trial_colouring = trial_space.compute_cell_colouring();
+
     assemble_nonsingular_into_dense::<16, 16, BLOCKSIZE>(
         output,
         operator,
         pde,
         trial_space,
         test_space,
+        &trial_colouring,
+        &test_colouring,
     );
     assemble_singular_into_dense::<4, BLOCKSIZE>(output, operator, pde, trial_space, test_space);
 }
@@ -1018,10 +1023,9 @@ pub fn assemble_nonsingular_into_dense<
     pde: PDEType,
     trial_space: &SerialFunctionSpace<'a>,
     test_space: &SerialFunctionSpace<'a>,
+    trial_colouring: &Vec<Vec<usize>>,
+    test_colouring: &Vec<Vec<usize>>,
 ) {
-    let test_colouring = test_space.compute_cell_colouring();
-    let trial_colouring = trial_space.compute_cell_colouring();
-
     let kernel = match pde {
         PDEType::Laplace => laplace_3d::Laplace3dKernel::new(),
         _ => {
@@ -1092,8 +1096,8 @@ pub fn assemble_nonsingular_into_dense<
         shape: output.shape(),
     };
 
-    for test_c in &test_colouring {
-        for trial_c in &trial_colouring {
+    for test_c in test_colouring {
+        for trial_c in trial_colouring {
             let mut test_cells: Vec<&[usize]> = vec![];
             let mut trial_cells: Vec<&[usize]> = vec![];
 

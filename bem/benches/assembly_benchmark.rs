@@ -1,8 +1,7 @@
-use bempp_bem::assembly::batched;
+use bempp_bem::assembly::{batched, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
-use bempp_kernel::laplace_3d;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
@@ -41,7 +40,8 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 b.iter(|| {
                     batched::assemble_singular_into_dense::<4, 128>(
                         &mut matrix,
-                        &laplace_3d::Laplace3dKernel::new(),
+                        BoundaryOperator::SingleLayer,
+                        PDEType::Laplace,
                         &space,
                         &space,
                     )
@@ -56,9 +56,10 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    batched::assemble_nonsingular::<16, 16, 128>(
+                    batched::assemble_nonsingular_into_dense::<16, 16, 128>(
                         &mut matrix,
-                        &laplace_3d::Laplace3dKernel::new(),
+                        BoundaryOperator::SingleLayer,
+                        PDEType::Laplace,
                         &space,
                         &space,
                         &colouring,
