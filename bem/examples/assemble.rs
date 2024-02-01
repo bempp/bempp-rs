@@ -1,4 +1,4 @@
-use bempp_bem::assembly::{assemble_batched, BoundaryOperator, PDEType};
+use bempp_bem::assembly::{assemble, AssemblyType, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
@@ -39,8 +39,9 @@ fn main() {
     );
 
     println!("Assembling dense matrix (complex)");
-    assemble_batched(
+    assemble(
         &mut matrix,
+        AssemblyType::Dense,
         BoundaryOperator::SingleLayer,
         PDEType::Laplace,
         &space0,
