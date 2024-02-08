@@ -36,6 +36,8 @@ fftw = {git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.*"
 approx = "0.5"
 rayon = "1.7"
+serde = "1.0.196"
+serde_json = "1.0.113"
 
 [dev-dependencies]
 approx_eq = "0.1.8"

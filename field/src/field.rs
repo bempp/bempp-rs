@@ -174,6 +174,10 @@ where
     }
 }
 
+
+use serde_json::{json, to_string_pretty};
+
+
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmRcmp<T, U>
 where
     T: Float + Default,
@@ -253,6 +257,17 @@ where
             )
             .unwrap();
 
+
+        // // Create a JSON object with the data
+        // let ncoeffs = self.ncoeffs(order);
+        // let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "sigma": sigma});
+
+        // // Convert the JSON object to a String
+        // let json_string = to_string_pretty(&json_data).unwrap();
+
+        // // Print the JSON string
+        // println!("{}", json_string);
+
         let mut u = rlst_dynamic_array2!(T, [mu, self.k]);
         let mut sigma_mat = rlst_dynamic_array2!(T, [self.k, self.k]);
         let mut vt = rlst_dynamic_array2!(T, [self.k, nvt]);
@@ -292,6 +307,8 @@ where
         let mut c_u = Vec::new();
         let mut c_vt = Vec::new();
 
+        let mut ranks = Vec::new();
+
         for i in 0..self.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [self.k, ncols]);
 
@@ -308,6 +325,8 @@ where
                 .unwrap();
 
             let rank = retain_energy(&sigma_i, self.threshold);
+
+            ranks.push(rank);
 
             let mut u_i_compressed = rlst_dynamic_array2!(T, [self.k, rank]);
             let mut vt_i_compressed_ = rlst_dynamic_array2!(T, [rank, self.k]);
@@ -332,6 +351,15 @@ where
 
         let mut st_block = rlst_dynamic_array2!(T, [self.k, nst]);
         st_block.fill_from(s_block.transpose());
+
+        let ncoeffs = self.ncoeffs(order);
+        let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "ranks": ranks});
+
+        // Convert the JSON object to a String
+        let json_string = to_string_pretty(&json_data).unwrap();
+
+        // Print the JSON string
+        println!("{}", json_string);
 
         SvdM2lOperatorDataRcmp {
             u,

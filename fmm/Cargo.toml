@@ -40,6 +40,7 @@ rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = { git = "https://github.com/skailasa/fftw.git" }
 rayon = "1.7"
+serde = "1.0.196"
 
 [[example]]
 name = "single_node_fft"
