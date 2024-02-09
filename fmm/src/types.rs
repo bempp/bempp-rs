@@ -215,6 +215,55 @@ where
 }
 
 /// Type to store data associated with the kernel independent (KiFMM) in.
+pub struct KiFmmLinearOverdetermined<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    /// The expansion order
+    pub order: usize,
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_1: C2EType<W>,
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_2: C2EType<W>,
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_1: C2EType<W>,
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_2: C2EType<W>,
+
+    /// The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    pub alpha_inner: W,
+
+    /// The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    pub alpha_outer: W,
+
+    /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
+    pub m2m: C2EType<W>,
+
+    /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
+    pub l2l: Vec<C2EType<W>>,
+
+    /// The tree (single or multi node) associated with this FMM
+    pub tree: T,
+
+    /// The kernel associated with this FMM.
+    pub kernel: U,
+
+    /// The M2L operator matrices, as well as metadata associated with this FMM.
+    pub m2l: V,
+}
+
+/// Type to store data associated with the kernel independent (KiFMM) in.
 pub struct KiFmmLinear<T, U, V, W>
 where
     T: Tree,

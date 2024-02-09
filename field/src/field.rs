@@ -353,7 +353,7 @@ where
         st_block.fill_from(s_block.transpose());
 
         let ncoeffs = self.ncoeffs(order);
-        let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "ranks": ranks});
+        let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "k": self.k ,"k_t": ranks});
 
         // Convert the JSON object to a String
         let json_string = to_string_pretty(&json_data).unwrap();

@@ -22,8 +22,209 @@ use bempp_traits::{
 
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
+use crate::types::{
+    FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix,
+    KiFmmLinearOverdetermined,
+};
 use crate::{pinv::pinv, types::KiFmmLinear};
+
+/// Implementation of constructor for single node KiFMM
+impl<T, U, V> KiFmmLinearOverdetermined<SingleNodeTree<V>, T, U, V>
+where
+    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
+    U: FieldTranslationData<T>,
+    V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
+    Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
+{
+    /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
+    /// the associated single node octree, and the associated kernel function.
+    ///
+    /// # Arguments
+    /// * `order` - The expansion order for the multipole and local expansions.
+    /// * `alpha_inner` - The ratio of the inner check surface diamater in comparison to the surface discretising a box.
+    /// * `alpha_order` - The ratio of the outer check surface diamater in comparison to the surface discretising a box.
+    /// * `kernel` - The kernel function for this FMM.
+    /// * `tree` - The type of tree associated with this FMM, can be single or multi node.
+    /// * `m2l` - The M2L operator matrices, as well as metadata associated with this FMM.
+    pub fn new(
+        order: usize,
+        alpha_inner: V,
+        alpha_outer: V,
+        kernel: T,
+        tree: SingleNodeTree<V>,
+        m2l: U,
+    ) -> Self {
+        let equivalent_order = order;
+        let check_order = order + 2;
+
+        let upward_equivalent_surface =
+            ROOT.compute_surface(tree.get_domain(), equivalent_order, alpha_inner);
+        let upward_check_surface =
+            ROOT.compute_surface(tree.get_domain(), check_order, alpha_outer);
+        let downward_equivalent_surface =
+            ROOT.compute_surface(tree.get_domain(), equivalent_order, alpha_outer);
+        let downward_check_surface =
+            ROOT.compute_surface(tree.get_domain(), check_order, alpha_inner);
+
+        let nequiv_surface = upward_equivalent_surface.len() / kernel.space_dimension();
+        let ncheck_surface = upward_check_surface.len() / kernel.space_dimension();
+
+        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
+        // as well as their inverses using DGESVD.
+        let mut uc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
+        kernel.assemble_st(
+            EvalType::Value,
+            &upward_equivalent_surface[..],
+            &upward_check_surface[..],
+            uc2e_t.data_mut(),
+        );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let mut uc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+        uc2e.fill_from(uc2e_t.transpose());
+
+        let mut dc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
+        kernel.assemble_st(
+            EvalType::Value,
+            &downward_equivalent_surface[..],
+            &downward_check_surface[..],
+            dc2e_t.data_mut(),
+        );
+
+        // Need to tranapose so that rows correspond to targets and columns to sources
+        let mut dc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+        dc2e.fill_from(dc2e_t.transpose());
+
+        let (s, ut, v) = pinv::<V>(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = V::from_real(s[i]);
+        }
+        let uc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+        let uc2e_inv_2 = ut;
+
+        let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = V::from_real(s[i]);
+        }
+
+        let dc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+        let dc2e_inv_2 = ut;
+
+        // Calculate M2M/L2L matrices
+        let children = ROOT.children();
+        let mut m2m = rlst_dynamic_array2!(V, [nequiv_surface, 8 * nequiv_surface]);
+        let mut l2l = Vec::new();
+
+        for (i, child) in children.iter().enumerate() {
+            let child_upward_equivalent_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
+            let child_downward_check_surface =
+                child.compute_surface(tree.get_domain(), order, alpha_inner);
+
+            let mut pc2ce_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
+
+            kernel.assemble_st(
+                EvalType::Value,
+                &child_upward_equivalent_surface,
+                &upward_check_surface,
+                pc2ce_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut pc2ce = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+            pc2ce.fill_from(pc2ce_t.transpose());
+
+            let tmp = empty_array::<V, 2>().simple_mult_into_resize(
+                uc2e_inv_1.view(),
+                empty_array::<V, 2>().simple_mult_into_resize(uc2e_inv_2.view(), pc2ce.view()),
+            );
+            let l = i * nequiv_surface * nequiv_surface;
+            let r = l + nequiv_surface * nequiv_surface;
+
+            m2m.data_mut()[l..r].copy_from_slice(tmp.data());
+
+            let mut cc2pe_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
+
+            kernel.assemble_st(
+                EvalType::Value,
+                &downward_equivalent_surface,
+                &child_downward_check_surface,
+                cc2pe_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut cc2pe = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
+            cc2pe.fill_from(cc2pe_t.transpose());
+            let mut tmp = empty_array::<V, 2>().simple_mult_into_resize(
+                dc2e_inv_1.view(),
+                empty_array::<V, 2>().simple_mult_into_resize(dc2e_inv_2.view(), cc2pe.view()),
+            );
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|d| *d *= kernel.scale(child.level()));
+
+            l2l.push(tmp);
+        }
+
+        Self {
+            order,
+            uc2e_inv_1,
+            uc2e_inv_2,
+            dc2e_inv_1,
+            dc2e_inv_2,
+            alpha_inner,
+            alpha_outer,
+            m2m,
+            l2l,
+            kernel,
+            tree,
+            m2l,
+        }
+    }
+}
+
+impl<T, U, V, W> KiFmmTrait for KiFmmLinearOverdetermined<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_inner
+    }
+
+    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
+        self.alpha_outer
+    }
+}
+
+impl<T, U, V, W> Fmm for KiFmmLinearOverdetermined<T, U, V, W>
+where
+    T: Tree,
+    U: Kernel<T = W>,
+    V: FieldTranslationData<U>,
+    W: Scalar + Float + Default,
+{
+    type Tree = T;
+    type Kernel = U;
+
+    fn order(&self) -> usize {
+        self.order
+    }
+
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
+
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
+    }
+}
 
 /// Implementation of constructor for single node KiFMM
 impl<T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
