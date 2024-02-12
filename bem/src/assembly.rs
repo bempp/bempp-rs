@@ -42,15 +42,15 @@ pub fn assemble<'a>(
         AssemblyType::Dense => match pde {
             PDEType::Laplace => match operator {
                 BoundaryOperator::SingleLayer => {
-                    let a = batched::LaplaceSingleLayerAssembler::new();
+                    let a = batched::LaplaceSingleLayerAssembler::default();
                     a.assemble_into_dense::<128>(output, trial_space, test_space)
                 }
                 BoundaryOperator::DoubleLayer => {
-                    let a = batched::LaplaceDoubleLayerAssembler::new();
+                    let a = batched::LaplaceDoubleLayerAssembler::default();
                     a.assemble_into_dense::<128>(output, trial_space, test_space)
                 }
                 BoundaryOperator::AdjointDoubleLayer => {
-                    let a = batched::LaplaceAdjointDoubleLayerAssembler::new();
+                    let a = batched::LaplaceAdjointDoubleLayerAssembler::default();
                     a.assemble_into_dense::<128>(output, trial_space, test_space)
                 }
                 _ => {
@@ -101,7 +101,7 @@ mod test {
             f64,
             [space1.dofmap().global_size(), space0.dofmap().global_size()]
         );
-        let a = batched::LaplaceSingleLayerAssembler::new();
+        let a = batched::LaplaceSingleLayerAssembler::default();
         a.assemble_into_dense::<128>(&mut matrix, &space0, &space1);
 
         let mut matrix2 = rlst_dynamic_array2!(

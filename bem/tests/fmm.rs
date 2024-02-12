@@ -42,7 +42,7 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let a = batched::LaplaceSingleLayerAssembler::new();
+    let a = batched::LaplaceSingleLayerAssembler::default();
     a.assemble_into_dense::<128>(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
@@ -112,7 +112,7 @@ fn fmm_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpac
     let kernel = Laplace3dKernel::new();
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let a = batched::LaplaceSingleLayerAssembler::new();
+    let a = batched::LaplaceSingleLayerAssembler::default();
     a.assemble_into_dense::<128>(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
