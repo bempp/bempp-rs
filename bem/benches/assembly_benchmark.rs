@@ -1,4 +1,4 @@
-use bempp_bem::assembly::{batched, BoundaryOperator, PDEType};
+use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::create_element;
 use bempp_grid::shapes::regular_sphere;
@@ -29,6 +29,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let colouring = space.compute_cell_colouring();
+        let a = batched::LaplaceSingleLayerAssembler::default();
 
         group.bench_function(
             &format!(
@@ -36,17 +37,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.dofmap().global_size(),
                 space.dofmap().global_size()
             ),
-            |b| {
-                b.iter(|| {
-                    batched::assemble_singular_into_dense::<4, 128>(
-                        &mut matrix,
-                        BoundaryOperator::SingleLayer,
-                        PDEType::Laplace,
-                        &space,
-                        &space,
-                    )
-                })
-            },
+            |b| b.iter(|| a.assemble_singular_into_dense::<4, 128>(&mut matrix, &space, &space)),
         );
         group.bench_function(
             &format!(
@@ -56,10 +47,8 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    batched::assemble_nonsingular_into_dense::<16, 16, 128>(
+                    a.assemble_nonsingular_into_dense::<16, 16, 128>(
                         &mut matrix,
-                        BoundaryOperator::SingleLayer,
-                        PDEType::Laplace,
                         &space,
                         &space,
                         &colouring,
