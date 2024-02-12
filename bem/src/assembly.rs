@@ -1,6 +1,7 @@
 pub mod batched;
 pub mod common;
 pub mod fmm_tools;
+use crate::assembly::batched::BatchedAssembler;
 use crate::function_space::SerialFunctionSpace;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 
@@ -38,9 +39,28 @@ pub fn assemble<'a>(
     test_space: &SerialFunctionSpace<'a>,
 ) {
     match atype {
-        AssemblyType::Dense => {
-            batched::assemble_into_dense::<128>(output, operator, pde, trial_space, test_space)
-        }
+        AssemblyType::Dense => match pde {
+            PDEType::Laplace => match operator {
+                BoundaryOperator::SingleLayer => {
+                    let a = batched::LaplaceSingleLayerAssembler::new();
+                    a.assemble_into_dense::<128>(output, trial_space, test_space)
+                }
+                BoundaryOperator::DoubleLayer => {
+                    let a = batched::LaplaceDoubleLayerAssembler::new();
+                    a.assemble_into_dense::<128>(output, trial_space, test_space)
+                }
+                BoundaryOperator::AdjointDoubleLayer => {
+                    let a = batched::LaplaceAdjointDoubleLayerAssembler::new();
+                    a.assemble_into_dense::<128>(output, trial_space, test_space)
+                }
+                _ => {
+                    panic!("Unsupported operator");
+                }
+            },
+            _ => {
+                panic!("Unsupported PDE");
+            }
+        },
     }
 }
 
@@ -81,13 +101,8 @@ mod test {
             f64,
             [space1.dofmap().global_size(), space0.dofmap().global_size()]
         );
-        batched::assemble_into_dense::<128>(
-            &mut matrix,
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space0,
-            &space1,
-        );
+        let a = batched::LaplaceSingleLayerAssembler::new();
+        a.assemble_into_dense::<128>(&mut matrix, &space0, &space1);
 
         let mut matrix2 = rlst_dynamic_array2!(
             f64,

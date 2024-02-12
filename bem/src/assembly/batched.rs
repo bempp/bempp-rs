@@ -12,8 +12,7 @@ use bempp_traits::grid::{Geometry, Grid, Topology};
 use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 
-use crate::assembly::{BoundaryOperator, PDEType};
-use bempp_kernel::laplace_3d;
+use bempp_kernel::laplace_3d::Laplace3dKernel;
 
 use rayon::prelude::*;
 use rlst_dense::{
@@ -24,86 +23,6 @@ use rlst_dense::{
     traits::{RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef},
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
-
-type SingularKernelValueFunction = unsafe fn(
-    &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    usize,
-) -> f64;
-type NonSingularKernelValueFunction = unsafe fn(
-    &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
-    &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    usize,
-    usize,
-) -> f64;
-
-unsafe fn singular_single_layer_kernel_value(
-    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    index: usize,
-) -> f64 {
-    *k.get_unchecked([0, index])
-}
-unsafe fn nonsingular_single_layer_kernel_value(
-    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
-    _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    test_index: usize,
-    trial_index: usize,
-) -> f64 {
-    *k.get_unchecked([test_index, 0, trial_index])
-}
-
-unsafe fn singular_double_layer_kernel_value(
-    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    index: usize,
-) -> f64 {
-    *k.get_unchecked([1, index]) * *trial_normals.get_unchecked([index, 0])
-        + *k.get_unchecked([2, index]) * *trial_normals.get_unchecked([index, 1])
-        + *k.get_unchecked([3, index]) * *trial_normals.get_unchecked([index, 2])
-}
-unsafe fn nonsingular_double_layer_kernel_value(
-    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
-    _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    test_index: usize,
-    trial_index: usize,
-) -> f64 {
-    *k.get_unchecked([test_index, 1, trial_index]) * *trial_normals.get_unchecked([trial_index, 0])
-        + *k.get_unchecked([test_index, 2, trial_index])
-            * *trial_normals.get_unchecked([trial_index, 1])
-        + *k.get_unchecked([test_index, 3, trial_index])
-            * *trial_normals.get_unchecked([trial_index, 2])
-}
-
-unsafe fn singular_adjoint_double_layer_kernel_value(
-    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    index: usize,
-) -> f64 {
-    -*k.get_unchecked([1, index]) * *test_normals.get_unchecked([index, 0])
-        - *k.get_unchecked([2, index]) * *test_normals.get_unchecked([index, 1])
-        - *k.get_unchecked([3, index]) * *test_normals.get_unchecked([index, 2])
-}
-unsafe fn nonsingular_adjoint_double_layer_kernel_value(
-    k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
-    test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    test_index: usize,
-    trial_index: usize,
-) -> f64 {
-    -*k.get_unchecked([test_index, 1, trial_index]) * *test_normals.get_unchecked([test_index, 0])
-        - *k.get_unchecked([test_index, 2, trial_index])
-            * *test_normals.get_unchecked([test_index, 1])
-        - *k.get_unchecked([test_index, 3, trial_index])
-            * *test_normals.get_unchecked([test_index, 2])
-}
 
 fn get_quadrature_rule(
     test_celltype: ReferenceCellType,
@@ -158,30 +77,31 @@ fn get_quadrature_rule(
     }
 }
 
-
-trait BatchedAssembler {
+pub trait BatchedAssembler: Sync {
     const DERIV_SIZE: usize;
-    const EVAL_TYPE: EvalType;
     unsafe fn singular_kernel_value(
+        &self,
         k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         index: usize,
     ) -> f64;
     unsafe fn nonsingular_kernel_value(
+        &self,
         k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
         test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> f64;
+    fn kernel_assemble_diagonal_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]);
+    fn kernel_assemble_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]);
 
     // TODO: use T not f64
     #[allow(clippy::too_many_arguments)]
     fn assemble_batch_singular<'a>(
         &self,
         shape: [usize; 2],
-        kernel: &impl Kernel<T = f64>,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
         cell_pairs: &[(usize, usize)],
@@ -238,8 +158,7 @@ trait BatchedAssembler {
             );
             trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
 
-            kernel.assemble_diagonal_st(
-                Self::EVAL_TYPE,
+            self.kernel_assemble_diagonal_st(
                 test_mapped_pts.data(),
                 trial_mapped_pts.data(),
                 k.data_mut(),
@@ -263,8 +182,12 @@ trait BatchedAssembler {
 
                     for (index, wt) in weights.iter().enumerate() {
                         unsafe {
-                            sum += self.singular_kernel_value(&k, &test_normals, &trial_normals, index)
-                                * wt
+                            sum += self.singular_kernel_value(
+                                &k,
+                                &test_normals,
+                                &trial_normals,
+                                index,
+                            ) * wt
                                 * test_table.get_unchecked([0, index, test_i, 0])
                                 * test_jdet.get_unchecked(index)
                                 * trial_table.get_unchecked([0, index, trial_i, 0])
@@ -282,8 +205,8 @@ trait BatchedAssembler {
 
     #[allow(clippy::too_many_arguments)]
     fn assemble_batch_nonadjacent<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
+        &self,
         output: &RawData2D<f64>,
-        kernel: &impl Kernel<T = f64>,
         trial_space: &SerialFunctionSpace<'a>,
         trial_cells: &[usize],
         test_space: &SerialFunctionSpace<'a>,
@@ -305,14 +228,7 @@ trait BatchedAssembler {
         let trial_grid = trial_space.grid();
         let trial_c20 = trial_grid.topology().connectivity(2, 0);
 
-        let mut k = rlst_dynamic_array3!(
-            f64,
-            [
-                NPTS_TEST,
-                [Self::DERIV_SIZE,
-                NPTS_TRIAL
-            ]
-        );
+        let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, Self::DERIV_SIZE, NPTS_TRIAL]);
         let mut test_jdet = [0.0; NPTS_TEST];
         let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
         let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -377,8 +293,7 @@ trait BatchedAssembler {
                     continue;
                 }
 
-                kernel.assemble_st(
-                    Self::EVAL_TYPE,
+                self.kernel_assemble_st(
                     test_mapped_pts.data(),
                     trial_mapped_pts[trial_cell_i].data(),
                     k.data_mut(),
@@ -438,8 +353,8 @@ trait BatchedAssembler {
 
     #[allow(clippy::too_many_arguments)]
     fn assemble_batch_singular_correction<'a, const NPTS_TEST: usize, const NPTS_TRIAL: usize>(
+        &self,
         shape: [usize; 2],
-        kernel: &impl Kernel<T = f64>,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
         cell_pairs: &[(usize, usize)],
@@ -461,14 +376,7 @@ trait BatchedAssembler {
 
         let grid = test_space.grid();
 
-        let mut k = rlst_dynamic_array3!(
-            f64,
-            [
-                NPTS_TEST,
-                Self::DERIV_SIZE,
-                NPTS_TRIAL
-            ]
-        );
+        let mut k = rlst_dynamic_array3!(f64, [NPTS_TEST, Self::DERIV_SIZE, NPTS_TRIAL]);
         let mut test_jdet = [0.0; NPTS_TEST];
         let mut test_mapped_pts = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
         let mut test_normals = rlst_dynamic_array2!(f64, [NPTS_TEST, 3]);
@@ -507,8 +415,7 @@ trait BatchedAssembler {
             );
             trial_evaluator.compute_points(trial_cell_gindex, &mut trial_mapped_pts);
 
-            kernel.assemble_st(
-                Self::EVAL_TYPE,
+            self.kernel_assemble_st(
                 test_mapped_pts.data(),
                 trial_mapped_pts.data(),
                 k.data_mut(),
@@ -564,20 +471,14 @@ trait BatchedAssembler {
         output
     }
 
-    pub fn assemble_singular_into_dense<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+    fn assemble_singular_into_dense<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+        &self,
         output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        operator: BoundaryOperator,
-        pde: PDEType,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) {
-        let sparse_matrix = assemble_singular::<QDEGREE, BLOCKSIZE>(
-            output.shape(),
-            operator,
-            pde,
-            trial_space,
-            test_space,
-        );
+        let sparse_matrix =
+            self.assemble_singular::<QDEGREE, BLOCKSIZE>(output.shape(), trial_space, test_space);
         let data = sparse_matrix.data;
         let rows = sparse_matrix.rows;
         let cols = sparse_matrix.cols;
@@ -586,9 +487,8 @@ trait BatchedAssembler {
         }
     }
 
-    pub fn assemble_singular_into_csr<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
-        operator: BoundaryOperator,
-        pde: PDEType,
+    fn assemble_singular_into_csr<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+        &self,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) -> CsrMatrix<f64> {
@@ -597,7 +497,7 @@ trait BatchedAssembler {
             trial_space.dofmap().global_size(),
         ];
         let sparse_matrix =
-            assemble_singular::<QDEGREE, BLOCKSIZE>(shape, operator, pde, trial_space, test_space);
+            self.assemble_singular::<QDEGREE, BLOCKSIZE>(shape, trial_space, test_space);
 
         CsrMatrix::<f64>::from_aij(
             sparse_matrix.shape,
@@ -609,9 +509,8 @@ trait BatchedAssembler {
     }
 
     fn assemble_singular<'a, const QDEGREE: usize, const BLOCKSIZE: usize>(
+        &self,
         shape: [usize; 2],
-        operator: BoundaryOperator,
-        pde: PDEType,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) -> SparseMatrixData<f64> {
@@ -742,9 +641,8 @@ trait BatchedAssembler {
             let r: SparseMatrixData<f64> = (0..numtasks)
                 .into_par_iter()
                 .map(&|t| {
-                    assemble_batch_singular(
+                    self.assemble_batch_singular(
                         shape,
-                        &kernel,
                         trial_space,
                         test_space,
                         cell_blocks[t],
@@ -762,22 +660,19 @@ trait BatchedAssembler {
         output
     }
 
-    pub fn assemble_singular_correction_into_dense<
+    fn assemble_singular_correction_into_dense<
         'a,
         const NPTS_TEST: usize,
         const NPTS_TRIAL: usize,
         const BLOCKSIZE: usize,
     >(
+        &self,
         output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        operator: BoundaryOperator,
-        pde: PDEType,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) {
-        let sparse_matrix = assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE>(
+        let sparse_matrix = self.assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE>(
             output.shape(),
-            operator,
-            pde,
             trial_space,
             test_space,
         );
@@ -789,14 +684,13 @@ trait BatchedAssembler {
         }
     }
 
-    pub fn assemble_singular_correction_into_csr<
+    fn assemble_singular_correction_into_csr<
         'a,
         const NPTS_TEST: usize,
         const NPTS_TRIAL: usize,
         const BLOCKSIZE: usize,
     >(
-        operator: BoundaryOperator,
-        pde: PDEType,
+        &self,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) -> CsrMatrix<f64> {
@@ -804,10 +698,8 @@ trait BatchedAssembler {
             test_space.dofmap().global_size(),
             trial_space.dofmap().global_size(),
         ];
-        let sparse_matrix = assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE>(
+        let sparse_matrix = self.assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE>(
             shape,
-            operator,
-            pde,
             trial_space,
             test_space,
         );
@@ -827,9 +719,8 @@ trait BatchedAssembler {
         const NPTS_TRIAL: usize,
         const BLOCKSIZE: usize,
     >(
+        &self,
         shape: [usize; 2],
-        operator: BoundaryOperator,
-        pde: PDEType,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) -> SparseMatrixData<f64> {
@@ -919,9 +810,8 @@ trait BatchedAssembler {
         (0..numtasks)
             .into_par_iter()
             .map(&|t| {
-                assemble_batch_singular_correction::<NPTS_TEST, NPTS_TRIAL>(
+                self.assemble_batch_singular_correction::<NPTS_TEST, NPTS_TRIAL>(
                     shape,
-                    &kernel,
                     trial_space,
                     test_space,
                     cell_blocks[t],
@@ -936,37 +826,33 @@ trait BatchedAssembler {
             .reduce(|| SparseMatrixData::<f64>::new(shape), |a, b| a.sum(b))
     }
 
-    pub fn assemble_into_dense<'a, const BLOCKSIZE: usize>(
+    fn assemble_into_dense<'a, const BLOCKSIZE: usize>(
+        &self,
         output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        operator: BoundaryOperator,
-        pde: PDEType,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
     ) {
         let test_colouring = test_space.compute_cell_colouring();
         let trial_colouring = trial_space.compute_cell_colouring();
 
-        assemble_nonsingular_into_dense::<16, 16, BLOCKSIZE>(
+        self.assemble_nonsingular_into_dense::<16, 16, BLOCKSIZE>(
             output,
-            operator,
-            pde,
             trial_space,
             test_space,
             &trial_colouring,
             &test_colouring,
         );
-        assemble_singular_into_dense::<4, BLOCKSIZE>(output, operator, pde, trial_space, test_space);
+        self.assemble_singular_into_dense::<4, BLOCKSIZE>(output, trial_space, test_space);
     }
 
-    pub fn assemble_nonsingular_into_dense<
+    fn assemble_nonsingular_into_dense<
         'a,
         const NPTS_TEST: usize,
         const NPTS_TRIAL: usize,
         const BLOCKSIZE: usize,
     >(
+        &self,
         output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        operator: BoundaryOperator,
-        pde: PDEType,
         trial_space: &SerialFunctionSpace<'a>,
         test_space: &SerialFunctionSpace<'a>,
         trial_colouring: &Vec<Vec<usize>>,
@@ -1049,9 +935,8 @@ trait BatchedAssembler {
                 let r: usize = (0..numtasks)
                     .into_par_iter()
                     .map(&|t| {
-                        assemble_batch_nonadjacent::<NPTS_TEST, NPTS_TRIAL>(
+                        self.assemble_batch_nonadjacent::<NPTS_TEST, NPTS_TRIAL>(
                             &output_raw,
-                            &kernel,
                             trial_space,
                             trial_cells[t],
                             test_space,
@@ -1068,6 +953,149 @@ trait BatchedAssembler {
                 assert_eq!(r, numtasks);
             }
         }
+    }
+}
+
+pub struct LaplaceSingleLayerAssembler {
+    kernel: Laplace3dKernel<f64>,
+}
+
+impl LaplaceSingleLayerAssembler {
+    pub fn new() -> Self {
+        Self {
+            kernel: Laplace3dKernel::<f64>::new(),
+        }
+    }
+}
+unsafe impl Sync for LaplaceSingleLayerAssembler {}
+impl BatchedAssembler for LaplaceSingleLayerAssembler {
+    const DERIV_SIZE: usize = 1;
+    unsafe fn singular_kernel_value(
+        &self,
+        k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        index: usize,
+    ) -> f64 {
+        *k.get_unchecked([0, index])
+    }
+    unsafe fn nonsingular_kernel_value(
+        &self,
+        k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
+        _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        test_index: usize,
+        trial_index: usize,
+    ) -> f64 {
+        *k.get_unchecked([test_index, 0, trial_index])
+    }
+    fn kernel_assemble_diagonal_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]) {
+        self.kernel
+            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+    }
+    fn kernel_assemble_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]) {
+        self.kernel
+            .assemble_st(EvalType::Value, sources, targets, result);
+    }
+}
+
+pub struct LaplaceDoubleLayerAssembler {
+    kernel: Laplace3dKernel<f64>,
+}
+
+impl LaplaceDoubleLayerAssembler {
+    pub fn new() -> Self {
+        Self {
+            kernel: Laplace3dKernel::<f64>::new(),
+        }
+    }
+}
+unsafe impl Sync for LaplaceDoubleLayerAssembler {}
+impl BatchedAssembler for LaplaceDoubleLayerAssembler {
+    const DERIV_SIZE: usize = 4;
+    unsafe fn singular_kernel_value(
+        &self,
+        k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        index: usize,
+    ) -> f64 {
+        *k.get_unchecked([1, index]) * *trial_normals.get_unchecked([index, 0])
+            + *k.get_unchecked([2, index]) * *trial_normals.get_unchecked([index, 1])
+            + *k.get_unchecked([3, index]) * *trial_normals.get_unchecked([index, 2])
+    }
+    unsafe fn nonsingular_kernel_value(
+        &self,
+        k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
+        _test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        test_index: usize,
+        trial_index: usize,
+    ) -> f64 {
+        *k.get_unchecked([test_index, 1, trial_index])
+            * *trial_normals.get_unchecked([trial_index, 0])
+            + *k.get_unchecked([test_index, 2, trial_index])
+                * *trial_normals.get_unchecked([trial_index, 1])
+            + *k.get_unchecked([test_index, 3, trial_index])
+                * *trial_normals.get_unchecked([trial_index, 2])
+    }
+    fn kernel_assemble_diagonal_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]) {
+        self.kernel
+            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+    }
+    fn kernel_assemble_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]) {
+        self.kernel
+            .assemble_st(EvalType::ValueDeriv, sources, targets, result);
+    }
+}
+
+pub struct LaplaceAdjointDoubleLayerAssembler {
+    kernel: Laplace3dKernel<f64>,
+}
+
+impl LaplaceAdjointDoubleLayerAssembler {
+    pub fn new() -> Self {
+        Self {
+            kernel: Laplace3dKernel::<f64>::new(),
+        }
+    }
+}
+unsafe impl Sync for LaplaceAdjointDoubleLayerAssembler {}
+impl BatchedAssembler for LaplaceAdjointDoubleLayerAssembler {
+    const DERIV_SIZE: usize = 4;
+    unsafe fn singular_kernel_value(
+        &self,
+        k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        index: usize,
+    ) -> f64 {
+        -*k.get_unchecked([1, index]) * *test_normals.get_unchecked([index, 0])
+            - *k.get_unchecked([2, index]) * *test_normals.get_unchecked([index, 1])
+            - *k.get_unchecked([3, index]) * *test_normals.get_unchecked([index, 2])
+    }
+    unsafe fn nonsingular_kernel_value(
+        &self,
+        k: &Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
+        test_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        _trial_normals: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+        test_index: usize,
+        trial_index: usize,
+    ) -> f64 {
+        -*k.get_unchecked([test_index, 1, trial_index])
+            * *test_normals.get_unchecked([test_index, 0])
+            - *k.get_unchecked([test_index, 2, trial_index])
+                * *test_normals.get_unchecked([test_index, 1])
+            - *k.get_unchecked([test_index, 3, trial_index])
+                * *test_normals.get_unchecked([test_index, 2])
+    }
+    fn kernel_assemble_diagonal_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]) {
+        self.kernel
+            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+    }
+    fn kernel_assemble_st(&self, sources: &[f64], targets: &[f64], result: &mut [f64]) {
+        self.kernel
+            .assemble_st(EvalType::ValueDeriv, sources, targets, result);
     }
 }
 
@@ -1096,19 +1124,9 @@ mod test {
         let ndofs = space.dofmap().global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        assemble_singular_into_dense::<4, 128>(
-            &mut matrix,
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space,
-            &space,
-        );
-        let csr = assemble_singular_into_csr::<4, 128>(
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space,
-            &space,
-        );
+        let assembler = LaplaceSingleLayerAssembler::new();
+        assembler.assemble_singular_into_dense::<4, 128>(&mut matrix, &space, &space);
+        let csr = assembler.assemble_singular_into_csr::<4, 128>(&space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
@@ -1137,19 +1155,9 @@ mod test {
         let ndofs = space.dofmap().global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        assemble_singular_into_dense::<4, 128>(
-            &mut matrix,
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space,
-            &space,
-        );
-        let csr = assemble_singular_into_csr::<4, 128>(
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space,
-            &space,
-        );
+        let assembler = LaplaceSingleLayerAssembler::new();
+        assembler.assemble_singular_into_dense::<4, 128>(&mut matrix, &space, &space);
+        let csr = assembler.assemble_singular_into_csr::<4, 128>(&space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
@@ -1186,19 +1194,9 @@ mod test {
         let ndofs1 = space1.dofmap().global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
-        assemble_singular_into_dense::<4, 128>(
-            &mut matrix,
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space0,
-            &space1,
-        );
-        let csr = assemble_singular_into_csr::<4, 128>(
-            BoundaryOperator::SingleLayer,
-            PDEType::Laplace,
-            &space0,
-            &space1,
-        );
+        let assembler = LaplaceSingleLayerAssembler::new();
+        assembler.assemble_singular_into_dense::<4, 128>(&mut matrix, &space0, &space1);
+        let csr = assembler.assemble_singular_into_csr::<4, 128>(&space0, &space1);
         let indptr = csr.indptr();
         let indices = csr.indices();
         let data = csr.data();
