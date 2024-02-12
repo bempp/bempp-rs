@@ -420,6 +420,8 @@ pub mod uniform {
             let mut bytes = 0;
             let profile = true;
             let size_of_U = std::mem::size_of::<U>();
+            let flops_mutex = Mutex::new(flops);
+            let bytes_mutex = Mutex::new(bytes);
             ///////
 
 
@@ -439,7 +441,7 @@ pub mod uniform {
                 [ncoeffs, nsources]
             );
 
-            bytes += ncoeffs * nsources * size_of_U;
+            *bytes_mutex.lock().unwrap() += ncoeffs * nsources * size_of_U;
 
             rlst_blis::interface::threading::enable_threading();
             let mut compressed_multipoles = empty_array::<U, 2>()
@@ -448,9 +450,9 @@ pub mod uniform {
 
             // Computing compressed multipoles
             let [k, _] = self.fmm.m2l.operator_data.st_block.shape();
-            flops += k * (2*ncoeffs-1) * nsources; // matmul
-            bytes += (k*ncoeffs + ncoeffs * nsources) * size_of_U; // reads
-            bytes += (k * nsources) * size_of_U; // writes
+            *flops_mutex.lock().unwrap() += k * (2*ncoeffs-1) * nsources; // matmul
+            *bytes_mutex.lock().unwrap() += (k*ncoeffs + ncoeffs * nsources) * size_of_U; // reads
+            *bytes_mutex.lock().unwrap() += (k * nsources) * size_of_U; // writes
 
             compressed_multipoles
                 .data_mut()
@@ -458,8 +460,8 @@ pub mod uniform {
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
 
             // Scaling compressed multipoles
-            flops += compressed_multipoles.data().len(); // pointwise mult
-            bytes += compressed_multipoles.data().len() * size_of_U; // reads and writes in place
+            *flops_mutex.lock().unwrap() += compressed_multipoles.data().len(); // pointwise mult
+            *bytes_mutex.lock().unwrap() += compressed_multipoles.data().len() * size_of_U; // reads and writes in place
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -562,8 +564,6 @@ pub mod uniform {
             // }
 
 
-            let flops_mutex = Mutex::new(flops);
-            let bytes_mutex = Mutex::new(bytes);
 
 
             (0..316)
@@ -605,8 +605,9 @@ pub mod uniform {
                         // For computing compressed check potential
                         let mut flops_lock = flops_mutex.lock().unwrap();
                         let [a, b] = c_u_sub.shape();
+                        let [_, c] = c_vt_sub.shape();
                         let [_, d] = compressed_multipoles_subset.shape();
-                        *flops_lock += 2 * a * d * (2* b - 1);
+                        *flops_lock += b * d * (2*c-1)+a*d*(2*b-1);
 
                         // For saving compressed check potential,  accessing C_t, reading multipole data
                         let mut bytes_lock = bytes_mutex.lock().unwrap();
@@ -633,8 +634,8 @@ pub mod uniform {
             let elapsed = s.elapsed().as_millis() as usize;
 
             let [a, b] = self.fmm.m2l.operator_data.u.shape();
-            flops += a * (2*b-1) * nsources; // Computing locals
-            bytes += (a * b + compressed_locals.data().len()) * size_of_U; // accessing post proc matrix and locals
+            *flops_mutex.lock().unwrap() += a * (2*b-1) * nsources; // Computing locals
+            *bytes_mutex.lock().unwrap() += (a * b + compressed_locals.data().len()) * size_of_U; // accessing post proc matrix and locals
 
 
             // Post process compressed locals
@@ -652,10 +653,10 @@ pub mod uniform {
             rlst_blis::interface::threading::disable_threading();
 
             // Saving local data
-            flops += result.data().len();
-            bytes += result.data().len() * size_of_U;
+            *flops_mutex.lock().unwrap() += result.data().len();
+            *bytes_mutex.lock().unwrap() += result.data().len() * size_of_U;
             if level > 2 {
-                println!("level {:?} flops {:?} bytes {:?} time {:?}", level, flops, bytes, elapsed);
+                println!("level {:?} flops {:?} bytes {:?} time {:?}", level, *flops_mutex.lock().unwrap(), *bytes_mutex.lock().unwrap(), elapsed);
             }
 
 
