@@ -253,11 +253,11 @@ fn run_test_f64(order: usize, time: bool, depth: u64) {
 fn main() {
 
     let depth = 6;
-    let order = 3;
+    let order = 10;
     let time = true;
 
-    // run_test_f64(order, time, depth);
-    run_test_f32(order, time, depth);
+    run_test_f64(order, time, depth);
+    // run_test_f32(order, time, depth);
 
     // println!("ncoeffs {:?}", ncoeffs);
     // assert!(err < test_val);

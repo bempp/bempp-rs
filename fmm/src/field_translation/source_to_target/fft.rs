@@ -310,10 +310,11 @@ pub mod uniform {
                                     scale,
                                 );
                             }
-                            *flops_mutex.lock().unwrap() += 64 * 3 * (chunk_end - chunk_start); // matmul and scale and add
                         }
                     });
                 });
+
+            *flops_mutex.lock().unwrap() += 26 * 64 * 3 * nparents * size_real; // matmul and scale and add
 
             ////////////////////////////////////////////////////////////////////////////////////
             // Post processing to find local expansions from check potentials
