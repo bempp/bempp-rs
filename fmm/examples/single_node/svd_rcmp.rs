@@ -328,9 +328,9 @@ fn minimal_ranks_f64(digits: usize, timing: bool, depth: u64) {
 fn main() {
 
     let depth = 6;
-    let order = 3;
+    let order = 10;
     let time = true;
 
-    minimal_ranks_f32(order, time, depth);
-    // minimal_ranks_f64(order, time, depth);
+    // minimal_ranks_f32(order, time, depth);
+    minimal_ranks_f64(order, time, depth);
 }
