@@ -104,8 +104,8 @@ let abs_error: f64 = potentials
   .sum();
 let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-println!("pot {:?}", &potentials[0..3]);
-println!("direct {:?}", &direct[0..3]);
+// println!("pot {:?}", &potentials[0..3]);
+// println!("direct {:?}", &direct[0..3]);
 rel_error
 }
 
@@ -194,8 +194,8 @@ fn test_uniform_f32_svd_rcmp(
         .sum();
     let rel_error: f32 = abs_error / (direct.iter().sum::<f32>());
 
-    println!("pot {:?}", &potentials[0..3]);
-    println!("direct {:?}", &direct[0..3]);
+    // println!("pot {:?}", &potentials[0..3]);
+    // println!("direct {:?}", &direct[0..3]);
     rel_error
 }
 
@@ -220,7 +220,7 @@ fn minimal_ranks_f32(digits: usize, timing: bool, depth: u64) {
     if digits == 3 {
         order = 3;
         k = 10;
-        threshold = 0.999669;
+        threshold = 0.99967;
         test_val = 1e-3;
     } else if digits == 5 {
         order = 5;
@@ -254,7 +254,7 @@ fn minimal_ranks_f32(digits: usize, timing: bool, depth: u64) {
         println!("runtime {:?} operators {:?}", s.elapsed(), times);
     } else {
         let err = test_uniform_f32_svd_rcmp(&points, &charges, &global_idxs, order, alpha_inner, alpha_outer, true, depth, k, threshold, test_val); // 3 digits minimum
-        println!("err {:?}", err);
+        // println!("err {:?}", err);
         assert!(err < test_val);
     }
 }
@@ -319,7 +319,7 @@ fn minimal_ranks_f64(digits: usize, timing: bool, depth: u64) {
         println!("runtime {:?} operators {:?}", s.elapsed(), times);
     } else {
         let err = test_uniform_f64_svd_rcmp(&points, &charges, &global_idxs, order, alpha_inner, alpha_outer, true, depth, k, threshold, test_val); // 3 digits minimum
-        println!("err {:?}", err);
+        // println!("err {:?}", err);
         assert!(err < test_val);
     }
 }
@@ -327,10 +327,10 @@ fn minimal_ranks_f64(digits: usize, timing: bool, depth: u64) {
 
 fn main() {
 
-    let depth = 4;
-    let order = 10;
+    let depth = 6;
+    let order = 3;
     let time = true;
 
-    // minimal_ranks_f32(5, true, 4);
-    minimal_ranks_f64(order, time, depth);
+    minimal_ranks_f32(order, time, depth);
+    // minimal_ranks_f64(order, time, depth);
 }

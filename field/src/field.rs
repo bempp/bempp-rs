@@ -258,15 +258,15 @@ where
             .unwrap();
 
 
-        // // Create a JSON object with the data
-        // let ncoeffs = self.ncoeffs(order);
-        // let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "sigma": sigma});
+        // Create a JSON object with the data
+        let ncoeffs = self.ncoeffs(order);
+        let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "sigma": sigma});
 
-        // // Convert the JSON object to a String
-        // let json_string = to_string_pretty(&json_data).unwrap();
+        // Convert the JSON object to a String
+        let json_string = to_string_pretty(&json_data).unwrap();
 
-        // // Print the JSON string
-        // println!("{}", json_string);
+        // Print the JSON string
+        println!("{}", json_string);
 
         let mut u = rlst_dynamic_array2!(T, [mu, self.k]);
         let mut sigma_mat = rlst_dynamic_array2!(T, [self.k, self.k]);
@@ -352,14 +352,14 @@ where
         let mut st_block = rlst_dynamic_array2!(T, [self.k, nst]);
         st_block.fill_from(s_block.transpose());
 
-        let ncoeffs = self.ncoeffs(order);
-        let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "k": self.k ,"k_t": ranks});
+        // let ncoeffs = self.ncoeffs(order);
+        // let json_data = json!({ "order": order, "ncoeffs": ncoeffs, "k": self.k ,"k_t": ranks});
 
-        // Convert the JSON object to a String
-        let json_string = to_string_pretty(&json_data).unwrap();
+        // // Convert the JSON object to a String
+        // let json_string = to_string_pretty(&json_data).unwrap();
 
-        // Print the JSON string
-        println!("{}", json_string);
+        // // Print the JSON string
+        // println!("{}", json_string);
 
         SvdM2lOperatorDataRcmp {
             u,

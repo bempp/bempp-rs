@@ -24,6 +24,10 @@ use rlst_dense::{
     traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut},
 };
 
+use rlst_dense::traits::Shape;
+
+
+
 /// Field translations for uniformly refined trees that take matrix input for charges.
 pub mod matrix {
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
@@ -311,7 +315,12 @@ pub mod matrix {
     }
 }
 
+
+use std::time::Instant;
+
 pub mod uniform {
+    use std::{ops::DerefMut};
+
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 
     use crate::types::SendPtrMut;
@@ -402,7 +411,17 @@ pub mod uniform {
                 return;
             };
 
+            let mut s = Instant::now();
             let nsources = sources.len();
+
+            /////
+            let mut flops: usize = 0;
+            let mut accesses = 0;
+            let mut bytes = 0;
+            let profile = true;
+            let size_of_U = std::mem::size_of::<U>();
+            ///////
+
 
             let all_displacements = self.displacements(level);
 
@@ -420,15 +439,26 @@ pub mod uniform {
                 [ncoeffs, nsources]
             );
 
+            bytes += ncoeffs * nsources * size_of_U;
+
             rlst_blis::interface::threading::enable_threading();
             let mut compressed_multipoles = empty_array::<U, 2>()
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
             rlst_blis::interface::threading::disable_threading();
 
+            // Computing compressed multipoles
+            let [k, _] = self.fmm.m2l.operator_data.st_block.shape();
+            flops += k * (2*ncoeffs-1) * nsources;
+            bytes += (k*ncoeffs + ncoeffs * nsources) * size_of_U;
+
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+
+            // Scaling compressed multipoles
+            flops += compressed_multipoles.data().len();
+            bytes += compressed_multipoles.data().len() * size_of_U;
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -444,6 +474,26 @@ pub mod uniform {
                 })
                 .collect_vec();
 
+            {
+                let size_of_displacement_ptr = nsources; // Replace with actual type
+                let size_of_displacement_element = std::mem::size_of::<i64>(); // Replace with actual type
+                let size_of_index = std::mem::size_of::<usize>(); // Assuming usize for indices
+
+                // For iterating over all_displacements
+                bytes += all_displacements.len() * size_of_displacement_ptr;
+
+                // For iterating over elements within each displacement
+                for displacement in all_displacements.iter() {
+                    bytes += displacement.lock().unwrap().len() * size_of_displacement_element;
+                }
+                // For the map operation + inner collection
+                for idx in multipole_idxs.iter() {
+                    bytes +=  idx.len() * size_of_index;
+                }
+                // For the outer collection of multipole idxs
+                bytes += all_displacements.len() * size_of_index;
+            }
+
             let local_idxs = all_displacements
                 .iter()
                 .map(|displacements| {
@@ -457,6 +507,26 @@ pub mod uniform {
                         .collect_vec()
                 })
                 .collect_vec();
+
+            {
+                let size_of_displacement_ptr = nsources; // Replace with actual type
+                let size_of_displacement_element = std::mem::size_of::<i64>(); // Replace with actual type
+                let size_of_index = std::mem::size_of::<usize>(); // Assuming usize for indices
+                // For iterating over all_displacements
+                bytes += all_displacements.len() * size_of_displacement_ptr;
+
+                // For iterating over elements within each displacement
+                for displacement in all_displacements.iter() {
+                    bytes += displacement.lock().unwrap().len() * size_of_displacement_element;
+                }
+                // For the map operation + inner collection
+                for idx in multipole_idxs.iter() {
+                    bytes +=  idx.len() * size_of_index;
+                }
+                // For the outer collection of multipole idxs
+                bytes += all_displacements.len() * size_of_index;
+            }
+
 
             let compressed_locals_ = vec![U::zero(); nsources * self.fmm.m2l.k];
             let compressed_locals = rlst_array_from_slice2!(
@@ -475,6 +545,25 @@ pub mod uniform {
 
             let compressed_level_locals =
                 compressed_locals_ptrs.iter().map(Mutex::new).collect_vec();
+
+            {
+                let size_of_send_ptr_mut = std::mem::size_of::<SendPtrMut<U>>();
+                let size_of_mutex_snd_ptr_mut = std::mem::size_of::<Mutex<SendPtrMut<U>>>();
+
+                // For creating compressed_locals from a slice
+                bytes += nsources * self.fmm.m2l.k * size_of_U;
+
+                // For creating send pointers
+                bytes += nsources * size_of_send_ptr_mut;
+
+                // For creating mutexes
+                bytes += nsources * size_of_mutex_snd_ptr_mut;
+            }
+
+
+            let flops_mutex = Mutex::new(flops);
+            let bytes_mutex = Mutex::new(bytes);
+
 
             (0..316)
                 .into_par_iter()
@@ -496,6 +585,12 @@ pub mod uniform {
                             );
                     }
 
+                    {
+                        let mut bytes_lock = bytes_mutex.lock().unwrap();
+                        *bytes_lock.deref_mut() += multipole_idxs.len() * self.fmm.m2l.k * size_of_U;
+                    }
+
+
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
                         c_u_sub.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
@@ -503,6 +598,17 @@ pub mod uniform {
                             compressed_multipoles_subset.view(),
                         ),
                     );
+
+                    {
+                        let mut flops_lock = flops_mutex.lock().unwrap();
+                        let [a, b] = c_u_sub.shape();
+                        let [_, d] = compressed_multipoles_subset.shape();
+                        *flops_lock += 2 * a * d * (2* b - 1);
+
+                        let mut bytes_lock = bytes_mutex.lock().unwrap();
+                        *bytes_lock.deref_mut() += (2 * a * b + b * d + locals.data().len() )* size_of_U;
+                    }
+
 
                     for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                         let local_lock = compressed_level_locals[local_idx].lock().unwrap();
@@ -512,8 +618,19 @@ pub mod uniform {
                         let res = &locals.data()
                             [multipole_idx * self.fmm.m2l.k..(multipole_idx + 1) * self.fmm.m2l.k];
                         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
+
+                        {
+                            let mut bytes_lock = bytes_mutex.lock().unwrap();
+                            *bytes_lock.deref_mut() += 2 * self.fmm.m2l.k * size_of_U;
+                        }
                     }
                 });
+
+            let elapsed = s.elapsed().as_millis() as usize;
+            if level > 2 {
+                println!("level {:?} flops {:?} bytes {:?} time {:?}", level, flops, bytes, elapsed);
+
+            }
 
             // Post process compressed locals
             rlst_blis::interface::threading::enable_threading();
