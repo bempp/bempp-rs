@@ -32,6 +32,8 @@ use crate::field_translation::hadamard::matmul8x8;
 
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
+    use std::sync::Mutex;
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -112,6 +114,15 @@ pub mod uniform {
                 return;
             };
 
+            let mut flops: usize = 0;
+            let mut accesses = 0;
+            let mut bytes = 0;
+            let profile = true;
+            let size_of_U = std::mem::size_of::<U>();
+            let flops_mutex = Mutex::new(flops);
+            // let bytes_mutex = Mutex::new(bytes);
+
+
             let n = 2 * self.fmm.order - 1;
             let npad = n + 1;
 
@@ -138,6 +149,8 @@ pub mod uniform {
 
             let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
+            // Read multipoles from buffer
+            // *bytes_mutex.lock().unwrap() += ncoeffs * ntargets * size_of_U;
             ////////////////////////////////////////////////////////////////////////////////////
             // Pre-process to setup data structures for M2L kernel
             ////////////////////////////////////////////////////////////////////////////////////
@@ -184,6 +197,12 @@ pub mod uniform {
                         }
                     }
 
+                    // Reads of multipole data
+                    // *bytes_mutex.lock().unwrap() += nsiblings*chunk_size * ncoeffs * size_of_U;
+                    // Reads and writes of signal data
+                    // *bytes_mutex.lock().unwrap() += 2*nsiblings*chunk_size * size * size_of_U;
+
+
                     // Temporary buffer to hold results of FFT
                     let signal_hat_chunk_buffer =
                         vec![U::zero(); size_real * nsiblings * chunk_size * 2];
@@ -195,6 +214,10 @@ pub mod uniform {
                     }
 
                     U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad]);
+
+                    // FFT
+                    *flops_mutex.lock().unwrap() += 3 * size * (npad as i32).ilog2() as usize;
+                    // *bytes_mutex.lock().unwrap() += ;
 
                     // Re-order the temporary buffer into frequency order before flushing to main memory
                     let signal_hat_chunk_f_buffer =
@@ -237,6 +260,9 @@ pub mod uniform {
                                 .iter_mut()
                                 .zip(results_i)
                                 .for_each(|(c, r)| *c += *r);
+
+                            // Storing signals
+                            *flops_mutex.lock().unwrap() += results_i.len();
                         }
                     }
                 });
@@ -282,8 +308,9 @@ pub mod uniform {
                                     s_f,
                                     &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
                                     scale,
-                                )
+                                );
                             }
+                            *flops_mutex.lock().unwrap() += 64 * 3 * (chunk_end - chunk_start); // matmul and scale and add
                         }
                     });
                 });
@@ -318,6 +345,8 @@ pub mod uniform {
                 &[npad, npad, npad],
             );
 
+            *flops_mutex.lock().unwrap() += 3 * size * (npad as i32).ilog2() as usize;
+
             check_potential
                 .par_chunks_exact(nsiblings * size)
                 .zip(self.level_locals[level as usize].par_chunks_exact(nsiblings))
@@ -331,6 +360,9 @@ pub mod uniform {
                         {
                             *potential_chunk.get_mut([surf_idx, i]).unwrap() =
                                 check_potential_chunk[i * size + conv_idx];
+
+                            // Unpermute check potential
+                            *flops_mutex.lock().unwrap() += 1;
                         }
                     }
 
@@ -351,6 +383,11 @@ pub mod uniform {
                             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                         });
                 });
+
+
+            if level > 2 {
+                println!("level {:?} flops {:?}", level, *flops_mutex.lock().unwrap());
+            }
         }
 
         fn m2l_scale(&self, level: u64) -> U {
