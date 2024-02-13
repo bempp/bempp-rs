@@ -213,10 +213,10 @@ pub mod uniform {
                             std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunk_size);
                     }
 
-                    U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad]);
+                    let fft_flops = U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad], true);
 
                     // FFT
-                    *flops_mutex.lock().unwrap() += 3 * size * (npad as i32).ilog2() as usize;
+                    *flops_mutex.lock().unwrap() += fft_flops.unwrap() as usize;
                     // *bytes_mutex.lock().unwrap() += ;
 
                     // Re-order the temporary buffer into frequency order before flushing to main memory
@@ -340,13 +340,14 @@ pub mod uniform {
                 });
 
             // Compute inverse FFT
-            U::irfft3_fftw_par_slice(
+            let ifftw_flops = U::irfft3_fftw_par_slice(
                 check_potential_hat_c,
                 &mut check_potential,
                 &[npad, npad, npad],
+                true
             );
 
-            *flops_mutex.lock().unwrap() += 3 * size * (npad as i32).ilog2() as usize;
+            *flops_mutex.lock().unwrap() += ifftw_flops.unwrap() as usize;
 
             check_potential
                 .par_chunks_exact(nsiblings * size)
@@ -672,7 +673,7 @@ pub mod adaptive {
                             std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunk_size);
                     }
 
-                    U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad]);
+                    U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad], false);
 
                     // Re-order the temporary buffer into frequency order before flushing to main memory
                     let signal_hat_chunk_f_buffer =
@@ -790,10 +791,11 @@ pub mod adaptive {
                 });
 
             // Compute inverse FFT
-            U::irfft3_fftw_par_slice(
+            let flops = U::irfft3_fftw_par_slice(
                 check_potential_hat_c,
                 &mut check_potential,
                 &[npad, npad, npad],
+                true
             );
 
             check_potential

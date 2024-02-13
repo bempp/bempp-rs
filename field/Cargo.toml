@@ -32,7 +32,7 @@ rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
-fftw = {git = "https://github.com/skailasa/fftw.git" }
+fftw = {git = "https://github.com/skailasa/fftw.git" , branch = "exp/flop-count"}
 cauchy = "0.4.*"
 approx = "0.5"
 rayon = "1.7"

@@ -23,7 +23,7 @@ where
     /// * `input` - Input slice of real data, corresponding to a 3D array stored in column major order.
     /// * `output` - Output slice.
     /// * `shape` - Shape of input data.
-    fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]);
+    fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize], count: bool) -> Option<f64>;
 
     /// Compute an parallel complex to real inverse FFT over a slice which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
@@ -32,7 +32,7 @@ where
     /// * `input` - Input slice of complex data, corresponding to an FFT of a 3D array stored in column major order.
     /// * `output` - Output slice.
     /// * `shape` - Shape of output data.
-    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]);
+    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize], count: bool) -> Option<f64>;
 
     /// Compute an complex to real inverse FFT over a rlst matrix which stores data corresponding to multiple 3 dimensional arrays of shape `shape`, stored in column major order.
     /// This function is multithreaded, and uses the FFTW library.
@@ -76,7 +76,7 @@ impl Fft for f32 {
         });
     }
 
-    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
+    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize], count: bool) -> Option<f64> {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
         let size_real = (size / size_d) * (size_d / 2 + 1);
@@ -90,10 +90,21 @@ impl Fft for f32 {
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (size as f32));
-        })
+        });
+
+        if count {
+            let mut add: f64 = 0.;
+            let mut mul: f64 = 0.;
+            let mut fmas: f64 = 0.;
+
+            plan.flops(&mut add, &mut mul, &mut fmas);
+            Some(add+mul+2.*fmas)
+        } else {
+            None
+        }
     }
 
-    fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
+    fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize], count: bool) -> Option<f64> {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
         let size_real = (size / size_d) * (size_d / 2 + 1);
@@ -105,6 +116,17 @@ impl Fft for f32 {
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.r2c(inp, out);
         });
+
+        if count {
+            let mut add: f64 = 0.;
+            let mut mul: f64 = 0.;
+            let mut fmas: f64 = 0.;
+
+            plan.flops(&mut add, &mut mul, &mut fmas);
+            Some(add+mul+2.*fmas)
+        } else {
+            None
+        }
     }
 
     fn irfft3_fftw_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
@@ -157,7 +179,7 @@ impl Fft for f64 {
         });
     }
 
-    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
+    fn irfft3_fftw_par_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize], count: bool) -> Option<f64> {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
         let size_real = (size / size_d) * (size_d / 2 + 1);
@@ -171,10 +193,21 @@ impl Fft for f64 {
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (size as f64));
-        })
+        });
+
+        if count {
+            let mut add: f64 = 0.;
+            let mut mul: f64 = 0.;
+            let mut fmas: f64 = 0.;
+
+            plan.flops(&mut add, &mut mul, &mut fmas);
+            Some(add+mul+2.*fmas)
+        } else {
+            None
+        }
     }
 
-    fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize]) {
+    fn rfft3_fftw_slice(input: &mut [Self], output: &mut [Complex<Self>], shape: &[usize], count: bool) -> Option<f64> {
         let size: usize = shape.iter().product();
         let size_d = shape.last().unwrap();
         let size_real = (size / size_d) * (size_d / 2 + 1);
@@ -186,6 +219,17 @@ impl Fft for f64 {
         it_inp.zip(it_out).for_each(|(inp, out)| {
             let _ = plan.r2c(inp, out);
         });
+
+        if count {
+            let mut add: f64 = 0.;
+            let mut mul: f64 = 0.;
+            let mut fmas: f64 = 0.;
+
+            plan.flops(&mut add, &mut mul, &mut fmas);
+            Some(add+mul+2.*fmas)
+        } else {
+            None
+        }
     }
 
     fn irfft3_fftw_slice(input: &mut [Complex<Self>], output: &mut [Self], shape: &[usize]) {
