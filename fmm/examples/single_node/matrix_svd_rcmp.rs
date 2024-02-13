@@ -161,7 +161,6 @@ fn time_f64(digits: usize, npoints: usize, depth: u64, sparse: bool, ncharge_vec
 
 
 fn main() {
-
-
-    time_f64(10, 1000000, 5, true, 10)
+    // time_f64(10, 1000000, 5, true, 10)
+    time_f32(5, 1000000, 4, true, 10)
 }

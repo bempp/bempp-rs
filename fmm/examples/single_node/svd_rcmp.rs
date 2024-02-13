@@ -132,11 +132,11 @@ fn time_f64(digits: usize, npoints: usize, depth: u64, sparse: bool) {
 
 fn main() {
 
-    let order = 10;
+    let order = 5;
     let npoints = 1000000;
-    let depth = 5;
+    let depth = 6;
     let sparse = true;
 
-    time_f64(order, npoints, depth, sparse);
+    time_f32(order, npoints, depth, sparse);
 
 }

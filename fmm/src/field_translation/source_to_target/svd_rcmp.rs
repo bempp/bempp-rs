@@ -312,6 +312,8 @@ pub mod matrix {
 }
 
 pub mod uniform {
+    use std::time::{Duration, Instant};
+
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 
     use crate::types::SendPtrMut;
@@ -402,6 +404,9 @@ pub mod uniform {
                 return;
             };
 
+            let mut kernel_time = Duration::new(0, 0);
+            let mut setup_time = Duration::new(0, 0);
+
             let nsources = sources.len();
 
             let all_displacements = self.displacements(level);
@@ -409,6 +414,7 @@ pub mod uniform {
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
+            let s = Instant::now();
             let multipoles = rlst_array_from_slice2!(
                 U,
                 unsafe {
@@ -429,6 +435,8 @@ pub mod uniform {
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+
+            kernel_time += s.elapsed();
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -476,6 +484,7 @@ pub mod uniform {
             let compressed_level_locals =
                 compressed_locals_ptrs.iter().map(Mutex::new).collect_vec();
 
+            let s = Instant::now();
             (0..316)
                 .into_par_iter()
                 .zip(multipole_idxs)
@@ -516,25 +525,40 @@ pub mod uniform {
                 });
 
             // Post process compressed locals
+            // rlst_blis::interface::threading::enable_threading();
+            // let result = empty_array::<U, 2>().simple_mult_into_resize(
+            //     self.fmm.dc2e_inv_1.view(),
+            //     empty_array::<U, 2>().simple_mult_into_resize(
+            //         self.fmm.dc2e_inv_2.view(),
+            //         empty_array::<U, 2>().simple_mult_into_resize(
+            //             self.fmm.m2l.operator_data.u.view(),
+            //             compressed_locals,
+            //         ),
+            //     ),
+            // );
+            // rlst_blis::interface::threading::disable_threading();
             rlst_blis::interface::threading::enable_threading();
-            let result = empty_array::<U, 2>().simple_mult_into_resize(
-                self.fmm.dc2e_inv_1.view(),
-                empty_array::<U, 2>().simple_mult_into_resize(
-                    self.fmm.dc2e_inv_2.view(),
+            // let result = empty_array::<U, 2>().simple_mult_into_resize(
+            //     self.fmm.dc2e_inv_1.view(),
+                // empty_array::<U, 2>().simple_mult_into_resize(
+            //         self.fmm.dc2e_inv_2.view(),
                     empty_array::<U, 2>().simple_mult_into_resize(
                         self.fmm.m2l.operator_data.u.view(),
                         compressed_locals,
-                    ),
-                ),
-            );
+                    );
+                // ),
+            // );
             rlst_blis::interface::threading::disable_threading();
+            kernel_time += s.elapsed();
 
-            let ptr = self.level_locals[level as usize][0].raw;
-            let all_locals = unsafe { std::slice::from_raw_parts_mut(ptr, nsources * ncoeffs) };
-            all_locals
-                .iter_mut()
-                .zip(result.data().iter())
-                .for_each(|(l, r)| *l += *r);
+            println!("level {:?} kernel time {:?}", level, kernel_time);
+
+            // let ptr = self.level_locals[level as usize][0].raw;
+            // let all_locals = unsafe { std::slice::from_raw_parts_mut(ptr, nsources * ncoeffs) };
+            // all_locals
+            //     .iter_mut()
+            //     .zip(result.data().iter())
+            //     .for_each(|(l, r)| *l += *r);
         }
 
         fn m2l_scale(&self, level: u64) -> U {
