@@ -296,7 +296,8 @@ pub mod uniform {
                     });
                 });
 
-            *flops.lock().unwrap() += (26* 64 * 3 * nparents * size_real) as f64;
+                // 64 muls, 8 eight adds for each of 26 directions direction
+            *flops.lock().unwrap() += (26* 64 * nparents * size_real + 26 * 8 * nparents * size_real) as f64;
 
             ////////////////////////////////////////////////////////////////////////////////////
             // Post processing to find local expansions from check potentials

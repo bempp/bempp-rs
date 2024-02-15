@@ -311,6 +311,8 @@ pub mod matrix {
     }
 }
 
+use rlst_dense::traits::Shape;
+
 pub mod uniform {
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 
@@ -409,6 +411,8 @@ pub mod uniform {
             // Interpret multipoles as a matrix
             let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
 
+            let mut flops = Mutex::new(0.);
+
             let multipoles = rlst_array_from_slice2!(
                 U,
                 unsafe {
@@ -425,10 +429,16 @@ pub mod uniform {
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
             rlst_blis::interface::threading::disable_threading();
 
+            let [a, _] = self.fmm.m2l.operator_data.st_block.shape();
+            *flops.lock().unwrap() += (a * (2* ncoeffs - 1) * nsources) as f64;
+
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+
+            // 2 muls for each element
+            *flops.lock().unwrap() += (2 * compressed_multipoles.data().len()) as f64;
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -504,6 +514,13 @@ pub mod uniform {
                         ),
                     );
 
+                    // 2 matmuls
+                    let [a, _b] = c_u_sub.shape();
+                    let [c, _d] = c_vt_sub.shape();
+                    let [e, f] = compressed_multipoles_subset.shape();
+                    *flops.lock().unwrap() += (a * (2*e-1) * f) as f64;
+                    *flops.lock().unwrap() += (c * (2*e-1) * f) as f64;
+
                     for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                         let local_lock = compressed_level_locals[local_idx].lock().unwrap();
                         let local_ptr = local_lock.raw;
@@ -514,6 +531,11 @@ pub mod uniform {
                         local.iter_mut().zip(res).for_each(|(l, r)| *l += *r);
                     }
                 });
+
+
+            let [a, b] = self.fmm.m2l.operator_data.u.shape();
+            let [_, d] = compressed_locals.shape();
+            *flops.lock().unwrap() += (a * (2*b-1) * d) as f64;
 
             // Post process compressed locals
             rlst_blis::interface::threading::enable_threading();
@@ -529,12 +551,16 @@ pub mod uniform {
             );
             rlst_blis::interface::threading::disable_threading();
 
+
             let ptr = self.level_locals[level as usize][0].raw;
             let all_locals = unsafe { std::slice::from_raw_parts_mut(ptr, nsources * ncoeffs) };
             all_locals
                 .iter_mut()
                 .zip(result.data().iter())
                 .for_each(|(l, r)| *l += *r);
+
+
+            println!("level {:?} flops {:?}", level, flops);
         }
 
         fn m2l_scale(&self, level: u64) -> U {
