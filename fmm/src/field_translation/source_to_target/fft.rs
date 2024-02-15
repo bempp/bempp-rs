@@ -33,6 +33,8 @@ use crate::field_translation::hadamard::matmul8x8;
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
 
+    use std::sync::Mutex;
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -139,6 +141,8 @@ pub mod uniform {
 
             let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
+            let mut flops = Mutex::new(0.);
+
             ////////////////////////////////////////////////////////////////////////////////////
             // Pre-process to setup data structures for M2L kernel
             ////////////////////////////////////////////////////////////////////////////////////
@@ -195,7 +199,9 @@ pub mod uniform {
                             std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunk_size);
                     }
 
-                    U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad]);
+                    let fft_flops = U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad], true).unwrap();
+                    *flops.lock().unwrap() += fft_flops;
+
 
                     // Re-order the temporary buffer into frequency order before flushing to main memory
                     let signal_hat_chunk_f_buffer =
@@ -290,6 +296,8 @@ pub mod uniform {
                     });
                 });
 
+            *flops.lock().unwrap() += (26* 64 * 3 * nparents * size_real) as f64;
+
             ////////////////////////////////////////////////////////////////////////////////////
             // Post processing to find local expansions from check potentials
             ////////////////////////////////////////////////////////////////////////////////////
@@ -314,11 +322,14 @@ pub mod uniform {
                 });
 
             // Compute inverse FFT
-            U::irfft3_fftw_par_slice(
+            let ifft_flops = U::irfft3_fftw_par_slice(
                 check_potential_hat_c,
                 &mut check_potential,
                 &[npad, npad, npad],
+                true,
             );
+
+            *flops.lock().unwrap() += ifft_flops.unwrap();
 
             check_potential
                 .par_chunks_exact(nsiblings * size)
@@ -353,6 +364,8 @@ pub mod uniform {
                             local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                         });
                 });
+
+            println!("p={:?} l={:?} flops={:?}", self.fmm.order, level, flops);
         }
 
         fn m2l_scale(&self, level: u64) -> U {
@@ -636,7 +649,7 @@ pub mod adaptive {
                             std::slice::from_raw_parts_mut(ptr, size_real * nsiblings * chunk_size);
                     }
 
-                    U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad]);
+                    U::rfft3_fftw_slice(&mut signal_chunk, signal_hat_chunk_c, &[npad, npad, npad], false);
 
                     // Re-order the temporary buffer into frequency order before flushing to main memory
                     let signal_hat_chunk_f_buffer =
@@ -758,6 +771,7 @@ pub mod adaptive {
                 check_potential_hat_c,
                 &mut check_potential,
                 &[npad, npad, npad],
+                false,
             );
 
             check_potential
