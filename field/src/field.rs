@@ -809,15 +809,11 @@ where
             }
         }
 
-
+        // Transpose results for better cache locality in application
         let mut kernel_data_ft = Vec::new();
-
         for freq in 0..size_real {
-
             let frequency_offset = 64 * freq;
-
-            for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
-
+            for kernel_f in kernel_data_f.iter().take(26) {
                 let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
                 let k_f_ = rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [8, 8]);
                 let mut k_ft = rlst_dynamic_array2!(Complex<T>, [8, 8]);

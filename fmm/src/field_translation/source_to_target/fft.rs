@@ -32,9 +32,6 @@ use crate::field_translation::hadamard::matmul8x8;
 
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
-    use std::time::Instant;
-
-    use rlst_dense::rlst_array_from_slice2;
 
     use super::*;
 
