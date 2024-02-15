@@ -2,6 +2,13 @@
 use bempp_traits::types::Scalar;
 use num::{complex::Complex, Zero};
 
+/// The 8x8 matmul operation, always inlined
+///
+/// # Arguments
+/// * - `kernel` - The kernel data for a specific translation for a specific frequency for a set of 8 siblings.
+/// * - `signal` - The signal data at a specific frequency for a set of 8 siblings.
+/// * `save_locations` - Reference to where the check potential, in frequency space, is being stored for this frequency and set of siblings.
+/// * `scale` - The scaling factor of the M2L translation.
 #[inline(always)]
 pub fn matmul8x8<U>(
     kernel: &[Complex<U>],
