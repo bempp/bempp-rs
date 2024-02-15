@@ -18,7 +18,7 @@ use bempp_tree::types::single_node::SingleNodeTree;
 fn main() {
     let npoints = 10000;
 
-    let points = points_fixture::<f32>(npoints, None, None);
+    let points = points_fixture::<f64>(npoints, None, None);
 
     let global_idxs = (0..npoints).collect_vec();
     let charges = vec![1.0; npoints];
@@ -31,7 +31,7 @@ fn main() {
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
     let kernel = Laplace3dKernel::default();
-    let m2l_data: FftFieldTranslationKiFmm<f32, Laplace3dKernel<f32>> =
+    let m2l_data =
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
     let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);

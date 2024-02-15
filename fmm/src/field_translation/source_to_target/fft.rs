@@ -32,6 +32,7 @@ use crate::field_translation::hadamard::matmul8x8;
 
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -253,7 +254,7 @@ pub mod uniform {
             // M2L Kernel
             ////////////////////////////////////////////////////////////////////////////////////
             let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
-            let kernel_data_f = &self.fmm.m2l.operator_data.kernel_data_f;
+            let kernel_data_ft = &self.fmm.m2l.operator_data.kernel_data_f;
 
             (0..size_real)
                 .into_par_iter()
@@ -266,10 +267,10 @@ pub mod uniform {
                         let save_locations = &mut check_potential_hat_f
                             [chunk_start * nsiblings..chunk_end * nsiblings];
 
-                        for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
-                            let frequency_offset = 64 * freq;
-                            let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
-
+                        // for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
+                        for i in 0..26 {
+                            let frequency_offset = freq * 26;
+                            let k_f = &kernel_data_ft[i + frequency_offset];
                             // Lookup signals
                             let displacements = &all_displacements[i][chunk_start..chunk_end];
 
@@ -279,6 +280,7 @@ pub mod uniform {
 
                                 matmul8x8(
                                     k_f,
+                                    // k_ft.data(),
                                     s_f,
                                     &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
                                     scale,
@@ -693,7 +695,7 @@ pub mod adaptive {
             // M2L Kernel
             ////////////////////////////////////////////////////////////////////////////////////
             let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
-            let kernel_data_f = &self.fmm.m2l.operator_data.kernel_data_f;
+            let kernel_data_ft = &self.fmm.m2l.operator_data.kernel_data_f;
 
             (0..size_real)
                 .into_par_iter()
@@ -706,9 +708,9 @@ pub mod adaptive {
                         let save_locations = &mut check_potential_hat_f
                             [chunk_start * nsiblings..chunk_end * nsiblings];
 
-                        for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
-                            let frequency_offset = 64 * freq;
-                            let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
+                        for i in 0..26 {
+                            let frequency_offset = freq * 26;
+                            let k_f = &kernel_data_ft[i + frequency_offset];
 
                             // Lookup signals
                             let displacements = &all_displacements[i][chunk_start..chunk_end];
