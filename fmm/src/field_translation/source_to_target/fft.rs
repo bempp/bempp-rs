@@ -267,7 +267,6 @@ pub mod uniform {
                         let save_locations = &mut check_potential_hat_f
                             [chunk_start * nsiblings..chunk_end * nsiblings];
 
-                        // for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
                         for i in 0..26 {
                             let frequency_offset = freq * 26;
                             let k_f = &kernel_data_ft[i + frequency_offset];
@@ -280,7 +279,6 @@ pub mod uniform {
 
                                 matmul8x8(
                                     k_f,
-                                    // k_ft.data(),
                                     s_f,
                                     &mut save_locations[j * nsiblings..(j + 1) * nsiblings],
                                     scale,
