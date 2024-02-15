@@ -5,6 +5,7 @@ use num::Zero;
 use num::{Complex, Float};
 use rlst_blis::interface::gemm::Gemm;
 use rlst_common::types::Scalar;
+use rlst_dense::rlst_array_from_slice2;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -808,9 +809,26 @@ where
             }
         }
 
+
+        let mut kernel_data_ft = Vec::new();
+
+        for freq in 0..size_real {
+
+            let frequency_offset = 64 * freq;
+
+            for (i, kernel_f) in kernel_data_f.iter().enumerate().take(26) {
+
+                let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
+                let k_f_ = rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [8, 8]);
+                let mut k_ft = rlst_dynamic_array2!(Complex<T>, [8, 8]);
+                k_ft.fill_from(k_f_.view().transpose());
+                kernel_data_ft.push(k_ft.data().to_vec());
+            }
+        }
+
         FftM2lOperatorData {
             kernel_data,
-            kernel_data_f,
+            kernel_data_f: kernel_data_ft,
         }
     }
 
