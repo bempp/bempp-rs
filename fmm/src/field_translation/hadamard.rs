@@ -30,10 +30,10 @@ pub fn matmul8x8<U>(
     for i in 0..4 {
         let mut sum1: Complex<U> = Complex::zero();
         let mut sum2: Complex<U> = Complex::zero();
-        let i1 = 2*i;
-        let i2 = 2*i + 1;
+        let i1 = 2 * i;
+        let i2 = 2 * i + 1;
 
-        sum1 += kernel[i1 * 8]     * s1;
+        sum1 += kernel[i1 * 8] * s1;
         sum1 += kernel[i1 * 8 + 1] * s2;
         sum1 += kernel[i1 * 8 + 2] * s3;
         sum1 += kernel[i1 * 8 + 3] * s4;
@@ -42,7 +42,7 @@ pub fn matmul8x8<U>(
         sum1 += kernel[i1 * 8 + 6] * s7;
         sum1 += kernel[i1 * 8 + 7] * s8;
 
-        sum2 += kernel[i2 * 8]     * s1;
+        sum2 += kernel[i2 * 8] * s1;
         sum2 += kernel[i2 * 8 + 1] * s2;
         sum2 += kernel[i2 * 8 + 2] * s3;
         sum2 += kernel[i2 * 8 + 3] * s4;
