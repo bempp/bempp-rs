@@ -33,7 +33,6 @@ pub fn matmul8x8<U>(
         let i1 = 2*i;
         let i2 = 2*i + 1;
 
-
         sum1 += kernel[i1 * 8]     * s1;
         sum1 += kernel[i1 * 8 + 1] * s2;
         sum1 += kernel[i1 * 8 + 2] * s3;
@@ -52,32 +51,6 @@ pub fn matmul8x8<U>(
         sum2 += kernel[i2 * 8 + 6] * s7;
         sum2 += kernel[i2 * 8 + 7] * s8;
 
-        // sum1 += kernel[i1 * 8] * signal[0];
-        // sum1 += kernel[i1 * 8 + 1] * signal[1];
-        // sum1 += kernel[i1 * 8 + 2] * signal[2];
-        // sum1 += kernel[i1 * 8 + 3] * signal[3];
-        // sum1 += kernel[i1 * 8 + 4] * signal[4];
-        // sum1 += kernel[i1 * 8 + 5] * signal[5];
-        // sum1 += kernel[i1 * 8 + 6] * signal[6];
-        // sum1 += kernel[i1 * 8 + 7] * signal[7];
-
-        // sum2 += kernel[i2 * 8] * signal[0];
-        // sum2 += kernel[i2 * 8 + 1] * signal[1];
-        // sum2 += kernel[i2 * 8 + 2] * signal[2];
-        // sum2 += kernel[i2 * 8 + 3] * signal[3];
-        // sum2 += kernel[i2 * 8 + 4] * signal[4];
-        // sum2 += kernel[i2 * 8 + 5] * signal[5];
-        // sum2 += kernel[i2 * 8 + 6] * signal[6];
-        // sum2 += kernel[i2 * 8 + 7] * signal[7];
-
-        // sum += kernel[i * 8] * signal[0];
-        // sum += kernel[i * 8 + 1] * signal[1];
-        // sum += kernel[i * 8 + 2] * signal[2];
-        // sum += kernel[i * 8 + 3] * signal[3];
-        // sum += kernel[i * 8 + 4] * signal[4];
-        // sum += kernel[i * 8 + 5] * signal[5];
-        // sum += kernel[i * 8 + 6] * signal[6];
-        // sum += kernel[i * 8 + 7] * signal[7];
         save_locations[i1] += sum1 * scale;
         save_locations[i2] += sum2 * scale;
     }

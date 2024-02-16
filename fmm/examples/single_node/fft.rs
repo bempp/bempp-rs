@@ -16,17 +16,17 @@ use bempp_tree::implementations::helpers::points_fixture;
 use bempp_tree::types::single_node::SingleNodeTree;
 
 fn main() {
-    let npoints = 1000000;
+    let npoints = 10000;
 
     let points = points_fixture::<f64>(npoints, None, None);
 
     let global_idxs = (0..npoints).collect_vec();
     let charges = vec![1.0; npoints];
 
-    let order = 10;
+    let order = 6;
     let alpha_inner = 1.05;
     let alpha_outer = 2.95;
-    let depth = 5;
+    let depth = 3;
 
     let tree = SingleNodeTree::new(points.data(), false, None, Some(depth), &global_idxs, true);
 
