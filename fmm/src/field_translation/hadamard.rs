@@ -18,16 +18,40 @@ pub fn matmul8x8<U>(
 ) where
     U: Scalar,
 {
-    for i in 0..8 {
-        let mut sum: Complex<U> = Complex::zero();
-        sum += kernel[i * 8] * signal[0];
-        sum += kernel[i * 8 + 1] * signal[1];
-        sum += kernel[i * 8 + 2] * signal[2];
-        sum += kernel[i * 8 + 3] * signal[3];
-        sum += kernel[i * 8 + 4] * signal[4];
-        sum += kernel[i * 8 + 5] * signal[5];
-        sum += kernel[i * 8 + 6] * signal[6];
-        sum += kernel[i * 8 + 7] * signal[7];
-        save_locations[i] += sum * scale;
+    let s1 = signal[0];
+    let s2 = signal[1];
+    let s3 = signal[2];
+    let s4 = signal[3];
+    let s5 = signal[4];
+    let s6 = signal[5];
+    let s7 = signal[6];
+    let s8 = signal[7];
+
+    for i in 0..4 {
+        let mut sum1: Complex<U> = Complex::zero();
+        let mut sum2: Complex<U> = Complex::zero();
+        let i1 = 2 * i;
+        let i2 = 2 * i + 1;
+
+        sum1 += kernel[i1 * 8] * s1;
+        sum1 += kernel[i1 * 8 + 1] * s2;
+        sum1 += kernel[i1 * 8 + 2] * s3;
+        sum1 += kernel[i1 * 8 + 3] * s4;
+        sum1 += kernel[i1 * 8 + 4] * s5;
+        sum1 += kernel[i1 * 8 + 5] * s6;
+        sum1 += kernel[i1 * 8 + 6] * s7;
+        sum1 += kernel[i1 * 8 + 7] * s8;
+
+        sum2 += kernel[i2 * 8] * s1;
+        sum2 += kernel[i2 * 8 + 1] * s2;
+        sum2 += kernel[i2 * 8 + 2] * s3;
+        sum2 += kernel[i2 * 8 + 3] * s4;
+        sum2 += kernel[i2 * 8 + 4] * s5;
+        sum2 += kernel[i2 * 8 + 5] * s6;
+        sum2 += kernel[i2 * 8 + 6] * s7;
+        sum2 += kernel[i2 * 8 + 7] * s8;
+
+        save_locations[i1] += sum1 * scale;
+        save_locations[i2] += sum2 * scale;
     }
 }
