@@ -26,6 +26,8 @@ use rlst_dense::{
 
 /// Field translations for uniformly refined trees that take matrix input for charges.
 pub mod matrix {
+    use std::time::{Duration, Instant};
+
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 
     use crate::types::{FmmDataUniformMatrix, KiFmmLinearMatrix, SendPtrMut};
@@ -120,6 +122,7 @@ pub mod matrix {
             };
 
             let nsources = sources.len();
+            let mut time = Duration::new(0, 0);
 
             let all_displacements = self.displacements(level);
 
@@ -135,6 +138,7 @@ pub mod matrix {
                 [self.ncoeffs, nsources * self.ncharge_vectors]
             );
 
+            let s = Instant::now();
             rlst_blis::interface::threading::enable_threading();
             let mut compressed_multipoles = empty_array::<U, 2>()
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
@@ -144,6 +148,7 @@ pub mod matrix {
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+            time += s.elapsed();
 
             let compressed_locals_ =
                 vec![U::zero(); nsources * self.ncharge_vectors * self.fmm.m2l.k];
@@ -205,6 +210,7 @@ pub mod matrix {
                 })
                 .collect_vec();
 
+            let s = Instant::now();
             (0..316)
                 .into_par_iter()
                 .zip(multipole_idxs)
@@ -275,17 +281,31 @@ pub mod matrix {
                 });
 
             rlst_blis::interface::threading::enable_threading();
-            let result = empty_array::<U, 2>().simple_mult_into_resize(
-                self.fmm.dc2e_inv_1.view(),
-                empty_array::<U, 2>().simple_mult_into_resize(
-                    self.fmm.dc2e_inv_2.view(),
+            // let result = empty_array::<U, 2>().simple_mult_into_resize(
+            //     self.fmm.dc2e_inv_1.view(),
+            //     empty_array::<U, 2>().simple_mult_into_resize(
+            //         self.fmm.dc2e_inv_2.view(),
+            //         empty_array::<U, 2>().simple_mult_into_resize(
+            //             self.fmm.m2l.operator_data.u.view(),
+            //             compressed_locals,
+            //         ),
+            //     ),
+            // );
+            let result =
+            // empty_array::<U, 2>().simple_mult_into_resize(
+                // self.fmm.dc2e_inv_1.view(),
+                // empty_array::<U, 2>().simple_mult_into_resize(
+                    // self.fmm.dc2e_inv_2.view(),
                     empty_array::<U, 2>().simple_mult_into_resize(
                         self.fmm.m2l.operator_data.u.view(),
                         compressed_locals,
-                    ),
-                ),
-            );
+                    );
+                // ),
+            // );
             rlst_blis::interface::threading::disable_threading();
+            time += s.elapsed();
+            println!("level {:?} m2l {:?}", level, time.as_millis());
+
             let ptr = self.level_locals[level as usize][0][0].raw;
             let all_locals = unsafe {
                 std::slice::from_raw_parts_mut(ptr, nsources * self.ncoeffs * self.ncharge_vectors)
@@ -312,6 +332,8 @@ pub mod matrix {
 }
 
 pub mod uniform {
+    use std::time::{Duration, Instant};
+
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
 
     use crate::types::SendPtrMut;
@@ -420,6 +442,9 @@ pub mod uniform {
                 [ncoeffs, nsources]
             );
 
+            let mut time = Duration::new(0, 0);
+
+            let s = Instant::now();
             rlst_blis::interface::threading::enable_threading();
             let mut compressed_multipoles = empty_array::<U, 2>()
                 .simple_mult_into_resize(self.fmm.m2l.operator_data.st_block.view(), multipoles);
@@ -429,6 +454,7 @@ pub mod uniform {
                 .data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+            time += s.elapsed();
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -476,6 +502,7 @@ pub mod uniform {
             let compressed_level_locals =
                 compressed_locals_ptrs.iter().map(Mutex::new).collect_vec();
 
+            let s = Instant::now();
             (0..316)
                 .into_par_iter()
                 .zip(multipole_idxs)
@@ -517,17 +544,30 @@ pub mod uniform {
 
             // Post process compressed locals
             rlst_blis::interface::threading::enable_threading();
-            let result = empty_array::<U, 2>().simple_mult_into_resize(
-                self.fmm.dc2e_inv_1.view(),
-                empty_array::<U, 2>().simple_mult_into_resize(
-                    self.fmm.dc2e_inv_2.view(),
+            // let result = empty_array::<U, 2>().simple_mult_into_resize(
+            //     self.fmm.dc2e_inv_1.view(),
+            //     empty_array::<U, 2>().simple_mult_into_resize(
+            //         self.fmm.dc2e_inv_2.view(),
+            //         empty_array::<U, 2>().simple_mult_into_resize(
+            //             self.fmm.m2l.operator_data.u.view(),
+            //             compressed_locals,
+            //         ),
+            //     ),
+            // );
+            let result =
+            // empty_array::<U, 2>().simple_mult_into_resize(
+                // self.fmm.dc2e_inv_1.view(),
+                // empty_array::<U, 2>().simple_mult_into_resize(
+                    // self.fmm.dc2e_inv_2.view(),
                     empty_array::<U, 2>().simple_mult_into_resize(
                         self.fmm.m2l.operator_data.u.view(),
                         compressed_locals,
-                    ),
-                ),
-            );
+                    );
+                // ),
+            // );
             rlst_blis::interface::threading::disable_threading();
+            time += s.elapsed();
+            println!("level {:?} m2l {:?}", level, time.as_millis());
 
             let ptr = self.level_locals[level as usize][0].raw;
             let all_locals = unsafe { std::slice::from_raw_parts_mut(ptr, nsources * ncoeffs) };

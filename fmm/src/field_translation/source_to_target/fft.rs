@@ -33,6 +33,8 @@ use crate::field_translation::hadamard::matmul8x8;
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
 
+    use std::time::{Duration, Instant};
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
@@ -113,6 +115,8 @@ pub mod uniform {
                 return;
             };
 
+            let mut time = Duration::new(0, 0);
+
             let n = 2 * self.fmm.order - 1;
             let npad = n + 1;
 
@@ -168,6 +172,7 @@ pub mod uniform {
             let chunk_size = find_chunk_size(nparents, max_chunk_size);
 
             // Pre-processing to find FFT
+            let s = Instant::now();
             multipoles
                 .par_chunks_exact(ncoeffs * nsiblings * chunk_size)
                 .enumerate()
@@ -241,6 +246,7 @@ pub mod uniform {
                         }
                     }
                 });
+            time += s.elapsed();
 
             // Allocate check potentials (implicitly in frequency order)
             let mut check_potentials_hat_f_buffer = vec![U::zero(); 2 * size_real * ntargets];
@@ -256,6 +262,7 @@ pub mod uniform {
             let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
             let kernel_data_ft = &self.fmm.m2l.operator_data.kernel_data_f;
 
+            let s = Instant::now();
             (0..size_real)
                 .into_par_iter()
                 .zip(signals_hat_f.par_chunks_exact(ntargets + nzeros))
@@ -287,6 +294,7 @@ pub mod uniform {
                         }
                     });
                 });
+            time += s.elapsed();
 
             ////////////////////////////////////////////////////////////////////////////////////
             // Post processing to find local expansions from check potentials
@@ -311,12 +319,17 @@ pub mod uniform {
                     }
                 });
 
+
             // Compute inverse FFT
+            let s = Instant::now();
             U::irfft3_fftw_par_slice(
                 check_potential_hat_c,
                 &mut check_potential,
                 &[npad, npad, npad],
             );
+            time += s.elapsed();
+
+            println!("level {:?} m2l {:?}", level, time.as_millis());
 
             check_potential
                 .par_chunks_exact(nsiblings * size)
