@@ -33,8 +33,13 @@ pub fn create(
             }
         }
         let mut midp = rlst_dynamic_array2!(f64, [1, tdim]);
-        for (i, j) in cell.midpoint().iter().enumerate() {
-            *midp.get_mut([0, i]).unwrap() = *j;
+        let nvertices = cell.vertex_count();
+        let vertices = cell.vertices();
+        for i in 0..tdim {
+            for j in 0..nvertices {
+                *midp.get_mut([0, i]).unwrap() += vertices[j * tdim + i];
+            }
+            *midp.get_mut([0, i]).unwrap() /= nvertices as f64;
         }
         x[tdim].push(midp);
         let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
