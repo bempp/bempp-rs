@@ -1,10 +1,10 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
-use bempp_element::element::{create_element, CiarletElement};
+use bempp_element::element::{create_element, CiarletElement, ElementFamily};
 use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
+use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use itertools::izip;
 use rlst_dense::{
@@ -374,7 +374,9 @@ impl Geometry for SerialGeometry {
         element: &impl FiniteElement,
         points: &'a Self::T,
     ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a> {
-        if element.degree() == 1 && cell::create_cell(element.cell_type()).is_simplex() {
+        if element.embedded_superdegree() == 1
+            && cell::create_cell(element.cell_type()).is_simplex()
+        {
             Box::new(LinearSimplexEvaluatorTdim2Gdim3::new(self, element, points))
         } else {
             Box::new(EvaluatorTdim2Gdim3::new(self, element, points))
@@ -604,8 +606,8 @@ impl Geometry for SerialGeometry {
         }
         let element = self.element(cell);
         if element.cell_type() == ReferenceCellType::Triangle
-            && element.family() == ElementFamily::Lagrange
-            && element.degree() == 1
+            && element.is_lagrange()
+            && element.embedded_superdegree() == 1
         {
             // Map is affine
             let mut js = rlst_dynamic_array2!(f64, [npts, gdim * tdim]);

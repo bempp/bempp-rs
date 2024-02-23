@@ -100,13 +100,13 @@ pub fn export_as_gmsh(grid: &SerialGrid, fname: String) {
         };
         gmsh_s.push_str(&format!(
             "2 1 {} {}\n",
-            get_gmsh_cell(element.cell_type(), element.degree()),
+            get_gmsh_cell(element.cell_type(), element.embedded_superdegree()),
             end - start
         ));
         for i in start..end {
             let cell = grid.geometry().cell_vertices(i).unwrap();
             gmsh_s.push_str(&format!("{i}"));
-            for j in get_permutation_to_gmsh(element.cell_type(), element.degree()) {
+            for j in get_permutation_to_gmsh(element.cell_type(), element.embedded_superdegree()) {
                 gmsh_s.push_str(&format!(" {}", cell[j] + 1))
             }
             gmsh_s.push('\n');
