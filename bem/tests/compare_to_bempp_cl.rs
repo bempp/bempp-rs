@@ -1,11 +1,11 @@
 use approx::*;
 use bempp_bem::assembly::{assemble, AssemblyType, BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::create_element;
+use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily};
+use bempp_traits::element::Continuity;
 use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
 
 #[test]

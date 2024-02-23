@@ -87,10 +87,10 @@ impl<'a> FunctionSpace<'a> for SerialFunctionSpace<'a> {
 #[cfg(test)]
 mod test {
     use crate::function_space::*;
-    use bempp_element::element::create_element;
+    use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::{Continuity, ElementFamily};
+    use bempp_traits::element::Continuity;
 
     #[test]
     fn test_colouring_p1() {

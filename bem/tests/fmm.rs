@@ -2,7 +2,7 @@ use approx::*;
 use bempp_bem::assembly::batched::BatchedAssembler;
 use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::create_element;
+use bempp_element::element::{create_element, ElementFamily};
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::{
     charge::build_charge_dict,
@@ -12,7 +12,7 @@ use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily};
+use bempp_traits::element::Continuity;
 use bempp_traits::fmm::{Fmm, FmmLoop};
 use bempp_traits::grid::{Grid, Topology};
 use bempp_traits::kernel::Kernel;

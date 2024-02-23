@@ -5,7 +5,7 @@ use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_pol
 use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily, FiniteElement, MapType};
+use bempp_traits::element::{Continuity, FiniteElement, MapType};
 use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::{
     array::Array,
@@ -20,14 +20,22 @@ pub mod raviart_thomas;
 type EntityPoints = [Vec<Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>>; 4];
 type EntityWeights = [Vec<Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>>; 4];
 
+/// The family of an element
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[repr(u8)]
+pub enum ElementFamily {
+    Lagrange = 0,
+    RaviartThomas = 1,
+}
+
 pub struct CiarletElement {
     cell_type: ReferenceCellType,
+    family: ElementFamily,
     degree: usize,
-    highest_degree: usize,
+    embedded_superdegree: usize,
     map_type: MapType,
     value_shape: Vec<usize>,
     value_size: usize,
-    family: ElementFamily,
     continuity: Continuity,
     dim: usize,
     coefficients: Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
@@ -40,8 +48,8 @@ impl CiarletElement {
     /// Create a Ciarlet element
     #[allow(clippy::too_many_arguments)]
     pub fn create(
-        family: ElementFamily,
         cell_type: ReferenceCellType,
+        family: ElementFamily,
         degree: usize,
         value_shape: Vec<usize>,
         polynomial_coeffs: Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
@@ -49,7 +57,7 @@ impl CiarletElement {
         interpolation_weights: EntityWeights,
         map_type: MapType,
         continuity: Continuity,
-        highest_degree: usize,
+        embedded_superdegree: usize,
     ) -> CiarletElement {
         let mut dim = 0;
         let mut npts = 0;
@@ -131,7 +139,7 @@ impl CiarletElement {
         };
 
         // Compute the dual matrix
-        let pdim = polynomial_count(cell_type, highest_degree);
+        let pdim = polynomial_count(cell_type, embedded_superdegree);
         let mut d_matrix = rlst_dynamic_array3!(f64, [value_size, pdim, dim]);
 
         let mut dof = 0;
@@ -139,7 +147,13 @@ impl CiarletElement {
             for (e, pts) in new_pts[d].iter().enumerate() {
                 if pts.shape()[0] > 0 {
                     let mut table = rlst_dynamic_array3!(f64, [1, pdim, pts.shape()[0]]);
-                    tabulate_legendre_polynomials(cell_type, pts, highest_degree, 0, &mut table);
+                    tabulate_legendre_polynomials(
+                        cell_type,
+                        pts,
+                        embedded_superdegree,
+                        0,
+                        &mut table,
+                    );
                     let mat = &new_wts[d][e];
                     for i in 0..mat.shape()[0] {
                         for j in 0..value_size {
@@ -209,12 +223,12 @@ impl CiarletElement {
         }
         CiarletElement {
             cell_type,
+            family,
             degree,
-            highest_degree,
+            embedded_superdegree,
             map_type,
             value_shape,
             value_size,
-            family,
             continuity,
             dim,
             coefficients,
@@ -222,6 +236,16 @@ impl CiarletElement {
             // interpolation_points: new_pts,
             // interpolation_weights: new_wts,
         }
+    }
+
+    // The element family
+    pub fn family(&self) -> ElementFamily {
+        self.family
+    }
+
+    // The polynomial degree
+    pub fn degree(&self) -> usize {
+        self.degree
     }
 }
 
@@ -239,20 +263,17 @@ impl FiniteElement for CiarletElement {
     fn cell_type(&self) -> ReferenceCellType {
         self.cell_type
     }
-    fn degree(&self) -> usize {
-        self.degree
-    }
-    fn highest_degree(&self) -> usize {
-        self.highest_degree
-    }
-    fn family(&self) -> ElementFamily {
-        self.family
+    fn embedded_superdegree(&self) -> usize {
+        self.embedded_superdegree
     }
     fn continuity(&self) -> Continuity {
         self.continuity
     }
     fn dim(&self) -> usize {
         self.dim
+    }
+    fn is_lagrange(&self) -> bool {
+        self.family == ElementFamily::Lagrange
     }
     fn tabulate<
         T: RandomAccessByRef<2, Item = f64> + Shape<2>,
@@ -265,12 +286,12 @@ impl FiniteElement for CiarletElement {
     ) {
         let mut table = rlst_dynamic_array3!(
             f64,
-            legendre_shape(self.cell_type, points, self.highest_degree, nderivs,)
+            legendre_shape(self.cell_type, points, self.embedded_superdegree, nderivs,)
         );
         tabulate_legendre_polynomials(
             self.cell_type,
             points,
-            self.highest_degree,
+            self.embedded_superdegree,
             nderivs,
             &mut table,
         );

@@ -1,9 +1,9 @@
 //! Raviart-Thomas elements
 
-use crate::element::{create_cell, CiarletElement};
+use crate::element::{create_cell, CiarletElement, ElementFamily};
 use crate::polynomials::polynomial_count;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily, MapType};
+use bempp_traits::element::{Continuity, MapType};
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
 /// Create a Raviart-Thomas element
@@ -70,8 +70,8 @@ pub fn create(
     }
 
     CiarletElement::create(
-        ElementFamily::RaviartThomas,
         cell_type,
+        ElementFamily::RaviartThomas,
         degree,
         vec![2],
         wcoeffs,

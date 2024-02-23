@@ -3,14 +3,6 @@
 use crate::cell::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
-/// The family of an element
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-#[repr(u8)]
-pub enum ElementFamily {
-    Lagrange = 0,
-    RaviartThomas = 1,
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum Continuity {
@@ -48,14 +40,11 @@ pub trait FiniteElement {
     /// The reference cell type
     fn cell_type(&self) -> ReferenceCellType;
 
-    /// The polynomial degree
-    fn degree(&self) -> usize;
-
     /// The highest degree polynomial in the element's polynomial set
-    fn highest_degree(&self) -> usize;
+    fn embedded_superdegree(&self) -> usize;
 
-    // The element family
-    fn family(&self) -> ElementFamily;
+    /// Check if the element is a Lagrange element
+    fn is_lagrange(&self) -> bool;
 
     /// The number of basis functions
     fn dim(&self) -> usize;
