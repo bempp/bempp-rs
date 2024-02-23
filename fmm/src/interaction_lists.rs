@@ -2,9 +2,7 @@
 use itertools::Itertools;
 use rlst_common::types::Scalar;
 
-use bempp_traits::{
-    field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
-};
+use bempp_traits::{field::SourceToTargetData, fmm::InteractionLists, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::{MortonKey, MortonKeys};
 use num::Float;
 
@@ -14,7 +12,7 @@ impl<T, U, V, W> InteractionLists for KiFmmLinear<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
+    V: SourceToTargetData<U>,
     W: Scalar + Float + Default,
 {
     type Tree = T;
@@ -136,7 +134,7 @@ impl<T, U, V, W> InteractionLists for KiFmmLinearMatrix<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
+    V: SourceToTargetData<U>,
     W: Scalar + Float + Default,
 {
     type Tree = T;

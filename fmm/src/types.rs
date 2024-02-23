@@ -2,8 +2,8 @@
 use std::collections::HashMap;
 
 use bempp_traits::fmm::KiFmm;
-use bempp_traits::kernel::ScaleInvariantKernel;
-use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::Tree};
+use bempp_traits::kernel::ScaleInvariantHomogenousKernel;
+use bempp_traits::{field::SourceToTargetData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
 use num::{Complex, Float};
@@ -219,7 +219,7 @@ pub struct KiFmmLinear<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
+    V: SourceToTargetData<U>,
     W: Scalar + Float + Default,
 {
     /// The expansion order
@@ -268,7 +268,7 @@ pub struct KiFmmLinearMatrix<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
+    V: SourceToTargetData<U>,
     W: Scalar + Float + Default,
 {
     /// The expansion order
@@ -348,8 +348,8 @@ impl<T> Default for SendPtr<T> {
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
-    U: FieldTranslationData<T>,
+    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    U: SourceToTargetData<T>,
     V: Float + Scalar<Real = V> + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
@@ -522,8 +522,8 @@ where
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
-    U: FieldTranslationData<T>,
+    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    U: SourceToTargetData<T>,
     V: Float + Scalar<Real = V> + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
@@ -774,8 +774,8 @@ where
 // Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
-    U: FieldTranslationData<T>,
+    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    U: SourceToTargetData<T>,
     V: Float + Scalar<Real = V> + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
@@ -969,7 +969,7 @@ mod test {
     };
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_traits::field::FieldTranslationData;
+    use bempp_traits::field::SourceToTargetData;
     use bempp_traits::fmm::Fmm;
     use bempp_traits::tree::Tree;
     use bempp_tree::{

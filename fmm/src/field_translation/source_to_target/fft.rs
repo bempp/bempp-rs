@@ -7,9 +7,9 @@ use std::collections::HashSet;
 use bempp_field::{fft::Fft, types::FftFieldTranslationKiFmm};
 
 use bempp_traits::{
-    field::{FieldTranslation, FieldTranslationData},
+    field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, InteractionLists},
-    kernel::{Kernel, ScaleInvariantKernel},
+    kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::Tree,
     types::{EvalType, Scalar},
 };
@@ -33,12 +33,14 @@ use crate::field_translation::hadamard::matmul8x8;
 /// Field translations defined on uniformly refined trees.
 pub mod uniform {
 
+    use bempp_traits::field::SourceToTargetHomogenousScaleInvariant;
+
     use super::*;
 
     impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -88,11 +90,11 @@ pub mod uniform {
         }
     }
 
-    impl<T, U> FieldTranslation<U>
+    impl<T, U> SourceToTarget<U>
         for FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -253,7 +255,7 @@ pub mod uniform {
             ////////////////////////////////////////////////////////////////////////////////////
             // M2L Kernel
             ////////////////////////////////////////////////////////////////////////////////////
-            let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
+            let scale = Complex::from(self.s2t_scale(level) * self.fmm.kernel.scale(level));
             let kernel_data_ft = &self.fmm.m2l.operator_data.kernel_data_f;
 
             (0..size_real)
@@ -353,7 +355,39 @@ pub mod uniform {
                 });
         }
 
-        fn m2l_scale(&self, level: u64) -> U {
+        //     fn s2t_scale(&self, level: u64) -> U {
+        //         if level < 2 {
+        //             panic!("M2L only perfomed on level 2 and below")
+        //         }
+
+        //         if level == 2 {
+        //             U::from(1. / 2.).unwrap()
+        //         } else {
+        //             let two = U::from(2.0).unwrap();
+        //             Scalar::powf(two, U::from(level - 3).unwrap())
+        //         }
+        // }
+    }
+
+    impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
+        for FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+    where
+        T: Kernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
+            + std::marker::Send
+            + std::marker::Sync
+            + Default,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
+        Complex<U>: Scalar,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    {
+        fn s2t_scale(&self, level: u64) -> U {
             if level < 2 {
                 panic!("M2L only perfomed on level 2 and below")
             }
@@ -370,6 +404,7 @@ pub mod uniform {
 
 /// Field translations defined on adaptively refined
 pub mod adaptive {
+    use bempp_traits::field::SourceToTargetHomogenousScaleInvariant;
     use rlst_dense::rlst_array_from_slice2;
 
     use super::*;
@@ -377,7 +412,7 @@ pub mod adaptive {
     impl<T, U> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -433,11 +468,11 @@ pub mod adaptive {
         }
     }
 
-    impl<T, U> FieldTranslation<U>
+    impl<T, U> SourceToTarget<U>
         for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -692,7 +727,7 @@ pub mod adaptive {
             ////////////////////////////////////////////////////////////////////////////////////
             // M2L Kernel
             ////////////////////////////////////////////////////////////////////////////////////
-            let scale = Complex::from(self.m2l_scale(level) * self.fmm.kernel.scale(level));
+            let scale = Complex::from(self.s2t_scale(level) * self.fmm.kernel.scale(level));
             let kernel_data_ft = &self.fmm.m2l.operator_data.kernel_data_f;
 
             (0..size_real)
@@ -791,7 +826,29 @@ pub mod adaptive {
                 });
         }
 
-        fn m2l_scale(&self, level: u64) -> U {
+        // fn s2t_scale(&self, level: u64) -> U {
+        // }
+    }
+
+    impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
+        for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+    where
+        T: Kernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
+            + std::marker::Send
+            + std::marker::Sync
+            + Default,
+        U: Scalar<Real = U>
+            + Float
+            + Default
+            + std::marker::Send
+            + std::marker::Sync
+            + Fft
+            + rlst_blis::interface::gemm::Gemm,
+        Complex<U>: Scalar,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    {
+        fn s2t_scale(&self, level: u64) -> U {
             if level < 2 {
                 panic!("M2L only perfomed on level 2 and below")
             }

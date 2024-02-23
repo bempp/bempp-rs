@@ -4,7 +4,7 @@ use num::Float;
 use crate::kernel::Kernel;
 
 /// Container for metadata associated with a field translation implementation.
-pub trait FieldTranslationData<T>
+pub trait SourceToTargetData<T>
 where
     T: Kernel,
 {
@@ -39,17 +39,15 @@ where
 }
 
 /// Interface for field translations.
-pub trait FieldTranslation<T>
+pub trait SourceToTarget<T>
 where
     T: Float + Scalar<Real = T> + Default,
 {
-    /// # Warning
-    /// This method is only applicable to homogeneous kernels, which are currently
-    /// implemented by our software. This method is staged to be deprecated.
-    ///
-    /// # Arguments
-    /// * `level` - The level of the tree at which a field translation is being applied.
-    fn m2l_scale(&self, level: u64) -> T;
+    // /// # Warning
+    // /// This method is only applicable to homogeneous kernels, which are currently
+    // /// implemented by our software. This method is staged to be deprecated.
+    // ///
+    // fn s2t_scale(&self, level: u64) -> T;
 
     /// Interface for a field translation operation, takes place over each level of an octree.
     ///
@@ -64,4 +62,14 @@ where
     /// # Arguments
     /// * `level` - The level of the tree at which a field translation is being applied.
     fn p2l(&self, level: u64);
+}
+
+pub trait SourceToTargetHomogenousScaleInvariant<T>
+where
+    Self: SourceToTarget<T>,
+    T: Float + Scalar<Real = T> + Default,
+{
+    /// # Arguments
+    /// * `level` - The level of the tree at which a field translation is being applied.
+    fn s2t_scale(&self, level: u64) -> T;
 }

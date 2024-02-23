@@ -6,9 +6,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use bempp_traits::{
-    field::{FieldTranslation, FieldTranslationData},
+    field::{SourceToTarget, SourceToTargetData},
     fmm::Fmm,
-    kernel::{Kernel, ScaleInvariantKernel},
+    kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::Tree,
     types::Scalar,
 };
@@ -27,6 +27,7 @@ use rlst_dense::{
 /// Field translations for uniformly refined trees that take matrix input for charges.
 pub mod matrix {
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
+    use bempp_traits::field::SourceToTargetHomogenousScaleInvariant;
 
     use crate::types::{FmmDataUniformMatrix, KiFmmLinearMatrix, SendPtrMut};
 
@@ -39,7 +40,7 @@ pub mod matrix {
         >
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -96,14 +97,14 @@ pub mod matrix {
     }
 
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
-    impl<T, U> FieldTranslation<U>
+    impl<T, U> SourceToTarget<U>
         for FmmDataUniformMatrix<
             KiFmmLinearMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>,
             U,
         >
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -143,7 +144,7 @@ pub mod matrix {
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
-                .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+                .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.s2t_scale(level));
 
             let compressed_locals_ =
                 vec![U::zero(); nsources * self.ncharge_vectors * self.fmm.m2l.k];
@@ -295,8 +296,25 @@ pub mod matrix {
                 .zip(result.data().iter())
                 .for_each(|(l, r)| *l += *r);
         }
+    }
 
-        fn m2l_scale(&self, level: u64) -> U {
+    impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
+        for FmmDataUniformMatrix<
+            KiFmmLinearMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>,
+            U,
+        >
+    where
+        T: Kernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
+            + std::marker::Send
+            + std::marker::Sync
+            + Default,
+        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: Float + Default,
+        U: std::marker::Send + std::marker::Sync + Default,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    {
+        fn s2t_scale(&self, level: u64) -> U {
             if level < 2 {
                 panic!("M2L only perfomed on level 2 and below")
             }
@@ -313,6 +331,7 @@ pub mod matrix {
 
 pub mod uniform {
     use bempp_field::types::SvdFieldTranslationKiFmmRcmp;
+    use bempp_traits::field::SourceToTargetHomogenousScaleInvariant;
 
     use crate::types::SendPtrMut;
 
@@ -322,7 +341,7 @@ pub mod uniform {
         FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -379,14 +398,14 @@ pub mod uniform {
     }
 
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
-    impl<T, U> FieldTranslation<U>
+    impl<T, U> SourceToTarget<U>
         for FmmDataUniform<
             KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>,
             U,
         >
     where
         T: Kernel<T = U>
-            + ScaleInvariantKernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -428,7 +447,7 @@ pub mod uniform {
             compressed_multipoles
                 .data_mut()
                 .iter_mut()
-                .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.m2l_scale(level));
+                .for_each(|d| *d *= self.fmm.kernel.scale(level) * self.s2t_scale(level));
 
             let multipole_idxs = all_displacements
                 .iter()
@@ -536,8 +555,25 @@ pub mod uniform {
                 .zip(result.data().iter())
                 .for_each(|(l, r)| *l += *r);
         }
+    }
 
-        fn m2l_scale(&self, level: u64) -> U {
+    impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
+        for FmmDataUniform<
+            KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmmRcmp<U, T>, U>,
+            U,
+        >
+    where
+        T: Kernel<T = U>
+            + ScaleInvariantHomogenousKernel<T = U>
+            + std::marker::Send
+            + std::marker::Sync
+            + Default,
+        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: Float + Default,
+        U: std::marker::Send + std::marker::Sync + Default,
+        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    {
+        fn s2t_scale(&self, level: u64) -> U {
             if level < 2 {
                 panic!("M2L only perfomed on level 2 and below")
             }

@@ -6,9 +6,9 @@ use num::Float;
 use rayon::prelude::*;
 
 use bempp_traits::{
-    field::FieldTranslationData,
+    field::SourceToTargetData,
     fmm::{Fmm, SourceTranslation},
-    kernel::{Kernel, ScaleInvariantKernel},
+    kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::Tree,
     types::EvalType,
 };
@@ -30,8 +30,11 @@ use rlst_dense::{
 
 impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
-    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
+    T: Kernel<T = V>
+        + ScaleInvariantHomogenousKernel<T = V>
+        + std::marker::Send
+        + std::marker::Sync,
+    U: SourceToTargetData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V>
         + Float
         + Default
@@ -200,8 +203,11 @@ where
 
 impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
-    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
+    T: Kernel<T = V>
+        + ScaleInvariantHomogenousKernel<T = V>
+        + std::marker::Send
+        + std::marker::Sync,
+    U: SourceToTargetData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V>
         + Float
         + Default
@@ -368,8 +374,11 @@ where
 impl<T, U, V> SourceTranslation
     for FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
-    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
+    T: Kernel<T = V>
+        + ScaleInvariantHomogenousKernel<T = V>
+        + std::marker::Send
+        + std::marker::Sync,
+    U: SourceToTargetData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V>
         + Float
         + Default

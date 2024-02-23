@@ -1,5 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use bempp_traits::kernel::ScaleInvariantKernel;
+use bempp_traits::kernel::ScaleInvariantHomogenousKernel;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
@@ -19,7 +19,7 @@ use rlst_dense::{
 };
 use std::collections::HashSet;
 
-use bempp_traits::{field::FieldTranslationData, kernel::Kernel, types::EvalType};
+use bempp_traits::{field::SourceToTargetData, kernel::Kernel, types::EvalType};
 use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
@@ -38,7 +38,7 @@ use crate::{
     },
 };
 
-impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
+impl<T, U> SourceToTargetData<U> for SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
@@ -175,7 +175,7 @@ where
     }
 }
 
-impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmRcmp<T, U>
+impl<T, U> SourceToTargetData<U> for SvdFieldTranslationKiFmmRcmp<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
@@ -343,11 +343,11 @@ where
     }
 }
 
-impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmIA<T, U>
+impl<T, U> SourceToTargetData<U> for SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
-    U: Kernel<T = T> + ScaleInvariantKernel<T = T> + Default,
+    U: Kernel<T = T> + ScaleInvariantHomogenousKernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type TransferVector = Vec<TransferVector>;
@@ -586,7 +586,7 @@ impl<T, U> SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
-    U: Kernel<T = T> + Default + ScaleInvariantKernel<T = T>,
+    U: Kernel<T = T> + Default + ScaleInvariantHomogenousKernel<T = T>,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
@@ -623,7 +623,7 @@ where
     }
 }
 
-impl<T, U> FieldTranslationData<U> for FftFieldTranslationKiFmm<T, U>
+impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
     T: Scalar<Real = T> + Float + Default + Fft,
     Complex<T>: Scalar,
