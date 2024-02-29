@@ -6,6 +6,7 @@ use bempp_traits::kernel::ScaleInvariantHomogenousKernel;
 use bempp_traits::{field::SourceToTargetData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
+use bempp_field::field::ncoeffs;
 use num::{Complex, Float};
 use rlst_common::types::Scalar;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
@@ -362,7 +363,7 @@ where
         global_charges: &ChargeDict<V>,
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
-            let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+            let ncoeffs = ncoeffs(fmm.order);
             let nkeys = keys.len();
             let leaves = fmm.tree().get_all_leaves().unwrap();
             let nleaves = leaves.len();
@@ -537,7 +538,7 @@ where
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
             if !fmm.tree().adaptive {
-                let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+                let ncoeffs = ncoeffs(fmm.order);
                 let nkeys = keys.len();
                 let leaves = fmm.tree().get_all_leaves().unwrap();
                 let nleaves = leaves.len();
@@ -789,7 +790,7 @@ where
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
             if fmm.tree().adaptive {
-                let ncoeffs = fmm.m2l.ncoeffs(fmm.order);
+                let ncoeffs = ncoeffs(fmm.order);
                 let nkeys = keys.len();
                 let leaves = fmm.tree().get_all_leaves().unwrap();
                 let nleaves = leaves.len();
@@ -965,7 +966,7 @@ where
 mod test {
     use crate::{
         charge::build_charge_dict,
-        types::{FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix},
+        types::{FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix, ncoeffs},
     };
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -1153,7 +1154,7 @@ mod test {
 
             let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
 
-            let ncoeffs = datatree.fmm.m2l.ncoeffs(order);
+            let ncoeffs = ncoeffs(order);
             let nleaves = datatree.fmm.tree().get_all_leaves_set().len();
             let nkeys = datatree.fmm.tree().get_all_keys_set().len();
 

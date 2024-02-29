@@ -777,10 +777,8 @@ mod test {
     use super::*;
     use rlst_dense::rlst_array_from_slice2;
 
-    use bempp_field::types::{
-        FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA,
-        SvdFieldTranslationKiFmmRcmp,
-    };
+    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
+
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::{points_fixture, points_fixture_sphere};
 
@@ -886,7 +884,7 @@ mod test {
 
         let kernel = Laplace3dKernel::default();
 
-        let m2l_data = SvdFieldTranslationKiFmmRcmp::new(
+        let m2l_data = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
             Some(70),
             0.999999,
@@ -1060,7 +1058,7 @@ mod test {
         let tree = SingleNodeTree::new(points, false, None, Some(depth), global_idxs, sparse);
 
         // Precompute the M2L data
-        let m2l_data = SvdFieldTranslationKiFmmRcmp::new(
+        let m2l_data = SvdFieldTranslationKiFmm::new(
             kernel.clone(),
             Some(1000),
             0.999999,

@@ -13,6 +13,7 @@ use bempp_traits::{
     types::EvalType,
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_field::field::ncoeffs;
 
 use crate::{
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
@@ -42,14 +43,14 @@ where
         + std::marker::Send
         + rlst_blis::interface::gemm::Gemm,
 {
-    /// Point to multipole evaluations, multithreaded over each leaf box.
+    /// Point to multipole evaluations, multithreaded over each leaff box.
     fn p2m<'a>(&self) {
         let Some(leaves) = self.fmm.tree().get_all_leaves() else {
             return;
         };
 
         let nleaves = leaves.len();
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
 
@@ -131,7 +132,7 @@ where
             return;
         };
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
         let nsiblings = 8;
 
         // 1. Lookup parents and corresponding children that exist for this set of sources
@@ -222,7 +223,7 @@ where
         };
 
         let nleaves = leaves.len();
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         let mut check_potentials = rlst_dynamic_array2!(V, [nleaves * ncoeffs, 1]);
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
@@ -302,7 +303,7 @@ where
             return;
         };
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
         let nsiblings = 8;
 
         // 1. Lookup parents and corresponding children that exist for this set of sources
@@ -602,7 +603,7 @@ mod test {
 
         // Associate data with the FMM
         let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
+        let ncoeffs = ncoeffs(datatree.fmm.order);
 
         // Upward pass
         {
@@ -829,7 +830,7 @@ mod test {
         let datatree = FmmDataAdaptive::new(fmm, &charge_dict).unwrap();
 
         // Associate data with the FMM
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
+        let ncoeffs = ncoeffs(datatree.fmm.order);
 
         // Run P2M
         datatree.p2m();
@@ -912,7 +913,7 @@ mod test {
         let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
 
         // Associate data with the FMM
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
+        let ncoeffs = ncoeffs(datatree.fmm.order);
 
         // Run P2M
         datatree.p2m();

@@ -13,6 +13,7 @@ use bempp_traits::{
     types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_field::field::ncoeffs;
 
 use crate::{
     constants::L2L_MAX_CHUNK_SIZE,
@@ -48,7 +49,7 @@ where
         };
 
         let nsiblings = 8;
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         let parent_sources: HashSet<MortonKey> =
             child_targets.iter().map(|source| source.parent()).collect();
@@ -117,7 +118,7 @@ where
             return;
         };
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
         let dim = self.fmm.kernel.space_dimension();
@@ -272,7 +273,7 @@ where
         };
 
         let nsiblings = 8;
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         let mut child_targets = child_targets.iter().cloned().collect_vec();
         child_targets.sort();
@@ -329,7 +330,7 @@ where
         let dim = self.fmm.kernel.space_dimension();
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         leaves
             .par_iter()
@@ -386,7 +387,7 @@ where
             return;
         };
 
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let ncoeffs = ncoeffs(self.fmm.order);
 
         let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
         let dim = self.fmm.kernel.space_dimension();

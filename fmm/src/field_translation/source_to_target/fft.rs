@@ -14,6 +14,7 @@ use bempp_traits::{
     types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_field::field::ncoeffs;
 
 use crate::helpers::find_chunk_size;
 use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
@@ -126,7 +127,7 @@ pub mod uniform {
             parents.sort();
             let nparents = parents.len();
 
-            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+            let ncoeffs = ncoeffs(self.fmm.order);
             let nsiblings = 8;
             let nzeros = 8;
             let size = npad * npad * npad;
@@ -491,7 +492,7 @@ pub mod adaptive {
                 return;
             };
 
-            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+            let ncoeffs = ncoeffs(self.fmm.order);
             let dim = self.fmm.kernel().space_dimension();
             let surface_size = ncoeffs * dim;
             let min_idx = self.fmm.tree().key_to_index.get(&targets[0]).unwrap();
@@ -595,7 +596,7 @@ pub mod adaptive {
             parents.sort();
             let nparents = parents.len();
 
-            let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+            let ncoeffs = ncoeffs(self.fmm.order);
             let nsiblings = 8;
             let nzeros = 8;
             let size = npad * npad * npad;
