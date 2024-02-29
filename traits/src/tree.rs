@@ -13,15 +13,8 @@ pub trait Tree {
     /// The computational domain defined by the tree.
     type Domain;
 
+    /// The precision of the point data
     type Precision: Scalar<Real = Self::Precision> + Float + Default;
-
-    /// The type of points that define a tree.
-    type Point: Point<Self::Precision>;
-
-    /// Slice of points.
-    type PointSlice<'a>: IntoIterator<Item = &'a Self::Point>
-    where
-        Self: 'a;
 
     /// A tree node.
     type NodeIndex: MortonKeyInterface;
@@ -33,14 +26,6 @@ pub trait Tree {
 
     /// Copy of nodes
     type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
-
-    /// Global indices of points
-    type GlobalIndex;
-
-    /// Slice of global indices
-    type GlobalIndexSlice<'a>: IntoIterator<Item = &'a Self::GlobalIndex>
-    where
-        Self: 'a;
 
     /// Get depth of tree.
     fn get_depth(&self) -> u64;
@@ -55,16 +40,10 @@ pub trait Tree {
     fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>>;
 
     /// Get a reference to all keys as a set, gets local keys in a multi-node setting.
-    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex>;
+    fn get_all_keys_set(&self) -> Option<&'_ HashSet<Self::NodeIndex>>;
 
     /// Get a reference to all leaves as a set, gets local keys in a multi-node setting.
-    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex>;
-
-    /// Gets a reference to the points contained with a leaf node.
-    fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
-
-    /// Gets a reference to the points contained with a leaf node.
-    fn get_all_points(&self) -> Option<Self::PointSlice<'_>>;
+    fn get_all_leaves_set(&self) -> Option<&'_ HashSet<Self::NodeIndex>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]>;
@@ -87,17 +66,14 @@ pub trait Tree {
     /// Get a map from the key to leaf index position in sorted leaves
     fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
 
-    /// Checks whether a a given node corresponds to a leaf
-    fn is_leaf(&self, key: &Self::NodeIndex) -> bool;
-
-    /// Checks whether a a given node is contained in the tree
-    fn is_node(&self, key: &Self::NodeIndex) -> bool;
 }
 
-pub trait Point<T>
-where
-    T: Scalar<Real = T> + Float + Default,
-{
+pub trait FmmTree {
+    type Tree: Tree;
+
+    fn get_source_tree(&self) -> &Self::Tree;
+
+    fn get_target_tree(&self) -> &Self::Tree;
 }
 
 /// A minimal interface for Morton Key like nodes.

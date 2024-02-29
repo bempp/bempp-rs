@@ -91,7 +91,7 @@ pub mod uniform {
         }
     }
 
-    impl<T, U> SourceToTarget<U>
+    impl<T, U> SourceToTarget
         for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
@@ -469,7 +469,7 @@ pub mod adaptive {
         }
     }
 
-    impl<T, U> SourceToTarget<U>
+    impl<T, U> SourceToTarget
         for FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>

@@ -82,6 +82,7 @@ where
     pub global_indices: Vec<usize>,
 }
 
+
 pub struct FmmDataUniformMatrix<T, U>
 where
     T: Fmm,
@@ -366,7 +367,7 @@ where
             let nkeys = keys.len();
             let leaves = fmm.tree().get_all_leaves().unwrap();
             let nleaves = leaves.len();
-            let npoints = fmm.tree().get_all_points().unwrap().len();
+            let npoints = fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
 
             let multipoles = vec![V::default(); ncoeffs * nkeys];
             let locals = vec![V::default(); ncoeffs * nkeys];
@@ -443,8 +444,8 @@ where
 
                 // Assign potential pointers
                 let npoints;
-                if let Some(points) = fmm.tree().get_points(leaf) {
-                    npoints = points.len();
+                if let Some(points) = fmm.tree().get_coordinates(leaf) {
+                    npoints = points.len() / fmm.kernel.space_dimension();
                 } else {
                     npoints = 0;
                 }
@@ -541,7 +542,7 @@ where
                 let nkeys = keys.len();
                 let leaves = fmm.tree().get_all_leaves().unwrap();
                 let nleaves = leaves.len();
-                let npoints = fmm.tree().get_all_points().unwrap().len();
+                let npoints = fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
                 let ncharge_vectors = global_charges.len();
 
                 let multipoles = vec![V::default(); ncoeffs * nkeys * ncharge_vectors];
@@ -670,8 +671,8 @@ where
 
                     // Assign potential pointers
                     let npoints;
-                    if let Some(points) = fmm.tree().get_points(leaf) {
-                        npoints = points.len();
+                    if let Some(points) = fmm.tree().get_coordinates(leaf) {
+                        npoints = points.len() / fmm.kernel.space_dimension();
                     } else {
                         npoints = 0;
                     }
@@ -781,7 +782,7 @@ where
                 let nkeys = keys.len();
                 let leaves = fmm.tree().get_all_leaves().unwrap();
                 let nleaves = leaves.len();
-                let npoints = fmm.tree().get_all_points().unwrap().len();
+                let npoints = fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
 
                 let multipoles = vec![V::default(); ncoeffs * nkeys];
                 let locals = vec![V::default(); ncoeffs * nkeys];
@@ -859,8 +860,8 @@ where
 
                     // Assign potential pointers
                     let npoints;
-                    if let Some(points) = fmm.tree().get_points(leaf) {
-                        npoints = points.len();
+                    if let Some(points) = fmm.tree().get_coordinates(leaf) {
+                        npoints = points.len() / fmm.kernel.space_dimension();
                     } else {
                         npoints = 0;
                     }
@@ -1129,8 +1130,8 @@ mod test {
             let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
 
             let ncoeffs = ncoeffs(order);
-            let nleaves = datatree.fmm.tree().get_all_leaves_set().len();
-            let nkeys = datatree.fmm.tree().get_all_keys_set().len();
+            let nleaves = datatree.fmm.tree().get_all_leaves_set().unwrap().len();
+            let nkeys = datatree.fmm.tree().get_all_keys_set().unwrap().len();
 
             // Test that the number of of coefficients is being correctly assigned
             assert_eq!(datatree.multipoles.len(), ncoeffs * nkeys);

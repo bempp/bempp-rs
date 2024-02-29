@@ -28,13 +28,13 @@ where
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && key.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_leaves_set().unwrap().contains(nc) && key.is_adjacent(nc))
             .collect();
 
         // Key level
         let mut neighbors_adj: Vec<MortonKey> = neighbours
             .iter()
-            .filter(|n| self.tree.get_all_leaves_set().contains(n) && key.is_adjacent(n))
+            .filter(|n| self.tree.get_all_leaves_set().unwrap().contains(n) && key.is_adjacent(n))
             .cloned()
             .collect();
 
@@ -43,7 +43,7 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_leaves_set().contains(pn) && key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_leaves_set().unwrap().contains(pn) && key.is_adjacent(pn))
             .collect();
 
         u_list.append(&mut neighbors_children_adj);
@@ -71,7 +71,7 @@ where
                 .neighbors()
                 .iter()
                 .flat_map(|pn| pn.children())
-                .filter(|pnc| self.tree.get_all_keys_set().contains(pnc) && !key.is_adjacent(pnc))
+                .filter(|pnc| self.tree.get_all_keys_set().unwrap().contains(pnc) && !key.is_adjacent(pnc))
                 .collect_vec();
 
             if !v_list.is_empty() {
@@ -95,7 +95,7 @@ where
             .neighbors()
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_keys_set().contains(nc) && !leaf.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_keys_set().unwrap().contains(nc) && !leaf.is_adjacent(nc))
             .collect_vec();
 
         if !w_list.is_empty() {
@@ -116,7 +116,7 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_keys_set().contains(pn) && !key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_keys_set().unwrap().contains(pn) && !key.is_adjacent(pn))
             .collect_vec();
 
         if !x_list.is_empty() {
@@ -150,13 +150,13 @@ where
         let mut neighbors_children_adj: Vec<MortonKey> = neighbours
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_leaves_set().contains(nc) && key.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_leaves_set().unwrap().contains(nc) && key.is_adjacent(nc))
             .collect();
 
         // Key level
         let mut neighbors_adj: Vec<MortonKey> = neighbours
             .iter()
-            .filter(|n| self.tree.get_all_leaves_set().contains(n) && key.is_adjacent(n))
+            .filter(|n| self.tree.get_all_leaves_set().unwrap().contains(n) && key.is_adjacent(n))
             .cloned()
             .collect();
 
@@ -165,7 +165,7 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_leaves_set().contains(pn) && key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_leaves_set().unwrap().contains(pn) && key.is_adjacent(pn))
             .collect();
 
         u_list.append(&mut neighbors_children_adj);
@@ -193,7 +193,7 @@ where
                 .neighbors()
                 .iter()
                 .flat_map(|pn| pn.children())
-                .filter(|pnc| self.tree.get_all_keys_set().contains(pnc) && !key.is_adjacent(pnc))
+                .filter(|pnc| self.tree.get_all_keys_set().unwrap().contains(pnc) && !key.is_adjacent(pnc))
                 .collect_vec();
 
             if !v_list.is_empty() {
@@ -217,7 +217,7 @@ where
             .neighbors()
             .iter()
             .flat_map(|n| n.children())
-            .filter(|nc| self.tree.get_all_keys_set().contains(nc) && !leaf.is_adjacent(nc))
+            .filter(|nc| self.tree.get_all_keys_set().unwrap().contains(nc) && !leaf.is_adjacent(nc))
             .collect_vec();
 
         if !w_list.is_empty() {
@@ -238,7 +238,7 @@ where
             .parent()
             .neighbors()
             .into_iter()
-            .filter(|pn| self.tree.get_all_keys_set().contains(pn) && !key.is_adjacent(pn))
+            .filter(|pn| self.tree.get_all_keys_set().unwrap().contains(pn) && !key.is_adjacent(pn))
             .collect_vec();
 
         if !x_list.is_empty() {

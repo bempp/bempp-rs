@@ -1,6 +1,9 @@
 //! FMM traits
 use std::collections::HashMap;
 
+use cauchy::Scalar;
+use num::Float;
+
 use crate::kernel::Kernel;
 use crate::tree::Tree;
 use crate::types::EvalType;
@@ -57,9 +60,9 @@ pub trait Fmm {
 }
 
 pub trait NewFmm {
-    type T: cauchy::Scalar;
-    fn evaluate_vec(&self, eval_type: EvalType, charges_vec: &[Self::T], result: &mut [Self::T]);
-    fn evaluate_mat(&self, eval_type: EvalType, charges_mat: &[Self::T], result: &mut [Self::T]);
+    type Precision: Scalar + Default + Float;
+    fn evaluate_vec(&self, eval_type: EvalType, charges_vec: &[Self::Precision], result: &mut [Self::Precision]);
+    fn evaluate_mat(&self, eval_type: EvalType, charges_mat: &[Self::Precision], result: &mut [Self::Precision]);
     fn get_expansion_order(&self) -> usize;
     fn get_ncoeffs(&self) -> usize;
 }

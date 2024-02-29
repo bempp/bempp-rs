@@ -28,9 +28,7 @@ where
 }
 
 /// Interface for field translations.
-pub trait SourceToTarget<T>
-where
-    T: Float + Scalar<Real = T> + Default,
+pub trait SourceToTarget
 {
     /// Interface for a field translation operation, takes place over each level of an octree.
     ///
@@ -49,7 +47,7 @@ where
 
 pub trait SourceToTargetHomogenousScaleInvariant<T>
 where
-    Self: SourceToTarget<T>,
+    Self: SourceToTarget,
     T: Float + Scalar<Real = T> + Default,
 {
     /// # Arguments

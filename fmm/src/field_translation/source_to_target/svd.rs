@@ -64,7 +64,7 @@ pub mod matrix {
                     .iter()
                     .flat_map(|pn| pn.children())
                     .filter(|pnc| {
-                        !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().contains(pnc)
+                        !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().unwrap().contains(pnc)
                     })
                     .collect_vec();
 
@@ -98,7 +98,7 @@ pub mod matrix {
     }
 
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
-    impl<T, U> SourceToTarget<U>
+    impl<T, U> SourceToTarget
         for FmmDataUniformMatrix<
             KiFmmMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
             U,
@@ -364,7 +364,7 @@ pub mod uniform {
                     .iter()
                     .flat_map(|pn| pn.children())
                     .filter(|pnc| {
-                        !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().contains(pnc)
+                        !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().unwrap().contains(pnc)
                     })
                     .collect_vec();
 
@@ -398,7 +398,7 @@ pub mod uniform {
     }
 
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
-    impl<T, U> SourceToTarget<U>
+    impl<T, U> SourceToTarget
         for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>

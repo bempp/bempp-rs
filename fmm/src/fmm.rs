@@ -417,7 +417,7 @@ impl<T, U> FmmLoop for FmmDataAdaptive<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
-    FmmDataAdaptive<T, U>: SourceTranslation + SourceToTarget<U> + TargetTranslation,
+    FmmDataAdaptive<T, U>: SourceTranslation + SourceToTarget + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {
         match time {
@@ -533,7 +533,7 @@ impl<T, U> FmmLoop for FmmDataUniform<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
-    FmmDataUniform<T, U>: SourceTranslation + SourceToTarget<U> + TargetTranslation,
+    FmmDataUniform<T, U>: SourceTranslation + SourceToTarget + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {
         match time {
@@ -638,7 +638,7 @@ impl<T, U> FmmLoop for FmmDataUniformMatrix<T, U>
 where
     T: Fmm,
     U: Scalar<Real = U> + Float + Default,
-    FmmDataUniformMatrix<T, U>: SourceTranslation + SourceToTarget<U> + TargetTranslation,
+    FmmDataUniformMatrix<T, U>: SourceTranslation + SourceToTarget + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {
         match time {
