@@ -18,7 +18,6 @@ mod field_translation {
     pub mod target;
 }
 
-
 // Temporary files to be moved over onto main source
 pub mod new_types;
 pub mod tree;

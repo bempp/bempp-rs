@@ -64,7 +64,8 @@ pub mod matrix {
                     .iter()
                     .flat_map(|pn| pn.children())
                     .filter(|pnc| {
-                        !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().unwrap().contains(pnc)
+                        !source.is_adjacent(pnc)
+                            && self.fmm.tree().get_all_keys_set().unwrap().contains(pnc)
                     })
                     .collect_vec();
 
@@ -364,7 +365,8 @@ pub mod uniform {
                     .iter()
                     .flat_map(|pn| pn.children())
                     .filter(|pnc| {
-                        !source.is_adjacent(pnc) && self.fmm.tree().get_all_keys_set().unwrap().contains(pnc)
+                        !source.is_adjacent(pnc)
+                            && self.fmm.tree().get_all_keys_set().unwrap().contains(pnc)
                     })
                     .collect_vec();
 

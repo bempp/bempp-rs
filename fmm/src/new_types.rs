@@ -1,12 +1,24 @@
 use std::collections::HashMap;
 
-use bempp_traits::{field::{SourceToTarget, SourceToTargetData, SourceToTargetHomogenousScaleInvariant}, fmm::{NewFmm, SourceTranslation, TargetTranslation}, kernel::Kernel, tree::{FmmTree, Tree}};
+use bempp_field::{
+    fft::Fft,
+    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
+};
+use bempp_traits::{
+    field::{SourceToTarget, SourceToTargetData, SourceToTargetHomogenousScaleInvariant},
+    fmm::{Fmm, NewFmm, SourceTranslation, TargetTranslation},
+    kernel::{Kernel, ScaleInvariantHomogenousKernel},
+    tree::{FmmTree, Tree},
+};
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use cauchy::Scalar;
-use num::Float;
+use num::{traits::real::Real, Complex, Float};
+use rlst_blis::interface::gemm::Gemm;
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, traits::MatrixSvd,
+};
 
 use crate::types::{C2EType, SendPtrMut};
-
 
 /// Combines the old datatree + Fmm structs into a single storage of metadata
 pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar + Default> {
@@ -90,67 +102,64 @@ pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar +
     pub global_indices: Vec<usize>,
 }
 
-
-impl <T, U, V, W>SourceTranslation for NewKiFmm<T, U, V, W>
+impl<T, U, V, W> SourceTranslation for NewKiFmm<T, U, V, W>
 where
     T: FmmTree,
     U: SourceToTargetData<V>,
     V: Kernel,
-    W: Scalar + Default
-
+    W: Scalar + Default,
 {
-
     fn m2m(&self, level: u64) {}
 
     fn p2m(&self) {}
 }
 
-
-impl <T, U, V, W>TargetTranslation for NewKiFmm<T, U, V, W>
+impl<T, U, V, W> TargetTranslation for NewKiFmm<T, U, V, W>
 where
     T: FmmTree,
     U: SourceToTargetData<V>,
     V: Kernel,
-    W: Scalar + Default
-
+    W: Scalar + Default,
 {
-    fn l2l(&self, level: u64) {
+    fn l2l(&self, level: u64) {}
 
-    }
+    fn l2p(&self) {}
 
-    fn l2p(&self) {
+    fn m2p(&self) {}
 
-    }
-
-    fn m2p(&self) {
-
-    }
-
-    fn p2p(&self) {
-
-    }
+    fn p2p(&self) {}
 }
 
-impl <T, U, V, W> SourceToTarget for NewKiFmm<T, U, V, W>
+impl<T, U, V> SourceToTarget for NewKiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
-    T: FmmTree,
-    U: SourceToTargetData<V>,
-    V: Kernel,
-    W: Scalar + Default
+    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    U: Scalar<Real = U>
+        + Float
+        + Default
+        + std::marker::Send
+        + std::marker::Sync
+        + Fft
+        + rlst_blis::interface::gemm::Gemm,
+    Complex<U>: Scalar,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    V: FmmTree,
 {
     fn m2l(&self, level: u64) {}
 
     fn p2l(&self, level: u64) {}
 }
 
-impl <T, U, V, W> SourceToTargetHomogenousScaleInvariant<W> for NewKiFmm<T, U, V, W>
+/// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
+impl<T, U, V> SourceToTarget for NewKiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
 where
-    T: FmmTree,
-    U: SourceToTargetData<V>,
-    V: Kernel,
-    W: Scalar<Real = W> + Float + Default
+    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+    U: Float + Default,
+    U: std::marker::Send + std::marker::Sync + Default,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    V: FmmTree,
 {
-    fn s2t_scale(&self, level: u64) -> W {
-        W::from(1.).unwrap()
-    }
+    fn m2l(&self, level: u64) {}
+
+    fn p2l(&self, level: u64) {}
 }

@@ -65,7 +65,6 @@ pub trait Tree {
 
     /// Get a map from the key to leaf index position in sorted leaves
     fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
-
 }
 
 pub trait FmmTree {

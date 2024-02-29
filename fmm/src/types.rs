@@ -82,7 +82,6 @@ where
     pub global_indices: Vec<usize>,
 }
 
-
 pub struct FmmDataUniformMatrix<T, U>
 where
     T: Fmm,
@@ -367,7 +366,8 @@ where
             let nkeys = keys.len();
             let leaves = fmm.tree().get_all_leaves().unwrap();
             let nleaves = leaves.len();
-            let npoints = fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
+            let npoints =
+                fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
 
             let multipoles = vec![V::default(); ncoeffs * nkeys];
             let locals = vec![V::default(); ncoeffs * nkeys];
@@ -542,7 +542,8 @@ where
                 let nkeys = keys.len();
                 let leaves = fmm.tree().get_all_leaves().unwrap();
                 let nleaves = leaves.len();
-                let npoints = fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
+                let npoints =
+                    fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
                 let ncharge_vectors = global_charges.len();
 
                 let multipoles = vec![V::default(); ncoeffs * nkeys * ncharge_vectors];
@@ -782,7 +783,8 @@ where
                 let nkeys = keys.len();
                 let leaves = fmm.tree().get_all_leaves().unwrap();
                 let nleaves = leaves.len();
-                let npoints = fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
+                let npoints =
+                    fmm.tree().get_all_coordinates().unwrap().len() / fmm.kernel.space_dimension();
 
                 let multipoles = vec![V::default(); ncoeffs * nkeys];
                 let locals = vec![V::default(); ncoeffs * nkeys];

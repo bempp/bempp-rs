@@ -28,8 +28,7 @@ where
 }
 
 /// Interface for field translations.
-pub trait SourceToTarget
-{
+pub trait SourceToTarget {
     /// Interface for a field translation operation, takes place over each level of an octree.
     ///
     /// # Arguments

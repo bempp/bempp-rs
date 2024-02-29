@@ -20,11 +20,9 @@ use crate::helpers::find_chunk_size;
 use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmm, SendPtrMut};
 
 use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
+    array::empty_array,
     rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut},
+    traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
 use rlst_dense::traits::RandomAccessMut;
@@ -47,7 +45,6 @@ pub mod uniform {
             + Default,
         U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
         Complex<U>: Scalar,
-        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
             let nneighbors = 26;
@@ -107,7 +104,6 @@ pub mod uniform {
             + Fft
             + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l(&self, _level: u64) {}
 
@@ -386,7 +382,6 @@ pub mod uniform {
             + Fft
             + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn s2t_scale(&self, level: u64) -> U {
             if level < 2 {
@@ -425,7 +420,6 @@ pub mod adaptive {
             + Fft
             + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
             let nneighbors = 26;
@@ -485,7 +479,6 @@ pub mod adaptive {
             + Fft
             + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l<'a>(&self, level: u64) {
             let Some(targets) = self.fmm.tree().get_keys(level) else {
@@ -847,7 +840,6 @@ pub mod adaptive {
             + Fft
             + rlst_blis::interface::gemm::Gemm,
         Complex<U>: Scalar,
-        Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn s2t_scale(&self, level: u64) -> U {
             if level < 2 {
