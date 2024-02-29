@@ -717,14 +717,6 @@ where
     type NodeIndexSlice<'a> = &'a [MortonKey]
         where T: 'a;
     type NodeIndices = MortonKeys;
-    type Point = Point<Self::Precision>;
-
-    type PointSlice<'a> = &'a [Point<T>]
-        where T: 'a;
-
-    type GlobalIndex = usize;
-    type GlobalIndexSlice<'a> = &'a [usize]
-        where T: 'a;
 
     fn get_depth(&self) -> u64 {
         self.depth
@@ -746,28 +738,16 @@ where
         Some(&self.keys)
     }
 
-    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex> {
-        &self.keys_set
+    fn get_all_keys_set(&self) -> Option<&'_ HashSet<Self::NodeIndex>> {
+        Some(&self.keys_set)
     }
 
-    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex> {
-        &self.leaves_set
+    fn get_all_leaves_set(&self) -> Option<&'_ HashSet<Self::NodeIndex>> {
+        Some(&self.leaves_set)
     }
 
     fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
         Some(&self.leaves)
-    }
-
-    fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>> {
-        if let Some(&(l, r)) = self.leaves_to_points.get(key) {
-            Some(&self.points.points[l..r])
-        } else {
-            None
-        }
-    }
-
-    fn get_all_points(&self) -> Option<Self::PointSlice<'_>> {
-        Some(&self.points.points)
     }
 
     fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
@@ -802,13 +782,13 @@ where
         self.leaf_to_index.get(key)
     }
 
-    fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
-        self.leaves_set.contains(key)
-    }
+    // fn is_leaf(&self, key: &Self::NodeIndex) -> bool {
+    //     self.leaves_set.contains(key)
+    // }
 
-    fn is_node(&self, key: &Self::NodeIndex) -> bool {
-        self.keys_set.contains(key)
-    }
+    // fn is_node(&self, key: &Self::NodeIndex) -> bool {
+    //     self.keys_set.contains(key)
+    // }
 }
 
 #[cfg(test)]
@@ -868,8 +848,8 @@ mod test {
         let mut unique_leaves = HashSet::new();
 
         // Test that only a subset of the leaves contain any points
-        for leaf in tree.get_all_leaves_set().iter() {
-            if let Some(_points) = tree.get_points(leaf) {
+        for leaf in tree.get_all_leaves_set().unwrap().iter() {
+            if let Some(_points) = tree.get_coordinates(leaf) {
                 unique_leaves.insert(leaf.morton);
             }
         }
@@ -939,7 +919,7 @@ mod test {
             if key != ROOT {
                 let siblings = key.siblings();
                 for sibling in siblings.iter() {
-                    assert!(tree.get_all_keys_set().contains(sibling));
+                    assert!(tree.get_all_keys_set().unwrap().contains(sibling));
                 }
             }
         }
@@ -1144,8 +1124,8 @@ mod test {
             // Get all points at this level
             if let Some(nodes) = tree.get_keys(level) {
                 for node in nodes.iter() {
-                    if let Some(points) = tree.get_points(node) {
-                        tot += points.len()
+                    if let Some(points) = tree.get_coordinates(node) {
+                        tot += points.len() / 3
                     }
                 }
             }
@@ -1173,8 +1153,8 @@ mod test {
             // Get all points at this level
             if let Some(nodes) = tree.get_keys(level) {
                 for node in nodes.iter() {
-                    if let Some(points) = tree.get_points(node) {
-                        tot += points.len()
+                    if let Some(points) = tree.get_coordinates(node) {
+                        tot += points.len() / 3
                     }
                 }
             }
