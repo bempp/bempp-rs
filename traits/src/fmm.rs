@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use crate::kernel::Kernel;
 use crate::tree::Tree;
+use crate::types::EvalType;
 
 /// Interface for source box translations.
 pub trait SourceTranslation {
@@ -55,15 +56,12 @@ pub trait Fmm {
     fn tree(&self) -> &Self::Tree;
 }
 
-pub trait KiFmm
-where
-    Self: Fmm,
-{
-    /// Scaling of inner check or equivalent surface with respect to a box.
-    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
-
-    /// Scaling of outer check or equivalent surface with respect to a box.
-    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
+pub trait NewFmm {
+    type T: cauchy::Scalar;
+    fn evaluate_vec(&self, eval_type: EvalType, charges_vec: &[Self::T], result: &mut [Self::T]);
+    fn evaluate_mat(&self, eval_type: EvalType, charges_mat: &[Self::T], result: &mut [Self::T]);
+    fn get_expansion_order(&self) -> usize;
+    fn get_ncoeffs(&self) -> usize;
 }
 
 /// Dictionary containing timings

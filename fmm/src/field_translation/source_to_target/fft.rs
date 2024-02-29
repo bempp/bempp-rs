@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use bempp_field::{fft::Fft, types::FftFieldTranslationKiFmm};
 
+use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, InteractionLists},
@@ -14,10 +15,9 @@ use bempp_traits::{
     types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
-use bempp_field::field::ncoeffs;
 
 use crate::helpers::find_chunk_size;
-use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmmLinear, SendPtrMut};
+use crate::types::{FmmDataAdaptive, FmmDataUniform, KiFmm, SendPtrMut};
 
 use rlst_dense::{
     array::{empty_array, Array},
@@ -38,7 +38,7 @@ pub mod uniform {
 
     use super::*;
 
-    impl<T, U> FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+    impl<T, U> FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -92,7 +92,7 @@ pub mod uniform {
     }
 
     impl<T, U> SourceToTarget<U>
-        for FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+        for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -371,7 +371,7 @@ pub mod uniform {
     }
 
     impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
-        for FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+        for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -410,7 +410,7 @@ pub mod adaptive {
 
     use super::*;
 
-    impl<T, U> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+    impl<T, U> FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -470,7 +470,7 @@ pub mod adaptive {
     }
 
     impl<T, U> SourceToTarget<U>
-        for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+        for FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -832,7 +832,7 @@ pub mod adaptive {
     }
 
     impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
-        for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
+        for FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>

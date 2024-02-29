@@ -1,12 +1,11 @@
 //! Data structures FMM data and metadata.
 use std::collections::HashMap;
 
-use bempp_traits::fmm::KiFmm;
+use bempp_field::field::ncoeffs;
 use bempp_traits::kernel::ScaleInvariantHomogenousKernel;
 use bempp_traits::{field::SourceToTargetData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
-use bempp_field::field::ncoeffs;
 use num::{Complex, Float};
 use rlst_common::types::Scalar;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
@@ -216,7 +215,7 @@ where
 }
 
 /// Type to store data associated with the kernel independent (KiFMM) in.
-pub struct KiFmmLinear<T, U, V, W>
+pub struct KiFmm<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
@@ -265,7 +264,7 @@ where
 }
 
 /// Type to store data associated with the kernel independent (KiFMM) in for matrix input FMMs.
-pub struct KiFmmLinearMatrix<T, U, V, W>
+pub struct KiFmmMatrix<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
@@ -347,7 +346,7 @@ impl<T> Default for SendPtr<T> {
 }
 
 /// Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U, V> FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> FmmDataUniform<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
@@ -359,7 +358,7 @@ where
     /// `fmm` - A single node KiFMM object.
     /// `global_charges` - The charge data associated to the point data via unique global indices.
     pub fn new(
-        fmm: KiFmmLinear<SingleNodeTree<V>, T, U, V>,
+        fmm: KiFmm<SingleNodeTree<V>, T, U, V>,
         global_charges: &ChargeDict<V>,
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
@@ -467,10 +466,10 @@ where
             // For each key form both upward and downward check surfaces
             for (i, key) in keys.iter().enumerate() {
                 let upward_surface =
-                    key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+                    key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer);
 
                 let downward_surface =
-                    key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner());
+                    key.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_inner);
 
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
@@ -483,10 +482,10 @@ where
             let mut leaf_downward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
             for (i, leaf) in leaves.iter().enumerate() {
                 let upward_surface =
-                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer);
 
                 let downward_surface =
-                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer());
+                    leaf.compute_surface(fmm.tree().get_domain(), fmm.order(), fmm.alpha_outer);
 
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
@@ -521,7 +520,7 @@ where
 }
 
 /// Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U, V> FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> FmmDataUniformMatrix<KiFmmMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
@@ -533,7 +532,7 @@ where
     /// `fmm` - A single node KiFMM object.
     /// `global_charges` - The charge data associated to the point data via unique global indices.
     pub fn new(
-        fmm: KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>,
+        fmm: KiFmmMatrix<SingleNodeTree<V>, T, U, V>,
         global_charges: &[ChargeDict<V>],
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
@@ -700,17 +699,11 @@ where
 
                 // For each key form both upward and downward check surfaces
                 for (i, key) in keys.iter().enumerate() {
-                    let upward_surface = key.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_outer(),
-                    );
+                    let upward_surface =
+                        key.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer);
 
-                    let downward_surface = key.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_inner(),
-                    );
+                    let downward_surface =
+                        key.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_inner);
 
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
@@ -722,17 +715,11 @@ where
                 let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
                 let mut leaf_downward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
                 for (i, leaf) in leaves.iter().enumerate() {
-                    let upward_surface = leaf.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_outer(),
-                    );
+                    let upward_surface =
+                        leaf.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer);
 
-                    let downward_surface = leaf.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_outer(),
-                    );
+                    let downward_surface =
+                        leaf.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer);
 
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
@@ -773,7 +760,7 @@ where
 }
 
 // Implementation of the data structure to store the data for the single node KiFMM.
-impl<T, U, V> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> FmmDataAdaptive<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
@@ -785,7 +772,7 @@ where
     /// `fmm` - A single node KiFMM object.
     /// `global_charges` - The charge data associated to the point data via unique global indices.
     pub fn new(
-        fmm: KiFmmLinear<SingleNodeTree<V>, T, U, V>,
+        fmm: KiFmm<SingleNodeTree<V>, T, U, V>,
         global_charges: &ChargeDict<V>,
     ) -> Result<Self, String> {
         if let Some(keys) = fmm.tree().get_all_keys() {
@@ -894,17 +881,11 @@ where
 
                 // For each key form both upward and downward check surfaces
                 for (i, key) in keys.iter().enumerate() {
-                    let upward_surface = key.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_outer(),
-                    );
+                    let upward_surface =
+                        key.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer);
 
-                    let downward_surface = key.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_inner(),
-                    );
+                    let downward_surface =
+                        key.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_inner);
 
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
@@ -916,17 +897,11 @@ where
                 let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
                 let mut leaf_downward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
                 for (i, leaf) in leaves.iter().enumerate() {
-                    let upward_surface = leaf.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_outer(),
-                    );
+                    let upward_surface =
+                        leaf.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer);
 
-                    let downward_surface = leaf.compute_surface(
-                        fmm.tree().get_domain(),
-                        fmm.order(),
-                        fmm.alpha_outer(),
-                    );
+                    let downward_surface =
+                        leaf.compute_surface(&fmm.tree.domain, fmm.order, fmm.alpha_outer);
 
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
@@ -966,7 +941,7 @@ where
 mod test {
     use crate::{
         charge::build_charge_dict,
-        types::{FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix, ncoeffs},
+        types::{ncoeffs, FmmDataUniform, FmmDataUniformMatrix, KiFmm, KiFmmMatrix},
     };
     use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -1018,8 +993,7 @@ mod test {
                 alpha_inner,
             );
 
-            let fmm =
-                KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+            let fmm = KiFmmMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
             // Form charge dicts, matching all charges with their associated global indices
             let charge_dicts: Vec<_> = (0..ncharge_vecs)
@@ -1147,7 +1121,7 @@ mod test {
                 alpha_inner,
             );
 
-            let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
+            let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data_fft);
 
             // Form charge dict, matching charges with their associated global indices
             let charge_dict = build_charge_dict(&global_idxs[..], &charges[..]);

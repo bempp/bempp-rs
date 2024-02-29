@@ -71,11 +71,7 @@ where
     type OperatorData = SvdSourceToTargetOperatorData<T>;
     type Domain = Domain<T>;
 
-    fn set_operator_data<'a>(
-        &mut self,
-        order: usize,
-        domain: Self::Domain,
-    ) {
+    fn set_operator_data<'a>(&mut self, order: usize, domain: Self::Domain) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -221,7 +217,6 @@ where
             c_vt,
         };
         self.operator_data = result;
-
     }
 
     fn set_expansion_order(&mut self, expansion_order: usize) {
@@ -231,7 +226,6 @@ where
     fn set_kernel(&mut self, kernel: U) {
         self.kernel = kernel;
     }
-
 }
 
 impl<T, U> SvdFieldTranslationKiFmm<T, U>
@@ -265,7 +259,7 @@ where
             kernel,
             operator_data: SvdSourceToTargetOperatorData::default(),
             transfer_vectors: vec![],
-            expansion_order: 0
+            expansion_order: 0,
         };
         let ncoeffs = ncoeffs(order);
         if let Some(k) = k {
@@ -283,7 +277,6 @@ where
 
         result
     }
-
 }
 
 impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
@@ -296,11 +289,7 @@ where
 
     type OperatorData = FftM2lOperatorData<Complex<T>>;
 
-    fn set_operator_data(
-        &mut self,
-        order: usize,
-        domain: Self::Domain,
-    ) {
+    fn set_operator_data(&mut self, order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
@@ -497,7 +486,6 @@ where
     fn set_kernel(&mut self, kernel: U) {
         self.kernel = kernel;
     }
-
 }
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
@@ -521,7 +509,7 @@ where
             conv_to_surf_map: Vec::default(),
             operator_data: FftM2lOperatorData::default(),
             transfer_vectors: Vec::default(),
-            expansion_order: 0
+            expansion_order: 0,
         };
 
         // Create maps between surface and convolution grids
@@ -664,10 +652,10 @@ mod test {
     use super::*;
     use crate::fft::Fft;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use bempp_traits::kernel::Kernel;
     use cauchy::{c32, c64};
     use num::complex::Complex;
     use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut};
-    use bempp_traits::kernel::Kernel;
 
     // #[test]
     // pub fn test_svd_operator_data() {

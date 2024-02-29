@@ -6,7 +6,7 @@ use bempp_element::element::create_element;
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::{
     charge::build_charge_dict,
-    types::{FmmDataUniform, KiFmmLinear},
+    types::{FmmDataUniform, KiFmm},
 };
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
@@ -183,7 +183,7 @@ fn fmm_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpac
         );
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinear::new(
+        let fmm = KiFmm::new(
             order,
             alpha_inner,
             alpha_outer,
@@ -384,7 +384,7 @@ fn test_fmm_result() {
 
     let m2l_data =
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-    let fmm = KiFmmLinear::new(
+    let fmm = KiFmm::new(
         order,
         alpha_inner,
         alpha_outer,

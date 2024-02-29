@@ -6,9 +6,9 @@ use bempp_traits::{field::SourceToTargetData, fmm::InteractionLists, kernel::Ker
 use bempp_tree::types::morton::{MortonKey, MortonKeys};
 use num::Float;
 
-use crate::types::{KiFmmLinear, KiFmmLinearMatrix};
+use crate::types::{KiFmm, KiFmmMatrix};
 
-impl<T, U, V, W> InteractionLists for KiFmmLinear<T, U, V, W>
+impl<T, U, V, W> InteractionLists for KiFmm<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,
@@ -130,7 +130,7 @@ where
     }
 }
 
-impl<T, U, V, W> InteractionLists for KiFmmLinearMatrix<T, U, V, W>
+impl<T, U, V, W> InteractionLists for KiFmmMatrix<T, U, V, W>
 where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,

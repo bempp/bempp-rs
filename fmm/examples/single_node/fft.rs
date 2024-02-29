@@ -8,7 +8,7 @@ use rlst_dense::traits::RawAccess;
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::{
     charge::build_charge_dict,
-    types::{FmmDataUniform, KiFmmLinear},
+    types::{FmmDataUniform, KiFmm},
 };
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::{fmm::FmmLoop, tree::Tree};
@@ -34,7 +34,7 @@ fn main() {
     let m2l_data =
         FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-    let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+    let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
     // Form charge dict, matching charges with their associated global indices
     let charge_dict = build_charge_dict(&global_idxs, &charges);

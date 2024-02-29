@@ -14,7 +14,7 @@ use rlst_dense::{
 
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
-    fmm::{Fmm, FmmLoop, KiFmm as KiFmmTrait, SourceTranslation, TargetTranslation, TimeDict},
+    fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
     kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::Tree,
     types::EvalType,
@@ -22,11 +22,11 @@ use bempp_traits::{
 
 use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
-use crate::{pinv::pinv, types::KiFmmLinear};
+use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmMatrix};
+use crate::{pinv::pinv, types::KiFmm};
 
 /// Implementation of constructor for single node KiFMM
-impl<T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
+impl<T, U, V> KiFmm<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
@@ -178,23 +178,7 @@ where
     }
 }
 
-impl<T, U, V, W> KiFmmTrait for KiFmmLinear<T, U, V, W>
-where
-    T: Tree,
-    U: Kernel<T = W>,
-    V: SourceToTargetData<U>,
-    W: Scalar + Float + Default,
-{
-    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_inner
-    }
-
-    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_outer
-    }
-}
-
-impl<T, U, V, W> Fmm for KiFmmLinear<T, U, V, W>
+impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
@@ -218,7 +202,7 @@ where
 }
 
 /// Implementation of constructor for single node KiFMM
-impl<T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
+impl<T, U, V> KiFmmMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
@@ -406,23 +390,7 @@ where
     }
 }
 
-impl<T, U, V, W> KiFmmTrait for KiFmmLinearMatrix<T, U, V, W>
-where
-    T: Tree,
-    U: Kernel<T = W>,
-    V: SourceToTargetData<U>,
-    W: Scalar + Float + Default,
-{
-    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_inner
-    }
-
-    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_outer
-    }
-}
-
-impl<T, U, V, W> Fmm for KiFmmLinearMatrix<T, U, V, W>
+impl<T, U, V, W> Fmm for KiFmmMatrix<T, U, V, W>
 where
     T: Tree,
     U: Kernel<T = W>,
@@ -803,7 +771,7 @@ mod test {
         let m2l_data: FftFieldTranslationKiFmm<f64, Laplace3dKernel<f64>> =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(global_idxs, charges);
@@ -893,7 +861,7 @@ mod test {
             alpha_inner,
         );
 
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(global_idxs, charges);
@@ -973,7 +941,7 @@ mod test {
         let m2l_data: FftFieldTranslationKiFmm<f64, Laplace3dKernel<f64>> =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(global_idxs, charges);
@@ -1067,7 +1035,7 @@ mod test {
             alpha_inner,
         );
 
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmmMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dicts: Vec<_> = (0..ncharge_vecs)

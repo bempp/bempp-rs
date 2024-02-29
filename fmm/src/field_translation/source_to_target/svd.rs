@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
+use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::Fmm,
@@ -13,9 +14,8 @@ use bempp_traits::{
     types::Scalar,
 };
 use bempp_tree::types::single_node::SingleNodeTree;
-use bempp_field::field::ncoeffs;
 
-use crate::types::{FmmDataUniform, KiFmmLinear};
+use crate::types::{FmmDataUniform, KiFmm};
 
 use rlst_dense::{
     array::{empty_array, Array},
@@ -30,13 +30,13 @@ pub mod matrix {
     use bempp_field::types::SvdFieldTranslationKiFmm;
     use bempp_traits::field::SourceToTargetHomogenousScaleInvariant;
 
-    use crate::types::{FmmDataUniformMatrix, KiFmmLinearMatrix, SendPtrMut};
+    use crate::types::{FmmDataUniformMatrix, KiFmmMatrix, SendPtrMut};
 
     use super::*;
 
     impl<T, U>
         FmmDataUniformMatrix<
-            KiFmmLinearMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
+            KiFmmMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
             U,
         >
     where
@@ -100,7 +100,7 @@ pub mod matrix {
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
     impl<T, U> SourceToTarget<U>
         for FmmDataUniformMatrix<
-            KiFmmLinearMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
+            KiFmmMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
             U,
         >
     where
@@ -301,7 +301,7 @@ pub mod matrix {
 
     impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
         for FmmDataUniformMatrix<
-            KiFmmLinearMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
+            KiFmmMatrix<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
             U,
         >
     where
@@ -338,8 +338,7 @@ pub mod uniform {
 
     use super::*;
 
-    impl<T, U>
-        FmmDataUniform<KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
+    impl<T, U> FmmDataUniform<KiFmm<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -400,10 +399,7 @@ pub mod uniform {
 
     /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
     impl<T, U> SourceToTarget<U>
-        for FmmDataUniform<
-            KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
-            U,
-        >
+        for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>
@@ -559,10 +555,7 @@ pub mod uniform {
     }
 
     impl<T, U> SourceToTargetHomogenousScaleInvariant<U>
-        for FmmDataUniform<
-            KiFmmLinear<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>,
-            U,
-        >
+        for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, SvdFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
             + ScaleInvariantHomogenousKernel<T = U>

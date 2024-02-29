@@ -8,7 +8,6 @@ pub trait SourceToTargetData<T>
 where
     T: Kernel,
 {
-
     /// Metadata for applying each to source to target translation, depends on both the kernel
     /// and translation method
     type OperatorData;
@@ -21,16 +20,11 @@ where
     /// # Arguments
     /// * `order` - the order of expansions used in constructing the surface grid
     /// * `domain` - Domain associated with the global point set.
-    fn set_operator_data(
-        &mut self,
-        order: usize,
-        domain: Self::Domain,
-    );
+    fn set_operator_data(&mut self, order: usize, domain: Self::Domain);
 
     fn set_expansion_order(&mut self, expansion_order: usize);
 
     fn set_kernel(&mut self, kernel: T);
-
 }
 
 /// Interface for field translations.

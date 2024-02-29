@@ -5,6 +5,7 @@ use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
 
+use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::SourceToTargetData,
     fmm::{Fmm, InteractionLists, TargetTranslation},
@@ -13,14 +14,11 @@ use bempp_traits::{
     types::{EvalType, Scalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
-use bempp_field::field::ncoeffs;
 
 use crate::{
     constants::L2L_MAX_CHUNK_SIZE,
     helpers::find_chunk_size,
-    types::{
-        FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix,
-    },
+    types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmm, KiFmmMatrix},
 };
 
 use rlst_dense::{
@@ -29,7 +27,7 @@ use rlst_dense::{
     traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
-impl<T, U, V> TargetTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> TargetTranslation for FmmDataUniform<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>
         + ScaleInvariantHomogenousKernel<T = V>
@@ -253,7 +251,7 @@ where
     }
 }
 
-impl<T, U, V> TargetTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> TargetTranslation for FmmDataAdaptive<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>
         + ScaleInvariantHomogenousKernel<T = V>
@@ -520,8 +518,7 @@ where
     }
 }
 
-impl<T, U, V> TargetTranslation
-    for FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> TargetTranslation for FmmDataUniformMatrix<KiFmmMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>
         + ScaleInvariantHomogenousKernel<T = V>

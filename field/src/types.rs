@@ -40,7 +40,7 @@ where
     /// The associated kernel with this translation operator.
     pub kernel: U,
 
-    pub expansion_order: usize
+    pub expansion_order: usize,
 }
 
 /// A type to store the M2L field translation meta-data and data for an SVD based sparsification in the kernel independent FMM.
@@ -71,7 +71,7 @@ where
     /// The associated kernel with this translation operator.
     pub kernel: U,
 
-    pub expansion_order: usize
+    pub expansion_order: usize,
 }
 
 /// A type to store a transfer vector between a `source` and `target` Morton key.

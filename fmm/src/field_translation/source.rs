@@ -5,6 +5,7 @@ use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
 
+use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::SourceToTargetData,
     fmm::{Fmm, SourceTranslation},
@@ -13,14 +14,11 @@ use bempp_traits::{
     types::EvalType,
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
-use bempp_field::field::ncoeffs;
 
 use crate::{
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
     helpers::find_chunk_size,
-    types::{
-        FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix,
-    },
+    types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmm, KiFmmMatrix},
 };
 use bempp_traits::types::Scalar;
 use rlst_dense::{
@@ -29,7 +27,7 @@ use rlst_dense::{
     traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
-impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>
         + ScaleInvariantHomogenousKernel<T = V>
@@ -202,7 +200,7 @@ where
     }
 }
 
-impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>
         + ScaleInvariantHomogenousKernel<T = V>
@@ -372,8 +370,7 @@ where
     }
 }
 
-impl<T, U, V> SourceTranslation
-    for FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V> SourceTranslation for FmmDataUniformMatrix<KiFmmMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V>
         + ScaleInvariantHomogenousKernel<T = V>
@@ -596,7 +593,7 @@ mod test {
         let m2l_data: FftFieldTranslationKiFmm<f64, Laplace3dKernel<f64>> =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
 
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(global_idxs, charges);
@@ -664,7 +661,7 @@ mod test {
         // Precompute the M2L data
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmmMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dicts: Vec<_> = (0..ncharge_vecs)
@@ -822,7 +819,7 @@ mod test {
         // Precompute the M2L data
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(global_idxs, charges);
@@ -905,7 +902,7 @@ mod test {
         // Precompute the M2L data
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmm::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dict = build_charge_dict(global_idxs, charges);
@@ -989,7 +986,7 @@ mod test {
         // Precompute the M2L data
         let m2l_data =
             FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let fmm = KiFmmMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
 
         // Form charge dict, matching charges with their associated global indices
         let charge_dicts: Vec<_> = (0..ncharge_vecs)
