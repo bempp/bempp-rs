@@ -49,7 +49,6 @@ impl<T: Float + Default> Domain<T> {
     }
 
     pub fn union(&self, other: &Self) -> Self {
-
         // Find minimum origin
         let min_x = self.origin[0].min(other.origin[0]);
         let min_y = self.origin[1].min(other.origin[1]);
@@ -69,7 +68,6 @@ impl<T: Float + Default> Domain<T> {
             diameter: max_diameter,
         }
     }
-
 
     /// Construct a domain a user specified origin and diameter.
     ///

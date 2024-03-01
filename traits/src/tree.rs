@@ -5,7 +5,6 @@ use std::hash::Hash;
 use cauchy::Scalar;
 use num::Float;
 
-
 pub trait LenAndIntoIterator<'a> {
     type Item;
     type IntoIter: IntoIterator<Item = Self::Item>;

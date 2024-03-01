@@ -199,14 +199,13 @@ where
         n_crit: Option<u64>,
         sparse: Option<bool>,
     ) -> Self {
-
         // Source and target trees calcualted over the same domain
         let source_domain = Domain::from_local_points(sources);
         let target_domain = Domain::from_local_points(targets);
 
         // Calculate union of domains for source and target points, needed to define operators
         let domain = source_domain.union(&target_domain);
-        self.domain = Some(domain.clone());
+        self.domain = Some(domain);
 
         let source_tree = SingleNodeTreeNew::new(sources, n_crit, sparse, self.domain);
         let target_tree = SingleNodeTreeNew::new(targets, n_crit, sparse, self.domain);
@@ -235,6 +234,8 @@ where
             self.ncoeffs = Some(ncoeffs(expansion_order));
             self.kernel = Some(kernel);
             self.eval_type = Some(eval_type);
+
+            // Set source to target metadataca
             // Set the expansion order
             source_to_target.set_expansion_order(self.expansion_order.unwrap());
 
@@ -243,10 +244,8 @@ where
             source_to_target.set_kernel(kernel);
 
             // Compute the field translation operators
-            source_to_target.set_operator_data(
-                self.expansion_order.unwrap(),
-                self.source_domain.unwrap().clone(),
-            );
+            source_to_target
+                .set_operator_data(self.expansion_order.unwrap(), self.source_domain.unwrap());
 
             self.source_to_target = Some(source_to_target);
 
@@ -260,18 +259,29 @@ where
         {
             Err("Missing fields for constructing KiFmm".to_string())
         } else {
-            let mut result = NewKiFmm::default();
+            // let mut result = NewKiFmm::default();
 
             // Configure with tree, expansion parameters and source to target field translation operators
-            result.tree = self.tree.unwrap();
-            result.expansion_order = self.expansion_order.unwrap();
-            result.ncoeffs = self.ncoeffs.unwrap();
-            result.kernel = self.kernel.unwrap();
+            // result.tree = self.tree.unwrap();
+            // result.expansion_order = self.expansion_order.unwrap();
+            // result.ncoeffs = self.ncoeffs.unwrap();
+            // result.kernel = self.kernel.unwrap();
+            // result.source_to_target_data = self.source_to_target.unwrap();
 
-            result.source_to_target_data = self.source_to_target.unwrap();
+            let mut result = NewKiFmm {
+                tree: self.tree.unwrap(),
+                expansion_order: self.expansion_order.unwrap(),
+                ncoeffs: self.ncoeffs.unwrap(),
+                kernel: self.kernel.unwrap(),
+                source_to_target_data: self.source_to_target.unwrap(),
+                ..Default::default()
+            };
 
             // Compute the source to source and target to target field translation operators
             result.set_source_and_target_operator_data();
+
+            // Set metadata, such as index pointers and buffers to store results
+            result.set_metadata();
 
             Ok(result)
         }
@@ -467,12 +477,12 @@ where
 
         // Compute required surfaces
         let upward_equivalent_surface =
-            ROOT.compute_surface(&domain, self.expansion_order, alpha_inner);
-        let upward_check_surface = ROOT.compute_surface(&domain, self.expansion_order, alpha_outer);
+            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
+        let upward_check_surface = ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
         let downward_equivalent_surface =
-            ROOT.compute_surface(&domain, self.expansion_order, alpha_outer);
+            ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
         let downward_check_surface =
-            ROOT.compute_surface(&domain, self.expansion_order, alpha_inner);
+            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
 
         let nequiv_surface = upward_equivalent_surface.len() / self.kernel.space_dimension();
         let ncheck_surface = upward_check_surface.len() / self.kernel.space_dimension();
@@ -529,9 +539,9 @@ where
 
         for (i, child) in children.iter().enumerate() {
             let child_upward_equivalent_surface =
-                child.compute_surface(&domain, self.expansion_order, alpha_inner);
+                child.compute_surface(domain, self.expansion_order, alpha_inner);
             let child_downward_check_surface =
-                child.compute_surface(&domain, self.expansion_order, alpha_inner);
+                child.compute_surface(domain, self.expansion_order, alpha_inner);
 
             let mut pc2ce_t = rlst_dynamic_array2!(W, [ncheck_surface, nequiv_surface]);
 
@@ -587,11 +597,8 @@ where
     }
 
     fn set_metadata(&mut self) {
-
-        let n_source_keys  = self.tree.get_source_tree().get_nkeys().unwrap();
-        let leaves = self.tree.get_source_tree().get_all_leaves().unwrap();
-
-
+        // let n_source_keys = self.tree.get_source_tree().get_nkeys().unwrap();
+        // let leaves = self.tree.get_source_tree().get_all_leaves().unwrap();
     }
 }
 mod test {
@@ -599,7 +606,6 @@ mod test {
     use bempp_field::types::FftFieldTranslationKiFmmNew;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::points_fixture;
-    use rayon::result;
     use rlst_dense::traits::RawAccess;
 
     use super::*;

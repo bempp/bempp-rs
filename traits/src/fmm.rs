@@ -61,16 +61,8 @@ pub trait Fmm {
 
 pub trait NewFmm {
     type Precision: Scalar + Default + Float;
-    fn evaluate_vec(
-        &self,
-        charges_vec: &[Self::Precision],
-        result: &mut [Self::Precision],
-    );
-    fn evaluate_mat(
-        &self,
-        charges_mat: &[Self::Precision],
-        result: &mut [Self::Precision],
-    );
+    fn evaluate_vec(&self, charges_vec: &[Self::Precision], result: &mut [Self::Precision]);
+    fn evaluate_mat(&self, charges_mat: &[Self::Precision], result: &mut [Self::Precision]);
     fn get_expansion_order(&self) -> usize;
     fn get_ncoeffs(&self) -> usize;
 }

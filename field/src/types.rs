@@ -101,7 +101,6 @@ where
     pub expansion_order: usize,
 }
 
-
 pub struct SvdFieldTranslationKiFmmMew<T, U>
 where
     T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,

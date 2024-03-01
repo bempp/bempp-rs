@@ -1034,8 +1034,12 @@ where
     /// * `n_crit` - The maximum number of points per leaf node.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
-    pub fn new(points: &[T], n_crit: Option<u64>, sparse: Option<bool>, domain: Option<Domain<T>>) -> SingleNodeTreeNew<T> {
-
+    pub fn new(
+        points: &[T],
+        n_crit: Option<u64>,
+        sparse: Option<bool>,
+        domain: Option<Domain<T>>,
+    ) -> SingleNodeTreeNew<T> {
         let dim = 3;
         let domain = domain.unwrap_or(Domain::from_local_points(points));
         let sparse = sparse.unwrap_or(true);
@@ -1053,7 +1057,6 @@ where
         }
     }
 }
-
 
 impl<T> Tree for SingleNodeTree<T>
 where
