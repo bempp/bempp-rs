@@ -6,6 +6,7 @@ use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
+use rlst_common::types::{c32, c64, Scalar};
 use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::{
     array::Array,
@@ -14,11 +15,12 @@ use rlst_dense::{
     traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut},
 };
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3};
+
 pub mod lagrange;
 pub mod raviart_thomas;
 
-type EntityPoints = [Vec<Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>>; 4];
-type EntityWeights = [Vec<Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>>; 4];
+type EntityPoints<T: Scalar> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>; 4];
+type EntityWeights<T: Scalar> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>; 4];
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -28,7 +30,7 @@ pub enum ElementFamily {
     RaviartThomas = 1,
 }
 
-pub struct CiarletElement {
+pub struct CiarletElement<T: Scalar> {
     cell_type: ReferenceCellType,
     family: ElementFamily,
     degree: usize,
@@ -38,13 +40,38 @@ pub struct CiarletElement {
     value_size: usize,
     continuity: Continuity,
     dim: usize,
-    coefficients: Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
+    coefficients: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
     entity_dofs: [AdjacencyList<usize>; 4],
     // interpolation_points: EntityPoints,
     // interpolation_weights: EntityWeights,
 }
 
-impl CiarletElement {
+pub trait Inverse: Scalar {
+    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>);
+}
+
+impl Inverse for f64 {
+    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
+        mat.view_mut().into_inverse_alloc().unwrap();
+    }
+}
+impl Inverse for f32 {
+    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
+        mat.view_mut().into_inverse_alloc().unwrap();
+    }
+}
+impl Inverse for c64 {
+    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
+        mat.view_mut().into_inverse_alloc().unwrap();
+    }
+}
+impl Inverse for c32 {
+    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
+        mat.view_mut().into_inverse_alloc().unwrap();
+    }
+}
+
+impl<T: Scalar + Inverse> CiarletElement<T> {
     /// Create a Ciarlet element
     #[allow(clippy::too_many_arguments)]
     pub fn create(
@@ -52,13 +79,13 @@ impl CiarletElement {
         family: ElementFamily,
         degree: usize,
         value_shape: Vec<usize>,
-        polynomial_coeffs: Array<f64, BaseArray<f64, VectorContainer<f64>, 3>, 3>,
-        interpolation_points: EntityPoints,
-        interpolation_weights: EntityWeights,
+        polynomial_coeffs: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
+        interpolation_points: EntityPoints<T>,
+        interpolation_weights: EntityWeights<T>,
         map_type: MapType,
         continuity: Continuity,
         embedded_superdegree: usize,
-    ) -> CiarletElement {
+    ) -> Self {
         let mut dim = 0;
         let mut npts = 0;
 
@@ -85,12 +112,12 @@ impl CiarletElement {
         }
 
         let new_pts = if continuity == Continuity::Discontinuous {
-            let mut new_pts: EntityPoints = [vec![], vec![], vec![], vec![]];
+            let mut new_pts: EntityPoints<T> = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
-            let mut all_pts = rlst_dynamic_array2![f64, [npts, tdim]];
+            let mut all_pts = rlst_dynamic_array2![T, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
                 for _pts in pts_i {
-                    new_pts[i].push(rlst_dynamic_array2![f64, [0, tdim]]);
+                    new_pts[i].push(rlst_dynamic_array2![T, [0, tdim]]);
                 }
             }
             for pts_i in interpolation_points.iter() {
@@ -112,10 +139,10 @@ impl CiarletElement {
             let mut new_wts = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
             let mut dn = 0;
-            let mut all_mat = rlst_dynamic_array3!(f64, [dim, value_size, npts]);
+            let mut all_mat = rlst_dynamic_array3!(T, [dim, value_size, npts]);
             for (i, mi) in interpolation_weights.iter().take(tdim).enumerate() {
                 for _mat in mi {
-                    new_wts[i].push(rlst_dynamic_array3!(f64, [0, value_size, 0]));
+                    new_wts[i].push(rlst_dynamic_array3!(T, [0, value_size, 0]));
                 }
             }
             for mi in interpolation_weights.iter() {
@@ -140,13 +167,13 @@ impl CiarletElement {
 
         // Compute the dual matrix
         let pdim = polynomial_count(cell_type, embedded_superdegree);
-        let mut d_matrix = rlst_dynamic_array3!(f64, [value_size, pdim, dim]);
+        let mut d_matrix = rlst_dynamic_array3!(T, [value_size, pdim, dim]);
 
         let mut dof = 0;
         for d in 0..4 {
             for (e, pts) in new_pts[d].iter().enumerate() {
                 if pts.shape()[0] > 0 {
-                    let mut table = rlst_dynamic_array3!(f64, [1, pdim, pts.shape()[0]]);
+                    let mut table = rlst_dynamic_array3!(T, [1, pdim, pts.shape()[0]]);
                     tabulate_legendre_polynomials(
                         cell_type,
                         pts,
@@ -159,7 +186,7 @@ impl CiarletElement {
                         for j in 0..value_size {
                             for l in 0..pdim {
                                 let value = d_matrix.get_mut([j, l, dof + i]).unwrap();
-                                *value = 0.0;
+                                *value = T::from(0.0).unwrap();
                                 for k in 0..pts.shape()[0] {
                                     *value += *mat.get([i, j, k]).unwrap()
                                         * *table.get([0, l, k]).unwrap();
@@ -172,12 +199,12 @@ impl CiarletElement {
             }
         }
 
-        let mut inverse = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
+        let mut inverse = rlst_dense::rlst_dynamic_array2!(T, [dim, dim]);
 
         for i in 0..dim {
             for j in 0..dim {
                 let entry = inverse.get_mut([i, j]).unwrap();
-                *entry = 0.0;
+                *entry = T::from(0.0).unwrap();
                 for k in 0..value_size {
                     for l in 0..pdim {
                         *entry += *polynomial_coeffs.get([i, k, l]).unwrap()
@@ -187,15 +214,15 @@ impl CiarletElement {
             }
         }
 
-        let mut ident = rlst_dense::rlst_dynamic_array2!(f64, [dim, dim]);
+        let mut ident = rlst_dense::rlst_dynamic_array2!(T, [dim, dim]);
         for i in 0..dim {
             unsafe {
-                *ident.get_unchecked_mut([i, i]) = 1.0;
+                *ident.get_unchecked_mut([i, i]) = T::from(1.0).unwrap();
             }
         }
-        inverse.view_mut().into_inverse_alloc().unwrap();
+        T::invert_matrix(&mut inverse);
 
-        let mut coefficients = rlst_dynamic_array3!(f64, [dim, value_size, pdim]);
+        let mut coefficients = rlst_dynamic_array3!(T, [dim, value_size, pdim]);
         for i in 0..dim {
             for l in 0..pdim {
                 for j in 0..value_size {
@@ -221,7 +248,7 @@ impl CiarletElement {
                 dof += pts.shape()[0];
             }
         }
-        CiarletElement {
+        CiarletElement::<T> {
             cell_type,
             family,
             degree,
@@ -249,7 +276,8 @@ impl CiarletElement {
     }
 }
 
-impl FiniteElement for CiarletElement {
+impl<T: Scalar> FiniteElement for CiarletElement<T> {
+    type T = T;
     fn value_shape(&self) -> &[usize] {
         &self.value_shape
     }
@@ -276,16 +304,16 @@ impl FiniteElement for CiarletElement {
         self.family == ElementFamily::Lagrange
     }
     fn tabulate<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        T4Mut: RandomAccessMut<4, Item = f64>,
+        Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+        Array4Mut: RandomAccessMut<4, Item = T>,
     >(
         &self,
-        points: &T,
+        points: &Array2,
         nderivs: usize,
-        data: &mut T4Mut,
+        data: &mut Array4Mut,
     ) {
         let mut table = rlst_dynamic_array3!(
-            f64,
+            T,
             legendre_shape(self.cell_type, points, self.embedded_superdegree, nderivs,)
         );
         tabulate_legendre_polynomials(
@@ -301,7 +329,7 @@ impl FiniteElement for CiarletElement {
                 for j in 0..self.value_size {
                     for b in 0..self.dim {
                         let value = data.get_mut([d, p, b, j]).unwrap();
-                        *value = 0.0;
+                        *value = T::from(0.0).unwrap();
                         for i in 0..table.shape()[1] {
                             *value += *self.coefficients.get([b, j, i]).unwrap()
                                 * *table.get_mut([d, i, p]).unwrap();
@@ -316,15 +344,15 @@ impl FiniteElement for CiarletElement {
     }
 }
 
-pub fn create_element(
+pub fn create_element<T: Scalar + Inverse>(
     family: ElementFamily,
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,
-) -> CiarletElement {
+) -> CiarletElement<T> {
     match family {
-        ElementFamily::Lagrange => lagrange::create(cell_type, degree, continuity),
-        ElementFamily::RaviartThomas => raviart_thomas::create(cell_type, degree, continuity),
+        ElementFamily::Lagrange => lagrange::create::<T>(cell_type, degree, continuity),
+        ElementFamily::RaviartThomas => raviart_thomas::create::<T>(cell_type, degree, continuity),
     }
 }
 
@@ -335,7 +363,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1() {
-        let e = create_element(
+        let e = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
