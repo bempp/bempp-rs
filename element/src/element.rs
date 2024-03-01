@@ -19,8 +19,8 @@ use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3};
 pub mod lagrange;
 pub mod raviart_thomas;
 
-type EntityPoints<T: Scalar> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>; 4];
-type EntityWeights<T: Scalar> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>; 4];
+type EntityPoints<T> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>; 4];
+type EntityWeights<T> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>; 4];
 
 /// The family of an element
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

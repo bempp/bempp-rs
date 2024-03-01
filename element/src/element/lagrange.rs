@@ -5,7 +5,6 @@ use crate::polynomials::polynomial_count;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, MapType};
 use rlst_common::types::Scalar;
-use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
 /// Create a Lagrange element

@@ -3,7 +3,6 @@
 use bempp_traits::cell::ReferenceCellType;
 use rlst_common::types::Scalar;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
-use std::ops::Mul;
 
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
@@ -382,12 +381,12 @@ fn tabulate_legendre_polynomials_triangle<
                         (T::from(p).unwrap() + T::from(q).unwrap() + T::from(2.0).unwrap())
                             / (T::from(p).unwrap() + T::from(q).unwrap()),
                     );
-                    let a1 = T::from(((p + q + 1) * (2 * p + 2 * q + 3))).unwrap()
-                        / T::from(((q + 1) * (2 * p + q + 2))).unwrap();
-                    let a2 = T::from(((2 * p + 1) * (2 * p + 1) * (p + q + 1))).unwrap()
-                        / T::from(((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1))).unwrap();
-                    let a3 = T::from((q * (2 * p + q + 1) * (2 * p + 2 * q + 3))).unwrap()
-                        / T::from(((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1))).unwrap();
+                    let a1 = T::from((p + q + 1) * (2 * p + 2 * q + 3)).unwrap()
+                        / T::from((q + 1) * (2 * p + q + 2)).unwrap();
+                    let a2 = T::from((2 * p + 1) * (2 * p + 1) * (p + q + 1)).unwrap()
+                        / T::from((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1)).unwrap();
+                    let a3 = T::from(q * (2 * p + q + 1) * (2 * p + 2 * q + 3)).unwrap()
+                        / T::from((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1)).unwrap();
 
                     for i in 0..data.shape()[2] {
                         let d = *data.get([tri_index(kx, ky), tri_index(q, p), i]).unwrap();
