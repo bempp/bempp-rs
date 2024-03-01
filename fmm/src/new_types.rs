@@ -10,7 +10,11 @@ use bempp_traits::{
     kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::{FmmTree, Tree},
 };
-use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
+use bempp_tree::types::{
+    domain::Domain,
+    morton::MortonKey,
+    single_node::{SingleNodeTree, SingleNodeTreeNew},
+};
 use cauchy::Scalar;
 use num::{traits::real::Real, Complex, Float};
 use rlst_blis::interface::gemm::Gemm;
@@ -108,8 +112,8 @@ pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar +
 }
 
 pub struct SingleNodeFmmTree<T: Float + Default + Scalar<Real = T>> {
-    pub source_tree: SingleNodeTree<T>,
-    pub target_tree: SingleNodeTree<T>,
+    pub source_tree: SingleNodeTreeNew<T>,
+    pub target_tree: SingleNodeTreeNew<T>,
 }
 
 #[derive(Default)]
@@ -133,7 +137,7 @@ impl<T> FmmTree for SingleNodeFmmTree<T>
 where
     T: Float + Default + Scalar<Real = T>,
 {
-    type Tree = SingleNodeTree<T>;
+    type Tree = SingleNodeTreeNew<T>;
 
     fn get_source_tree(&self) -> &Self::Tree {
         &self.target_tree
@@ -163,39 +167,18 @@ where
         }
     }
 
-    pub fn tree(mut self, sources: &[U], targets: &[U], n_crit: Option<usize>) -> Self {
-        if n_crit.is_some() {
-            let calculated_depth = 5;
-            let source_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
-            let target_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
+    pub fn tree(mut self, sources: &[U], targets: &[U], n_crit: Option<u64>, sparse: bool) -> Self {
+        let source_tree = SingleNodeTreeNew::new(sources, n_crit, sparse);
+        let target_tree = SingleNodeTreeNew::new(targets, n_crit, sparse);
+        self.source_domain = Some(source_tree.get_domain().clone());
+        self.target_domain = Some(target_tree.get_domain().clone());
 
-            self.source_domain = Some(source_tree.get_domain().clone());
-            self.target_domain = Some(target_tree.get_domain().clone());
-
-            let fmm_tree = SingleNodeFmmTree {
-                source_tree,
-                target_tree,
-            };
-            self.tree = Some(fmm_tree);
-            self
-        } else {
-            // Determine n crit from data
-            let calculated_depth = 5;
-            let source_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
-            let target_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
-
-            self.source_domain = Some(source_tree.get_domain().clone());
-            self.target_domain = Some(target_tree.get_domain().clone());
-            let max_depth = source_tree.depth.max(target_tree.depth);
-
-            let fmm_tree = SingleNodeFmmTree {
-                source_tree,
-                target_tree,
-            };
-            self.tree = Some(fmm_tree);
-            self.max_depth = Some(calculated_depth);
-            self
-        }
+        let fmm_tree = SingleNodeFmmTree {
+            source_tree,
+            target_tree,
+        };
+        self.tree = Some(fmm_tree);
+        self
     }
 
     pub fn parameters(mut self, expansion_order: usize, kernel: V) -> Result<Self, String> {
@@ -361,13 +344,15 @@ mod test {
         let charges = vec![1.0; npoints];
         let n_crit = Some(100);
         let expansion_order = 5;
+        let sparse = true;
 
-        let builder = KiFmmBuilderSingleNode::new()
-            .tree(&sources.data(), &targets.data(), n_crit)
+        let fmm = KiFmmBuilderSingleNode::new()
+            .tree(&sources.data(), &targets.data(), n_crit, sparse)
             .parameters(expansion_order, Laplace3dKernel::new())
             .unwrap()
             .field_translation(FftFieldTranslationKiFmmNew::default())
             .unwrap()
-            .build();
+            .build()
+            .unwrap();
     }
 }

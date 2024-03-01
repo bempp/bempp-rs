@@ -6,7 +6,7 @@ use crate::types::morton::{KeyType, MortonKey};
 pub const K: i32 = 2;
 
 /// Default value chosen for maximum number of particles per leaf in adaptive trees.
-pub const NCRIT: u64 = 150;
+pub const N_CRIT: u64 = 150;
 
 /// Maximum possible level of octree recursion, by definition.
 pub const DEEPEST_LEVEL: KeyType = 16;
