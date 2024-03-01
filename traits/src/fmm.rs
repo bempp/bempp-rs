@@ -63,13 +63,11 @@ pub trait NewFmm {
     type Precision: Scalar + Default + Float;
     fn evaluate_vec(
         &self,
-        eval_type: EvalType,
         charges_vec: &[Self::Precision],
         result: &mut [Self::Precision],
     );
     fn evaluate_mat(
         &self,
-        eval_type: EvalType,
         charges_mat: &[Self::Precision],
         result: &mut [Self::Precision],
     );

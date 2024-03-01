@@ -101,6 +101,33 @@ where
     pub expansion_order: usize,
 }
 
+
+pub struct SvdFieldTranslationKiFmmMew<T, U>
+where
+    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    U: Kernel<T = T> + Default,
+{
+    /// Amount to dilate inner check surface by when computing operator.
+    pub alpha: T,
+
+    /// Maximum rank taken for SVD compression
+    pub k: usize,
+
+    /// Amount of energy of each M2L operator retained in SVD re-compression
+    pub threshold: T,
+
+    /// Precomputed data required for SVD compressed M2L interaction.
+    pub operator_data: SvdSourceToTargetOperatorData<T>,
+
+    /// Unique transfer vectors to lookup m2l unique kernel interactions.
+    pub transfer_vectors: Vec<TransferVector>,
+
+    /// The associated kernel with this translation operator.
+    pub kernel: U,
+
+    pub expansion_order: usize,
+}
+
 /// A type to store a transfer vector between a `source` and `target` Morton key.
 #[derive(Debug)]
 pub struct TransferVector {
