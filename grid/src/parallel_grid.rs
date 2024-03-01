@@ -34,7 +34,7 @@ impl<'a, C: Communicator> ParallelGeometry<'a, C> {
         }
     }
 
-    pub fn coordinate_elements(&self) -> &Vec<CiarletElement> {
+    pub fn coordinate_elements(&self) -> &Vec<CiarletElement<f64>> {
         self.serial_geometry.coordinate_elements()
     }
 
@@ -74,7 +74,7 @@ impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
     }
     fn get_evaluator<'b>(
         &'b self,
-        element: &impl FiniteElement,
+        element: &impl FiniteElement<T=f64>,
         points: &'b Self::T,
     ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'b> {
         self.serial_geometry.get_evaluator(element, points)
