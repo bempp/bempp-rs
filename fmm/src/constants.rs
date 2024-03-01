@@ -8,3 +8,7 @@ pub const M2M_MAX_CHUNK_SIZE: usize = 256;
 
 /// Maximum chunk size to use to process boxes by level during L2L kernel.
 pub const L2L_MAX_CHUNK_SIZE: usize = 256;
+
+pub const ALPHA_INNER: f64 = 1.05;
+
+pub const ALPHA_OUTER: f64 = 2.95;

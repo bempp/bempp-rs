@@ -1034,16 +1034,17 @@ where
     /// * `n_crit` - The maximum number of points per leaf node.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
-    pub fn new(points: &[T], n_crit: Option<u64>, sparse: Option<bool>) -> SingleNodeTreeNew<T> {
-        // TODO: Come back and reconcile a runtime point dimension detector
-        let domain = Domain::from_local_points(points);
-        let npoints = points.len() / 3;
+    pub fn new(points: &[T], n_crit: Option<u64>, sparse: Option<bool>, domain: Option<Domain<T>>) -> SingleNodeTreeNew<T> {
+
+        let dim = 3;
+        let domain = domain.unwrap_or(Domain::from_local_points(points));
+        let sparse = sparse.unwrap_or(true);
+        let npoints = points.len() / dim;
         let global_idxs = (0..npoints).collect_vec();
 
-        // If not specified estimate from point data
+        // If not specified estimate from point data estimate critical value
         let n_crit = n_crit.unwrap_or(N_CRIT);
         let depth = SingleNodeTreeNew::<T>::minimum_depth(npoints as u64, n_crit);
-        let sparse = sparse.unwrap_or(true);
 
         if sparse {
             SingleNodeTreeNew::uniform_tree_sparse(points, &domain, depth, &global_idxs)
@@ -1064,6 +1065,10 @@ where
     type NodeIndexSlice<'a> = &'a [MortonKey]
         where T: 'a;
     type NodeIndices = MortonKeys;
+
+    fn get_nkeys(&self) -> Option<usize> {
+        Some(self.keys.len())
+    }
 
     fn get_depth(&self) -> u64 {
         self.depth
@@ -1140,6 +1145,10 @@ where
     type NodeIndexSlice<'a> = &'a [MortonKey]
         where T: 'a;
     type NodeIndices = MortonKeys;
+
+    fn get_nkeys(&self) -> Option<usize> {
+        Some(self.keys.len())
+    }
 
     fn get_depth(&self) -> u64 {
         self.depth

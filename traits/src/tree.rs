@@ -5,6 +5,15 @@ use std::hash::Hash;
 use cauchy::Scalar;
 use num::Float;
 
+
+pub trait LenAndIntoIterator<'a> {
+    type Item;
+    type IntoIter: IntoIterator<Item = Self::Item>;
+
+    fn len(&self) -> usize;
+    fn into_iter(&'a self) -> Self::IntoIter;
+}
+
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 /// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
 /// it simply provides methods for accessing tree nodes, and associated data, and is generically
@@ -32,6 +41,8 @@ pub trait Tree {
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
     fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>;
+
+    fn get_nkeys(&self) -> Option<usize>;
 
     /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
     fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>>;
@@ -73,6 +84,8 @@ pub trait FmmTree {
     fn get_source_tree(&self) -> &Self::Tree;
 
     fn get_target_tree(&self) -> &Self::Tree;
+
+    fn get_domain(&self) -> &<Self::Tree as Tree>::Domain;
 }
 
 /// A minimal interface for Morton Key like nodes.
