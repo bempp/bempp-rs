@@ -9,6 +9,7 @@ use bempp_traits::{
     fmm::{Fmm, NewFmm, SourceTranslation, TargetTranslation},
     kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::{FmmTree, Tree},
+    types::EvalType,
 };
 use bempp_tree::types::{
     domain::Domain,
@@ -130,7 +131,7 @@ where
     kernel: Option<V>,
     expansion_order: Option<usize>,
     ncoeffs: Option<usize>,
-    max_depth: Option<usize>,
+    eval_type: Option<EvalType>,
 }
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
@@ -163,11 +164,17 @@ where
             kernel: None,
             expansion_order: None,
             ncoeffs: None,
-            max_depth: None,
+            eval_type: None,
         }
     }
 
-    pub fn tree(mut self, sources: &[U], targets: &[U], n_crit: Option<u64>, sparse: bool) -> Self {
+    pub fn tree(
+        mut self,
+        sources: &[U],
+        targets: &[U],
+        n_crit: Option<u64>,
+        sparse: Option<bool>,
+    ) -> Self {
         let source_tree = SingleNodeTreeNew::new(sources, n_crit, sparse);
         let target_tree = SingleNodeTreeNew::new(targets, n_crit, sparse);
         self.source_domain = Some(source_tree.get_domain().clone());
@@ -181,25 +188,20 @@ where
         self
     }
 
-    pub fn parameters(mut self, expansion_order: usize, kernel: V) -> Result<Self, String> {
+    pub fn parameters(
+        mut self,
+        expansion_order: usize,
+        kernel: V,
+        eval_type: EvalType,
+        mut source_to_target: T,
+    ) -> Result<Self, String> {
         if self.tree.is_none() {
             Err("Must build tree before specifying FMM parameters".to_string())
         } else {
             self.expansion_order = Some(expansion_order);
             self.ncoeffs = Some(ncoeffs(expansion_order));
             self.kernel = Some(kernel);
-            Ok(self)
-        }
-    }
-
-    pub fn field_translation(mut self, mut source_to_target: T) -> Result<Self, String> {
-        if self.expansion_order.is_none()
-            || self.kernel.is_none()
-            || self.ncoeffs.is_none()
-            || self.source_domain.is_none()
-        {
-            Err("Must Build tree and specify FMM parameters".to_string())
-        } else {
+            self.eval_type = Some(eval_type);
             // Set the expansion order
             source_to_target.set_expansion_order(self.expansion_order.unwrap());
 
@@ -227,7 +229,6 @@ where
             let uc2e_inv_1 = rlst_dynamic_array2!(U, [1, 1]);
             let uc2e_inv_2 = rlst_dynamic_array2!(U, [1, 1]);
             let dc2e_inv_1 = rlst_dynamic_array2!(U, [1, 1]);
-            let dc2e_inv_2 = rlst_dynamic_array2!(U, [1, 1]);
             let dc2e_inv_2 = rlst_dynamic_array2!(U, [1, 1]);
             let source = rlst_dynamic_array2!(U, [1, 1]);
 
@@ -312,6 +313,26 @@ where
     fn p2l(&self, level: u64) {}
 }
 
+impl<T, U, V> SourceToTargetHomogenousScaleInvariant<U>
+    for NewKiFmm<V, FftFieldTranslationKiFmmNew<U, T>, T, U>
+where
+    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    U: Scalar<Real = U>
+        + Float
+        + Default
+        + std::marker::Send
+        + std::marker::Sync
+        + Fft
+        + rlst_blis::interface::gemm::Gemm,
+    Complex<U>: Scalar,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    V: FmmTree,
+{
+    fn s2t_scale(&self, level: u64) -> U {
+        U::from(1.).unwrap()
+    }
+}
+
 /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
 impl<T, U, V> SourceToTarget for NewKiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
 where
@@ -327,11 +348,54 @@ where
     fn p2l(&self, level: u64) {}
 }
 
+impl<T, U, V> SourceToTargetHomogenousScaleInvariant<U>
+    for NewKiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
+where
+    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    U: Scalar<Real = U>
+        + Float
+        + Default
+        + std::marker::Send
+        + std::marker::Sync
+        + Fft
+        + rlst_blis::interface::gemm::Gemm,
+    Complex<U>: Scalar,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
+    V: FmmTree,
+{
+    fn s2t_scale(&self, level: u64) -> U {
+        U::from(1.).unwrap()
+    }
+}
+
+impl<T, U, V, W> NewFmm for NewKiFmm<T, U, V, W>
+where
+    T: FmmTree,
+    U: SourceToTargetData<V>,
+    V: ScaleInvariantHomogenousKernel,
+    W: Scalar<Real = W> + Default + Float,
+    Self: SourceToTargetHomogenousScaleInvariant<W>,
+{
+    type Precision = W;
+
+    fn evaluate_vec(&self, charges_vec: &[Self::Precision], result: &mut [Self::Precision]) {}
+
+    fn evaluate_mat(&self, charges_mat: &[Self::Precision], result: &mut [Self::Precision]) {}
+
+    fn get_expansion_order(&self) -> usize {
+        self.expansion_order
+    }
+
+    fn get_ncoeffs(&self) -> usize {
+        self.ncoeffs
+    }
+}
 mod test {
 
     use bempp_field::types::FftFieldTranslationKiFmmNew;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::points_fixture;
+    use rayon::result;
     use rlst_dense::traits::RawAccess;
 
     use super::*;
@@ -341,18 +405,24 @@ mod test {
         let npoints = 1000;
         let sources = points_fixture::<f64>(npoints, None, None);
         let targets = points_fixture::<f64>(npoints, None, None);
+        let mut result = vec![0.; npoints];
         let charges = vec![1.0; npoints];
         let n_crit = Some(100);
         let expansion_order = 5;
         let sparse = true;
 
         let fmm = KiFmmBuilderSingleNode::new()
-            .tree(&sources.data(), &targets.data(), n_crit, sparse)
-            .parameters(expansion_order, Laplace3dKernel::new())
-            .unwrap()
-            .field_translation(FftFieldTranslationKiFmmNew::default())
+            .tree(&sources.data(), &targets.data(), None, None)
+            .parameters(
+                expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                FftFieldTranslationKiFmmNew::default(),
+            )
             .unwrap()
             .build()
             .unwrap();
+
+        fmm.evaluate_vec(&charges, &mut result);
     }
 }
