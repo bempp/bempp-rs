@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::LocalKey};
 
 use bempp_field::{
     fft::Fft,
-    types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm},
+    types::{FftFieldTranslationKiFmm, FftFieldTranslationKiFmmNew, SvdFieldTranslationKiFmm},
 };
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData, SourceToTargetHomogenousScaleInvariant},
@@ -10,15 +10,20 @@ use bempp_traits::{
     kernel::{Kernel, ScaleInvariantHomogenousKernel},
     tree::{FmmTree, Tree},
 };
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
 use cauchy::Scalar;
 use num::{traits::real::Real, Complex, Float};
 use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, traits::MatrixSvd,
+    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
+    traits::MatrixSvd,
 };
 
 use crate::types::{C2EType, SendPtrMut};
+
+pub fn ncoeffs(expansion_order: usize) -> usize {
+    6 * (expansion_order - 1).pow(2) + 2
+}
 
 /// Combines the old datatree + Fmm structs into a single storage of metadata
 pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar + Default> {
@@ -102,6 +107,181 @@ pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar +
     pub global_indices: Vec<usize>,
 }
 
+pub struct SingleNodeFmmTree<T: Float + Default + Scalar<Real = T>> {
+    pub source_tree: SingleNodeTree<T>,
+    pub target_tree: SingleNodeTree<T>,
+}
+
+#[derive(Default)]
+pub struct KiFmmBuilderSingleNode<T, U, V>
+where
+    T: SourceToTargetData<V>,
+    U: Float + Default + Scalar<Real = U>,
+    V: Kernel,
+{
+    tree: Option<SingleNodeFmmTree<U>>,
+    source_to_target: Option<T>,
+    source_domain: Option<Domain<U>>,
+    target_domain: Option<Domain<U>>,
+    kernel: Option<V>,
+    expansion_order: Option<usize>,
+    ncoeffs: Option<usize>,
+    max_depth: Option<usize>,
+}
+
+impl<T> FmmTree for SingleNodeFmmTree<T>
+where
+    T: Float + Default + Scalar<Real = T>,
+{
+    type Tree = SingleNodeTree<T>;
+
+    fn get_source_tree(&self) -> &Self::Tree {
+        &self.target_tree
+    }
+    fn get_target_tree(&self) -> &Self::Tree {
+        &self.source_tree
+    }
+}
+
+impl<T, U, V> KiFmmBuilderSingleNode<T, U, V>
+where
+    T: SourceToTargetData<V, Domain = Domain<U>>,
+    U: Float + Scalar<Real = U> + Default,
+    V: Kernel + Clone,
+{
+    // Start building with mandatory parameters
+    pub fn new() -> Self {
+        KiFmmBuilderSingleNode {
+            tree: None,
+            source_domain: None,
+            target_domain: None,
+            source_to_target: None,
+            kernel: None,
+            expansion_order: None,
+            ncoeffs: None,
+            max_depth: None,
+        }
+    }
+
+    pub fn tree(mut self, sources: &[U], targets: &[U], n_crit: Option<usize>) -> Self {
+        if n_crit.is_some() {
+            let calculated_depth = 5;
+            let source_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
+            let target_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
+
+            self.source_domain = Some(source_tree.get_domain().clone());
+            self.target_domain = Some(target_tree.get_domain().clone());
+
+            let fmm_tree = SingleNodeFmmTree {
+                source_tree,
+                target_tree,
+            };
+            self.tree = Some(fmm_tree);
+            self
+        } else {
+            // Determine n crit from data
+            let calculated_depth = 5;
+            let source_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
+            let target_tree = SingleNodeTree::new(sources, false, Some(100), Some(5), &[1], false);
+
+            self.source_domain = Some(source_tree.get_domain().clone());
+            self.target_domain = Some(target_tree.get_domain().clone());
+            let max_depth = source_tree.depth.max(target_tree.depth);
+
+            let fmm_tree = SingleNodeFmmTree {
+                source_tree,
+                target_tree,
+            };
+            self.tree = Some(fmm_tree);
+            self.max_depth = Some(calculated_depth);
+            self
+        }
+    }
+
+    pub fn parameters(mut self, expansion_order: usize, kernel: V) -> Result<Self, String> {
+        if self.tree.is_none() {
+            Err("Must build tree before specifying FMM parameters".to_string())
+        } else {
+            self.expansion_order = Some(expansion_order);
+            self.ncoeffs = Some(ncoeffs(expansion_order));
+            self.kernel = Some(kernel);
+            Ok(self)
+        }
+    }
+
+    pub fn field_translation(mut self, mut source_to_target: T) -> Result<Self, String> {
+        if self.expansion_order.is_none()
+            || self.kernel.is_none()
+            || self.ncoeffs.is_none()
+            || self.source_domain.is_none()
+        {
+            Err("Must Build tree and specify FMM parameters".to_string())
+        } else {
+            // Set the expansion order
+            source_to_target.set_expansion_order(self.expansion_order.unwrap());
+
+            // Set the associated kernel
+            let kernel = self.kernel.as_ref().unwrap().clone();
+            source_to_target.set_kernel(kernel);
+
+            // Compute the field translation operators
+            source_to_target.set_operator_data(
+                self.expansion_order.unwrap(),
+                self.source_domain.unwrap().clone(),
+            );
+
+            self.source_to_target = Some(source_to_target);
+            Ok(self)
+        }
+    }
+
+    // Finalize and build the KiFmm
+    pub fn build(self) -> Result<NewKiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
+        if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
+        {
+            Err("Missing fields for KiFmm".to_string())
+        } else {
+            let uc2e_inv_1 = rlst_dynamic_array2!(U, [1, 1]);
+            let uc2e_inv_2 = rlst_dynamic_array2!(U, [1, 1]);
+            let dc2e_inv_1 = rlst_dynamic_array2!(U, [1, 1]);
+            let dc2e_inv_2 = rlst_dynamic_array2!(U, [1, 1]);
+            let dc2e_inv_2 = rlst_dynamic_array2!(U, [1, 1]);
+            let source = rlst_dynamic_array2!(U, [1, 1]);
+
+            Ok(NewKiFmm {
+                tree: self.tree.unwrap(),
+                field_translation_data: self.source_to_target.unwrap(),
+                kernel: self.kernel.unwrap(),
+                expansion_order: self.expansion_order.unwrap(),
+                ncoeffs: self.ncoeffs.unwrap(),
+                uc2e_inv_1,
+                uc2e_inv_2,
+                dc2e_inv_1,
+                dc2e_inv_2,
+                source,
+                target: Vec::default(),
+                multipoles: Vec::default(),
+                locals: Vec::default(),
+                leaf_multipoles: Vec::default(),
+                level_multipoles: Vec::default(),
+                leaf_locals: Vec::default(),
+                level_locals: Vec::default(),
+                level_index_pointer: Vec::default(),
+                potentials: Vec::default(),
+                potentials_send_pointers: Vec::default(),
+                upward_surfaces: Vec::default(),
+                downward_surfaces: Vec::default(),
+                leaf_upward_surfaces: Vec::default(),
+                leaf_downward_surfaces: Vec::default(),
+                charges: Vec::default(),
+                charge_index_pointer: Vec::default(),
+                scales: Vec::default(),
+                global_indices: Vec::default(),
+            })
+        }
+    }
+}
+
 impl<T, U, V, W> SourceTranslation for NewKiFmm<T, U, V, W>
 where
     T: FmmTree,
@@ -109,9 +289,9 @@ where
     V: Kernel,
     W: Scalar + Default,
 {
-    fn m2m(&self, level: u64) {}
-
     fn p2m(&self) {}
+
+    fn m2m(&self, level: u64) {}
 }
 
 impl<T, U, V, W> TargetTranslation for NewKiFmm<T, U, V, W>
@@ -130,7 +310,7 @@ where
     fn p2p(&self) {}
 }
 
-impl<T, U, V> SourceToTarget for NewKiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> SourceToTarget for NewKiFmm<V, FftFieldTranslationKiFmmNew<U, T>, T, U>
 where
     T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
@@ -162,4 +342,32 @@ where
     fn m2l(&self, level: u64) {}
 
     fn p2l(&self, level: u64) {}
+}
+
+mod test {
+
+    use bempp_field::types::FftFieldTranslationKiFmmNew;
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use bempp_tree::implementations::helpers::points_fixture;
+    use rlst_dense::traits::RawAccess;
+
+    use super::*;
+
+    #[test]
+    fn test_builder() {
+        let npoints = 1000;
+        let sources = points_fixture::<f64>(npoints, None, None);
+        let targets = points_fixture::<f64>(npoints, None, None);
+        let charges = vec![1.0; npoints];
+        let n_crit = Some(100);
+        let expansion_order = 5;
+
+        let builder = KiFmmBuilderSingleNode::new()
+            .tree(&sources.data(), &targets.data(), n_crit)
+            .parameters(expansion_order, Laplace3dKernel::new())
+            .unwrap()
+            .field_translation(FftFieldTranslationKiFmmNew::default())
+            .unwrap()
+            .build();
+    }
 }

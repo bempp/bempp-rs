@@ -20,4 +20,3 @@ mod field_translation {
 
 // Temporary files to be moved over onto main source
 pub mod new_types;
-pub mod tree;

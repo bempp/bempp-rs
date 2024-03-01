@@ -43,6 +43,33 @@ where
     pub expansion_order: usize,
 }
 
+#[derive(Default)]
+pub struct FftFieldTranslationKiFmmNew<T, U>
+where
+    T: Default + Scalar<Real = T> + Float,
+    U: Kernel<T = T> + Default,
+{
+    /// Amount to dilate inner check surface by
+    pub alpha: T,
+
+    /// Map between indices of surface convolution grid points.
+    pub surf_to_conv_map: Vec<usize>,
+
+    /// Map between indices of convolution and surface grid points.
+    pub conv_to_surf_map: Vec<usize>,
+
+    /// Precomputed data required for FFT compressed M2L interaction.
+    pub operator_data: FftM2lOperatorData<Complex<T>>,
+
+    /// Unique transfer vectors to lookup m2l unique kernel interactions
+    pub transfer_vectors: Vec<TransferVector>,
+
+    /// The associated kernel with this translation operator.
+    pub kernel: U,
+
+    pub expansion_order: usize,
+}
+
 /// A type to store the M2L field translation meta-data and data for an SVD based sparsification in the kernel independent FMM.
 /// Here we take the a SVD over all M2L matrices, but the compressed M2L matrices are recompressed to account for the redundancy
 /// in rank due to some M2L matrices being of higher rank. This recompression is controlled by the threshold parameter which is
