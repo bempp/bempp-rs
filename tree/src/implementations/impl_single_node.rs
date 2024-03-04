@@ -1073,6 +1073,10 @@ where
         Some(self.keys.len())
     }
 
+    fn get_nleaves(&self) -> Option<usize> {
+        Some(self.leaves.len())
+    }
+
     fn get_depth(&self) -> u64 {
         self.depth
     }
@@ -1151,6 +1155,10 @@ where
 
     fn get_nkeys(&self) -> Option<usize> {
         Some(self.keys.len())
+    }
+
+    fn get_nleaves(&self) -> Option<usize> {
+        Some(self.leaves.len())
     }
 
     fn get_depth(&self) -> u64 {

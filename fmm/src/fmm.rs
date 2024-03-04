@@ -15,7 +15,7 @@ use rlst_dense::{
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
-    kernel::{Kernel, ScaleInvariantHomogenousKernel},
+    kernel::{Kernel, HomogenousKernel},
     tree::Tree,
     types::EvalType,
 };
@@ -28,7 +28,7 @@ use crate::{pinv::pinv, types::KiFmm};
 /// Implementation of constructor for single node KiFMM
 impl<T, U, V> KiFmm<SingleNodeTree<V>, T, U, V>
 where
-    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    T: Kernel<T = V> + HomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
     V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
@@ -204,7 +204,7 @@ where
 /// Implementation of constructor for single node KiFMM
 impl<T, U, V> KiFmmMatrix<SingleNodeTree<V>, T, U, V>
 where
-    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    T: Kernel<T = V> + HomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
     V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,

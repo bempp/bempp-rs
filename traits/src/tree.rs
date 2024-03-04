@@ -25,7 +25,7 @@ pub trait Tree {
     type Precision: Scalar<Real = Self::Precision> + Float + Default;
 
     /// A tree node.
-    type NodeIndex: MortonKeyInterface;
+    type NodeIndex: MortonKeyInterface + Clone + Copy;
 
     /// Slice of nodes.
     type NodeIndexSlice<'a>: IntoIterator<Item = &'a Self::NodeIndex>
@@ -40,6 +40,8 @@ pub trait Tree {
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
     fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>;
+
+    fn get_nleaves(&self) -> Option<usize>;
 
     fn get_nkeys(&self) -> Option<usize>;
 

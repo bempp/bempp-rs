@@ -103,7 +103,7 @@ pub trait Kernel: Sync {
 }
 
 /// Scaling required by the FMM to apply kernel to each octree level when it is scale invariant and homogenous
-pub trait ScaleInvariantHomogenousKernel
+pub trait HomogenousKernel
 where
     Self: Kernel,
 {

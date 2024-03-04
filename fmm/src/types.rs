@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 
 use bempp_field::field::ncoeffs;
-use bempp_traits::kernel::ScaleInvariantHomogenousKernel;
+use bempp_traits::kernel::HomogenousKernel;
 use bempp_traits::{field::SourceToTargetData, fmm::Fmm, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
@@ -348,7 +348,7 @@ impl<T> Default for SendPtr<T> {
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataUniform<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    T: Kernel<T = V> + HomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
     V: Float + Scalar<Real = V> + Default,
 {
@@ -523,7 +523,7 @@ where
 /// Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataUniformMatrix<KiFmmMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    T: Kernel<T = V> + HomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
     V: Float + Scalar<Real = V> + Default,
 {
@@ -764,7 +764,7 @@ where
 // Implementation of the data structure to store the data for the single node KiFMM.
 impl<T, U, V> FmmDataAdaptive<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V> + ScaleInvariantHomogenousKernel<T = V>,
+    T: Kernel<T = V> + HomogenousKernel<T = V>,
     U: SourceToTargetData<T>,
     V: Float + Scalar<Real = V> + Default,
 {

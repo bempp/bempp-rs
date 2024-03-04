@@ -7,7 +7,7 @@ use bempp_field::{
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData, SourceToTargetHomogenousScaleInvariant},
     fmm::{Fmm, NewFmm, SourceTranslation, TargetTranslation},
-    kernel::{self, Kernel, ScaleInvariantHomogenousKernel},
+    kernel::{self, Kernel, HomogenousKernel},
     tree::{FmmTree, Tree},
     types::EvalType,
 };
@@ -34,7 +34,7 @@ use crate::{
     constants::{ALPHA_INNER, ALPHA_OUTER},
     field_translation::target,
     pinv::pinv,
-    types::{C2EType, SendPtrMut},
+    types::{C2EType, SendPtr, SendPtrMut},
 };
 
 pub fn ncoeffs(expansion_order: usize) -> usize {
@@ -135,7 +135,7 @@ pub struct KiFmmBuilderSingleNode<T, U, V>
 where
     T: SourceToTargetData<V>,
     U: Float + Default + Scalar<Real = U>,
-    V: Kernel + ScaleInvariantHomogenousKernel,
+    V: Kernel + HomogenousKernel,
 {
     tree: Option<SingleNodeFmmTree<U>>,
     source_to_target: Option<T>,
@@ -175,7 +175,7 @@ where
     U: Float + Default,
     U: std::marker::Send + std::marker::Sync + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: Kernel<T = U> + ScaleInvariantHomogenousKernel + Clone + Default,
+    V: Kernel<T = U> + HomogenousKernel + Clone + Default,
 {
     // Start building with mandatory parameters
     pub fn new() -> Self {
@@ -259,15 +259,7 @@ where
         {
             Err("Missing fields for constructing KiFmm".to_string())
         } else {
-            // let mut result = NewKiFmm::default();
-
             // Configure with tree, expansion parameters and source to target field translation operators
-            // result.tree = self.tree.unwrap();
-            // result.expansion_order = self.expansion_order.unwrap();
-            // result.ncoeffs = self.ncoeffs.unwrap();
-            // result.kernel = self.kernel.unwrap();
-            // result.source_to_target_data = self.source_to_target.unwrap();
-
             let mut result = NewKiFmm {
                 tree: self.tree.unwrap(),
                 expansion_order: self.expansion_order.unwrap(),
@@ -281,7 +273,8 @@ where
             result.set_source_and_target_operator_data();
 
             // Set metadata, such as index pointers and buffers to store results
-            result.set_metadata();
+            /// TODO: MetaData setting!
+            result.set_metadata(self.eval_type.unwrap());
 
             Ok(result)
         }
@@ -318,7 +311,7 @@ where
 
 impl<T, U, V> SourceToTarget for NewKiFmm<V, FftFieldTranslationKiFmmNew<U, T>, T, U>
 where
-    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
         + Float
         + Default
@@ -338,7 +331,7 @@ where
 impl<T, U, V> SourceToTargetHomogenousScaleInvariant<U>
     for NewKiFmm<V, FftFieldTranslationKiFmmNew<U, T>, T, U>
 where
-    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
         + Float
         + Default
@@ -351,14 +344,23 @@ where
     V: FmmTree,
 {
     fn s2t_scale(&self, level: u64) -> U {
-        U::from(1.).unwrap()
+        if level < 2 {
+            panic!("M2L only perfomed on level 2 and below")
+        }
+
+        if level == 2 {
+            U::from(1. / 2.).unwrap()
+        } else {
+            let two = U::from(2.0).unwrap();
+            Scalar::powf(two, U::from(level - 3).unwrap())
+        }
     }
 }
 
 /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
 impl<T, U, V> SourceToTarget for NewKiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
 where
-    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
     U: Float + Default,
     U: std::marker::Send + std::marker::Sync + Default,
@@ -373,7 +375,7 @@ where
 impl<T, U, V> SourceToTargetHomogenousScaleInvariant<U>
     for NewKiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
 where
-    T: ScaleInvariantHomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
         + Float
         + Default
@@ -386,7 +388,16 @@ where
     V: FmmTree,
 {
     fn s2t_scale(&self, level: u64) -> U {
-        U::from(1.).unwrap()
+        if level < 2 {
+            panic!("M2L only perfomed on level 2 and below")
+        }
+
+        if level == 2 {
+            U::from(1. / 2.).unwrap()
+        } else {
+            let two = U::from(2.0).unwrap();
+            Scalar::powf(two, U::from(level - 3).unwrap())
+        }
     }
 }
 
@@ -394,7 +405,7 @@ impl<T, U, V, W> NewFmm for NewKiFmm<T, U, V, W>
 where
     T: FmmTree,
     U: SourceToTargetData<V>,
-    V: ScaleInvariantHomogenousKernel,
+    V: HomogenousKernel,
     W: Scalar<Real = W> + Default + Float,
     Self: SourceToTargetHomogenousScaleInvariant<W>,
 {
@@ -417,7 +428,7 @@ impl<T, U, V, W> Default for NewKiFmm<T, U, V, W>
 where
     T: FmmTree + Default,
     U: SourceToTargetData<V> + Default,
-    V: ScaleInvariantHomogenousKernel + Default,
+    V: HomogenousKernel + Default,
     W: Scalar<Real = W> + Default + Float,
 {
     fn default() -> Self {
@@ -464,7 +475,7 @@ where
     T: FmmTree,
     T::Tree: Tree<Domain = Domain<W>>,
     U: SourceToTargetData<V>,
-    V: ScaleInvariantHomogenousKernel<T = W>,
+    V: HomogenousKernel<T = W>,
     W: Scalar<Real = W> + Default + Float + rlst_blis::interface::gemm::Gemm,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
     // Self: SourceToTargetHomogenousScaleInvariant<W>
@@ -596,9 +607,174 @@ where
         self.uc2e_inv_2 = uc2e_inv_2;
     }
 
-    fn set_metadata(&mut self) {
-        // let n_source_keys = self.tree.get_source_tree().get_nkeys().unwrap();
-        // let leaves = self.tree.get_source_tree().get_all_leaves().unwrap();
+    fn set_metadata(&mut self, eval_type: EvalType) {
+        let dim = self.kernel.space_dimension();
+
+        let eval_size;
+        match eval_type {
+            EvalType::Value => {
+                eval_size = 1;
+            }
+            EvalType::ValueDeriv => {
+                eval_size = dim + 1;
+            }
+        }
+
+        let nsource_points = self
+            .tree
+            .get_source_tree()
+            .get_all_coordinates()
+            .unwrap()
+            .len();
+        let ntarget_points = self
+            .tree
+            .get_target_tree()
+            .get_all_coordinates()
+            .unwrap()
+            .len();
+        let nsource_keys = self.tree.get_source_tree().get_nkeys().unwrap();
+        let ntarget_keys = self.tree.get_target_tree().get_nkeys().unwrap();
+        let ntarget_leaves = self.tree.get_target_tree().get_nleaves().unwrap();
+        let nsource_leaves = self.tree.get_source_tree().get_nleaves().unwrap();
+
+        // Buffers to store all multipole and local data
+        let multipoles = vec![W::default(); self.ncoeffs * nsource_keys];
+        let locals = vec![W::default(); self.ncoeffs * ntarget_keys];
+
+        // Mutable pointers to multipole and local data, indexed by level
+        let mut level_multipoles = vec![
+            Vec::new();
+            (self.tree.get_source_tree().get_depth() + 1)
+                .try_into()
+                .unwrap()
+        ];
+        let mut level_locals = vec![
+            Vec::new();
+            (self.tree.get_target_tree().get_depth() + 1)
+                .try_into()
+                .unwrap()
+        ];
+
+        // Index pointers of multipole and local data, indexed by level
+        let mut level_index_pointer_multipoles = vec![
+            HashMap::new();
+            (self.tree.get_source_tree().get_depth() + 1)
+                .try_into()
+                .unwrap()
+        ];
+        let mut level_index_pointer_locals = vec![
+            HashMap::new();
+            (self.tree.get_target_tree().get_depth() + 1)
+                .try_into()
+                .unwrap()
+        ];
+
+        // Mutable pointers to multipole and local data only at leaf level
+        let mut leaf_multipoles = Vec::new();
+        let mut leaf_locals = Vec::new();
+
+        // Buffer to store evaluated potentials and/or gradients at target points
+        let mut potentials = vec![W::default(); ntarget_points * eval_size];
+
+        // Mutable pointers to potential data at each target leaf
+        let mut potentials_send_pointers = vec![SendPtrMut::default(); ntarget_leaves];
+
+        // Index pointer of charge data at each target leaf
+        let mut charge_index_pointer = vec![(0usize, 0usize); ntarget_leaves];
+
+        // Kernel scale at each target and source leaf
+        let mut target_leaf_scales = vec![W::default(); ntarget_leaves * self.ncoeffs];
+        let mut source_leaf_scales = vec![W::default(); nsource_leaves * self.ncoeffs];
+
+        // Create mutable pointers to multipole and local data indexed by tree level
+        {
+            for level in 0..=self.tree.get_source_tree().get_depth() {
+                let keys = self.tree.get_source_tree().get_keys(level).unwrap();
+
+                let mut tmp_multipoles = Vec::new();
+                for (level_idx, key) in keys.into_iter().enumerate() {
+                    let idx = self.tree.get_source_tree().get_index(key).unwrap();
+                    unsafe {
+                        let raw = multipoles.as_ptr().add(self.ncoeffs * idx) as *mut W;
+                        tmp_multipoles.push(SendPtrMut { raw });
+                    }
+                    level_index_pointer_multipoles[level as usize].insert(*key, level_idx);
+                }
+
+                level_multipoles[level as usize] = tmp_multipoles;
+            }
+            for level in 0..=self.tree.get_target_tree().get_depth() {
+                let keys = self.tree.get_target_tree().get_keys(level).unwrap();
+
+                let mut tmp_locals = Vec::new();
+                for (level_idx, key) in keys.into_iter().enumerate() {
+                    let idx = self.tree.get_source_tree().get_index(key).unwrap();
+                    unsafe {
+                        let raw = locals.as_ptr().add(self.ncoeffs * idx) as *mut W;
+                        tmp_locals.push(SendPtrMut { raw });
+                    }
+                    level_index_pointer_locals[level as usize].insert(*key, level_idx);
+                }
+                level_locals[level as usize] = tmp_locals;
+            }
+        }
+
+        // Create mutable pointers to multipole and local data at leaf level
+        {
+            for leaf in self
+                .tree
+                .get_source_tree()
+                .get_all_leaves()
+                .unwrap()
+                .into_iter()
+            {
+                let i = self.tree.get_source_tree().get_index(leaf).unwrap();
+                unsafe {
+                    let raw = multipoles.as_ptr().add(i * self.ncoeffs) as *mut W;
+                    leaf_multipoles.push(SendPtrMut { raw });
+                }
+            }
+            for leaf in self
+                .tree
+                .get_target_tree()
+                .get_all_leaves()
+                .unwrap()
+                .into_iter()
+            {
+                let i = self.tree.get_target_tree().get_index(leaf).unwrap();
+                unsafe {
+                    let raw = locals.as_ptr().add(i * self.ncoeffs) as *mut W;
+                    leaf_locals.push(SendPtrMut { raw });
+                }
+            }
+        }
+
+
+        let mut index_pointer = 0;
+        let mut potential_raw_pointer = potentials.as_mut_ptr();
+        for (i, leaf) in self
+            .tree
+            .get_target_tree()
+            .get_all_leaves()
+            .unwrap()
+            .into_iter()
+            .enumerate()
+        {
+            let npoints;
+            let nevals;
+
+            if let Some(coordinates) = self.tree.get_target_tree().get_coordinates(leaf) {
+                npoints = coordinates.len() / dim;
+                nevals = npoints * eval_size;
+            } else {
+                npoints = 0;
+                nevals = 0;
+            }
+
+            potentials_send_pointers[i] = SendPtrMut {
+                raw: potential_raw_pointer,
+            }
+        }
     }
 }
 mod test {

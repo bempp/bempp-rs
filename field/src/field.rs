@@ -1,5 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use bempp_traits::kernel::{Kernel, ScaleInvariantHomogenousKernel};
+use bempp_traits::kernel::{Kernel, HomogenousKernel};
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
@@ -67,7 +67,7 @@ impl<T, U> SourceToTargetData<U> for SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
-    U: ScaleInvariantHomogenousKernel<T = T> + Default,
+    U: HomogenousKernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type OperatorData = SvdSourceToTargetOperatorData<T>;
@@ -234,7 +234,7 @@ impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
-    U: ScaleInvariantHomogenousKernel<T = T> + Default,
+    U: HomogenousKernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     /// Constructor for SVD field translation struct for the kernel independent FMM (KiFMM).
@@ -285,7 +285,7 @@ impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
     T: Scalar<Real = T> + Float + Default + Fft,
     Complex<T>: Scalar,
-    U: ScaleInvariantHomogenousKernel<T = T> + Default,
+    U: HomogenousKernel<T = T> + Default,
 {
     type Domain = Domain<T>;
 
@@ -494,7 +494,7 @@ impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmmNew<T, U>
 where
     T: Scalar<Real = T> + Float + Default + Fft,
     Complex<T>: Scalar,
-    U: ScaleInvariantHomogenousKernel<T = T> + Default,
+    U: HomogenousKernel<T = T> + Default,
 {
     type Domain = Domain<T>;
 
@@ -703,7 +703,7 @@ impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
     T: Float + Scalar<Real = T> + Default + Fft,
     Complex<T>: Scalar,
-    U: ScaleInvariantHomogenousKernel<T = T> + Default,
+    U: HomogenousKernel<T = T> + Default,
 {
     /// Constructor for FFT field translation struct for the kernel independent FMM (KiFMM).
     ///
@@ -862,7 +862,7 @@ impl<T, U> FftFieldTranslationKiFmmNew<T, U>
 where
     T: Float + Scalar<Real = T> + Default + Fft,
     Complex<T>: Scalar,
-    U: ScaleInvariantHomogenousKernel<T = T> + Default,
+    U: HomogenousKernel<T = T> + Default,
 {
     /// Constructor for FFT field translation struct for the kernel independent FMM (KiFMM).
     ///

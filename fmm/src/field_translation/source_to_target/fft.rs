@@ -10,7 +10,7 @@ use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, InteractionLists},
-    kernel::{Kernel, ScaleInvariantHomogenousKernel},
+    kernel::{Kernel, HomogenousKernel},
     tree::Tree,
     types::{EvalType, Scalar},
 };
@@ -39,7 +39,7 @@ pub mod uniform {
     impl<T, U> FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantHomogenousKernel<T = U>
+            + HomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -92,7 +92,7 @@ pub mod uniform {
         for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantHomogenousKernel<T = U>
+            + HomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -370,7 +370,7 @@ pub mod uniform {
         for FmmDataUniform<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantHomogenousKernel<T = U>
+            + HomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -408,7 +408,7 @@ pub mod adaptive {
     impl<T, U> FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantHomogenousKernel<T = U>
+            + HomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -467,7 +467,7 @@ pub mod adaptive {
         for FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantHomogenousKernel<T = U>
+            + HomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
@@ -828,7 +828,7 @@ pub mod adaptive {
         for FmmDataAdaptive<KiFmm<SingleNodeTree<U>, T, FftFieldTranslationKiFmm<U, T>, U>, U>
     where
         T: Kernel<T = U>
-            + ScaleInvariantHomogenousKernel<T = U>
+            + HomogenousKernel<T = U>
             + std::marker::Send
             + std::marker::Sync
             + Default,
