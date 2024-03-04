@@ -25,6 +25,6 @@ where
     res
 }
 
-pub type Charges<T: Scalar> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-pub type Coordinates<T: Scalar> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

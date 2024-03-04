@@ -6,6 +6,7 @@ pub mod fmm;
 pub mod helpers;
 pub mod interaction_lists;
 pub mod pinv;
+pub mod tree;
 pub mod types;
 
 mod field_translation {
@@ -19,4 +20,4 @@ mod field_translation {
 }
 
 // Temporary files to be moved over onto main source
-pub mod new_types;
+// pub mod new_types;
