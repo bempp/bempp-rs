@@ -10,7 +10,7 @@ use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, InteractionLists},
-    kernel::{Kernel, HomogenousKernel},
+    kernel::{HomogenousKernel, Kernel},
     tree::Tree,
     types::{EvalType, Scalar},
 };

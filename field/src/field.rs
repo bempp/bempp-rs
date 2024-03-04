@@ -1,5 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use bempp_traits::kernel::{Kernel, HomogenousKernel};
+use bempp_traits::kernel::{HomogenousKernel, Kernel};
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};

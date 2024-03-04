@@ -9,7 +9,7 @@ use bempp_field::field::ncoeffs;
 use bempp_traits::{
     field::SourceToTargetData,
     fmm::{Fmm, SourceTranslation},
-    kernel::{Kernel, HomogenousKernel},
+    kernel::{HomogenousKernel, Kernel},
     tree::Tree,
     types::EvalType,
 };
@@ -29,10 +29,7 @@ use rlst_dense::{
 
 impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V>
-        + HomogenousKernel<T = V>
-        + std::marker::Send
-        + std::marker::Sync,
+    T: Kernel<T = V> + HomogenousKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: SourceToTargetData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V>
         + Float
@@ -202,10 +199,7 @@ where
 
 impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmm<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V>
-        + HomogenousKernel<T = V>
-        + std::marker::Send
-        + std::marker::Sync,
+    T: Kernel<T = V> + HomogenousKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: SourceToTargetData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V>
         + Float
@@ -372,10 +366,7 @@ where
 
 impl<T, U, V> SourceTranslation for FmmDataUniformMatrix<KiFmmMatrix<SingleNodeTree<V>, T, U, V>, V>
 where
-    T: Kernel<T = V>
-        + HomogenousKernel<T = V>
-        + std::marker::Send
-        + std::marker::Sync,
+    T: Kernel<T = V> + HomogenousKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: SourceToTargetData<T> + std::marker::Sync + std::marker::Send,
     V: Scalar<Real = V>
         + Float

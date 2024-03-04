@@ -15,7 +15,7 @@ use rlst_dense::{
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, FmmLoop, SourceTranslation, TargetTranslation, TimeDict},
-    kernel::{Kernel, HomogenousKernel},
+    kernel::{HomogenousKernel, Kernel},
     tree::Tree,
     types::EvalType,
 };

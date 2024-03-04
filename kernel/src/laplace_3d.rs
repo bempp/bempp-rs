@@ -6,7 +6,7 @@ use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use bempp_traits::{
-    kernel::{Kernel, HomogenousKernel},
+    kernel::{HomogenousKernel, Kernel},
     types::{EvalType, KernelType, Scalar},
 };
 use num::traits::FloatConst;

@@ -3,6 +3,9 @@ use std::collections::HashMap;
 
 use num::Float;
 use rlst_common::types::Scalar;
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, traits::Shape,
+};
 
 use crate::types::{Charge, ChargeDict, GlobalIdx};
 
@@ -21,3 +24,7 @@ where
     }
     res
 }
+
+pub type Charges<T: Scalar> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+
+pub type Coordinates<T: Scalar> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

@@ -25,7 +25,7 @@ pub trait Tree {
     type Precision: Scalar<Real = Self::Precision> + Float + Default;
 
     /// A tree node.
-    type NodeIndex: MortonKeyInterface + Clone + Copy;
+    type NodeIndex: MortonKeyInterface<Self::Precision, Domain = Self::Domain> + Clone + Copy;
 
     /// Slice of nodes.
     type NodeIndexSlice<'a>: IntoIterator<Item = &'a Self::NodeIndex>
@@ -90,15 +90,27 @@ pub trait FmmTree {
 }
 
 /// A minimal interface for Morton Key like nodes.
-pub trait MortonKeyInterface
+pub trait MortonKeyInterface<T>
 where
     Self: Hash + Eq,
+    T: Scalar,
 {
+    type Domain;
+
     // Copy of nodes
     type NodeIndices: IntoIterator<Item = Self>;
 
     /// The parent of a key.
     fn parent(&self) -> Self;
+
+    fn level(&self) -> u64;
+
+    fn compute_surface(
+        &self,
+        domain: &Self::Domain,
+        expansion_order: usize,
+        alpha: T,
+    ) -> Vec<<T as Scalar>::Real>;
 
     /// Neighbours defined by keys sharing a vertex, edge, or face.
     fn neighbors(&self) -> Self::NodeIndices;

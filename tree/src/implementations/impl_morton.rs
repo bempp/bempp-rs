@@ -978,8 +978,10 @@ impl Hash for MortonKey {
     }
 }
 
-impl MortonKeyInterface for MortonKey {
+impl<T: Scalar + Float + Default> MortonKeyInterface<T> for MortonKey {
     type NodeIndices = MortonKeys;
+
+    type Domain = Domain<T>;
 
     fn children(&self) -> Self::NodeIndices {
         MortonKeys {
@@ -992,11 +994,24 @@ impl MortonKeyInterface for MortonKey {
         self.parent()
     }
 
+    fn level(&self) -> u64 {
+        self.level()
+    }
+
     fn neighbors(&self) -> Self::NodeIndices {
         MortonKeys {
             keys: self.neighbors(),
             index: 0,
         }
+    }
+
+    fn compute_surface(
+        &self,
+        domain: &Self::Domain,
+        order: usize,
+        alpha: T,
+    ) -> Vec<<T as Scalar>::Real> {
+        self.compute_surface(domain, order, alpha)
     }
 
     fn is_adjacent(&self, other: &Self) -> bool {
