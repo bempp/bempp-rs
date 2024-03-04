@@ -14,8 +14,10 @@ use bempp_traits::{
     types::EvalType,
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use rlst_blis::interface::gemm::Gemm;
 
 use crate::{
+    builder::FmmEvaluationMode,
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
     fmm::NewKiFmm,
     helpers::find_chunk_size,
@@ -1179,16 +1181,108 @@ use rlst_dense::{
 //     }
 // }
 
+
 impl<T, U, V, W> SourceTranslation for NewKiFmm<T, U, V, W>
 where
-    T: FmmTree,
-    U: SourceToTargetData<V>,
-    V: Kernel,
-    W: Scalar + Default,
+    T: FmmTree<Precision = W> + Send + Sync,
+    U: SourceToTargetData<V> + Send + Sync,
+    V: Kernel<T = W> + Send + Sync,
+    W: Scalar<Real = W> + Default + Send + Sync + Gemm,
 {
     fn p2m(&self) {
+        let Some(leaves) = self.tree.get_source_tree().get_all_leaves() else {
+            return;
+        };
 
+        let nleaves = self.tree.get_source_tree().get_nleaves().unwrap();
+        let dim = self.kernel.space_dimension();
+        let surface_size = self.ncoeffs * dim;
+        let coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
+
+        match self.eval_mode {
+            FmmEvaluationMode::Vector => {
+                // Calculate check potentials
+                let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs, 1]);
+                check_potentials
+                    .data_mut()
+                    .par_chunks_exact_mut(self.ncoeffs)
+                    .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
+                    .zip(&self.charge_index_pointer)
+                    .for_each(
+                        |((check_potential, upward_check_surface), charge_index_pointer)| {
+                            let charges =
+                                &self.charges[charge_index_pointer.0..charge_index_pointer.1];
+                            let coordinates_row_major = &coordinates
+                                [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
+
+                            let nsources = coordinates_row_major.len() / dim;
+                            if nsources > 0 {
+                                let coordinates_row_major = rlst_array_from_slice2!(
+                                    W,
+                                    coordinates_row_major,
+                                    [nsources, dim],
+                                    [dim, 1]
+                                );
+                                let mut coordinates_col_major =
+                                    rlst_dynamic_array2!(W, [nsources, dim]);
+                                coordinates_col_major.fill_from(coordinates_row_major.view());
+
+                                self.kernel.evaluate_st(
+                                    EvalType::Value,
+                                    coordinates_col_major.data(),
+                                    upward_check_surface,
+                                    charges,
+                                    check_potential,
+                                );
+                            }
+                        },
+                    );
+
+                // Use check potentials to compute the multipole expansion
+                let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
+                check_potentials
+                    .data()
+                    .par_chunks_exact(self.ncoeffs * chunk_size)
+                    .zip(self.leaf_multipoles[0].par_chunks_exact(chunk_size))
+                    .zip(
+                        self.source_scales
+                            .par_chunks_exact(self.ncoeffs * chunk_size),
+                    )
+                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                        let check_potential =
+                            rlst_array_from_slice2!(W, check_potential, [self.ncoeffs, chunk_size]);
+                        let scale = rlst_array_from_slice2!(W, scale, [self.ncoeffs, chunk_size]);
+
+                        let mut cmp_prod = rlst_dynamic_array2!(W, [self.ncoeffs, chunk_size]);
+                        cmp_prod.fill_from(check_potential * scale);
+
+                        let tmp = empty_array::<W, 2>().simple_mult_into_resize(
+                            self.uc2e_inv_1.view(),
+                            empty_array::<W, 2>()
+                                .simple_mult_into_resize(self.uc2e_inv_2.view(), cmp_prod),
+                        );
+
+                        for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
+                        {
+                            let multipole = unsafe {
+                                std::slice::from_raw_parts_mut(multipole_ptr.raw, self.ncoeffs)
+                            };
+                            multipole
+                                .iter_mut()
+                                .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
+                                .for_each(|(m, t)| *m += *t);
+                        }
+                    })
+            }
+
+            FmmEvaluationMode::Matrix(n) => {}
+        }
     }
 
-    fn m2m(&self, level: u64) {}
+    fn m2m(&self, level: u64) {
+        match self.eval_mode {
+            FmmEvaluationMode::Vector => {},
+            FmmEvaluationMode::Matrix(n) => {},
+        }
+    }
 }

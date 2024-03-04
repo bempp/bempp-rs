@@ -29,9 +29,12 @@ use bempp_tree::{
     types::{morton::MortonKey, single_node::SingleNodeTree},
 };
 
-use crate::{builder::FmmEvaluationMode, types::{
-    C2EType, FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmMatrix, SendPtrMut,
-}};
+use crate::{
+    builder::FmmEvaluationMode,
+    types::{
+        C2EType, FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmMatrix, SendPtrMut,
+    },
+};
 use crate::{pinv::pinv, types::KiFmm};
 
 // /// Implementation of constructor for single node KiFMM

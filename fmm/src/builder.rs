@@ -33,9 +33,10 @@ pub fn ncoeffs(expansion_order: usize) -> usize {
     6 * (expansion_order - 1).pow(2) + 2
 }
 
-pub enum  FmmEvaluationMode {
+#[derive(Clone, Copy)]
+pub enum FmmEvaluationMode {
     Vector,
-    Matrix(usize)
+    Matrix(usize),
 }
 
 #[derive(Default)]
@@ -77,7 +78,7 @@ where
             ncoeffs: None,
             eval_type: None,
             charges: None,
-            eval_mode: None
+            eval_mode: None,
         }
     }
 

@@ -47,8 +47,9 @@ pub struct SingleNodeFmmTree<T: Float + Default + Scalar<Real = T>> {
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
-    T: Float + Default + Scalar<Real = T>,
+    T: Float + Default + Scalar<Real = T> + Send + Sync,
 {
+    type Precision = T;
     type Tree = SingleNodeTreeNew<T>;
 
     fn get_source_tree(&self) -> &Self::Tree {
@@ -63,3 +64,6 @@ where
         &self.domain
     }
 }
+
+unsafe impl<T: Float + Default + Scalar<Real = T>> Send for SingleNodeFmmTree<T> {}
+unsafe impl<T: Float + Default + Scalar<Real = T>> Sync for SingleNodeFmmTree<T> {}
