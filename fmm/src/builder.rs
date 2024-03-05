@@ -182,7 +182,7 @@ where
 
 impl<T, U, V, W> NewKiFmm<T, U, V, W>
 where
-    T: FmmTree,
+    T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
     U: SourceToTargetData<V>,
     V: HomogenousKernel<T = W>,
@@ -255,6 +255,8 @@ where
         // Calculate M2M and L2L operator matrices
         let children = ROOT.children();
         let mut m2m = rlst_dynamic_array2!(W, [nequiv_surface, 8 * nequiv_surface]);
+        let mut m2m_vec = Vec::new();
+
         let mut l2l = Vec::new();
 
         for (i, child) in children.iter().enumerate() {
@@ -284,6 +286,7 @@ where
             let r = l + nequiv_surface * nequiv_surface;
 
             m2m.data_mut()[l..r].copy_from_slice(tmp.data());
+            m2m_vec.push(tmp);
 
             let mut cc2pe_t = rlst_dynamic_array2!(W, [ncheck_surface, nequiv_surface]);
 
@@ -309,6 +312,7 @@ where
         }
 
         self.source_data = m2m;
+        self.source_data_vec = m2m_vec;
         self.target_data = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
@@ -337,8 +341,8 @@ where
             .unwrap()
             .len();
 
-        let nsource_keys = self.tree.get_source_tree().get_nkeys().unwrap();
-        let ntarget_keys = self.tree.get_target_tree().get_nkeys().unwrap();
+        let nsource_keys = self.tree.get_source_tree().get_nall_keys().unwrap();
+        let ntarget_keys = self.tree.get_target_tree().get_nall_keys().unwrap();
         let ntarget_leaves = self.tree.get_target_tree().get_nleaves().unwrap();
         let nsource_leaves = self.tree.get_source_tree().get_nleaves().unwrap();
 
@@ -660,6 +664,7 @@ where
             self.downward_surfaces = downward_surfaces;
             self.leaf_upward_surfaces = leaf_upward_surfaces;
             self.leaf_downward_surfaces = leaf_downward_surfaces;
+            self.charges = charges.data().to_vec();
             self.charge_index_pointer = charge_index_pointer;
             self.target_scales = target_leaf_scales;
             self.source_scales = source_leaf_scales;

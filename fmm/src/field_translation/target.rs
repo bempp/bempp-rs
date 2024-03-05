@@ -741,18 +741,23 @@
 // }
 
 use bempp_traits::{
-    field::SourceToTargetData, fmm::TargetTranslation, kernel::Kernel, tree::FmmTree,
+    field::SourceToTargetData,
+    fmm::TargetTranslation,
+    kernel::Kernel,
+    tree::{FmmTree, Tree},
 };
+use bempp_tree::types::single_node::SingleNodeTreeNew;
 use cauchy::Scalar;
+use num::Float;
 
 use crate::fmm::NewKiFmm;
 
 impl<T, U, V, W> TargetTranslation for NewKiFmm<T, U, V, W>
 where
-    T: FmmTree,
+    T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     U: SourceToTargetData<V>,
     V: Kernel,
-    W: Scalar + Default,
+    W: Scalar<Real = W> + Default + Float,
 {
     fn l2l(&self, level: u64) {}
 

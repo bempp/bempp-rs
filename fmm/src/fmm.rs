@@ -5,8 +5,12 @@ use bempp_field::{
 };
 use itertools::Itertools;
 use num::{Complex, Float};
+use rlst_blis::interface::gemm::Gemm;
 use rlst_common::types::Scalar;
-use std::{collections::HashMap, time::Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use rlst_dense::{
     array::{empty_array, Array},
@@ -26,7 +30,7 @@ use bempp_traits::{
 
 use bempp_tree::{
     constants::ROOT,
-    types::{morton::MortonKey, single_node::SingleNodeTree},
+    types::{morton::MortonKey, single_node::SingleNodeTreeNew},
 };
 
 use crate::{
@@ -1368,7 +1372,12 @@ pub fn ncoeffs(expansion_order: usize) -> usize {
 }
 
 /// Combines the old datatree + Fmm structs into a single storage of metadata
-pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar + Default> {
+pub struct NewKiFmm<
+    T: FmmTree<Tree = SingleNodeTreeNew<W>>,
+    U: SourceToTargetData<V>,
+    V: Kernel,
+    W: Scalar<Real = W> + Default + Float,
+> {
     pub tree: T,
     pub source_to_target_data: U,
     pub kernel: V,
@@ -1394,6 +1403,8 @@ pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar +
 
     /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
     pub source_data: C2EType<W>,
+
+    pub source_data_vec: Vec<C2EType<W>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
     pub target_data: Vec<C2EType<W>>,
@@ -1489,15 +1500,41 @@ pub struct NewKiFmm<T: FmmTree, U: SourceToTargetData<V>, V: Kernel, W: Scalar +
 
 impl<T, U, V, W> NewFmm for NewKiFmm<T, U, V, W>
 where
-    T: FmmTree,
-    U: SourceToTargetData<V>,
-    V: HomogenousKernel,
-    W: Scalar<Real = W> + Default + Float,
+    // T: FmmTree,
+    // U: SourceToTargetData<V>,
+    // V: HomogenousKernel,
+    // W: Scalar<Real = W> + Default + Float,
     // Self: SourceToTargetHomogenousScaleInvariant<W>,
+    T: FmmTree<Tree = SingleNodeTreeNew<W>> + Send + Sync,
+    U: SourceToTargetData<V> + Send + Sync,
+    V: Kernel<T = W> + Send + Sync,
+    W: Scalar<Real = W> + Default + Send + Sync + Gemm + Float,
 {
     type Precision = W;
 
-    fn evaluate(&self, result: &mut [Self::Precision]) {}
+    fn evaluate(
+        &self,
+        result: &mut [Self::Precision],
+        profile: bool,
+    ) -> Option<HashMap<String, Duration>> {
+        // Upward pass
+        let mut times = HashMap::new();
+        {
+            self.p2m();
+            for level in (1..=self.tree.get_source_tree().get_depth()).rev() {
+                self.m2m(level);
+            }
+        }
+
+        // Downward pass
+        {}
+
+        if profile {
+            Some(times)
+        } else {
+            None
+        }
+    }
 
     fn get_expansion_order(&self) -> usize {
         self.expansion_order
@@ -1510,7 +1547,7 @@ where
 
 impl<T, U, V, W> Default for NewKiFmm<T, U, V, W>
 where
-    T: FmmTree + Default,
+    T: FmmTree<Tree = SingleNodeTreeNew<W>> + Default,
     U: SourceToTargetData<V> + Default,
     V: HomogenousKernel + Default,
     W: Scalar<Real = W> + Default + Float,
@@ -1533,6 +1570,7 @@ where
             dc2e_inv_1,
             dc2e_inv_2,
             source_data: source,
+            source_data_vec: Vec::default(),
             target_data: Vec::default(),
             multipoles: Vec::default(),
             locals: Vec::default(),
@@ -1571,6 +1609,7 @@ mod test {
     fn test_fmm() {
         let npoints = 1000;
         let nvecs = 1;
+        let profile = true;
         let sources = points_fixture::<f64>(npoints, None, None);
         let targets = points_fixture::<f64>(npoints, None, None);
         let mut result = rlst_dynamic_array2!(f64, [npoints, 1]);
@@ -1594,6 +1633,10 @@ mod test {
             .build()
             .unwrap();
 
-        fmm.evaluate(result.data_mut());
+        let times = fmm.evaluate(result.data_mut(), profile);
+
+        println!("multipoles {:?}", fmm.multipoles);
+
+        assert!(false);
     }
 }

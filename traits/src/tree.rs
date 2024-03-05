@@ -1,6 +1,7 @@
 //! Traits
 use std::collections::HashSet;
 use std::hash::Hash;
+use std::ops::Index;
 
 use cauchy::Scalar;
 use num::Float;
@@ -43,7 +44,9 @@ pub trait Tree {
 
     fn get_nleaves(&self) -> Option<usize>;
 
-    fn get_nkeys(&self) -> Option<usize>;
+    fn get_nall_keys(&self) -> Option<usize>;
+
+    fn get_nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
     fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>>;
@@ -75,12 +78,17 @@ pub trait Tree {
     /// Get a map from the key to index position in sorted keys
     fn get_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
 
+    fn get_node_index(&self, idx: usize) -> Option<&Self::NodeIndex>;
+
     /// Get a map from the key to leaf index position in sorted leaves
     fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
 }
 
 pub trait FmmTree {
-    type Tree: Tree;
+    type Precision;
+    type NodeIndex;
+
+    type Tree: Tree<Precision = Self::Precision, NodeIndex = Self::NodeIndex>;
 
     fn get_source_tree(&self) -> &Self::Tree;
 

@@ -15,7 +15,7 @@ use bempp_traits::{
     tree::Tree,
     types::Scalar,
 };
-use bempp_tree::types::single_node::SingleNodeTree;
+use bempp_tree::types::single_node::SingleNodeTreeNew;
 
 use crate::fmm::NewKiFmm;
 use crate::types::{FmmDataUniform, KiFmm};
@@ -595,7 +595,7 @@ where
     U: Float + Default,
     U: std::marker::Send + std::marker::Sync + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree,
+    V: FmmTree<Tree = SingleNodeTreeNew<U>>,
 {
     fn m2l(&self, level: u64) {}
 

@@ -1,5 +1,7 @@
 //! FMM traits
+use core::time;
 use std::collections::HashMap;
+use std::time::Duration;
 
 use cauchy::Scalar;
 use num::Float;
@@ -61,7 +63,7 @@ pub trait Fmm {
 
 pub trait NewFmm {
     type Precision: Scalar + Default + Float;
-    fn evaluate(&self, result: &mut [Self::Precision]);
+    fn evaluate(&self, result: &mut [Self::Precision], profile: bool) -> Option<HashMap<String, Duration>>;
     fn get_expansion_order(&self) -> usize;
     fn get_ncoeffs(&self) -> usize;
 }

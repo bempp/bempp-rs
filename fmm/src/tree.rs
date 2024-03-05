@@ -13,11 +13,7 @@ use bempp_traits::{
 };
 use bempp_tree::{
     constants::ROOT,
-    types::{
-        domain::Domain,
-        morton::MortonKey,
-        single_node::{SingleNodeTree, SingleNodeTreeNew},
-    },
+    types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew},
 };
 use cauchy::Scalar;
 use num::{traits::real::Real, Complex, Float};
@@ -50,6 +46,7 @@ where
     T: Float + Default + Scalar<Real = T> + Send + Sync,
 {
     type Precision = T;
+    type NodeIndex = MortonKey;
     type Tree = SingleNodeTreeNew<T>;
 
     fn get_source_tree(&self) -> &Self::Tree {

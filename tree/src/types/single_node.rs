@@ -10,54 +10,54 @@ use crate::types::{
     point::Points,
 };
 
-/// Local Trees (non-distributed).
-#[derive(Debug)]
-pub struct SingleNodeTree<T>
-where
-    T: Float + Default + Scalar<Real = T>,
-{
-    /// Depth of a tree.
-    pub depth: u64,
+// /// Local Trees (non-distributed).
+// #[derive(Debug)]
+// pub struct SingleNodeTree<T>
+// where
+//     T: Float + Default + Scalar<Real = T>,
+// {
+//     /// Depth of a tree.
+//     pub depth: u64,
 
-    /// Whether the tree is adaptive.
-    pub adaptive: bool,
+//     /// Whether the tree is adaptive.
+//     pub adaptive: bool,
 
-    /// Domain spanned by the points.
-    pub domain: Domain<T>,
+//     /// Domain spanned by the points.
+//     pub domain: Domain<T>,
 
-    ///  All Points.
-    pub points: Points<T>,
+//     ///  All Points.
+//     pub points: Points<T>,
 
-    /// All coordinates
-    pub coordinates: Vec<T>,
+//     /// All coordinates
+//     pub coordinates: Vec<T>,
 
-    /// All global indices
-    pub global_indices: Vec<usize>,
+//     /// All global indices
+//     pub global_indices: Vec<usize>,
 
-    /// The leaves that span the tree, and associated Point data.
-    pub leaves: MortonKeys,
+//     /// The leaves that span the tree, and associated Point data.
+//     pub leaves: MortonKeys,
 
-    /// All nodes in tree, and associated Node data.
-    pub keys: MortonKeys,
+//     /// All nodes in tree, and associated Node data.
+//     pub keys: MortonKeys,
 
-    /// Associate leaves with point indices.
-    pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
+//     /// Associate leaves with point indices.
+//     pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
 
-    /// Associate levels with key indices.
-    pub levels_to_keys: HashMap<u64, (usize, usize)>,
+//     /// Associate levels with key indices.
+//     pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
-    /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey, usize>,
+//     /// Map between a key and its index
+//     pub key_to_index: HashMap<MortonKey, usize>,
 
-    /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey, usize>,
+//     /// Map between a leaf and its index
+//     pub leaf_to_index: HashMap<MortonKey, usize>,
 
-    /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey>,
+//     /// All leaves, returned as a set.
+//     pub leaves_set: HashSet<MortonKey>,
 
-    /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey>,
-}
+//     /// All keys, returned as a set.
+//     pub keys_set: HashSet<MortonKey>,
+// }
 
 /// Local Trees (non-distributed).
 #[derive(Default)]
