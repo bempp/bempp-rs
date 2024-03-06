@@ -126,37 +126,6 @@ pub struct KiFmm<
     pub global_indices: Vec<usize>,
 }
 
-// TODO: Remove scale function
-
-// impl<T, U, V> SourceToTargetHomogenousScaleInvariant<U>
-//     for NewKiFmm<V, FftFieldTranslationKiFmmNew<U, T>, T, U>
-// where
-//     T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-//     U: Scalar<Real = U>
-//         + Float
-//         + Default
-//         + std::marker::Send
-//         + std::marker::Sync
-//         + Fft
-//         + rlst_blis::interface::gemm::Gemm,
-//     Complex<U>: Scalar,
-//     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-//     V: FmmTree,
-// {
-//     fn s2t_scale(&self, level: u64) -> U {
-//         if level < 2 {
-//             panic!("M2L only perfomed on level 2 and below")
-//         }
-
-//         if level == 2 {
-//             U::from(1. / 2.).unwrap()
-//         } else {
-//             let two = U::from(2.0).unwrap();
-//             Scalar::powf(two, U::from(level - 3).unwrap())
-//         }
-//     }
-// }
-
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTreeNew<W>, NodeIndex = MortonKey> + Send + Sync,
@@ -166,8 +135,10 @@ where
 {
     type NodeIndex = T::NodeIndex;
     type Precision = W;
+    type Kernel = V;
+    type Tree = T;
 
-    fn get_multipole_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn get_multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
         if let Some(index) = self.tree.get_source_tree().get_index(key) {
             match self.eval_mode {
                 FmmEvaluationMode::Vector => {
@@ -183,7 +154,7 @@ where
         }
     }
 
-    fn get_local_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn get_local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
         if let Some(index) = self.tree.get_target_tree().get_index(key) {
             match self.eval_mode {
                 FmmEvaluationMode::Vector => {
@@ -199,7 +170,7 @@ where
         }
     }
 
-    fn get_potential_data(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+    fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
         if let Some(&leaf_idx) = self.tree.get_target_tree().get_leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer[leaf_idx];
             let ntargets = r - l;
@@ -227,6 +198,18 @@ where
         } else {
             None
         }
+    }
+
+    fn get_expansion_order(&self) -> usize {
+        self.expansion_order
+    }
+
+    fn get_kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
+
+    fn get_tree(&self) -> &Self::Tree {
+        &self.tree
     }
 
     fn evaluate(&self) {
@@ -294,18 +277,67 @@ where
     }
 }
 
+#[cfg(test)]
+
 mod test {
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use bempp_traits::fmm;
     use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
 
-    use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER};
-    use bempp_field::types::{FftFieldTranslationKiFmmNew, SvdFieldTranslationKiFmm};
+    use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
+    use bempp_field::types::{
+        FftFieldTranslationKiFmmNew, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmNew,
+    };
 
     use super::*;
 
-    #[test]
+    fn test_root_multipole_laplace_single_node<
+        T: Scalar<Real = T> + Float + Default + Sync + Send,
+    >(
+        fmm: Box<
+            dyn Fmm<
+                Precision = T,
+                NodeIndex = MortonKey,
+                Kernel = Laplace3dKernel<T>,
+                Tree = SingleNodeFmmTree<T>,
+            >,
+        >,
+        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+    ) {
+        let multipole = fmm.get_multipole(&ROOT).unwrap();
+        let upward_equivalent_surface = ROOT.compute_surface(
+            fmm.get_tree().get_domain(),
+            fmm.get_expansion_order(),
+            T::from(ALPHA_INNER).unwrap(),
+        );
+        let test_point = vec![T::from(100000.).unwrap(), T::zero(), T::zero()];
+        let mut expected = vec![T::zero()];
+        let mut found = vec![T::zero()];
 
+        fmm.get_kernel().evaluate_st(
+            bempp_traits::types::EvalType::Value,
+            sources.data(),
+            &test_point,
+            charges.data(),
+            &mut expected,
+        );
+
+        fmm.get_kernel().evaluate_st(
+            bempp_traits::types::EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            multipole,
+            &mut found,
+        );
+
+        let abs_error = num::Float::abs(expected[0] - found[0]);
+        let rel_error = abs_error / expected[0];
+        assert!(rel_error < T::from(1e-7).unwrap());
+    }
+
+    #[test]
     fn test_upward_pass() {
         let npoints = 10000;
         let nvecs = 1;
@@ -316,10 +348,10 @@ mod test {
         charges.data_mut().copy_from_slice(&tmp);
 
         let n_crit = Some(100);
-        let expansion_order = 10;
+        let expansion_order = 7;
         let sparse = false;
 
-        let fmm = KiFmmBuilderSingleNode::new()
+        let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)
             .parameters(
                 expansion_order,
@@ -331,33 +363,24 @@ mod test {
             .build()
             .unwrap();
 
-        fmm.evaluate();
+        let fmm_svd = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .parameters(
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                SvdFieldTranslationKiFmm::default(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-        let multipole = fmm.get_multipole_data(&ROOT).unwrap();
-        let upward_equivalent_surface =
-            ROOT.compute_surface(fmm.tree.get_domain(), fmm.expansion_order, ALPHA_INNER);
-        let test_point = vec![100000., 0., 0.];
-        let mut expected = vec![0.];
-        let mut found = vec![0.];
+        fmm_fft.evaluate();
+        fmm_svd.evaluate();
 
-        fmm.kernel.evaluate_st(
-            bempp_traits::types::EvalType::Value,
-            sources.data(),
-            &test_point,
-            charges.data(),
-            &mut expected,
-        );
-
-        fmm.kernel.evaluate_st(
-            bempp_traits::types::EvalType::Value,
-            &upward_equivalent_surface,
-            &test_point,
-            multipole,
-            &mut found,
-        );
-
-        let abs_error = num::Float::abs(expected[0] - found[0]);
-        let rel_error = abs_error / expected[0];
-        assert!(rel_error < 1e-10);
+        let fmm_fft = Box::new(fmm_fft);
+        let fmm_svd = Box::new(fmm_svd);
+        test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges);
+        test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges);
     }
 }

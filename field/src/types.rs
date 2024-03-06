@@ -75,6 +75,7 @@ where
 /// in rank due to some M2L matrices being of higher rank. This recompression is controlled by the threshold parameter which is
 /// which is computed as the percentage of the energy of the compressed M2L matrix, as measured by the sum of the squares of the
 /// singular values.
+#[derive(Default)]
 pub struct SvdFieldTranslationKiFmm<T, U>
 where
     T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
@@ -101,7 +102,8 @@ where
     pub expansion_order: usize,
 }
 
-pub struct SvdFieldTranslationKiFmmMew<T, U>
+#[derive(Default)]
+pub struct SvdFieldTranslationKiFmmNew<T, U>
 where
     T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
     U: Kernel<T = T> + Default,

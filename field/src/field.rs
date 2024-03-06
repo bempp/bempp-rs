@@ -80,7 +80,9 @@ where
         let nrows = ncoeffs(order);
         let ncols = ncoeffs(order);
 
-        let ntransfer_vectors = self.transfer_vectors.len();
+        // TODO: Need to somehow incorporate this value with the kernel marker trait
+        let ntransfer_vectors = 316;
+
         let mut se2tc_fat = rlst_dynamic_array2!(T, [nrows, ncols * ntransfer_vectors]);
         let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * ntransfer_vectors, ncols]);
 

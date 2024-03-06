@@ -7,7 +7,7 @@ use cauchy::Scalar;
 use num::Float;
 
 use crate::kernel::Kernel;
-use crate::tree::Tree;
+use crate::tree::{FmmTree, Tree};
 use crate::types::EvalType;
 
 /// Interface for source box translations.
@@ -47,9 +47,16 @@ pub trait TargetTranslation {
 pub trait Fmm {
     type Precision;
     type NodeIndex;
-    fn get_multipole_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
-    fn get_local_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
-    fn get_potential_data(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
+    type Tree: FmmTree;
+    type Kernel: Kernel;
+
+    fn get_multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn get_local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
+
+    fn get_expansion_order(&self) -> usize;
+    fn get_tree(&self) -> &Self::Tree;
+    fn get_kernel(&self) -> &Self::Kernel;
     fn evaluate(&self);
 }
 
