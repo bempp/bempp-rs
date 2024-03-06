@@ -297,32 +297,30 @@ where
 mod test {
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::implementations::helpers::points_fixture;
+    use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
 
-    use crate::builder::KiFmmBuilderSingleNode;
+    use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER};
     use bempp_field::types::{FftFieldTranslationKiFmmNew, SvdFieldTranslationKiFmm};
 
     use super::*;
 
     #[test]
 
-    fn test_fmm() {
-        let npoints = 1000;
+    fn test_upward_pass() {
+        let npoints = 10000;
         let nvecs = 1;
-        let profile = true;
         let sources = points_fixture::<f64>(npoints, None, None);
         let targets = points_fixture::<f64>(npoints, None, None);
-        let mut result = rlst_dynamic_array2!(f64, [npoints, 1]);
         let tmp = vec![1.0; npoints * nvecs];
         let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         let n_crit = Some(100);
-        let expansion_order = 5;
-        let sparse = true;
+        let expansion_order = 10;
+        let sparse = false;
 
         let fmm = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, None, None)
+            .tree(&sources, &targets, &charges, n_crit, sparse)
             .parameters(
                 expansion_order,
                 Laplace3dKernel::new(),
@@ -335,6 +333,33 @@ mod test {
 
         fmm.evaluate();
 
-        assert!(false);
+        let multipole = fmm.get_multipole_data(&ROOT).unwrap();
+        let upward_equivalent_surface =
+            ROOT.compute_surface(fmm.tree.get_domain(), fmm.expansion_order, ALPHA_INNER);
+        let test_point = vec![100000., 0., 0.];
+        let mut expected = vec![0.];
+        let mut found = vec![0.];
+
+        fmm.kernel.evaluate_st(
+            bempp_traits::types::EvalType::Value,
+            sources.data(),
+            &test_point,
+            charges.data(),
+            &mut expected,
+        );
+
+        fmm.kernel.evaluate_st(
+            bempp_traits::types::EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            multipole,
+            &mut found,
+        );
+
+        let abs_error = num::Float::abs(expected[0] - found[0]);
+        let rel_error = abs_error / expected[0];
+        assert!(rel_error < 1e-10);
     }
+
+
 }

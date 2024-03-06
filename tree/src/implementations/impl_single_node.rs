@@ -1037,12 +1037,11 @@ where
     pub fn new(
         points: &[T],
         n_crit: Option<u64>,
-        sparse: Option<bool>,
+        sparse: bool,
         domain: Option<Domain<T>>,
     ) -> SingleNodeTreeNew<T> {
         let dim = 3;
         let domain = domain.unwrap_or(Domain::from_local_points(points));
-        let sparse = sparse.unwrap_or(true);
         let npoints = points.len() / dim;
         let global_idxs = (0..npoints).collect_vec();
 

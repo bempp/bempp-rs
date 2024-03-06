@@ -88,7 +88,7 @@ where
         targets: &Coordinates<U>,
         charges: &'builder Charges<U>,
         n_crit: Option<u64>,
-        sparse: Option<bool>,
+        sparse: bool,
     ) -> Self {
         // Source and target trees calcualted over the same domain
         let source_domain = Domain::from_local_points(sources.data());
@@ -486,6 +486,8 @@ where
                 }
             }
 
+            println!("HERE {:?} {:?}", leaf_multipoles.len(), nmatvecs);
+
             for (leaf_idx, leaf) in self
                 .tree
                 .get_target_tree()
@@ -698,7 +700,7 @@ mod test {
         let sparse = true;
 
         let fmm = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, None, None)
+            .tree(&sources, &targets, &charges, None, sparse)
             .parameters(
                 expansion_order,
                 Laplace3dKernel::new(),

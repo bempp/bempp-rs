@@ -213,12 +213,8 @@ where
         };
 
         let nchild_sources = self.tree.get_source_tree().get_nkeys(level).unwrap();
-        let min = self.tree.get_source_tree().get_node_index(0).unwrap();
-        let max = self
-            .tree
-            .get_source_tree()
-            .get_node_index(nchild_sources - 1)
-            .unwrap();
+        let min = &child_sources[0];
+        let max = &child_sources[nchild_sources - 1];
         let min_idx = self.tree.get_source_tree().get_index(min).unwrap();
         let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
 
@@ -229,6 +225,7 @@ where
 
         parent_targets.sort();
         let nparents = parent_targets.len();
+
 
         match self.eval_mode {
             FmmEvaluationMode::Vector => {
