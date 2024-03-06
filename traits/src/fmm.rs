@@ -44,9 +44,7 @@ pub trait TargetTranslation {
     fn p2p(&self);
 }
 
-
 pub trait Fmm {
-
     type Precision;
     type NodeIndex;
     fn get_multipole_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;

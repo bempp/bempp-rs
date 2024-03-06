@@ -226,7 +226,6 @@ where
         parent_targets.sort();
         let nparents = parent_targets.len();
 
-
         match self.eval_mode {
             FmmEvaluationMode::Vector => {
                 let mut parent_multipoles = Vec::new();

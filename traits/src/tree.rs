@@ -36,17 +36,15 @@ pub trait Tree {
     /// Copy of nodes
     type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
 
+    fn get_nleaves(&self) -> Option<usize>;
+    fn get_nall_keys(&self) -> Option<usize>;
+    fn get_nkeys(&self, level: u64) -> Option<usize>;
+
     /// Get depth of tree.
     fn get_depth(&self) -> u64;
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
     fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>;
-
-    fn get_nleaves(&self) -> Option<usize>;
-
-    fn get_nall_keys(&self) -> Option<usize>;
-
-    fn get_nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
     fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>>;

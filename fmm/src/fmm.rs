@@ -360,6 +360,4 @@ mod test {
         let rel_error = abs_error / expected[0];
         assert!(rel_error < 1e-10);
     }
-
-
 }
