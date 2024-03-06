@@ -53,7 +53,6 @@ pub trait Fmm {
     fn get_multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
     fn get_local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
     fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
-
     fn get_expansion_order(&self) -> usize;
     fn get_tree(&self) -> &Self::Tree;
     fn get_kernel(&self) -> &Self::Kernel;

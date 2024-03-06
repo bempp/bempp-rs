@@ -13,16 +13,16 @@ use crate::{
 /// # Arguments
 /// * `global_idxs` - Unique global index associated with charge.
 /// * `charges` - The charge associated with each unique global index.
-pub fn build_charge_dict<T: FmmScalar>(
-    global_idxs: &[GlobalIdx],
-    charges: &[Charge<T>],
-) -> ChargeDict<T> {
-    let mut res: ChargeDict<T> = HashMap::new();
-    for (&global_idx, &charge) in global_idxs.iter().zip(charges.iter()) {
-        res.insert(global_idx, charge);
-    }
-    res
-}
+// pub fn build_charge_dict<T: FmmScalar>(
+//     global_idxs: &[GlobalIdx],
+//     charges: &[Charge<T>],
+// ) -> ChargeDict<T> {
+//     let mut res: ChargeDict<T> = HashMap::new();
+//     for (&global_idx, &charge) in global_idxs.iter().zip(charges.iter()) {
+//         res.insert(global_idx, charge);
+//     }
+//     res
+// }
 
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 

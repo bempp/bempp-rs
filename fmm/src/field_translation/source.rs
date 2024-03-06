@@ -42,7 +42,7 @@ where
         let dim = self.kernel.space_dimension();
         let surface_size = self.ncoeffs * dim;
         let coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
-        let ncoordinates = coordinates.len();
+        let ncoordinates = coordinates.len() / dim;
 
         match self.eval_mode {
             FmmEvaluationMode::Vector => {
@@ -122,7 +122,9 @@ where
             }
 
             FmmEvaluationMode::Matrix(nmatvecs) => {
-                let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * nmatvecs, 1]);
+                let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
+
+                // println!("HERERERE {:?} {:?} {:?}", check_potentials.data().len(), self.ncoeffs, nmatvecs);
 
                 // Compute the check potential for each box for each charge vector
                 check_potentials
@@ -166,6 +168,7 @@ where
                             }
                         },
                     );
+
 
                 // Compute multipole expansions
                 check_potentials
@@ -307,6 +310,7 @@ where
                 let max_key_displacement = (max_idx + 1) * self.ncoeffs * nmatvecs;
 
                 let child_multipoles = &self.multipoles[min_key_displacement..max_key_displacement];
+
 
                 child_multipoles
                     .par_chunks_exact(nmatvecs * self.ncoeffs * NSIBLINGS)

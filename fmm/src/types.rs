@@ -14,7 +14,12 @@ pub type Charge<T> = T;
 pub type GlobalIdx = usize;
 
 /// Type alias for mapping charge data to global indices.
-pub type ChargeDict<T> = HashMap<GlobalIdx, Charge<T>>;
+// pub type ChargeDict<T> = HashMap<GlobalIdx, Vec<Charge<T>>>;
+
+pub struct ChargeDict<T> {
+    pub nvecs: usize,
+    pub data: HashMap<GlobalIdx, Vec<Charge<T>>>
+}
 
 /// Type alias for approximation of FMM operator matrices.
 pub type C2EType<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

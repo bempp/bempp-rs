@@ -28,7 +28,7 @@ use crate::{
     pinv::pinv,
     traits::FmmScalar,
     tree::SingleNodeFmmTree,
-    types::SendPtrMut,
+    types::{SendPtrMut},
 };
 
 #[derive(Clone, Copy)]
@@ -105,7 +105,8 @@ where
         self.tree = Some(fmm_tree);
         self.charges = Some(charges);
 
-        let [_, nmatvec] = charges.shape();
+        let [ncharges, nmatvec] = charges.shape();
+
         if nmatvec > 1 {
             self.eval_mode = Some(FmmEvaluationMode::Matrix(nmatvec))
         } else {
@@ -329,14 +330,21 @@ where
         };
 
         // Check if we are computing matvec or matmul
-        let [_, nmatvecs] = charges.shape();
+        let [ncharges, nmatvecs] = charges.shape();
 
         let ntarget_points = self
             .tree
             .get_target_tree()
             .get_all_coordinates()
             .unwrap()
-            .len();
+            .len() / dim;
+
+        let nsource_points= self
+            .tree
+            .get_source_tree()
+            .get_all_coordinates()
+            .unwrap()
+            .len() / dim;
 
         let nsource_keys = self.tree.get_source_tree().get_nall_keys().unwrap();
         let ntarget_keys = self.tree.get_target_tree().get_nall_keys().unwrap();
