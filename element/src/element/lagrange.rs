@@ -1,23 +1,24 @@
 //! Lagrange elements
 
-use crate::element::{create_cell, CiarletElement, ElementFamily};
+use crate::element::{create_cell, CiarletElement, ElementFamily, Inverse};
 use crate::polynomials::polynomial_count;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, MapType};
+use rlst_common::types::Scalar;
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
 /// Create a Lagrange element
-pub fn create(
+pub fn create<T: Scalar + Inverse>(
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,
-) -> CiarletElement {
+) -> CiarletElement<T> {
     let cell = create_cell(cell_type);
     let dim = polynomial_count(cell_type, degree);
     let tdim = cell.dim();
-    let mut wcoeffs = rlst_dynamic_array3!(f64, [dim, 1, dim]);
+    let mut wcoeffs = rlst_dynamic_array3!(T, [dim, 1, dim]);
     for i in 0..dim {
-        *wcoeffs.get_mut([i, 0, i]).unwrap() = 1.0;
+        *wcoeffs.get_mut([i, 0, i]).unwrap() = T::from(1.0).unwrap();
     }
 
     let mut x = [vec![], vec![], vec![], vec![]];
@@ -28,48 +29,49 @@ pub fn create(
         }
         for d in 0..tdim {
             for _e in 0..cell.entity_count(d) {
-                x[d].push(rlst_dynamic_array2!(f64, [0, tdim]));
-                m[d].push(rlst_dynamic_array3!(f64, [0, 1, 0]));
+                x[d].push(rlst_dynamic_array2!(T, [0, tdim]));
+                m[d].push(rlst_dynamic_array3!(T, [0, 1, 0]));
             }
         }
-        let mut midp = rlst_dynamic_array2!(f64, [1, tdim]);
+        let mut midp = rlst_dynamic_array2!(T, [1, tdim]);
         let nvertices = cell.vertex_count();
         let vertices = cell.vertices();
         for i in 0..tdim {
             for j in 0..nvertices {
-                *midp.get_mut([0, i]).unwrap() += vertices[j * tdim + i];
+                *midp.get_mut([0, i]).unwrap() += T::from(vertices[j * tdim + i]).unwrap();
             }
-            *midp.get_mut([0, i]).unwrap() /= nvertices as f64;
+            *midp.get_mut([0, i]).unwrap() /= T::from(nvertices).unwrap();
         }
         x[tdim].push(midp);
-        let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
-        *mentry.get_mut([0, 0, 0]).unwrap() = 1.0;
+        let mut mentry = rlst_dynamic_array3!(T, [1, 1, 1]);
+        *mentry.get_mut([0, 0, 0]).unwrap() = T::from(1.0).unwrap();
         m[tdim].push(mentry);
     } else {
         // TODO: GLL points
         for e in 0..cell.entity_count(0) {
-            let mut pts = rlst_dynamic_array2!(f64, [1, tdim]);
+            let mut pts = rlst_dynamic_array2!(T, [1, tdim]);
             for i in 0..tdim {
-                *pts.get_mut([0, i]).unwrap() = cell.vertices()[e * tdim + i];
+                *pts.get_mut([0, i]).unwrap() = T::from(cell.vertices()[e * tdim + i]).unwrap();
             }
             x[0].push(pts);
-            let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
-            *mentry.get_mut([0, 0, 0]).unwrap() = 1.0;
+            let mut mentry = rlst_dynamic_array3!(T, [1, 1, 1]);
+            *mentry.get_mut([0, 0, 0]).unwrap() = T::from(1.0).unwrap();
             m[0].push(mentry);
         }
         for e in 0..cell.entity_count(1) {
-            let mut pts = rlst_dynamic_array2!(f64, [degree - 1, tdim]);
+            let mut pts = rlst_dynamic_array2!(T, [degree - 1, tdim]);
             let vn0 = cell.edges()[2 * e];
             let vn1 = cell.edges()[2 * e + 1];
             let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
             let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
-            let mut ident = rlst_dynamic_array3!(f64, [degree - 1, 1, degree - 1]);
+            let mut ident = rlst_dynamic_array3!(T, [degree - 1, 1, degree - 1]);
 
             for i in 1..degree {
-                *ident.get_mut([i - 1, 0, i - 1]).unwrap() = 1.0;
+                *ident.get_mut([i - 1, 0, i - 1]).unwrap() = T::from(1.0).unwrap();
                 for j in 0..tdim {
-                    *pts.get_mut([i - 1, j]).unwrap() =
-                        v0[j] + i as f64 / degree as f64 * (v1[j] - v0[j]);
+                    *pts.get_mut([i - 1, j]).unwrap() = T::from(v0[j]).unwrap()
+                        + T::from(i).unwrap() / T::from(degree).unwrap()
+                            * T::from(v1[j] - v0[j]).unwrap();
                 }
             }
             x[1].push(pts);
@@ -89,7 +91,7 @@ pub fn create(
             } else {
                 panic!("Unsupported face type");
             };
-            let mut pts = rlst_dynamic_array2!(f64, [npts, tdim]);
+            let mut pts = rlst_dynamic_array2!(T, [npts, tdim]);
 
             let vn0 = cell.faces()[start];
             let vn1 = cell.faces()[start + 1];
@@ -104,9 +106,11 @@ pub fn create(
                 for i0 in 1..degree {
                     for i1 in 1..degree - i0 {
                         for j in 0..tdim {
-                            *pts.get_mut([n, j]).unwrap() = v0[j]
-                                + i0 as f64 / degree as f64 * (v1[j] - v0[j])
-                                + i1 as f64 / degree as f64 * (v2[j] - v0[j]);
+                            *pts.get_mut([n, j]).unwrap() = T::from(v0[j]).unwrap()
+                                + T::from(i0).unwrap() / T::from(degree).unwrap()
+                                    * T::from(v1[j] - v0[j]).unwrap()
+                                + T::from(i1).unwrap() / T::from(degree).unwrap()
+                                    * T::from(v2[j] - v0[j]).unwrap();
                         }
                         n += 1;
                     }
@@ -117,9 +121,11 @@ pub fn create(
                 for i0 in 1..degree {
                     for i1 in 1..degree {
                         for j in 0..tdim {
-                            *pts.get_mut([n, j]).unwrap() = v0[j]
-                                + i0 as f64 / degree as f64 * (v1[j] - v0[j])
-                                + i1 as f64 / degree as f64 * (v2[j] - v0[j]);
+                            *pts.get_mut([n, j]).unwrap() = T::from(v0[j]).unwrap()
+                                + T::from(i0).unwrap() / T::from(degree).unwrap()
+                                    * T::from(v1[j] - v0[j]).unwrap()
+                                + T::from(i1).unwrap() / T::from(degree).unwrap()
+                                    * T::from(v2[j] - v0[j]).unwrap();
                         }
                         n += 1;
                     }
@@ -128,16 +134,16 @@ pub fn create(
                 panic!("Unsupported face type.");
             }
 
-            let mut ident = rlst_dynamic_array3!(f64, [npts, 1, npts]);
+            let mut ident = rlst_dynamic_array3!(T, [npts, 1, npts]);
             for i in 0..npts {
-                *ident.get_mut([i, 0, i]).unwrap() = 1.0;
+                *ident.get_mut([i, 0, i]).unwrap() = T::from(1.0).unwrap();
             }
             x[2].push(pts);
             m[2].push(ident);
             start += nvertices;
         }
     }
-    CiarletElement::create(
+    CiarletElement::<T>::create(
         cell_type,
         ElementFamily::Lagrange,
         degree,
@@ -192,7 +198,7 @@ mod test {
 
     #[test]
     fn test_lagrange_0_interval() {
-        let e = create(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
+        let e = create::<f64>(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
         let mut points = rlst_dynamic_array2!(f64, [4, 1]);
@@ -210,7 +216,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_interval() {
-        let e = create(ReferenceCellType::Interval, 1, Continuity::Continuous);
+        let e = create::<f64>(ReferenceCellType::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
         let mut points = rlst_dynamic_array2!(f64, [4, 1]);
@@ -235,7 +241,7 @@ mod test {
 
     #[test]
     fn test_lagrange_0_triangle() {
-        let e = create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+        let e = create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
 
@@ -263,7 +269,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_triangle() {
-        let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let e = create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);
@@ -300,53 +306,53 @@ mod test {
 
     #[test]
     fn test_lagrange_higher_degree_triangle() {
-        create(ReferenceCellType::Triangle, 2, Continuity::Continuous);
-        create(ReferenceCellType::Triangle, 3, Continuity::Continuous);
-        create(ReferenceCellType::Triangle, 4, Continuity::Continuous);
-        create(ReferenceCellType::Triangle, 5, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Triangle, 3, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Triangle, 4, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Triangle, 5, Continuity::Continuous);
 
-        create(ReferenceCellType::Triangle, 2, Continuity::Discontinuous);
-        create(ReferenceCellType::Triangle, 3, Continuity::Discontinuous);
-        create(ReferenceCellType::Triangle, 4, Continuity::Discontinuous);
-        create(ReferenceCellType::Triangle, 5, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Triangle, 3, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Triangle, 4, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Triangle, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_higher_degree_interval() {
-        create(ReferenceCellType::Interval, 2, Continuity::Continuous);
-        create(ReferenceCellType::Interval, 3, Continuity::Continuous);
-        create(ReferenceCellType::Interval, 4, Continuity::Continuous);
-        create(ReferenceCellType::Interval, 5, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Interval, 2, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Interval, 3, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Interval, 4, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Interval, 5, Continuity::Continuous);
 
-        create(ReferenceCellType::Interval, 2, Continuity::Discontinuous);
-        create(ReferenceCellType::Interval, 3, Continuity::Discontinuous);
-        create(ReferenceCellType::Interval, 4, Continuity::Discontinuous);
-        create(ReferenceCellType::Interval, 5, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Interval, 2, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Interval, 3, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Interval, 4, Continuity::Discontinuous);
+        create::<f64>(ReferenceCellType::Interval, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_higher_degree_quadrilateral() {
-        create(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
-        create(ReferenceCellType::Quadrilateral, 3, Continuity::Continuous);
-        create(ReferenceCellType::Quadrilateral, 4, Continuity::Continuous);
-        create(ReferenceCellType::Quadrilateral, 5, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Quadrilateral, 3, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Quadrilateral, 4, Continuity::Continuous);
+        create::<f64>(ReferenceCellType::Quadrilateral, 5, Continuity::Continuous);
 
-        create(
+        create::<f64>(
             ReferenceCellType::Quadrilateral,
             2,
             Continuity::Discontinuous,
         );
-        create(
+        create::<f64>(
             ReferenceCellType::Quadrilateral,
             3,
             Continuity::Discontinuous,
         );
-        create(
+        create::<f64>(
             ReferenceCellType::Quadrilateral,
             4,
             Continuity::Discontinuous,
         );
-        create(
+        create::<f64>(
             ReferenceCellType::Quadrilateral,
             5,
             Continuity::Discontinuous,
@@ -355,7 +361,7 @@ mod test {
 
     #[test]
     fn test_lagrange_0_quadrilateral() {
-        let e = create(
+        let e = create::<f64>(
             ReferenceCellType::Quadrilateral,
             0,
             Continuity::Discontinuous,
@@ -385,7 +391,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_quadrilateral() {
-        let e = create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
+        let e = create::<f64>(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);
@@ -427,7 +433,7 @@ mod test {
 
     #[test]
     fn test_lagrange_2_quadrilateral() {
-        let e = create(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
+        let e = create::<f64>(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);

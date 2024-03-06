@@ -1,17 +1,19 @@
 //! Orthonormal polynomials
 
 use bempp_traits::cell::ReferenceCellType;
+use rlst_common::types::Scalar;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
-    T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-    T3Mut: RandomAccessMut<3, Item = f64> + RandomAccessByRef<3, Item = f64> + Shape<3>,
+    T: Scalar,
+    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
-    points: &T,
+    points: &Array2,
     degree: usize,
     derivatives: usize,
-    data: &mut T3Mut,
+    data: &mut Array3Mut,
 ) {
     assert_eq!(data.shape()[0], derivatives + 1);
     assert_eq!(data.shape()[1], degree + 1);
@@ -19,33 +21,43 @@ fn tabulate_legendre_polynomials_interval<
     assert_eq!(points.shape()[1], 1);
 
     for i in 0..data.shape()[2] {
-        *data.get_mut([0, 0, i]).unwrap() = 1.0;
+        *data.get_mut([0, 0, i]).unwrap() = T::from(1.0).unwrap();
     }
     for k in 1..data.shape()[0] {
         for i in 0..data.shape()[2] {
-            *data.get_mut([k, 0, i]).unwrap() = 0.0;
+            *data.get_mut([k, 0, i]).unwrap() = T::from(0.0).unwrap();
         }
     }
 
     for k in 0..derivatives + 1 {
         for p in 1..degree + 1 {
-            let a = 1.0 - 1.0 / p as f64;
-            let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
+            let a = T::from(1.0).unwrap() - T::from(1.0).unwrap() / T::from(p).unwrap();
+            let b = (a + T::from(1.0).unwrap())
+                * ((T::from(2.0).unwrap() * T::from(p).unwrap() + T::from(1.0).unwrap())
+                    / (T::from(2.0).unwrap() * T::from(p).unwrap() - T::from(1.0).unwrap()))
+                .sqrt();
             for i in 0..data.shape()[2] {
-                *data.get_mut([k, p, i]).unwrap() = (points.get([i, 0]).unwrap() * 2.0 - 1.0)
-                    * data.get([k, p - 1, i]).unwrap()
-                    * b;
+                let d = *data.get([k, p - 1, i]).unwrap();
+                *data.get_mut([k, p, i]).unwrap() =
+                    (*points.get([i, 0]).unwrap() * T::from(2.0).unwrap() - T::from(1.0).unwrap())
+                        * d
+                        * b;
             }
             if p > 1 {
-                let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
+                let c = a
+                    * ((T::from(2.0).unwrap() * T::from(p).unwrap() + T::from(1.0).unwrap())
+                        / (T::from(2.0).unwrap() * T::from(p).unwrap() - T::from(3.0).unwrap()))
+                    .sqrt();
                 for i in 0..data.shape()[2] {
-                    *data.get_mut([k, p, i]).unwrap() -= data.get([k, p - 2, i]).unwrap() * c;
+                    let d = *data.get([k, p - 2, i]).unwrap();
+                    *data.get_mut([k, p, i]).unwrap() -= d * c;
                 }
             }
             if k > 0 {
                 for i in 0..data.shape()[2] {
+                    let d = *data.get([k - 1, p - 1, i]).unwrap();
                     *data.get_mut([k, p, i]).unwrap() +=
-                        2.0 * k as f64 * data.get([k - 1, p - 1, i]).unwrap() * b;
+                        T::from(2.0).unwrap() * T::from(k).unwrap() * d * b;
                 }
             }
         }
@@ -62,13 +74,14 @@ fn quad_index(i: usize, j: usize, n: usize) -> usize {
 
 /// Tabulate orthonormal polynomials on a quadrilateral
 fn tabulate_legendre_polynomials_quadrilateral<
-    T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-    T3Mut: RandomAccessMut<3, Item = f64> + RandomAccessByRef<3, Item = f64> + Shape<3>,
+    T: Scalar,
+    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
-    points: &T,
+    points: &Array2,
     degree: usize,
     derivatives: usize,
-    data: &mut T3Mut,
+    data: &mut Array3Mut,
 ) {
     assert_eq!(data.shape()[0], (derivatives + 1) * (derivatives + 2) / 2);
     assert_eq!(data.shape()[1], (degree + 1) * (degree + 1));
@@ -78,7 +91,7 @@ fn tabulate_legendre_polynomials_quadrilateral<
     for i in 0..data.shape()[2] {
         *data
             .get_mut([tri_index(0, 0), quad_index(0, 0, degree), i])
-            .unwrap() = 1.0;
+            .unwrap() = T::from(1.0).unwrap();
     }
 
     // Tabulate polynomials in x
@@ -86,44 +99,50 @@ fn tabulate_legendre_polynomials_quadrilateral<
         for i in 0..data.shape()[2] {
             *data
                 .get_mut([tri_index(k, 0), quad_index(0, 0, degree), i])
-                .unwrap() = 0.0;
+                .unwrap() = T::from(0.0).unwrap();
         }
     }
 
     for k in 0..derivatives + 1 {
         for p in 1..degree + 1 {
-            let a = 1.0 - 1.0 / p as f64;
-            let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
+            let a = T::from(1.0).unwrap() - T::from(1.0).unwrap() / T::from(p).unwrap();
+            let b = (a + T::from(1.0).unwrap())
+                * ((T::from(2.0).unwrap() * T::from(p).unwrap() + T::from(1.0).unwrap())
+                    / (T::from(2.0).unwrap() * T::from(p).unwrap() - T::from(1.0).unwrap()))
+                .sqrt();
             for i in 0..data.shape()[2] {
+                let d = *data
+                    .get([tri_index(k, 0), quad_index(p - 1, 0, degree), i])
+                    .unwrap();
                 *data
                     .get_mut([tri_index(k, 0), quad_index(p, 0, degree), i])
-                    .unwrap() = (points.get([i, 0]).unwrap() * 2.0 - 1.0)
-                    * data
-                        .get([tri_index(k, 0), quad_index(p - 1, 0, degree), i])
-                        .unwrap()
+                    .unwrap() = (*points.get([i, 0]).unwrap() * T::from(2.0).unwrap()
+                    - T::from(1.0).unwrap())
+                    * d
                     * b;
             }
             if p > 1 {
-                let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
+                let c = a
+                    * ((T::from(2.0).unwrap() * T::from(p).unwrap() + T::from(1.0).unwrap())
+                        / (T::from(2.0).unwrap() * T::from(p).unwrap() - T::from(3.0).unwrap()))
+                    .sqrt();
                 for i in 0..data.shape()[2] {
+                    let d = *data
+                        .get([tri_index(k, 0), quad_index(p - 2, 0, degree), i])
+                        .unwrap();
                     *data
                         .get_mut([tri_index(k, 0), quad_index(p, 0, degree), i])
-                        .unwrap() -= data
-                        .get([tri_index(k, 0), quad_index(p - 2, 0, degree), i])
-                        .unwrap()
-                        * c;
+                        .unwrap() -= d * c;
                 }
             }
             if k > 0 {
                 for i in 0..data.shape()[2] {
+                    let d = *data
+                        .get([tri_index(k - 1, 0), quad_index(p - 1, 0, degree), i])
+                        .unwrap();
                     *data
                         .get_mut([tri_index(k, 0), quad_index(p, 0, degree), i])
-                        .unwrap() += 2.0
-                        * k as f64
-                        * data
-                            .get([tri_index(k - 1, 0), quad_index(p - 1, 0, degree), i])
-                            .unwrap()
-                        * b;
+                        .unwrap() += T::from(2.0).unwrap() * T::from(k).unwrap() * d * b;
                 }
             }
         }
@@ -134,44 +153,50 @@ fn tabulate_legendre_polynomials_quadrilateral<
         for i in 0..data.shape()[2] {
             *data
                 .get_mut([tri_index(0, k), quad_index(0, 0, degree), i])
-                .unwrap() = 0.0;
+                .unwrap() = T::from(0.0).unwrap();
         }
     }
 
     for k in 0..derivatives + 1 {
         for p in 1..degree + 1 {
-            let a = 1.0 - 1.0 / p as f64;
-            let b = (a + 1.0) * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 1.0)).sqrt();
+            let a = T::from(1.0).unwrap() - T::from(1.0).unwrap() / T::from(p).unwrap();
+            let b = (a + T::from(1.0).unwrap())
+                * ((T::from(2.0).unwrap() * T::from(p).unwrap() + T::from(1.0).unwrap())
+                    / (T::from(2.0).unwrap() * T::from(p).unwrap() - T::from(1.0).unwrap()))
+                .sqrt();
             for i in 0..data.shape()[2] {
+                let d = *data
+                    .get([tri_index(0, k), quad_index(0, p - 1, degree), i])
+                    .unwrap();
                 *data
                     .get_mut([tri_index(0, k), quad_index(0, p, degree), i])
-                    .unwrap() = (points.get([i, 1]).unwrap() * 2.0 - 1.0)
-                    * data
-                        .get([tri_index(0, k), quad_index(0, p - 1, degree), i])
-                        .unwrap()
+                    .unwrap() = (*points.get([i, 1]).unwrap() * T::from(2.0).unwrap()
+                    - T::from(1.0).unwrap())
+                    * d
                     * b;
             }
             if p > 1 {
-                let c = a * ((2.0 * p as f64 + 1.0) / (2.0 * p as f64 - 3.0)).sqrt();
+                let c = a
+                    * ((T::from(2.0).unwrap() * T::from(p).unwrap() + T::from(1.0).unwrap())
+                        / (T::from(2.0).unwrap() * T::from(p).unwrap() - T::from(3.0).unwrap()))
+                    .sqrt();
                 for i in 0..data.shape()[2] {
+                    let d = *data
+                        .get([tri_index(0, k), quad_index(0, p - 2, degree), i])
+                        .unwrap();
                     *data
                         .get_mut([tri_index(0, k), quad_index(0, p, degree), i])
-                        .unwrap() -= data
-                        .get([tri_index(0, k), quad_index(0, p - 2, degree), i])
-                        .unwrap()
-                        * c;
+                        .unwrap() -= d * c;
                 }
             }
             if k > 0 {
                 for i in 0..data.shape()[2] {
+                    let d = *data
+                        .get([tri_index(0, k - 1), quad_index(0, p - 1, degree), i])
+                        .unwrap();
                     *data
                         .get_mut([tri_index(0, k), quad_index(0, p, degree), i])
-                        .unwrap() += 2.0
-                        * k as f64
-                        * data
-                            .get([tri_index(0, k - 1), quad_index(0, p - 1, degree), i])
-                            .unwrap()
-                        * b;
+                        .unwrap() += T::from(2.0).unwrap() * T::from(k).unwrap() * d * b;
                 }
             }
         }
@@ -183,14 +208,15 @@ fn tabulate_legendre_polynomials_quadrilateral<
             for px in 1..degree + 1 {
                 for py in 1..degree + 1 {
                     for i in 0..data.shape()[2] {
+                        let d = *data
+                            .get([tri_index(0, ky), quad_index(0, py, degree), i])
+                            .unwrap();
                         *data
                             .get_mut([tri_index(kx, ky), quad_index(px, py, degree), i])
                             .unwrap() = *data
-                            .get_mut([tri_index(kx, 0), quad_index(px, 0, degree), i])
+                            .get([tri_index(kx, 0), quad_index(px, 0, degree), i])
                             .unwrap()
-                            * *data
-                                .get_mut([tri_index(0, ky), quad_index(0, py, degree), i])
-                                .unwrap();
+                            * d;
                     }
                 }
             }
@@ -199,13 +225,14 @@ fn tabulate_legendre_polynomials_quadrilateral<
 }
 /// Tabulate orthonormal polynomials on a triangle
 fn tabulate_legendre_polynomials_triangle<
-    T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-    T3Mut: RandomAccessMut<3, Item = f64> + RandomAccessByRef<3, Item = f64> + Shape<3>,
+    T: Scalar,
+    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
-    points: &T,
+    points: &Array2,
     degree: usize,
     derivatives: usize,
-    data: &mut T3Mut,
+    data: &mut Array3Mut,
 ) {
     assert_eq!(data.shape()[0], (derivatives + 1) * (derivatives + 2) / 2);
     assert_eq!(data.shape()[1], (degree + 1) * (degree + 2) / 2);
@@ -213,161 +240,182 @@ fn tabulate_legendre_polynomials_triangle<
     assert_eq!(points.shape()[1], 2);
 
     for i in 0..data.shape()[2] {
-        *data.get_mut([tri_index(0, 0), tri_index(0, 0), i]).unwrap() = f64::sqrt(2.0);
+        *data.get_mut([tri_index(0, 0), tri_index(0, 0), i]).unwrap() =
+            T::sqrt(T::from(2.0).unwrap());
     }
 
     for k in 1..data.shape()[0] {
         for i in 0..data.shape()[2] {
-            *data.get_mut([k, tri_index(0, 0), i]).unwrap() = 0.0;
+            *data.get_mut([k, tri_index(0, 0), i]).unwrap() = T::from(0.0).unwrap();
         }
     }
 
     for kx in 0..derivatives + 1 {
         for ky in 0..derivatives + 1 - kx {
             for p in 1..degree + 1 {
-                let a = 2.0 - 1.0 / p as f64;
-                let scale1 =
-                    f64::sqrt((p as f64 + 0.5) * (p as f64 + 1.0) / ((p as f64 - 0.5) * p as f64));
+                let a = T::from(2.0).unwrap() - T::from(1.0).unwrap() / T::from(p).unwrap();
+                let scale1 = T::sqrt(
+                    (T::from(p).unwrap() + T::from(0.5).unwrap())
+                        * (T::from(p).unwrap() + T::from(1.0).unwrap())
+                        / ((T::from(p).unwrap() - T::from(0.5).unwrap()) * T::from(p).unwrap()),
+                );
                 for i in 0..data.shape()[2] {
+                    let d = *data
+                        .get([tri_index(kx, ky), tri_index(0, p - 1), i])
+                        .unwrap();
                     *data
                         .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                        .unwrap() =
-                        (*points.get([i, 0]).unwrap() * 2.0 + *points.get([i, 1]).unwrap() - 1.0)
-                            * *data
-                                .get([tri_index(kx, ky), tri_index(0, p - 1), i])
-                                .unwrap()
-                            * a
-                            * scale1;
+                        .unwrap() = (*points.get([i, 0]).unwrap() * T::from(2.0).unwrap()
+                        + *points.get([i, 1]).unwrap()
+                        - T::from(1.0).unwrap())
+                        * d
+                        * a
+                        * scale1;
                 }
                 if kx > 0 {
                     for i in 0..data.shape()[2] {
+                        let d = *data
+                            .get([tri_index(kx - 1, ky), tri_index(0, p - 1), i])
+                            .unwrap();
                         *data
                             .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                            .unwrap() += 2.0
-                            * kx as f64
-                            * a
-                            * *data
-                                .get([tri_index(kx - 1, ky), tri_index(0, p - 1), i])
-                                .unwrap()
-                            * scale1;
+                            .unwrap() +=
+                            T::from(2.0).unwrap() * T::from(kx).unwrap() * a * d * scale1;
                     }
                 }
                 if ky > 0 {
                     for i in 0..data.shape()[2] {
+                        let d = *data
+                            .get([tri_index(kx, ky - 1), tri_index(0, p - 1), i])
+                            .unwrap();
                         *data
                             .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                            .unwrap() += ky as f64
-                            * a
-                            * *data
-                                .get([tri_index(kx, ky - 1), tri_index(0, p - 1), i])
-                                .unwrap()
-                            * scale1;
+                            .unwrap() += T::from(ky).unwrap() * a * d * scale1;
                     }
                 }
                 if p > 1 {
-                    let scale2 = f64::sqrt((p as f64 + 0.5) * (p as f64 + 1.0))
-                        / f64::sqrt((p as f64 - 1.5) * (p as f64 - 1.0));
+                    let scale2 = T::sqrt(
+                        (T::from(p).unwrap() + T::from(0.5).unwrap())
+                            * (T::from(p).unwrap() + T::from(1.0).unwrap()),
+                    ) / T::sqrt(
+                        (T::from(p).unwrap() - T::from(1.5).unwrap())
+                            * (T::from(p).unwrap() - T::from(1.0).unwrap()),
+                    );
 
                     for i in 0..data.shape()[2] {
-                        let b = 1.0 - *points.get([i, 1]).unwrap();
+                        let b = T::from(1.0).unwrap() - *points.get([i, 1]).unwrap();
+                        let d = *data
+                            .get([tri_index(kx, ky), tri_index(0, p - 2), i])
+                            .unwrap();
                         *data
                             .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                            .unwrap() -= b
-                            * b
-                            * *data
-                                .get([tri_index(kx, ky), tri_index(0, p - 2), i])
-                                .unwrap()
-                            * (a - 1.0)
-                            * scale2;
+                            .unwrap() -= b * b * d * (a - T::from(1.0).unwrap()) * scale2;
                     }
                     if ky > 0 {
                         for i in 0..data.shape()[2] {
+                            let d = *data
+                                .get([tri_index(kx, ky - 1), tri_index(0, p - 2), i])
+                                .unwrap();
                             *data
                                 .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                                .unwrap() -= 2.0
-                                * ky as f64
-                                * (*points.get([i, 1]).unwrap() - 1.0)
-                                * *data
-                                    .get([tri_index(kx, ky - 1), tri_index(0, p - 2), i])
-                                    .unwrap()
+                                .unwrap() -= T::from(2.0).unwrap()
+                                * T::from(ky).unwrap()
+                                * (*points.get([i, 1]).unwrap() - T::from(1.0).unwrap())
+                                * d
                                 * scale2
-                                * (a - 1.0);
+                                * (a - T::from(1.0).unwrap());
                         }
                     }
                     if ky > 1 {
                         for i in 0..data.shape()[2] {
+                            let d = *data
+                                .get([tri_index(kx, ky - 2), tri_index(0, p - 2), i])
+                                .unwrap();
                             *data
                                 .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                                .unwrap() -= ky as f64
-                                * (ky as f64 - 1.0)
-                                * *data
-                                    .get([tri_index(kx, ky - 2), tri_index(0, p - 2), i])
-                                    .unwrap()
+                                .unwrap() -= T::from(ky).unwrap()
+                                * (T::from(ky).unwrap() - T::from(1.0).unwrap())
+                                * d
                                 * scale2
-                                * (a - 1.0);
+                                * (a - T::from(1.0).unwrap());
                         }
                     }
                 }
             }
             for p in 0..degree {
-                let scale3 = f64::sqrt((p as f64 + 2.0) / (p as f64 + 1.0));
+                let scale3 = T::sqrt(
+                    (T::from(p).unwrap() + T::from(2.0).unwrap())
+                        / (T::from(p).unwrap() + T::from(1.0).unwrap()),
+                );
                 for i in 0..data.shape()[2] {
                     *data
                         .get_mut([tri_index(kx, ky), tri_index(1, p), i])
                         .unwrap() = *data.get([tri_index(kx, ky), tri_index(0, p), i]).unwrap()
                         * scale3
-                        * ((*points.get([i, 1]).unwrap() * 2.0 - 1.0) * (1.5 + p as f64)
-                            + 0.5
-                            + p as f64);
+                        * ((*points.get([i, 1]).unwrap() * T::from(2.0).unwrap()
+                            - T::from(1.0).unwrap())
+                            * (T::from(1.5).unwrap() + T::from(p).unwrap())
+                            + T::from(0.5).unwrap()
+                            + T::from(p).unwrap());
                 }
                 if ky > 0 {
                     for i in 0..data.shape()[2] {
+                        let d = *data
+                            .get([tri_index(kx, ky - 1), tri_index(0, p), i])
+                            .unwrap();
                         *data
                             .get_mut([tri_index(kx, ky), tri_index(1, p), i])
-                            .unwrap() += 2.0
-                            * ky as f64
-                            * (1.5 + p as f64)
-                            * *data
-                                .get([tri_index(kx, ky - 1), tri_index(0, p), i])
-                                .unwrap()
+                            .unwrap() += T::from(2.0).unwrap()
+                            * T::from(ky).unwrap()
+                            * (T::from(1.5).unwrap() + T::from(p).unwrap())
+                            * d
                             * scale3;
                     }
                 }
                 for q in 1..degree - p {
-                    let scale4 =
-                        f64::sqrt((p as f64 + q as f64 + 2.0) / (p as f64 + q as f64 + 1.0));
-                    let scale5 = f64::sqrt((p as f64 + q as f64 + 2.0) / (p as f64 + q as f64));
-                    let a1 = ((p + q + 1) * (2 * p + 2 * q + 3)) as f64
-                        / ((q + 1) * (2 * p + q + 2)) as f64;
-                    let a2 = ((2 * p + 1) * (2 * p + 1) * (p + q + 1)) as f64
-                        / ((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1)) as f64;
-                    let a3 = (q * (2 * p + q + 1) * (2 * p + 2 * q + 3)) as f64
-                        / ((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1)) as f64;
+                    let scale4 = T::sqrt(
+                        (T::from(p).unwrap() + T::from(q).unwrap() + T::from(2.0).unwrap())
+                            / (T::from(p).unwrap() + T::from(q).unwrap() + T::from(1.0).unwrap()),
+                    );
+                    let scale5 = T::sqrt(
+                        (T::from(p).unwrap() + T::from(q).unwrap() + T::from(2.0).unwrap())
+                            / (T::from(p).unwrap() + T::from(q).unwrap()),
+                    );
+                    let a1 = T::from((p + q + 1) * (2 * p + 2 * q + 3)).unwrap()
+                        / T::from((q + 1) * (2 * p + q + 2)).unwrap();
+                    let a2 = T::from((2 * p + 1) * (2 * p + 1) * (p + q + 1)).unwrap()
+                        / T::from((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1)).unwrap();
+                    let a3 = T::from(q * (2 * p + q + 1) * (2 * p + 2 * q + 3)).unwrap()
+                        / T::from((q + 1) * (2 * p + q + 2) * (2 * p + 2 * q + 1)).unwrap();
 
                     for i in 0..data.shape()[2] {
+                        let d = *data.get([tri_index(kx, ky), tri_index(q, p), i]).unwrap();
                         *data
                             .get_mut([tri_index(kx, ky), tri_index(q + 1, p), i])
-                            .unwrap() = *data
-                            .get_mut([tri_index(kx, ky), tri_index(q, p), i])
-                            .unwrap()
+                            .unwrap() = d
                             * scale4
-                            * ((*points.get([i, 1]).unwrap() * 2.0 - 1.0) * a1 + a2)
+                            * ((*points.get([i, 1]).unwrap()
+                                * T::from(T::from(2.0).unwrap()).unwrap()
+                                - T::from(T::from(1.0).unwrap()).unwrap())
+                                * a1
+                                + a2)
                             - *data
-                                .get_mut([tri_index(kx, ky), tri_index(q - 1, p), i])
+                                .get([tri_index(kx, ky), tri_index(q - 1, p), i])
                                 .unwrap()
                                 * scale5
                                 * a3;
                     }
                     if ky > 0 {
                         for i in 0..data.shape()[2] {
+                            let d = *data
+                                .get([tri_index(kx, ky - 1), tri_index(q, p), i])
+                                .unwrap();
                             *data
                                 .get_mut([tri_index(kx, ky), tri_index(q + 1, p), i])
-                                .unwrap() += 2.0
-                                * ky as f64
+                                .unwrap() += T::from(T::from(2.0).unwrap() * T::from(ky).unwrap())
+                                .unwrap()
                                 * a1
-                                * *data
-                                    .get_mut([tri_index(kx, ky - 1), tri_index(q, p), i])
-                                    .unwrap()
+                                * d
                                 * scale4;
                         }
                     }
@@ -399,9 +447,9 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
     }
 }
 
-pub fn legendre_shape<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
+pub fn legendre_shape<T: Scalar, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
     cell_type: ReferenceCellType,
-    points: &T,
+    points: &Array2,
     degree: usize,
     derivatives: usize,
 ) -> [usize; 3] {
@@ -414,14 +462,15 @@ pub fn legendre_shape<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
 
 /// Tabulate orthonormal polynomials
 pub fn tabulate_legendre_polynomials<
-    T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-    T3Mut: RandomAccessMut<3, Item = f64> + RandomAccessByRef<3, Item = f64> + Shape<3>,
+    T: Scalar,
+    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
     cell_type: ReferenceCellType,
-    points: &T,
+    points: &Array2,
     degree: usize,
     derivatives: usize,
-    data: &mut T3Mut,
+    data: &mut Array3Mut,
 ) {
     match cell_type {
         ReferenceCellType::Interval => {
