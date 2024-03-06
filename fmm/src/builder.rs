@@ -390,7 +390,8 @@ where
         let mut potentials_send_pointers = vec![SendPtrMut::default(); ntarget_leaves * nmatvecs];
 
         // Index pointer of charge data at each target leaf
-        let mut charge_index_pointer = vec![(0usize, 0usize); ntarget_leaves];
+        let mut charge_index_pointer_sources = vec![(0usize, 0usize); ntarget_leaves];
+        let mut charge_index_pointer_targets = vec![(0usize, 0usize); ntarget_leaves];
 
         // Kernel scale at each target and source leaf
         let mut target_leaf_scales = vec![W::default(); ntarget_leaves * self.ncoeffs * nmatvecs];
@@ -556,7 +557,7 @@ where
 
                 // Update charge index pointer
                 let bounds_points = (index_pointer, index_pointer + npoints);
-                charge_index_pointer[i] = bounds_points;
+                charge_index_pointer_targets[i] = bounds_points;
                 index_pointer += npoints;
 
                 // Update raw pointer with number of points at this leaf
@@ -564,6 +565,8 @@ where
                     *ptr = unsafe { ptr.add(nevals) }
                 }
             }
+
+            let mut index_pointer = 0;
 
             for (i, leaf) in self
                 .tree
@@ -579,7 +582,20 @@ where
                 source_leaf_scales[l..r].copy_from_slice(
                     vec![self.kernel.scale(leaf.level()); self.ncoeffs].as_slice(),
                 );
+
+                let npoints;
+                if let Some(coordinates) = self.tree.get_source_tree().get_coordinates(leaf) {
+                    npoints = coordinates.len() / dim;
+                } else {
+                    npoints = 0;
+                }
+
+                let bounds_points = (index_pointer, index_pointer + npoints);
+                charge_index_pointer_sources[i] = bounds_points;
+                index_pointer += npoints;
             }
+
+
         }
 
         // Compute surfaces
@@ -668,7 +684,8 @@ where
             self.leaf_upward_surfaces = leaf_upward_surfaces;
             self.leaf_downward_surfaces = leaf_downward_surfaces;
             self.charges = charges.data().to_vec();
-            self.charge_index_pointer = charge_index_pointer;
+            self.charge_index_pointer_targets = charge_index_pointer_targets;
+            self.charge_index_pointer_sources = charge_index_pointer_sources;
             self.target_scales = target_leaf_scales;
             self.source_scales = source_leaf_scales;
             self.eval_size = eval_size;

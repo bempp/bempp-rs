@@ -45,6 +45,8 @@ pub struct KiFmm<
     pub eval_mode: FmmEvaluationMode,
     pub source_data_vec: Vec<C2EType<W>>,
     pub eval_size: usize,
+    pub charge_index_pointer_sources: Vec<(usize, usize)>,
+    pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
@@ -113,8 +115,6 @@ pub struct KiFmm<
     /// The charge data at each leaf box.
     pub charges: Vec<W>,
 
-    /// Index pointer between leaf keys and charges
-    pub charge_index_pointer: Vec<(usize, usize)>,
 
     /// Scales of each leaf operator
     pub target_scales: Vec<W>,
@@ -172,7 +172,7 @@ where
 
     fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
         if let Some(&leaf_idx) = self.tree.get_target_tree().get_leaf_index(leaf) {
-            let (l, r) = self.charge_index_pointer[leaf_idx];
+            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
             let ntargets = r - l;
 
             match self.eval_mode {
@@ -269,7 +269,8 @@ where
             leaf_upward_surfaces: Vec::default(),
             leaf_downward_surfaces: Vec::default(),
             charges: Vec::default(),
-            charge_index_pointer: Vec::default(),
+            charge_index_pointer_sources: Vec::default(),
+            charge_index_pointer_targets: Vec::default(),
             source_scales: Vec::default(),
             target_scales: Vec::default(),
             global_indices: Vec::default(),
@@ -341,7 +342,7 @@ mod test {
         // Setup random sources and targets
         let npoints = 10000;
         let sources = points_fixture::<f64>(npoints, None, None, Some(0));
-        let targets = points_fixture::<f64>(npoints, None, None, Some(0));
+        let targets = points_fixture::<f64>(npoints, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -353,6 +354,8 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
         let tmp = vec![1.0; npoints * nvecs];
         charges.data_mut().copy_from_slice(&tmp);
+
+
         let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)
             .parameters(
@@ -364,6 +367,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
+        fmm_fft.evaluate();
 
         let fmm_svd = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)
@@ -376,8 +380,6 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-
-        fmm_fft.evaluate();
         fmm_svd.evaluate();
 
         let fmm_fft = Box::new(fmm_fft);

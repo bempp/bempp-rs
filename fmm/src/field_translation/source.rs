@@ -55,7 +55,7 @@ where
                     .data_mut()
                     .par_chunks_exact_mut(self.ncoeffs)
                     .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
-                    .zip(&self.charge_index_pointer)
+                    .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
                             let charges =
@@ -131,7 +131,7 @@ where
                     .data_mut()
                     .par_chunks_exact_mut(self.ncoeffs * nmatvecs)
                     .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
-                    .zip(&self.charge_index_pointer)
+                    .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
                             let coordinates_row_major = &coordinates
