@@ -4,16 +4,10 @@ use rlst_blis::interface::gemm::Gemm;
 use rlst_common::types::Scalar;
 use std::collections::HashMap;
 
-use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
-};
+use rlst_dense::rlst_dynamic_array2;
 
 use bempp_traits::{
-    field::{SourceToTarget, SourceToTargetData, SourceToTargetHomogenousScaleInvariant},
+    field::{SourceToTarget, SourceToTargetData},
     fmm::{Fmm, SourceTranslation, TargetTranslation},
     kernel::{HomogenousKernel, Kernel},
     tree::{FmmTree, Tree},
@@ -127,6 +121,7 @@ where
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: Scalar<Real = W> + Default + Send + Sync + Gemm + Float,
+    Self: SourceToTarget,
 {
     type NodeIndex = T::NodeIndex;
     type Precision = W;
@@ -217,7 +212,20 @@ where
         }
 
         // Downward pass
-        {}
+        {
+            for level in 2..=self.tree.get_target_tree().get_depth() {
+                if level > 2 {
+                    self.l2l(level);
+                }
+                self.m2l(level);
+                self.p2l(level)
+            }
+
+            // Leaf level computations
+            self.m2p();
+            self.p2p();
+            self.l2p();
+        }
     }
 }
 
@@ -278,6 +286,10 @@ mod test {
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
+    use rlst_dense::array::Array;
+    use rlst_dense::base_array::BaseArray;
+    use rlst_dense::data_container::VectorContainer;
+    use rlst_dense::traits::{RawAccess, RawAccessMut};
 
     use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
     use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
