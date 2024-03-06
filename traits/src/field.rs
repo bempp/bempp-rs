@@ -43,13 +43,3 @@ pub trait SourceToTarget {
     /// * `level` - The level of the tree at which a field translation is being applied.
     fn p2l(&self, level: u64);
 }
-
-pub trait SourceToTargetHomogenousScaleInvariant<T>
-where
-    Self: SourceToTarget,
-    T: Float + Scalar<Real = T> + Default,
-{
-    /// # Arguments
-    /// * `level` - The level of the tree at which a field translation is being applied.
-    fn s2t_scale(&self, level: u64) -> T;
-}
