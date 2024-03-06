@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use bempp_field::helpers::ncoeffs_kifmm;
+
 use bempp_traits::{
     field::SourceToTargetData,
     kernel::{HomogenousKernel, Kernel},
@@ -23,16 +25,11 @@ use rlst_dense::{
 use crate::{
     charge::{Charges, Coordinates},
     constants::{ALPHA_INNER, ALPHA_OUTER},
-    field_translation::source,
     fmm::KiFmm,
     pinv::pinv,
     tree::SingleNodeFmmTree,
     types::SendPtrMut,
 };
-
-pub fn ncoeffs(expansion_order: usize) -> usize {
-    6 * (expansion_order - 1).pow(2) + 2
-}
 
 #[derive(Clone, Copy)]
 pub enum FmmEvaluationMode {
@@ -132,7 +129,7 @@ where
             Err("Must build tree before specifying FMM parameters".to_string())
         } else {
             self.expansion_order = Some(expansion_order);
-            self.ncoeffs = Some(ncoeffs(expansion_order));
+            self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
             self.eval_type = Some(eval_type);
 
@@ -143,6 +140,8 @@ where
             // Set the associated kernel
             let kernel = self.kernel.as_ref().unwrap().clone();
             source_to_target.set_kernel(kernel);
+
+            // Compute the transfer vectors
 
             // Compute the field translation operators
             source_to_target.set_operator_data(self.expansion_order.unwrap(), self.domain.unwrap());
@@ -487,8 +486,6 @@ where
                     leaf_multipoles[leaf_idx].push(SendPtrMut { raw });
                 }
             }
-
-            println!("HERE {:?} {:?}", leaf_multipoles.len(), nmatvecs);
 
             for (leaf_idx, leaf) in self
                 .tree

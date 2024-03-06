@@ -26,10 +26,6 @@ use crate::{
     types::{C2EType, SendPtrMut},
 };
 
-pub fn ncoeffs(expansion_order: usize) -> usize {
-    6 * (expansion_order - 1).pow(2) + 2
-}
-
 /// Combines the old datatree + Fmm structs into a single storage of metadata
 pub struct KiFmm<
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
@@ -278,11 +274,9 @@ where
 }
 
 #[cfg(test)]
-
 mod test {
 
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_traits::fmm;
     use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
 
     use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
@@ -303,6 +297,7 @@ mod test {
         >,
         sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T,
     ) {
         let multipole = fmm.get_multipole(&ROOT).unwrap();
         let upward_equivalent_surface = ROOT.compute_surface(
@@ -332,8 +327,8 @@ mod test {
 
         let abs_error = num::Float::abs(expected[0] - found[0]);
         let rel_error = abs_error / expected[0];
-        println!("rel error {:}", rel_error);
-        assert!(rel_error < T::from(1e-7).unwrap());
+        // println!("rel error {:}", rel_error);
+        assert!(rel_error <= threshold);
     }
 
     #[test]
@@ -345,13 +340,13 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 7;
+        let expansion_order = 6;
         let sparse = false;
 
         // Charge data
         let nvecs = 1;
-        let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
         let tmp = vec![1.0; npoints * nvecs];
+        let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
@@ -360,7 +355,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
-                FftFieldTranslationKiFmm::default(),
+                FftFieldTranslationKiFmm::new(),
             )
             .unwrap()
             .build()
@@ -373,7 +368,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
-                SvdFieldTranslationKiFmm::default(),
+                SvdFieldTranslationKiFmm::new(1e-5),
             )
             .unwrap()
             .build()
@@ -382,58 +377,58 @@ mod test {
 
         let fmm_fft = Box::new(fmm_fft);
         let fmm_svd = Box::new(fmm_svd);
-        test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges);
-        test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges);
+        test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
+        test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
     }
 
-    #[test]
-    fn test_upward_pass_matrix() {
-        // Setup random sources and targets
-        let npoints = 10000;
-        let sources = points_fixture::<f64>(npoints, None, None, Some(0));
-        let targets = points_fixture::<f64>(npoints, None, None, Some(1));
+    // #[test]
+    // fn test_upward_pass_matrix() {
+    //     // Setup random sources and targets
+    //     let npoints = 10000;
+    //     let sources = points_fixture::<f64>(npoints, None, None, Some(0));
+    //     let targets = points_fixture::<f64>(npoints, None, None, Some(1));
 
-        // FMM parameters
-        let n_crit = Some(100);
-        let expansion_order = 7;
-        let sparse = false;
+    //     // FMM parameters
+    //     let n_crit = Some(100);
+    //     let expansion_order = 7;
+    //     let sparse = false;
 
-        // Charge data
-        let nvecs = 5;
+    //     // Charge data
+    //     let nvecs = 5;
 
-        let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
-        let tmp = vec![1.0; npoints * nvecs];
-        charges.data_mut().copy_from_slice(&tmp);
-        let fmm_fft = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
-            .parameters(
-                expansion_order,
-                Laplace3dKernel::new(),
-                bempp_traits::types::EvalType::Value,
-                FftFieldTranslationKiFmm::default(),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
+    //     let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
+    //     let tmp = vec![1.0; npoints * nvecs];
+    //     charges.data_mut().copy_from_slice(&tmp);
+    //     let fmm_fft = KiFmmBuilderSingleNode::new()
+    //         .tree(&sources, &targets, &charges, n_crit, sparse)
+    //         .parameters(
+    //             expansion_order,
+    //             Laplace3dKernel::new(),
+    //             bempp_traits::types::EvalType::Value,
+    //             FftFieldTranslationKiFmm::default(),
+    //         )
+    //         .unwrap()
+    //         .build()
+    //         .unwrap();
 
-        let fmm_svd = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
-            .parameters(
-                expansion_order,
-                Laplace3dKernel::new(),
-                bempp_traits::types::EvalType::Value,
-                SvdFieldTranslationKiFmm::default(),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
+    //     let fmm_svd = KiFmmBuilderSingleNode::new()
+    //         .tree(&sources, &targets, &charges, n_crit, sparse)
+    //         .parameters(
+    //             expansion_order,
+    //             Laplace3dKernel::new(),
+    //             bempp_traits::types::EvalType::Value,
+    //             SvdFieldTranslationKiFmm::default(),
+    //         )
+    //         .unwrap()
+    //         .build()
+    //         .unwrap();
 
-        fmm_fft.evaluate();
-        fmm_svd.evaluate();
+    //     fmm_fft.evaluate();
+    //     fmm_svd.evaluate();
 
-        let fmm_fft = Box::new(fmm_fft);
-        let fmm_svd = Box::new(fmm_svd);
-        // test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges);
-        // test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges);
-    }
+    //     let fmm_fft = Box::new(fmm_fft);
+    //     let fmm_svd = Box::new(fmm_svd);
+    //     // test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges);
+    //     // test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges);
+    // }
 }

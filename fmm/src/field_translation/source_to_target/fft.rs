@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 use bempp_field::fft::Fft;
 
-use bempp_field::field::ncoeffs;
+use bempp_field::helpers::ncoeffs_kifmm;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::InteractionLists,

@@ -57,10 +57,6 @@ where
     /// Amount to dilate inner check surface by when computing operator.
     pub alpha: T,
 
-    /// Maximum rank taken for SVD compression
-    pub k: usize,
-
-    /// Amount of energy of each M2L operator retained in SVD re-compression
     pub threshold: T,
 
     /// Precomputed data required for SVD compressed M2L interaction.

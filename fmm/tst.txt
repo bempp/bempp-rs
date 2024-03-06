@@ -1,0 +1,17 @@
+
+running 1 test
+test fmm::test::test_upward_pass_vector ... FAILED
+
+failures:
+
+---- fmm::test::test_upward_pass_vector stdout ----
+thread 'fmm::test::test_upward_pass_vector' panicked at /Users/sri/.cargo/git/checkouts/rlst-ad4c9a6c781dcba3/c8c4ea1/dense/src/array/views.rs:376:9:
+assertion failed: !self.is_empty()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    fmm::test::test_upward_pass_vector
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 5.95s
+
