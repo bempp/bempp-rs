@@ -2,7 +2,6 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use num::Float;
 use rayon::prelude::*;
 
 use bempp_traits::{
@@ -13,7 +12,6 @@ use bempp_traits::{
     types::EvalType,
 };
 use bempp_tree::types::single_node::SingleNodeTreeNew;
-use rlst_blis::interface::gemm::Gemm;
 
 use crate::{
     builder::FmmEvaluationMode,
@@ -22,7 +20,6 @@ use crate::{
     helpers::find_chunk_size,
     traits::FmmScalar,
 };
-use bempp_traits::types::Scalar;
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,

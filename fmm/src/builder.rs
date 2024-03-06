@@ -12,8 +12,6 @@ use bempp_tree::{
     constants::ROOT,
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew},
 };
-use cauchy::Scalar;
-use num::Float;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,

@@ -1,12 +1,7 @@
 use bempp_traits::{
-    field::SourceToTargetData,
-    fmm::TargetTranslation,
-    kernel::Kernel,
-    tree::{FmmTree, Tree},
+    field::SourceToTargetData, fmm::TargetTranslation, kernel::Kernel, tree::FmmTree,
 };
 use bempp_tree::types::single_node::SingleNodeTreeNew;
-use cauchy::Scalar;
-use num::Float;
 
 use crate::{fmm::KiFmm, traits::FmmScalar};
 

@@ -1,7 +1,4 @@
 //! Implementation of FmmData and Fmm traits.
-use num::Float;
-use rlst_blis::interface::gemm::Gemm;
-use rlst_common::types::Scalar;
 use std::collections::HashMap;
 
 use rlst_dense::rlst_dynamic_array2;
@@ -26,7 +23,7 @@ pub struct KiFmm<
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     U: SourceToTargetData<V>,
     V: Kernel,
-    W: Scalar<Real = W> + Default + Float,
+    W: FmmScalar,
 > {
     pub tree: T,
     pub source_to_target_data: U,
