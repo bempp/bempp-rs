@@ -1198,7 +1198,7 @@ mod test {
     #[test]
     fn test_sorting() {
         let npoints = 1000;
-        let points = points_fixture(npoints, Some(-1.), Some(1.0));
+        let points = points_fixture(npoints, Some(-1.), Some(1.0), None);
 
         let domain = Domain::from_local_points(points.data());
 
@@ -1484,7 +1484,7 @@ mod test {
         let min = Some(-1.01);
         let max = Some(0.99);
 
-        let points = points_fixture(npoints, min, max);
+        let points = points_fixture(npoints, min, max, None);
 
         let mut keys = Vec::new();
 

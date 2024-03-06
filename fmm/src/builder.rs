@@ -689,9 +689,8 @@ mod test {
     fn test_builder() {
         let npoints = 1000;
         let nvecs = 1;
-        let sources = points_fixture::<f64>(npoints, None, None);
-        let targets = points_fixture::<f64>(npoints, None, None);
-        let mut result = vec![0.; npoints];
+        let sources = points_fixture::<f64>(npoints, None, None, Some(0));
+        let targets = points_fixture::<f64>(npoints, None, None, Some(1));
         let tmp = vec![1.0; npoints * nvecs];
         let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);

@@ -122,11 +122,11 @@ mod test {
         let npoints = 10000;
 
         // Test points in positive octant only
-        let points = points_fixture::<f64>(npoints, None, None);
+        let points = points_fixture::<f64>(npoints, None, None, None);
         test_compute_bounds(points);
 
         // Test points in positive and negative octants
-        let points = points_fixture::<f64>(npoints, Some(-1.), Some(1.));
+        let points = points_fixture::<f64>(npoints, Some(-1.), Some(1.), None);
         test_compute_bounds(points);
 
         // Test rectangular distributions of points
