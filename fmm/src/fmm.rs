@@ -372,23 +372,23 @@ mod test {
                 bempp_traits::types::EvalType::Value,
                 sources.data(),
                 &test_point,
-                &charges.data()[eval_idx*nsources..(eval_idx+1)*nsources],
-                &mut expected[eval_idx..eval_idx+1],
+                &charges.data()[eval_idx * nsources..(eval_idx + 1) * nsources],
+                &mut expected[eval_idx..eval_idx + 1],
             );
         }
 
         for eval_idx in 0..nmatvecs {
-            let multipole_i = &multipole[eval_idx*ncoeffs..(eval_idx+1)*ncoeffs];
+            let multipole_i = &multipole[eval_idx * ncoeffs..(eval_idx + 1) * ncoeffs];
             fmm.get_kernel().evaluate_st(
                 bempp_traits::types::EvalType::Value,
                 &upward_equivalent_surface,
                 &test_point,
                 &multipole_i,
-                &mut found[eval_idx..eval_idx+1],
+                &mut found[eval_idx..eval_idx + 1],
             );
         }
         for (&a, &b) in expected.iter().zip(found.iter()) {
-            let abs_error = num::Float::abs(b-a);
+            let abs_error = num::Float::abs(b - a);
             let rel_error = abs_error / a;
             assert!(rel_error <= threshold);
         }
@@ -462,9 +462,11 @@ mod test {
         let nvecs = 3;
         let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
 
-        charges.data_mut().chunks_exact_mut(npoints).enumerate().for_each(|(i, chunk)|
-            chunk.iter_mut().for_each(|elem| *elem += (i+1) as f64 )
-        );
+        charges
+            .data_mut()
+            .chunks_exact_mut(npoints)
+            .enumerate()
+            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (i + 1) as f64));
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)

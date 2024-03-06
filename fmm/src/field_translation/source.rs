@@ -122,7 +122,8 @@ where
             }
 
             FmmEvaluationMode::Matrix(nmatvecs) => {
-                let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
+                let mut check_potentials =
+                    rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
 
                 // println!("HERERERE {:?} {:?} {:?}", check_potentials.data().len(), self.ncoeffs, nmatvecs);
 
@@ -168,7 +169,6 @@ where
                             }
                         },
                     );
-
 
                 // Compute multipole expansions
                 check_potentials
@@ -310,7 +310,6 @@ where
                 let max_key_displacement = (max_idx + 1) * self.ncoeffs * nmatvecs;
 
                 let child_multipoles = &self.multipoles[min_key_displacement..max_key_displacement];
-
 
                 child_multipoles
                     .par_chunks_exact(nmatvecs * self.ncoeffs * NSIBLINGS)

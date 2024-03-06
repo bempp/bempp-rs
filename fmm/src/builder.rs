@@ -27,7 +27,7 @@ use crate::{
     pinv::pinv,
     traits::FmmScalar,
     tree::SingleNodeFmmTree,
-    types::{SendPtrMut, Charges, Coordinates},
+    types::{Charges, Coordinates, SendPtrMut},
 };
 
 #[derive(Clone, Copy)]
@@ -336,14 +336,16 @@ where
             .get_target_tree()
             .get_all_coordinates()
             .unwrap()
-            .len() / dim;
+            .len()
+            / dim;
 
-        let nsource_points= self
+        let nsource_points = self
             .tree
             .get_source_tree()
             .get_all_coordinates()
             .unwrap()
-            .len() / dim;
+            .len()
+            / dim;
 
         let nsource_keys = self.tree.get_source_tree().get_nall_keys().unwrap();
         let ntarget_keys = self.tree.get_target_tree().get_nall_keys().unwrap();

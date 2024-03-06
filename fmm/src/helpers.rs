@@ -19,3 +19,16 @@ pub fn homogenous_kernel_scale<T: FmmScalar<Real = T>>(level: u64) -> T {
     let denominator = <T as Scalar>::powf(denominator, power);
     numerator / denominator
 }
+
+pub fn m2l_scale<T: FmmScalar<Real = T>>(level: u64) -> T {
+    if level < 2 {
+        panic!("M2L only perfomed on level 2 and below")
+    }
+
+    if level == 2 {
+        T::from(1. / 2.).unwrap()
+    } else {
+        let two = T::from(2.0).unwrap();
+        <T as Scalar>::powf(two, T::from(level - 3).unwrap())
+    }
+}
