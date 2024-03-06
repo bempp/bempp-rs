@@ -1,50 +1,36 @@
-//! Implementation of the Laplace kernel
-use num;
+//! Implementation of the Helmholtz kernel
+use num::{self, Zero};
 use std::marker::PhantomData;
 
 use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use bempp_traits::{
-    kernel::{Kernel, ScaleInvariantKernel},
+    kernel::Kernel,
     types::{EvalType, Scalar},
 };
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
 #[derive(Clone)]
-pub struct Laplace3dKernel<T: Scalar> {
+pub struct Helmholtz3dKernel<T: Scalar> {
+    wavenumber: T::Real,
     _phantom_t: std::marker::PhantomData<T>,
 }
 
-impl<T: Scalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
-    type T = T;
-
-    fn scale(&self, level: u64) -> Self::T {
-        let numerator = T::from(1).unwrap();
-        let denominator = T::from(2.).unwrap();
-        let power = T::from(level).unwrap();
-        let denominator = denominator.powf(power);
-        numerator / denominator
-    }
-}
-
-impl<T: Scalar> Laplace3dKernel<T> {
-    pub fn new() -> Self {
+impl<T: Scalar> Helmholtz3dKernel<T> {
+    pub fn new(wavenumber: T::Real) -> Self {
         Self {
+            wavenumber,
             _phantom_t: PhantomData,
         }
     }
 }
 
-impl<T: Scalar> Default for Laplace3dKernel<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: Scalar + Send + Sync> Kernel for Laplace3dKernel<T>
+impl<T: Scalar<Complex = T> + Send + Sync> Kernel for Helmholtz3dKernel<T>
 where
+    // Send and sync are defined for all the standard types that implement Scalar (f32, f64, c32, c64)
+    <T as Scalar>::Complex: Send + Sync,
     <T as Scalar>::Real: Send + Sync,
 {
     type T = T;
@@ -79,7 +65,14 @@ where
                     targets[2 * ntargets + target_index],
                 ];
 
-                evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
+                evaluate_helmholtz_one_target(
+                    eval_type,
+                    &target,
+                    sources,
+                    charges,
+                    self.wavenumber,
+                    my_chunk,
+                )
             });
     }
 
@@ -105,8 +98,55 @@ where
                     targets[2 * ntargets + target_index],
                 ];
 
-                evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
+                evaluate_helmholtz_one_target(
+                    eval_type,
+                    &target,
+                    sources,
+                    charges,
+                    self.wavenumber,
+                    my_chunk,
+                )
             });
+    }
+
+    fn greens_fct(
+        &self,
+        eval_type: EvalType,
+        source: &[<Self::T as Scalar>::Real],
+        target: &[<Self::T as Scalar>::Real],
+        result: &mut [Self::T],
+    ) {
+        let zero_real = <T::Real as num::Zero>::zero();
+        let one_real = <T::Real as num::One>::one();
+        let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
+        let diff0 = source[0] - target[0];
+        let diff1 = source[1] - target[1];
+        let diff2 = source[2] - target[2];
+        let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
+        let inv_diff_norm = {
+            if diff_norm == zero_real {
+                zero_real
+            } else {
+                one_real / diff_norm
+            }
+        };
+
+        let kr: T::Real = diff_norm * self.wavenumber;
+        match eval_type {
+            EvalType::Value => {
+                result[0] = T::complex(kr.cos(), kr.sin()).mul_real(inv_diff_norm * m_inv_4pi)
+            }
+            EvalType::ValueDeriv => {
+                let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
+                let gr = T::complex(kr.cos(), kr.sin()).mul_real(inv_diff_norm * m_inv_4pi);
+                let gr_diff = gr.mul_real(inv_diff_norm_squared) * T::complex(one_real, -kr);
+
+                result[0] = gr;
+                result[1] = gr_diff.mul_real(diff0);
+                result[2] = gr_diff.mul_real(diff1);
+                result[3] = gr_diff.mul_real(diff2);
+            }
+        }
     }
 
     fn assemble_st(
@@ -131,7 +171,13 @@ where
                     targets[2 * ntargets + target_index],
                 ];
 
-                assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+                assemble_helmholtz_one_target(
+                    eval_type,
+                    &target,
+                    sources,
+                    self.wavenumber,
+                    my_chunk,
+                )
             });
     }
 
@@ -157,7 +203,13 @@ where
                     targets[2 * ntargets + target_index],
                 ];
 
-                assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+                assemble_helmholtz_one_target(
+                    eval_type,
+                    &target,
+                    sources,
+                    self.wavenumber,
+                    my_chunk,
+                )
             });
     }
 
@@ -186,55 +238,27 @@ where
                     sources[ntargets + target_index],
                     sources[2 * ntargets + target_index],
                 ];
-                assemble_laplace_one_target(eval_type, &target, &source, my_chunk)
+                assemble_helmholtz_one_target(
+                    eval_type,
+                    &target,
+                    &source,
+                    self.wavenumber,
+                    my_chunk,
+                )
             });
     }
 
     fn range_component_count(&self, eval_type: EvalType) -> usize {
-        laplace_component_count(eval_type)
-    }
-
-    fn greens_fct(
-        &self,
-        eval_type: EvalType,
-        source: &[<Self::T as Scalar>::Real],
-        target: &[<Self::T as Scalar>::Real],
-        result: &mut [Self::T],
-    ) {
-        let zero_real = <T::Real as num::Zero>::zero();
-        let one_real = <T::Real as num::One>::one();
-        let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
-        let diff0 = source[0] - target[0];
-        let diff1 = source[1] - target[1];
-        let diff2 = source[2] - target[2];
-        let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-        let inv_diff_norm = {
-            if diff_norm == zero_real {
-                zero_real
-            } else {
-                one_real / diff_norm
-            }
-        };
-        match eval_type {
-            EvalType::Value => {
-                result[0] = num::cast(inv_diff_norm * m_inv_4pi).unwrap();
-            }
-            EvalType::ValueDeriv => {
-                let inv_diff_norm_cube = inv_diff_norm * inv_diff_norm * inv_diff_norm;
-                result[0] = num::cast(inv_diff_norm * m_inv_4pi).unwrap();
-                result[1] = num::cast(inv_diff_norm_cube * m_inv_4pi * diff0).unwrap();
-                result[2] = num::cast(inv_diff_norm_cube * m_inv_4pi * diff1).unwrap();
-                result[3] = num::cast(inv_diff_norm_cube * m_inv_4pi * diff2).unwrap();
-            }
-        }
+        helmholtz_component_count(eval_type)
     }
 }
 
-pub fn evaluate_laplace_one_target<T: Scalar>(
+pub fn evaluate_helmholtz_one_target<T: Scalar<Complex = T>>(
     eval_type: EvalType,
     target: &[<T as Scalar>::Real],
     sources: &[<T as Scalar>::Real],
     charges: &[T],
+    wavenumber: T::Real,
     result: &mut [T],
 ) {
     let ncharges = charges.len();
@@ -253,7 +277,8 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result = T::zero();
+            let mut my_result_real = <<T as Scalar>::Real as Zero>::zero();
+            let mut my_result_imag = <<T as Scalar>::Real as Zero>::zero();
             for index in 0..nsources {
                 diff0 = sources0[index] - target[0];
                 diff1 = sources1[index] - target[1];
@@ -267,18 +292,32 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
                     }
                 };
 
-                my_result += charges[index].mul_real(inv_diff_norm);
+                let kr = wavenumber * diff_norm;
+
+                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm;
+                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm;
+                let charge_re = charges[index].re();
+                let charge_im = charges[index].im();
+
+                my_result_imag += g_re * charge_im + g_im * charge_re;
+                my_result_real += g_re * charge_re - g_im * charge_im;
             }
-            result[0] += my_result.mul_real(m_inv_4pi);
+            result[0] +=
+                <T::Complex as Scalar>::complex(my_result_real, my_result_imag).mul_real(m_inv_4pi);
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
             // correctly auto-vectorized.
 
-            let mut my_result0 = T::zero();
-            let mut my_result1 = T::zero();
-            let mut my_result2 = T::zero();
-            let mut my_result3 = T::zero();
+            let mut my_result0_real = <T::Real as Zero>::zero();
+            let mut my_result1_real = <T::Real as Zero>::zero();
+            let mut my_result2_real = <T::Real as Zero>::zero();
+            let mut my_result3_real = <T::Real as Zero>::zero();
+
+            let mut my_result0_imag = <T::Real as Zero>::zero();
+            let mut my_result1_imag = <T::Real as Zero>::zero();
+            let mut my_result2_imag = <T::Real as Zero>::zero();
+            let mut my_result3_imag = <T::Real as Zero>::zero();
 
             for index in 0..nsources {
                 diff0 = sources0[index] - target[0];
@@ -292,26 +331,47 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
                         one_real / diff_norm
                     }
                 };
-                let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
+                let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
 
-                my_result0 += charges[index].mul_real(inv_diff_norm);
-                my_result1 += charges[index].mul_real(diff0 * inv_diff_norm_cubed);
-                my_result2 += charges[index].mul_real(diff1 * inv_diff_norm_cubed);
-                my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
+                let kr = wavenumber * diff_norm;
+                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+
+                let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
+                let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
+
+                let charge_re = charges[index].re();
+                let charge_im = charges[index].im();
+
+                my_result0_imag += g_re * charge_im + g_im * charge_re;
+                my_result0_real += g_re * charge_re - g_im * charge_im;
+
+                let times_charge_imag = g_deriv_re * charge_im + g_deriv_im * charge_re;
+                let times_charge_real = g_deriv_re * charge_re - g_deriv_im * charge_im;
+
+                my_result1_real += times_charge_real * diff0;
+                my_result1_imag += times_charge_imag * diff0;
+
+                my_result2_real += times_charge_real * diff1;
+                my_result2_imag += times_charge_imag * diff1;
+
+                my_result3_real += times_charge_real * diff2;
+                my_result3_imag += times_charge_imag * diff2;
             }
 
-            result[0] += my_result0.mul_real(m_inv_4pi);
-            result[1] += my_result1.mul_real(m_inv_4pi);
-            result[2] += my_result2.mul_real(m_inv_4pi);
-            result[3] += my_result3.mul_real(m_inv_4pi);
+            result[0] += <T::Complex as Scalar>::complex(my_result0_real, my_result0_imag);
+            result[1] += <T::Complex as Scalar>::complex(my_result1_real, my_result1_imag);
+            result[2] += <T::Complex as Scalar>::complex(my_result2_real, my_result2_imag);
+            result[3] += <T::Complex as Scalar>::complex(my_result3_real, my_result3_imag);
         }
     }
 }
 
-pub fn assemble_laplace_one_target<T: Scalar>(
+pub fn assemble_helmholtz_one_target<T: Scalar<Complex = T>>(
     eval_type: EvalType,
     target: &[<T as Scalar>::Real],
     sources: &[<T as Scalar>::Real],
+    wavenumber: T::Real,
     result: &mut [T],
 ) {
     assert_eq!(sources.len() % 3, 0);
@@ -331,7 +391,6 @@ pub fn assemble_laplace_one_target<T: Scalar>(
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result;
             for index in 0..nsources {
                 diff0 = sources0[index] - target[0];
                 diff1 = sources1[index] - target[1];
@@ -345,8 +404,12 @@ pub fn assemble_laplace_one_target<T: Scalar>(
                     }
                 };
 
-                my_result = inv_diff_norm * m_inv_4pi;
-                result[index] = num::cast::<T::Real, T>(my_result).unwrap();
+                let kr = wavenumber * diff_norm;
+
+                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+
+                result[index] = <T as Scalar>::complex(g_re, g_im);
             }
         }
         EvalType::ValueDeriv => {
@@ -357,6 +420,14 @@ pub fn assemble_laplace_one_target<T: Scalar>(
             let mut my_result1;
             let mut my_result2;
             let mut my_result3;
+
+            let mut my_result1_real: T::Real;
+            let mut my_result2_real: T::Real;
+            let mut my_result3_real: T::Real;
+
+            let mut my_result1_imag: T::Real;
+            let mut my_result2_imag: T::Real;
+            let mut my_result3_imag: T::Real;
 
             let mut chunks = result.chunks_exact_mut(nsources);
 
@@ -378,12 +449,28 @@ pub fn assemble_laplace_one_target<T: Scalar>(
                         one_real / diff_norm
                     }
                 };
-                let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
+                let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
 
-                my_result0 = T::one().mul_real(inv_diff_norm * m_inv_4pi);
-                my_result1 = T::one().mul_real(diff0 * inv_diff_norm_cubed * m_inv_4pi);
-                my_result2 = T::one().mul_real(diff1 * inv_diff_norm_cubed * m_inv_4pi);
-                my_result3 = T::one().mul_real(diff2 * inv_diff_norm_cubed * m_inv_4pi);
+                let kr = wavenumber * diff_norm;
+                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+
+                let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
+                let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
+
+                my_result1_real = g_deriv_re * diff0;
+                my_result1_imag = g_deriv_im * diff0;
+
+                my_result2_real = g_deriv_re * diff1;
+                my_result2_imag = g_deriv_im * diff1;
+
+                my_result3_real = g_deriv_re * diff2;
+                my_result3_imag = g_deriv_im * diff2;
+
+                my_result0 = <T as Scalar>::complex(g_re, g_im);
+                my_result1 = <T as Scalar>::complex(my_result1_real, my_result1_imag);
+                my_result2 = <T as Scalar>::complex(my_result2_real, my_result2_imag);
+                my_result3 = <T as Scalar>::complex(my_result3_real, my_result3_imag);
 
                 my_res0[index] = my_result0;
                 my_res1[index] = my_result1;
@@ -394,7 +481,7 @@ pub fn assemble_laplace_one_target<T: Scalar>(
     }
 }
 
-fn laplace_component_count(eval_type: EvalType) -> usize {
+fn helmholtz_component_count(eval_type: EvalType) -> usize {
     match eval_type {
         EvalType::Value => 1,
         EvalType::ValueDeriv => 4,
@@ -405,10 +492,13 @@ fn laplace_component_count(eval_type: EvalType) -> usize {
 //     eval_type: EvalType,
 //     target: &[f32],
 //     sources: &[f32],
-//     charges: &[f32],
-//     result: &mut [f32],
+//     charges: &[rlst_common::types::c32],
+//     wavenumber: f32,
+//     result: &mut [rlst_common::types::c32],
 // ) {
-//     evaluate_laplace_one_target(eval_type, target, sources, charges, result)
+//     evaluate_helmholtz_one_target::<rlst_common::types::c32>(
+//         eval_type, target, sources, charges, wavenumber, result,
+//     )
 // }
 
 // pub fn simd_wrapper_assemble(
@@ -417,7 +507,7 @@ fn laplace_component_count(eval_type: EvalType) -> usize {
 //     sources: &[f32],
 //     result: &mut [f32],
 // ) {
-//     assemble_laplace_one_target(eval_type, target, sources, result);
+//     assemble_helmholtz_one_target(eval_type, target, sources, result);
 // }
 
 #[cfg(test)]
@@ -426,14 +516,15 @@ mod test {
     use super::*;
     use approx::assert_relative_eq;
     use bempp_traits::types::Scalar;
-    use rand::prelude::*;
     use rlst_dense::{
         array::Array,
         base_array::BaseArray,
         data_container::VectorContainer,
-        rlst_dynamic_array2,
+        rlst_dynamic_array1, rlst_dynamic_array2,
         traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
     };
+
+    use rlst_common::types::c64;
 
     fn copy(
         m_in: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
@@ -447,39 +538,26 @@ mod test {
         m
     }
 
-    fn rand_mat(shape: [usize; 2]) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
-        let mut m = rlst_dynamic_array2!(f64, shape);
-        let mut rng = rand::thread_rng();
-        for i in 0..shape[0] {
-            for j in 0..shape[1] {
-                *m.get_mut([i, j]).unwrap() = rng.gen()
-            }
-        }
-        m
-    }
-
-    fn rand_vec(size: usize) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
-        let mut v = rlst_dynamic_array2!(f64, [size, 1]);
-        let mut rng = rand::thread_rng();
-        for i in 0..size {
-            *v.get_mut([i, 0]).unwrap() = rng.gen();
-        }
-        v
-    }
-
     #[test]
-    fn test_laplace_3d() {
+    fn test_helmholtz_3d() {
         let eps = 1E-8;
+
+        let wavenumber: f64 = 1.5;
 
         let nsources = 5;
         let ntargets = 3;
 
-        let sources = rand_mat([nsources, 3]);
-        let targets = rand_mat([ntargets, 3]);
-        let charges = rand_vec(nsources);
-        let mut green_value = rlst::dense::rlst_dynamic_array2!(f64, [ntargets, 1]);
+        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
+        let mut charges = rlst_dynamic_array1!(c64, [nsources]);
 
-        Laplace3dKernel::<f64>::default().evaluate_st(
+        sources.fill_from_seed_equally_distributed(0);
+        targets.fill_from_seed_equally_distributed(1);
+        charges.fill_from_seed_equally_distributed(2);
+
+        let mut green_value = rlst_dynamic_array1!(c64, [ntargets]);
+
+        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
             sources.data(),
             targets.data(),
@@ -488,17 +566,21 @@ mod test {
         );
 
         for target_index in 0..ntargets {
-            let mut expected: f64 = 0.0;
+            let mut expected = c64::default();
             for source_index in 0..nsources {
                 let dist = ((targets[[target_index, 0]] - sources[[source_index, 0]]).square()
                     + (targets[[target_index, 1]] - sources[[source_index, 1]]).square()
                     + (targets[[target_index, 2]] - sources[[source_index, 2]]).square())
                 .sqrt();
 
-                expected += charges[[source_index, 0]] * 0.25 * f64::FRAC_1_PI() / dist;
+                expected += charges[[source_index]]
+                    * c64::exp(c64::complex(0.0, wavenumber * dist))
+                    * 0.25
+                    * f64::FRAC_1_PI()
+                    / dist;
             }
 
-            assert_relative_eq!(green_value[[target_index, 0]], expected, epsilon = 1E-12);
+            assert_relative_eq!(green_value[[target_index]], expected, epsilon = 1E-12);
         }
 
         let mut targets_x_eps = copy(&targets);
@@ -511,9 +593,9 @@ mod test {
             targets_z_eps[[index, 2]] += eps;
         }
 
-        let mut expected = rlst_dynamic_array2!(f64, [4, ntargets]);
+        let mut expected = rlst_dynamic_array2!(c64, [4, ntargets]);
 
-        Laplace3dKernel::<f64>::default().evaluate_st(
+        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::ValueDeriv,
             sources.data(),
             targets.data(),
@@ -521,9 +603,9 @@ mod test {
             expected.data_mut(),
         );
 
-        let mut green_value_x_eps = rlst_dynamic_array2![f64, [ntargets, 1]];
+        let mut green_value_x_eps = rlst_dynamic_array1![c64, [ntargets]];
 
-        Laplace3dKernel::<f64>::default().evaluate_st(
+        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
             sources.data(),
             targets_x_eps.data(),
@@ -531,18 +613,18 @@ mod test {
             green_value_x_eps.data_mut(),
         );
 
-        let mut green_value_y_eps = rlst_dynamic_array2![f64, [ntargets, 1]];
+        let mut green_value_y_eps = rlst_dynamic_array1![c64, [ntargets]];
 
-        Laplace3dKernel::<f64>::default().evaluate_st(
+        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
             sources.data(),
             targets_y_eps.data(),
             charges.data(),
             green_value_y_eps.data_mut(),
         );
-        let mut green_value_z_eps = rlst_dynamic_array2![f64, [ntargets, 1]];
+        let mut green_value_z_eps = rlst_dynamic_array1![c64, [ntargets]];
 
-        Laplace3dKernel::<f64>::default().evaluate_st(
+        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
             sources.data(),
             targets_z_eps.data(),
@@ -550,37 +632,41 @@ mod test {
             green_value_z_eps.data_mut(),
         );
 
-        let gv0 = copy(&green_value);
-        let gv1 = copy(&green_value);
-        let gv2 = copy(&green_value);
+        let mut x_deriv = rlst_dynamic_array1![c64, [ntargets]];
+        let mut y_deriv = rlst_dynamic_array1![c64, [ntargets]];
+        let mut z_deriv = rlst_dynamic_array1![c64, [ntargets]];
 
-        let mut x_deriv = rlst_dynamic_array2![f64, [ntargets, 1]];
-        let mut y_deriv = rlst_dynamic_array2![f64, [ntargets, 1]];
-        let mut z_deriv = rlst_dynamic_array2![f64, [ntargets, 1]];
-        x_deriv.fill_from((green_value_x_eps - gv0) * (1.0 / eps));
-        y_deriv.fill_from((green_value_y_eps - gv1) * (1.0 / eps));
-        z_deriv.fill_from((green_value_z_eps - gv2) * (1.0 / eps));
+        x_deriv.fill_from(
+            (green_value_x_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
+        );
+
+        y_deriv.fill_from(
+            (green_value_y_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
+        );
+        z_deriv.fill_from(
+            (green_value_z_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
+        );
 
         for target_index in 0..ntargets {
             assert_relative_eq!(
-                green_value[[target_index, 0]],
+                green_value[[target_index]],
                 expected[[0, target_index]],
                 epsilon = 1E-12
             );
 
             assert_relative_eq!(
-                x_deriv[[target_index, 0]],
+                x_deriv[[target_index]],
                 expected[[1, target_index]],
                 epsilon = 1E-5
             );
             assert_relative_eq!(
-                y_deriv[[target_index, 0]],
+                y_deriv[[target_index]],
                 expected[[2, target_index]],
                 epsilon = 1E-5
             );
 
             assert_relative_eq!(
-                z_deriv[[target_index, 0]],
+                z_deriv[[target_index]],
                 expected[[3, target_index]],
                 epsilon = 1E-5
             );
@@ -588,15 +674,20 @@ mod test {
     }
 
     #[test]
-    fn test_assemble_laplace_3d() {
+    fn test_assemble_helmholtz_3d() {
         let nsources = 3;
         let ntargets = 5;
+        let wavenumber: f64 = 1.5;
 
-        let sources = rand_mat([nsources, 3]);
-        let targets = rand_mat([ntargets, 3]);
-        let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
+        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
 
-        Laplace3dKernel::<f64>::default().assemble_st(
+        sources.fill_from_seed_equally_distributed(1);
+        targets.fill_from_seed_equally_distributed(2);
+
+        let mut green_value_t = rlst_dynamic_array2!(c64, [nsources, ntargets]);
+
+        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
             EvalType::Value,
             sources.data(),
             targets.data(),
@@ -606,15 +697,15 @@ mod test {
         // The matrix needs to be transposed so that the first row corresponds to the first target,
         // second row to the second target and so on.
 
-        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
+        let mut green_value = rlst_dynamic_array2!(c64, [ntargets, nsources]);
         green_value.fill_from(green_value_t.transpose());
 
         for charge_index in 0..nsources {
-            let mut charges = rlst_dynamic_array2![f64, [nsources, 1]];
-            let mut expected = rlst_dynamic_array2![f64, [ntargets, 1]];
-            charges[[charge_index, 0]] = 1.0;
+            let mut charges = rlst_dynamic_array1![c64, [nsources]];
+            let mut expected = rlst_dynamic_array1![c64, [ntargets]];
+            charges[[charge_index]] = c64::complex(1.0, 0.0);
 
-            Laplace3dKernel::<f64>::default().evaluate_st(
+            Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
                 EvalType::Value,
                 sources.data(),
                 targets.data(),
@@ -625,15 +716,15 @@ mod test {
             for target_index in 0..ntargets {
                 assert_relative_eq!(
                     green_value[[target_index, charge_index]],
-                    expected[[target_index, 0]],
+                    expected[[target_index]],
                     epsilon = 1E-12
                 );
             }
         }
 
-        let mut green_value_deriv_t = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
+        let mut green_value_deriv_t = rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
 
-        Laplace3dKernel::<f64>::default().assemble_st(
+        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
             EvalType::ValueDeriv,
             sources.data(),
             targets.data(),
@@ -642,16 +733,16 @@ mod test {
 
         // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
+        let mut green_value_deriv = rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
         green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
         for charge_index in 0..nsources {
-            let mut charges = rlst_dynamic_array2![f64, [nsources, 1]];
-            let mut expected = rlst_dynamic_array2!(f64, [4, ntargets]);
+            let mut charges = rlst_dynamic_array1![c64, [nsources]];
+            let mut expected = rlst_dynamic_array2!(c64, [4, ntargets]);
 
-            charges[[charge_index, 0]] = 1.0;
+            charges[[charge_index]] = c64::complex(1.0, 0.0);
 
-            Laplace3dKernel::<f64>::default().evaluate_st(
+            Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
                 EvalType::ValueDeriv,
                 sources.data(),
                 targets.data(),
@@ -669,22 +760,5 @@ mod test {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_compare_assemble_with_direct_computation() {
-        let nsources = 3;
-        let ntargets = 5;
-
-        let sources = rand_mat([nsources, 3]);
-        let targets = rand_mat([ntargets, 3]);
-        let mut green_value_deriv = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
-
-        Laplace3dKernel::<f64>::default().assemble_st(
-            EvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            green_value_deriv.data_mut(),
-        );
     }
 }
