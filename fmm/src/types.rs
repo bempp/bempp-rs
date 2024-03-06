@@ -1,25 +1,10 @@
 //! Data structures FMM data and metadata.
-use std::collections::HashMap;
-
-use bempp_traits::{field::SourceToTargetData, kernel::Kernel, tree::Tree};
-use bempp_tree::types::morton::MortonKey;
-use num::{Complex, Float};
-use rlst_common::types::Scalar;
+use num::Complex;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 
-/// Type alias for charge data
-pub type Charge<T> = T;
+pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Type alias for global index for identifying charge data with a point
-pub type GlobalIdx = usize;
-
-/// Type alias for mapping charge data to global indices.
-// pub type ChargeDict<T> = HashMap<GlobalIdx, Vec<Charge<T>>>;
-
-pub struct ChargeDict<T> {
-    pub nvecs: usize,
-    pub data: HashMap<GlobalIdx, Vec<Charge<T>>>
-}
+pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Type alias for approximation of FMM operator matrices.
 pub type C2EType<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

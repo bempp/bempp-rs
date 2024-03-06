@@ -1,6 +1,5 @@
 //! A a general framework for implementing Fast Multipole Methods.
 pub mod builder;
-pub mod charge;
 pub mod constants;
 pub mod fmm;
 pub mod helpers;

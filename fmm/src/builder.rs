@@ -21,14 +21,13 @@ use rlst_dense::{
 };
 
 use crate::{
-    charge::{Charges, Coordinates},
     constants::{ALPHA_INNER, ALPHA_OUTER},
     fmm::KiFmm,
     helpers::homogenous_kernel_scale,
     pinv::pinv,
     traits::FmmScalar,
     tree::SingleNodeFmmTree,
-    types::{SendPtrMut},
+    types::{SendPtrMut, Charges, Coordinates},
 };
 
 #[derive(Clone, Copy)]
