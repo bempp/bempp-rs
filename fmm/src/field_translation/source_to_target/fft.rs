@@ -16,7 +16,7 @@ use bempp_field::helpers::ncoeffs_kifmm;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
     fmm::InteractionLists,
-    kernel::{HomogenousKernel, Kernel},
+    kernel::Kernel,
     tree::Tree,
     types::{EvalType, Scalar},
 };
@@ -36,7 +36,7 @@ use crate::field_translation::hadamard::matmul8x8;
 
 impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
-    T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>
         + Float
         + Default

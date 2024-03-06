@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use bempp_field::helpers::ncoeffs_kifmm;
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
-    kernel::{HomogenousKernel, Kernel},
+    kernel::Kernel,
     tree::Tree,
     types::Scalar,
 };
@@ -29,7 +29,7 @@ use rlst_dense::{
 /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
 impl<T, U, V> SourceToTarget for KiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
 where
-    T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
     U: Float + Default,
     U: std::marker::Send + std::marker::Sync + Default,

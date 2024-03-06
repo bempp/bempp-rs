@@ -6,7 +6,7 @@ use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use bempp_traits::{
-    kernel::{HomogenousKernel, Kernel},
+    kernel::Kernel,
     types::{EvalType, KernelType, Scalar},
 };
 use num::traits::FloatConst;
@@ -16,16 +16,6 @@ use rayon::prelude::*;
 pub struct Laplace3dKernel<T: Scalar> {
     kernel_type: KernelType,
     _phantom_t: std::marker::PhantomData<T>,
-}
-
-impl<T: Scalar<Real = T> + Sync + Send> HomogenousKernel for Laplace3dKernel<T> {
-    fn scale(&self, level: u64) -> Self::T {
-        let numerator = T::from(1).unwrap();
-        let denominator = T::from(2.).unwrap();
-        let power = T::from(level).unwrap();
-        let denominator = denominator.powf(power);
-        numerator / denominator
-    }
 }
 
 impl<T: Scalar> Laplace3dKernel<T> {

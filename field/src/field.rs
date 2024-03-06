@@ -1,5 +1,5 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use bempp_traits::kernel::{HomogenousKernel, Kernel};
+use bempp_traits::kernel::Kernel;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
@@ -50,7 +50,7 @@ impl<T, U> SourceToTargetData<U> for SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
-    U: HomogenousKernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type OperatorData = SvdSourceToTargetOperatorData<T>;
@@ -227,12 +227,12 @@ impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
-    U: HomogenousKernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    pub fn new(threshold: T) -> Self {
+    pub fn new(threshold: Option<T>) -> Self {
         let mut new = Self::default();
-        new.threshold = threshold;
+        new.threshold = threshold.unwrap_or(T::epsilon());
         new.transfer_vectors = compute_transfer_vectors();
         new
     }
@@ -242,7 +242,7 @@ impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
     T: Scalar<Real = T> + Float + Default + Fft,
     Complex<T>: Scalar,
-    U: HomogenousKernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
 {
     type Domain = Domain<T>;
 
@@ -451,7 +451,7 @@ impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
     T: Float + Scalar<Real = T> + Default + Fft,
     Complex<T>: Scalar,
-    U: HomogenousKernel<T = T> + Default,
+    U: Kernel<T = T> + Default,
 {
     pub fn new() -> Self {
         let mut new = Self::default();

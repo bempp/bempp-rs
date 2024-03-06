@@ -4,7 +4,7 @@ use bempp_field::helpers::ncoeffs_kifmm;
 
 use bempp_traits::{
     field::SourceToTargetData,
-    kernel::{HomogenousKernel, Kernel},
+    kernel::Kernel,
     tree::{FmmTree, Tree},
     types::EvalType,
 };
@@ -26,6 +26,7 @@ use crate::{
     charge::{Charges, Coordinates},
     constants::{ALPHA_INNER, ALPHA_OUTER},
     fmm::KiFmm,
+    helpers::homogenous_kernel_scale,
     pinv::pinv,
     tree::SingleNodeFmmTree,
     types::SendPtrMut,
@@ -42,7 +43,7 @@ pub struct KiFmmBuilderSingleNode<'builder, T, U, V>
 where
     T: SourceToTargetData<V>,
     U: Float + Default + Scalar<Real = U>,
-    V: Kernel + HomogenousKernel,
+    V: Kernel,
 {
     tree: Option<SingleNodeFmmTree<U>>,
     charges: Option<&'builder Charges<U>>,
@@ -63,7 +64,7 @@ where
     U: Float + Default,
     U: std::marker::Send + std::marker::Sync + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: Kernel<T = U> + HomogenousKernel + Clone + Default,
+    V: Kernel<T = U> + Clone + Default,
 {
     // Start building with mandatory parameters
     pub fn new() -> Self {
@@ -185,7 +186,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
     U: SourceToTargetData<V>,
-    V: HomogenousKernel<T = W>,
+    V: Kernel<T = W>,
     W: Scalar<Real = W> + Default + Float + rlst_blis::interface::gemm::Gemm,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
 {
@@ -306,7 +307,7 @@ where
             );
             tmp.data_mut()
                 .iter_mut()
-                .for_each(|d| *d *= self.kernel.scale(child.level()));
+                .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
 
             l2l.push(tmp);
         }
@@ -531,7 +532,7 @@ where
                 let l = i * self.ncoeffs;
                 let r = l + self.ncoeffs;
                 target_leaf_scales[l..r].copy_from_slice(
-                    vec![self.kernel.scale(leaf.level()); self.ncoeffs].as_slice(),
+                    vec![homogenous_kernel_scale(leaf.level()); self.ncoeffs].as_slice(),
                 );
 
                 let npoints;
@@ -577,7 +578,7 @@ where
                 let l = i * self.ncoeffs;
                 let r = l + self.ncoeffs;
                 source_leaf_scales[l..r].copy_from_slice(
-                    vec![self.kernel.scale(leaf.level()); self.ncoeffs].as_slice(),
+                    vec![homogenous_kernel_scale(leaf.level()); self.ncoeffs].as_slice(),
                 );
 
                 let npoints;

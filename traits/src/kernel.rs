@@ -101,13 +101,3 @@ pub trait Kernel: Sync {
     /// given, and `4` if [EvalType::ValueDeriv] is given.
     fn range_component_count(&self, eval_type: EvalType) -> usize;
 }
-
-/// Scaling required by the FMM to apply kernel to each octree level when it is scale invariant and homogenous
-pub trait HomogenousKernel
-where
-    Self: Kernel,
-{
-    /// # Arguments
-    /// * `level` - Level of octree at which the kernel is being applied.
-    fn scale(&self, level: u64) -> Self::T;
-}
