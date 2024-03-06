@@ -286,9 +286,7 @@ mod test {
     use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
 
     use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
-    use bempp_field::types::{
-        FftFieldTranslationKiFmmNew, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmNew,
-    };
+    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
 
     use super::*;
 
@@ -357,7 +355,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
-                FftFieldTranslationKiFmmNew::default(),
+                FftFieldTranslationKiFmm::default(),
             )
             .unwrap()
             .build()

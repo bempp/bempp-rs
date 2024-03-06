@@ -16,35 +16,8 @@ pub type SvdM2lEntry<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// of the halo box.
 pub type FftKernelData<C> = Vec<Vec<C>>;
 
-/// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
-pub struct FftFieldTranslationKiFmm<T, U>
-where
-    T: Default + Scalar<Real = T> + Float,
-    U: Kernel<T = T> + Default,
-{
-    /// Amount to dilate inner check surface by
-    pub alpha: T,
-
-    /// Map between indices of surface convolution grid points.
-    pub surf_to_conv_map: Vec<usize>,
-
-    /// Map between indices of convolution and surface grid points.
-    pub conv_to_surf_map: Vec<usize>,
-
-    /// Precomputed data required for FFT compressed M2L interaction.
-    pub operator_data: FftM2lOperatorData<Complex<T>>,
-
-    /// Unique transfer vectors to lookup m2l unique kernel interactions
-    pub transfer_vectors: Vec<TransferVector>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: U,
-
-    pub expansion_order: usize,
-}
-
 #[derive(Default)]
-pub struct FftFieldTranslationKiFmmNew<T, U>
+pub struct FftFieldTranslationKiFmm<T, U>
 where
     T: Default + Scalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
@@ -77,33 +50,6 @@ where
 /// singular values.
 #[derive(Default)]
 pub struct SvdFieldTranslationKiFmm<T, U>
-where
-    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
-    U: Kernel<T = T> + Default,
-{
-    /// Amount to dilate inner check surface by when computing operator.
-    pub alpha: T,
-
-    /// Maximum rank taken for SVD compression
-    pub k: usize,
-
-    /// Amount of energy of each M2L operator retained in SVD re-compression
-    pub threshold: T,
-
-    /// Precomputed data required for SVD compressed M2L interaction.
-    pub operator_data: SvdSourceToTargetOperatorData<T>,
-
-    /// Unique transfer vectors to lookup m2l unique kernel interactions.
-    pub transfer_vectors: Vec<TransferVector>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: U,
-
-    pub expansion_order: usize,
-}
-
-#[derive(Default)]
-pub struct SvdFieldTranslationKiFmmNew<T, U>
 where
     T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
     U: Kernel<T = T> + Default,

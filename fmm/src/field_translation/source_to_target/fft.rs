@@ -1,5 +1,5 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use bempp_field::types::FftFieldTranslationKiFmmNew;
+use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_traits::tree::FmmTree;
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 use itertools::Itertools;
@@ -10,7 +10,7 @@ use rlst_dense::base_array::BaseArray;
 use rlst_dense::data_container::VectorContainer;
 use std::collections::HashSet;
 
-use bempp_field::{fft::Fft, types::FftFieldTranslationKiFmm};
+use bempp_field::fft::Fft;
 
 use bempp_field::field::ncoeffs;
 use bempp_traits::{
@@ -34,7 +34,7 @@ use rlst_dense::traits::{MatrixSvd, RandomAccessMut};
 
 use crate::field_translation::hadamard::matmul8x8;
 
-impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmmNew<U, T>, T, U>
+impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: HomogenousKernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: Scalar<Real = U>

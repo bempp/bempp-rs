@@ -678,7 +678,7 @@ where
 
 mod test {
 
-    use bempp_field::types::FftFieldTranslationKiFmmNew;
+    use bempp_field::types::FftFieldTranslationKiFmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::implementations::helpers::points_fixture;
     use rlst_dense::{rlst_array_from_slice2, traits::RawAccess};
@@ -706,7 +706,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::ValueDeriv,
-                FftFieldTranslationKiFmmNew::default(),
+                FftFieldTranslationKiFmm::default(),
             )
             .unwrap()
             .build()
