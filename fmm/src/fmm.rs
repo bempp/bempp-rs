@@ -115,7 +115,6 @@ pub struct KiFmm<
     /// The charge data at each leaf box.
     pub charges: Vec<W>,
 
-
     /// Scales of each leaf operator
     pub target_scales: Vec<W>,
 
@@ -354,7 +353,6 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
         let tmp = vec![1.0; npoints * nvecs];
         charges.data_mut().copy_from_slice(&tmp);
-
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)

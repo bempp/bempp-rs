@@ -594,8 +594,6 @@ where
                 charge_index_pointer_sources[i] = bounds_points;
                 index_pointer += npoints;
             }
-
-
         }
 
         // Compute surfaces
