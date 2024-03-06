@@ -17,6 +17,7 @@ use bempp_traits::{
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 
 use crate::fmm::KiFmm;
+use crate::traits::FmmScalar;
 
 use rlst_dense::{
     array::{empty_array, Array},
@@ -30,9 +31,7 @@ use rlst_dense::{
 impl<T, U, V> SourceToTarget for KiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
-    U: Float + Default,
-    U: std::marker::Send + std::marker::Sync + Default,
+    U: FmmScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTreeNew<U>>,
 {

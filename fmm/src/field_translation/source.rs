@@ -20,6 +20,7 @@ use crate::{
     constants::{M2M_MAX_CHUNK_SIZE, NSIBLINGS, P2M_MAX_CHUNK_SIZE},
     fmm::KiFmm,
     helpers::find_chunk_size,
+    traits::FmmScalar,
 };
 use bempp_traits::types::Scalar;
 use rlst_dense::{
@@ -33,7 +34,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
-    W: Scalar<Real = W> + Default + Send + Sync + Gemm + Float,
+    W: FmmScalar,
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.get_source_tree().get_all_leaves() else {

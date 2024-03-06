@@ -6,6 +6,7 @@ pub mod fmm;
 pub mod helpers;
 pub mod interaction_lists;
 pub mod pinv;
+pub mod traits;
 pub mod tree;
 pub mod types;
 
@@ -18,6 +19,3 @@ mod field_translation {
     }
     pub mod target;
 }
-
-// Temporary files to be moved over onto main source
-// pub mod new_types;

@@ -8,14 +8,14 @@ use bempp_tree::types::single_node::SingleNodeTreeNew;
 use cauchy::Scalar;
 use num::Float;
 
-use crate::fmm::KiFmm;
+use crate::{fmm::KiFmm, traits::FmmScalar};
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     U: SourceToTargetData<V>,
     V: Kernel,
-    W: Scalar<Real = W> + Default + Float,
+    W: FmmScalar,
 {
     fn l2l(&self, level: u64) {}
 

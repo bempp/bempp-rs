@@ -17,6 +17,7 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTreeNew};
 
 use crate::{
     builder::FmmEvaluationMode,
+    traits::FmmScalar,
     types::{C2EType, SendPtrMut},
 };
 
@@ -120,7 +121,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>, NodeIndex = MortonKey> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
-    W: Scalar<Real = W> + Default + Send + Sync + Gemm + Float,
+    W: FmmScalar,
     Self: SourceToTarget,
 {
     type NodeIndex = T::NodeIndex;
@@ -234,7 +235,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>> + Default,
     U: SourceToTargetData<V> + Default,
     V: Kernel + Default,
-    W: Scalar<Real = W> + Default + Float,
+    W: FmmScalar,
 {
     fn default() -> Self {
         let uc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
@@ -296,9 +297,7 @@ mod test {
 
     use super::*;
 
-    fn test_root_multipole_laplace_single_node<
-        T: Scalar<Real = T> + Float + Default + Sync + Send,
-    >(
+    fn test_root_multipole_laplace_single_node<T: FmmScalar>(
         fmm: Box<
             dyn Fmm<
                 Precision = T,

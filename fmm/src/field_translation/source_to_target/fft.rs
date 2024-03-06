@@ -5,6 +5,7 @@ use bempp_tree::types::single_node::SingleNodeTreeNew;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
+use rlst_blis::interface::gemm::Gemm;
 use rlst_dense::array::Array;
 use rlst_dense::base_array::BaseArray;
 use rlst_dense::data_container::VectorContainer;
@@ -22,8 +23,8 @@ use bempp_traits::{
 };
 use bempp_tree::types::morton::MortonKey;
 
-use crate::fmm::KiFmm;
 use crate::helpers::find_chunk_size;
+use crate::{fmm::KiFmm, traits::FmmScalar};
 use rlst_dense::{
     array::empty_array,
     rlst_dynamic_array2,
@@ -37,13 +38,7 @@ use crate::field_translation::hadamard::matmul8x8;
 impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: Scalar<Real = U>
-        + Float
-        + Default
-        + std::marker::Send
-        + std::marker::Sync
-        + Fft
-        + rlst_blis::interface::gemm::Gemm,
+    U: FmmScalar,
     Complex<U>: Scalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTreeNew<U>>,

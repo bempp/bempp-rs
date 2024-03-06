@@ -28,6 +28,7 @@ use crate::{
     fmm::KiFmm,
     helpers::homogenous_kernel_scale,
     pinv::pinv,
+    traits::FmmScalar,
     tree::SingleNodeFmmTree,
     types::SendPtrMut,
 };
@@ -42,7 +43,7 @@ pub enum FmmEvaluationMode {
 pub struct KiFmmBuilderSingleNode<'builder, T, U, V>
 where
     T: SourceToTargetData<V>,
-    U: Float + Default + Scalar<Real = U>,
+    U: FmmScalar,
     V: Kernel,
 {
     tree: Option<SingleNodeFmmTree<U>>,
@@ -59,10 +60,7 @@ where
 impl<'builder, T, U, V> KiFmmBuilderSingleNode<'builder, T, U, V>
 where
     T: SourceToTargetData<V, Domain = Domain<U>> + Default,
-    // U: Float + Scalar<Real = U> + Default,
-    U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
-    U: Float + Default,
-    U: std::marker::Send + std::marker::Sync + Default,
+    U: FmmScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,
 {
@@ -187,7 +185,7 @@ where
     T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
     U: SourceToTargetData<V>,
     V: Kernel<T = W>,
-    W: Scalar<Real = W> + Default + Float + rlst_blis::interface::gemm::Gemm,
+    W: FmmScalar,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
 {
     fn set_source_and_target_operator_data(&mut self) {
@@ -689,6 +687,7 @@ where
     }
 }
 
+#[cfg(test)]
 mod test {
 
     use bempp_field::types::FftFieldTranslationKiFmm;
