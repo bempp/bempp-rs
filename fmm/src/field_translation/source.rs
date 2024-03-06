@@ -1,5 +1,5 @@
-//! Multipole field translations for uniform and adaptive Kernel Indepenent FMMs
-use std::{collections::HashSet, time::Instant};
+//! Multipole field translations
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use num::Float;
@@ -18,7 +18,7 @@ use rlst_blis::interface::gemm::Gemm;
 use crate::{
     builder::FmmEvaluationMode,
     constants::{M2M_MAX_CHUNK_SIZE, NSIBLINGS, P2M_MAX_CHUNK_SIZE},
-    fmm::NewKiFmm,
+    fmm::KiFmm,
     helpers::find_chunk_size,
 };
 use bempp_traits::types::Scalar;
@@ -28,7 +28,7 @@ use rlst_dense::{
     traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
-impl<T, U, V, W> SourceTranslation for NewKiFmm<T, U, V, W>
+impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTreeNew<W>> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
@@ -222,10 +222,8 @@ where
         let min_idx = self.tree.get_source_tree().get_index(min).unwrap();
         let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
 
-        let parent_targets: HashSet<_> = child_sources
-            .into_iter()
-            .map(|source| source.parent())
-            .collect();
+        let parent_targets: HashSet<_> =
+            child_sources.iter().map(|source| source.parent()).collect();
 
         let mut parent_targets = parent_targets.into_iter().collect_vec();
 

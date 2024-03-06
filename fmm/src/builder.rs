@@ -23,7 +23,7 @@ use rlst_dense::{
 use crate::{
     charge::{Charges, Coordinates},
     constants::{ALPHA_INNER, ALPHA_OUTER},
-    fmm::NewKiFmm,
+    fmm::KiFmm,
     pinv::pinv,
     tree::SingleNodeFmmTree,
     types::SendPtrMut,
@@ -153,13 +153,13 @@ where
     }
 
     // Finalize and build the KiFmm
-    pub fn build(self) -> Result<NewKiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
+    pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
         if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
         {
             Err("Missing fields for constructing KiFmm".to_string())
         } else {
             // Configure with tree, expansion parameters and source to target field translation operators
-            let mut result = NewKiFmm {
+            let mut result = KiFmm {
                 tree: self.tree.unwrap(),
                 expansion_order: self.expansion_order.unwrap(),
                 ncoeffs: self.ncoeffs.unwrap(),
@@ -180,7 +180,7 @@ where
     }
 }
 
-impl<T, U, V, W> NewKiFmm<T, U, V, W>
+impl<T, U, V, W> KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
@@ -514,7 +514,7 @@ where
                 let ptr = unsafe {
                     potentials
                         .as_mut_ptr()
-                        .add(eval_idx * ntarget_points * (dim + 1))
+                        .add(eval_idx * ntarget_points * eval_size)
                 };
                 potential_raw_pointers.push(ptr)
             }
@@ -668,6 +668,7 @@ where
             self.charge_index_pointer = charge_index_pointer;
             self.target_scales = target_leaf_scales;
             self.source_scales = source_leaf_scales;
+            self.eval_size = eval_size;
         }
     }
 }

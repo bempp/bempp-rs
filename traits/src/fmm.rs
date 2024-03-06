@@ -44,52 +44,15 @@ pub trait TargetTranslation {
     fn p2p(&self);
 }
 
-/// Interface for an FMM algorithm, this is uniquely specified by the type of tree
-/// (single/multi node), the order of expansions being used, as well as the kernel function
-/// being evaluated.
+
 pub trait Fmm {
-    type Kernel: Kernel;
-    type Tree: Tree;
 
-    /// Expansion order.
-    fn order(&self) -> usize;
-
-    /// Kernel function
-    fn kernel(&self) -> &Self::Kernel;
-
-    /// Associated tree
-    fn tree(&self) -> &Self::Tree;
-}
-
-pub trait NewFmm {
-    type Precision: Scalar + Default + Float;
-    fn evaluate(&self, result: &mut [Self::Precision], profile: bool) -> Option<HashMap<String, Duration>>;
-    fn get_expansion_order(&self) -> usize;
-    fn get_ncoeffs(&self) -> usize;
-}
-
-/// Dictionary containing timings
-pub type TimeDict = HashMap<String, u128>;
-
-/// Interface for running the FMM loop.
-pub trait FmmLoop {
-    /// Compute the upward pass, optionally collect timing for each operator.
-    ///
-    /// # Arguments
-    /// `time` - If true, method returns a dictionary of times for the downward pass operators.
-    fn upward_pass(&self, time: bool) -> Option<TimeDict>;
-
-    /// Compute the downward pass, optionally collect timing for each operator.
-    ///
-    /// # Arguments
-    /// `time` - If true, method returns a dictionary of times for the upward pass operators.
-    fn downward_pass(&self, time: bool) -> Option<TimeDict>;
-
-    /// Compute the upward and downward pass, optionally collect timing for each operator.
-    ///
-    /// # Arguments
-    /// `time` - If true, method returns a dictionary of times for all operators.
-    fn run(&self, time: bool) -> Option<TimeDict>;
+    type Precision;
+    type NodeIndex;
+    fn get_multipole_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn get_local_data(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn get_potential_data(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
+    fn evaluate(&self);
 }
 
 /// Interface to compute interaction lists given a tree.

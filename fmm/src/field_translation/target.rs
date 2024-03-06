@@ -750,9 +750,9 @@ use bempp_tree::types::single_node::SingleNodeTreeNew;
 use cauchy::Scalar;
 use num::Float;
 
-use crate::fmm::NewKiFmm;
+use crate::fmm::KiFmm;
 
-impl<T, U, V, W> TargetTranslation for NewKiFmm<T, U, V, W>
+impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     U: SourceToTargetData<V>,
