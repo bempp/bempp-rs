@@ -70,11 +70,11 @@ mod test {
     use crate::assembly::*;
     use crate::function_space::SerialFunctionSpace;
     use approx::*;
-    use bempp_element::element::create_element;
+    use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::bem::DofMap;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::{Continuity, ElementFamily};
+    use bempp_traits::element::Continuity;
     // use num::complex::Complex;
     use bempp_traits::bem::FunctionSpace;
     use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};

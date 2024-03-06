@@ -1,11 +1,11 @@
 use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::create_element;
+use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily};
+use bempp_traits::element::Continuity;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rlst_dense::rlst_dynamic_array2;
 

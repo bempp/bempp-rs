@@ -1,9 +1,9 @@
 //! Lagrange elements
 
-use crate::element::{create_cell, CiarletElement};
+use crate::element::{create_cell, CiarletElement, ElementFamily};
 use crate::polynomials::polynomial_count;
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily, MapType};
+use bempp_traits::element::{Continuity, MapType};
 use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
 
 /// Create a Lagrange element
@@ -33,8 +33,13 @@ pub fn create(
             }
         }
         let mut midp = rlst_dynamic_array2!(f64, [1, tdim]);
-        for (i, j) in cell.midpoint().iter().enumerate() {
-            *midp.get_mut([0, i]).unwrap() = *j;
+        let nvertices = cell.vertex_count();
+        let vertices = cell.vertices();
+        for i in 0..tdim {
+            for j in 0..nvertices {
+                *midp.get_mut([0, i]).unwrap() += vertices[j * tdim + i];
+            }
+            *midp.get_mut([0, i]).unwrap() /= nvertices as f64;
         }
         x[tdim].push(midp);
         let mut mentry = rlst_dynamic_array3!(f64, [1, 1, 1]);
@@ -133,8 +138,8 @@ pub fn create(
         }
     }
     CiarletElement::create(
-        ElementFamily::Lagrange,
         cell_type,
+        ElementFamily::Lagrange,
         degree,
         vec![],
         wcoeffs,
