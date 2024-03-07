@@ -291,7 +291,7 @@ mod test {
     use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
 
     use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
-    use bempp_field::types::{FftFieldTranslationKiFmm, BlasFieldTranslationKiFmm};
+    use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 
     use super::*;
 

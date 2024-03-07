@@ -10,12 +10,7 @@ use rlst_dense::base_array::BaseArray;
 use rlst_dense::data_container::VectorContainer;
 use std::collections::HashSet;
 
-use bempp_traits::{
-    field::SourceToTarget,
-    kernel::Kernel,
-    tree::Tree,
-    types::Scalar,
-};
+use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree, types::Scalar};
 use bempp_tree::types::morton::MortonKey;
 
 use crate::{

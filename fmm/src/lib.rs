@@ -13,8 +13,8 @@ mod field_translation {
     pub mod hadamard;
     pub mod source;
     pub mod source_to_target {
-        pub mod fft;
         pub mod blas;
+        pub mod fft;
     }
     pub mod target;
 }
