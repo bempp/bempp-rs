@@ -439,10 +439,13 @@ mod test {
             .unwrap();
         fmm_svd.evaluate();
 
-        let fmm_fft = Box::new(fmm_fft);
-        let fmm_svd = Box::new(fmm_svd);
-        test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
-        test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
+        assert!(false);
+
+        // let fmm_fft = Box::new(fmm_fft);
+        // let fmm_svd = Box::new(fmm_svd);
+        // test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
+        // test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
+
     }
 
     #[test]

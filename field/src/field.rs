@@ -435,7 +435,12 @@ where
             kernel_data_f: kernel_data_ft,
         };
 
+        // Set operator data
         self.operator_data = result;
+
+        // Set required maps, TODO: Should be a part of operator data
+        (self.surf_to_conv_map, self.conv_to_surf_map) = FftFieldTranslationKiFmm::<T, U>::compute_surf_to_conv_map(self.expansion_order);
+
     }
 
     fn set_expansion_order(&mut self, expansion_order: usize) {

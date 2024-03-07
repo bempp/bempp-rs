@@ -49,7 +49,7 @@ where
 
         let mut result = vec![Vec::new(); NHALO];
 
-        let targets_parent_neighbors = targets
+        let targets_parents_neighbors = targets_parents
             .iter()
             .map(|parent| parent.all_neighbors())
             .collect_vec();
@@ -57,13 +57,15 @@ where
         let zero_displacement = ntargets_parents * NSIBLINGS;
 
         for i in 0..NHALO {
-            for all_neighbors in targets_parent_neighbors.iter().take(ntargets_parents) {
+            for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
                 // Check if neighbor exists in a valid tree
                 if let Some(neighbor) = all_neighbors[i] {
                     // If it does, check if first child exists in the source tree
+                    let first_child = neighbor.first_child();
+
                     if let Some(neighbor_displacement) = self.level_index_pointer_multipoles
                         [level as usize]
-                        .get(&neighbor.first_child())
+                        .get(&first_child)
                     {
                         result[i].push(*neighbor_displacement)
                     } else {
@@ -96,6 +98,7 @@ where
                 let Some(sources) = self.tree.get_source_tree().get_keys(level) else {
                     return;
                 };
+
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -133,6 +136,7 @@ where
                 let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
                 let multipoles =
                     &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
+
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
@@ -317,6 +321,10 @@ where
                                             let displacement = displacements[j];
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
+
+
+
+
                                             matmul8x8(
                                                 k_f,
                                                 s_f,
@@ -331,6 +339,7 @@ where
                         });
                 }
 
+
                 // 3. Post process to find local expansions at target boxes
                 {
                     check_potential_hat_c
@@ -343,6 +352,7 @@ where
                                     check_potentials_hat_f[j * ntargets + i]
                             }
                         });
+
 
                     // Compute inverse FFT
                     U::irfft3_fftw_par_slice(
@@ -379,6 +389,7 @@ where
                                     potential_chunk,
                                 ),
                             );
+
 
                             local_chunk
                                 .data()
