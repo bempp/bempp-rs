@@ -3,3 +3,4 @@
 4. Add tests for fmm crate (full loop tests)
 5. Add docs for new functionality and usage
 6. Add examples and benchmarks
+7. Make sure displacement function in fft m2l is multithreaded

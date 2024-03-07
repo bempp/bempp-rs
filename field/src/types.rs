@@ -49,7 +49,7 @@ where
 /// which is computed as the percentage of the energy of the compressed M2L matrix, as measured by the sum of the squares of the
 /// singular values.
 #[derive(Default)]
-pub struct SvdFieldTranslationKiFmm<T, U>
+pub struct BlasFieldTranslationKiFmm<T, U>
 where
     T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
     U: Kernel<T = T> + Default,
@@ -60,7 +60,7 @@ where
     pub threshold: T,
 
     /// Precomputed data required for SVD compressed M2L interaction.
-    pub operator_data: SvdSourceToTargetOperatorData<T>,
+    pub operator_data: BlasSourceToTargetOperatorData<T>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions.
     pub transfer_vectors: Vec<TransferVector>,
@@ -100,7 +100,7 @@ pub struct FftM2lOperatorData<C> {
 /// Container to store precomputed data required for SVD field translations.
 /// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
 // #[derive(Default)]
-pub struct SvdSourceToTargetOperatorData<T>
+pub struct BlasSourceToTargetOperatorData<T>
 where
     T: Scalar,
 {
@@ -126,7 +126,7 @@ where
     pub c_vt: Vec<SvdM2lEntry<T>>,
 }
 
-impl<T> Default for SvdSourceToTargetOperatorData<T>
+impl<T> Default for BlasSourceToTargetOperatorData<T>
 where
     T: Scalar,
 {
@@ -134,7 +134,7 @@ where
         let u = rlst_dynamic_array2!(T, [1, 1]);
         let st_block = rlst_dynamic_array2!(T, [1, 1]);
 
-        SvdSourceToTargetOperatorData {
+        BlasSourceToTargetOperatorData {
             u,
             st_block,
             c_u: Vec::default(),

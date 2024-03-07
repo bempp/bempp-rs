@@ -17,3 +17,6 @@ pub const ALPHA_OUTER: f64 = 2.95;
 
 /// Number of siblings for each node in octree
 pub const NSIBLINGS: usize = 8;
+
+/// Maximum number of boxes in a 1 box deep halo around a given box in 3D
+pub const NHALO: usize = 26;

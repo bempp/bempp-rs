@@ -14,7 +14,7 @@ mod field_translation {
     pub mod source;
     pub mod source_to_target {
         pub mod fft;
-        pub mod svd;
+        pub mod blas;
     }
     pub mod target;
 }

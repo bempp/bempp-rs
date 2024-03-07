@@ -30,7 +30,7 @@ impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTreeNew<W>> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
-    V: Kernel<T = W> + Send + Sync,
+    V: Kernel<T = W>,
     W: FmmScalar,
 {
     fn p2m(&self) {

@@ -1,5 +1,5 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use bempp_field::types::SvdFieldTranslationKiFmm;
+use bempp_field::types::BlasFieldTranslationKiFmm;
 use bempp_traits::tree::FmmTree;
 use itertools::Itertools;
 use num::Float;
@@ -28,7 +28,7 @@ use rlst_dense::{
 };
 
 /// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
-impl<T, U, V> SourceToTarget for KiFmm<V, SvdFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> SourceToTarget for KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: FmmScalar,

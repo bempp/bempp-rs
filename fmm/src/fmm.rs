@@ -291,7 +291,7 @@ mod test {
     use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
 
     use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
-    use bempp_field::types::{FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm};
+    use bempp_field::types::{FftFieldTranslationKiFmm, BlasFieldTranslationKiFmm};
 
     use super::*;
 
@@ -432,7 +432,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
-                SvdFieldTranslationKiFmm::new(svd_threshold),
+                BlasFieldTranslationKiFmm::new(svd_threshold),
             )
             .unwrap()
             .build()
@@ -486,7 +486,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
-                SvdFieldTranslationKiFmm::new(svd_threshold),
+                BlasFieldTranslationKiFmm::new(svd_threshold),
             )
             .unwrap()
             .build()

@@ -101,3 +101,4 @@ pub trait Kernel: Sync {
     /// given, and `4` if [EvalType::ValueDeriv] is given.
     fn range_component_count(&self, eval_type: EvalType) -> usize;
 }
+

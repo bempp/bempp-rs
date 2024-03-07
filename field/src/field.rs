@@ -27,7 +27,7 @@ use bempp_tree::{
 use crate::constants::ALPHA_INNER;
 use crate::helpers::ncoeffs_kifmm;
 use crate::types::{
-    FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdSourceToTargetOperatorData,
+    FftFieldTranslationKiFmm, BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData,
 };
 use crate::{
     array::flip3, fft::Fft, transfer_vector::compute_transfer_vectors, types::FftM2lOperatorData,
@@ -46,14 +46,14 @@ fn find_cutoff_rank<T: Float + Default + Scalar<Real = T> + Gemm>(
     singular_values.len() - 1
 }
 
-impl<T, U> SourceToTargetData<U> for SvdFieldTranslationKiFmm<T, U>
+impl<T, U> SourceToTargetData<U> for BlasFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + Gemm,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    type OperatorData = SvdSourceToTargetOperatorData<T>;
+    type OperatorData = BlasSourceToTargetOperatorData<T>;
     type Domain = Domain<T>;
 
     fn set_operator_data<'a>(&mut self, order: usize, domain: Self::Domain) {
@@ -205,7 +205,7 @@ where
         let mut st_block = rlst_dynamic_array2!(T, [cutoff_rank, nst]);
         st_block.fill_from(s_block.transpose());
 
-        let result = SvdSourceToTargetOperatorData {
+        let result = BlasSourceToTargetOperatorData {
             u,
             st_block,
             c_u,
@@ -223,7 +223,7 @@ where
     }
 }
 
-impl<T, U> SvdFieldTranslationKiFmm<T, U>
+impl<T, U> BlasFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
     T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
