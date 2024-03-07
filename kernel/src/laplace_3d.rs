@@ -186,7 +186,7 @@ where
                     sources[ntargets + target_index],
                     sources[2 * ntargets + target_index],
                 ];
-                assemble_laplace_one_target(eval_type, &target, &source, my_chunk)
+                self.greens_fct(eval_type, &target, &source, my_chunk)
             });
     }
 

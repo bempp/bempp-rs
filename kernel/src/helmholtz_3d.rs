@@ -238,13 +238,7 @@ where
                     sources[ntargets + target_index],
                     sources[2 * ntargets + target_index],
                 ];
-                assemble_helmholtz_one_target(
-                    eval_type,
-                    &target,
-                    &source,
-                    self.wavenumber,
-                    my_chunk,
-                )
+                self.greens_fct(eval_type, &source, &target, my_chunk)
             });
     }
 
@@ -759,6 +753,96 @@ mod test {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_assemble_diag_helmholtz_3d() {
+        let nsources = 5;
+        let ntargets = 5;
+        let wavenumber: f64 = 1.5;
+
+        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
+
+        sources.fill_from_seed_equally_distributed(1);
+        targets.fill_from_seed_equally_distributed(2);
+
+        let mut green_value_diag = rlst_dynamic_array1!(c64, [ntargets]);
+        let mut green_value_diag_deriv = rlst_dynamic_array2!(c64, [4, ntargets]);
+
+        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_diag.data_mut(),
+        );
+        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_diag_deriv.data_mut(),
+        );
+
+        let mut green_value_t = rlst_dynamic_array2!(c64, [nsources, ntargets]);
+
+        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_t.data_mut(),
+        );
+
+        // The matrix needs to be transposed so that the first row corresponds to the first target,
+        // second row to the second target and so on.
+
+        let mut green_value = rlst_dynamic_array2!(c64, [ntargets, nsources]);
+        green_value.fill_from(green_value_t.transpose());
+
+        let mut green_value_deriv_t = rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
+
+        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_deriv_t.data_mut(),
+        );
+
+        // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
+
+        let mut green_value_deriv = rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
+        green_value_deriv.fill_from(green_value_deriv_t.transpose());
+
+        for index in 0..nsources {
+            assert_relative_eq!(
+                green_value[[index, index]],
+                green_value_diag[[index]],
+                epsilon = 1E-12
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index, index]],
+                green_value_diag_deriv[[0, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 1, index]],
+                green_value_diag_deriv[[1, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 2, index]],
+                green_value_diag_deriv[[2, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 3, index]],
+                green_value_diag_deriv[[3, index]],
+                epsilon = 1E-12,
+            );
         }
     }
 }
