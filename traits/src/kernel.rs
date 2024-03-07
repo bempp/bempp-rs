@@ -1,11 +1,19 @@
 //! Trait for Green's function kernels
 use crate::types::EvalType;
-use crate::types::KernelType;
 use crate::types::Scalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel: Sync {
     type T: Scalar;
+
+    /// Evaluate the Green's fct. for a single source and single target.
+    fn greens_fct(
+        &self,
+        eval_type: EvalType,
+        source: &[<Self::T as Scalar>::Real],
+        target: &[<Self::T as Scalar>::Real],
+        result: &mut [Self::T],
+    );
 
     /// Single threaded evaluation of Green's functions.
     ///
@@ -83,9 +91,6 @@ pub trait Kernel: Sync {
         targets: &[<Self::T as Scalar>::Real],
         result: &mut [Self::T],
     );
-
-    /// Return the type of the kernel.
-    fn kernel_type(&self) -> &KernelType;
 
     /// Return the domain component count of the Green's fct.
     ///
