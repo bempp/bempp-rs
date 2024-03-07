@@ -186,7 +186,7 @@ where
                     sources[ntargets + target_index],
                     sources[2 * ntargets + target_index],
                 ];
-                self.greens_fct(eval_type, &target, &source, my_chunk)
+                self.greens_fct(eval_type, &source, &target, my_chunk)
             });
     }
 
@@ -431,7 +431,7 @@ mod test {
         array::Array,
         base_array::BaseArray,
         data_container::VectorContainer,
-        rlst_dynamic_array2,
+        rlst_dynamic_array1, rlst_dynamic_array2,
         traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
     };
 
@@ -686,5 +686,94 @@ mod test {
             targets.data(),
             green_value_deriv.data_mut(),
         );
+    }
+
+    #[test]
+    fn test_assemble_diag_laplace_3d() {
+        let nsources = 5;
+        let ntargets = 5;
+
+        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
+
+        sources.fill_from_seed_equally_distributed(1);
+        targets.fill_from_seed_equally_distributed(2);
+
+        let mut green_value_diag = rlst_dynamic_array1!(f64, [ntargets]);
+        let mut green_value_diag_deriv = rlst_dynamic_array2!(f64, [4, ntargets]);
+
+        Laplace3dKernel::<f64>::default().assemble_diagonal_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_diag.data_mut(),
+        );
+        Laplace3dKernel::<f64>::default().assemble_diagonal_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_diag_deriv.data_mut(),
+        );
+
+        let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
+
+        Laplace3dKernel::<f64>::default().assemble_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_t.data_mut(),
+        );
+
+        // The matrix needs to be transposed so that the first row corresponds to the first target,
+        // second row to the second target and so on.
+
+        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
+        green_value.fill_from(green_value_t.transpose());
+
+        let mut green_value_deriv_t = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
+
+        Laplace3dKernel::<f64>::default().assemble_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_deriv_t.data_mut(),
+        );
+
+        // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
+
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
+        green_value_deriv.fill_from(green_value_deriv_t.transpose());
+
+        for index in 0..nsources {
+            assert_relative_eq!(
+                green_value[[index, index]],
+                green_value_diag[[index]],
+                epsilon = 1E-12
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index, index]],
+                green_value_diag_deriv[[0, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 1, index]],
+                green_value_diag_deriv[[1, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 2, index]],
+                green_value_diag_deriv[[2, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 3, index]],
+                green_value_diag_deriv[[3, index]],
+                epsilon = 1E-12,
+            );
+        }
     }
 }
