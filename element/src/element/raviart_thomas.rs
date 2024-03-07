@@ -1,18 +1,26 @@
 //! Raviart-Thomas elements
 
-use crate::element::{create_cell, CiarletElement, ElementFamily, Inverse};
+use crate::element::{create_cell, CiarletElement, ElementFamily};
 use crate::polynomials::polynomial_count;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, MapType};
 use rlst_common::types::Scalar;
-use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
+use rlst_dense::linalg::inverse::MatrixInverse;
+use rlst_dense::{
+    array::views::ArrayViewMut, array::Array, base_array::BaseArray,
+    data_container::VectorContainer, rlst_dynamic_array2, rlst_dynamic_array3,
+    traits::RandomAccessMut,
+};
 
 /// Create a Raviart-Thomas element
-pub fn create<T: Scalar + Inverse>(
+pub fn create<T: Scalar>(
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,
-) -> CiarletElement<T> {
+) -> CiarletElement<T>
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
+{
     if cell_type != ReferenceCellType::Triangle && cell_type != ReferenceCellType::Quadrilateral {
         panic!("Unsupported cell type");
     }

@@ -6,9 +6,10 @@ use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
-use rlst_common::types::{c32, c64, Scalar};
+use rlst_common::types::Scalar;
 use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::{
+    array::views::ArrayViewMut,
     array::Array,
     base_array::BaseArray,
     data_container::VectorContainer,
@@ -46,32 +47,10 @@ pub struct CiarletElement<T: Scalar> {
     // interpolation_weights: EntityWeights,
 }
 
-pub trait Inverse: Scalar {
-    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>);
-}
-
-impl Inverse for f64 {
-    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
-        mat.view_mut().into_inverse_alloc().unwrap();
-    }
-}
-impl Inverse for f32 {
-    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
-        mat.view_mut().into_inverse_alloc().unwrap();
-    }
-}
-impl Inverse for c64 {
-    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
-        mat.view_mut().into_inverse_alloc().unwrap();
-    }
-}
-impl Inverse for c32 {
-    fn invert_matrix(mat: &mut Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>) {
-        mat.view_mut().into_inverse_alloc().unwrap();
-    }
-}
-
-impl<T: Scalar + Inverse> CiarletElement<T> {
+impl<T: Scalar> CiarletElement<T>
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
+{
     /// Create a Ciarlet element
     #[allow(clippy::too_many_arguments)]
     pub fn create(
@@ -220,7 +199,7 @@ impl<T: Scalar + Inverse> CiarletElement<T> {
                 *ident.get_unchecked_mut([i, i]) = T::from(1.0).unwrap();
             }
         }
-        T::invert_matrix(&mut inverse);
+        inverse.view_mut().into_inverse_alloc().unwrap();
 
         let mut coefficients = rlst_dynamic_array3!(T, [dim, value_size, pdim]);
         for i in 0..dim {
@@ -344,12 +323,15 @@ impl<T: Scalar> FiniteElement for CiarletElement<T> {
     }
 }
 
-pub fn create_element<T: Scalar + Inverse>(
+pub fn create_element<T: Scalar>(
     family: ElementFamily,
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,
-) -> CiarletElement<T> {
+) -> CiarletElement<T>
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
+{
     match family {
         ElementFamily::Lagrange => lagrange::create::<T>(cell_type, degree, continuity),
         ElementFamily::RaviartThomas => raviart_thomas::create::<T>(cell_type, degree, continuity),
