@@ -638,11 +638,7 @@ mod test {
         assert!(rel_error <= 1e-5);
     }
 
-    fn test_upward_pass_matrix_f64(
-        points: &[f64],
-        global_idxs: &[usize],
-        charge_mat: &Vec<Vec<f64>>,
-    ) {
+    fn test_upward_pass_matrix_f64(points: &[f64], global_idxs: &[usize], charge_mat: &[Vec<f64>]) {
         let order = 8;
         let alpha_inner = 1.05;
         let alpha_outer = 2.95;
@@ -965,7 +961,7 @@ mod test {
     fn test_p2m_matrix_f64(
         points: &[f64],
         global_idxs: &[usize],
-        charge_mat: &Vec<Vec<f64>>,
+        charge_mat: &[Vec<f64>],
         sparse: bool,
     ) {
         let order = 8;

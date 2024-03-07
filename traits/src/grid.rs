@@ -60,7 +60,7 @@ pub trait Geometry {
     /// Get the evaluator for the given points
     fn get_evaluator<'a>(
         &'a self,
-        element: &impl FiniteElement,
+        element: &impl FiniteElement<T = f64>,
         points: &'a Self::T,
     ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a>;
 
@@ -139,10 +139,10 @@ pub trait Topology<'a> {
     /// The number of entities of dimension `dim`
     fn entity_count(&self, dim: usize) -> usize;
 
-    /// The indices of the vertices that from cell with index `index`
+    /// The indices of the vertices of the cell with topological index `index`
     fn cell(&self, index: usize) -> Option<&[usize]>;
 
-    /// The indices of the vertices that from cell with index `index`
+    /// The cell type of the cell with topological index `index`
     fn cell_type(&self, index: usize) -> Option<ReferenceCellType>;
 
     /// Get the connectivity of entities of dimension `dim0` to entities of dimension `dim1`

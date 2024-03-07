@@ -1,8 +1,8 @@
 use approx::*;
+use bempp_bem::assembly::batched::BatchedAssembler;
 use bempp_bem::assembly::{batched, fmm_tools};
-use bempp_bem::assembly::{BoundaryOperator, PDEType};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::create_element;
+use bempp_element::element::{create_element, ElementFamily};
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::{
     charge::build_charge_dict,
@@ -12,7 +12,7 @@ use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
-use bempp_traits::element::{Continuity, ElementFamily};
+use bempp_traits::element::Continuity;
 use bempp_traits::fmm::{Fmm, FmmLoop};
 use bempp_traits::grid::{Grid, Topology};
 use bempp_traits::kernel::Kernel;
@@ -42,13 +42,8 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    batched::assemble_into_dense::<128>(
-        &mut matrix,
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
-        trial_space,
-        test_space,
-    );
+    let a = batched::LaplaceSingleLayerAssembler::default();
+    a.assemble_into_dense::<128>(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
     let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
@@ -72,19 +67,11 @@ fn fmm_prototype(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionS
     let mut matrix2 = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
 
     // matrix 2 = singular
-    batched::assemble_singular_into_dense::<4, 128>(
-        &mut matrix2,
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
-        trial_space,
-        test_space,
-    );
+    a.assemble_singular_into_dense::<4, 128>(&mut matrix2, trial_space, test_space);
 
     let mut correction = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    batched::assemble_singular_correction_into_dense::<NPTS, NPTS, 128>(
+    a.assemble_singular_correction_into_dense::<NPTS, NPTS, 128>(
         &mut correction,
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
         trial_space,
         test_space,
     );
@@ -125,13 +112,8 @@ fn fmm_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpac
     let kernel = Laplace3dKernel::new();
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    batched::assemble_into_dense::<128>(
-        &mut matrix,
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
-        trial_space,
-        test_space,
-    );
+    let a = batched::LaplaceSingleLayerAssembler::default();
+    a.assemble_into_dense::<128>(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
     let all_points = fmm_tools::get_all_quadrature_points::<NPTS>(grid);
@@ -145,19 +127,10 @@ fn fmm_matvec(trial_space: &SerialFunctionSpace, test_space: &SerialFunctionSpac
 
     let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128>(test_space);
     let p = fmm_tools::basis_to_quadrature_into_csr::<NPTS, 128>(trial_space);
-    let singular = batched::assemble_singular_into_csr::<4, 128>(
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
-        trial_space,
-        test_space,
-    );
+    let singular = a.assemble_singular_into_csr::<4, 128>(trial_space, test_space);
 
-    let correction = batched::assemble_singular_correction_into_csr::<NPTS, NPTS, 128>(
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
-        trial_space,
-        test_space,
-    );
+    let correction =
+        a.assemble_singular_correction_into_csr::<NPTS, NPTS, 128>(trial_space, test_space);
 
     // matrix2 = p_t @ k @ p - c + singular
     let mut rng = rand::thread_rng();

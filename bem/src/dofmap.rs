@@ -95,15 +95,15 @@ impl DofMap for SerialDofMap {
 #[cfg(test)]
 mod test {
     use crate::dofmap::*;
-    use bempp_element::element::create_element;
+    use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::{Continuity, ElementFamily};
+    use bempp_traits::element::Continuity;
 
     #[test]
     fn test_dofmap_lagrange0() {
         let grid = regular_sphere(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
@@ -120,7 +120,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange1() {
         let grid = regular_sphere(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
@@ -134,7 +134,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange2() {
         let grid = regular_sphere(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             2,

@@ -1,15 +1,8 @@
 //! Finite element definitions
 
 use crate::cell::ReferenceCellType;
+use rlst_common::types::Scalar;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
-
-/// The family of an element
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-#[repr(u8)]
-pub enum ElementFamily {
-    Lagrange = 0,
-    RaviartThomas = 1,
-}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -44,18 +37,16 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usi
 
 pub trait FiniteElement {
     //! A finite element defined on a reference cell
+    type T: Scalar;
 
     /// The reference cell type
     fn cell_type(&self) -> ReferenceCellType;
 
-    /// The polynomial degree
-    fn degree(&self) -> usize;
-
     /// The highest degree polynomial in the element's polynomial set
-    fn highest_degree(&self) -> usize;
+    fn embedded_superdegree(&self) -> usize;
 
-    // The element family
-    fn family(&self) -> ElementFamily;
+    /// Check if the element is a Lagrange element
+    fn is_lagrange(&self) -> bool;
 
     /// The number of basis functions
     fn dim(&self) -> usize;
@@ -71,13 +62,13 @@ pub trait FiniteElement {
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
     fn tabulate<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        T4Mut: RandomAccessMut<4, Item = f64>,
+        Array2: RandomAccessByRef<2, Item = Self::T> + Shape<2>,
+        Array4Mut: RandomAccessMut<4, Item = Self::T>,
     >(
         &self,
-        points: &T,
+        points: &Array2,
         nderivs: usize,
-        data: &mut T4Mut,
+        data: &mut Array4Mut,
     );
 
     /// The DOFs that are associated with a subentity of the reference cell

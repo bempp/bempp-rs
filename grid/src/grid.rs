@@ -1,10 +1,10 @@
 //! A serial implementation of a grid
 use bempp_element::cell;
-use bempp_element::element::{create_element, CiarletElement};
+use bempp_element::element::{create_element, CiarletElement, ElementFamily};
 use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::element::{Continuity, ElementFamily, FiniteElement};
+use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use itertools::izip;
 use rlst_dense::{
@@ -31,7 +31,7 @@ pub struct EvaluatorTdim2Gdim3<'a> {
 impl<'a> EvaluatorTdim2Gdim3<'a> {
     pub fn new(
         geometry: &'a SerialGeometry,
-        element: &impl FiniteElement,
+        element: &impl FiniteElement<T = f64>,
         points: &'a Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     ) -> Self {
         let npts = points.shape()[0];
@@ -148,7 +148,7 @@ pub struct LinearSimplexEvaluatorTdim2Gdim3<'a> {
 impl<'a> LinearSimplexEvaluatorTdim2Gdim3<'a> {
     pub fn new(
         geometry: &'a SerialGeometry,
-        element: &impl FiniteElement,
+        element: &impl FiniteElement<T = f64>,
         points: &'a Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     ) -> Self {
         let npts = points.shape()[0];
@@ -257,15 +257,15 @@ impl<'a>
 
 /// Geometry of a serial grid
 pub struct SerialGeometry {
-    coordinate_elements: Vec<CiarletElement>,
+    coordinate_elements: Vec<CiarletElement<f64>>,
     coordinates: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     cells: AdjacencyList<usize>,
     element_changes: Vec<usize>,
     index_map: Vec<usize>,
 }
 
-fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement {
-    create_element(
+fn element_from_npts(cell_type: ReferenceCellType, npts: usize) -> CiarletElement<f64> {
+    create_element::<f64>(
         ElementFamily::Lagrange,
         cell_type,
         match cell_type {
@@ -315,7 +315,7 @@ impl SerialGeometry {
     }
 
     /// TODO: document
-    pub fn coordinate_elements(&self) -> &Vec<CiarletElement> {
+    pub fn coordinate_elements(&self) -> &Vec<CiarletElement<f64>> {
         &self.coordinate_elements
     }
 
@@ -325,7 +325,7 @@ impl SerialGeometry {
     }
 
     /// Get the coordinate element associated with the given cell
-    pub fn element(&self, cell: usize) -> &CiarletElement {
+    pub fn element(&self, cell: usize) -> &CiarletElement<f64> {
         for i in 0..self.element_changes.len() - 1 {
             if cell < self.element_changes[i + 1] {
                 return &self.coordinate_elements[i - 1];
@@ -371,10 +371,12 @@ impl Geometry for SerialGeometry {
 
     fn get_evaluator<'a>(
         &'a self,
-        element: &impl FiniteElement,
+        element: &impl FiniteElement<T = f64>,
         points: &'a Self::T,
     ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a> {
-        if element.degree() == 1 && cell::create_cell(element.cell_type()).is_simplex() {
+        if element.embedded_superdegree() == 1
+            && cell::create_cell(element.cell_type()).is_simplex()
+        {
             Box::new(LinearSimplexEvaluatorTdim2Gdim3::new(self, element, points))
         } else {
             Box::new(EvaluatorTdim2Gdim3::new(self, element, points))
@@ -604,8 +606,8 @@ impl Geometry for SerialGeometry {
         }
         let element = self.element(cell);
         if element.cell_type() == ReferenceCellType::Triangle
-            && element.family() == ElementFamily::Lagrange
-            && element.degree() == 1
+            && element.is_lagrange()
+            && element.embedded_superdegree() == 1
         {
             // Map is affine
             let mut js = rlst_dynamic_array2!(f64, [npts, gdim * tdim]);
@@ -1619,7 +1621,7 @@ mod test {
     #[test]
     fn test_compute_points_evaluator() {
         let grid = regular_sphere(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
@@ -1648,7 +1650,7 @@ mod test {
     #[test]
     fn test_compute_normals_and_jdets_evaluator() {
         let grid = regular_sphere(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,

@@ -8,12 +8,12 @@ use bempp_traits::grid::{Grid, Topology};
 
 pub struct SerialFunctionSpace<'a> {
     grid: &'a SerialGrid,
-    element: &'a CiarletElement,
+    element: &'a CiarletElement<f64>,
     dofmap: SerialDofMap,
 }
 
 impl<'a> SerialFunctionSpace<'a> {
-    pub fn new(grid: &'a SerialGrid, element: &'a CiarletElement) -> Self {
+    pub fn new(grid: &'a SerialGrid, element: &'a CiarletElement<f64>) -> Self {
         let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
@@ -71,7 +71,7 @@ impl<'a> SerialFunctionSpace<'a> {
 impl<'a> FunctionSpace<'a> for SerialFunctionSpace<'a> {
     type DofMap = SerialDofMap;
     type Grid = SerialGrid;
-    type FiniteElement = CiarletElement;
+    type FiniteElement = CiarletElement<f64>;
 
     fn dofmap(&self) -> &Self::DofMap {
         &self.dofmap
@@ -79,7 +79,7 @@ impl<'a> FunctionSpace<'a> for SerialFunctionSpace<'a> {
     fn grid(&self) -> &Self::Grid {
         self.grid
     }
-    fn element(&self) -> &CiarletElement {
+    fn element(&self) -> &CiarletElement<f64> {
         self.element
     }
 }
@@ -87,10 +87,10 @@ impl<'a> FunctionSpace<'a> for SerialFunctionSpace<'a> {
 #[cfg(test)]
 mod test {
     use crate::function_space::*;
-    use bempp_element::element::create_element;
+    use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::cell::ReferenceCellType;
-    use bempp_traits::element::{Continuity, ElementFamily};
+    use bempp_traits::element::Continuity;
 
     #[test]
     fn test_colouring_p1() {
