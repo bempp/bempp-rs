@@ -93,6 +93,8 @@ pub trait FmmTree {
     fn get_target_tree(&self) -> &Self::Tree;
 
     fn get_domain(&self) -> &<Self::Tree as Tree>::Domain;
+
+    fn get_near_field(&self, leaf: &Self::NodeIndex) -> Option<Vec<Self::NodeIndex>>;
 }
 
 /// A minimal interface for Morton Key like nodes.

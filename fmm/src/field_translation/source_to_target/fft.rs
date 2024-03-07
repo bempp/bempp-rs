@@ -14,7 +14,7 @@ use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree, types::Sca
 use bempp_tree::types::morton::MortonKey;
 
 use crate::{
-    builder::FmmEvaluationMode,
+    builder::FmmEvalType,
     constants::{NHALO, NSIBLINGS},
     helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
     types::SendPtrMut,
@@ -42,10 +42,18 @@ where
         let targets = self.tree.get_target_tree().get_keys(level).unwrap();
 
         let targets_parents: HashSet<MortonKey> =
-            targets.iter().map(|source| source.parent()).collect();
+            targets.iter().map(|target| target.parent()).collect();
         let mut targets_parents = targets_parents.into_iter().collect_vec();
         targets_parents.sort();
         let ntargets_parents = targets_parents.len();
+
+        let sources = self.tree.get_source_tree().get_keys(level).unwrap();
+
+        let sources_parents: HashSet<MortonKey> =
+            sources.iter().map(|source| source.parent()).collect();
+        let mut sources_parents = sources_parents.into_iter().collect_vec();
+        sources_parents.sort();
+        let nsources_parents= sources_parents.len();
 
         let mut result = vec![Vec::new(); NHALO];
 
@@ -54,7 +62,7 @@ where
             .map(|parent| parent.all_neighbors())
             .collect_vec();
 
-        let zero_displacement = ntargets_parents * NSIBLINGS;
+        let zero_displacement = nsources_parents * NSIBLINGS;
 
         for i in 0..NHALO {
             for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
@@ -62,10 +70,8 @@ where
                 if let Some(neighbor) = all_neighbors[i] {
                     // If it does, check if first child exists in the source tree
                     let first_child = neighbor.first_child();
-
-                    if let Some(neighbor_displacement) = self.level_index_pointer_multipoles
-                        [level as usize]
-                        .get(&first_child)
+                    if let Some(neighbor_displacement) =
+                        self.level_index_pointer_multipoles[level as usize].get(&first_child)
                     {
                         result[i].push(*neighbor_displacement)
                     } else {
@@ -89,8 +95,8 @@ where
     V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
 {
     fn m2l(&self, level: u64) {
-        match self.eval_mode {
-            FmmEvaluationMode::Vector => {
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
                 let Some(targets) = self.tree.get_target_tree().get_keys(level) else {
                     return;
                 };
@@ -98,7 +104,6 @@ where
                 let Some(sources) = self.tree.get_source_tree().get_keys(level) else {
                     return;
                 };
-
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -293,11 +298,18 @@ where
                         });
                 }
 
+                if level == 2 {
+                    println!(" signals hat {:?}", signals_hat_f.len());
+                    println!(" signals hat {:?}", check_potentials_hat_f.len());
+                    println!("kernel {:?}", kernel_data_ft[0]);
+                    // println!("displacements {:?}", all_displacements)
+                }
+
                 // 2. Compute the Hadamard product
                 {
                     (0..fft_size_real)
                         .into_par_iter()
-                        .zip(signals_hat_f.par_chunks_exact(ntargets + nzeros))
+                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
                         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
                         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
@@ -322,9 +334,6 @@ where
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
 
-
-
-
                                             matmul8x8(
                                                 k_f,
                                                 s_f,
@@ -339,7 +348,6 @@ where
                         });
                 }
 
-
                 // 3. Post process to find local expansions at target boxes
                 {
                     check_potential_hat_c
@@ -352,7 +360,6 @@ where
                                     check_potentials_hat_f[j * ntargets + i]
                             }
                         });
-
 
                     // Compute inverse FFT
                     U::irfft3_fftw_par_slice(
@@ -390,7 +397,6 @@ where
                                 ),
                             );
 
-
                             local_chunk
                                 .data()
                                 .chunks_exact(self.ncoeffs)
@@ -405,7 +411,7 @@ where
                 }
             }
 
-            FmmEvaluationMode::Matrix(_nmatvec) => {
+            FmmEvalType::Matrix(_nmatvec) => {
                 panic!("unimplemnted FFT M2L for Matrix input")
             }
         }

@@ -14,7 +14,7 @@ use bempp_traits::{
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 
 use crate::{
-    builder::FmmEvaluationMode,
+    builder::FmmEvalType,
     constants::{M2M_MAX_CHUNK_SIZE, NSIBLINGS, P2M_MAX_CHUNK_SIZE},
     fmm::KiFmm,
     helpers::find_chunk_size,
@@ -39,13 +39,12 @@ where
         };
 
         let nleaves = self.tree.get_source_tree().get_nleaves().unwrap();
-        let dim = self.kernel.space_dimension();
-        let surface_size = self.ncoeffs * dim;
+        let surface_size = self.ncoeffs * self.dim;
         let coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
-        let ncoordinates = coordinates.len() / dim;
+        let ncoordinates = coordinates.len() / self.dim;
 
-        match self.eval_mode {
-            FmmEvaluationMode::Vector => {
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
                 let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs, 1]);
 
                 // Compute check potential for each box
@@ -59,18 +58,18 @@ where
                             let charges =
                                 &self.charges[charge_index_pointer.0..charge_index_pointer.1];
                             let coordinates_row_major = &coordinates
-                                [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
+                                [charge_index_pointer.0 * self.dim..charge_index_pointer.1 * self.dim];
 
-                            let nsources = coordinates_row_major.len() / dim;
+                            let nsources = coordinates_row_major.len() / self.dim;
                             if nsources > 0 {
                                 let coordinates_row_major = rlst_array_from_slice2!(
                                     W,
                                     coordinates_row_major,
-                                    [nsources, dim],
-                                    [dim, 1]
+                                    [nsources, self.dim],
+                                    [self.dim, 1]
                                 );
                                 let mut coordinates_col_major =
-                                    rlst_dynamic_array2!(W, [nsources, dim]);
+                                    rlst_dynamic_array2!(W, [nsources, self.dim]);
                                 coordinates_col_major.fill_from(coordinates_row_major.view());
 
                                 self.kernel.evaluate_st(
@@ -121,7 +120,7 @@ where
                     })
             }
 
-            FmmEvaluationMode::Matrix(nmatvecs) => {
+            FmmEvalType::Matrix(nmatvecs) => {
                 let mut check_potentials =
                     rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
 
@@ -136,8 +135,8 @@ where
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
                             let coordinates_row_major = &coordinates
-                                [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                            let nsources = coordinates_row_major.len() / dim;
+                                [charge_index_pointer.0 * self.dim..charge_index_pointer.1 * self.dim];
+                            let nsources = coordinates_row_major.len() / self.dim;
 
                             if nsources > 0 {
                                 for i in 0..nmatvecs {
@@ -151,11 +150,11 @@ where
                                     let coordinates_mat = rlst_array_from_slice2!(
                                         W,
                                         coordinates_row_major,
-                                        [nsources, dim],
-                                        [dim, 1]
+                                        [nsources, self.dim],
+                                        [self.dim, 1]
                                     );
                                     let mut coordinates_col_major =
-                                        rlst_dynamic_array2!(W, [nsources, dim]);
+                                        rlst_dynamic_array2!(W, [nsources, self.dim]);
                                     coordinates_col_major.fill_from(coordinates_mat.view());
 
                                     self.kernel.evaluate_st(
@@ -227,8 +226,8 @@ where
         parent_targets.sort();
         let nparents = parent_targets.len();
 
-        match self.eval_mode {
-            FmmEvaluationMode::Vector => {
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
                 let mut parent_multipoles = Vec::new();
                 for parent in parent_targets.iter() {
                     let &parent_index_pointer = self.level_index_pointer_multipoles
@@ -291,7 +290,7 @@ where
                     )
             }
 
-            FmmEvaluationMode::Matrix(nmatvecs) => {
+            FmmEvalType::Matrix(nmatvecs) => {
                 let mut parent_multipoles = vec![Vec::new(); nparents];
 
                 for (parent_idx, parent) in parent_targets.iter().enumerate() {

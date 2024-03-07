@@ -24,7 +24,7 @@ use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
 
-use crate::constants::ALPHA_INNER;
+use crate::constants::{ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM};
 use crate::helpers::ncoeffs_kifmm;
 use crate::types::{
     FftFieldTranslationKiFmm, BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData,
@@ -63,11 +63,8 @@ where
         let nrows = ncoeffs_kifmm(order);
         let ncols = ncoeffs_kifmm(order);
 
-        // TODO: Need to somehow incorporate this value with the kernel marker trait
-        let ntransfer_vectors = 316;
-
-        let mut se2tc_fat = rlst_dynamic_array2!(T, [nrows, ncols * ntransfer_vectors]);
-        let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * ntransfer_vectors, ncols]);
+        let mut se2tc_fat = rlst_dynamic_array2!(T, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
         let alpha = T::from(ALPHA_INNER).unwrap();
 
@@ -249,6 +246,9 @@ where
     type OperatorData = FftM2lOperatorData<Complex<T>>;
 
     fn set_operator_data(&mut self, order: usize, domain: Self::Domain) {
+
+        println!("HERE {:?}", domain);
+
         // Parameters related to the FFT and Tree
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
@@ -314,7 +314,7 @@ where
 
         let n_source_equivalent_surface = 6 * (order - 1).pow(2) + 2;
         let n_target_check_surface = n_source_equivalent_surface;
-        let n_corners = 8;
+        let alpha = T::from(ALPHA_INNER).unwrap();
 
         // Iterate over each set of convolutions in the halo (26)
         for i in 0..transfer_vectors.len() {
@@ -324,8 +324,8 @@ where
                 let target = targets[i][j];
                 let source = sources[i][j];
 
-                let source_equivalent_surface = source.compute_surface(&domain, order, self.alpha);
-                let target_check_surface = target.compute_surface(&domain, order, self.alpha);
+                let source_equivalent_surface = source.compute_surface(&domain, order, alpha);
+                let target_check_surface = target.compute_surface(&domain, order, alpha);
 
                 let v_list: HashSet<MortonKey> = target
                     .parent()
@@ -341,14 +341,14 @@ where
                     let corners = find_corners(&source_equivalent_surface[..]);
                     let conv_point_corner = [
                         corners[conv_point_corner_index],
-                        corners[n_corners + conv_point_corner_index],
-                        corners[2 * n_corners + conv_point_corner_index],
+                        corners[NCORNERS + conv_point_corner_index],
+                        corners[2 * NCORNERS + conv_point_corner_index],
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
                         order,
                         &domain,
-                        self.alpha,
+                        alpha,
                         &conv_point_corner,
                         conv_point_corner_index,
                     );
@@ -407,9 +407,9 @@ where
             let current_vector = &kernel_data[i];
             for l in 0..size_real {
                 // halo child
-                for k in 0..8 {
+                for k in 0..NSIBLINGS {
                     // sibling
-                    for j in 0..8 {
+                    for j in 0..NSIBLINGS {
                         let index = j * size_real * 8 + k * size_real + l;
                         kernel_data_f[i].push(current_vector[index]);
                     }
@@ -420,11 +420,11 @@ where
         // Transpose results for better cache locality in application
         let mut kernel_data_ft = Vec::new();
         for freq in 0..size_real {
-            let frequency_offset = 64 * freq;
-            for kernel_f in kernel_data_f.iter().take(26) {
-                let k_f = &kernel_f[frequency_offset..(frequency_offset + 64)].to_vec();
-                let k_f_ = rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [8, 8]);
-                let mut k_ft = rlst_dynamic_array2!(Complex<T>, [8, 8]);
+            let frequency_offset = NSIBLINGS_SQUARED * freq;
+            for kernel_f in kernel_data_f.iter().take(NHALO) {
+                let k_f = &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
+                let k_f_ = rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                let mut k_ft = rlst_dynamic_array2!(Complex<T>, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }

@@ -22,8 +22,6 @@ where
     T: Default + Scalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
 {
-    /// Amount to dilate inner check surface by
-    pub alpha: T,
 
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
@@ -54,8 +52,6 @@ where
     T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
     U: Kernel<T = T> + Default,
 {
-    /// Amount to dilate inner check surface by when computing operator.
-    pub alpha: T,
 
     pub threshold: T,
 

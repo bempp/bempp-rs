@@ -31,7 +31,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy)]
-pub enum FmmEvaluationMode {
+pub enum FmmEvalType {
     Vector,
     Matrix(usize),
 }
@@ -50,8 +50,8 @@ where
     kernel: Option<V>,
     expansion_order: Option<usize>,
     ncoeffs: Option<usize>,
-    eval_type: Option<EvalType>,
-    eval_mode: Option<FmmEvaluationMode>,
+    kernel_eval_type: Option<EvalType>,
+    fmm_eval_type: Option<FmmEvalType>,
 }
 
 impl<'builder, T, U, V> KiFmmBuilderSingleNode<'builder, T, U, V>
@@ -70,9 +70,9 @@ where
             kernel: None,
             expansion_order: None,
             ncoeffs: None,
-            eval_type: None,
+            kernel_eval_type: None,
             charges: None,
-            eval_mode: None,
+            fmm_eval_type: None,
         }
     }
 
@@ -107,9 +107,9 @@ where
         let [ncharges, nmatvec] = charges.shape();
 
         if nmatvec > 1 {
-            self.eval_mode = Some(FmmEvaluationMode::Matrix(nmatvec))
+            self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvec))
         } else {
-            self.eval_mode = Some(FmmEvaluationMode::Vector)
+            self.fmm_eval_type = Some(FmmEvalType::Vector)
         }
 
         self
@@ -128,7 +128,7 @@ where
             self.expansion_order = Some(expansion_order);
             self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
-            self.eval_type = Some(eval_type);
+            self.kernel_eval_type = Some(eval_type);
 
             // Set source to target metadata
             // Set the expansion order
@@ -156,13 +156,18 @@ where
             Err("Missing fields for constructing KiFmm".to_string())
         } else {
             // Configure with tree, expansion parameters and source to target field translation operators
+            let kernel = self.kernel.unwrap();
+            let dim = kernel.space_dimension();
+
             let mut result = KiFmm {
                 tree: self.tree.unwrap(),
                 expansion_order: self.expansion_order.unwrap(),
                 ncoeffs: self.ncoeffs.unwrap(),
-                kernel: self.kernel.unwrap(),
                 source_to_target_data: self.source_to_target.unwrap(),
-                eval_mode: self.eval_mode.unwrap(),
+                fmm_eval_type: self.fmm_eval_type.unwrap(),
+                kernel_eval_type: self.kernel_eval_type.unwrap(),
+                kernel,
+                dim,
                 ..Default::default()
             };
 
@@ -170,7 +175,7 @@ where
             result.set_source_and_target_operator_data();
 
             // Compute metadata and allocate storage buffers for results
-            result.set_metadata(self.eval_type.unwrap(), self.charges.unwrap());
+            result.set_metadata(self.kernel_eval_type.unwrap(), self.charges.unwrap());
 
             Ok(result)
         }
@@ -201,8 +206,8 @@ where
         let downward_check_surface =
             ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
 
-        let nequiv_surface = upward_equivalent_surface.len() / self.kernel.space_dimension();
-        let ncheck_surface = upward_check_surface.len() / self.kernel.space_dimension();
+        let nequiv_surface = upward_equivalent_surface.len() / self.dim;
+        let ncheck_surface = upward_check_surface.len() / self.dim;
 
         // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
         // As well as estimating their inverses using GESVD
@@ -318,18 +323,17 @@ where
     }
 
     fn set_metadata(&mut self, eval_type: EvalType, charges: &Charges<W>) {
-        let dim = self.kernel.space_dimension();
         let alpha_outer = W::from(ALPHA_OUTER).unwrap();
         let alpha_inner = W::from(ALPHA_INNER).unwrap();
 
         // Check if computing potentials, or potentials and derivatives
         let eval_size = match eval_type {
             EvalType::Value => 1,
-            EvalType::ValueDeriv => dim + 1,
+            EvalType::ValueDeriv => self.dim + 1,
         };
 
         // Check if we are computing matvec or matmul
-        let [ncharges, nmatvecs] = charges.shape();
+        let [_ncharges, nmatvecs] = charges.shape();
 
         let ntarget_points = self
             .tree
@@ -337,7 +341,7 @@ where
             .get_all_coordinates()
             .unwrap()
             .len()
-            / dim;
+            / self.dim;
 
         let nsource_points = self
             .tree
@@ -345,7 +349,7 @@ where
             .get_all_coordinates()
             .unwrap()
             .len()
-            / dim;
+            / self.dim;
 
         let nsource_keys = self.tree.get_source_tree().get_nall_keys().unwrap();
         let ntarget_keys = self.tree.get_target_tree().get_nall_keys().unwrap();
@@ -403,10 +407,10 @@ where
         let mut source_leaf_scales = vec![W::default(); nsource_leaves * self.ncoeffs * nmatvecs];
 
         // Pre compute check surfaces
-        let mut upward_surfaces = vec![W::default(); self.ncoeffs * nsource_keys * dim];
-        let mut downward_surfaces = vec![W::default(); self.ncoeffs * ntarget_keys * dim];
-        let mut leaf_upward_surfaces = vec![W::default(); self.ncoeffs * nsource_leaves * dim];
-        let mut leaf_downward_surfaces = vec![W::default(); self.ncoeffs * ntarget_leaves * dim];
+        let mut upward_surfaces = vec![W::default(); self.ncoeffs * nsource_keys * self.dim];
+        let mut downward_surfaces = vec![W::default(); self.ncoeffs * ntarget_keys * self.dim];
+        let mut leaf_upward_surfaces = vec![W::default(); self.ncoeffs * nsource_leaves * self.dim];
+        let mut leaf_downward_surfaces = vec![W::default(); self.ncoeffs * ntarget_leaves * self.dim];
 
         // Create mutable pointers to multipole and local data indexed by tree level
         {
@@ -544,7 +548,7 @@ where
                 let nevals;
 
                 if let Some(coordinates) = self.tree.get_target_tree().get_coordinates(leaf) {
-                    npoints = coordinates.len() / dim;
+                    npoints = coordinates.len() / self.dim;
                     nevals = npoints * eval_size;
                 } else {
                     npoints = 0;
@@ -588,7 +592,7 @@ where
 
                 let npoints;
                 if let Some(coordinates) = self.tree.get_source_tree().get_coordinates(leaf) {
-                    npoints = coordinates.len() / dim;
+                    npoints = coordinates.len() / self.dim;
                 } else {
                     npoints = 0;
                 }
@@ -610,8 +614,8 @@ where
                 .into_iter()
                 .enumerate()
             {
-                let l = i * self.ncoeffs * dim;
-                let r = l + self.ncoeffs * dim;
+                let l = i * self.ncoeffs * self.dim;
+                let r = l + self.ncoeffs * self.dim;
                 let upward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
 
@@ -626,8 +630,8 @@ where
                 .into_iter()
                 .enumerate()
             {
-                let l = i * self.ncoeffs * dim;
-                let r = l + self.ncoeffs * dim;
+                let l = i * self.ncoeffs * self.dim;
+                let r = l + self.ncoeffs * self.dim;
                 let downward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
 
@@ -643,8 +647,8 @@ where
                 .into_iter()
                 .enumerate()
             {
-                let l = i * self.ncoeffs * dim;
-                let r = l + self.ncoeffs * dim;
+                let l = i * self.ncoeffs * self.dim;
+                let r = l + self.ncoeffs * self.dim;
                 let upward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
 
@@ -659,8 +663,8 @@ where
                 .into_iter()
                 .enumerate()
             {
-                let l = i * self.ncoeffs * dim;
-                let r = l + self.ncoeffs * dim;
+                let l = i * self.ncoeffs * self.dim;
+                let r = l + self.ncoeffs * self.dim;
                 let downward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_inner);
 
