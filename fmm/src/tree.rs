@@ -1,5 +1,12 @@
-use bempp_traits::{fmm::InteractionLists, tree::{FmmTree, Tree}};
-use bempp_tree::types::{domain::Domain, morton::{MortonKey, MortonKeys}, single_node::SingleNodeTreeNew};
+use bempp_traits::{
+    fmm::InteractionLists,
+    tree::{FmmTree, Tree},
+};
+use bempp_tree::types::{
+    domain::Domain,
+    morton::{MortonKey, MortonKeys},
+    single_node::SingleNodeTreeNew,
+};
 
 use crate::traits::FmmScalar;
 
@@ -19,11 +26,11 @@ where
     type Tree = SingleNodeTreeNew<T>;
 
     fn get_source_tree(&self) -> &Self::Tree {
-        &self.target_tree
+        &self.source_tree
     }
 
     fn get_target_tree(&self) -> &Self::Tree {
-        &self.source_tree
+        &self.target_tree
     }
 
     fn get_domain(&self) -> &<Self::Tree as Tree>::Domain {
@@ -35,18 +42,28 @@ where
         let neighbours = leaf.neighbors();
 
         // Child level
-        let mut neighbors_children_adj= neighbours
+        let mut neighbors_children_adj = neighbours
             .iter()
             .flat_map(|n| n.children())
             .filter(|nc| {
-                self.get_source_tree().get_all_leaves_set().unwrap().contains(nc) && leaf.is_adjacent(nc)
+                self.get_source_tree()
+                    .get_all_keys_set()
+                    .unwrap()
+                    .contains(nc)
+                    && leaf.is_adjacent(nc)
             })
             .collect();
 
         // Key level
-        let mut neighbors_adj= neighbours
+        let mut neighbors_adj = neighbours
             .iter()
-            .filter(|n| self.get_source_tree().get_all_leaves_set().unwrap().contains(n) && leaf.is_adjacent(n))
+            .filter(|n| {
+                self.get_source_tree()
+                    .get_all_keys_set()
+                    .unwrap()
+                    .contains(n)
+                    && leaf.is_adjacent(n)
+            })
             .cloned()
             .collect();
 
@@ -56,7 +73,11 @@ where
             .neighbors()
             .into_iter()
             .filter(|pn| {
-                self.get_source_tree().get_all_leaves_set().unwrap().contains(pn) && leaf.is_adjacent(pn)
+                self.get_source_tree()
+                    .get_all_keys_set()
+                    .unwrap()
+                    .contains(pn)
+                    && leaf.is_adjacent(pn)
             })
             .collect();
 
@@ -70,11 +91,8 @@ where
         } else {
             None
         }
-
     }
-
 }
 
 unsafe impl<T: FmmScalar> Send for SingleNodeFmmTree<T> {}
 unsafe impl<T: FmmScalar> Sync for SingleNodeFmmTree<T> {}
-

@@ -88,8 +88,15 @@ where
         let source_domain = Domain::from_local_points(sources.data());
         let target_domain = Domain::from_local_points(targets.data());
 
+        // println!("coords test t b {:?}", &targets.data()[0..5]);
+        // println!("coords test s b{:?}", &sources.data()[0..5]);
+
         // Calculate union of domains for source and target points, needed to define operators
         let domain = source_domain.union(&target_domain);
+        let zero = U::from(0).unwrap();
+        let one = U::from(1).unwrap();
+
+        let domain = Domain {origin: [zero, zero, zero], diameter: [one, one, one]};
         self.domain = Some(domain);
 
         let source_tree = SingleNodeTreeNew::new(sources.data(), n_crit, sparse, self.domain);
@@ -104,7 +111,7 @@ where
         self.tree = Some(fmm_tree);
         self.charges = Some(charges);
 
-        let [ncharges, nmatvec] = charges.shape();
+        let [_ncharges, nmatvec] = charges.shape();
 
         if nmatvec > 1 {
             self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvec))
@@ -399,7 +406,7 @@ where
         let mut potentials_send_pointers = vec![SendPtrMut::default(); ntarget_leaves * nmatvecs];
 
         // Index pointer of charge data at each target leaf
-        let mut charge_index_pointer_sources = vec![(0usize, 0usize); ntarget_leaves];
+        let mut charge_index_pointer_sources = vec![(0usize, 0usize); nsource_leaves];
         let mut charge_index_pointer_targets = vec![(0usize, 0usize); ntarget_leaves];
 
         // Kernel scale at each target and source leaf
@@ -407,10 +414,14 @@ where
         let mut source_leaf_scales = vec![W::default(); nsource_leaves * self.ncoeffs * nmatvecs];
 
         // Pre compute check surfaces
-        let mut upward_surfaces = vec![W::default(); self.ncoeffs * nsource_keys * self.dim];
-        let mut downward_surfaces = vec![W::default(); self.ncoeffs * ntarget_keys * self.dim];
-        let mut leaf_upward_surfaces = vec![W::default(); self.ncoeffs * nsource_leaves * self.dim];
-        let mut leaf_downward_surfaces = vec![W::default(); self.ncoeffs * ntarget_leaves * self.dim];
+        let mut upward_surfaces_sources = vec![W::default(); self.ncoeffs * nsource_keys * self.dim];
+        let mut downward_surfaces_targets = vec![W::default(); self.ncoeffs * ntarget_keys * self.dim];
+        let mut leaf_upward_surfaces_sources =
+            vec![W::default(); self.ncoeffs * nsource_leaves * self.dim];
+        let mut leaf_upward_surfaces_targets =
+            vec![W::default(); self.ncoeffs * ntarget_leaves * self.dim];
+        let mut leaf_downward_surfaces_targets =
+            vec![W::default(); self.ncoeffs * ntarget_leaves * self.dim];
 
         // Create mutable pointers to multipole and local data indexed by tree level
         {
@@ -471,6 +482,7 @@ where
                 }
             }
         }
+
 
         // Create mutable pointers to multipole and local data at leaf level
         {
@@ -575,6 +587,7 @@ where
 
             let mut index_pointer = 0;
 
+
             for (i, leaf) in self
                 .tree
                 .get_source_tree()
@@ -619,7 +632,7 @@ where
                 let upward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
 
-                upward_surfaces[l..r].copy_from_slice(&upward_surface);
+                upward_surfaces_sources[l..r].copy_from_slice(&upward_surface);
             }
 
             for (i, key) in self
@@ -635,7 +648,7 @@ where
                 let downward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
 
-                downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                downward_surfaces_targets[l..r].copy_from_slice(&downward_surface);
             }
 
             // Leaf upward and downward surfaces
@@ -652,7 +665,7 @@ where
                 let upward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
 
-                leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
+                leaf_upward_surfaces_sources[l..r].copy_from_slice(&upward_surface);
             }
 
             for (i, key) in self
@@ -665,10 +678,15 @@ where
             {
                 let l = i * self.ncoeffs * self.dim;
                 let r = l + self.ncoeffs * self.dim;
+
                 let downward_surface =
                     key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_inner);
 
-                leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                let upward_surface =
+                    key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
+
+                leaf_downward_surfaces_targets[l..r].copy_from_slice(&downward_surface);
+                leaf_upward_surfaces_targets[l..r].copy_from_slice(&upward_surface);
             }
         }
 
@@ -684,10 +702,11 @@ where
             self.level_index_pointer_multipoles = level_index_pointer_multipoles;
             self.potentials = potentials;
             self.potentials_send_pointers = potentials_send_pointers;
-            self.upward_surfaces = upward_surfaces;
-            self.downward_surfaces = downward_surfaces;
-            self.leaf_upward_surfaces = leaf_upward_surfaces;
-            self.leaf_downward_surfaces = leaf_downward_surfaces;
+            self.upward_surfaces = upward_surfaces_sources;
+            self.downward_surfaces = downward_surfaces_targets;
+            self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
+            self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
+            self.leaf_downward_surfaces = leaf_downward_surfaces_targets;
             self.charges = charges.data().to_vec();
             self.charge_index_pointer_targets = charge_index_pointer_targets;
             self.charge_index_pointer_sources = charge_index_pointer_sources;

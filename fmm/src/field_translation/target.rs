@@ -4,11 +4,20 @@ use itertools::Itertools;
 use rayon::prelude::*;
 
 use bempp_traits::{
-    field::SourceToTargetData, fmm::TargetTranslation, kernel::Kernel, tree::{FmmTree, Tree}, types::EvalType,
+    field::SourceToTargetData,
+    fmm::TargetTranslation,
+    kernel::Kernel,
+    tree::{FmmTree, Tree},
+    types::EvalType,
 };
-use bempp_tree::types::{morton::{MortonKey, MortonKeys}, single_node::SingleNodeTreeNew};
+use bempp_tree::types::{
+    morton::{MortonKey, MortonKeys},
+    single_node::SingleNodeTreeNew,
+};
 use rlst_dense::{
-    array::empty_array, rlst_array_from_slice2, rlst_dynamic_array2, traits::{MultIntoResize, RawAccess, RawAccessMut}
+    array::empty_array,
+    rlst_array_from_slice2, rlst_dynamic_array2,
+    traits::{MultIntoResize, RawAccess, RawAccessMut},
 };
 
 use crate::{
@@ -103,7 +112,7 @@ where
         let coordinates = self.tree.get_target_tree().get_all_coordinates().unwrap();
         let surface_size = self.ncoeffs * self.dim;
 
-        self.leaf_upward_surfaces
+        self.leaf_upward_surfaces_targets
             .par_chunks_exact(surface_size)
             .zip(self.leaf_locals.into_par_iter())
             .zip(&self.charge_index_pointer_targets)
@@ -113,8 +122,8 @@ where
                     ((leaf_downward_equivalent_surface, local_ptr), charge_index_pointer),
                     potential_send_ptr,
                 )| {
-                    let target_coordinates_row_major =
-                        &coordinates[charge_index_pointer.0 * self.dim..charge_index_pointer.1 * self.dim];
+                    let target_coordinates_row_major = &coordinates
+                        [charge_index_pointer.0 * self.dim..charge_index_pointer.1 * self.dim];
                     let ntargets = target_coordinates_row_major.len() / self.dim;
 
                     // Compute direct
@@ -130,14 +139,19 @@ where
                         target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
 
                         let result = unsafe {
-                            std::slice::from_raw_parts_mut(potential_send_ptr.raw, ntargets * self.eval_size)
+                            std::slice::from_raw_parts_mut(
+                                potential_send_ptr.raw,
+                                ntargets * self.eval_size,
+                            )
                         };
 
                         self.kernel.evaluate_st(
                             self.kernel_eval_type,
                             leaf_downward_equivalent_surface,
                             target_coordinates_col_major.data(),
-                            unsafe { std::slice::from_raw_parts_mut(local_ptr[0].raw, self.ncoeffs) },
+                            unsafe {
+                                std::slice::from_raw_parts_mut(local_ptr[0].raw, self.ncoeffs)
+                            },
                             result,
                         );
                     }
@@ -156,80 +170,85 @@ where
         let all_source_coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
 
         leaves
-        .par_iter()
-        .zip(&self.charge_index_pointer_targets)
-        .zip(&self.potentials_send_pointers)
-        .for_each(|((leaf, charge_index_pointer_targets), potential_send_pointer)| {
-            let target_coordinates_row_major =
-                &all_target_coordinates[charge_index_pointer_targets.0 * self.dim..charge_index_pointer_targets.1 * self.dim];
-            let ntargets = target_coordinates_row_major.len() / self.dim;
+            .par_iter()
+            .zip(&self.charge_index_pointer_targets)
+            .zip(&self.potentials_send_pointers)
+            .for_each(
+                |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+                    let target_coordinates_row_major = &all_target_coordinates
+                        [charge_index_pointer_targets.0 * self.dim
+                            ..charge_index_pointer_targets.1 * self.dim];
+                    let ntargets = target_coordinates_row_major.len() / self.dim;
 
-            if ntargets > 0 {
-                let target_coordinates_row_major = rlst_array_from_slice2!(
-                    W,
-                    target_coordinates_row_major,
-                    [ntargets, self.dim],
-                    [self.dim, 1]
-                );
-                let mut target_coordinates_col_major = rlst_dynamic_array2!(W, [ntargets, self.dim]);
-                target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
+                    if ntargets > 0 {
+                        let target_coordinates_row_major = rlst_array_from_slice2!(
+                            W,
+                            target_coordinates_row_major,
+                            [ntargets, self.dim],
+                            [self.dim, 1]
+                        );
+                        let mut target_coordinates_col_major =
+                            rlst_dynamic_array2!(W, [ntargets, self.dim]);
+                        target_coordinates_col_major.fill_from(target_coordinates_row_major.view());
 
-                if let Some(u_list) = self.tree.get_near_field(leaf) {
-                    let u_list_indices = u_list
-                        .iter()
-                        .filter_map(|k| self.tree.get_source_tree().get_leaf_index(k));
+                        if let Some(u_list) = self.tree.get_near_field(leaf) {
+                            let u_list_indices = u_list
+                                .iter()
+                                .filter_map(|k| self.tree.get_source_tree().get_leaf_index(k));
 
-                    let charges = u_list_indices
-                        .clone()
-                        .map(|&idx| {
-                            let index_pointer = &self.charge_index_pointer_sources[idx];
-                            &self.charges[index_pointer.0..index_pointer.1]
-                        })
-                        .collect_vec();
+                            let charges = u_list_indices
+                                .clone()
+                                .map(|&idx| {
+                                    let index_pointer = &self.charge_index_pointer_sources[idx];
+                                    &self.charges[index_pointer.0..index_pointer.1]
+                                })
+                                .collect_vec();
 
-                    let sources_coordinates = u_list_indices
-                        .into_iter()
-                        .map(|&idx| {
-                            let index_pointer = &self.charge_index_pointer_sources[idx];
-                            &all_source_coordinates[index_pointer.0 * self.dim..index_pointer.1 * self.dim]
-                        })
-                        .collect_vec();
+                            let sources_coordinates = u_list_indices
+                                .into_iter()
+                                .map(|&idx| {
+                                    let index_pointer = &self.charge_index_pointer_sources[idx];
+                                    &all_source_coordinates
+                                        [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
+                                })
+                                .collect_vec();
 
-                    for (&charges, source_coordinates_row_major) in
-                        charges.iter().zip(sources_coordinates)
-                    {
-                        let nsources = source_coordinates_row_major.len() / self.dim;
+                            for (&charges, source_coordinates_row_major) in
+                                charges.iter().zip(sources_coordinates)
+                            {
+                                let nsources = source_coordinates_row_major.len() / self.dim;
 
-                        if nsources > 0 {
-                            let source_coordinates_row_major = rlst_array_from_slice2!(
-                                W,
-                                source_coordinates_row_major,
-                                [nsources, self.dim],
-                                [self.dim, 1]
-                            );
-                            let mut source_coordinates_col_major =
-                                rlst_dynamic_array2!(W, [nsources, self.dim]);
-                            source_coordinates_col_major
-                                .fill_from(source_coordinates_row_major.view());
+                                if nsources > 0 {
+                                    let source_coordinates_row_major = rlst_array_from_slice2!(
+                                        W,
+                                        source_coordinates_row_major,
+                                        [nsources, self.dim],
+                                        [self.dim, 1]
+                                    );
+                                    let mut source_coordinates_col_major =
+                                        rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                    source_coordinates_col_major
+                                        .fill_from(source_coordinates_row_major.view());
 
-                            let result = unsafe {
-                                std::slice::from_raw_parts_mut(
-                                    potential_send_pointer.raw,
-                                    ntargets * self.eval_size,
-                                )
-                            };
+                                    let result = unsafe {
+                                        std::slice::from_raw_parts_mut(
+                                            potential_send_pointer.raw,
+                                            ntargets * self.eval_size,
+                                        )
+                                    };
 
-                            self.kernel.evaluate_st(
-                                self.kernel_eval_type,
-                                source_coordinates_col_major.data(),
-                                target_coordinates_col_major.data(),
-                                charges,
-                                result,
-                            )
+                                    self.kernel.evaluate_st(
+                                        self.kernel_eval_type,
+                                        source_coordinates_col_major.data(),
+                                        target_coordinates_col_major.data(),
+                                        charges,
+                                        result,
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-            }
-        })
+                },
+            )
     }
 }

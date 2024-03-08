@@ -53,7 +53,7 @@ where
             sources.iter().map(|source| source.parent()).collect();
         let mut sources_parents = sources_parents.into_iter().collect_vec();
         sources_parents.sort();
-        let nsources_parents= sources_parents.len();
+        let nsources_parents = sources_parents.len();
 
         let mut result = vec![Vec::new(); NHALO];
 
@@ -141,7 +141,6 @@ where
                 let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
                 let multipoles =
                     &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
-
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
@@ -296,13 +295,6 @@ where
                                 }
                             }
                         });
-                }
-
-                if level == 2 {
-                    println!(" signals hat {:?}", signals_hat_f.len());
-                    println!(" signals hat {:?}", check_potentials_hat_f.len());
-                    println!("kernel {:?}", kernel_data_ft[0]);
-                    // println!("displacements {:?}", all_displacements)
                 }
 
                 // 2. Compute the Hadamard product

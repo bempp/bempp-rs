@@ -43,6 +43,8 @@ where
         let coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
 
+        println!("coords {:?}", &coordinates[0..5]);
+
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs, 1]);
@@ -51,14 +53,18 @@ where
                 check_potentials
                     .data_mut()
                     .par_chunks_exact_mut(self.ncoeffs)
-                    .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
+                    .zip(
+                        self.leaf_upward_surfaces_sources
+                            .par_chunks_exact(surface_size),
+                    )
                     .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
                             let charges =
                                 &self.charges[charge_index_pointer.0..charge_index_pointer.1];
-                            let coordinates_row_major = &coordinates
-                                [charge_index_pointer.0 * self.dim..charge_index_pointer.1 * self.dim];
+                            let coordinates_row_major = &coordinates[charge_index_pointer.0
+                                * self.dim
+                                ..charge_index_pointer.1 * self.dim];
 
                             let nsources = coordinates_row_major.len() / self.dim;
                             if nsources > 0 {
@@ -130,12 +136,16 @@ where
                 check_potentials
                     .data_mut()
                     .par_chunks_exact_mut(self.ncoeffs * nmatvecs)
-                    .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
+                    .zip(
+                        self.leaf_upward_surfaces_sources
+                            .par_chunks_exact(surface_size),
+                    )
                     .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
-                            let coordinates_row_major = &coordinates
-                                [charge_index_pointer.0 * self.dim..charge_index_pointer.1 * self.dim];
+                            let coordinates_row_major = &coordinates[charge_index_pointer.0
+                                * self.dim
+                                ..charge_index_pointer.1 * self.dim];
                             let nsources = coordinates_row_major.len() / self.dim;
 
                             if nsources > 0 {

@@ -247,15 +247,11 @@ where
 
     fn set_operator_data(&mut self, order: usize, domain: Self::Domain) {
 
-        println!("HERE {:?}", domain);
-
         // Parameters related to the FFT and Tree
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
         let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
         let size_real = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
-        let nsiblings = 8; // Number of siblings for a given tree node
-        let nconvolutions = nsiblings * nsiblings; // Number of convolutions computed for each node
 
         // Pick a point in the middle of the domain
         let two = T::from(2.0).unwrap();
@@ -385,12 +381,12 @@ where
 
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
         let mut kernel_data =
-            vec![vec![Complex::<T>::zero(); nconvolutions * size_real]; halo_children.len()];
+            vec![vec![Complex::<T>::zero(); NSIBLINGS_SQUARED * size_real]; halo_children.len()];
 
         // For each halo position
         for i in 0..halo_children.len() {
             // For each unique interaction
-            for j in 0..nconvolutions {
+            for j in 0..NSIBLINGS_SQUARED {
                 let offset = j * size_real;
                 kernel_data[i][offset..offset + size_real]
                     .copy_from_slice(kernel_data_vec[i][j].data())

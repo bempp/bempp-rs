@@ -2,12 +2,7 @@
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
 use std::{
-    cmp::Ordering,
-    collections::HashSet,
-    error::Error,
-    hash::{Hash, Hasher},
-    ops::{Deref, DerefMut},
-    vec,
+    cmp::Ordering, collections::HashSet, error::Error, fmt::Debug, hash::{Hash, Hasher}, ops::{Deref, DerefMut}, vec
 };
 
 use crate::{
@@ -234,11 +229,17 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-pub fn point_to_anchor<T: Float + ToPrimitive + Default>(
+pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
     point: &[PointType<T>; 3],
     level: KeyType,
     domain: &Domain<T>,
-) -> Result<[KeyType; 3], Box<dyn Error>> {
+)
+
+-> Result<[KeyType; 3], Box<dyn Error>>
+
+where
+    [PointType<T>; 3]: Debug
+    {
     // Check if point is in the domain
 
     let mut contained = Vec::new();
@@ -265,6 +266,7 @@ pub fn point_to_anchor<T: Float + ToPrimitive + Default>(
             Ok(anchor)
         }
         false => {
+            println!("points {:?} domain {:?}", &point, &domain);
             panic!("Point not in Domain")
         }
     }
@@ -318,7 +320,7 @@ impl MortonKey {
     /// * `point` - Cartesian coordinate for a given point.
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
-    pub fn from_point<T: Float + Default>(
+    pub fn from_point<T: Float + Default + Debug>(
         point: &[PointType<T>; 3],
         domain: &Domain<T>,
         level: u64,
