@@ -1,6 +1,6 @@
 //! FMM traits
 use crate::kernel::Kernel;
-use crate::tree::{FmmTree, Tree};
+use crate::tree::FmmTree;
 
 /// Interface for source box translations.
 pub trait SourceTranslation {
@@ -48,49 +48,6 @@ pub trait Fmm {
     fn get_expansion_order(&self) -> usize;
     fn get_tree(&self) -> &Self::Tree;
     fn get_kernel(&self) -> &Self::Kernel;
+    fn get_dim(&self) -> usize;
     fn evaluate(&self);
-}
-
-/// Interface to compute interaction lists given a tree.
-pub trait InteractionLists {
-    type Tree: Tree;
-
-    /// The interaction list defining multipole to local translations, i.e. for well separated boxes.
-    ///
-    /// # Arguments
-    /// * `key` - The target key for which this interaction list is being calculated.
-    fn get_v_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-
-    /// The interaction list defining particle to local translations, i.e. where the box in the in
-    /// the interaction list is too large for the multipole expansion to apply at the target box
-    /// specified by `key`.
-    ///
-    /// # Arguments
-    /// * `key` - The target key for which this interaction list is being calculated.
-    fn get_x_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-
-    /// The interaction list defining multiopole to particle translations, i.e. where the multipole
-    /// expansion of the source key applies at the target key, only applies to leaf nodes.
-    ///
-    /// # Arguments
-    /// * `leaf` - The target leaf key for which this interaction list is being calculated.
-    fn get_w_list(
-        &self,
-        leaf: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-
-    /// The interaction list defining the near field of each leaf box, i.e. adjacent boxes.
-    ///
-    /// # Arguments
-    /// * `key` - The target key for which this interaction list is being calculated.
-    fn get_u_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
 }

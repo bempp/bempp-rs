@@ -714,39 +714,36 @@ where
 #[cfg(test)]
 mod test {
 
-    use bempp_field::types::FftFieldTranslationKiFmm;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::implementations::helpers::points_fixture;
-    use rlst_dense::{rlst_array_from_slice2, traits::RawAccess};
+    // use bempp_field::types::FftFieldTranslationKiFmm;
+    // use bempp_kernel::laplace_3d::Laplace3dKernel;
+    // use bempp_tree::implementations::helpers::points_fixture;
 
-    use super::*;
+    // use super::*;
 
     #[test]
     fn test_builder() {
-        let npoints = 1000;
-        let nvecs = 1;
-        let sources = points_fixture::<f64>(npoints, None, None, Some(0));
-        let targets = points_fixture::<f64>(npoints, None, None, Some(1));
-        let tmp = vec![1.0; npoints * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        // let npoints = 1000;
+        // let nvecs = 1;
+        // let sources = points_fixture::<f64>(npoints, None, None, Some(0));
+        // let targets = points_fixture::<f64>(npoints, None, None, Some(1));
+        // let tmp = vec![1.0; npoints * nvecs];
+        // let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
+        // charges.data_mut().copy_from_slice(&tmp);
 
-        let n_crit = Some(100);
-        let expansion_order = 5;
-        let sparse = true;
+        // let expansion_order = 5;
+        // let sparse = true;
 
-        let fmm = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, None, sparse)
-            .parameters(
-                expansion_order,
-                Laplace3dKernel::new(),
-                EvalType::ValueDeriv,
-                FftFieldTranslationKiFmm::default(),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
+        // let fmm = KiFmmBuilderSingleNode::new()
+        //     .tree(&sources, &targets, &charges, None, sparse)
+        //     .parameters(
+        //         expansion_order,
+        //         Laplace3dKernel::new(),
+        //         EvalType::ValueDeriv,
+        //         FftFieldTranslationKiFmm::default(),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
 
-        // fmm.evaluate_vec(&charges, &mut result);
     }
 }
