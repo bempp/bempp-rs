@@ -58,12 +58,12 @@ where
     type OperatorData = BlasSourceToTargetOperatorData<T>;
     type Domain = Domain<T>;
 
-    fn set_operator_data<'a>(&mut self, order: usize, domain: Self::Domain) {
+    fn set_operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
-        let nrows = ncoeffs_kifmm(order);
-        let ncols = ncoeffs_kifmm(order);
+        let nrows = ncoeffs_kifmm(expansion_order);
+        let ncols = ncoeffs_kifmm(expansion_order);
 
         let mut se2tc_fat = rlst_dynamic_array2!(T, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
         let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
@@ -71,10 +71,11 @@ where
         let alpha = T::from(ALPHA_INNER).unwrap();
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t.source.compute_surface(&domain, order, alpha);
+            let source_equivalent_surface =
+                t.source.compute_surface(&domain, expansion_order, alpha);
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
-            let target_check_surface = t.target.compute_surface(&domain, order, alpha);
+            let target_check_surface = t.target.compute_surface(&domain, expansion_order, alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
             let mut tmp_gram_t = rlst_dynamic_array2!(T, [ntargets, nsources]);
@@ -248,9 +249,9 @@ where
 
     type OperatorData = FftM2lOperatorData<Complex<T>>;
 
-    fn set_operator_data(&mut self, order: usize, domain: Self::Domain) {
+    fn set_operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
-        let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
         let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
         let size_real = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
@@ -310,7 +311,7 @@ where
             sources[i] = tmp_sources;
         }
 
-        let n_source_equivalent_surface = 6 * (order - 1).pow(2) + 2;
+        let n_source_equivalent_surface = 6 * (expansion_order - 1).pow(2) + 2;
         let n_target_check_surface = n_source_equivalent_surface;
         let alpha = T::from(ALPHA_INNER).unwrap();
 
@@ -322,8 +323,9 @@ where
                 let target = targets[i][j];
                 let source = sources[i][j];
 
-                let source_equivalent_surface = source.compute_surface(&domain, order, alpha);
-                let target_check_surface = target.compute_surface(&domain, order, alpha);
+                let source_equivalent_surface =
+                    source.compute_surface(&domain, expansion_order, alpha);
+                let target_check_surface = target.compute_surface(&domain, expansion_order, alpha);
 
                 let v_list: HashSet<MortonKey> = target
                     .parent()
@@ -344,7 +346,7 @@ where
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
-                        order,
+                        expansion_order,
                         &domain,
                         alpha,
                         &conv_point_corner,
@@ -360,7 +362,7 @@ where
                     ];
 
                     // Compute Green's fct evaluations
-                    let kernel = self.compute_kernel(order, &conv_grid, kernel_point);
+                    let kernel = self.compute_kernel(expansion_order, &conv_grid, kernel_point);
 
                     let mut kernel = flip3(&kernel);
 
@@ -373,7 +375,7 @@ where
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
                     // Fill with zeros when interaction doesn't exist
-                    let n = 2 * order - 1;
+                    let n = 2 * expansion_order - 1;
                     let p = n + 1;
                     let kernel_hat_zeros = rlst_dynamic_array3!(Complex<T>, [p, p, p / 2 + 1]);
                     kernel_data_vec[i].push(kernel_hat_zeros);
@@ -469,12 +471,12 @@ where
     ///
     /// # Arguments
     /// * `order` - The expansion order for the multipole and local expansions.
-    pub fn compute_surf_to_conv_map(order: usize) -> (Vec<usize>, Vec<usize>) {
+    pub fn compute_surf_to_conv_map(expansion_order: usize) -> (Vec<usize>, Vec<usize>) {
         // Number of points along each axis of convolution grid
-        let n = 2 * order - 1;
+        let n = 2 * expansion_order - 1;
         let npad = n + 1;
 
-        let nsurf_grid = 6 * (order - 1).pow(2) + 2;
+        let nsurf_grid = 6 * (expansion_order - 1).pow(2) + 2;
 
         // Index maps between surface and convolution grids
         let mut surf_to_conv = vec![0usize; nsurf_grid];
@@ -484,8 +486,8 @@ where
         let mut surf_index = 0;
 
         // The boundaries of the surface grid when embedded within the convolution grid
-        let lower = order;
-        let upper = 2 * order - 1;
+        let lower = expansion_order;
+        let upper = 2 * expansion_order - 1;
 
         for k in 0..npad {
             for j in 0..npad {
@@ -503,7 +505,7 @@ where
         }
 
         let lower = 0;
-        let upper = order - 1;
+        let upper = expansion_order - 1;
         let mut surf_index = 0;
 
         for k in 0..npad {
@@ -532,11 +534,11 @@ where
     /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn compute_kernel(
         &self,
-        order: usize,
+        expansion_order: usize,
         convolution_grid: &[T],
         target_pt: [T; 3],
     ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3> {
-        let n = 2 * order - 1;
+        let n = 2 * expansion_order - 1;
         let npad = n + 1;
 
         let mut result = rlst_dynamic_array3!(T, [npad, npad, npad]);
@@ -571,10 +573,10 @@ where
     /// * `charges` - A vector of charges.
     pub fn compute_signal(
         &self,
-        order: usize,
+        expansion_order: usize,
         charges: &[T],
     ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3> {
-        let n = 2 * order - 1;
+        let n = 2 * expansion_order - 1;
         let npad = n + 1;
 
         let mut result = rlst_dynamic_array3!(T, [npad, npad, npad]);

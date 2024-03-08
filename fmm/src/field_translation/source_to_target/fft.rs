@@ -30,7 +30,7 @@ use rlst_dense::{
 
 use rlst_dense::traits::{MatrixSvd, RandomAccessMut};
 
-use crate::field_translation::hadamard::matmul8x8;
+use crate::field_translation::matmul::matmul8x8;
 
 impl<T, U, V> KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
@@ -120,7 +120,6 @@ where
                     targets.iter().map(|target| target.parent()).collect();
 
                 let targets_parents = targets_parents.into_iter().collect_vec();
-                // targets_parents.sort();
                 let ntargets_parents = targets_parents.len();
 
                 let sources_parents: HashSet<MortonKey> =

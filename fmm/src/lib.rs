@@ -9,7 +9,7 @@ pub mod tree;
 pub mod types;
 
 mod field_translation {
-    pub mod hadamard;
+    pub mod matmul;
     pub mod source;
     pub mod source_to_target {
         pub mod blas;
