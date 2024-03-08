@@ -1,5 +1,8 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use bempp_field::types::FftFieldTranslationKiFmm;
+use bempp_field::{
+    constants::{NHALO, NSIBLINGS},
+    types::FftFieldTranslationKiFmm,
+};
 use bempp_traits::tree::FmmTree;
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 use itertools::Itertools;
@@ -15,7 +18,6 @@ use bempp_tree::types::morton::MortonKey;
 
 use crate::{
     builder::FmmEvalType,
-    constants::{NHALO, NSIBLINGS},
     helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
     types::SendPtrMut,
 };

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use bempp_field::helpers::ncoeffs_kifmm;
+use bempp_field::{
+    constants::{ALPHA_INNER, ALPHA_OUTER},
+    helpers::ncoeffs_kifmm,
+};
 
 use bempp_traits::{
     field::SourceToTargetData,
@@ -21,7 +24,6 @@ use rlst_dense::{
 };
 
 use crate::{
-    constants::{ALPHA_INNER, ALPHA_OUTER},
     fmm::KiFmm,
     helpers::homogenous_kernel_scale,
     pinv::pinv,
@@ -744,6 +746,5 @@ mod test {
         //     .unwrap()
         //     .build()
         //     .unwrap();
-
     }
 }

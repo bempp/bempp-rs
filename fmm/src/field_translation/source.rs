@@ -1,6 +1,7 @@
 //! Multipole field translations
 use std::collections::HashSet;
 
+use bempp_field::constants::NSIBLINGS;
 use itertools::Itertools;
 use rayon::prelude::*;
 
@@ -15,7 +16,7 @@ use bempp_tree::types::single_node::SingleNodeTreeNew;
 
 use crate::{
     builder::FmmEvalType,
-    constants::{M2M_MAX_CHUNK_SIZE, NSIBLINGS, P2M_MAX_CHUNK_SIZE},
+    constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
     fmm::KiFmm,
     helpers::find_chunk_size,
     traits::FmmScalar,

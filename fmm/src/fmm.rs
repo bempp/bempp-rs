@@ -293,6 +293,7 @@ where
 #[cfg(test)]
 mod test {
 
+    use bempp_field::constants::ALPHA_INNER;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
     use rlst_dense::array::Array;
@@ -301,7 +302,7 @@ mod test {
     use rlst_dense::rlst_array_from_slice2;
     use rlst_dense::traits::{RawAccess, RawAccessMut};
 
-    use crate::{builder::KiFmmBuilderSingleNode, constants::ALPHA_INNER, tree::SingleNodeFmmTree};
+    use crate::{builder::KiFmmBuilderSingleNode, tree::SingleNodeFmmTree};
     use bempp_field::types::FftFieldTranslationKiFmm;
 
     use super::*;
@@ -325,6 +326,7 @@ mod test {
             fmm.get_expansion_order(),
             T::from(ALPHA_INNER).unwrap(),
         );
+
         let test_point = vec![T::from(100000.).unwrap(), T::zero(), T::zero()];
         let mut expected = vec![T::zero()];
         let mut found = vec![T::zero()];
@@ -363,7 +365,6 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-
         let leaf_idx = 2;
         let leaf: MortonKey = fmm.get_tree().get_target_tree().get_all_leaves().unwrap()[leaf_idx];
         let potential = fmm.get_potential(&leaf).unwrap()[0];
@@ -377,8 +378,12 @@ mod test {
         let ntargets = leaf_targets.len() / fmm.get_dim();
         let mut direct = vec![T::zero(); ntargets];
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.get_dim()], [fmm.get_dim(), 1]);
+        let leaf_coordinates_row_major = rlst_array_from_slice2!(
+            T,
+            leaf_targets,
+            [ntargets, fmm.get_dim()],
+            [fmm.get_dim(), 1]
+        );
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.get_dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
@@ -394,10 +399,7 @@ mod test {
             let rel_error = abs_error / p;
             assert!(rel_error <= threshold)
         });
-
-
     }
-
 
     // fn test_root_multipole_laplace_single_node_matrix<T: FmmScalar>(
     //     fmm: Box<
@@ -466,8 +468,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = false;
-        // let svd_threshold = Some(1e-5);
+        let sparse = true;
 
         // Charge data
         let nvecs = 1;
@@ -488,6 +489,7 @@ mod test {
             .unwrap();
         fmm_fft.evaluate();
 
+        // let svd_threshold = Some(1e-5);
         // let fmm_svd = KiFmmBuilderSingleNode::new()
         //     .tree(&sources, &targets, &charges, n_crit, sparse)
         //     .parameters(
@@ -545,7 +547,6 @@ mod test {
 
         let fmm_fft = Box::new(fmm_fft);
         test_single_node_laplace_fmm(fmm_fft, &sources, &charges, threshold);
-
 
         // let fmm_svd = KiFmmBuilderSingleNode::new()
         //     .tree(&sources, &targets, &charges, n_crit, sparse)

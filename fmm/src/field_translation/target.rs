@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use bempp_field::constants::NSIBLINGS;
 use itertools::Itertools;
 use rayon::prelude::*;
 
@@ -17,10 +18,7 @@ use rlst_dense::{
 };
 
 use crate::{
-    constants::{L2L_MAX_CHUNK_SIZE, NSIBLINGS},
-    fmm::KiFmm,
-    helpers::find_chunk_size,
-    traits::FmmScalar,
+    constants::L2L_MAX_CHUNK_SIZE, fmm::KiFmm, helpers::find_chunk_size, traits::FmmScalar,
 };
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
