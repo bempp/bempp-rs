@@ -1,9 +1,11 @@
 //! Constructor for a single node Domain.
+use std::fmt::Debug;
+
 use num::Float;
 
 use crate::types::{domain::Domain, point::PointType};
 
-impl<T: Float + Default> Domain<T> {
+impl<T: Float + Default + Debug> Domain<T> {
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
     /// ensure correct Morton encoding.
@@ -11,8 +13,6 @@ impl<T: Float + Default> Domain<T> {
     /// # Arguments
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     pub fn from_local_points(points: &[PointType<T>]) -> Domain<T> {
-        // Increase size of bounding box to capture all points
-        let err = T::from(1e-5).unwrap();
         // TODO: Should be parametrised by dimension
         let dim = 3;
         let npoints = points.len() / dim;
@@ -35,6 +35,11 @@ impl<T: Float + Default> Domain<T> {
 
         // Want a cubic box to place everything in
         let diameter = diameter_x.max(diameter_y).max(diameter_z);
+
+        // Increase size of bounding box by 1% along each dimension to capture all points
+        let err_fraction = T::from(0.005).unwrap();
+        let err = diameter * err_fraction;
+
         let two = T::from(2.0).unwrap();
         let diameter = [
             diameter + two * err,

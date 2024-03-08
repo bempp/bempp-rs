@@ -242,11 +242,11 @@ where
     {
     // Check if point is in the domain
 
-    let mut contained = Vec::new();
+    let mut tmp = Vec::new();
     for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
-        contained.push((o <= p) && (p <= o + d));
+        tmp.push((o <= p) && (p <= o + d));
     }
-    let contained = contained.iter().all(|&x| x);
+    let contained = tmp.iter().all(|&x| x);
 
     match contained {
         true => {
@@ -266,7 +266,7 @@ where
             Ok(anchor)
         }
         false => {
-            println!("points {:?} domain {:?}", &point, &domain);
+            println!("points {:?} \n domain {:?} \n {:?}", &point, &domain, tmp);
             panic!("Point not in Domain")
         }
     }

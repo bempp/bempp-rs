@@ -1012,7 +1012,7 @@ where
         }
     }
 
-    fn minimum_depth(npoints: u64, n_crit: u64) -> u64 {
+    pub fn minimum_depth(npoints: u64, n_crit: u64) -> u64 {
         let mut tmp = npoints;
         let mut level = 0;
         while tmp > n_crit {
@@ -1036,7 +1036,8 @@ where
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     pub fn new(
         points: &[T],
-        n_crit: Option<u64>,
+        // n_crit: Option<u64>,
+        depth: u64,
         sparse: bool,
         domain: Option<Domain<T>>,
     ) -> SingleNodeTreeNew<T> {
@@ -1045,9 +1046,8 @@ where
         let npoints = points.len() / dim;
         let global_idxs = (0..npoints).collect_vec();
 
-        // If not specified estimate from point data estimate critical value
-        let n_crit = n_crit.unwrap_or(N_CRIT);
-        let depth = SingleNodeTreeNew::<T>::minimum_depth(npoints as u64, n_crit);
+
+        println!("HERE {:?}", depth);
 
         if sparse {
             SingleNodeTreeNew::uniform_tree_sparse(points, &domain, depth, &global_idxs)

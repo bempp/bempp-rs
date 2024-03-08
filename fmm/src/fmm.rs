@@ -458,7 +458,6 @@ mod test {
         //     .unwrap();
         // fmm_svd.evaluate();
 
-
         let fmm_fft = Box::new(fmm_fft);
         // let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
@@ -468,13 +467,14 @@ mod test {
     #[test]
     fn test_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 2000;
-        let ntargets = 6000;
-        let min = Some(0.1);
-        let max = Some(0.9);
+        let nsources = 50000;
+        let ntargets = 10000;
+        // let min = Some(0.1);
+        // let max = Some(0.9);
+        let min = None;
+        let max = None;
         let sources = points_fixture::<f64>(nsources, min, max, Some(0));
         let targets = points_fixture::<f64>(ntargets, min, max, Some(3));
-
         // FMM parameters
         let n_crit = Some(10);
         let expansion_order = 7;
@@ -504,19 +504,11 @@ mod test {
         let leaf = fmm_fft.tree.get_target_tree().get_all_leaves().unwrap()[leaf_idx];
         let potential = fmm_fft.get_potential(&leaf).unwrap()[0];
 
-        // println!("potential {:?}", potential);
         let leaf_targets = fmm_fft
             .tree
             .get_target_tree()
             .get_coordinates(&leaf)
             .unwrap();
-
-        // let leaf_sources = fmm_fft
-        //     .tree
-        //     .get_source_tree()
-        //     .get_coordinates(&leaf)
-        //     .unwrap();
-
 
         let ntargets = leaf_targets.len() / fmm_fft.dim;
         let mut direct = vec![0f64; ntargets];
@@ -526,8 +518,6 @@ mod test {
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, fmm_fft.dim]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
-        println!("depth {:?}", fmm_fft.tree.get_source_tree().get_depth());
-
         fmm_fft.kernel.evaluate_st(
             EvalType::Value,
             sources.data(),
@@ -536,8 +526,13 @@ mod test {
             &mut direct,
         );
 
+        let threshold = 1e-6;
 
-        println!("{:?} \n {:?}", &potential, &direct);
+        direct.iter().zip(potential).for_each(|(d, p)| {
+            let abs_error = num::Float::abs(d - p);
+            let rel_error = abs_error / p;
+            assert!(rel_error <= threshold)
+        });
         // for (i, leaf) in fmm_fft.tree.get_source_tree().get_all_leaves_set().unwrap().iter().enumerate()  {
 
         //     if !fmm_fft.tree.get_target_tree().get_all_leaves_set().unwrap().contains(leaf) {
@@ -547,7 +542,7 @@ mod test {
         // println!("{:?}", leaf_targets);
 
         // println!("{:?} \n {:?}", fmm_fft.tree.get_source_tree().get_all_leaves().unwrap(), fmm_fft.tree.get_target_tree().get_all_leaves().unwrap());
-        assert!(false);
+        // assert!(false);
 
         // let fmm_svd = KiFmmBuilderSingleNode::new()
         //     .tree(&sources, &targets, &charges, n_crit, sparse)

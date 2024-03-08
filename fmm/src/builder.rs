@@ -9,7 +9,7 @@ use bempp_traits::{
     types::EvalType,
 };
 use bempp_tree::{
-    constants::ROOT,
+    constants::{N_CRIT, ROOT},
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew},
 };
 use rlst_dense::{
@@ -88,19 +88,22 @@ where
         let source_domain = Domain::from_local_points(sources.data());
         let target_domain = Domain::from_local_points(targets.data());
 
-        // println!("coords test t b {:?}", &targets.data()[0..5]);
-        // println!("coords test s b{:?}", &sources.data()[0..5]);
-
         // Calculate union of domains for source and target points, needed to define operators
         let domain = source_domain.union(&target_domain);
-        let zero = U::from(0).unwrap();
-        let one = U::from(1).unwrap();
-
-        let domain = Domain {origin: [zero, zero, zero], diameter: [one, one, one]};
         self.domain = Some(domain);
 
-        let source_tree = SingleNodeTreeNew::new(sources.data(), n_crit, sparse, self.domain);
-        let target_tree = SingleNodeTreeNew::new(targets.data(), n_crit, sparse, self.domain);
+        // If not specified estimate from point data estimate critical value
+        let n_crit = n_crit.unwrap_or(N_CRIT);
+        let [nsources, _dim] = sources.shape();
+        let [ntargets, _dim] = targets.shape();
+
+        // Estimate depth based on a uniform distribution
+        let source_depth = SingleNodeTreeNew::<U>::minimum_depth(nsources as u64, n_crit);
+        let target_depth = SingleNodeTreeNew::<U>::minimum_depth(ntargets as u64, n_crit);
+        let depth = source_depth.max(target_depth); // refine source and target trees to same depth
+
+        let source_tree = SingleNodeTreeNew::new(sources.data(), depth, sparse, self.domain);
+        let target_tree = SingleNodeTreeNew::new(targets.data(), depth, sparse, self.domain);
 
         let fmm_tree = SingleNodeFmmTree {
             source_tree,
@@ -414,8 +417,10 @@ where
         let mut source_leaf_scales = vec![W::default(); nsource_leaves * self.ncoeffs * nmatvecs];
 
         // Pre compute check surfaces
-        let mut upward_surfaces_sources = vec![W::default(); self.ncoeffs * nsource_keys * self.dim];
-        let mut downward_surfaces_targets = vec![W::default(); self.ncoeffs * ntarget_keys * self.dim];
+        let mut upward_surfaces_sources =
+            vec![W::default(); self.ncoeffs * nsource_keys * self.dim];
+        let mut downward_surfaces_targets =
+            vec![W::default(); self.ncoeffs * ntarget_keys * self.dim];
         let mut leaf_upward_surfaces_sources =
             vec![W::default(); self.ncoeffs * nsource_leaves * self.dim];
         let mut leaf_upward_surfaces_targets =
@@ -482,7 +487,6 @@ where
                 }
             }
         }
-
 
         // Create mutable pointers to multipole and local data at leaf level
         {
@@ -586,7 +590,6 @@ where
             }
 
             let mut index_pointer = 0;
-
 
             for (i, leaf) in self
                 .tree
