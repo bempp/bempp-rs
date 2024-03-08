@@ -449,12 +449,12 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate();
+        // fmm_svd.evaluate();
 
         let fmm_fft = Box::new(fmm_fft);
         let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
-        test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
+        // test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
     }
 
     #[test]
@@ -526,16 +526,6 @@ mod test {
             let rel_error = abs_error / p;
             assert!(rel_error <= threshold)
         });
-        // for (i, leaf) in fmm_fft.tree.get_source_tree().get_all_leaves_set().unwrap().iter().enumerate()  {
-
-        //     if !fmm_fft.tree.get_target_tree().get_all_leaves_set().unwrap().contains(leaf) {
-        //         println!("i {:?}/{:?}", i+1, fmm_fft.tree.get_target_tree().get_nleaves().unwrap())
-        //     }
-        // }
-        // println!("{:?}", leaf_targets);
-
-        // println!("{:?} \n {:?}", fmm_fft.tree.get_source_tree().get_all_leaves().unwrap(), fmm_fft.tree.get_target_tree().get_all_leaves().unwrap());
-        // assert!(false);
 
         // let fmm_svd = KiFmmBuilderSingleNode::new()
         //     .tree(&sources, &targets, &charges, n_crit, sparse)

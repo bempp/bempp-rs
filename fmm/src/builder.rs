@@ -353,14 +353,6 @@ where
             .len()
             / self.dim;
 
-        let nsource_points = self
-            .tree
-            .get_source_tree()
-            .get_all_coordinates()
-            .unwrap()
-            .len()
-            / self.dim;
-
         let nsource_keys = self.tree.get_source_tree().get_nall_keys().unwrap();
         let ntarget_keys = self.tree.get_target_tree().get_nall_keys().unwrap();
         let ntarget_leaves = self.tree.get_target_tree().get_nleaves().unwrap();

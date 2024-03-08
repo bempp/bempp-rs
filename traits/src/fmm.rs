@@ -1,14 +1,6 @@
 //! FMM traits
-use core::time;
-use std::collections::HashMap;
-use std::time::Duration;
-
-use cauchy::Scalar;
-use num::Float;
-
 use crate::kernel::Kernel;
 use crate::tree::{FmmTree, Tree};
-use crate::types::EvalType;
 
 /// Interface for source box translations.
 pub trait SourceTranslation {

@@ -1,12 +1,5 @@
-use bempp_traits::{
-    fmm::InteractionLists,
-    tree::{FmmTree, Tree},
-};
-use bempp_tree::types::{
-    domain::Domain,
-    morton::{MortonKey, MortonKeys},
-    single_node::SingleNodeTreeNew,
-};
+use bempp_traits::tree::{FmmTree, Tree};
+use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew};
 
 use crate::traits::FmmScalar;
 

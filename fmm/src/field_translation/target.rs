@@ -8,12 +8,8 @@ use bempp_traits::{
     fmm::TargetTranslation,
     kernel::Kernel,
     tree::{FmmTree, Tree},
-    types::EvalType,
 };
-use bempp_tree::types::{
-    morton::{MortonKey, MortonKeys},
-    single_node::SingleNodeTreeNew,
-};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTreeNew};
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,

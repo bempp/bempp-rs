@@ -7,7 +7,6 @@ use num::Float;
 use crate::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},
-    point::Points,
 };
 
 /// Local Trees (non-distributed).

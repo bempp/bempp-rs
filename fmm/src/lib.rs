@@ -3,7 +3,6 @@ pub mod builder;
 pub mod constants;
 pub mod fmm;
 pub mod helpers;
-pub mod interaction_lists;
 pub mod pinv;
 pub mod traits;
 pub mod tree;

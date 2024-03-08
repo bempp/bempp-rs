@@ -230,10 +230,11 @@ where
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     pub fn new(threshold: Option<T>) -> Self {
-        let mut new = Self::default();
-        new.threshold = threshold.unwrap_or(T::epsilon());
-        new.transfer_vectors = compute_transfer_vectors();
-        new
+        BlasFieldTranslationKiFmm {
+            threshold: threshold.unwrap_or(T::epsilon()),
+            transfer_vectors: compute_transfer_vectors(),
+            ..Default::default()
+        }
     }
 }
 
@@ -458,9 +459,10 @@ where
     U: Kernel<T = T> + Default,
 {
     pub fn new() -> Self {
-        let mut new = Self::default();
-        new.transfer_vectors = compute_transfer_vectors();
-        new
+        FftFieldTranslationKiFmm {
+            transfer_vectors: compute_transfer_vectors(),
+            ..Default::default()
+        }
     }
 
     /// Compute map between convolution grid indices and surface indices, return mapping and inverse mapping.

@@ -1,6 +1,3 @@
-use cauchy::Scalar;
-use num::Float;
-
 use crate::kernel::Kernel;
 
 /// Container for metadata associated with a field translation implementation.

@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use bempp_traits::{tree::Tree, types::Scalar};
 
 use crate::{
-    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, LEVEL_SIZE, N_CRIT, ROOT},
-    implementations::impl_morton::{complete_region, encode_anchor},
+    constants::{DEEPEST_LEVEL, LEVEL_SIZE},
+    implementations::impl_morton::encode_anchor,
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
@@ -1016,8 +1016,8 @@ where
         let mut tmp = npoints;
         let mut level = 0;
         while tmp > n_crit {
-            level = level + 1;
-            tmp = tmp / 8i32.pow(level) as u64;
+            level += 1;
+            tmp /= 8i32.pow(level) as u64;
         }
 
         level.into()

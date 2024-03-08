@@ -1,18 +1,9 @@
 //! Traits
 use std::collections::HashSet;
 use std::hash::Hash;
-use std::ops::Index;
 
 use cauchy::Scalar;
 use num::Float;
-
-pub trait LenAndIntoIterator<'a> {
-    type Item;
-    type IntoIter: IntoIterator<Item = Self::Item>;
-
-    fn len(&self) -> usize;
-    fn into_iter(&'a self) -> Self::IntoIter;
-}
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 /// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
