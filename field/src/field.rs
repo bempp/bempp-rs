@@ -24,10 +24,12 @@ use bempp_tree::{
     implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
 };
 
-use crate::constants::{ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM};
+use crate::constants::{
+    ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
+};
 use crate::helpers::ncoeffs_kifmm;
 use crate::types::{
-    FftFieldTranslationKiFmm, BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData,
+    BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm,
 };
 use crate::{
     array::flip3, fft::Fft, transfer_vector::compute_transfer_vectors, types::FftM2lOperatorData,
@@ -246,7 +248,6 @@ where
     type OperatorData = FftM2lOperatorData<Complex<T>>;
 
     fn set_operator_data(&mut self, order: usize, domain: Self::Domain) {
-
         // Parameters related to the FFT and Tree
         let m = 2 * order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
@@ -418,8 +419,10 @@ where
         for freq in 0..size_real {
             let frequency_offset = NSIBLINGS_SQUARED * freq;
             for kernel_f in kernel_data_f.iter().take(NHALO) {
-                let k_f = &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
-                let k_f_ = rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                let k_f =
+                    &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
+                let k_f_ =
+                    rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft = rlst_dynamic_array2!(Complex<T>, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
@@ -435,8 +438,8 @@ where
         self.operator_data = result;
 
         // Set required maps, TODO: Should be a part of operator data
-        (self.surf_to_conv_map, self.conv_to_surf_map) = FftFieldTranslationKiFmm::<T, U>::compute_surf_to_conv_map(self.expansion_order);
-
+        (self.surf_to_conv_map, self.conv_to_surf_map) =
+            FftFieldTranslationKiFmm::<T, U>::compute_surf_to_conv_map(self.expansion_order);
     }
 
     fn set_expansion_order(&mut self, expansion_order: usize) {

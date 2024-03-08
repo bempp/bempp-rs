@@ -43,8 +43,6 @@ where
         let coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
 
-        println!("coords {:?}", &coordinates[0..5]);
-
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs, 1]);
@@ -129,8 +127,6 @@ where
             FmmEvalType::Matrix(nmatvecs) => {
                 let mut check_potentials =
                     rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
-
-                // println!("HERERERE {:?} {:?} {:?}", check_potentials.data().len(), self.ncoeffs, nmatvecs);
 
                 // Compute the check potential for each box for each charge vector
                 check_potentials

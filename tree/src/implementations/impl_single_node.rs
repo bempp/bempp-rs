@@ -1046,9 +1046,6 @@ where
         let npoints = points.len() / dim;
         let global_idxs = (0..npoints).collect_vec();
 
-
-        println!("HERE {:?}", depth);
-
         if sparse {
             SingleNodeTreeNew::uniform_tree_sparse(points, &domain, depth, &global_idxs)
         } else {

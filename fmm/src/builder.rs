@@ -571,7 +571,6 @@ where
                     nevals = 0;
                 }
 
-                // println!("nevals {:?}", nevals, potential_raw_pointers.len());
                 for j in 0..nmatvecs {
                     potentials_send_pointers[ntarget_leaves * j + i] = SendPtrMut {
                         raw: potential_raw_pointers[j],

@@ -53,10 +53,6 @@ where
             parent_locals.push(parent_local);
         }
 
-        // if level == 3 {
-        //     println!("parent locals {:?} {:?}", parent_sources[0], unsafe { std::slice::from_raw_parts(parent_locals[0].raw, self.ncoeffs) })
-        // }
-
         let mut max_chunk_size = nparents;
         if max_chunk_size > L2L_MAX_CHUNK_SIZE {
             max_chunk_size = L2L_MAX_CHUNK_SIZE

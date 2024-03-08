@@ -2,7 +2,13 @@
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
 use std::{
-    cmp::Ordering, collections::HashSet, error::Error, fmt::Debug, hash::{Hash, Hasher}, ops::{Deref, DerefMut}, vec
+    cmp::Ordering,
+    collections::HashSet,
+    error::Error,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+    ops::{Deref, DerefMut},
+    vec,
 };
 
 use crate::{
@@ -233,13 +239,7 @@ pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
     point: &[PointType<T>; 3],
     level: KeyType,
     domain: &Domain<T>,
-)
-
--> Result<[KeyType; 3], Box<dyn Error>>
-
-where
-    [PointType<T>; 3]: Debug
-    {
+) -> Result<[KeyType; 3], Box<dyn Error>> {
     // Check if point is in the domain
 
     let mut tmp = Vec::new();
@@ -266,7 +266,6 @@ where
             Ok(anchor)
         }
         false => {
-            println!("points {:?} \n domain {:?} \n {:?}", &point, &domain, tmp);
             panic!("Point not in Domain")
         }
     }
