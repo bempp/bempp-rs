@@ -156,6 +156,7 @@ where
             }
         }
 
+
         let mut c_u = Vec::new();
         let mut c_vt = Vec::new();
 
@@ -212,6 +213,7 @@ where
             c_vt,
         };
         self.operator_data = result;
+        self.cutoff_rank = cutoff_rank;
     }
 
     fn set_expansion_order(&mut self, expansion_order: usize) {
@@ -231,8 +233,9 @@ where
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     pub fn new(threshold: Option<T>) -> Self {
+        let tmp = T::from(4).unwrap() * T::epsilon();
         BlasFieldTranslationKiFmm {
-            threshold: threshold.unwrap_or(T::epsilon()),
+            threshold: threshold.unwrap_or(tmp),
             transfer_vectors: compute_transfer_vectors(),
             ..Default::default()
         }
@@ -587,6 +590,109 @@ where
 
         result
     }
+}
+
+#[cfg(test)]
+mod test {
+    use bempp_kernel::laplace_3d::Laplace3dKernel;
+    use rlst_dense::traits::RandomAccessMut;
+
+    use super::*;
+
+    #[test]
+    fn test_blas_field_translation() {
+        let kernel = Laplace3dKernel::new();
+        let expansion_order = 5;
+
+        let domain = Domain {
+            origin: [0., 0., 0.],
+            diameter: [1., 1., 1.],
+        };
+        let alpha = 1.05;
+        let threshold = 1e-5;
+        let cutoff_rank = 100;
+
+        // Some expansion data
+        let ncoeffs = 6 * (expansion_order - 1usize).pow(2) + 2;
+        let mut multipole = rlst_dynamic_array2!(f64, [ncoeffs, 1]);
+
+        for i in 0..ncoeffs {
+            *multipole.get_mut([i, 0]).unwrap() = i as f64;
+        }
+        let transfer_vectors = compute_transfer_vectors();
+
+        // Create field translation object
+        let mut blas = BlasFieldTranslationKiFmm {
+            kernel,
+            threshold,
+            transfer_vectors,
+            expansion_order,
+            cutoff_rank,
+            ..Default::default()
+        };
+
+        blas.set_operator_data(expansion_order, domain);
+
+        let idx = 123;
+
+        let transfer_vectors = compute_transfer_vectors();
+        let transfer_vector = &transfer_vectors[idx];
+
+        // Lookup correct components of SVD compressed M2L operator matrix
+        let c_idx = blas
+            .transfer_vectors
+            .iter()
+            .position(|x| x.hash == transfer_vector.hash)
+            .unwrap();
+
+        let c_u = &blas.operator_data.c_u[c_idx];
+        let c_vt = &blas.operator_data.c_vt[c_idx];
+
+
+        let compressed_multipole = empty_array::<f64, 2>()
+            .simple_mult_into_resize(blas.operator_data.st_block.view(), multipole.view());
+
+        let compressed_check_potential = empty_array::<f64, 2>()
+            .simple_mult_into_resize(c_u.view(),
+            empty_array::<f64, 2>().simple_mult_into_resize(
+                c_vt.view(), compressed_multipole.view())
+        );
+
+
+        // Post process to find check potential
+        let check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
+            blas.operator_data.u.view(),
+            compressed_check_potential.view(),
+        );
+
+        let sources = transfer_vector
+            .source
+            .compute_surface(&domain, expansion_order, alpha);
+        let targets = transfer_vector
+            .target
+            .compute_surface(&domain, expansion_order, alpha);
+        let mut direct = vec![0f64; ncoeffs];
+        blas.kernel.evaluate_st(
+            EvalType::Value,
+            &sources[..],
+            &targets[..],
+            multipole.data(),
+            &mut direct[..],
+        );
+
+        let abs_error: f64 = check_potential
+            .data()
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+
+        assert!(rel_error < 1e-5);
+
+
+    }
+
 }
 
 // #[cfg(test)]

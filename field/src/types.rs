@@ -63,6 +63,8 @@ where
     pub kernel: U,
 
     pub expansion_order: usize,
+
+    pub cutoff_rank: usize,
 }
 
 /// A type to store a transfer vector between a `source` and `target` Morton key.
