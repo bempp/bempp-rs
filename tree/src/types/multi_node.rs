@@ -1,5 +1,5 @@
 //! Data structures to create distributed octrees with MPI.
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use mpi::topology::UserCommunicator;
 
 use std::collections::{HashMap, HashSet};
@@ -15,7 +15,7 @@ use crate::types::{
 /// Concrete distributed multi-node tree.
 pub struct MultiNodeTree<T>
 where
-    T: Default + Float + Scalar<Real = T>,
+    T: Default + Float + RlstScalar<Real = T>,
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,

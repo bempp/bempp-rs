@@ -1,7 +1,7 @@
 //! Helper functions used in testing tree implementations, specifically test point generators,
 //! as well as helpers for handling surfaces that discretise a box corresponding to a Morton key.
 
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use num::Float;
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -19,7 +19,7 @@ pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// * `npoints` - The number of points to sample.
 /// * `min` - The minumum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
-pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
     npoints: usize,
     min: Option<T>,
     max: Option<T>,
@@ -51,7 +51,7 @@ pub fn points_fixture<T: Float + Scalar + rand::distributions::uniform::SampleUn
 /// * `npoints` - The number of points to sample.
 /// * `min` - The minumum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
-pub fn points_fixture_sphere<T: Scalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
     npoints: usize,
 ) -> PointsMat<T> {
     // Generate a set of randomly distributed points
@@ -85,7 +85,7 @@ pub fn points_fixture_sphere<T: Scalar + rand::distributions::uniform::SampleUni
 ///
 /// # Arguments
 /// * `npoints` - The number of points to sample.
-pub fn points_fixture_col<T: Float + Scalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
     npoints: usize,
 ) -> PointsMat<T> {
     // Generate a set of randomly distributed points

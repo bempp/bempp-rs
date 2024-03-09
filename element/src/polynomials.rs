@@ -1,12 +1,12 @@
 //! Orthonormal polynomials
 
 use bempp_traits::cell::ReferenceCellType;
-use rlst_common::types::Scalar;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::types::RlstScalar;
 
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
-    T: Scalar,
+    T: RlstScalar,
     Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
@@ -74,7 +74,7 @@ fn quad_index(i: usize, j: usize, n: usize) -> usize {
 
 /// Tabulate orthonormal polynomials on a quadrilateral
 fn tabulate_legendre_polynomials_quadrilateral<
-    T: Scalar,
+    T: RlstScalar,
     Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
@@ -225,7 +225,7 @@ fn tabulate_legendre_polynomials_quadrilateral<
 }
 /// Tabulate orthonormal polynomials on a triangle
 fn tabulate_legendre_polynomials_triangle<
-    T: Scalar,
+    T: RlstScalar,
     Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
@@ -447,7 +447,7 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
     }
 }
 
-pub fn legendre_shape<T: Scalar, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
+pub fn legendre_shape<T: RlstScalar, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
     cell_type: ReferenceCellType,
     points: &Array2,
     degree: usize,
@@ -462,7 +462,7 @@ pub fn legendre_shape<T: Scalar, Array2: RandomAccessByRef<2, Item = T> + Shape<
 
 /// Tabulate orthonormal polynomials
 pub fn tabulate_legendre_polynomials<
-    T: Scalar,
+    T: RlstScalar,
     Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(

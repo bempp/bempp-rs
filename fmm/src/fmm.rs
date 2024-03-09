@@ -1,7 +1,7 @@
 //! Implementation of FmmData and Fmm traits.
 use itertools::Itertools;
 use num::Float;
-use rlst_common::types::Scalar;
+use rlst_dense::types::RlstScalar;
 use std::time::Instant;
 
 use rlst_dense::{
@@ -30,7 +30,7 @@ impl<T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
@@ -183,7 +183,7 @@ where
     T: Tree,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
         self.alpha_inner
@@ -199,7 +199,7 @@ where
     T: Tree,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     type Tree = T;
     type Kernel = U;
@@ -222,7 +222,7 @@ impl<T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Scalar<Real = V> + Default + Float + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
     Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
 {
     /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
@@ -411,7 +411,7 @@ where
     T: Tree,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
         self.alpha_inner
@@ -427,7 +427,7 @@ where
     T: Tree,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     type Tree = T;
     type Kernel = U;
@@ -448,7 +448,7 @@ where
 impl<T, U> FmmLoop for FmmDataAdaptive<T, U>
 where
     T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
+    U: RlstScalar<Real = U> + Float + Default,
     FmmDataAdaptive<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {
@@ -564,7 +564,7 @@ where
 impl<T, U> FmmLoop for FmmDataUniform<T, U>
 where
     T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
+    U: RlstScalar<Real = U> + Float + Default,
     FmmDataUniform<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {
@@ -669,7 +669,7 @@ where
 impl<T, U> FmmLoop for FmmDataUniformMatrix<T, U>
 where
     T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
+    U: RlstScalar<Real = U> + Float + Default,
     FmmDataUniformMatrix<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
 {
     fn upward_pass(&self, time: bool) -> Option<TimeDict> {

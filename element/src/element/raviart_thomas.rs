@@ -4,8 +4,8 @@ use crate::element::{create_cell, CiarletElement, ElementFamily};
 use crate::polynomials::polynomial_count;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, MapType};
-use rlst_common::types::Scalar;
 use rlst_dense::linalg::inverse::MatrixInverse;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::views::ArrayViewMut, array::Array, base_array::BaseArray,
     data_container::VectorContainer, rlst_dynamic_array2, rlst_dynamic_array3,
@@ -13,7 +13,7 @@ use rlst_dense::{
 };
 
 /// Create a Raviart-Thomas element
-pub fn create<T: Scalar>(
+pub fn create<T: RlstScalar>(
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,

@@ -1,9 +1,9 @@
 use bempp_traits::{
     kernel::Kernel,
-    types::{EvalType, Scalar},
+    types::{EvalType, RlstScalar},
 };
 
-pub(crate) fn check_dimensions_evaluate<K: Kernel, T: Scalar>(
+pub(crate) fn check_dimensions_evaluate<K: Kernel, T: RlstScalar>(
     kernel: &K,
     eval_type: EvalType,
     sources: &[T::Real],
@@ -45,7 +45,7 @@ pub(crate) fn check_dimensions_evaluate<K: Kernel, T: Scalar>(
     );
 }
 
-pub(crate) fn check_dimensions_assemble<K: Kernel, T: Scalar>(
+pub(crate) fn check_dimensions_assemble<K: Kernel, T: RlstScalar>(
     kernel: &K,
     eval_type: EvalType,
     sources: &[T::Real],
@@ -78,7 +78,7 @@ pub(crate) fn check_dimensions_assemble<K: Kernel, T: Scalar>(
     );
 }
 
-pub(crate) fn check_dimensions_assemble_diagonal<K: Kernel, T: Scalar>(
+pub(crate) fn check_dimensions_assemble_diagonal<K: Kernel, T: RlstScalar>(
     kernel: &K,
     eval_type: EvalType,
     sources: &[T::Real],

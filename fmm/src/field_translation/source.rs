@@ -21,7 +21,7 @@ use crate::{
         FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix,
     },
 };
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
@@ -32,12 +32,7 @@ impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V>
-        + Float
-        + Default
-        + std::marker::Sync
-        + std::marker::Send
-        + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
@@ -202,12 +197,7 @@ impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V>
-        + Float
-        + Default
-        + std::marker::Sync
-        + std::marker::Send
-        + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
@@ -370,12 +360,7 @@ impl<T, U, V> SourceTranslation
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V>
-        + Float
-        + Default
-        + std::marker::Sync
-        + std::marker::Send
-        + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
 {
     /// Point to multipole evaluations, multithreaded over each leaf box.
     fn p2m<'a>(&self) {
@@ -625,7 +610,7 @@ mod test {
 
         datatree.fmm.kernel().evaluate_st(
             EvalType::Value,
-            &upward_equivalent_surface,
+            upward_equivalent_surface.as_slice(),
             &test_point,
             multipole,
             &mut found,
@@ -698,7 +683,7 @@ mod test {
                 unsafe { std::slice::from_raw_parts(multipoles[i].raw, datatree.ncoeffs) };
             datatree.fmm.kernel().evaluate_st(
                 EvalType::Value,
-                &upward_equivalent_surface,
+                upward_equivalent_surface.as_slice(),
                 &test_point,
                 multipole,
                 &mut found[i..i + 1],
@@ -864,7 +849,7 @@ mod test {
 
         kernel.evaluate_st(
             EvalType::Value,
-            &surface,
+            surface.as_slice(),
             &test_point,
             multipole,
             &mut found,
@@ -947,7 +932,7 @@ mod test {
 
         kernel.evaluate_st(
             EvalType::Value,
-            &surface,
+            surface.as_slice(),
             &test_point,
             multipole,
             &mut found,
@@ -1037,7 +1022,7 @@ mod test {
                 unsafe { std::slice::from_raw_parts(multipoles[i].raw, datatree.ncoeffs) };
             datatree.fmm.kernel.evaluate_st(
                 EvalType::Value,
-                &upward_equivalent_surface,
+                upward_equivalent_surface.as_slice(),
                 &test_point,
                 multipole,
                 &mut found[i..i + 1],

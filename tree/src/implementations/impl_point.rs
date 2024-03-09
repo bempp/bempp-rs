@@ -3,25 +3,25 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 use bempp_traits::tree::Point as PointInterface;
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use num::Float;
 
 use crate::types::point::{Point, Points};
 
 impl<T> PartialEq for Point<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     fn eq(&self, other: &Self) -> bool {
         self.encoded_key == other.encoded_key
     }
 }
 
-impl<T> Eq for Point<T> where T: Scalar<Real = T> {}
+impl<T> Eq for Point<T> where T: RlstScalar<Real = T> {}
 
 impl<T> Ord for Point<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.encoded_key.cmp(&other.encoded_key)
@@ -30,7 +30,7 @@ where
 
 impl<T> PartialOrd for Point<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // less_than(&self.morton, &other.morton)
@@ -40,7 +40,7 @@ where
 
 impl<T> Hash for Point<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.encoded_key.hash(state);
@@ -49,7 +49,7 @@ where
 
 impl<T> Points<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     pub fn new() -> Points<T> {
         Points {
@@ -67,7 +67,7 @@ where
     }
 }
 
-impl<T> PointInterface<T> for Point<T> where T: Scalar<Real = T> + Float + Default {}
+impl<T> PointInterface<T> for Point<T> where T: RlstScalar<Real = T> + Float + Default {}
 
 // impl <T>Iterator for Points<T> {
 //     type Item = Point<T>;

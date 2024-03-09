@@ -10,7 +10,7 @@ use bempp_traits::{
     fmm::{Fmm, InteractionLists, TargetTranslation},
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::{EvalType, Scalar},
+    types::{EvalType, RlstScalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
@@ -32,12 +32,7 @@ impl<T, U, V> TargetTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V>
-        + Float
-        + Default
-        + std::marker::Sync
-        + std::marker::Send
-        + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {
@@ -253,12 +248,7 @@ impl<T, U, V> TargetTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V>
-        + Float
-        + Default
-        + std::marker::Sync
-        + std::marker::Send
-        + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {
@@ -518,12 +508,7 @@ impl<T, U, V> TargetTranslation
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
     U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: Scalar<Real = V>
-        + Float
-        + Default
-        + std::marker::Sync
-        + std::marker::Send
-        + rlst_blis::interface::gemm::Gemm,
+    V: RlstScalar<Real = V> + Float + Default,
 {
     fn l2l<'a>(&self, level: u64) {
         let Some(child_targets) = self.fmm.tree().get_keys(level) else {

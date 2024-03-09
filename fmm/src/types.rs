@@ -7,7 +7,7 @@ use bempp_traits::{field::FieldTranslationData, fmm::Fmm, kernel::Kernel, tree::
 use bempp_tree::types::morton::MortonKey;
 use bempp_tree::types::single_node::SingleNodeTree;
 use num::{Complex, Float};
-use rlst_common::types::Scalar;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
 
 /// Type alias for charge data
@@ -25,7 +25,7 @@ pub type C2EType<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 pub struct FmmDataUniform<T, U>
 where
     T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
+    U: RlstScalar<Real = U> + Float + Default,
 {
     /// The associated FMM object, which implements an FMM interface
     pub fmm: T,
@@ -85,7 +85,7 @@ where
 pub struct FmmDataUniformMatrix<T, U>
 where
     T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
+    U: RlstScalar<Real = U> + Float + Default,
 {
     /// The associated FMM object, which implements an FMM interface
     pub fmm: T,
@@ -157,7 +157,7 @@ where
 pub struct FmmDataAdaptive<T, U>
 where
     T: Fmm,
-    U: Scalar<Real = U> + Float + Default,
+    U: RlstScalar<Real = U> + Float + Default,
 {
     /// The associated FMM object, which implements an FMM interface
     pub fmm: T,
@@ -220,7 +220,7 @@ where
     T: Tree,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     /// The expansion order
     pub order: usize,
@@ -269,7 +269,7 @@ where
     T: Tree,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     /// The expansion order
     pub order: usize,
@@ -350,7 +350,7 @@ impl<T, U, V> FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Float + Scalar<Real = V> + Default,
+    V: Float + RlstScalar<Real = V> + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
     ///
@@ -474,8 +474,8 @@ where
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
 
-                upward_surfaces[l..r].copy_from_slice(&upward_surface);
-                downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                upward_surfaces[l..r].copy_from_slice(upward_surface.as_slice());
+                downward_surfaces[l..r].copy_from_slice(downward_surface.as_slice());
             }
 
             let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
@@ -489,8 +489,8 @@ where
 
                 let l = i * ncoeffs * dim;
                 let r = l + ncoeffs * dim;
-                leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
-                leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                leaf_upward_surfaces[l..r].copy_from_slice(upward_surface.as_slice());
+                leaf_downward_surfaces[l..r].copy_from_slice(downward_surface.as_slice());
             }
 
             return Ok(Self {
@@ -524,7 +524,7 @@ impl<T, U, V> FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Float + Scalar<Real = V> + Default,
+    V: Float + RlstScalar<Real = V> + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
     ///
@@ -714,8 +714,8 @@ where
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
 
-                    upward_surfaces[l..r].copy_from_slice(&upward_surface);
-                    downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                    upward_surfaces[l..r].copy_from_slice(upward_surface.as_slice());
+                    downward_surfaces[l..r].copy_from_slice(downward_surface.as_slice());
                 }
 
                 let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
@@ -735,8 +735,8 @@ where
 
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
-                    leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
-                    leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                    leaf_upward_surfaces[l..r].copy_from_slice(upward_surface.as_slice());
+                    leaf_downward_surfaces[l..r].copy_from_slice(downward_surface.as_slice());
                 }
 
                 return Ok(Self {
@@ -776,7 +776,7 @@ impl<T, U, V> FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
 where
     T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
     U: FieldTranslationData<T>,
-    V: Float + Scalar<Real = V> + Default,
+    V: Float + RlstScalar<Real = V> + Default,
 {
     /// Constructor fo the KiFMM's associated FmmData on a single node.
     ///
@@ -908,8 +908,8 @@ where
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
 
-                    upward_surfaces[l..r].copy_from_slice(&upward_surface);
-                    downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                    upward_surfaces[l..r].copy_from_slice(upward_surface.as_slice());
+                    downward_surfaces[l..r].copy_from_slice(downward_surface.as_slice());
                 }
 
                 let mut leaf_upward_surfaces = vec![V::default(); ncoeffs * nleaves * dim];
@@ -929,8 +929,8 @@ where
 
                     let l = i * ncoeffs * dim;
                     let r = l + ncoeffs * dim;
-                    leaf_upward_surfaces[l..r].copy_from_slice(&upward_surface);
-                    leaf_downward_surfaces[l..r].copy_from_slice(&downward_surface);
+                    leaf_upward_surfaces[l..r].copy_from_slice(upward_surface.as_slice());
+                    leaf_downward_surfaces[l..r].copy_from_slice(downward_surface.as_slice());
                 }
 
                 return Ok(Self {

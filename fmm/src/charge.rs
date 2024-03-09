@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 
 use num::Float;
-use rlst_common::types::Scalar;
+use rlst_dense::types::RlstScalar;
 
 use crate::types::{Charge, ChargeDict, GlobalIdx};
 
@@ -13,7 +13,7 @@ use crate::types::{Charge, ChargeDict, GlobalIdx};
 /// * `charges` - The charge associated with each unique global index.
 pub fn build_charge_dict<T>(global_idxs: &[GlobalIdx], charges: &[Charge<T>]) -> ChargeDict<T>
 where
-    T: Float + Scalar + Default,
+    T: Float + RlstScalar + Default,
 {
     let mut res: ChargeDict<T> = HashMap::new();
     for (&global_idx, &charge) in global_idxs.iter().zip(charges.iter()) {

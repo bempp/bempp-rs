@@ -7,17 +7,17 @@ use crate::helpers::{
 };
 use bempp_traits::{
     kernel::{Kernel, ScaleInvariantKernel},
-    types::{EvalType, Scalar},
+    types::{EvalType, RlstScalar},
 };
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
 #[derive(Clone)]
-pub struct Laplace3dKernel<T: Scalar> {
+pub struct Laplace3dKernel<T: RlstScalar> {
     _phantom_t: std::marker::PhantomData<T>,
 }
 
-impl<T: Scalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
+impl<T: RlstScalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
     type T = T;
 
     fn scale(&self, level: u64) -> Self::T {
@@ -29,7 +29,7 @@ impl<T: Scalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
     }
 }
 
-impl<T: Scalar> Laplace3dKernel<T> {
+impl<T: RlstScalar> Laplace3dKernel<T> {
     pub fn new() -> Self {
         Self {
             _phantom_t: PhantomData,
@@ -37,15 +37,15 @@ impl<T: Scalar> Laplace3dKernel<T> {
     }
 }
 
-impl<T: Scalar> Default for Laplace3dKernel<T> {
+impl<T: RlstScalar> Default for Laplace3dKernel<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Scalar + Send + Sync> Kernel for Laplace3dKernel<T>
+impl<T: RlstScalar + Send + Sync> Kernel for Laplace3dKernel<T>
 where
-    <T as Scalar>::Real: Send + Sync,
+    <T as RlstScalar>::Real: Send + Sync,
 {
     type T = T;
 
@@ -60,8 +60,8 @@ where
     fn evaluate_st(
         &self,
         eval_type: EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
     ) {
@@ -86,8 +86,8 @@ where
     fn evaluate_mt(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
     ) {
@@ -112,8 +112,8 @@ where
     fn assemble_st(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
@@ -138,8 +138,8 @@ where
     fn assemble_mt(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
@@ -164,8 +164,8 @@ where
     fn assemble_diagonal_st(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble_diagonal(self, eval_type, sources, targets, result);
@@ -197,8 +197,8 @@ where
     fn greens_fct(
         &self,
         eval_type: EvalType,
-        source: &[<Self::T as Scalar>::Real],
-        target: &[<Self::T as Scalar>::Real],
+        source: &[<Self::T as RlstScalar>::Real],
+        target: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         let zero_real = <T::Real as num::Zero>::zero();
@@ -230,10 +230,10 @@ where
     }
 }
 
-pub fn evaluate_laplace_one_target<T: Scalar>(
+pub fn evaluate_laplace_one_target<T: RlstScalar>(
     eval_type: EvalType,
-    target: &[<T as Scalar>::Real],
-    sources: &[<T as Scalar>::Real],
+    target: &[<T as RlstScalar>::Real],
+    sources: &[<T as RlstScalar>::Real],
     charges: &[T],
     result: &mut [T],
 ) {
@@ -308,10 +308,10 @@ pub fn evaluate_laplace_one_target<T: Scalar>(
     }
 }
 
-pub fn assemble_laplace_one_target<T: Scalar>(
+pub fn assemble_laplace_one_target<T: RlstScalar>(
     eval_type: EvalType,
-    target: &[<T as Scalar>::Real],
-    sources: &[<T as Scalar>::Real],
+    target: &[<T as RlstScalar>::Real],
+    sources: &[<T as RlstScalar>::Real],
     result: &mut [T],
 ) {
     assert_eq!(sources.len() % 3, 0);
@@ -425,7 +425,7 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use bempp_traits::types::Scalar;
+    use bempp_traits::types::RlstScalar;
     use rand::prelude::*;
     use rlst_dense::{
         array::Array,

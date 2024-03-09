@@ -35,7 +35,6 @@ rand = "0.8.*"
 float-cmp = "0.9.0"
 num_cpus = "1"
 num = "0.4"
-rlst-common = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = { git = "https://github.com/skailasa/fftw.git" }
