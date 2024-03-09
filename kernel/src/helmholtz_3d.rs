@@ -7,18 +7,18 @@ use crate::helpers::{
 };
 use bempp_traits::{
     kernel::Kernel,
-    types::{EvalType, Scalar},
+    types::{EvalType, RlstScalar},
 };
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
 #[derive(Clone)]
-pub struct Helmholtz3dKernel<T: Scalar> {
+pub struct Helmholtz3dKernel<T: RlstScalar> {
     wavenumber: T::Real,
     _phantom_t: std::marker::PhantomData<T>,
 }
 
-impl<T: Scalar> Helmholtz3dKernel<T> {
+impl<T: RlstScalar> Helmholtz3dKernel<T> {
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             wavenumber,
@@ -27,11 +27,11 @@ impl<T: Scalar> Helmholtz3dKernel<T> {
     }
 }
 
-impl<T: Scalar<Complex = T> + Send + Sync> Kernel for Helmholtz3dKernel<T>
+impl<T: RlstScalar<Complex = T> + Send + Sync> Kernel for Helmholtz3dKernel<T>
 where
-    // Send and sync are defined for all the standard types that implement Scalar (f32, f64, c32, c64)
-    <T as Scalar>::Complex: Send + Sync,
-    <T as Scalar>::Real: Send + Sync,
+    // Send and sync are defined for all the standard types that implement RlstScalar (f32, f64, c32, c64)
+    <T as RlstScalar>::Complex: Send + Sync,
+    <T as RlstScalar>::Real: Send + Sync,
 {
     type T = T;
 
@@ -46,8 +46,8 @@ where
     fn evaluate_st(
         &self,
         eval_type: EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
     ) {
@@ -79,8 +79,8 @@ where
     fn evaluate_mt(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
         result: &mut [Self::T],
     ) {
@@ -112,8 +112,8 @@ where
     fn greens_fct(
         &self,
         eval_type: EvalType,
-        source: &[<Self::T as Scalar>::Real],
-        target: &[<Self::T as Scalar>::Real],
+        source: &[<Self::T as RlstScalar>::Real],
+        target: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         let zero_real = <T::Real as num::Zero>::zero();
@@ -152,8 +152,8 @@ where
     fn assemble_st(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
@@ -184,8 +184,8 @@ where
     fn assemble_mt(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
@@ -216,8 +216,8 @@ where
     fn assemble_diagonal_st(
         &self,
         eval_type: bempp_traits::types::EvalType,
-        sources: &[<Self::T as Scalar>::Real],
-        targets: &[<Self::T as Scalar>::Real],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble_diagonal(self, eval_type, sources, targets, result);
@@ -247,10 +247,10 @@ where
     }
 }
 
-pub fn evaluate_helmholtz_one_target<T: Scalar<Complex = T>>(
+pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
-    target: &[<T as Scalar>::Real],
-    sources: &[<T as Scalar>::Real],
+    target: &[<T as RlstScalar>::Real],
+    sources: &[<T as RlstScalar>::Real],
     charges: &[T],
     wavenumber: T::Real,
     result: &mut [T],
@@ -271,8 +271,8 @@ pub fn evaluate_helmholtz_one_target<T: Scalar<Complex = T>>(
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result_real = <<T as Scalar>::Real as Zero>::zero();
-            let mut my_result_imag = <<T as Scalar>::Real as Zero>::zero();
+            let mut my_result_real = <<T as RlstScalar>::Real as Zero>::zero();
+            let mut my_result_imag = <<T as RlstScalar>::Real as Zero>::zero();
             for index in 0..nsources {
                 diff0 = sources0[index] - target[0];
                 diff1 = sources1[index] - target[1];
@@ -288,16 +288,16 @@ pub fn evaluate_helmholtz_one_target<T: Scalar<Complex = T>>(
 
                 let kr = wavenumber * diff_norm;
 
-                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm;
-                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm;
+                let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm;
+                let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm;
                 let charge_re = charges[index].re();
                 let charge_im = charges[index].im();
 
                 my_result_imag += g_re * charge_im + g_im * charge_re;
                 my_result_real += g_re * charge_re - g_im * charge_im;
             }
-            result[0] +=
-                <T::Complex as Scalar>::complex(my_result_real, my_result_imag).mul_real(m_inv_4pi);
+            result[0] += <T::Complex as RlstScalar>::complex(my_result_real, my_result_imag)
+                .mul_real(m_inv_4pi);
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
@@ -328,8 +328,8 @@ pub fn evaluate_helmholtz_one_target<T: Scalar<Complex = T>>(
                 let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
 
                 let kr = wavenumber * diff_norm;
-                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
-                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+                let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+                let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
 
                 let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
                 let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
@@ -353,18 +353,18 @@ pub fn evaluate_helmholtz_one_target<T: Scalar<Complex = T>>(
                 my_result3_imag += times_charge_imag * diff2;
             }
 
-            result[0] += <T::Complex as Scalar>::complex(my_result0_real, my_result0_imag);
-            result[1] += <T::Complex as Scalar>::complex(my_result1_real, my_result1_imag);
-            result[2] += <T::Complex as Scalar>::complex(my_result2_real, my_result2_imag);
-            result[3] += <T::Complex as Scalar>::complex(my_result3_real, my_result3_imag);
+            result[0] += <T::Complex as RlstScalar>::complex(my_result0_real, my_result0_imag);
+            result[1] += <T::Complex as RlstScalar>::complex(my_result1_real, my_result1_imag);
+            result[2] += <T::Complex as RlstScalar>::complex(my_result2_real, my_result2_imag);
+            result[3] += <T::Complex as RlstScalar>::complex(my_result3_real, my_result3_imag);
         }
     }
 }
 
-pub fn assemble_helmholtz_one_target<T: Scalar<Complex = T>>(
+pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
-    target: &[<T as Scalar>::Real],
-    sources: &[<T as Scalar>::Real],
+    target: &[<T as RlstScalar>::Real],
+    sources: &[<T as RlstScalar>::Real],
     wavenumber: T::Real,
     result: &mut [T],
 ) {
@@ -400,10 +400,10 @@ pub fn assemble_helmholtz_one_target<T: Scalar<Complex = T>>(
 
                 let kr = wavenumber * diff_norm;
 
-                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
-                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+                let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+                let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
 
-                result[index] = <T as Scalar>::complex(g_re, g_im);
+                result[index] = <T as RlstScalar>::complex(g_re, g_im);
             }
         }
         EvalType::ValueDeriv => {
@@ -446,8 +446,8 @@ pub fn assemble_helmholtz_one_target<T: Scalar<Complex = T>>(
                 let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
 
                 let kr = wavenumber * diff_norm;
-                let g_re = <T::Real as Scalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
-                let g_im = <T::Real as Scalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+                let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+                let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
 
                 let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
                 let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
@@ -461,10 +461,10 @@ pub fn assemble_helmholtz_one_target<T: Scalar<Complex = T>>(
                 my_result3_real = g_deriv_re * diff2;
                 my_result3_imag = g_deriv_im * diff2;
 
-                my_result0 = <T as Scalar>::complex(g_re, g_im);
-                my_result1 = <T as Scalar>::complex(my_result1_real, my_result1_imag);
-                my_result2 = <T as Scalar>::complex(my_result2_real, my_result2_imag);
-                my_result3 = <T as Scalar>::complex(my_result3_real, my_result3_imag);
+                my_result0 = <T as RlstScalar>::complex(g_re, g_im);
+                my_result1 = <T as RlstScalar>::complex(my_result1_real, my_result1_imag);
+                my_result2 = <T as RlstScalar>::complex(my_result2_real, my_result2_imag);
+                my_result3 = <T as RlstScalar>::complex(my_result3_real, my_result3_imag);
 
                 my_res0[index] = my_result0;
                 my_res1[index] = my_result1;
@@ -486,11 +486,11 @@ fn helmholtz_component_count(eval_type: EvalType) -> usize {
 //     eval_type: EvalType,
 //     target: &[f32],
 //     sources: &[f32],
-//     charges: &[rlst_common::types::c32],
+//     charges: &[rlst_dense::types::c32],
 //     wavenumber: f32,
-//     result: &mut [rlst_common::types::c32],
+//     result: &mut [rlst_dense::types::c32],
 // ) {
-//     evaluate_helmholtz_one_target::<rlst_common::types::c32>(
+//     evaluate_helmholtz_one_target::<rlst_dense::types::c32>(
 //         eval_type, target, sources, charges, wavenumber, result,
 //     )
 // }
@@ -509,7 +509,7 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use bempp_traits::types::Scalar;
+    use bempp_traits::types::RlstScalar;
     use rlst_dense::{
         array::Array,
         base_array::BaseArray,
@@ -518,7 +518,7 @@ mod test {
         traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
     };
 
-    use rlst_common::types::c64;
+    use rlst_dense::types::c64;
 
     fn copy(
         m_in: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,

@@ -1,8 +1,8 @@
 //! General type definitions
 
-// Definition of scalar types.
-// For now we simply derive from the `caucy::Scalar` type.
-pub use cauchy::{c32, c64, Scalar};
+// Definition of RlstScalar types.
+// For now we simply derive from the `caucy::RlstScalar` type.
+pub use rlst_dense::types::{c32, c64, RlstScalar};
 
 // Declare if entity is local, a ghost, or remote.
 pub enum Locality {

@@ -5,7 +5,7 @@
 // use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 
 // use bempp_traits::tree::Tree;
-// use bempp_traits::types::Scalar;
+// use bempp_traits::types::RlstScalar;
 
 // use rand::distributions::uniform::SampleUniform;
 
@@ -19,7 +19,7 @@
 
 // /// Test that the leaves on separate nodes do not overlap.
 // #[cfg(feature = "mpi")]
-// fn test_no_overlaps<T: Float + Default + Scalar<Real = T>>(
+// fn test_no_overlaps<T: Float + Default + RlstScalar<Real = T>>(
 //     world: &UserCommunicator,
 //     tree: &MultiNodeTree<T>,
 // ) {
@@ -56,7 +56,7 @@
 
 // /// Test that the globally defined domain contains all the points at a given node.
 // #[cfg(feature = "mpi")]
-// fn test_global_bounds<T: Scalar + Float + Default + Equivalence + SampleUniform>(
+// fn test_global_bounds<T: RlstScalar + Float + Default + Equivalence + SampleUniform>(
 //     world: &UserCommunicator,
 // ) {
 //     let npoints = 10000;

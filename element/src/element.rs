@@ -6,8 +6,8 @@ use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
-use rlst_common::types::Scalar;
 use rlst_dense::linalg::inverse::MatrixInverse;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::views::ArrayViewMut,
     array::Array,
@@ -31,7 +31,7 @@ pub enum ElementFamily {
     RaviartThomas = 1,
 }
 
-pub struct CiarletElement<T: Scalar> {
+pub struct CiarletElement<T: RlstScalar> {
     cell_type: ReferenceCellType,
     family: ElementFamily,
     degree: usize,
@@ -47,7 +47,7 @@ pub struct CiarletElement<T: Scalar> {
     // interpolation_weights: EntityWeights,
 }
 
-impl<T: Scalar> CiarletElement<T>
+impl<T: RlstScalar> CiarletElement<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -255,7 +255,7 @@ where
     }
 }
 
-impl<T: Scalar> FiniteElement for CiarletElement<T> {
+impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
     type T = T;
     fn value_shape(&self) -> &[usize] {
         &self.value_shape
@@ -323,7 +323,7 @@ impl<T: Scalar> FiniteElement for CiarletElement<T> {
     }
 }
 
-pub fn create_element<T: Scalar>(
+pub fn create_element<T: RlstScalar>(
     family: ElementFamily,
     cell_type: ReferenceCellType,
     degree: usize,

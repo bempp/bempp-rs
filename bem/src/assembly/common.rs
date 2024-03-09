@@ -1,20 +1,20 @@
-use rlst_common::types::Scalar;
+use rlst_dense::types::RlstScalar;
 
-pub struct RawData2D<T: Scalar> {
+pub struct RawData2D<T: RlstScalar> {
     pub data: *mut T,
     pub shape: [usize; 2],
 }
 
-unsafe impl<T: Scalar> Sync for RawData2D<T> {}
+unsafe impl<T: RlstScalar> Sync for RawData2D<T> {}
 
-pub struct SparseMatrixData<T: Scalar> {
+pub struct SparseMatrixData<T: RlstScalar> {
     pub data: Vec<T>,
     pub rows: Vec<usize>,
     pub cols: Vec<usize>,
     pub shape: [usize; 2],
 }
 
-impl<T: Scalar> SparseMatrixData<T> {
+impl<T: RlstScalar> SparseMatrixData<T> {
     pub fn new(shape: [usize; 2]) -> Self {
         Self {
             data: vec![],
@@ -52,4 +52,4 @@ impl<T: Scalar> SparseMatrixData<T> {
     }
 }
 
-unsafe impl<T: Scalar> Sync for SparseMatrixData<T> {}
+unsafe impl<T: RlstScalar> Sync for SparseMatrixData<T> {}

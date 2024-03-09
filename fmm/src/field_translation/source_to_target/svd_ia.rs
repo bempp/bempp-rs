@@ -10,7 +10,7 @@ use bempp_traits::{
     fmm::Fmm,
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::Scalar,
+    types::RlstScalar,
 };
 use bempp_tree::types::single_node::SingleNodeTree;
 
@@ -42,7 +42,7 @@ pub mod matrix {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: RlstScalar<Real = U>,
         U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
@@ -106,7 +106,7 @@ pub mod matrix {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: RlstScalar<Real = U>,
         U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
@@ -251,7 +251,7 @@ pub mod matrix {
                 U::from(1. / 2.).unwrap()
             } else {
                 let two = U::from(2.0).unwrap();
-                Scalar::powf(two, U::from(level - 3).unwrap())
+                RlstScalar::powf(two, U::from(level - 3).unwrap())
             }
         }
     }
@@ -269,7 +269,7 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: RlstScalar<Real = U>,
         U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
@@ -333,7 +333,7 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + rlst_blis::interface::gemm::Gemm,
+        U: RlstScalar<Real = U>,
         U: Float + Default,
         U: std::marker::Send + std::marker::Sync + Default,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
@@ -452,7 +452,7 @@ pub mod uniform {
                 U::from(1. / 2.).unwrap()
             } else {
                 let two = U::from(2.0).unwrap();
-                Scalar::powf(two, U::from(level - 3).unwrap())
+                RlstScalar::powf(two, U::from(level - 3).unwrap())
             }
         }
     }

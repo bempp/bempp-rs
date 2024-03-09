@@ -1,8 +1,8 @@
 //! Finite element definitions
 
 use crate::cell::ReferenceCellType;
-use rlst_common::types::Scalar;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::types::RlstScalar;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -37,7 +37,7 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usi
 
 pub trait FiniteElement {
     //! A finite element defined on a reference cell
-    type T: Scalar;
+    type T: RlstScalar;
 
     /// The reference cell type
     fn cell_type(&self) -> ReferenceCellType;

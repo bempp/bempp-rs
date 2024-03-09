@@ -2,8 +2,8 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-use cauchy::Scalar;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 /// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
@@ -13,7 +13,7 @@ pub trait Tree {
     /// The computational domain defined by the tree.
     type Domain;
 
-    type Precision: Scalar<Real = Self::Precision> + Float + Default;
+    type Precision: RlstScalar<Real = Self::Precision> + Float + Default;
 
     /// The type of points that define a tree.
     type Point: Point<Self::Precision>;
@@ -96,7 +96,7 @@ pub trait Tree {
 
 pub trait Point<T>
 where
-    T: Scalar<Real = T> + Float + Default,
+    T: RlstScalar<Real = T> + Float + Default,
 {
 }
 

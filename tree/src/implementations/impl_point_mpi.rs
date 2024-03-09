@@ -3,7 +3,7 @@ use crate::types::{
     morton::{KeyType, MortonKey},
     point::Point,
 };
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
@@ -13,7 +13,7 @@ use num::Float;
 
 unsafe impl<T> Equivalence for Point<T>
 where
-    T: Scalar<Real = T> + Float + Equivalence,
+    T: RlstScalar<Real = T> + Float + Equivalence,
 {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {

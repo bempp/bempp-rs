@@ -11,7 +11,7 @@ use bempp_traits::{
     fmm::{Fmm, InteractionLists},
     kernel::{Kernel, ScaleInvariantKernel},
     tree::Tree,
-    types::{EvalType, Scalar},
+    types::{EvalType, RlstScalar},
 };
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
@@ -42,8 +42,8 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
-        Complex<U>: Scalar,
+        U: RlstScalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        Complex<U>: RlstScalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
@@ -96,14 +96,8 @@ pub mod uniform {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U>
-            + Float
-            + Default
-            + std::marker::Send
-            + std::marker::Sync
-            + Fft
-            + rlst_blis::interface::gemm::Gemm,
-        Complex<U>: Scalar,
+        U: RlstScalar<Real = U> + Float + Default + std::marker::Send + std::marker::Sync + Fft,
+        Complex<U>: RlstScalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l(&self, _level: u64) {}
@@ -362,7 +356,7 @@ pub mod uniform {
                 U::from(1. / 2.).unwrap()
             } else {
                 let two = U::from(2.0).unwrap();
-                Scalar::powf(two, U::from(level - 3).unwrap())
+                RlstScalar::powf(two, U::from(level - 3).unwrap())
             }
         }
     }
@@ -381,14 +375,8 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U>
-            + Float
-            + Default
-            + std::marker::Send
-            + std::marker::Sync
-            + Fft
-            + rlst_blis::interface::gemm::Gemm,
-        Complex<U>: Scalar,
+        U: RlstScalar<Real = U> + Fft + num::Float + Default,
+        Complex<U>: RlstScalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
@@ -441,14 +429,8 @@ pub mod adaptive {
             + std::marker::Send
             + std::marker::Sync
             + Default,
-        U: Scalar<Real = U>
-            + Float
-            + Default
-            + std::marker::Send
-            + std::marker::Sync
-            + Fft
-            + rlst_blis::interface::gemm::Gemm,
-        Complex<U>: Scalar,
+        U: RlstScalar<Real = U> + Fft + Float + Default,
+        Complex<U>: RlstScalar,
         Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     {
         fn p2l<'a>(&self, level: u64) {
@@ -800,7 +782,7 @@ pub mod adaptive {
                 U::from(1. / 2.).unwrap()
             } else {
                 let two = U::from(2.0).unwrap();
-                Scalar::powf(two, U::from(level - 3).unwrap())
+                RlstScalar::powf(two, U::from(level - 3).unwrap())
             }
         }
     }

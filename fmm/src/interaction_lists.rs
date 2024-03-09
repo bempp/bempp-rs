@@ -1,6 +1,6 @@
 //! Implementation of interaction lists for FMMs (single and multi node)
 use itertools::Itertools;
-use rlst_common::types::Scalar;
+use rlst_dense::types::RlstScalar;
 
 use bempp_traits::{
     field::FieldTranslationData, fmm::InteractionLists, kernel::Kernel, tree::Tree,
@@ -15,7 +15,7 @@ where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     type Tree = T;
 
@@ -137,7 +137,7 @@ where
     T: Tree<NodeIndex = MortonKey, NodeIndices = MortonKeys>,
     U: Kernel<T = W>,
     V: FieldTranslationData<U>,
-    W: Scalar + Float + Default,
+    W: RlstScalar + Float + Default,
 {
     type Tree = T;
 

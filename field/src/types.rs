@@ -5,7 +5,7 @@ use rlst_dense::{
 };
 
 use bempp_traits::kernel::Kernel;
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use bempp_tree::types::morton::MortonKey;
 
 /// Simple type alias for a 2D `Matrix<f64>`
@@ -19,7 +19,7 @@ pub type FftKernelData<C> = Vec<Vec<C>>;
 /// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
 pub struct FftFieldTranslationKiFmm<T, U>
 where
-    T: Default + Scalar<Real = T> + Float,
+    T: Default + RlstScalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by
@@ -46,7 +46,7 @@ where
 /// highest rank interactions.
 pub struct SvdFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by when computing operator.
@@ -71,7 +71,7 @@ where
 /// sum of the squares of the singular values.
 pub struct SvdFieldTranslationKiFmmIA<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by when computing operator.
@@ -100,7 +100,7 @@ where
 /// singular values.
 pub struct SvdFieldTranslationKiFmmRcmp<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     /// Amount to dilate inner check surface by when computing operator.
@@ -152,7 +152,7 @@ pub struct FftM2lOperatorData<C> {
 /// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
 pub struct SvdM2lOperatorData<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     /// Left singular vectors from SVD of fat M2L matrix.
     pub u: SvdM2lEntry<T>,
@@ -169,7 +169,7 @@ where
 
 impl<T> Default for SvdM2lOperatorData<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     fn default() -> Self {
         let u = rlst_dynamic_array2!(T, [1, 1]);
@@ -185,7 +185,7 @@ where
 #[derive(Default)]
 pub struct SvdM2lOperatorDataIA<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     /// The left singular vectors of each M2L matrix.
     pub u: Vec<SvdM2lEntry<T>>,
@@ -199,7 +199,7 @@ where
 // #[derive(Default)]
 pub struct SvdM2lOperatorDataRcmp<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     /// Left singular vectors from SVD of fat M2L matrix.
     pub u: SvdM2lEntry<T>,
@@ -225,7 +225,7 @@ where
 
 impl<T> Default for SvdM2lOperatorDataRcmp<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     fn default() -> Self {
         let u = rlst_dynamic_array2!(T, [1, 1]);

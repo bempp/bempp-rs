@@ -1,5 +1,5 @@
-use cauchy::Scalar;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 
 use crate::kernel::Kernel;
 
@@ -41,7 +41,7 @@ where
 /// Interface for field translations.
 pub trait FieldTranslation<T>
 where
-    T: Float + Scalar<Real = T> + Default,
+    T: Float + RlstScalar<Real = T> + Default,
 {
     /// # Warning
     /// This method is only applicable to homogeneous kernels, which are currently

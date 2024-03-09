@@ -3,9 +3,8 @@ use bempp_traits::kernel::ScaleInvariantKernel;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
-use rlst_blis::interface::gemm::Gemm;
-use rlst_common::types::Scalar;
 use rlst_dense::rlst_array_from_slice2;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -41,7 +40,7 @@ use crate::{
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -178,7 +177,7 @@ where
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmRcmp<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -346,7 +345,7 @@ where
 impl<T, U> FieldTranslationData<U> for SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + ScaleInvariantKernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -452,7 +451,7 @@ where
 fn m2l_scale<T>(level: u64) -> T
 where
     T: Float + Default,
-    T: Scalar<Real = T> + Gemm,
+    T: RlstScalar<Real = T>,
 {
     if level < 2 {
         panic!("M2L only perfomed on level 2 and below")
@@ -462,11 +461,11 @@ where
         T::from(1. / 2.).unwrap()
     } else {
         let two = T::from(2.0).unwrap();
-        Scalar::powf(two, T::from(level - 3).unwrap())
+        RlstScalar::powf(two, T::from(level - 3).unwrap())
     }
 }
 
-fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
+fn retain_energy<T: Float + Default + RlstScalar<Real = T>>(
     singular_values: &[T],
     percentage: T,
 ) -> usize {
@@ -494,7 +493,7 @@ fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
 impl<T, U> SvdFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -535,7 +534,7 @@ where
 impl<T, U> SvdFieldTranslationKiFmmRcmp<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -585,7 +584,7 @@ where
 impl<T, U> SvdFieldTranslationKiFmmIA<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default + ScaleInvariantKernel<T = T>,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -625,8 +624,8 @@ where
 
 impl<T, U> FieldTranslationData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + Fft,
-    Complex<T>: Scalar,
+    T: RlstScalar<Real = T> + Float + Default + Fft,
+    Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
     type Domain = Domain<T>;
@@ -835,8 +834,8 @@ where
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Float + Scalar<Real = T> + Default + Fft,
-    Complex<T>: Scalar,
+    T: Float + RlstScalar<Real = T> + Default + Fft,
+    Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
     /// Constructor for FFT field translation struct for the kernel independent FMM (KiFMM).

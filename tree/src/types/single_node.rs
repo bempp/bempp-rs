@@ -1,7 +1,7 @@
 //! Data Structures to create octrees on a single node.
 use std::collections::{HashMap, HashSet};
 
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use num::Float;
 
 use crate::types::{
@@ -14,7 +14,7 @@ use crate::types::{
 #[derive(Debug)]
 pub struct SingleNodeTree<T>
 where
-    T: Float + Default + Scalar<Real = T>,
+    T: Float + Default + RlstScalar<Real = T>,
 {
     /// Depth of a tree.
     pub depth: u64,
