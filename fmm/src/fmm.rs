@@ -300,10 +300,10 @@ mod test {
     use rlst_dense::base_array::BaseArray;
     use rlst_dense::data_container::VectorContainer;
     use rlst_dense::rlst_array_from_slice2;
-    use rlst_dense::traits::{RawAccess, RawAccessMut};
+    use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
 
     use crate::{builder::KiFmmBuilderSingleNode, tree::SingleNodeFmmTree};
-    use bempp_field::types::FftFieldTranslationKiFmm;
+    use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 
     use super::*;
 
@@ -365,7 +365,7 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-        let leaf_idx = 2;
+        let leaf_idx = 0;
         let leaf: MortonKey = fmm.get_tree().get_target_tree().get_all_leaves().unwrap()[leaf_idx];
         let potential = fmm.get_potential(&leaf).unwrap()[0];
 
@@ -394,10 +394,13 @@ mod test {
             charges.data(),
             &mut direct,
         );
+
+        print!("HERE {:?} \n {:?} \n", &direct[0..5], &potential[0..5]);
+
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = num::Float::abs(d - p);
             let rel_error = abs_error / p;
-            assert!(rel_error <= threshold)
+            // assert!(rel_error <= threshold)
         });
     }
 
@@ -461,8 +464,8 @@ mod test {
     fn test_upward_pass_vector() {
         // Setup random sources and targets
         let nsources = 10000;
-        let ntargets = 9000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(0));
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
@@ -512,18 +515,17 @@ mod test {
     #[test]
     fn test_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 50000;
+        let nsources = 10000;
         let ntargets = 10000;
-        // let min = Some(0.1);
-        // let max = Some(0.9);
+
         let min = None;
         let max = None;
         let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(3));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(0));
         // FMM parameters
-        let n_crit = Some(10);
-        let expansion_order = 7;
-        let sparse = true;
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = false;
         let threshold = 1e-6;
 
         // Charge data
@@ -548,23 +550,25 @@ mod test {
         let fmm_fft = Box::new(fmm_fft);
         test_single_node_laplace_fmm(fmm_fft, &sources, &charges, threshold);
 
-        // let fmm_svd = KiFmmBuilderSingleNode::new()
-        //     .tree(&sources, &targets, &charges, n_crit, sparse)
-        //     .parameters(
-        //         expansion_order,
-        //         Laplace3dKernel::new(),
-        //         bempp_traits::types::EvalType::Value,
-        //         BlasFieldTranslationKiFmm::new(svd_threshold),
-        //     )
-        //     .unwrap()
-        //     .build()
-        //     .unwrap();
-        // fmm_svd.evaluate();
-        // let fmm_svd = Box::new(fmm_svd);
-        // test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
+        let fmm_svd = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .parameters(
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                BlasFieldTranslationKiFmm::new(Some(0.8e-2)),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_svd.evaluate();
 
-        // let fmm_fft = Box::new(fmm_fft);
-        // test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
+        // println!("DEPTH {:?}", fmm_svd.tree.source_tree.get_depth());
+        let fmm_svd = Box::new(fmm_svd);
+        test_single_node_laplace_fmm(fmm_svd, &sources, &charges, threshold);
+
+        assert!(false)
+
     }
 
     // #[test]

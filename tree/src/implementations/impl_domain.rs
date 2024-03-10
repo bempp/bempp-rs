@@ -12,7 +12,48 @@ impl<T: Float + Default + Debug> Domain<T> {
     ///
     /// # Arguments
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    // pub fn from_local_points(points: &[PointType<T>]) -> Domain<T> {
+    //     // TODO: Should be parametrised by dimension
+    //     let dim = 3;
+    //     let npoints = points.len() / dim;
+    //     let x = points[0..npoints].to_vec();
+    //     let y = points[npoints..2 * npoints].to_vec();
+    //     let z = points[2 * npoints..].to_vec();
+
+    //     let max_x = x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+    //     let max_y = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+    //     let max_z = z.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+    //     let min_x = x.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+    //     let min_y = y.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+    //     let min_z = z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+    //     // Find maximum dimension, this will define the size of the boxes in the domain
+    //     let diameter_x = (*max_x - *min_x).abs();
+    //     let diameter_y = (*max_y - *min_y).abs();
+    //     let diameter_z = (*max_z - *min_z).abs();
+
+    //     // Want a cubic box to place everything in
+    //     let diameter = diameter_x.max(diameter_y).max(diameter_z);
+
+    //     // Increase size of bounding box by 1% along each dimension to capture all points
+    //     let err_fraction = T::from(0.005).unwrap();
+    //     let err = diameter * err_fraction;
+
+    //     let two = T::from(2.0).unwrap();
+    //     let diameter = [
+    //         diameter + two * err,
+    //         diameter + two * err,
+    //         diameter + two * err,
+    //     ];
+
+    //     // The origin is defined by the minimum point
+    //     let origin = [*min_x - err, *min_y - err, *min_z - err];
+
+    //     Domain { origin, diameter }
+    // }
     pub fn from_local_points(points: &[PointType<T>]) -> Domain<T> {
+
         // TODO: Should be parametrised by dimension
         let dim = 3;
         let npoints = points.len() / dim;
@@ -52,7 +93,6 @@ impl<T: Float + Default + Debug> Domain<T> {
 
         Domain { origin, diameter }
     }
-
     pub fn union(&self, other: &Self) -> Self {
         // Find minimum origin
         let min_x = self.origin[0].min(other.origin[0]);

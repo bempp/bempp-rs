@@ -142,15 +142,12 @@ where
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);
 
-            // Set source to target metadata
             // Set the expansion order
             source_to_target.set_expansion_order(self.expansion_order.unwrap());
 
             // Set the associated kernel
             let kernel = self.kernel.as_ref().unwrap().clone();
             source_to_target.set_kernel(kernel);
-
-            // Compute the transfer vectors
 
             // Compute the field translation operators
             source_to_target.set_operator_data(self.expansion_order.unwrap(), self.domain.unwrap());

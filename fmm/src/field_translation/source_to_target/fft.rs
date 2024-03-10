@@ -143,6 +143,7 @@ where
                 let multipoles =
                     &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
 
+
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
                 let mut signals_hat_f_buffer =

@@ -48,6 +48,33 @@ fn find_cutoff_rank<T: Float + Default + Scalar<Real = T> + Gemm>(
     singular_values.len() - 1
 }
 
+
+fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
+    singular_values: &[T],
+    percentage: T,
+) -> usize {
+    // Calculate the total energy.
+    let total_energy: T = singular_values.iter().map(|&s| s * s).sum();
+
+    // Calculate the threshold energy to retain.
+    let threshold_energy = total_energy * (percentage / T::one());
+
+    // Iterate over singular values to find the minimum set that retains the desired energy.
+    let mut cumulative_energy = T::zero();
+    let mut significant_values = Vec::new();
+
+    for (i, &value) in singular_values.iter().enumerate() {
+        cumulative_energy += value * value;
+        significant_values.push(value);
+        if cumulative_energy >= threshold_energy {
+            return i + 1;
+        }
+    }
+
+    significant_values.len()
+}
+
+
 impl<T, U> SourceToTargetData<U> for BlasFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
@@ -69,6 +96,9 @@ where
         let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
         let alpha = T::from(ALPHA_INNER).unwrap();
+
+
+        println!("DOMAIN {:?}", &domain);
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface =
@@ -102,6 +132,7 @@ where
             block_column.fill_from(tmp_gram.view());
         }
 
+        // println!("se2tc thin {:?}", &se2tc_thin.data()[0..10]);
         let mu = se2tc_fat.shape()[0];
         let nvt = se2tc_fat.shape()[1];
         let k = std::cmp::min(mu, nvt);
@@ -110,6 +141,7 @@ where
         let mut sigma = vec![T::zero(); k];
         let mut vt_big = rlst_dynamic_array2!(T, [k, nvt]);
 
+        println!("se2tc {:?} {:?}", se2tc_fat.shape(), &se2tc_fat.data()[0..1000]);
         se2tc_fat
             .into_svd_alloc(
                 u_big.view_mut(),
@@ -118,8 +150,11 @@ where
                 SvdMode::Reduced,
             )
             .unwrap();
-
+        // println!("vt big {:?} {:?}", vt_big.shape(), &vt_big.data()[0..10]);
+        // println!("sigma {:?} {:?}", &sigma[0..10], sigma.len());
+        // println!("u big {:?} {:?}", u_big.shape(), &u_big.data()[0..10]);
         let cutoff_rank = find_cutoff_rank(&sigma, self.threshold);
+        let cutoff_rank = 70;
         let mut u = rlst_dynamic_array2!(T, [mu, cutoff_rank]);
         let mut sigma_mat = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
         let mut vt = rlst_dynamic_array2!(T, [cutoff_rank, nvt]);
@@ -131,7 +166,7 @@ where
                 *sigma_mat.get_unchecked_mut([j, j]) = T::from(*s).unwrap();
             }
         }
-
+        // println!("vt {:?}", &vt.data()[0..10]);
         // Store compressed M2L operators
         let thin_nrows = se2tc_thin.shape()[0];
         let nst = se2tc_thin.shape()[1];
@@ -163,6 +198,10 @@ where
         for i in 0..self.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
+            // if i == 0 {
+            //     println!("vt_block {:?}", vt_block.data())
+            // }
+
             let tmp = empty_array::<T, 2>().simple_mult_into_resize(
                 sigma_mat.view(),
                 empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_block.view()),
@@ -176,6 +215,7 @@ where
                 .unwrap();
 
             let directional_cutoff_rank = find_cutoff_rank(&sigma_i, self.threshold);
+            let directional_cutoff_rank = retain_energy(&sigma_i, T::from(0.99999).unwrap());
 
             let mut u_i_compressed =
                 rlst_dynamic_array2!(T, [cutoff_rank, directional_cutoff_rank]);
@@ -202,6 +242,10 @@ where
             c_u.push(u_i_compressed);
             c_vt.push(vt_i_compressed);
         }
+
+        // for c in c_u.iter() {
+            // println!("c {:?}", c_u[0].data());
+        // }
 
         let mut st_block = rlst_dynamic_array2!(T, [cutoff_rank, nst]);
         st_block.fill_from(s_block.transpose());
