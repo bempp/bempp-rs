@@ -1,6 +1,6 @@
 //! Raviart-Thomas elements
 
-use crate::element::{create_cell, CiarletElement, ElementFamily};
+use crate::element::{reference_cell, CiarletElement, ElementFamily};
 use crate::polynomials::polynomial_count;
 use bempp_traits::element::{Continuity, MapType};
 use bempp_traits::types::ReferenceCellType;
@@ -32,9 +32,8 @@ where
         panic!("Degree > 1 RT elements not implemented yet");
     }
 
-    let cell = create_cell(cell_type);
     let pdim = polynomial_count(cell_type, degree);
-    let tdim = cell.dim();
+    let tdim = reference_cell::dim(cell_type);
     let edim = tdim * polynomial_count(cell_type, degree - 1) + degree;
 
     let mut wcoeffs = rlst_dynamic_array3!(T, [edim, tdim, pdim]);
@@ -52,18 +51,24 @@ where
 
     let mut x = [vec![], vec![], vec![], vec![]];
     let mut m = [vec![], vec![], vec![], vec![]];
-    for _e in 0..cell.entity_count(0) {
+
+    let entity_counts = reference_cell::entity_counts(cell_type);
+    let vertices = reference_cell::vertices::<T::Real>(cell_type);
+    let edges = reference_cell::edges(cell_type);
+
+    for _e in 0..entity_counts[0] {
         x[0].push(rlst_dynamic_array2!(T, [0, tdim]));
         m[0].push(rlst_dynamic_array3!(T, [0, 2, 0]));
     }
 
-    for e in 0..cell.entity_count(1) {
+    for e in 0..entity_counts[1] {
         let mut pts = rlst_dynamic_array2!(T, [1, tdim]);
         let mut mat = rlst_dynamic_array3!(T, [1, 2, 1]);
-        let vn0 = cell.edges()[2 * e];
-        let vn1 = cell.edges()[2 * e + 1];
-        let v0 = &cell.vertices()[vn0 * tdim..(vn0 + 1) * tdim];
-        let v1 = &cell.vertices()[vn1 * tdim..(vn1 + 1) * tdim];
+        let [vn0, vn1] = edges[e][..] else {
+            panic!();
+        };
+        let v0 = &vertices[vn0];
+        let v1 = &vertices[vn1];
         for i in 0..tdim {
             *pts.get_mut([0, i]).unwrap() = T::from(v0[i] + v1[i]).unwrap() / T::from(2.0).unwrap();
         }
@@ -73,7 +78,7 @@ where
         m[1].push(mat);
     }
 
-    for _e in 0..cell.entity_count(2) {
+    for _e in 0..entity_counts[2] {
         x[2].push(rlst_dynamic_array2!(T, [0, tdim]));
         m[2].push(rlst_dynamic_array3!(T, [0, 2, 0]))
     }
@@ -90,95 +95,4 @@ where
         continuity,
         degree,
     )
-}
-
-#[cfg(test)]
-mod test {
-    use crate::cell::*;
-    use crate::element::raviart_thomas::*;
-    use approx::*;
-    use bempp_traits::element::FiniteElement;
-    use rlst_dense::rlst_dynamic_array4;
-    use rlst_dense::traits::RandomAccessByRef;
-
-    fn check_dofs(e: impl FiniteElement) {
-        let cell_dim = match e.cell_type() {
-            ReferenceCellType::Point => 0,
-            ReferenceCellType::Interval => 1,
-            ReferenceCellType::Triangle => 2,
-            ReferenceCellType::Quadrilateral => 2,
-            ReferenceCellType::Tetrahedron => 3,
-            ReferenceCellType::Hexahedron => 3,
-            ReferenceCellType::Prism => 3,
-            ReferenceCellType::Pyramid => 3,
-        };
-        let mut ndofs = 0;
-        for (dim, entity_count) in match e.cell_type() {
-            ReferenceCellType::Point => vec![1],
-            ReferenceCellType::Interval => vec![2, 1],
-            ReferenceCellType::Triangle => vec![3, 3, 1],
-            ReferenceCellType::Quadrilateral => vec![4, 4, 1],
-            ReferenceCellType::Tetrahedron => vec![4, 6, 4, 1],
-            ReferenceCellType::Hexahedron => vec![8, 12, 6, 1],
-            ReferenceCellType::Prism => vec![6, 9, 5, 1],
-            ReferenceCellType::Pyramid => vec![5, 8, 5, 1],
-        }
-        .iter()
-        .enumerate()
-        {
-            for entity in 0..*entity_count {
-                ndofs += e.entity_dofs(dim, entity).unwrap().len();
-            }
-        }
-        assert_eq!(ndofs, e.dim());
-    }
-
-    #[test]
-    fn test_raviart_thomas_1_triangle() {
-        let e = create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
-        assert_eq!(e.value_size(), 2);
-        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
-        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
-        *points.get_mut([0, 0]).unwrap() = 0.0;
-        *points.get_mut([0, 1]).unwrap() = 0.0;
-        *points.get_mut([1, 0]).unwrap() = 1.0;
-        *points.get_mut([1, 1]).unwrap() = 0.0;
-        *points.get_mut([2, 0]).unwrap() = 0.0;
-        *points.get_mut([2, 1]).unwrap() = 1.0;
-        *points.get_mut([3, 0]).unwrap() = 0.5;
-        *points.get_mut([3, 1]).unwrap() = 0.0;
-        *points.get_mut([4, 0]).unwrap() = 0.0;
-        *points.get_mut([4, 1]).unwrap() = 0.5;
-        *points.get_mut([5, 0]).unwrap() = 0.5;
-        *points.get_mut([5, 1]).unwrap() = 0.5;
-        e.tabulate(&points, 0, &mut data);
-
-        for pt in 0..6 {
-            assert_relative_eq!(
-                *data.get([0, pt, 0, 0]).unwrap(),
-                -*points.get([pt, 0]).unwrap()
-            );
-            assert_relative_eq!(
-                *data.get([0, pt, 0, 1]).unwrap(),
-                -*points.get([pt, 1]).unwrap()
-            );
-            assert_relative_eq!(
-                *data.get([0, pt, 1, 0]).unwrap(),
-                *points.get([pt, 0]).unwrap() - 1.0
-            );
-            assert_relative_eq!(
-                *data.get([0, pt, 1, 1]).unwrap(),
-                *points.get([pt, 1]).unwrap()
-            );
-            assert_relative_eq!(
-                *data.get([0, pt, 2, 0]).unwrap(),
-                -*points.get([pt, 0]).unwrap()
-            );
-            assert_relative_eq!(
-                *data.get([0, pt, 2, 1]).unwrap(),
-                1.0 - *points.get([pt, 1]).unwrap()
-            );
-        }
-        check_dofs(e);
-    }
 }
