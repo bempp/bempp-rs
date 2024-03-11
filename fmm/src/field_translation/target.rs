@@ -105,6 +105,7 @@ where
                         }
                     });
             }
+
             FmmEvalType::Matrix(nmatvec) => {
                 let mut parent_locals = vec![Vec::new(); nparents];
                 for (parent_idx, parent) in parent_sources.iter().enumerate() {

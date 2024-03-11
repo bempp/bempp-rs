@@ -19,7 +19,6 @@ fn main() {
 
     // FFT based M2L for a vector of charges
     {
-        // Charge data
         let nvecs = 1;
         let tmp = vec![1.0; nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
@@ -75,7 +74,6 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
 
-        // fmm with blas based field translatio
         let fmm_mat = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)
             .parameters(
