@@ -414,9 +414,9 @@ where
                                     .fill_from(target_coordinates_row_major.view());
 
                                 if let Some(u_list) = self.tree.near_field(leaf) {
-                                    let u_list_indices = u_list.iter().filter_map(|k| {
-                                        self.tree.source_tree().leaf_index(k)
-                                    });
+                                    let u_list_indices = u_list
+                                        .iter()
+                                        .filter_map(|k| self.tree.source_tree().leaf_index(k));
 
                                     let charge_vec_displacement = i * n_all_source_coordinates;
                                     let charges = u_list_indices

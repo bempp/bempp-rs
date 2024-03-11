@@ -353,13 +353,7 @@ where
         // Check if we are computing matvec or matmul
         let [_ncharges, nmatvecs] = charges.shape();
 
-        let ntarget_points = self
-            .tree
-            .target_tree()
-            .all_coordinates()
-            .unwrap()
-            .len()
-            / self.dim;
+        let ntarget_points = self.tree.target_tree().all_coordinates().unwrap().len() / self.dim;
 
         let nsource_keys = self.tree.source_tree().nkeys_tot().unwrap();
         let ntarget_keys = self.tree.target_tree().nkeys_tot().unwrap();

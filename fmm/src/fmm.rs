@@ -330,13 +330,8 @@ where
     }
 
     fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
-        let ntarget_coordinates = self
-            .tree
-            .target_tree()
-            .all_coordinates()
-            .unwrap()
-            .len()
-            / self.dim();
+        let ntarget_coordinates =
+            self.tree.target_tree().all_coordinates().unwrap().len() / self.dim();
 
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
@@ -507,21 +502,13 @@ mod test {
         let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
 
-        let leaf_targets = fmm
-            .tree()
-            .target_tree()
-            .coordinates(&leaf)
-            .unwrap();
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
         let ntargets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::zero(); ntargets * eval_size];
 
-        let leaf_coordinates_row_major = rlst_array_from_slice2!(
-            T,
-            leaf_targets,
-            [ntargets, fmm.dim()],
-            [fmm.dim(), 1]
-        );
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
@@ -557,20 +544,12 @@ mod test {
         let leaf_idx = 0;
         let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
 
-        let leaf_targets = fmm
-            .tree()
-            .target_tree()
-            .coordinates(&leaf)
-            .unwrap();
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
         let ntargets = leaf_targets.len() / fmm.dim();
 
-        let leaf_coordinates_row_major = rlst_array_from_slice2!(
-            T,
-            leaf_targets,
-            [ntargets, fmm.dim()],
-            [fmm.dim(), 1]
-        );
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
 
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());

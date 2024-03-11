@@ -39,11 +39,7 @@ where
             .iter()
             .flat_map(|n| n.children())
             .filter(|nc| {
-                self.source_tree()
-                    .all_keys_set()
-                    .unwrap()
-                    .contains(nc)
-                    && leaf.is_adjacent(nc)
+                self.source_tree().all_keys_set().unwrap().contains(nc) && leaf.is_adjacent(nc)
             })
             .collect();
 
@@ -51,11 +47,7 @@ where
         let mut neighbors_adj = neighbours
             .iter()
             .filter(|n| {
-                self.source_tree()
-                    .all_keys_set()
-                    .unwrap()
-                    .contains(n)
-                    && leaf.is_adjacent(n)
+                self.source_tree().all_keys_set().unwrap().contains(n) && leaf.is_adjacent(n)
             })
             .cloned()
             .collect();
@@ -66,11 +58,7 @@ where
             .neighbors()
             .into_iter()
             .filter(|pn| {
-                self.source_tree()
-                    .all_keys_set()
-                    .unwrap()
-                    .contains(pn)
-                    && leaf.is_adjacent(pn)
+                self.source_tree().all_keys_set().unwrap().contains(pn) && leaf.is_adjacent(pn)
             })
             .collect();
 
