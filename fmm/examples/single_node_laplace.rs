@@ -39,17 +39,20 @@ fn main() {
         fmm_fft.evaluate();
     }
 
-    // BLAS based M2L for a vector of charges
+    // BLAS based M2L
     {
-        // Charge data
+        // Vector of charges
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        charges
+            .data_mut()
+            .chunks_exact_mut(nsources)
+            .enumerate()
+            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
 
         let singular_value_threshold = Some(1e-5);
 
-        let fmm_blas = KiFmmBuilderSingleNode::new()
+        let fmm_vec = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, &charges, n_crit, sparse)
             .parameters(
                 expansion_order,
@@ -60,6 +63,30 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_blas.evaluate();
+        fmm_vec.evaluate();
+
+        // Matrix of charges
+        let nvecs = 5;
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+
+        charges
+            .data_mut()
+            .chunks_exact_mut(nsources)
+            .enumerate()
+            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
+
+        // fmm with blas based field translatio
+        let fmm_mat = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .parameters(
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                BlasFieldTranslationKiFmm::new(singular_value_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_mat.evaluate();
     }
 }
