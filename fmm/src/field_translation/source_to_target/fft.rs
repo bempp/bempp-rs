@@ -12,7 +12,7 @@ use rayon::prelude::*;
 use rlst_dense::base_array::BaseArray;
 use rlst_dense::data_container::VectorContainer;
 use rlst_dense::{array::Array, types::RlstScalar};
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::RwLock};
 
 use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
@@ -39,9 +39,9 @@ where
     U: RlstScalar<Real = U> + Float + Default + Fft,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTree<U>>,
+    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
-    fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
+    fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
         let targets = self.tree.get_target_tree().get_keys(level).unwrap();
 
         let targets_parents: HashSet<MortonKey> =
@@ -58,7 +58,8 @@ where
         sources_parents.sort();
         let nsources_parents = sources_parents.len();
 
-        let mut result = vec![Vec::new(); NHALO];
+        let result = vec![Vec::new(); NHALO];
+        let result = result.into_iter().map(RwLock::new).collect_vec();
 
         let targets_parents_neighbors = targets_parents
             .iter()
@@ -67,7 +68,8 @@ where
 
         let zero_displacement = nsources_parents * NSIBLINGS;
 
-        for i in 0..NHALO {
+        (0..NHALO).into_par_iter().for_each(|i| {
+            let mut result_i = result[i].write().unwrap();
             for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
                 // Check if neighbor exists in a valid tree
                 if let Some(neighbor) = all_neighbors[i] {
@@ -76,15 +78,16 @@ where
                     if let Some(neighbor_displacement) =
                         self.level_index_pointer_multipoles[level as usize].get(&first_child)
                     {
-                        result[i].push(*neighbor_displacement)
+                        result_i.push(*neighbor_displacement)
                     } else {
-                        result[i].push(zero_displacement)
+                        result_i.push(zero_displacement)
                     }
                 } else {
-                    result[i].push(zero_displacement)
+                    result_i.push(zero_displacement)
                 }
             }
-        }
+        });
+
         result
     }
 }
@@ -320,8 +323,8 @@ where
                                         let frequency_offset = freq * NHALO;
                                         let k_f = &kernel_data_ft[i + frequency_offset];
                                         // Lookup signals
-                                        let displacements =
-                                            &all_displacements[i][chunk_start..chunk_end];
+                                        let displacements = &all_displacements[i].read().unwrap()
+                                            [chunk_start..chunk_end];
 
                                         for j in 0..(chunk_end - chunk_start) {
                                             let displacement = displacements[j];

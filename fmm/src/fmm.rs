@@ -498,10 +498,9 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-        let eval_size;
-        match eval_type {
-            EvalType::Value => eval_size = 1,
-            EvalType::ValueDeriv => eval_size = 4,
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
         };
 
         let leaf_idx = 0;
@@ -646,7 +645,7 @@ mod test {
                 bempp_traits::types::EvalType::Value,
                 &upward_equivalent_surface,
                 &test_point,
-                &multipole_i,
+                multipole_i,
                 &mut found[eval_idx..eval_idx + 1],
             );
         }
