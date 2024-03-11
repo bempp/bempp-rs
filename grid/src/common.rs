@@ -1,6 +1,7 @@
 //! Functionality common to multiple grid implementations
 
 use crate::traits::Geometry;
+use num::Float;
 use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::Array,
@@ -8,7 +9,7 @@ use rlst_dense::{
 };
 
 /// Compute a physical point
-pub fn compute_point<T: RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>>(
+pub fn compute_point<T: Float + RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>>(
     geometry: &impl Geometry<T = T>,
     table: Table,
     cell_index: usize,
@@ -31,7 +32,7 @@ pub fn compute_point<T: RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, It
 }
 
 /// Compute a Jacobian
-pub fn compute_jacobian<T: RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>>(
+pub fn compute_jacobian<T: Float + RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>>(
     geometry: &impl Geometry<T = T>,
     table: Table,
     tdim: usize,
@@ -58,7 +59,7 @@ pub fn compute_jacobian<T: RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4,
 }
 
 /// Compute a normal from a Jacobian of a cell with topological dimension 2 and geometric dimension 3
-pub fn compute_normal_from_jacobian23<T: RlstScalar<Real=T>>(jacobian: &[T], normal: &mut [T]) {
+pub fn compute_normal_from_jacobian23<T: Float + RlstScalar<Real=T>>(jacobian: &[T], normal: &mut [T]) {
     assert_eq!(jacobian.len(), 6);
     assert_eq!(normal.len(), 3);
 
@@ -120,7 +121,7 @@ pub fn compute_det<T: RlstScalar<Real = T>>(jacobian: &[T], tdim: usize, gdim: u
 
 /// Compute the diameter of a triangle
 pub fn compute_diameter_triangle<
-    T: RlstScalar<Real = T>,
+    T: Float + Float + RlstScalar<Real = T>,
     ArrayImpl: UnsafeRandomAccessByValue<1, Item = T> + Shape<1>,
 >(
     v0: Array<T, ArrayImpl, 1>,
@@ -135,7 +136,7 @@ pub fn compute_diameter_triangle<
 
 /// Compute the diameter of a quadrilateral
 pub fn compute_diameter_quadrilateral<
-    T: RlstScalar<Real = T>,
+    T: Float + RlstScalar<Real = T>,
     ArrayImpl: UnsafeRandomAccessByValue<1, Item = T> + Shape<1>,
 >(
     v0: Array<T, ArrayImpl, 1>,

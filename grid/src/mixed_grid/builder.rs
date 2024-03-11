@@ -1,11 +1,13 @@
 //! Grid builder
 
 use crate::mixed_grid::grid::SerialMixedGrid;
+use crate::traits_impl::WrappedGrid;
 use bempp_traits::grid::Builder;
 use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_traits::element::{Continuity, FiniteElement};
 use rlst_dense::types::RlstScalar;
+use num::Float;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -16,7 +18,7 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// Grid builder for a mixed grid
-pub struct SerialMixedGridBuilder<const GDIM: usize, T: RlstScalar<Real = T>> {
+pub struct SerialMixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
     elements_to_npoints: HashMap<(ReferenceCellType, usize), usize>,
     points: Vec<T>,
     cells: Vec<usize>,
@@ -28,12 +30,12 @@ pub struct SerialMixedGridBuilder<const GDIM: usize, T: RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<const GDIM: usize, T: RlstScalar<Real = T>> Builder<GDIM>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM>
     for SerialMixedGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    type GridType = SerialMixedGrid<T>;
+    type GridType = WrappedGrid<SerialMixedGrid<T>>;
     type T = T;
     type CellData = (Vec<usize>, ReferenceCellType, usize);
     type GridMetadata = ();
@@ -110,7 +112,7 @@ where
             [npts, 3],
             [1, npts]
         ));
-        SerialMixedGrid::new(
+        WrappedGrid { grid: SerialMixedGrid::new(
             points,
             &self.cells,
             &self.cell_types,
@@ -118,6 +120,6 @@ where
             self.point_indices_to_ids,
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
-        )
+        ) }
     }
 }

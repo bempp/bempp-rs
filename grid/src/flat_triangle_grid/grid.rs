@@ -7,6 +7,7 @@ use bempp_element::reference_cell;
 use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use bempp_element::element::{create_element, CiarletElement, ElementFamily};
 use bempp_traits::element::{Continuity, FiniteElement};
+use num::Float;
 use rlst_proc_macro::rlst_static_array;
 use rlst_dense::types::RlstScalar;
 use rlst_dense::{
@@ -23,7 +24,7 @@ use rlst_proc_macro::rlst_static_type;
 use std::collections::HashMap;
 
 /// A flat triangle grid
-pub struct SerialFlatTriangleGrid<T: RlstScalar<Real = T>> {
+pub struct SerialFlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     index_map: Vec<usize>,
 
     // Geometry information
@@ -49,7 +50,7 @@ pub struct SerialFlatTriangleGrid<T: RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: RlstScalar<Real = T>> SerialFlatTriangleGrid<T>
+impl<T: Float + RlstScalar<Real = T>> SerialFlatTriangleGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -198,7 +199,7 @@ where
     }
 }
 
-impl<T: RlstScalar<Real = T>> Grid for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Grid for SerialFlatTriangleGrid<T> {
     type T = T;
     type Topology = Self;
     type Geometry = Self;
@@ -216,7 +217,7 @@ impl<T: RlstScalar<Real = T>> Grid for SerialFlatTriangleGrid<T> {
     }
 }
 
-impl<T: RlstScalar<Real = T>> Geometry for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Geometry for SerialFlatTriangleGrid<T> {
     type IndexType = usize;
     type T = T;
     type Element = CiarletElement<T>;
@@ -306,12 +307,12 @@ impl<T: RlstScalar<Real = T>> Geometry for SerialFlatTriangleGrid<T> {
 }
 
 /// Geometry evaluator for a flat triangle grid
-pub struct GeometryEvaluatorFlatTriangle<'a, T: RlstScalar<Real = T>> {
+pub struct GeometryEvaluatorFlatTriangle<'a, T: Float + RlstScalar<Real = T>> {
     grid: &'a SerialFlatTriangleGrid<T>,
     points: SliceArray<'a, T, 2>,
 }
 
-impl<'a, T: RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
     /// Create a geometry evaluator
     fn new(grid: &'a SerialFlatTriangleGrid<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(grid.element.cell_type());
@@ -324,7 +325,7 @@ impl<'a, T: RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
     }
 }
 
-impl<'a, T: RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluatorFlatTriangle<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluatorFlatTriangle<'a, T> {
     type T = T;
 
     fn point_count(&self) -> usize {
@@ -357,7 +358,7 @@ impl<'a, T: RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluatorFlatTri
     }
 }
 
-impl<T: RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
     type IndexType = usize;
 
     fn dim(&self) -> usize {

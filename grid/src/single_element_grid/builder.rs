@@ -1,11 +1,13 @@
 //! Grid builder
 
 use crate::single_element_grid::grid::SerialSingleElementGrid;
+use crate::traits_impl::WrappedGrid;
 use bempp_traits::grid::Builder;
 use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_traits::element::{Continuity, FiniteElement};
 use rlst_dense::types::RlstScalar;
+use num::Float;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -16,7 +18,7 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// Grid builder for a single element grid
-pub struct SerialSingleElementGridBuilder<const GDIM: usize, T: RlstScalar<Real = T>> {
+pub struct SerialSingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
     element_data: (ReferenceCellType, usize),
     points_per_cell: usize,
     points: Vec<T>,
@@ -27,12 +29,12 @@ pub struct SerialSingleElementGridBuilder<const GDIM: usize, T: RlstScalar<Real 
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<const GDIM: usize, T: RlstScalar<Real = T>> Builder<GDIM>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM>
     for SerialSingleElementGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    type GridType = SerialSingleElementGrid<T>;
+    type GridType = WrappedGrid<SerialSingleElementGrid<T>>;
     type T = T;
     type CellData = Vec<usize>;
     type GridMetadata = (ReferenceCellType, usize);
@@ -104,7 +106,7 @@ where
             [npts, 3],
             [1, npts]
         ));
-        SerialSingleElementGrid::new(
+        WrappedGrid { grid: SerialSingleElementGrid::new(
             points,
             &self.cells,
             self.element_data.0,
@@ -113,6 +115,6 @@ where
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
             self.cell_ids_to_indices,
-        )
+        ) }
     }
 }

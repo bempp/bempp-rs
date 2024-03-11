@@ -11,6 +11,7 @@ use bempp_element::element::CiarletElement;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::element::FiniteElement;
 use rlst_dense::types::RlstScalar;
+use num::Float;
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
@@ -21,7 +22,7 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// Geometry of a serial grid
-pub struct SerialMixedGeometry<T: RlstScalar<Real = T>> {
+pub struct SerialMixedGeometry<T: Float + RlstScalar<Real = T>> {
     dim: usize,
     index_map: Vec<(usize, usize)>,
     coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -37,9 +38,9 @@ pub struct SerialMixedGeometry<T: RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, (usize, usize)>,
 }
 
-unsafe impl<T: RlstScalar<Real = T>> Sync for SerialMixedGeometry<T> {}
+unsafe impl<T: Float + RlstScalar<Real = T>> Sync for SerialMixedGeometry<T> {}
 
-impl<T: RlstScalar<Real = T>> SerialMixedGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> SerialMixedGeometry<T> {
     /// Create a geometry
     pub fn new(
         coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -216,7 +217,7 @@ impl<T: RlstScalar<Real = T>> SerialMixedGeometry<T> {
     }
 }
 
-impl<T: RlstScalar<Real = T>> Geometry for SerialMixedGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> Geometry for SerialMixedGeometry<T> {
     type IndexType = (usize, usize);
     type T = T;
     type Element = CiarletElement<T>;
@@ -315,13 +316,13 @@ impl<T: RlstScalar<Real = T>> Geometry for SerialMixedGeometry<T> {
 }
 
 /// Geometry evaluator for a mixed grid
-pub struct GeometryEvaluatorMixed<'a, T: RlstScalar<Real = T>> {
+pub struct GeometryEvaluatorMixed<'a, T: Float + RlstScalar<Real = T>> {
     geometry: &'a SerialMixedGeometry<T>,
     tdim: usize,
     tables: Vec<Array<T, BaseArray<T, VectorContainer<T>, 4>, 4>>,
 }
 
-impl<'a, T: RlstScalar<Real = T>> GeometryEvaluatorMixed<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorMixed<'a, T> {
     /// Create a geometry evaluator
     fn new(geometry: &'a SerialMixedGeometry<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(geometry.elements[0].cell_type());
@@ -344,7 +345,7 @@ impl<'a, T: RlstScalar<Real = T>> GeometryEvaluatorMixed<'a, T> {
     }
 }
 
-impl<'a, T: RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluatorMixed<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluatorMixed<'a, T> {
     type T = T;
 
     fn point_count(&self) -> usize {

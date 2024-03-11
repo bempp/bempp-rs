@@ -8,6 +8,7 @@ use bempp_element::element::{create_element, ElementFamily};
 use bempp_traits::element::{Continuity, FiniteElement};
 use log::warn;
 use rlst_dense::types::RlstScalar;
+use num::Float;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -17,12 +18,12 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// A mixed grid
-pub struct SerialMixedGrid<T: RlstScalar<Real = T>> {
+pub struct SerialMixedGrid<T: Float + RlstScalar<Real = T>> {
     topology: SerialMixedTopology,
     geometry: SerialMixedGeometry<T>,
 }
 
-impl<T: RlstScalar<Real = T>> SerialMixedGrid<T>
+impl<T: Float + RlstScalar<Real = T>> SerialMixedGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -88,7 +89,7 @@ where
     }
 }
 
-impl<T: RlstScalar<Real = T>> Grid for SerialMixedGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Grid for SerialMixedGrid<T> {
     type T = T;
     type Topology = SerialMixedTopology;
     type Geometry = SerialMixedGeometry<T>;

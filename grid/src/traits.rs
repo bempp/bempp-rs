@@ -3,6 +3,7 @@
 use bempp_traits::types::{ReferenceCellType, CellLocalIndexPair};
 use bempp_traits::element::FiniteElement;
 use rlst_dense::types::RlstScalar;
+use num::Float;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ownership {
@@ -71,7 +72,7 @@ pub trait Topology {
 /// This provides information about the physical locations of mesh points in space
 pub trait Geometry {
     type IndexType: std::fmt::Debug + Eq + Copy;
-    type T: RlstScalar<Real=Self::T>;
+    type T: Float + RlstScalar<Real=Self::T>;
     type Element: FiniteElement;
     type Evaluator<'a>: GeometryEvaluator<T = Self::T>
     where
@@ -134,7 +135,7 @@ pub trait Geometry {
 ///
 /// A geometry evaluator can compute points and jacobians on physical cells
 pub trait GeometryEvaluator {
-    type T: RlstScalar<Real=Self::T>;
+    type T: Float + RlstScalar<Real=Self::T>;
 
     /// The number of points on the reference cell used by this evaluator
     fn point_count(&self) -> usize;
@@ -151,7 +152,7 @@ pub trait GeometryEvaluator {
 
 /// A grid
 pub trait Grid {
-    type T: RlstScalar<Real=Self::T>;
+    type T: Float + RlstScalar<Real=Self::T>;
 
     /// The type that implements [Topology]
     type Topology: Topology;

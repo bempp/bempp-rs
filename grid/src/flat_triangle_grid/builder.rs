@@ -1,8 +1,10 @@
 //! Grid builder
 
 use crate::flat_triangle_grid::grid::SerialFlatTriangleGrid;
+use crate::traits_impl::WrappedGrid;
 use bempp_traits::grid::Builder;
 use rlst_dense::types::RlstScalar;
+use num::Float;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -13,7 +15,7 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// Grid builder for a flat triangle grid
-pub struct SerialFlatTriangleGridBuilder<T: RlstScalar<Real = T>> {
+pub struct SerialFlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
     points: Vec<T>,
     cells: Vec<usize>,
     point_indices_to_ids: Vec<usize>,
@@ -22,11 +24,11 @@ pub struct SerialFlatTriangleGridBuilder<T: RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: RlstScalar<Real = T>> Builder<3> for SerialFlatTriangleGridBuilder<T>
+impl<T: Float + RlstScalar<Real = T>> Builder<3> for SerialFlatTriangleGridBuilder<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    type GridType = SerialFlatTriangleGrid<T>;
+    type GridType = WrappedGrid<SerialFlatTriangleGrid<T>>;
     type T = T;
     type CellData = [usize; 3];
     type GridMetadata = ();
@@ -79,13 +81,13 @@ where
             [npts, 3],
             [1, npts]
         ));
-        SerialFlatTriangleGrid::new(
+        WrappedGrid { grid: SerialFlatTriangleGrid::new(
             points,
             &self.cells,
             self.point_indices_to_ids,
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
             self.cell_ids_to_indices,
-        )
+        ) }
     }
 }

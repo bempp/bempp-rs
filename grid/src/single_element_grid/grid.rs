@@ -10,6 +10,7 @@ use bempp_element::element::{create_element, ElementFamily};
 use bempp_traits::element::{Continuity, FiniteElement};
 use log::warn;
 use rlst_dense::types::RlstScalar;
+use num::Float;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -19,12 +20,12 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// A single element grid
-pub struct SerialSingleElementGrid<T: RlstScalar<Real=T>> {
+pub struct SerialSingleElementGrid<T: Float + RlstScalar<Real=T>> {
     topology: SerialSingleElementTopology,
     geometry: SerialSingleElementGeometry<T>,
 }
 
-impl<T: RlstScalar<Real = T>> SerialSingleElementGrid<T>
+impl<T: Float + RlstScalar<Real = T>> SerialSingleElementGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -79,7 +80,7 @@ where
     }
 }
 
-impl<T: RlstScalar<Real=T>> Grid for SerialSingleElementGrid<T> {
+impl<T: Float + RlstScalar<Real=T>> Grid for SerialSingleElementGrid<T> {
     type T = T;
     type Topology = SerialSingleElementTopology;
     type Geometry = SerialSingleElementGeometry<T>;
