@@ -85,36 +85,45 @@ where
         targets: &Coordinates<U>,
         n_crit: Option<u64>,
         sparse: bool,
-    ) -> Self {
-        // Source and target trees calcualted over the same domain
-        let source_domain = Domain::from_local_points(sources.data());
-        let target_domain = Domain::from_local_points(targets.data());
+    ) -> Result<Self, String> {
+        let [nsources, dims] = sources.shape();
+        let [ntargets, dimt] = targets.shape();
 
-        // Calculate union of domains for source and target points, needed to define operators
-        let domain = source_domain.union(&target_domain);
-        self.domain = Some(domain);
+        if dims < 3 || dimt < 3 {
+            Err("Only 3D KiFMM supported with this builder".to_string())
+        } else if nsources == 0 || ntargets == 0 {
+            Err("Must have a positive number of source or target particles".to_string())
+        } else {
+            // Source and target trees calcualted over the same domain
+            let source_domain = Domain::from_local_points(sources.data());
+            let target_domain = Domain::from_local_points(targets.data());
 
-        // If not specified estimate from point data estimate critical value
-        let n_crit = n_crit.unwrap_or(N_CRIT);
-        let [nsources, _dim] = sources.shape();
-        let [ntargets, _dim] = targets.shape();
+            // Calculate union of domains for source and target points, needed to define operators
+            let domain = source_domain.union(&target_domain);
+            self.domain = Some(domain);
 
-        // Estimate depth based on a uniform distribution
-        let source_depth = SingleNodeTree::<U>::minimum_depth(nsources as u64, n_crit);
-        let target_depth = SingleNodeTree::<U>::minimum_depth(ntargets as u64, n_crit);
-        let depth = source_depth.max(target_depth); // refine source and target trees to same depth
+            // If not specified estimate from point data estimate critical value
+            let n_crit = n_crit.unwrap_or(N_CRIT);
+            let [nsources, _dim] = sources.shape();
+            let [ntargets, _dim] = targets.shape();
 
-        let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain);
-        let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain);
+            // Estimate depth based on a uniform distribution
+            let source_depth = SingleNodeTree::<U>::minimum_depth(nsources as u64, n_crit);
+            let target_depth = SingleNodeTree::<U>::minimum_depth(ntargets as u64, n_crit);
+            let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-        let fmm_tree = SingleNodeFmmTree {
-            source_tree,
-            target_tree,
-            domain,
-        };
+            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain);
+            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain);
 
-        self.tree = Some(fmm_tree);
-        self
+            let fmm_tree = SingleNodeFmmTree {
+                source_tree,
+                target_tree,
+                domain,
+            };
+
+            self.tree = Some(fmm_tree);
+            Ok(self)
+        }
     }
 
     pub fn parameters(

@@ -26,6 +26,7 @@ fn main() {
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
             .parameters(
                 &charges,
                 expansion_order,
@@ -54,6 +55,7 @@ fn main() {
 
         let fmm_vec = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
             .parameters(
                 &charges,
                 expansion_order,
@@ -78,6 +80,7 @@ fn main() {
 
         let fmm_mat = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
             .parameters(
                 &charges,
                 expansion_order,

@@ -677,6 +677,7 @@ mod test {
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
             .parameters(
                 &charges,
                 expansion_order,
@@ -692,6 +693,7 @@ mod test {
         let svd_threshold = Some(1e-5);
         let fmm_svd = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
             .parameters(
                 &charges,
                 expansion_order,
@@ -740,6 +742,7 @@ mod test {
             // Evaluate potentials
             let fmm_fft = KiFmmBuilderSingleNode::new()
                 .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
                 .parameters(
                     &charges,
                     expansion_order,
@@ -758,6 +761,7 @@ mod test {
             // Evaluate potentials + derivatives
             let fmm_fft = KiFmmBuilderSingleNode::new()
                 .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
                 .parameters(
                     &charges,
                     expansion_order,
@@ -779,6 +783,7 @@ mod test {
             // Evaluate potentials
             let fmm_blas = KiFmmBuilderSingleNode::new()
                 .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
                 .parameters(
                     &charges,
                     expansion_order,
@@ -797,6 +802,7 @@ mod test {
             // Evaluate potentials + derivatives
             let fmm_blas = KiFmmBuilderSingleNode::new()
                 .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
                 .parameters(
                     &charges,
                     expansion_order,
@@ -851,6 +857,7 @@ mod test {
         {
             let fmm_blas = KiFmmBuilderSingleNode::new()
                 .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
                 .parameters(
                     &charges,
                     expansion_order,
@@ -894,6 +901,7 @@ mod test {
 
         let fmm_blas = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
             .parameters(
                 &charges,
                 expansion_order,
