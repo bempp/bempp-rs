@@ -207,7 +207,7 @@ impl Topology for SerialMixedTopology {
     fn dim(&self) -> usize {
         self.dim
     }
-    fn index_map(&self) -> &[Self::IndexType] {
+    fn index_map(&self) -> &[IndexType] {
         &self.index_map
     }
     fn entity_count(&self, etype: ReferenceCellType) -> usize {
@@ -224,7 +224,7 @@ impl Topology for SerialMixedTopology {
             .map(|e| self.entity_count(*e))
             .sum()
     }
-    fn cell(&self, index: Self::IndexType) -> Option<&[IndexType]> {
+    fn cell(&self, index: IndexType) -> Option<&[IndexType]> {
         if self.cells_to_entities[0].contains_key(&index.0)
             && index.1 < self.cells_to_entities[0][&index.0].len()
         {
@@ -233,7 +233,7 @@ impl Topology for SerialMixedTopology {
             None
         }
     }
-    fn cell_type(&self, index: Self::IndexType) -> Option<ReferenceCellType> {
+    fn cell_type(&self, index: IndexType) -> Option<ReferenceCellType> {
         if self.cells_to_entities[0].contains_key(&index.0)
             && index.1 < self.cells_to_entities[0][&index.0].len()
         {
@@ -247,15 +247,15 @@ impl Topology for SerialMixedTopology {
         &self.entity_types[dim]
     }
 
-    fn entity_ownership(&self, _dim: usize, _index: Self::IndexType) -> Ownership {
+    fn entity_ownership(&self, _dim: usize, _index: IndexType) -> Ownership {
         Ownership::Owned
     }
 
     fn entity_to_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
-    ) -> Option<&[CellLocalIndexPair<Self::IndexType>]> {
+        index: IndexType,
+    ) -> Option<&[CellLocalIndexPair<IndexType>]> {
         if dim <= self.dim
             && self.entities_to_cells[dim].contains_key(&index.0)
             && index.1 < self.entities_to_cells[dim][&index.0].len()
@@ -265,7 +265,7 @@ impl Topology for SerialMixedTopology {
             None
         }
     }
-    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[Self::IndexType]> {
+    fn cell_to_entities(&self, index: IndexType, dim: usize) -> Option<&[IndexType]> {
         if dim <= self.dim
             && self.cells_to_entities[dim].contains_key(&index.0)
             && index.1 < self.cells_to_entities[dim][&index.0].len()
@@ -276,7 +276,7 @@ impl Topology for SerialMixedTopology {
         }
     }
 
-    fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]> {
+    fn entity_vertices(&self, dim: usize, index: IndexType) -> Option<&[IndexType]> {
         if dim == self.dim {
             self.cell_to_entities(index, 0)
         } else if dim < self.dim
@@ -304,6 +304,16 @@ impl Topology for SerialMixedTopology {
     }
     fn cell_id_to_index(&self, id: usize) -> IndexType {
         self.cell_ids_to_indices[&id]
+    }
+    fn flat_index(&self, index: IndexType) -> usize {
+        let mut out = 0;
+        for etype in self.entity_types(reference_cell::dim(index.0)) {
+            if *etype == index.0 {
+                break;
+            }
+            out += self.entity_count(*etype);
+        }
+        out + index.1
     }
 }
 

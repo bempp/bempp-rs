@@ -1,19 +1,18 @@
 use crate::dofmap::SerialDofMap;
 use bempp_element::element::CiarletElement;
-use bempp_grid::grid::SerialGrid;
 use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::FunctionSpace;
+use bempp_traits::grid::GridType;
 use bempp_traits::element::FiniteElement;
-use bempp_traits::grid::{Grid, Topology};
 
-pub struct SerialFunctionSpace<'a> {
-    grid: &'a SerialGrid,
+pub struct SerialFunctionSpace<'a, GridImpl: GridType> {
+    grid: &'a GridImpl,
     element: &'a CiarletElement<f64>,
     dofmap: SerialDofMap,
 }
 
-impl<'a> SerialFunctionSpace<'a> {
-    pub fn new(grid: &'a SerialGrid, element: &'a CiarletElement<f64>) -> Self {
+impl<'a, GridImpl: GridType> SerialFunctionSpace<'a, GridImpl> {
+    pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<f64>) -> Self {
         let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
@@ -68,9 +67,9 @@ impl<'a> SerialFunctionSpace<'a> {
     }
 }
 
-impl<'a> FunctionSpace<'a> for SerialFunctionSpace<'a> {
+impl<'a, GridImpl: GridType> FunctionSpace for SerialFunctionSpace<'a, GridImpl> {
     type DofMap = SerialDofMap;
-    type Grid = SerialGrid;
+    type Grid = GridImpl;
     type FiniteElement = CiarletElement<f64>;
 
     fn dofmap(&self) -> &Self::DofMap {
@@ -89,7 +88,7 @@ mod test {
     use crate::function_space::*;
     use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
-    use bempp_traits::cell::ReferenceCellType;
+    use bempp_traits::types::ReferenceCellType;
     use bempp_traits::element::Continuity;
 
     #[test]

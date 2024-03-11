@@ -38,6 +38,9 @@ pub trait GridType: std::marker::Sized {
     /// The points are all points used to define the cell. For curved cells, this includes points on the edges and interior
     fn number_of_points(&self) -> usize;
 
+    /// The number of edges in the grid
+    fn number_of_edges(&self) -> usize;
+
     /// The number of cells in the grid
     fn number_of_cells(&self) -> usize;
 

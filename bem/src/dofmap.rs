@@ -1,65 +1,84 @@
-use bempp_tools::arrays::AdjacencyList;
-use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::DofMap;
+use bempp_traits::grid::{GridType, CellType, TopologyType};
 use bempp_traits::element::FiniteElement;
-use bempp_traits::grid::{Grid, Topology};
 
 pub struct SerialDofMap {
-    entity_dofs: [AdjacencyList<usize>; 4],
-    cell_dofs: AdjacencyList<usize>,
+    entity_dofs: [Vec<Vec<usize>>; 4],
+    cell_dofs: Vec<Vec<usize>>,
     size: usize,
 }
 
 impl SerialDofMap {
-    pub fn new<'a>(grid: &impl Grid<'a>, element: &impl FiniteElement) -> Self {
+    pub fn new<'a>(grid: &impl GridType, element: &impl FiniteElement) -> Self {
         let mut size = 0;
-        let mut entity_dofs_data: Vec<Vec<Vec<usize>>> = vec![];
-        let tdim = grid.topology().dim();
+        let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
+        let tdim = grid.domain_dimension();
+
+        let mut entity_counts = vec![];
+        entity_counts.push(grid.number_of_vertices());
+        if tdim > 1 {
+            entity_counts.push(grid.number_of_edges());
+        }
+        if tdim > 2 {
+            unimplemented!("DOF maps not implemented for cells with tdim > 2.");
+        }
+        entity_counts.push(grid.number_of_cells());
+
         for d in 0..tdim + 1 {
-            entity_dofs_data.push(vec![vec![]; grid.topology().entity_count(d)]);
+            entity_dofs[d] = vec![vec![]; entity_counts[d]];
         }
-        let mut offsets = vec![];
-        for i in 0..grid.topology().entity_count(tdim) + 1 {
-            offsets.push(i * element.dim());
-        }
-        let mut cell_dofs = AdjacencyList::from_data(
-            vec![0; grid.topology().entity_count(tdim) * element.dim()],
-            offsets,
-        );
-        for cell in 0..grid.topology().entity_count(tdim) {
-            for (d, ed_data) in entity_dofs_data.iter_mut().enumerate() {
-                for (i, e) in unsafe {
-                    grid.topology()
-                        .connectivity(tdim, d)
-                        .row_unchecked(cell)
-                        .iter()
-                        .enumerate()
-                } {
-                    let e_dofs = element.entity_dofs(d, i).unwrap();
+        let mut cell_dofs = vec![vec![0; element.dim()];entity_counts[tdim]];
+
+        for cell in grid.iter_all_cells() {
+            let topology = cell.topology();
+            for (i, e) in topology.vertex_indices().enumerate() {
+                let e_dofs = element.entity_dofs(0, i).unwrap();
+                if !e_dofs.is_empty() {
+                    if entity_dofs[0][topology.flat_index(e)].is_empty() {
+                        for _ in e_dofs {
+                            entity_dofs[0][topology.flat_index(e)].push(size);
+                            size += 1
+                        }
+                    }
+                    for (j, k) in e_dofs.iter().enumerate() {
+                        cell_dofs[cell.index()][*k] = entity_dofs[0][topology.flat_index(e)][j];
+                    }
+                }
+            }
+            if tdim >= 1 {
+                for (i, e) in topology.edge_indices().enumerate() {
+                    let e_dofs = element.entity_dofs(1, i).unwrap();
                     if !e_dofs.is_empty() {
-                        if ed_data[*e].is_empty() {
+                        if entity_dofs[1][topology.flat_index(e)].is_empty() {
                             for _ in e_dofs {
-                                ed_data[*e].push(size);
+                                entity_dofs[1][topology.flat_index(e)].push(size);
                                 size += 1
                             }
                         }
                         for (j, k) in e_dofs.iter().enumerate() {
-                            *cell_dofs.get_mut(cell, *k).unwrap() = ed_data[*e][j];
+                            cell_dofs[cell.index()][*k] = entity_dofs[1][topology.flat_index(e)][j];
                         }
                     }
                 }
             }
-        }
-
-        let mut entity_dofs = [
-            AdjacencyList::<usize>::new(),
-            AdjacencyList::<usize>::new(),
-            AdjacencyList::<usize>::new(),
-            AdjacencyList::<usize>::new(),
-        ];
-        for (ed, ed_data) in entity_dofs.iter_mut().zip(entity_dofs_data.iter()) {
-            for row in ed_data {
-                ed.add_row(row);
+            if tdim >= 2 {
+                for (i, e) in topology.face_indices().enumerate() {
+                    let e_dofs = element.entity_dofs(2, i).unwrap();
+                    if !e_dofs.is_empty() {
+                        if entity_dofs[2][topology.flat_index(e)].is_empty() {
+                            for _ in e_dofs {
+                                entity_dofs[2][topology.flat_index(e)].push(size);
+                                size += 1
+                            }
+                        }
+                        for (j, k) in e_dofs.iter().enumerate() {
+                            cell_dofs[cell.index()][*k] = entity_dofs[2][topology.flat_index(e)][j];
+                        }
+                    }
+                }
+            }
+            if tdim >= 3 {
+                unimplemented!("DOF maps not implemented for cells with tdim > 2.");
             }
         }
 
@@ -73,7 +92,7 @@ impl SerialDofMap {
 
 impl DofMap for SerialDofMap {
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        self.entity_dofs[entity_dim].row(entity_number).unwrap()
+        &self.entity_dofs[entity_dim][entity_number]
     }
     fn local_size(&self) -> usize {
         self.size
@@ -85,8 +104,9 @@ impl DofMap for SerialDofMap {
         self.local_size()
     }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
-        self.cell_dofs.row(cell)
-    }
+        if cell < self.cell_dofs.len() {
+            Some(&self.cell_dofs[cell])
+        } else { None }}
     fn is_serial(&self) -> bool {
         true
     }
@@ -97,12 +117,12 @@ mod test {
     use crate::dofmap::*;
     use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
-    use bempp_traits::cell::ReferenceCellType;
+    use bempp_traits::types::ReferenceCellType;
     use bempp_traits::element::Continuity;
 
     #[test]
     fn test_dofmap_lagrange0() {
-        let grid = regular_sphere(2);
+        let grid = regular_sphere::<f64>(2);
         let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -113,13 +133,13 @@ mod test {
         assert_eq!(dofmap.local_size(), dofmap.global_size());
         assert_eq!(
             dofmap.local_size(),
-            grid.topology().entity_count(grid.topology().dim())
+            grid.number_of_cells()
         );
     }
 
     #[test]
     fn test_dofmap_lagrange1() {
-        let grid = regular_sphere(2);
+        let grid = regular_sphere::<f64>(2);
         let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -128,12 +148,12 @@ mod test {
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
-        assert_eq!(dofmap.local_size(), grid.topology().entity_count(0));
+        assert_eq!(dofmap.local_size(), grid.number_of_vertices());
     }
 
     #[test]
     fn test_dofmap_lagrange2() {
-        let grid = regular_sphere(2);
+        let grid = regular_sphere::<f64>(2);
         let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -144,7 +164,7 @@ mod test {
         assert_eq!(dofmap.local_size(), dofmap.global_size());
         assert_eq!(
             dofmap.local_size(),
-            grid.topology().entity_count(0) + grid.topology().entity_count(1)
+            grid.number_of_vertices() + grid.number_of_edges()
         );
     }
 }

@@ -182,6 +182,10 @@ where
     fn cell_type(&self) -> ReferenceCellType {
         self.topology.cell_type(self.index).unwrap()
     }
+
+    fn flat_index(&self, index: Self::IndexType) -> usize {
+        self.topology.flat_index(index)
+    }
 }
 
 impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GeometryType
@@ -289,6 +293,9 @@ where
 
     fn number_of_points(&self) -> usize {
         self.geometry().point_count()
+    }
+    fn number_of_edges(&self) -> usize {
+        self.topology().entity_count(ReferenceCellType::Interval)
     }
     fn number_of_vertices(&self) -> usize {
         self.topology().entity_count(ReferenceCellType::Point)

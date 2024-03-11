@@ -34,4 +34,7 @@ pub trait TopologyType {
 
     /// The cell type
     fn cell_type(&self) -> ReferenceCellType;
+
+    /// Get the flat index from the index of an entity
+    fn flat_index(&self, index: Self::IndexType) -> usize;
 }

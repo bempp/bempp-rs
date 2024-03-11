@@ -65,6 +65,9 @@ pub trait Topology {
 
     /// Get the index of a cell from its id
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType;
+
+    /// Get the flat index from the index of an entity
+    fn flat_index(&self, index: Self::IndexType) -> usize;
 }
 
 /// The geometry of a grid

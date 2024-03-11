@@ -449,6 +449,7 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
     fn cell_id_to_index(&self, id: usize) -> usize {
         self.cell_ids_to_indices[&id]
     }
+    fn flat_index(&self, index: usize) -> usize { index }
 }
 
 #[cfg(test)]
