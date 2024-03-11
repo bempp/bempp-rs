@@ -61,10 +61,10 @@ where
         m[0].push(rlst_dynamic_array3!(T, [0, 2, 0]));
     }
 
-    for e in 0..entity_counts[1] {
+    for e in &edges {
         let mut pts = rlst_dynamic_array2!(T, [1, tdim]);
         let mut mat = rlst_dynamic_array3!(T, [1, 2, 1]);
-        let [vn0, vn1] = edges[e][..] else {
+        let [vn0, vn1] = e[..] else {
             panic!();
         };
         let v0 = &vertices[vn0];

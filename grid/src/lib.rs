@@ -1,11 +1,7 @@
 //! A Rust grid library
 #![cfg_attr(feature = "strict", deny(warnings))]
 
-//pub mod grid;
 //pub mod io;
-
-//#[cfg(feature = "mpi")]
-//pub mod parallel_grid;
 
 pub mod common;
 pub mod flat_triangle_grid;

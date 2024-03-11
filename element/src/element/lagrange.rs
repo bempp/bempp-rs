@@ -45,8 +45,8 @@ where
         let mut midp = rlst_dynamic_array2!(T, [1, tdim]);
         let nvertices = entity_counts[0];
         for i in 0..tdim {
-            for j in 0..nvertices {
-                *midp.get_mut([0, i]).unwrap() += T::from(vertices[j][i]).unwrap();
+            for vertex in &vertices {
+                *midp.get_mut([0, i]).unwrap() += T::from(vertex[i]).unwrap();
             }
             *midp.get_mut([0, i]).unwrap() /= T::from(nvertices).unwrap();
         }
@@ -58,19 +58,19 @@ where
         let edges = reference_cell::edges(cell_type);
         let faces = reference_cell::faces(cell_type);
         // TODO: GLL points
-        for e in 0..entity_counts[0] {
+        for vertex in &vertices {
             let mut pts = rlst_dynamic_array2!(T, [1, tdim]);
-            for i in 0..tdim {
-                *pts.get_mut([0, i]).unwrap() = T::from(vertices[e][i]).unwrap();
+            for (i, v) in vertex.iter().enumerate() {
+                *pts.get_mut([0, i]).unwrap() = T::from(*v).unwrap();
             }
             x[0].push(pts);
             let mut mentry = rlst_dynamic_array3!(T, [1, 1, 1]);
             *mentry.get_mut([0, 0, 0]).unwrap() = T::from(1.0).unwrap();
             m[0].push(mentry);
         }
-        for e in 0..entity_counts[1] {
+        for e in &edges {
             let mut pts = rlst_dynamic_array2!(T, [degree - 1, tdim]);
-            let [vn0, vn1] = edges[e][..] else {
+            let [vn0, vn1] = e[..] else {
                 panic!();
             };
             let v0 = &vertices[vn0];

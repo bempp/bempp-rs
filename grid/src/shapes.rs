@@ -11,8 +11,7 @@ use rlst_dense::{
     traits::MatrixInverse,
     types::RlstScalar,
 };
-use std::collections::HashMap;
-
+use std::collections::{hash_map::Entry::Vacant, HashMap};
 /// Create a regular sphere
 ///
 /// A regular sphere is created by starting with a regular octahedron. The shape is then refined `refinement_level` times.
@@ -70,7 +69,7 @@ where
                     if pt_i > pt_j {
                         std::mem::swap(&mut pt_i, &mut pt_j);
                     }
-                    if !edge_points.contains_key(&(pt_i, pt_j)) {
+                    if let Vacant(e) = edge_points.entry((pt_i, pt_j)) {
                         let v_i = v[*i];
                         let v_j = v[*j];
                         let mut new_pt = [
@@ -84,7 +83,7 @@ where
                             *i /= size;
                         }
                         b.add_point(point_n, new_pt);
-                        edge_points.insert((pt_i, pt_j), point_n);
+                        e.insert(point_n);
                         point_n += 1;
                     }
                     edge_points[&(pt_i, pt_j)]
