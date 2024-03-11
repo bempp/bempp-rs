@@ -5,13 +5,13 @@ use crate::common::{
     compute_normal_from_jacobian23, compute_point,
 };
 use crate::traits::{Geometry, GeometryEvaluator};
-use bempp_element::reference_cell;
-use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::CiarletElement;
+use bempp_element::reference_cell;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::element::FiniteElement;
-use rlst_dense::types::RlstScalar;
+use bempp_traits::types::ReferenceCellType;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,

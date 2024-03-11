@@ -3,12 +3,11 @@
 use crate::common::compute_diameter_triangle;
 use crate::traits::Ownership;
 use crate::traits::{Geometry, GeometryEvaluator, Grid, Topology};
-use bempp_element::reference_cell;
-use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use bempp_element::element::{create_element, CiarletElement, ElementFamily};
+use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
+use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
-use rlst_proc_macro::rlst_static_array;
 use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array, SliceArray},
@@ -20,6 +19,7 @@ use rlst_dense::{
         UnsafeRandomAccessByRef,
     },
 };
+use rlst_proc_macro::rlst_static_array;
 use rlst_proc_macro::rlst_static_type;
 use std::collections::HashMap;
 
@@ -325,7 +325,9 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
     }
 }
 
-impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluatorFlatTriangle<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
+    for GeometryEvaluatorFlatTriangle<'a, T>
+{
     type T = T;
 
     fn point_count(&self) -> usize {

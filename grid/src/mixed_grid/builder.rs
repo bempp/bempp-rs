@@ -2,12 +2,12 @@
 
 use crate::mixed_grid::grid::SerialMixedGrid;
 use crate::traits_impl::WrappedGrid;
-use bempp_traits::grid::Builder;
-use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_traits::element::{Continuity, FiniteElement};
-use rlst_dense::types::RlstScalar;
+use bempp_traits::grid::Builder;
+use bempp_traits::types::ReferenceCellType;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -112,14 +112,16 @@ where
             [npts, 3],
             [1, npts]
         ));
-        WrappedGrid { grid: SerialMixedGrid::new(
-            points,
-            &self.cells,
-            &self.cell_types,
-            &self.cell_degrees,
-            self.point_indices_to_ids,
-            self.point_ids_to_indices,
-            self.cell_indices_to_ids,
-        ) }
+        WrappedGrid {
+            grid: SerialMixedGrid::new(
+                points,
+                &self.cells,
+                &self.cell_types,
+                &self.cell_degrees,
+                self.point_indices_to_ids,
+                self.point_ids_to_indices,
+                self.cell_indices_to_ids,
+            ),
+        }
     }
 }

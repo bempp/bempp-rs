@@ -9,7 +9,10 @@ use rlst_dense::{
 };
 
 /// Compute a physical point
-pub fn compute_point<T: Float + RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>>(
+pub fn compute_point<
+    T: Float + RlstScalar<Real = T>,
+    Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>,
+>(
     geometry: &impl Geometry<T = T>,
     table: Table,
     cell_index: usize,
@@ -32,7 +35,10 @@ pub fn compute_point<T: Float + RlstScalar<Real=T>, Table: UnsafeRandomAccessByR
 }
 
 /// Compute a Jacobian
-pub fn compute_jacobian<T: Float + RlstScalar<Real=T>, Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>>(
+pub fn compute_jacobian<
+    T: Float + RlstScalar<Real = T>,
+    Table: UnsafeRandomAccessByRef<4, Item = T> + Shape<4>,
+>(
     geometry: &impl Geometry<T = T>,
     table: Table,
     tdim: usize,
@@ -59,7 +65,10 @@ pub fn compute_jacobian<T: Float + RlstScalar<Real=T>, Table: UnsafeRandomAccess
 }
 
 /// Compute a normal from a Jacobian of a cell with topological dimension 2 and geometric dimension 3
-pub fn compute_normal_from_jacobian23<T: Float + RlstScalar<Real=T>>(jacobian: &[T], normal: &mut [T]) {
+pub fn compute_normal_from_jacobian23<T: Float + RlstScalar<Real = T>>(
+    jacobian: &[T],
+    normal: &mut [T],
+) {
     assert_eq!(jacobian.len(), 6);
     assert_eq!(normal.len(), 3);
 

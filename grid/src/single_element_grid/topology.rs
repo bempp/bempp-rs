@@ -2,7 +2,7 @@
 
 use crate::traits::{Ownership, Topology};
 use bempp_element::reference_cell;
-use bempp_traits::types::{ReferenceCellType, CellLocalIndexPair};
+use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use std::collections::HashMap;
 
 fn all_equal<T: Eq>(a: &[T], b: &[T]) -> bool {

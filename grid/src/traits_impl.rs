@@ -2,14 +2,13 @@
 
 use crate::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use bempp_element::reference_cell;
-use bempp_traits::types::{ReferenceCellType, CellLocalIndexPair};
-use bempp_traits::grid::{
-    CellType, GeometryType, GridType, PointType,
-    ReferenceMapType, TopologyType,
-};
 use bempp_traits::element::FiniteElement;
-use rlst_dense::types::RlstScalar;
+use bempp_traits::grid::{
+    CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
+};
+use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use std::iter::Copied;
 use std::marker::PhantomData;
 
@@ -35,13 +34,13 @@ impl<GridImpl: Grid> Grid for WrappedGrid<GridImpl> {
 }
 
 /// A point
-pub struct Point<'a, T: Float + RlstScalar<Real=T>, G: Geometry> {
+pub struct Point<'a, T: Float + RlstScalar<Real = T>, G: Geometry> {
     geometry: &'a G,
     index: usize,
     _t: PhantomData<T>,
 }
 /// A cell
-pub struct Cell<'a, T: Float + RlstScalar<Real=T>, GridImpl: Grid> {
+pub struct Cell<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
     grid: &'a WrappedGrid<GridImpl>,
     index: usize,
     _t: PhantomData<T>,
@@ -52,7 +51,7 @@ pub struct CellTopology<'a, GridImpl: Grid> {
     index: <<GridImpl as Grid>::Topology as Topology>::IndexType,
 }
 /// The geometry of a cell
-pub struct CellGeometry<'a, T: Float + RlstScalar<Real=T>, GridImpl: Grid> {
+pub struct CellGeometry<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
     geometry: &'a <GridImpl as Grid>::Geometry,
     index: <<GridImpl as Grid>::Geometry as Geometry>::IndexType,
     _t: PhantomData<T>,
@@ -86,7 +85,7 @@ impl<'a, GridImpl: Grid, Iter: std::iter::Iterator<Item = usize>> std::iter::Ite
     }
 }
 
-impl<'a, T: Float + RlstScalar<Real=T>, G: Geometry<T = T>> PointType for Point<'a, T, G> {
+impl<'a, T: Float + RlstScalar<Real = T>, G: Geometry<T = T>> PointType for Point<'a, T, G> {
     type T = T;
     fn coords(&self, data: &mut [Self::T]) {
         assert_eq!(data.len(), self.geometry.dim());
@@ -102,7 +101,8 @@ impl<'a, T: Float + RlstScalar<Real=T>, G: Geometry<T = T>> PointType for Point<
     }
 }
 
-impl<'grid, T: Float + RlstScalar<Real=T>, GridImpl: Grid<T = T>> CellType for Cell<'grid, T, GridImpl>
+impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> CellType
+    for Cell<'grid, T, GridImpl>
 where
     GridImpl: 'grid,
 {
@@ -138,7 +138,8 @@ where
     }
 }
 
-impl<'grid, T: Float + RlstScalar<Real=T>, GridImpl: Grid<T = T>> TopologyType for CellTopology<'grid, GridImpl>
+impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> TopologyType
+    for CellTopology<'grid, GridImpl>
 where
     GridImpl: 'grid,
 {
@@ -183,7 +184,7 @@ where
     }
 }
 
-impl<'grid, T: Float + RlstScalar<Real=T>, GridImpl: Grid<T = T>> GeometryType
+impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GeometryType
     for CellGeometry<'grid, T, GridImpl>
 where
     GridImpl: 'grid,
@@ -234,7 +235,9 @@ where
     }
 }
 
-impl<'a, T: Float + RlstScalar<Real=T>, GridImpl: Grid<T = T>> ReferenceMapType for ReferenceMap<'a, GridImpl> {
+impl<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> ReferenceMapType
+    for ReferenceMap<'a, GridImpl>
+{
     type Grid = WrappedGrid<GridImpl>;
 
     fn domain_dimension(&self) -> usize {
@@ -269,7 +272,8 @@ impl<'a, T: Float + RlstScalar<Real=T>, GridImpl: Grid<T = T>> ReferenceMapType 
     }
 }
 
-impl<'grid, T: Float + RlstScalar<Real=T>, GridImpl: Grid<T = T>> GridType for WrappedGrid<GridImpl>
+impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GridType
+    for WrappedGrid<GridImpl>
 where
     GridImpl: 'grid,
 {

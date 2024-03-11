@@ -2,13 +2,13 @@
 
 use crate::mixed_grid::{geometry::SerialMixedGeometry, topology::SerialMixedTopology};
 use crate::traits::Grid;
-use bempp_element::reference_cell;
-use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
+use bempp_traits::types::ReferenceCellType;
 use log::warn;
-use rlst_dense::types::RlstScalar;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,

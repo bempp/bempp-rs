@@ -3,8 +3,8 @@
 use crate::flat_triangle_grid::grid::SerialFlatTriangleGrid;
 use crate::traits_impl::WrappedGrid;
 use bempp_traits::grid::Builder;
-use rlst_dense::types::RlstScalar;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -81,13 +81,15 @@ where
             [npts, 3],
             [1, npts]
         ));
-        WrappedGrid { grid: SerialFlatTriangleGrid::new(
-            points,
-            &self.cells,
-            self.point_indices_to_ids,
-            self.point_ids_to_indices,
-            self.cell_indices_to_ids,
-            self.cell_ids_to_indices,
-        ) }
+        WrappedGrid {
+            grid: SerialFlatTriangleGrid::new(
+                points,
+                &self.cells,
+                self.point_indices_to_ids,
+                self.point_ids_to_indices,
+                self.cell_indices_to_ids,
+                self.cell_ids_to_indices,
+            ),
+        }
     }
 }

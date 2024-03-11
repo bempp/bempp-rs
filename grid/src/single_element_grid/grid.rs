@@ -4,13 +4,13 @@ use crate::single_element_grid::{
     geometry::SerialSingleElementGeometry, topology::SerialSingleElementTopology,
 };
 use crate::traits::Grid;
-use bempp_element::reference_cell;
-use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
+use bempp_traits::types::ReferenceCellType;
 use log::warn;
-use rlst_dense::types::RlstScalar;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{views::ArrayViewMut, Array},
     base_array::BaseArray,
@@ -20,7 +20,7 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// A single element grid
-pub struct SerialSingleElementGrid<T: Float + RlstScalar<Real=T>> {
+pub struct SerialSingleElementGrid<T: Float + RlstScalar<Real = T>> {
     topology: SerialSingleElementTopology,
     geometry: SerialSingleElementGeometry<T>,
 }
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real=T>> Grid for SerialSingleElementGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Grid for SerialSingleElementGrid<T> {
     type T = T;
     type Topology = SerialSingleElementTopology;
     type Geometry = SerialSingleElementGeometry<T>;

@@ -5,13 +5,13 @@ use crate::common::{
     compute_normal_from_jacobian23, compute_point,
 };
 use crate::traits::{Geometry, GeometryEvaluator};
-use bempp_element::reference_cell;
-use bempp_traits::types::ReferenceCellType;
 use bempp_element::element::CiarletElement;
+use bempp_element::reference_cell;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::element::FiniteElement;
-use rlst_dense::types::RlstScalar;
+use bempp_traits::types::ReferenceCellType;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
@@ -22,7 +22,7 @@ use rlst_dense::{
 use std::collections::HashMap;
 
 /// Geometry of a single element grid
-pub struct SerialSingleElementGeometry<T: Float + RlstScalar<Real=T>> {
+pub struct SerialSingleElementGeometry<T: Float + RlstScalar<Real = T>> {
     dim: usize,
     index_map: Vec<usize>,
     pub(crate) coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -186,7 +186,7 @@ impl<T: Float + RlstScalar<Real = T>> SerialSingleElementGeometry<T> {
     }
 }
 
-impl<T: Float + RlstScalar<Real=T>> Geometry for SerialSingleElementGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> Geometry for SerialSingleElementGeometry<T> {
     type IndexType = usize;
     type T = T;
     type Element = CiarletElement<T>;
@@ -277,13 +277,13 @@ impl<T: Float + RlstScalar<Real=T>> Geometry for SerialSingleElementGeometry<T> 
 }
 
 /// Geometry evaluator for a single element grid
-pub struct GeometryEvaluatorSingleElement<'a, T: Float + RlstScalar<Real=T>> {
+pub struct GeometryEvaluatorSingleElement<'a, T: Float + RlstScalar<Real = T>> {
     geometry: &'a SerialSingleElementGeometry<T>,
     tdim: usize,
     table: Array<T, BaseArray<T, VectorContainer<T>, 4>, 4>,
 }
 
-impl<'a, T: Float + RlstScalar<Real=T>> GeometryEvaluatorSingleElement<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorSingleElement<'a, T> {
     /// Create a geometry evaluator
     fn new(geometry: &'a SerialSingleElementGeometry<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(geometry.element.cell_type());
@@ -301,7 +301,9 @@ impl<'a, T: Float + RlstScalar<Real=T>> GeometryEvaluatorSingleElement<'a, T> {
     }
 }
 
-impl<'a, T: Float + RlstScalar<Real=T>> GeometryEvaluator for GeometryEvaluatorSingleElement<'a, T> {
+impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
+    for GeometryEvaluatorSingleElement<'a, T>
+{
     type T = T;
 
     fn point_count(&self) -> usize {
@@ -344,10 +346,10 @@ impl<'a, T: Float + RlstScalar<Real=T>> GeometryEvaluator for GeometryEvaluatorS
 #[cfg(test)]
 mod test {
     use super::*;
-    use bempp_traits::types::ReferenceCellType;
     use approx::*;
     use bempp_element::element::{create_element, ElementFamily};
     use bempp_traits::element::Continuity;
+    use bempp_traits::types::ReferenceCellType;
     use rlst_dense::{
         rlst_dynamic_array2,
         traits::{RandomAccessMut, RawAccess, RawAccessMut},
