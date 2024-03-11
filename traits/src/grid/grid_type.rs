@@ -111,5 +111,4 @@ pub trait GridType: std::marker::Sized {
 
     /// The (geometric) dimension of cells in the physical grid
     fn physical_dimension(&self) -> usize;
-
 }

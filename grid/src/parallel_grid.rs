@@ -15,6 +15,8 @@ use rlst_dense::{
     traits::{RandomAccessByRef, RandomAccessMut, Shape},
 };
 
+// TODO: update this
+
 /// Geometry of a parallel grid
 pub struct ParallelGeometry<'a, C: Communicator> {
     comm: &'a C,
