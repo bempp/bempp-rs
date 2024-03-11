@@ -5,7 +5,7 @@ use bempp_field::{
     types::FftFieldTranslationKiFmm,
 };
 use bempp_traits::tree::FmmTree;
-use bempp_tree::types::single_node::SingleNodeTreeNew;
+use bempp_tree::types::single_node::SingleNodeTree;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -39,7 +39,7 @@ where
     U: RlstScalar<Real = U> + Float + Default + Fft,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTreeNew<U>>,
+    V: FmmTree<Tree = SingleNodeTree<U>>,
 {
     fn displacements(&self, level: u64) -> Vec<Vec<usize>> {
         let targets = self.tree.get_target_tree().get_keys(level).unwrap();
@@ -95,7 +95,7 @@ where
     U: RlstScalar<Real = U> + Float + Default + Fft,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
+    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {

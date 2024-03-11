@@ -12,7 +12,7 @@ use crate::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
         point::{Point, PointType, Points},
-        single_node::SingleNodeTreeNew,
+        single_node::SingleNodeTree,
     },
 };
 
@@ -707,7 +707,7 @@ use crate::{
 //     }
 // }
 
-impl<T> SingleNodeTreeNew<T>
+impl<T> SingleNodeTree<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
@@ -724,7 +724,7 @@ where
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
-    ) -> SingleNodeTreeNew<T> {
+    ) -> SingleNodeTree<T> {
         // Encode points at deepest level, and map to specified depth
 
         // TODO: Automatically infer dimension
@@ -762,7 +762,7 @@ where
             index: 0,
         };
         // Assign keys to points
-        let unmapped = SingleNodeTreeNew::assign_nodes_to_points(&leaves, &mut points);
+        let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
         // Group points by leaves
         points.sort();
@@ -850,7 +850,7 @@ where
             leaf_to_index.insert(*key, i);
         }
 
-        SingleNodeTreeNew {
+        SingleNodeTree {
             depth,
             adaptive: false,
             coordinates,
@@ -880,7 +880,7 @@ where
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
-    ) -> SingleNodeTreeNew<T> {
+    ) -> SingleNodeTree<T> {
         let dim = 3;
         let npoints = points.len() / dim;
 
@@ -995,7 +995,7 @@ where
         for (i, key) in leaves.iter().enumerate() {
             leaf_to_index.insert(*key, i);
         }
-        SingleNodeTreeNew {
+        SingleNodeTree {
             depth,
             adaptive: false,
             coordinates,
@@ -1040,16 +1040,16 @@ where
         depth: u64,
         sparse: bool,
         domain: Option<Domain<T>>,
-    ) -> SingleNodeTreeNew<T> {
+    ) -> SingleNodeTree<T> {
         let dim = 3;
         let domain = domain.unwrap_or(Domain::from_local_points(points));
         let npoints = points.len() / dim;
         let global_idxs = (0..npoints).collect_vec();
 
         if sparse {
-            SingleNodeTreeNew::uniform_tree_sparse(points, &domain, depth, &global_idxs)
+            SingleNodeTree::uniform_tree_sparse(points, &domain, depth, &global_idxs)
         } else {
-            SingleNodeTreeNew::uniform_tree(points, &domain, depth, &global_idxs)
+            SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
         }
     }
     /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
@@ -1091,7 +1091,7 @@ where
     }
 }
 
-impl<T> Tree for SingleNodeTreeNew<T>
+impl<T> Tree for SingleNodeTree<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {

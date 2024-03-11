@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
-use bempp_tree::types::single_node::SingleNodeTreeNew;
+use bempp_tree::types::single_node::SingleNodeTree;
 
 use crate::builder::FmmEvalType;
 use crate::fmm::KiFmm;
@@ -30,7 +30,7 @@ where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalar<Real = U> + Float + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
+    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
     pub fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
         let sources = self.tree.get_source_tree().get_keys(level).unwrap();
@@ -101,7 +101,7 @@ where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalar<Real = U> + Float + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
+    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {

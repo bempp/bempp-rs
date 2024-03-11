@@ -12,7 +12,7 @@ use bempp_traits::{
     types::EvalType,
 };
 
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTreeNew};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use crate::{
     builder::FmmEvalType,
@@ -21,7 +21,7 @@ use crate::{
 
 /// Combines the old datatree + Fmm structs into a single storage of metadata
 pub struct KiFmm<
-    T: FmmTree<Tree = SingleNodeTreeNew<W>>,
+    T: FmmTree<Tree = SingleNodeTree<W>>,
     U: SourceToTargetData<V>,
     V: Kernel,
     W: RlstScalar<Real = W> + Float + Default,
@@ -119,7 +119,7 @@ pub struct KiFmm<
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTreeNew<W>, NodeIndex = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>, NodeIndex = MortonKey> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalar<Real = W> + Float + Default,
@@ -237,7 +237,7 @@ where
 
 impl<T, U, V, W> Default for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTreeNew<W>> + Default,
+    T: FmmTree<Tree = SingleNodeTree<W>> + Default,
     U: SourceToTargetData<V> + Default,
     V: Kernel + Default,
     W: RlstScalar<Real = W> + Float + Default,

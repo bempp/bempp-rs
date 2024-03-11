@@ -11,7 +11,7 @@ use crate::types::{
 
 /// Local Trees (non-distributed).
 #[derive(Default)]
-pub struct SingleNodeTreeNew<T>
+pub struct SingleNodeTree<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {

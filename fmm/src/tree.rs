@@ -1,12 +1,12 @@
 use bempp_traits::tree::{FmmTree, Tree};
-use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew};
+use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
 use num::Float;
 use rlst_dense::types::RlstScalar;
 
 #[derive(Default)]
 pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
-    pub source_tree: SingleNodeTreeNew<T>,
-    pub target_tree: SingleNodeTreeNew<T>,
+    pub source_tree: SingleNodeTree<T>,
+    pub target_tree: SingleNodeTree<T>,
     pub domain: Domain<T>,
 }
 
@@ -16,7 +16,7 @@ where
 {
     type Precision = T;
     type NodeIndex = MortonKey;
-    type Tree = SingleNodeTreeNew<T>;
+    type Tree = SingleNodeTree<T>;
 
     fn get_source_tree(&self) -> &Self::Tree {
         &self.source_tree

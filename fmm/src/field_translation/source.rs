@@ -13,7 +13,7 @@ use bempp_traits::{
     tree::{FmmTree, Tree},
     types::EvalType,
 };
-use bempp_tree::types::single_node::SingleNodeTreeNew;
+use bempp_tree::types::single_node::SingleNodeTree;
 
 use crate::{
     builder::FmmEvalType,
@@ -30,7 +30,7 @@ use rlst_dense::{
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTreeNew<W>> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,

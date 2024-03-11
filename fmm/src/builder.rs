@@ -13,7 +13,7 @@ use bempp_traits::{
 };
 use bempp_tree::{
     constants::{N_CRIT, ROOT},
-    types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew},
+    types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree},
 };
 use num::Float;
 use rlst_dense::{
@@ -101,12 +101,12 @@ where
         let [ntargets, _dim] = targets.shape();
 
         // Estimate depth based on a uniform distribution
-        let source_depth = SingleNodeTreeNew::<U>::minimum_depth(nsources as u64, n_crit);
-        let target_depth = SingleNodeTreeNew::<U>::minimum_depth(ntargets as u64, n_crit);
+        let source_depth = SingleNodeTree::<U>::minimum_depth(nsources as u64, n_crit);
+        let target_depth = SingleNodeTree::<U>::minimum_depth(ntargets as u64, n_crit);
         let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-        let source_tree = SingleNodeTreeNew::new(sources.data(), depth, sparse, self.domain);
-        let target_tree = SingleNodeTreeNew::new(targets.data(), depth, sparse, self.domain);
+        let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain);
+        let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain);
 
         let fmm_tree = SingleNodeFmmTree {
             source_tree,
@@ -194,7 +194,7 @@ where
 
 impl<T, U, V, W> KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTreeNew<W>>,
+    T: FmmTree<Tree = SingleNodeTree<W>>,
     T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
     U: SourceToTargetData<V>,
     V: Kernel<T = W>,
