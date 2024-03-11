@@ -15,12 +15,11 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTreeNew};
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut}, types::RlstScalar,
+    traits::{MultIntoResize, RawAccess, RawAccessMut},
+    types::RlstScalar,
 };
 
-use crate::{
-    constants::L2L_MAX_CHUNK_SIZE, fmm::KiFmm, helpers::find_chunk_size,
-};
+use crate::{constants::L2L_MAX_CHUNK_SIZE, fmm::KiFmm, helpers::find_chunk_size};
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
 where

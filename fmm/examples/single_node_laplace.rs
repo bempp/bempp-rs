@@ -1,4 +1,4 @@
-use bempp_field::types::FftFieldTranslationKiFmm;
+use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 use bempp_fmm::builder::KiFmmBuilderSingleNode;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::fmm::Fmm;
@@ -41,6 +41,25 @@ fn main() {
 
     // BLAS based M2L for a vector of charges
     {
-        let svd_threshold = Some(1e-5);
+        // Charge data
+        let nvecs = 1;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+
+        let singular_value_threshold = Some(1e-5);
+
+        let fmm_blas = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .parameters(
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                BlasFieldTranslationKiFmm::new(singular_value_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_blas.evaluate();
     }
 }

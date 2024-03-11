@@ -3,7 +3,6 @@ use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNo
 use num::Float;
 use rlst_dense::types::RlstScalar;
 
-
 #[derive(Default)]
 pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
     pub source_tree: SingleNodeTreeNew<T>,

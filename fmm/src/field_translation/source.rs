@@ -24,7 +24,8 @@ use crate::{
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut}, types::RlstScalar,
+    traits::{MultIntoResize, RawAccess, RawAccessMut},
+    types::RlstScalar,
 };
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>

@@ -17,7 +17,6 @@ pub struct Laplace3dKernel<T: RlstScalar> {
     _phantom_t: std::marker::PhantomData<T>,
 }
 
-
 impl<T: RlstScalar> Laplace3dKernel<T> {
     pub fn new() -> Self {
         Self {

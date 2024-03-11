@@ -5,16 +5,11 @@ use bempp_traits::tree::FmmTree;
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
-// use rlst_dense::traits::Shape;
 use rlst_dense::types::RlstScalar;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
-use bempp_traits::{
-    field::SourceToTarget,
-    kernel::Kernel,
-    tree::Tree,
-};
+use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 
 use crate::builder::FmmEvalType;
@@ -56,8 +51,7 @@ where
                     .flat_map(|pn| pn.children())
                     .filter(|pnc| {
                         !source.is_adjacent(pnc)
-                            &&
-                            self
+                            && self
                                 .tree
                                 .get_target_tree()
                                 .get_all_keys_set()
@@ -119,9 +113,6 @@ where
                     return;
                 };
 
-                // if level == 2 {
-
-                // }
                 // Compute the displacements
                 let all_displacements = self.displacements(level);
 
@@ -133,7 +124,7 @@ where
                             .unwrap()
                             .iter()
                             .enumerate()
-                            .filter(|(_, &d)| d != 1)
+                            .filter(|(_, &d)| d != -1)
                             .map(|(i, _)| i)
                             .collect_vec()
                     })
@@ -168,7 +159,6 @@ where
                     },
                     [self.ncoeffs, nsources]
                 );
-
 
                 // Allocate buffers to store compressed check potentials
                 let compressed_check_potentials =
@@ -207,20 +197,10 @@ where
                     );
                     rlst_blis::interface::threading::disable_threading();
 
-                    compressed_multipoles
-                        .data_mut()
-                        .iter_mut()
-                        .for_each(|d| *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level));
+                    compressed_multipoles.data_mut().iter_mut().for_each(|d| {
+                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level)
+                    });
                 }
-                // if level == 2 {
-                //     for d in all_displacements.iter() {
-                //         println!("all displacements {:?}", d.lock().unwrap().len())
-                //     }
-                //     // println!("MULTIPOLES {:?}", &local_idxs.data()[0..5]);
-                //     // println!("MULTIPOLES {:?}", &compressed_multipoles.data())
-                //     // println!("MULTIPOLES {:?} {:?}", &compressed_multipoles.shape())
-                //     // println!("st block {:?}", &self.source_to_target_data.operator_data.st_block.data()[0..5]);
-                // }
 
                 // 2. Apply BLAS operation
                 {
@@ -232,9 +212,6 @@ where
                             let c_u_sub = &self.source_to_target_data.operator_data.c_u[c_idx];
                             let c_vt_sub = &self.source_to_target_data.operator_data.c_vt[c_idx];
 
-                            // if c_idx == 0 {
-                            //     println!("cu {:?} \n {:?}", c_u_sub.shape(), c_u_sub.data());
-                            // }
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
                                 [self.source_to_target_data.cutoff_rank, multipole_idxs.len()]
@@ -253,13 +230,14 @@ where
                                     );
                             }
 
-                            let compressed_check_potential = empty_array::<U, 2>().simple_mult_into_resize(
-                                c_u_sub.view(),
-                                empty_array::<U, 2>().simple_mult_into_resize(
-                                    c_vt_sub.view(),
-                                    compressed_multipoles_subset.view(),
-                                ),
-                            );
+                            let compressed_check_potential = empty_array::<U, 2>()
+                                .simple_mult_into_resize(
+                                    c_u_sub.view(),
+                                    empty_array::<U, 2>().simple_mult_into_resize(
+                                        c_vt_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
+                                );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
@@ -296,11 +274,6 @@ where
                         ),
                     );
                     rlst_blis::interface::threading::disable_threading();
-
-
-                    if level == 2 {
-                        println!("locals {:?}", &locals.data()[0..10]);
-                    }
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals =

@@ -1,6 +1,5 @@
 use crate::kernel::Kernel;
 
-
 /// Container for metadata associated with a field translation implementation.
 pub trait SourceToTargetData<T>
 where

@@ -301,7 +301,7 @@ mod test {
     use rlst_dense::base_array::BaseArray;
     use rlst_dense::data_container::VectorContainer;
     use rlst_dense::rlst_array_from_slice2;
-    use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
+    use rlst_dense::traits::{RawAccess, RawAccessMut};
 
     use crate::{builder::KiFmmBuilderSingleNode, tree::SingleNodeFmmTree};
     use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
@@ -396,12 +396,10 @@ mod test {
             &mut direct,
         );
 
-        print!("HERE {:?} \n {:?} \n", &direct[0..5], &potential[0..5]);
-
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = num::Float::abs(d - p);
             let rel_error = abs_error / p;
-            // assert!(rel_error <= threshold)
+            assert!(rel_error <= threshold)
         });
     }
 
@@ -516,18 +514,19 @@ mod test {
     #[test]
     fn test_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 10000;
+        let nsources = 9000;
         let ntargets = 10000;
 
         let min = None;
         let max = None;
         let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
         // FMM parameters
-        let n_crit = Some(100);
+        let n_crit = Some(10);
         let expansion_order = 6;
-        let sparse = false;
-        let threshold = 1e-6;
+        let sparse = true;
+        let threshold = 1e-5;
+        let singular_value_threshold = Some(1e-2);
 
         // Charge data
         let nvecs = 1;
@@ -535,41 +534,41 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let fmm_fft = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
-            .parameters(
-                expansion_order,
-                Laplace3dKernel::new(),
-                bempp_traits::types::EvalType::Value,
-                FftFieldTranslationKiFmm::new(),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm_fft.evaluate();
+        // fmm with fft based field translation
+        {
+            let fmm_fft = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, &charges, n_crit, sparse)
+                .parameters(
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    bempp_traits::types::EvalType::Value,
+                    FftFieldTranslationKiFmm::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_fft.evaluate();
+            let fmm_fft = Box::new(fmm_fft);
+            test_single_node_laplace_fmm(fmm_fft, &sources, &charges, threshold);
+        }
 
-        let fmm_fft = Box::new(fmm_fft);
-        test_single_node_laplace_fmm(fmm_fft, &sources, &charges, threshold);
-
-        let fmm_svd = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
-            .parameters(
-                expansion_order,
-                Laplace3dKernel::new(),
-                bempp_traits::types::EvalType::Value,
-                BlasFieldTranslationKiFmm::new(Some(0.8e-2)),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm_svd.evaluate();
-
-        // println!("DEPTH {:?}", fmm_svd.tree.source_tree.get_depth());
-        let fmm_svd = Box::new(fmm_svd);
-        test_single_node_laplace_fmm(fmm_svd, &sources, &charges, threshold);
-
-        assert!(false)
-
+        // fmm with blas based field translation
+        {
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, &charges, n_crit, sparse)
+                .parameters(
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    bempp_traits::types::EvalType::Value,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_laplace_fmm(fmm_blas, &sources, &charges, threshold);
+        }
     }
 
     // #[test]

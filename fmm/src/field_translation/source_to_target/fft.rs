@@ -1,26 +1,28 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use bempp_field::{
-    constants::{NHALO, NSIBLINGS}, fft::Fft, types::FftFieldTranslationKiFmm
+    constants::{NHALO, NSIBLINGS},
+    fft::Fft,
+    types::FftFieldTranslationKiFmm,
 };
 use bempp_traits::tree::FmmTree;
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
-use rlst_dense::{array::Array, types::RlstScalar};
 use rlst_dense::base_array::BaseArray;
 use rlst_dense::data_container::VectorContainer;
+use rlst_dense::{array::Array, types::RlstScalar};
 use std::collections::HashSet;
 
 use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 
+use crate::fmm::KiFmm;
 use crate::{
     builder::FmmEvalType,
     helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
     types::SendPtrMut,
 };
-use crate::fmm::KiFmm;
 use rlst_dense::{
     array::empty_array,
     rlst_dynamic_array2,
@@ -141,7 +143,6 @@ where
                 let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
                 let multipoles =
                     &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
-
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
