@@ -272,7 +272,7 @@ where
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals =
-                        unsafe { std::slice::from_raw_parts_mut(ptr, nsources * self.ncoeffs) };
+                        unsafe { std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs) };
                     all_locals
                         .iter_mut()
                         .zip(locals.data().iter())
@@ -292,7 +292,7 @@ where
                     [self.ncoeffs, nsources * nmatvec]
                 );
 
-                let compressed_check_potential = rlst_dynamic_array2!(
+                let compressed_check_potentials = rlst_dynamic_array2!(
                     U,
                     [self.source_to_target_data.cutoff_rank, nsources * nmatvec]
                 );
@@ -306,7 +306,7 @@ where
                             charge_vec_idx * self.source_to_target_data.cutoff_rank;
 
                         let raw = unsafe {
-                            compressed_check_potential
+                            compressed_check_potentials
                                 .data()
                                 .as_ptr()
                                 .add(key_displacement + charge_vec_displacement)
@@ -386,13 +386,14 @@ where
                                 }
                             }
 
-                            let locals = empty_array::<U, 2>().simple_mult_into_resize(
-                                c_u_sub.view(),
-                                empty_array::<U, 2>().simple_mult_into_resize(
-                                    c_vt_sub.view(),
-                                    compressed_multipoles_subset.view(),
-                                ),
-                            );
+                            let compressed_check_potential = empty_array::<U, 2>()
+                                .simple_mult_into_resize(
+                                    c_u_sub.view(),
+                                    empty_array::<U, 2>().simple_mult_into_resize(
+                                        c_vt_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
+                                );
 
                             for (local_multipole_idx, &global_local_idx) in
                                 local_idxs.iter().enumerate()
@@ -418,7 +419,7 @@ where
                                     let charge_vec_displacement =
                                         charge_vec_idx * self.source_to_target_data.cutoff_rank;
 
-                                    let tmp = &locals.data()[key_displacement
+                                    let tmp = &compressed_check_potential.data()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement
@@ -430,6 +431,30 @@ where
                                 }
                             }
                         });
+                }
+
+                // 3. Compute local expansions from compressed check potentials
+                {
+                    rlst_blis::interface::threading::enable_threading();
+                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                        self.dc2e_inv_1.view(),
+                        empty_array::<U, 2>().simple_mult_into_resize(
+                            self.dc2e_inv_2.view(),
+                            empty_array::<U, 2>().simple_mult_into_resize(
+                                self.source_to_target_data.operator_data.u.view(),
+                                compressed_check_potentials,
+                            ),
+                        ),
+                    );
+                    rlst_blis::interface::threading::disable_threading();
+                    let ptr = self.level_locals[level as usize][0][0].raw;
+                    let all_locals = unsafe {
+                        std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvec)
+                    };
+                    all_locals
+                        .iter_mut()
+                        .zip(locals.data().iter())
+                        .for_each(|(l, r)| *l += *r);
                 }
             }
         }
