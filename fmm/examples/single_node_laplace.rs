@@ -25,8 +25,9 @@ fn main() {
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .tree(&sources, &targets, n_crit, sparse)
             .parameters(
+                &charges,
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
@@ -52,8 +53,9 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let fmm_vec = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .tree(&sources, &targets, n_crit, sparse)
             .parameters(
+                &charges,
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,
@@ -75,8 +77,9 @@ fn main() {
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
 
         let fmm_mat = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, &charges, n_crit, sparse)
+            .tree(&sources, &targets, n_crit, sparse)
             .parameters(
+                &charges,
                 expansion_order,
                 Laplace3dKernel::new(),
                 bempp_traits::types::EvalType::Value,

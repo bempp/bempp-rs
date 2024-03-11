@@ -83,7 +83,6 @@ where
         mut self,
         sources: &Coordinates<U>,
         targets: &Coordinates<U>,
-        charges: &'builder Charges<U>,
         n_crit: Option<u64>,
         sparse: bool,
     ) -> Self {
@@ -115,21 +114,12 @@ where
         };
 
         self.tree = Some(fmm_tree);
-        self.charges = Some(charges);
-
-        let [_ncharges, nmatvec] = charges.shape();
-
-        if nmatvec > 1 {
-            self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvec))
-        } else {
-            self.fmm_eval_type = Some(FmmEvalType::Vector)
-        }
-
         self
     }
 
     pub fn parameters(
         mut self,
+        charges: &'builder Charges<U>,
         expansion_order: usize,
         kernel: V,
         eval_type: EvalType,
@@ -138,6 +128,15 @@ where
         if self.tree.is_none() {
             Err("Must build tree before specifying FMM parameters".to_string())
         } else {
+            self.charges = Some(charges);
+
+            let [_ncharges, nmatvec] = charges.shape();
+            if nmatvec > 1 {
+                self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvec))
+            } else {
+                self.fmm_eval_type = Some(FmmEvalType::Vector)
+            }
+
             self.expansion_order = Some(expansion_order);
             self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
