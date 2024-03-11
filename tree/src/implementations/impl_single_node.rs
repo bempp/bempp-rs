@@ -401,7 +401,7 @@ where
         unmapped
     }
 
-  /// Complete the minimal tree between a set of `seed` octants in some domain. Computed
+    /// Complete the minimal tree between a set of `seed` octants in some domain. Computed
     /// in place.
     ///
     /// # Arguments

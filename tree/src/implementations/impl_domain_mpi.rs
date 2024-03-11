@@ -1,5 +1,4 @@
 //! Implementation of an equivalent MPI type for a Domain object, and constructor for distributed Domains.
-use std::fmt::Debug;
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
@@ -7,6 +6,7 @@ use mpi::{
     traits::*,
     Address,
 };
+use std::fmt::Debug;
 
 use num::traits::Float;
 
