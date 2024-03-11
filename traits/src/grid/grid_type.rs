@@ -103,6 +103,13 @@ pub trait GridType: std::marker::Sized {
     /// Get the cells that are attached to a face
     fn face_to_cells(&self, face_index: Self::IndexType) -> &[CellLocalIndexPair<Self::IndexType>];
 
-    // Check if the function space is stored in serial
+    /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool;
+
+    /// The (topological) dimension of the reference cell
+    fn domain_dimension(&self) -> usize;
+
+    /// The (geometric) dimension of cells in the physical grid
+    fn physical_dimension(&self) -> usize;
+
 }
