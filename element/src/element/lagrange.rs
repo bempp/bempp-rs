@@ -2,8 +2,8 @@
 
 use crate::element::{create_cell, CiarletElement, ElementFamily};
 use crate::polynomials::polynomial_count;
-use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, MapType};
+use bempp_traits::types::ReferenceCellType;
 use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::types::RlstScalar;
 use rlst_dense::{
@@ -176,28 +176,30 @@ mod test {
 
     fn check_dofs(e: impl FiniteElement) {
         let cell_dim = match e.cell_type() {
-            ReferenceCellType::Point => Point {}.dim(),
-            ReferenceCellType::Interval => Interval {}.dim(),
-            ReferenceCellType::Triangle => Triangle {}.dim(),
-            ReferenceCellType::Quadrilateral => Quadrilateral {}.dim(),
-            ReferenceCellType::Tetrahedron => Tetrahedron {}.dim(),
-            ReferenceCellType::Hexahedron => Hexahedron {}.dim(),
-            ReferenceCellType::Prism => Prism {}.dim(),
-            ReferenceCellType::Pyramid => Pyramid {}.dim(),
+            ReferenceCellType::Point => 0,
+            ReferenceCellType::Interval => 1,
+            ReferenceCellType::Triangle => 2,
+            ReferenceCellType::Quadrilateral => 2,
+            ReferenceCellType::Tetrahedron => 3,
+            ReferenceCellType::Hexahedron => 3,
+            ReferenceCellType::Prism => 3,
+            ReferenceCellType::Pyramid => 3,
         };
         let mut ndofs = 0;
-        for dim in 0..cell_dim + 1 {
-            let entity_count = match e.cell_type() {
-                ReferenceCellType::Point => Point {}.entity_count(dim),
-                ReferenceCellType::Interval => Interval {}.entity_count(dim),
-                ReferenceCellType::Triangle => Triangle {}.entity_count(dim),
-                ReferenceCellType::Quadrilateral => Quadrilateral {}.entity_count(dim),
-                ReferenceCellType::Tetrahedron => Tetrahedron {}.entity_count(dim),
-                ReferenceCellType::Hexahedron => Hexahedron {}.entity_count(dim),
-                ReferenceCellType::Prism => Prism {}.entity_count(dim),
-                ReferenceCellType::Pyramid => Pyramid {}.entity_count(dim),
-            };
-            for entity in 0..entity_count {
+        for (dim, entity_count) in match e.cell_type() {
+            ReferenceCellType::Point => vec![1],
+            ReferenceCellType::Interval => vec![2, 1],
+            ReferenceCellType::Triangle => vec![3, 3, 1],
+            ReferenceCellType::Quadrilateral => vec![4, 4, 1],
+            ReferenceCellType::Tetrahedron => vec![4, 6, 4, 1],
+            ReferenceCellType::Hexahedron => vec![8, 12, 6, 1],
+            ReferenceCellType::Prism => vec![6, 9, 5, 1],
+            ReferenceCellType::Pyramid => vec![5, 8, 5, 1],
+        }
+        .iter()
+        .enumerate()
+        {
+            for entity in 0..*entity_count {
                 ndofs += e.entity_dofs(dim, entity).unwrap().len();
             }
         }

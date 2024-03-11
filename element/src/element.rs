@@ -4,8 +4,8 @@ use crate::cell::create_cell;
 use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
 use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
-use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
+use bempp_traits::types::ReferenceCellType;
 use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::types::RlstScalar;
 use rlst_dense::{
@@ -341,7 +341,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::element::*;
-    use bempp_traits::cell::ReferenceCellType;
+    use bempp_traits::types::ReferenceCellType;
 
     #[test]
     fn test_lagrange_1() {

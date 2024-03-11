@@ -1,6 +1,6 @@
 //! Orthonormal polynomials
 
-use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::types::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 use rlst_dense::types::RlstScalar;
 

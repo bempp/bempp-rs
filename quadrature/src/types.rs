@@ -1,5 +1,5 @@
 //! Type definitions.
-pub use bempp_traits::cell::ReferenceCellType;
+pub use bempp_traits::types::ReferenceCellType;
 use std::fmt;
 
 #[derive(Debug)]
