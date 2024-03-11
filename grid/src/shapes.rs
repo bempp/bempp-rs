@@ -1,128 +1,156 @@
 //! Functions to create simple example grids
 
-use crate::grid::SerialGrid;
-use bempp_element::cell::Triangle;
-use bempp_tools::arrays::AdjacencyList;
-use bempp_traits::arrays::AdjacencyListAccess;
-use bempp_traits::cell::{ReferenceCell, ReferenceCellType};
-use bempp_traits::grid::{Geometry, Grid, Topology};
+use crate::flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBuilder};
+use crate::traits_impl::WrappedGrid;
+use bempp_traits::grid::Builder;
+use num::Float;
 use rlst_dense::{
-    rlst_dynamic_array2,
-    traits::{RandomAccessByRef, RandomAccessMut, RawAccessMut},
+    array::{views::ArrayViewMut, Array},
+    base_array::BaseArray,
+    data_container::VectorContainer,
+    traits::MatrixInverse,
+    types::RlstScalar,
 };
+use std::collections::HashMap;
 
 /// Create a regular sphere
 ///
 /// A regular sphere is created by starting with a regular octahedron. The shape is then refined `refinement_level` times.
 /// Each time the grid is refined, each triangle is split into four triangles (by adding lines connecting the midpoints of
 /// each edge). The new points are then scaled so that they are a distance of 1 from the origin.
-pub fn regular_sphere(refinement_level: usize) -> SerialGrid {
-    let mut points = rlst_dynamic_array2!(f64, [6, 3]);
-    points.data_mut().copy_from_slice(&[
-        0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0,
-    ]);
-    let mut g = SerialGrid::new(
-        points,
-        AdjacencyList::from_data(
-            vec![
-                0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
-            ],
-            vec![0, 3, 6, 9, 12, 15, 18, 21, 24],
-        ),
-        vec![ReferenceCellType::Triangle; 8],
+pub fn regular_sphere<T: Float + RlstScalar<Real = T>>(
+    refinement_level: u32,
+) -> WrappedGrid<SerialFlatTriangleGrid<T>>
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
+{
+    let mut b = SerialFlatTriangleGridBuilder::new_with_capacity(
+        2 + 4 * usize::pow(6, refinement_level),
+        8 * usize::pow(6, refinement_level),
+        (),
     );
-    let ref_e = Triangle {};
-    for _level in 0..refinement_level {
-        let nvertices_old = g.topology().entity_count(0);
-        let ncells_old = g.topology().entity_count(2);
-        let nvertices = g.topology().entity_count(0) + g.topology().entity_count(1);
-        let mut coordinates = rlst_dynamic_array2!(f64, [nvertices, 3]);
-        let mut cells = AdjacencyList::<usize>::new();
+    let zero = T::from(0.0).unwrap();
+    let one = T::from(1.0).unwrap();
+    let half = T::from(0.5).unwrap();
+    let three = T::from(3.0).unwrap();
+    b.add_point(0, [zero, zero, one]);
+    b.add_point(1, [one, zero, zero]);
+    b.add_point(2, [zero, one, zero]);
+    b.add_point(3, [-one, zero, zero]);
+    b.add_point(4, [zero, -one, zero]);
+    b.add_point(5, [zero, zero, -one]);
+    let mut point_n = 6;
 
-        for i in 0..ncells_old {
-            let ti = g.topology().index_map()[i];
-            let tedges = (0..3)
-                .map(|x| unsafe { g.topology().connectivity(2, 1).row_unchecked(ti)[x] })
-                .collect::<Vec<usize>>();
-            let gi = g.geometry().index_map()[i];
-            let tv = g.topology().cell(ti).unwrap();
-            let gv = g.geometry().cell_vertices(gi).unwrap();
-            for (j, gv_j) in gv.iter().enumerate() {
-                for k in 0..g.geometry().dim() {
-                    *coordinates.get_mut([tv[j], k]).unwrap() =
-                        *g.geometry().coordinate(*gv_j, k).unwrap();
+    let mut cells = vec![
+        [0, 1, 2],
+        [0, 2, 3],
+        [0, 3, 4],
+        [0, 4, 1],
+        [5, 2, 1],
+        [5, 3, 2],
+        [5, 4, 3],
+        [5, 1, 4],
+    ];
+    let mut v = [[zero, zero, zero], [zero, zero, zero], [zero, zero, zero]];
+
+    for level in 0..refinement_level {
+        let mut edge_points = HashMap::new();
+        let mut new_cells = Vec::with_capacity(8 * usize::pow(6, level));
+        for c in &cells {
+            for i in 0..3 {
+                for j in 0..3 {
+                    v[i][j] = b.points[3 * c[i] + j];
                 }
             }
-
-            for (j, tedges_j) in tedges.iter().enumerate() {
-                let vs = ref_e.connectivity(1, j, 0).unwrap();
-                let pt = (0..3)
-                    .map(|k| {
-                        (*coordinates.get([tv[vs[0]], k]).unwrap()
-                            + *coordinates.get([tv[vs[1]], k]).unwrap())
-                            / 2.0
-                    })
-                    .collect::<Vec<f64>>();
-
-                let norm = (pt[0].powi(2) + pt[1].powi(2) + pt[2].powi(2)).sqrt();
-                for (k, pt_k) in pt.iter().enumerate() {
-                    *coordinates.get_mut([nvertices_old + tedges_j, k]).unwrap() = *pt_k / norm;
-                }
+            let edges = [[1, 2], [0, 2], [0, 1]]
+                .iter()
+                .map(|[i, j]| {
+                    let mut pt_i = c[*i];
+                    let mut pt_j = c[*j];
+                    if pt_i > pt_j {
+                        std::mem::swap(&mut pt_i, &mut pt_j);
+                    }
+                    if !edge_points.contains_key(&(pt_i, pt_j)) {
+                        let v_i = v[*i];
+                        let v_j = v[*j];
+                        let mut new_pt = [
+                            half * (v_i[0] + v_j[0]),
+                            half * (v_i[1] + v_j[1]),
+                            half * (v_i[2] + v_j[2]),
+                        ];
+                        let size =
+                            Float::sqrt(new_pt.iter().map(|x| Float::powi(*x, 2)).sum::<T>());
+                        for i in new_pt.iter_mut() {
+                            *i /= size;
+                        }
+                        b.add_point(point_n, new_pt);
+                        edge_points.insert((pt_i, pt_j), point_n);
+                        point_n += 1;
+                    }
+                    edge_points[&(pt_i, pt_j)]
+                })
+                .collect::<Vec<_>>();
+            let mid = point_n;
+            let mut new_pt = [
+                (v[0][0] + v[1][0] + v[2][0]) / three,
+                (v[0][1] + v[1][1] + v[2][1]) / three,
+                (v[0][2] + v[1][2] + v[2][2]) / three,
+            ];
+            let size = Float::sqrt(new_pt.iter().map(|x| Float::powi(*x, 2)).sum::<T>());
+            for i in new_pt.iter_mut() {
+                *i /= size;
             }
-
-            cells.add_row(&[tv[0], nvertices_old + tedges[2], nvertices_old + tedges[1]]);
-            cells.add_row(&[tv[1], nvertices_old + tedges[0], nvertices_old + tedges[2]]);
-            cells.add_row(&[tv[2], nvertices_old + tedges[1], nvertices_old + tedges[0]]);
-            cells.add_row(&[
-                nvertices_old + tedges[0],
-                nvertices_old + tedges[1],
-                nvertices_old + tedges[2],
-            ]);
+            b.add_point(point_n, new_pt);
+            point_n += 1;
+            new_cells.push([c[0], edges[2], mid]);
+            new_cells.push([c[0], mid, edges[1]]);
+            new_cells.push([c[1], edges[0], mid]);
+            new_cells.push([c[1], mid, edges[2]]);
+            new_cells.push([c[2], edges[1], mid]);
+            new_cells.push([c[2], mid, edges[0]]);
         }
-        let ncells = cells.num_rows();
-        g = SerialGrid::new(
-            coordinates,
-            cells,
-            vec![ReferenceCellType::Triangle; ncells],
-        );
+        cells = new_cells;
+    }
+    for (i, v) in cells.iter().enumerate() {
+        b.add_cell(i, *v);
     }
 
-    g
+    b.create_grid()
 }
 
 #[cfg(test)]
 mod test {
     use crate::shapes::*;
+    use bempp_traits::grid::{GridType, ReferenceMapType};
 
     #[test]
     fn test_regular_sphere_0() {
-        let _g = regular_sphere(0);
+        let _g = regular_sphere::<f64>(0);
     }
 
     #[test]
     fn test_regular_spheres() {
-        let _g1 = regular_sphere(1);
-        let _g2 = regular_sphere(2);
-        let _g3 = regular_sphere(3);
+        let _g1 = regular_sphere::<f64>(1);
+        let _g2 = regular_sphere::<f64>(2);
+        let _g3 = regular_sphere::<f64>(3);
     }
 
     #[test]
     fn test_normal_is_outward() {
         for i in 0..3 {
-            let g = regular_sphere(i);
-            let mut points = rlst_dynamic_array2!(f64, [1, 2]);
-            *points.get_mut([0, 0]).unwrap() = 1.0 / 3.0;
-            *points.get_mut([0, 1]).unwrap() = 1.0 / 3.0;
-
-            let mut mapped_pt = rlst_dynamic_array2!(f64, [1, 3]);
-            let mut normal = rlst_dynamic_array2!(f64, [1, 3]);
-
-            for i in 0..g.geometry().cell_count() {
-                g.geometry().compute_points(&points, i, &mut mapped_pt);
-                g.geometry().compute_normals(&points, i, &mut normal);
-                let dot = *mapped_pt.get([0, 0]).unwrap() * *normal.get([0, 0]).unwrap()
-                    + *mapped_pt.get([0, 1]).unwrap() * *normal.get([0, 1]).unwrap()
-                    + *mapped_pt.get([0, 2]).unwrap() * *normal.get([0, 2]).unwrap();
+            let g = regular_sphere::<f64>(i);
+            let points = vec![1.0 / 3.0, 1.0 / 3.0];
+            let map = g.reference_to_physical_map(&points);
+            let mut mapped_pt = vec![0.0; 3];
+            let mut normal = vec![0.0; 3];
+            for i in 0..g.number_of_cells() {
+                map.reference_to_physical(i, 0, &mut mapped_pt);
+                map.normal(i, 0, &mut normal);
+                let dot = mapped_pt
+                    .iter()
+                    .zip(&normal)
+                    .map(|(i, j)| i * j)
+                    .sum::<f64>();
                 assert!(dot > 0.0);
             }
         }

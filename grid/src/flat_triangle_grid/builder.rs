@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 /// Grid builder for a flat triangle grid
 pub struct SerialFlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
-    points: Vec<T>,
+    pub(crate) points: Vec<T>,
     cells: Vec<usize>,
     point_indices_to_ids: Vec<usize>,
     point_ids_to_indices: HashMap<usize, usize>,
@@ -75,12 +75,7 @@ where
         // TODO: remove this transposing
         let npts = self.point_indices_to_ids.len();
         let mut points = rlst_dynamic_array2!(T, [npts, 3]);
-        points.fill_from(rlst_array_from_slice2!(
-            T,
-            &self.points,
-            [npts, 3],
-            [1, npts]
-        ));
+        points.fill_from(rlst_array_from_slice2!(T, &self.points, [npts, 3], [3, 1]));
         WrappedGrid {
             grid: SerialFlatTriangleGrid::new(
                 points,

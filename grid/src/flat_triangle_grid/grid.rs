@@ -69,11 +69,11 @@ where
 
         // Compute geometry
         let mut index_map = vec![0; ncells];
-        let mut midpoints = vec![];
-        let mut diameters = vec![T::from(0.0).unwrap(); ncells];
-        let mut volumes = vec![T::from(0.0).unwrap(); ncells];
-        let mut normals = vec![];
-        let mut jacobians = vec![];
+        let mut midpoints = Vec::with_capacity(ncells);
+        let mut diameters = Vec::with_capacity(ncells);
+        let mut volumes = Vec::with_capacity(ncells);
+        let mut normals = Vec::with_capacity(ncells);
+        let mut jacobians = Vec::with_capacity(ncells);
 
         let mut a = rlst_static_array!(T, 3);
         let mut b = rlst_static_array!(T, 3);
@@ -115,8 +115,15 @@ where
             let normal_length = normals[cell_i].view().norm_2();
             normals[cell_i].scale_in_place(T::one() / normal_length);
 
-            volumes[cell_i] = normal_length / T::from(2.0).unwrap();
-            diameters[cell_i] = compute_diameter_triangle(v0.view(), v1.view(), v2.view());
+            println!("== {cell_i} ==");
+            println!("{:?}", v0.data());
+            println!("{:?}", v1.data());
+            println!("{:?}", v2.data());
+            println!("{normal_length}");
+            println!();
+
+            volumes.push(normal_length / T::from(2.0).unwrap());
+            diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
         }
 
         let element = create_element(

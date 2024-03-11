@@ -3,7 +3,6 @@
 
 //pub mod grid;
 //pub mod io;
-//pub mod shapes;
 
 //#[cfg(feature = "mpi")]
 //pub mod parallel_grid;
@@ -11,6 +10,7 @@
 pub mod common;
 pub mod flat_triangle_grid;
 pub mod mixed_grid;
+pub mod shapes;
 pub mod single_element_grid;
 pub mod traits;
 pub mod traits_impl;
