@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use bempp_traits::{tree::Tree, types::RlstScalar};
 
 use crate::{
-    constants::{DEEPEST_LEVEL, LEVEL_SIZE},
+    constants::{DEEPEST_LEVEL, LEVEL_SIZE, ROOT},
     implementations::impl_morton::encode_anchor,
     types::{
         domain::Domain,
@@ -15,6 +15,8 @@ use crate::{
         single_node::SingleNodeTree,
     },
 };
+
+use super::impl_morton::complete_region;
 
 impl<T> SingleNodeTree<T>
 where
@@ -397,6 +399,148 @@ where
         }
 
         unmapped
+    }
+
+  /// Complete the minimal tree between a set of `seed` octants in some domain. Computed
+    /// in place.
+    ///
+    /// # Arguments
+    /// * `seeds` - A mutable reference to a container of `seed' octants, with gaps between them.
+    pub fn complete_blocktree(seeds: &mut MortonKeys) -> MortonKeys {
+        let ffc_root = ROOT.finest_first_child();
+        let min = seeds.iter().min().unwrap();
+        let fa = ffc_root.finest_ancestor(min);
+        let first_child = fa.children().into_iter().min().unwrap();
+
+        // Check for overlap
+        if first_child < *min {
+            seeds.push(first_child)
+        }
+
+        let flc_root = ROOT.finest_last_child();
+        let max = seeds.iter().max().unwrap();
+        let fa = flc_root.finest_ancestor(max);
+        let last_child = fa.children().into_iter().max().unwrap();
+
+        if last_child > *max
+            && !max.ancestors().contains(&last_child)
+            && !last_child.ancestors().contains(max)
+        {
+            seeds.push(last_child);
+        }
+
+        seeds.sort();
+
+        let mut blocktree = MortonKeys::new();
+
+        for i in 0..(seeds.iter().len() - 1) {
+            let a = seeds[i];
+            let b = seeds[i + 1];
+            let mut tmp = complete_region(&a, &b);
+            blocktree.keys.push(a);
+            blocktree.keys.append(&mut tmp);
+        }
+
+        blocktree.keys.push(seeds.last().unwrap());
+
+        blocktree.sort();
+
+        blocktree
+    }
+
+    /// Seeds are defined as the coarsest boxes in a set of non-uniform leaf boxes.
+    /// Returns an owned vector of seeds in sorted order.
+    ///
+    /// # Arguments
+    /// * `leaves` - A reference to a container of Morton Keys containing the leaf boxes.
+    pub fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
+        let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
+
+        let mut seeds: MortonKeys = MortonKeys {
+            keys: leaves
+                .iter()
+                .filter(|k| k.level() == coarsest_level)
+                .cloned()
+                .collect_vec(),
+            index: 0,
+        };
+
+        seeds.sort();
+        seeds
+    }
+
+    /// Split tree coarse blocks by counting how many particles they contain until they satisfy
+    /// a constrants specified by `n_crit` for the maximum number of particles that they can contain.
+    ///
+    /// # Arguments
+    /// * `points` - A mutable reference to a container of points.
+    /// * `blocktree` - An owned container of the `blocktree`, created by completing the space between seeds.
+    /// * `n_crit` - The maximum number of points per leaf node.
+    pub fn split_blocks(
+        points: &mut Points<T>,
+        mut blocktree: MortonKeys,
+        n_crit: usize,
+    ) -> MortonKeys {
+        let split_blocktree;
+        let mut blocks_to_points;
+        loop {
+            let mut new_blocktree = MortonKeys::new();
+
+            // Map between blocks and the leaves they contain
+            let unmapped = SingleNodeTree::assign_nodes_to_points(&blocktree, points);
+            blocks_to_points = points
+                .points
+                .iter()
+                .enumerate()
+                .fold(
+                    (HashMap::new(), 0, points.points[0]),
+                    |(mut blocks_to_points, curr_idx, curr), (i, point)| {
+                        if point.encoded_key != curr.encoded_key {
+                            blocks_to_points.insert(curr.encoded_key, (curr_idx, i));
+
+                            (blocks_to_points, i, *point)
+                        } else {
+                            (blocks_to_points, curr_idx, curr)
+                        }
+                    },
+                )
+                .0;
+
+            // Collect all blocks, including those which haven't been mapped
+            let mut blocks = blocks_to_points.keys().cloned().collect_vec();
+            // Add empty nodes to blocks.
+            for key in unmapped.iter() {
+                blocks.push(*key)
+            }
+
+            // Generate a new blocktree with a block's children if they violate the n_crit parameter
+            let mut check = 0;
+
+            for block in blocks.iter() {
+                if let Some((l, r)) = blocks_to_points.get(block) {
+                    if (r - l) > n_crit {
+                        let mut children = block.children();
+                        new_blocktree.append(&mut children);
+                    } else {
+                        new_blocktree.push(*block);
+                        check += 1;
+                    }
+                } else {
+                    // Retain unmapped blocks
+                    new_blocktree.push(*block);
+                    check += 1;
+                }
+            }
+
+            // Return if we cycle through all blocks without splitting
+            if check == blocks.len() {
+                split_blocktree = new_blocktree;
+                break;
+            } else {
+                blocktree = new_blocktree;
+            }
+        }
+        split_blocktree
     }
 }
 

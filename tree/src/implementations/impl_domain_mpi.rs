@@ -1,4 +1,5 @@
 //! Implementation of an equivalent MPI type for a Domain object, and constructor for distributed Domains.
+use std::fmt::Debug;
 use memoffset::offset_of;
 use mpi::{
     datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
@@ -28,7 +29,7 @@ unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
     }
 }
 
-impl<T: Float + Default> Domain<T>
+impl<T: Float + Default + Debug> Domain<T>
 where
     [Domain<T>]: BufferMut,
     Vec<Domain<T>>: Buffer,
