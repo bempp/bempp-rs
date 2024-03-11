@@ -1,5 +1,5 @@
 use crate::element::FiniteElement;
-use crate::grid::Grid;
+use crate::grid::GridType;
 
 pub trait DofMap {
     /// Get the DOF numbers on the local process associated with the given entity
@@ -21,9 +21,9 @@ pub trait DofMap {
     fn is_serial(&self) -> bool;
 }
 
-pub trait FunctionSpace<'a> {
+pub trait FunctionSpace {
     type DofMap: DofMap;
-    type Grid: Grid<'a>;
+    type Grid: GridType;
     type FiniteElement: FiniteElement;
 
     /// Get the function space's DOF map

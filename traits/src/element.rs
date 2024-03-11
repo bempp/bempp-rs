@@ -1,6 +1,6 @@
 //! Finite element definitions
 
-use crate::cell::ReferenceCellType;
+use crate::types::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 use rlst_dense::types::RlstScalar;
 

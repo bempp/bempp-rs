@@ -1,6 +1,7 @@
 //! Topology of a cell
 
-use crate::{grid::grid::GridType, types::ReferenceCellType};
+use super::GridType;
+use crate::types::ReferenceCellType;
 
 pub trait TopologyType {
     //! Cell topology

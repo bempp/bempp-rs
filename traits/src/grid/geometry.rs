@@ -1,5 +1,5 @@
 //! Geometry of a physical cell
-use crate::grid::GridType;
+use super::GridType;
 use rlst_dense::types::RlstScalar;
 
 pub trait GeometryType {

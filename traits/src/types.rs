@@ -1,8 +1,10 @@
 //! General type definitions
-
-// Definition of RlstScalar types.
-// For now we simply derive from the `caucy::RlstScalar` type.
 pub use rlst_dense::types::{c32, c64, RlstScalar};
+pub mod cell;
+pub mod cell_iterator;
+pub mod point_iterator;
+
+pub use cell::{CellLocalIndexPair, ReferenceCellType};
 
 // Declare if entity is local, a ghost, or remote.
 pub enum Locality {

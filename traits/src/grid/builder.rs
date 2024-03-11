@@ -1,5 +1,5 @@
 //! Grid builder
-use crate::grid::grid::GridType;
+use super::GridType;
 use rlst_dense::types::RlstScalar;
 
 pub trait Builder<const GDIM: usize> {

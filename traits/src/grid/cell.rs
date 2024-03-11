@@ -1,8 +1,5 @@
 //! Definition of a cell.
-
-use crate::grid::topology::TopologyType;
-
-use super::{GeometryType, GridType};
+use super::{GeometryType, GridType, TopologyType};
 
 pub trait CellType {
     //! A cell
