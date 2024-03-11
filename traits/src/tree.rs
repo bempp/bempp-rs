@@ -2,8 +2,8 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-use cauchy::Scalar;
 use num::Float;
+use rlst_dense::types::RlstScalar;
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 /// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
@@ -13,8 +13,7 @@ pub trait Tree {
     /// The computational domain defined by the tree.
     type Domain;
 
-    /// The precision of the point data
-    type Precision: Scalar<Real = Self::Precision> + Float + Default;
+    type Precision: RlstScalar<Real = Self::Precision> + Float + Default;
 
     /// A tree node.
     type NodeIndex: MortonKeyInterface<Self::Precision, Domain = Self::Domain> + Clone + Copy;
@@ -92,7 +91,7 @@ pub trait FmmTree {
 pub trait MortonKeyInterface<T>
 where
     Self: Hash + Eq,
-    T: Scalar,
+    T: RlstScalar,
 {
     type Domain;
 
@@ -109,7 +108,7 @@ where
         domain: &Self::Domain,
         expansion_order: usize,
         alpha: T,
-    ) -> Vec<<T as Scalar>::Real>;
+    ) -> Vec<<T as RlstScalar>::Real>;
 
     /// Neighbours defined by keys sharing a vertex, edge, or face.
     fn neighbors(&self) -> Self::NodeIndices;

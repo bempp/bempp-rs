@@ -3,9 +3,9 @@ use bempp_traits::kernel::Kernel;
 use itertools::Itertools;
 use num::Zero;
 use num::{Complex, Float};
-use rlst_blis::interface::gemm::Gemm;
-use rlst_common::types::Scalar;
+use rlst_dense::gemm::Gemm;
 use rlst_dense::rlst_array_from_slice2;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
@@ -35,7 +35,7 @@ use crate::{
     array::flip3, fft::Fft, transfer_vector::compute_transfer_vectors, types::FftM2lOperatorData,
 };
 
-fn find_cutoff_rank<T: Float + Default + Scalar<Real = T> + Gemm>(
+fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
     singular_values: &[T],
     threshold: T,
 ) -> usize {
@@ -49,7 +49,7 @@ fn find_cutoff_rank<T: Float + Default + Scalar<Real = T> + Gemm>(
 }
 
 
-fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
+fn retain_energy<T: Float + Default + RlstScalar<Real = T>>(
     singular_values: &[T],
     percentage: T,
 ) -> usize {
@@ -78,7 +78,7 @@ fn retain_energy<T: Float + Default + Scalar<Real = T> + Gemm>(
 impl<T, U> SourceToTargetData<U> for BlasFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + Gemm,
+    T: RlstScalar<Real = T> + Gemm,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -153,7 +153,7 @@ where
         // println!("vt big {:?} {:?}", vt_big.shape(), &vt_big.data()[0..10]);
         // println!("sigma {:?} {:?}", &sigma[0..10], sigma.len());
         // println!("u big {:?} {:?}", u_big.shape(), &u_big.data()[0..10]);
-        let cutoff_rank = find_cutoff_rank(&sigma, self.threshold);
+        // let cutoff_rank = find_cutoff_rank(&sigma, self.threshold);
         let cutoff_rank = 70;
         let mut u = rlst_dynamic_array2!(T, [mu, cutoff_rank]);
         let mut sigma_mat = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
@@ -214,7 +214,7 @@ where
             tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
 
-            let directional_cutoff_rank = find_cutoff_rank(&sigma_i, self.threshold);
+            // let directional_cutoff_rank = find_cutoff_rank(&sigma_i, self.threshold);
             let directional_cutoff_rank = retain_energy(&sigma_i, T::from(0.99999).unwrap());
 
             let mut u_i_compressed =
@@ -272,7 +272,7 @@ where
 impl<T, U> BlasFieldTranslationKiFmm<T, U>
 where
     T: Float + Default,
-    T: Scalar<Real = T> + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -288,8 +288,8 @@ where
 
 impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + Fft,
-    Complex<T>: Scalar,
+    T: RlstScalar<Real = T> + Float + Default + Fft,
+    Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
     type Domain = Domain<T>;
@@ -503,8 +503,8 @@ where
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Float + Scalar<Real = T> + Default + Fft,
-    Complex<T>: Scalar,
+    T: Float + RlstScalar<Real = T> + Default + Fft,
+    Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
     pub fn new() -> Self {

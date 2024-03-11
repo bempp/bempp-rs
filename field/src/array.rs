@@ -4,7 +4,7 @@
 use itertools::Itertools;
 use num::traits::Num;
 
-use rlst_common::types::Scalar;
+use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
@@ -31,7 +31,7 @@ pub fn argsort<T: Ord>(arr: &[T]) -> Vec<usize> {
 /// * `arr` - An array to be padded.
 /// * `pad_size` - The amount of padding to be added along each axis.
 /// * `pad_index` - The position in the array to start the padding from.
-pub fn pad3<T: Scalar>(
+pub fn pad3<T: RlstScalar>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
     pad_size: (usize, usize, usize),
     pad_index: (usize, usize, usize),
@@ -64,7 +64,7 @@ where
 ///
 /// # Arguments
 /// * `arr` - An array to be flipped.
-pub fn flip3<T: Scalar>(
+pub fn flip3<T: RlstScalar>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where

@@ -2,6 +2,7 @@
 
 use crate::cell::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
+use rlst_dense::types::RlstScalar;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
@@ -36,6 +37,7 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usi
 
 pub trait FiniteElement {
     //! A finite element defined on a reference cell
+    type T: RlstScalar;
 
     /// The reference cell type
     fn cell_type(&self) -> ReferenceCellType;
@@ -60,13 +62,13 @@ pub trait FiniteElement {
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
     fn tabulate<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        T4Mut: RandomAccessMut<4, Item = f64>,
+        Array2: RandomAccessByRef<2, Item = Self::T> + Shape<2>,
+        Array4Mut: RandomAccessMut<4, Item = Self::T>,
     >(
         &self,
-        points: &T,
+        points: &Array2,
         nderivs: usize,
-        data: &mut T4Mut,
+        data: &mut Array4Mut,
     );
 
     /// The DOFs that are associated with a subentity of the reference cell

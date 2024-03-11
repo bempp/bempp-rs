@@ -1,10 +1,11 @@
 use bempp_traits::tree::{FmmTree, Tree};
 use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew};
+use num::Float;
+use rlst_dense::types::RlstScalar;
 
-use crate::traits::FmmScalar;
 
 #[derive(Default)]
-pub struct SingleNodeFmmTree<T: FmmScalar + Send + Sync> {
+pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
     pub source_tree: SingleNodeTreeNew<T>,
     pub target_tree: SingleNodeTreeNew<T>,
     pub domain: Domain<T>,
@@ -12,7 +13,7 @@ pub struct SingleNodeFmmTree<T: FmmScalar + Send + Sync> {
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
-    T: FmmScalar,
+    T: RlstScalar<Real = T> + Float + Default,
 {
     type Precision = T;
     type NodeIndex = MortonKey;
@@ -87,5 +88,5 @@ where
     }
 }
 
-unsafe impl<T: FmmScalar> Send for SingleNodeFmmTree<T> {}
-unsafe impl<T: FmmScalar> Sync for SingleNodeFmmTree<T> {}
+unsafe impl<T: RlstScalar<Real = T> + Default + Float> Send for SingleNodeFmmTree<T> {}
+unsafe impl<T: RlstScalar<Real = T> + Default + Float> Sync for SingleNodeFmmTree<T> {}

@@ -3,8 +3,10 @@ use bempp_field::constants::NTRANSFER_VECTORS_KIFMM;
 use bempp_field::types::BlasFieldTranslationKiFmm;
 use bempp_traits::tree::FmmTree;
 use itertools::Itertools;
+use num::Float;
 use rayon::prelude::*;
-use rlst_dense::traits::Shape;
+// use rlst_dense::traits::Shape;
+use rlst_dense::types::RlstScalar;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
@@ -18,7 +20,6 @@ use bempp_tree::types::single_node::SingleNodeTreeNew;
 use crate::builder::FmmEvalType;
 use crate::fmm::KiFmm;
 use crate::helpers::{homogenous_kernel_scale, m2l_scale};
-use crate::traits::FmmScalar;
 use crate::types::SendPtrMut;
 
 use rlst_dense::{
@@ -32,11 +33,11 @@ use rlst_dense::{
 impl<T, U, V> KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: FmmScalar,
+    U: RlstScalar<Real = U> + Float + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
 {
-    fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
+    pub fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
         let sources = self.tree.get_source_tree().get_keys(level).unwrap();
         let nsources = sources.len();
 
@@ -104,7 +105,7 @@ where
 impl<T, U, V> SourceToTarget for KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: FmmScalar,
+    U: RlstScalar<Real = U> + Float + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
 {
@@ -118,9 +119,9 @@ where
                     return;
                 };
 
-                if level == 2 {
+                // if level == 2 {
 
-                }
+                // }
                 // Compute the displacements
                 let all_displacements = self.displacements(level);
 
@@ -310,7 +311,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
             }
-            FmmEvalType::Matrix(nmatvec) => {}
+            FmmEvalType::Matrix(_nmatvec) => {}
         }
     }
 

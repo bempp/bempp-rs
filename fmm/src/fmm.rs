@@ -1,7 +1,8 @@
 //! Implementation of FmmData and Fmm traits.
 use std::collections::HashMap;
 
-use rlst_dense::rlst_dynamic_array2;
+use num::Float;
+use rlst_dense::{rlst_dynamic_array2, types::RlstScalar};
 
 use bempp_traits::{
     field::{SourceToTarget, SourceToTargetData},
@@ -15,7 +16,6 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTreeNew};
 
 use crate::{
     builder::FmmEvalType,
-    traits::FmmScalar,
     types::{C2EType, SendPtrMut},
 };
 
@@ -24,7 +24,7 @@ pub struct KiFmm<
     T: FmmTree<Tree = SingleNodeTreeNew<W>>,
     U: SourceToTargetData<V>,
     V: Kernel,
-    W: FmmScalar,
+    W: RlstScalar<Real = W> + Float + Default,
 > {
     pub tree: T,
     pub source_to_target_data: U,
@@ -122,7 +122,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>, NodeIndex = MortonKey> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
-    W: FmmScalar,
+    W: RlstScalar<Real = W> + Float + Default,
     Self: SourceToTarget,
 {
     type NodeIndex = T::NodeIndex;
@@ -240,7 +240,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>> + Default,
     U: SourceToTargetData<V> + Default,
     V: Kernel + Default,
-    W: FmmScalar,
+    W: RlstScalar<Real = W> + Float + Default,
 {
     fn default() -> Self {
         let uc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
@@ -296,6 +296,7 @@ mod test {
     use bempp_field::constants::ALPHA_INNER;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
     use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
+    use num::Float;
     use rlst_dense::array::Array;
     use rlst_dense::base_array::BaseArray;
     use rlst_dense::data_container::VectorContainer;
@@ -307,7 +308,7 @@ mod test {
 
     use super::*;
 
-    fn test_root_multipole_laplace_single_node<T: FmmScalar>(
+    fn test_root_multipole_laplace_single_node<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
             dyn Fmm<
                 Precision = T,
@@ -352,7 +353,7 @@ mod test {
         assert!(rel_error <= threshold);
     }
 
-    fn test_single_node_laplace_fmm<T: FmmScalar>(
+    fn test_single_node_laplace_fmm<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
             dyn Fmm<
                 Precision = T,

@@ -129,7 +129,7 @@ impl<T: Float + Default + Debug> Domain<T> {
 
 #[cfg(test)]
 mod test {
-    use bempp_traits::types::Scalar;
+    use bempp_traits::types::RlstScalar;
     use rlst_dense::traits::{RawAccess, Shape};
 
     use crate::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
@@ -138,7 +138,7 @@ mod test {
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where
-        T: Float + Default + Scalar,
+        T: Float + Default + RlstScalar,
     {
         let domain = Domain::from_local_points(points.data());
 

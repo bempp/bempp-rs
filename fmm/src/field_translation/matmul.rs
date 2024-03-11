@@ -1,5 +1,5 @@
 //! Implementations of 8x8 operation for Hadamard product in FFT based M2L operations.
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use num::{complex::Complex, Zero};
 
 /// The 8x8 matmul operation, always inlined
@@ -16,7 +16,7 @@ pub fn matmul8x8<U>(
     save_locations: &mut [Complex<U>],
     scale: Complex<U>,
 ) where
-    U: Scalar,
+    U: RlstScalar,
 {
     let s1 = signal[0];
     let s2 = signal[1];

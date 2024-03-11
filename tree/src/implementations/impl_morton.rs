@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-use bempp_traits::{tree::MortonKeyInterface, types::Scalar};
+use bempp_traits::{tree::MortonKeyInterface, types::RlstScalar};
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 /// Returns an owned vector of Morton Keys, hence requires a copy.
@@ -906,7 +906,7 @@ impl MortonKey {
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn scale_surface<T: Float + Default + Scalar>(
+    pub fn scale_surface<T: Float + Default + RlstScalar>(
         &self,
         surface: Vec<T::Real>,
         domain: &Domain<T>,
@@ -946,7 +946,7 @@ impl MortonKey {
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
     pub fn compute_surface<T>(&self, domain: &Domain<T>, order: usize, alpha: T) -> Vec<T::Real>
     where
-        T: Float + std::ops::MulAssign + std::ops::SubAssign + Default + Scalar,
+        T: Float + std::ops::MulAssign + std::ops::SubAssign + Default + RlstScalar,
     {
         let surface = MortonKey::surface_grid(order);
 
@@ -979,7 +979,7 @@ impl Hash for MortonKey {
     }
 }
 
-impl<T: Scalar + Float + Default> MortonKeyInterface<T> for MortonKey {
+impl<T: RlstScalar + Float + Default> MortonKeyInterface<T> for MortonKey {
     type NodeIndices = MortonKeys;
 
     type Domain = Domain<T>;
@@ -1011,7 +1011,7 @@ impl<T: Scalar + Float + Default> MortonKeyInterface<T> for MortonKey {
         domain: &Self::Domain,
         order: usize,
         alpha: T,
-    ) -> Vec<<T as Scalar>::Real> {
+    ) -> Vec<<T as RlstScalar>::Real> {
         self.compute_surface(domain, order, alpha)
     }
 

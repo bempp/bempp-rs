@@ -15,19 +15,19 @@ use bempp_tree::{
     constants::{N_CRIT, ROOT},
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTreeNew},
 };
+use num::Float;
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
+    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape}, types::RlstScalar,
 };
 
 use crate::{
     fmm::KiFmm,
     helpers::homogenous_kernel_scale,
     pinv::pinv,
-    traits::FmmScalar,
     tree::SingleNodeFmmTree,
     types::{Charges, Coordinates, SendPtrMut},
 };
@@ -42,7 +42,7 @@ pub enum FmmEvalType {
 pub struct KiFmmBuilderSingleNode<'builder, T, U, V>
 where
     T: SourceToTargetData<V>,
-    U: FmmScalar,
+    U: RlstScalar<Real = U> + Float + Default,
     V: Kernel,
 {
     tree: Option<SingleNodeFmmTree<U>>,
@@ -59,7 +59,7 @@ where
 impl<'builder, T, U, V> KiFmmBuilderSingleNode<'builder, T, U, V>
 where
     T: SourceToTargetData<V, Domain = Domain<U>> + Default,
-    U: FmmScalar,
+    U: RlstScalar<Real = U> + Float + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,
 {
@@ -197,7 +197,7 @@ where
     T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
     U: SourceToTargetData<V>,
     V: Kernel<T = W>,
-    W: FmmScalar,
+    W: RlstScalar<Real = W> + Float + Default,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
 {
     fn set_source_and_target_operator_data(&mut self) {

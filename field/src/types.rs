@@ -5,7 +5,7 @@ use rlst_dense::{
 };
 
 use bempp_traits::kernel::Kernel;
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use bempp_tree::types::morton::MortonKey;
 
 /// Simple type alias for a 2D `Matrix<f64>`
@@ -19,7 +19,7 @@ pub type FftKernelData<C> = Vec<Vec<C>>;
 #[derive(Default)]
 pub struct FftFieldTranslationKiFmm<T, U>
 where
-    T: Default + Scalar<Real = T> + Float,
+    T: Default + RlstScalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
 {
     /// Map between indices of surface convolution grid points.
@@ -48,7 +48,7 @@ where
 #[derive(Default)]
 pub struct BlasFieldTranslationKiFmm<T, U>
 where
-    T: Scalar<Real = T> + Float + Default + rlst_blis::interface::gemm::Gemm,
+    T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
     pub threshold: T,
@@ -98,7 +98,7 @@ pub struct FftM2lOperatorData<C> {
 // #[derive(Default)]
 pub struct BlasSourceToTargetOperatorData<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     /// Left singular vectors from SVD of fat M2L matrix.
     pub u: SvdM2lEntry<T>,
@@ -124,7 +124,7 @@ where
 
 impl<T> Default for BlasSourceToTargetOperatorData<T>
 where
-    T: Scalar,
+    T: RlstScalar,
 {
     fn default() -> Self {
         let u = rlst_dynamic_array2!(T, [1, 1]);

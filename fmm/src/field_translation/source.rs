@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use bempp_field::constants::NSIBLINGS;
 use itertools::Itertools;
+use num::Float;
 use rayon::prelude::*;
 
 use bempp_traits::{
@@ -19,12 +20,11 @@ use crate::{
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
     fmm::KiFmm,
     helpers::find_chunk_size,
-    traits::FmmScalar,
 };
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut},
+    traits::{MultIntoResize, RawAccess, RawAccessMut}, types::RlstScalar,
 };
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
@@ -32,7 +32,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W>,
-    W: FmmScalar,
+    W: RlstScalar<Real = W> + Float + Default,
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.get_source_tree().get_all_leaves() else {

@@ -60,7 +60,7 @@ pub trait Geometry {
     /// Get the evaluator for the given points
     fn get_evaluator<'a>(
         &'a self,
-        element: &impl FiniteElement,
+        element: &impl FiniteElement<T = f64>,
         points: &'a Self::T,
     ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'a>;
 

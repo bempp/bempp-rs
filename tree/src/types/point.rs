@@ -1,5 +1,5 @@
 //! Data structures for Cartesian Points in 3D.
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 
 use crate::types::morton::MortonKey;
 
@@ -13,7 +13,7 @@ pub type PointType<T> = T;
 #[derive(Clone, Debug, Default, Copy)]
 pub struct Point<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     /// Physical coordinate in Cartesian space.
     pub coordinate: [PointType<T>; 3],
@@ -33,7 +33,7 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct Points<T>
 where
-    T: Scalar<Real = T>,
+    T: RlstScalar<Real = T>,
 {
     /// A vector of Points
     pub points: Vec<Point<T>>,

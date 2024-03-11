@@ -1,6 +1,6 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use num::Float;
-use rlst_common::types::{RlstError, RlstResult, Scalar};
+use rlst_dense::types::{RlstError, RlstResult, RlstScalar};
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
@@ -12,9 +12,9 @@ use rlst_dense::{
 
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-type PinvReturnType<T> = RlstResult<(Vec<<T as Scalar>::Real>, PinvMatrix<T>, PinvMatrix<T>)>;
+type PinvReturnType<T> = RlstResult<(Vec<<T as RlstScalar>::Real>, PinvMatrix<T>, PinvMatrix<T>)>;
 
-//pub type SvdScalar<T> = <DenseMatrixLinAlgBuilder<T> as Svd>::T;
+//pub type SvdRlstScalar<T> = <DenseMatrixLinAlgBuilder<T> as Svd>::T;
 
 /// Compute the (Moore-Penrose) pseudo-inverse of a matrix.
 ///
@@ -33,7 +33,7 @@ pub fn pinv<T>(
 ) -> PinvReturnType<T>
 where
     //DenseMatrixLinAlgBuilder<T>: Svd,
-    T: Scalar<Real = T> + Float,
+    T: RlstScalar<Real = T> + Float,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     let shape = mat.shape();

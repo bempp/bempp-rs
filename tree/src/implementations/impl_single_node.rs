@@ -3,7 +3,7 @@ use itertools::Itertools;
 use num::Float;
 use std::collections::{HashMap, HashSet};
 
-use bempp_traits::{tree::Tree, types::Scalar};
+use bempp_traits::{tree::Tree, types::RlstScalar};
 
 use crate::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE},
@@ -709,7 +709,7 @@ use crate::{
 
 impl<T> SingleNodeTreeNew<T>
 where
-    T: Float + Default + Scalar<Real = T>,
+    T: Float + Default + RlstScalar<Real = T>,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     /// Returns a SingleNodeTree, with the leaves in sorted order.
@@ -1093,7 +1093,7 @@ where
 
 impl<T> Tree for SingleNodeTreeNew<T>
 where
-    T: Float + Default + Scalar<Real = T>,
+    T: Float + Default + RlstScalar<Real = T>,
 {
     type Precision = T;
     type Domain = Domain<T>;

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use bempp_field::constants::NSIBLINGS;
 use itertools::Itertools;
+use num::Float;
 use rayon::prelude::*;
 
 use bempp_traits::{
@@ -14,11 +15,11 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTreeNew};
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut},
+    traits::{MultIntoResize, RawAccess, RawAccessMut}, types::RlstScalar,
 };
 
 use crate::{
-    constants::L2L_MAX_CHUNK_SIZE, fmm::KiFmm, helpers::find_chunk_size, traits::FmmScalar,
+    constants::L2L_MAX_CHUNK_SIZE, fmm::KiFmm, helpers::find_chunk_size,
 };
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
@@ -26,7 +27,7 @@ where
     T: FmmTree<Tree = SingleNodeTreeNew<W>, NodeIndex = MortonKey> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W>,
-    W: FmmScalar,
+    W: RlstScalar<Real = W> + Float + Default,
 {
     fn l2l(&self, level: u64) {
         let Some(child_targets) = self.tree.get_target_tree().get_keys(level) else {

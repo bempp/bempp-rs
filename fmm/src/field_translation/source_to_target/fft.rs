@@ -1,19 +1,18 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use bempp_field::{
-    constants::{NHALO, NSIBLINGS},
-    types::FftFieldTranslationKiFmm,
+    constants::{NHALO, NSIBLINGS}, fft::Fft, types::FftFieldTranslationKiFmm
 };
 use bempp_traits::tree::FmmTree;
 use bempp_tree::types::single_node::SingleNodeTreeNew;
 use itertools::Itertools;
-use num::Complex;
+use num::{Complex, Float};
 use rayon::prelude::*;
-use rlst_dense::array::Array;
+use rlst_dense::{array::Array, types::RlstScalar};
 use rlst_dense::base_array::BaseArray;
 use rlst_dense::data_container::VectorContainer;
 use std::collections::HashSet;
 
-use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree, types::Scalar};
+use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
 use bempp_tree::types::morton::MortonKey;
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
     helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
     types::SendPtrMut,
 };
-use crate::{fmm::KiFmm, traits::FmmScalar};
+use crate::fmm::KiFmm;
 use rlst_dense::{
     array::empty_array,
     rlst_dynamic_array2,
@@ -35,8 +34,8 @@ use crate::field_translation::matmul::matmul8x8;
 impl<T, U, V> KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: FmmScalar,
-    Complex<U>: Scalar,
+    U: RlstScalar<Real = U> + Float + Default + Fft,
+    Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTreeNew<U>>,
 {
@@ -91,8 +90,8 @@ where
 impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
-    U: FmmScalar,
-    Complex<U>: Scalar,
+    U: RlstScalar<Real = U> + Float + Default + Fft,
+    Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTreeNew<U>> + Send + Sync,
 {

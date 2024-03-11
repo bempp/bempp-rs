@@ -1,5 +1,5 @@
 //! Implementation of constructors for multi node trees from distributed point data.
-use bempp_traits::types::Scalar;
+use bempp_traits::types::RlstScalar;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -30,7 +30,7 @@ use crate::{
 
 impl<T> MultiNodeTree<T>
 where
-    T: Float + Default + Equivalence + Debug + Scalar<Real = T>,
+    T: Float + Default + Equivalence + Debug + RlstScalar<Real = T>,
 {
     /// Constructor for uniform trees.
     ///
@@ -568,7 +568,7 @@ where
 
 // impl<T> Tree for MultiNodeTree<T>
 // where
-//     T: Float + Default + Scalar<Real = T>,
+//     T: Float + Default + RlstScalar<Real = T>,
 // {
 //     type Precision = T;
 //     type Domain = Domain<T>;
@@ -662,7 +662,7 @@ where
 
 // impl<T> MultiNodeTree<T>
 // where
-//     T: Float + Default + Equivalence + Scalar<Real = T>,
+//     T: Float + Default + Equivalence + RlstScalar<Real = T>,
 // {
 //     /// Create a locally essential tree (LET) for use in Fast Multipole Methods (FMMs).
 //     ///
