@@ -203,7 +203,7 @@ where
 impl<T, U, V, W> KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTree<W>>,
-    T::Tree: Tree<Domain = Domain<W>, Precision = W, NodeIndex = MortonKey>,
+    T::Tree: Tree<Domain = Domain<W>, Precision = W, Node = MortonKey>,
     U: SourceToTargetData<V>,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,
@@ -213,7 +213,7 @@ where
         // Cast surface parameters
         let alpha_outer = W::from(ALPHA_OUTER).unwrap();
         let alpha_inner = W::from(ALPHA_INNER).unwrap();
-        let domain = self.tree.get_domain();
+        let domain = self.tree.domain();
 
         // Compute required surfaces
         let upward_equivalent_surface =
@@ -355,16 +355,16 @@ where
 
         let ntarget_points = self
             .tree
-            .get_target_tree()
-            .get_all_coordinates()
+            .target_tree()
+            .all_coordinates()
             .unwrap()
             .len()
             / self.dim;
 
-        let nsource_keys = self.tree.get_source_tree().get_nall_keys().unwrap();
-        let ntarget_keys = self.tree.get_target_tree().get_nall_keys().unwrap();
-        let ntarget_leaves = self.tree.get_target_tree().get_nleaves().unwrap();
-        let nsource_leaves = self.tree.get_source_tree().get_nleaves().unwrap();
+        let nsource_keys = self.tree.source_tree().nkeys_tot().unwrap();
+        let ntarget_keys = self.tree.target_tree().nkeys_tot().unwrap();
+        let ntarget_leaves = self.tree.target_tree().nleaves().unwrap();
+        let nsource_leaves = self.tree.source_tree().nleaves().unwrap();
 
         // Buffers to store all multipole and local data
         let multipoles = vec![W::default(); self.ncoeffs * nsource_keys * nmatvecs];
@@ -373,13 +373,13 @@ where
         // Mutable pointers to multipole and local data, indexed by level
         let mut level_multipoles = vec![
             Vec::new();
-            (self.tree.get_source_tree().get_depth() + 1)
+            (self.tree.source_tree().get_depth() + 1)
                 .try_into()
                 .unwrap()
         ];
         let mut level_locals = vec![
             Vec::new();
-            (self.tree.get_target_tree().get_depth() + 1)
+            (self.tree.target_tree().get_depth() + 1)
                 .try_into()
                 .unwrap()
         ];
@@ -387,13 +387,13 @@ where
         // Index pointers of multipole and local data, indexed by level
         let mut level_index_pointer_multipoles = vec![
             HashMap::new();
-            (self.tree.get_source_tree().get_depth() + 1)
+            (self.tree.source_tree().get_depth() + 1)
                 .try_into()
                 .unwrap()
         ];
         let mut level_index_pointer_locals = vec![
             HashMap::new();
-            (self.tree.get_target_tree().get_depth() + 1)
+            (self.tree.target_tree().get_depth() + 1)
                 .try_into()
                 .unwrap()
         ];
@@ -430,12 +430,12 @@ where
 
         // Create mutable pointers to multipole and local data indexed by tree level
         {
-            for level in 0..=self.tree.get_source_tree().get_depth() {
+            for level in 0..=self.tree.source_tree().get_depth() {
                 let mut tmp_multipoles = Vec::new();
 
-                let keys = self.tree.get_source_tree().get_keys(level).unwrap();
+                let keys = self.tree.source_tree().keys(level).unwrap();
                 for key in keys.into_iter() {
-                    let &key_idx = self.tree.get_source_tree().get_index(key).unwrap();
+                    let &key_idx = self.tree.source_tree().index(key).unwrap();
                     let key_displacement = self.ncoeffs * nmatvecs * key_idx;
                     let mut key_multipoles = Vec::new();
                     for eval_idx in 0..nmatvecs {
@@ -453,12 +453,12 @@ where
                 level_multipoles[level as usize] = tmp_multipoles
             }
 
-            for level in 0..=self.tree.get_target_tree().get_depth() {
+            for level in 0..=self.tree.target_tree().get_depth() {
                 let mut tmp_locals = Vec::new();
 
-                let keys = self.tree.get_target_tree().get_keys(level).unwrap();
+                let keys = self.tree.target_tree().keys(level).unwrap();
                 for key in keys.into_iter() {
-                    let &key_idx = self.tree.get_target_tree().get_index(key).unwrap();
+                    let &key_idx = self.tree.target_tree().index(key).unwrap();
                     let key_displacement = self.ncoeffs * nmatvecs * key_idx;
                     let mut key_locals = Vec::new();
                     for eval_idx in 0..nmatvecs {
@@ -473,15 +473,15 @@ where
                 level_locals[level as usize] = tmp_locals
             }
 
-            for level in 0..=self.tree.get_source_tree().get_depth() {
-                let keys = self.tree.get_source_tree().get_keys(level).unwrap();
+            for level in 0..=self.tree.source_tree().get_depth() {
+                let keys = self.tree.source_tree().keys(level).unwrap();
                 for (level_idx, key) in keys.into_iter().enumerate() {
                     level_index_pointer_multipoles[level as usize].insert(*key, level_idx);
                 }
             }
 
-            for level in 0..=self.tree.get_target_tree().get_depth() {
-                let keys = self.tree.get_target_tree().get_keys(level).unwrap();
+            for level in 0..=self.tree.target_tree().get_depth() {
+                let keys = self.tree.target_tree().keys(level).unwrap();
                 for (level_idx, key) in keys.into_iter().enumerate() {
                     level_index_pointer_locals[level as usize].insert(*key, level_idx);
                 }
@@ -492,13 +492,13 @@ where
         {
             for (leaf_idx, leaf) in self
                 .tree
-                .get_source_tree()
-                .get_all_leaves()
+                .source_tree()
+                .all_leaves()
                 .unwrap()
                 .into_iter()
                 .enumerate()
             {
-                let key_idx = self.tree.get_source_tree().get_index(leaf).unwrap();
+                let key_idx = self.tree.source_tree().index(leaf).unwrap();
                 let key_displacement = self.ncoeffs * nmatvecs * key_idx;
                 for eval_idx in 0..nmatvecs {
                     let eval_displacement = self.ncoeffs * eval_idx;
@@ -515,13 +515,13 @@ where
 
             for (leaf_idx, leaf) in self
                 .tree
-                .get_target_tree()
-                .get_all_leaves()
+                .target_tree()
+                .all_leaves()
                 .unwrap()
                 .into_iter()
                 .enumerate()
             {
-                let key_idx = self.tree.get_target_tree().get_index(leaf).unwrap();
+                let key_idx = self.tree.target_tree().index(leaf).unwrap();
                 let key_displacement = self.ncoeffs * nmatvecs * key_idx;
                 for eval_idx in 0..nmatvecs {
                     let eval_displacement = self.ncoeffs * eval_idx;
@@ -548,8 +548,8 @@ where
 
             for (i, leaf) in self
                 .tree
-                .get_target_tree()
-                .get_all_leaves()
+                .target_tree()
+                .all_leaves()
                 .unwrap()
                 .into_iter()
                 .enumerate()
@@ -563,7 +563,7 @@ where
                 let npoints;
                 let nevals;
 
-                if let Some(coordinates) = self.tree.get_target_tree().get_coordinates(leaf) {
+                if let Some(coordinates) = self.tree.target_tree().coordinates(leaf) {
                     npoints = coordinates.len() / self.dim;
                     nevals = npoints * eval_size;
                 } else {
@@ -592,8 +592,8 @@ where
 
             for (i, leaf) in self
                 .tree
-                .get_source_tree()
-                .get_all_leaves()
+                .source_tree()
+                .all_leaves()
                 .unwrap()
                 .into_iter()
                 .enumerate()
@@ -606,7 +606,7 @@ where
                 );
 
                 let npoints;
-                if let Some(coordinates) = self.tree.get_source_tree().get_coordinates(leaf) {
+                if let Some(coordinates) = self.tree.source_tree().coordinates(leaf) {
                     npoints = coordinates.len() / self.dim;
                 } else {
                     npoints = 0;
@@ -623,8 +623,8 @@ where
             // All upward and downward surfaces
             for (i, key) in self
                 .tree
-                .get_source_tree()
-                .get_all_keys()
+                .source_tree()
+                .all_keys()
                 .unwrap()
                 .into_iter()
                 .enumerate()
@@ -632,15 +632,15 @@ where
                 let l = i * self.ncoeffs * self.dim;
                 let r = l + self.ncoeffs * self.dim;
                 let upward_surface =
-                    key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
+                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
 
                 upward_surfaces_sources[l..r].copy_from_slice(&upward_surface);
             }
 
             for (i, key) in self
                 .tree
-                .get_target_tree()
-                .get_all_keys()
+                .target_tree()
+                .all_keys()
                 .unwrap()
                 .into_iter()
                 .enumerate()
@@ -648,7 +648,7 @@ where
                 let l = i * self.ncoeffs * self.dim;
                 let r = l + self.ncoeffs * self.dim;
                 let downward_surface =
-                    key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
+                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
 
                 downward_surfaces_targets[l..r].copy_from_slice(&downward_surface);
             }
@@ -656,8 +656,8 @@ where
             // Leaf upward and downward surfaces
             for (i, key) in self
                 .tree
-                .get_source_tree()
-                .get_all_leaves()
+                .source_tree()
+                .all_leaves()
                 .unwrap()
                 .into_iter()
                 .enumerate()
@@ -665,15 +665,15 @@ where
                 let l = i * self.ncoeffs * self.dim;
                 let r = l + self.ncoeffs * self.dim;
                 let upward_surface =
-                    key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
+                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
 
                 leaf_upward_surfaces_sources[l..r].copy_from_slice(&upward_surface);
             }
 
             for (i, key) in self
                 .tree
-                .get_target_tree()
-                .get_all_leaves()
+                .target_tree()
+                .all_leaves()
                 .unwrap()
                 .into_iter()
                 .enumerate()
@@ -682,10 +682,10 @@ where
                 let r = l + self.ncoeffs * self.dim;
 
                 let downward_surface =
-                    key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_inner);
+                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_inner);
 
                 let upward_surface =
-                    key.compute_surface(self.tree.get_domain(), self.expansion_order, alpha_outer);
+                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
 
                 leaf_downward_surfaces_targets[l..r].copy_from_slice(&downward_surface);
                 leaf_upward_surfaces_targets[l..r].copy_from_slice(&upward_surface);

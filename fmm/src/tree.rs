@@ -15,22 +15,22 @@ where
     T: RlstScalar<Real = T> + Float + Default,
 {
     type Precision = T;
-    type NodeIndex = MortonKey;
+    type Node = MortonKey;
     type Tree = SingleNodeTree<T>;
 
-    fn get_source_tree(&self) -> &Self::Tree {
+    fn source_tree(&self) -> &Self::Tree {
         &self.source_tree
     }
 
-    fn get_target_tree(&self) -> &Self::Tree {
+    fn target_tree(&self) -> &Self::Tree {
         &self.target_tree
     }
 
-    fn get_domain(&self) -> &<Self::Tree as Tree>::Domain {
+    fn domain(&self) -> &<Self::Tree as Tree>::Domain {
         &self.domain
     }
 
-    fn get_near_field(&self, leaf: &Self::NodeIndex) -> Option<Vec<Self::NodeIndex>> {
+    fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>> {
         let mut u_list = Vec::new();
         let neighbours = leaf.neighbors();
 
@@ -39,8 +39,8 @@ where
             .iter()
             .flat_map(|n| n.children())
             .filter(|nc| {
-                self.get_source_tree()
-                    .get_all_keys_set()
+                self.source_tree()
+                    .all_keys_set()
                     .unwrap()
                     .contains(nc)
                     && leaf.is_adjacent(nc)
@@ -51,8 +51,8 @@ where
         let mut neighbors_adj = neighbours
             .iter()
             .filter(|n| {
-                self.get_source_tree()
-                    .get_all_keys_set()
+                self.source_tree()
+                    .all_keys_set()
                     .unwrap()
                     .contains(n)
                     && leaf.is_adjacent(n)
@@ -66,8 +66,8 @@ where
             .neighbors()
             .into_iter()
             .filter(|pn| {
-                self.get_source_tree()
-                    .get_all_keys_set()
+                self.source_tree()
+                    .all_keys_set()
                     .unwrap()
                     .contains(pn)
                     && leaf.is_adjacent(pn)

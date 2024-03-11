@@ -117,23 +117,23 @@ pub struct KiFmm<
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, NodeIndex = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalar<Real = W> + Float + Default,
     Self: SourceToTarget,
 {
-    type NodeIndex = T::NodeIndex;
+    type NodeIndex = T::Node;
     type Precision = W;
     type Kernel = V;
     type Tree = T;
 
-    fn get_dim(&self) -> usize {
+    fn dim(&self) -> usize {
         self.dim
     }
 
-    fn get_multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
-        if let Some(index) = self.tree.get_source_tree().get_index(key) {
+    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+        if let Some(index) = self.tree.source_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     Some(&self.multipoles[index * self.ncoeffs..(index + 1) * self.ncoeffs])
@@ -148,8 +148,8 @@ where
         }
     }
 
-    fn get_local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
-        if let Some(index) = self.tree.get_target_tree().get_index(key) {
+    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+        if let Some(index) = self.tree.target_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     Some(&self.locals[index * self.ncoeffs..(index + 1) * self.ncoeffs])
@@ -164,8 +164,8 @@ where
         }
     }
 
-    fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
-        if let Some(&leaf_idx) = self.tree.get_target_tree().get_leaf_index(leaf) {
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
             let ntargets = r - l;
 
@@ -174,7 +174,7 @@ where
                     &self.potentials[l * self.eval_size..r * self.eval_size],
                 ]),
                 FmmEvalType::Matrix(nmatvecs) => {
-                    let nleaves = self.tree.get_target_tree().get_nleaves().unwrap();
+                    let nleaves = self.tree.target_tree().nleaves().unwrap();
                     let mut slices = Vec::new();
                     for eval_idx in 0..nmatvecs {
                         let potentials_pointer =
@@ -194,15 +194,15 @@ where
         }
     }
 
-    fn get_expansion_order(&self) -> usize {
+    fn expansion_order(&self) -> usize {
         self.expansion_order
     }
 
-    fn get_kernel(&self) -> &Self::Kernel {
+    fn kernel(&self) -> &Self::Kernel {
         &self.kernel
     }
 
-    fn get_tree(&self) -> &Self::Tree {
+    fn tree(&self) -> &Self::Tree {
         &self.tree
     }
 
@@ -210,14 +210,14 @@ where
         // Upward pass
         {
             self.p2m();
-            for level in (1..=self.tree.get_source_tree().get_depth()).rev() {
+            for level in (1..=self.tree.source_tree().get_depth()).rev() {
                 self.m2m(level);
             }
         }
 
         // Downward pass
         {
-            for level in 2..=self.tree.get_target_tree().get_depth() {
+            for level in 2..=self.tree.target_tree().get_depth() {
                 if level > 2 {
                     self.l2l(level);
                 }
@@ -308,37 +308,37 @@ where
 
 impl<T, U, V> Fmm for KiFmmDummy<T, U, V>
 where
-    T: FmmTree<Tree = SingleNodeTree<U>, NodeIndex = MortonKey>,
+    T: FmmTree<Tree = SingleNodeTree<U>, Node = MortonKey>,
     U: RlstScalar<Real = U> + Float + Default,
     V: Kernel<T = U> + Send + Sync,
 {
-    type NodeIndex = T::NodeIndex;
+    type NodeIndex = T::Node;
     type Precision = U;
     type Tree = T;
     type Kernel = V;
 
-    fn get_dim(&self) -> usize {
+    fn dim(&self) -> usize {
         3
     }
 
-    fn get_multipole(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn multipole(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
         None
     }
 
-    fn get_local(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn local(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
         None
     }
 
-    fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
         let ntarget_coordinates = self
             .tree
-            .get_target_tree()
-            .get_all_coordinates()
+            .target_tree()
+            .all_coordinates()
             .unwrap()
             .len()
-            / self.get_dim();
+            / self.dim();
 
-        if let Some(&leaf_idx) = self.tree.get_target_tree().get_leaf_index(leaf) {
+        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
 
             match self.fmm_eval_type {
@@ -361,10 +361,10 @@ where
     }
 
     fn evaluate(&self) {
-        let all_target_coordinates = self.tree.get_target_tree().get_all_coordinates().unwrap();
-        let ntarget_coordinates = all_target_coordinates.len() / self.get_dim();
-        let all_source_coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
-        let nsource_coordinates = all_target_coordinates.len() / self.get_dim();
+        let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
+        let ntarget_coordinates = all_target_coordinates.len() / self.dim();
+        let all_source_coordinates = self.tree.source_tree().all_coordinates().unwrap();
+        let nsource_coordinates = all_target_coordinates.len() / self.dim();
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -406,15 +406,15 @@ where
         }
     }
 
-    fn get_expansion_order(&self) -> usize {
+    fn expansion_order(&self) -> usize {
         self.expansion_order
     }
 
-    fn get_kernel(&self) -> &Self::Kernel {
+    fn kernel(&self) -> &Self::Kernel {
         &self.kernel
     }
 
-    fn get_tree(&self) -> &Self::Tree {
+    fn tree(&self) -> &Self::Tree {
         &self.tree
     }
 }
@@ -451,10 +451,10 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-        let multipole = fmm.get_multipole(&ROOT).unwrap();
+        let multipole = fmm.multipole(&ROOT).unwrap();
         let upward_equivalent_surface = ROOT.compute_surface(
-            fmm.get_tree().get_domain(),
-            fmm.get_expansion_order(),
+            fmm.tree().domain(),
+            fmm.expansion_order(),
             T::from(ALPHA_INNER).unwrap(),
         );
 
@@ -462,7 +462,7 @@ mod test {
         let mut expected = vec![T::zero()];
         let mut found = vec![T::zero()];
 
-        fmm.get_kernel().evaluate_st(
+        fmm.kernel().evaluate_st(
             bempp_traits::types::EvalType::Value,
             sources.data(),
             &test_point,
@@ -470,7 +470,7 @@ mod test {
             &mut expected,
         );
 
-        fmm.get_kernel().evaluate_st(
+        fmm.kernel().evaluate_st(
             bempp_traits::types::EvalType::Value,
             &upward_equivalent_surface,
             &test_point,
@@ -504,28 +504,28 @@ mod test {
         };
 
         let leaf_idx = 0;
-        let leaf: MortonKey = fmm.get_tree().get_target_tree().get_all_leaves().unwrap()[leaf_idx];
-        let potential = fmm.get_potential(&leaf).unwrap()[0];
+        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let potential = fmm.potential(&leaf).unwrap()[0];
 
         let leaf_targets = fmm
-            .get_tree()
-            .get_target_tree()
-            .get_coordinates(&leaf)
+            .tree()
+            .target_tree()
+            .coordinates(&leaf)
             .unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.get_dim();
+        let ntargets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::zero(); ntargets * eval_size];
 
         let leaf_coordinates_row_major = rlst_array_from_slice2!(
             T,
             leaf_targets,
-            [ntargets, fmm.get_dim()],
-            [fmm.get_dim(), 1]
+            [ntargets, fmm.dim()],
+            [fmm.dim(), 1]
         );
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.get_dim()]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
-        fmm.get_kernel().evaluate_st(
+        fmm.kernel().evaluate_st(
             eval_type,
             sources.data(),
             leaf_coordinates_col_major.data(),
@@ -555,33 +555,33 @@ mod test {
         threshold: T,
     ) {
         let leaf_idx = 0;
-        let leaf: MortonKey = fmm.get_tree().get_target_tree().get_all_leaves().unwrap()[leaf_idx];
+        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
 
         let leaf_targets = fmm
-            .get_tree()
-            .get_target_tree()
-            .get_coordinates(&leaf)
+            .tree()
+            .target_tree()
+            .coordinates(&leaf)
             .unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.get_dim();
+        let ntargets = leaf_targets.len() / fmm.dim();
 
         let leaf_coordinates_row_major = rlst_array_from_slice2!(
             T,
             leaf_targets,
-            [ntargets, fmm.get_dim()],
-            [fmm.get_dim(), 1]
+            [ntargets, fmm.dim()],
+            [fmm.dim(), 1]
         );
 
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.get_dim()]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
         let [nsources, nmatvec] = charges.shape();
 
         for i in 0..nmatvec {
-            let potential_i = fmm.get_potential(&leaf).unwrap()[i];
+            let potential_i = fmm.potential(&leaf).unwrap()[i];
             let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
             let mut direct_i = vec![T::zero(); ntargets];
-            fmm.get_kernel().evaluate_st(
+            fmm.kernel().evaluate_st(
                 EvalType::Value,
                 sources.data(),
                 leaf_coordinates_col_major.data(),
@@ -614,10 +614,10 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-        let multipole = fmm.get_multipole(&ROOT).unwrap();
+        let multipole = fmm.multipole(&ROOT).unwrap();
         let upward_equivalent_surface = ROOT.compute_surface(
-            fmm.get_tree().get_domain(),
-            fmm.get_expansion_order(),
+            fmm.tree().domain(),
+            fmm.expansion_order(),
             T::from(ALPHA_INNER).unwrap(),
         );
         let test_point = vec![T::from(100000.).unwrap(), T::zero(), T::zero()];
@@ -627,10 +627,10 @@ mod test {
         let mut expected = vec![T::zero(); nmatvecs];
         let mut found = vec![T::zero(); nmatvecs];
 
-        let ncoeffs = ncoeffs_kifmm(fmm.get_expansion_order());
+        let ncoeffs = ncoeffs_kifmm(fmm.expansion_order());
 
         for eval_idx in 0..nmatvecs {
-            fmm.get_kernel().evaluate_st(
+            fmm.kernel().evaluate_st(
                 bempp_traits::types::EvalType::Value,
                 sources.data(),
                 &test_point,
@@ -641,7 +641,7 @@ mod test {
 
         for eval_idx in 0..nmatvecs {
             let multipole_i = &multipole[eval_idx * ncoeffs..(eval_idx + 1) * ncoeffs];
-            fmm.get_kernel().evaluate_st(
+            fmm.kernel().evaluate_st(
                 bempp_traits::types::EvalType::Value,
                 &upward_equivalent_surface,
                 &test_point,

@@ -25,13 +25,13 @@ use crate::{
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, NodeIndex = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,
 {
     fn l2l(&self, level: u64) {
-        let Some(child_targets) = self.tree.get_target_tree().get_keys(level) else {
+        let Some(child_targets) = self.tree.target_tree().keys(level) else {
             return;
         };
 
@@ -169,11 +169,11 @@ where
     }
 
     fn l2p(&self) {
-        let Some(_leaves) = self.tree.get_target_tree().get_all_leaves() else {
+        let Some(_leaves) = self.tree.target_tree().all_leaves() else {
             return;
         };
 
-        let coordinates = self.tree.get_target_tree().get_all_coordinates().unwrap();
+        let coordinates = self.tree.target_tree().all_coordinates().unwrap();
         let surface_size = self.ncoeffs * self.dim;
 
         match self.fmm_eval_type {
@@ -231,7 +231,7 @@ where
             }
 
             FmmEvalType::Matrix(nmatvec) => {
-                let nleaves = self.tree.get_target_tree().get_nleaves().unwrap();
+                let nleaves = self.tree.target_tree().nleaves().unwrap();
                 for i in 0..nmatvec {
                     self.leaf_upward_surfaces_targets
                         .par_chunks_exact(surface_size)
@@ -295,12 +295,12 @@ where
     fn m2p(&self) {}
 
     fn p2p(&self) {
-        let Some(leaves) = self.tree.get_target_tree().get_all_leaves() else {
+        let Some(leaves) = self.tree.target_tree().all_leaves() else {
             return;
         };
 
-        let all_target_coordinates = self.tree.get_target_tree().get_all_coordinates().unwrap();
-        let all_source_coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
+        let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
+        let all_source_coordinates = self.tree.source_tree().all_coordinates().unwrap();
         let n_all_source_coordinates = all_source_coordinates.len() / self.dim;
 
         match self.fmm_eval_type {
@@ -327,10 +327,10 @@ where
                             target_coordinates_col_major
                                 .fill_from(target_coordinates_row_major.view());
 
-                            if let Some(u_list) = self.tree.get_near_field(leaf) {
+                            if let Some(u_list) = self.tree.near_field(leaf) {
                                 let u_list_indices = u_list
                                     .iter()
-                                    .filter_map(|k| self.tree.get_source_tree().get_leaf_index(k));
+                                    .filter_map(|k| self.tree.source_tree().leaf_index(k));
 
                                 let charges = u_list_indices
                                     .clone()
@@ -388,7 +388,7 @@ where
                 ),
 
             FmmEvalType::Matrix(nmatvec) => {
-                let nleaves = self.tree.get_target_tree().get_nleaves().unwrap();
+                let nleaves = self.tree.target_tree().nleaves().unwrap();
 
                 for i in 0..nmatvec {
                     leaves
@@ -413,9 +413,9 @@ where
                                 target_coordinates_col_major
                                     .fill_from(target_coordinates_row_major.view());
 
-                                if let Some(u_list) = self.tree.get_near_field(leaf) {
+                                if let Some(u_list) = self.tree.near_field(leaf) {
                                     let u_list_indices = u_list.iter().filter_map(|k| {
-                                        self.tree.get_source_tree().get_leaf_index(k)
+                                        self.tree.source_tree().leaf_index(k)
                                     });
 
                                     let charge_vec_displacement = i * n_all_source_coordinates;

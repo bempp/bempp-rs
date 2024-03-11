@@ -33,7 +33,7 @@ where
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
     pub fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
-        let sources = self.tree.get_source_tree().get_keys(level).unwrap();
+        let sources = self.tree.source_tree().keys(level).unwrap();
         let nsources = sources.len();
 
         let all_displacements = vec![vec![-1i64; nsources]; 316];
@@ -53,8 +53,8 @@ where
                         !source.is_adjacent(pnc)
                             && self
                                 .tree
-                                .get_target_tree()
-                                .get_all_keys_set()
+                                .target_tree()
+                                .all_keys_set()
                                 .unwrap()
                                 .contains(pnc)
                     })
@@ -104,10 +104,10 @@ where
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
     fn m2l(&self, level: u64) {
-        let Some(sources) = self.tree.get_source_tree().get_keys(level) else {
+        let Some(sources) = self.tree.source_tree().keys(level) else {
             return;
         };
-        let Some(targets) = self.tree.get_target_tree().get_keys(level) else {
+        let Some(targets) = self.tree.target_tree().keys(level) else {
             return;
         };
 

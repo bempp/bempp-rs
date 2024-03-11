@@ -36,13 +36,13 @@ where
     W: RlstScalar<Real = W> + Float + Default,
 {
     fn p2m(&self) {
-        let Some(_leaves) = self.tree.get_source_tree().get_all_leaves() else {
+        let Some(_leaves) = self.tree.source_tree().all_leaves() else {
             return;
         };
 
-        let nleaves = self.tree.get_source_tree().get_nleaves().unwrap();
+        let nleaves = self.tree.source_tree().nleaves().unwrap();
         let surface_size = self.ncoeffs * self.dim;
-        let coordinates = self.tree.get_source_tree().get_all_coordinates().unwrap();
+        let coordinates = self.tree.source_tree().all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
 
         match self.fmm_eval_type {
@@ -216,15 +216,15 @@ where
     }
 
     fn m2m(&self, level: u64) {
-        let Some(child_sources) = self.tree.get_source_tree().get_keys(level) else {
+        let Some(child_sources) = self.tree.source_tree().keys(level) else {
             return;
         };
 
-        let nchild_sources = self.tree.get_source_tree().get_nkeys(level).unwrap();
+        let nchild_sources = self.tree.source_tree().nkeys(level).unwrap();
         let min = &child_sources[0];
         let max = &child_sources[nchild_sources - 1];
-        let min_idx = self.tree.get_source_tree().get_index(min).unwrap();
-        let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
+        let min_idx = self.tree.source_tree().index(min).unwrap();
+        let max_idx = self.tree.source_tree().index(max).unwrap();
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();

@@ -550,20 +550,20 @@ where
 {
     type Precision = T;
     type Domain = Domain<T>;
-    type NodeIndex = MortonKey;
-    type NodeIndexSlice<'a> = &'a [MortonKey]
+    type Node = MortonKey;
+    type NodeSlice<'a> = &'a [MortonKey]
         where T: 'a;
-    type NodeIndices = MortonKeys;
+    type Nodes = MortonKeys;
 
-    fn get_node_index(&self, idx: usize) -> Option<&Self::NodeIndex> {
+    fn node(&self, idx: usize) -> Option<&Self::Node> {
         Some(&self.keys[idx])
     }
 
-    fn get_nall_keys(&self) -> Option<usize> {
+    fn nkeys_tot(&self) -> Option<usize> {
         Some(self.keys.len())
     }
 
-    fn get_nkeys(&self, level: u64) -> Option<usize> {
+    fn nkeys(&self, level: u64) -> Option<usize> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
             Some(r - l)
         } else {
@@ -571,7 +571,7 @@ where
         }
     }
 
-    fn get_nleaves(&self) -> Option<usize> {
+    fn nleaves(&self) -> Option<usize> {
         Some(self.leaves.len())
     }
 
@@ -579,11 +579,11 @@ where
         self.depth
     }
 
-    fn get_domain(&self) -> &'_ Self::Domain {
+    fn domain(&self) -> &'_ Self::Domain {
         &self.domain
     }
 
-    fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>> {
+    fn keys(&self, level: u64) -> Option<Self::NodeSlice<'_>> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
             Some(&self.keys[l..r])
         } else {
@@ -591,23 +591,23 @@ where
         }
     }
 
-    fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>> {
+    fn all_keys(&self) -> Option<Self::NodeSlice<'_>> {
         Some(&self.keys)
     }
 
-    fn get_all_keys_set(&self) -> Option<&'_ HashSet<Self::NodeIndex>> {
+    fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>> {
         Some(&self.keys_set)
     }
 
-    fn get_all_leaves_set(&self) -> Option<&'_ HashSet<Self::NodeIndex>> {
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>> {
         Some(&self.leaves_set)
     }
 
-    fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>> {
+    fn all_leaves(&self) -> Option<Self::NodeSlice<'_>> {
         Some(&self.leaves)
     }
 
-    fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]> {
+    fn coordinates<'a>(&'a self, key: &Self::Node) -> Option<&'a [Self::Precision]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
@@ -615,11 +615,11 @@ where
         }
     }
 
-    fn get_all_coordinates(&self) -> Option<&[Self::Precision]> {
+    fn all_coordinates(&self) -> Option<&[Self::Precision]> {
         Some(&self.coordinates)
     }
 
-    fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]> {
+    fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
             Some(&self.global_indices[l..r])
         } else {
@@ -627,15 +627,15 @@ where
         }
     }
 
-    fn get_all_global_indices(&self) -> Option<&[usize]> {
+    fn all_global_indices(&self) -> Option<&[usize]> {
         Some(&self.global_indices)
     }
 
-    fn get_index(&self, key: &Self::NodeIndex) -> Option<&usize> {
+    fn index(&self, key: &Self::Node) -> Option<&usize> {
         self.key_to_index.get(key)
     }
 
-    fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize> {
+    fn leaf_index(&self, key: &Self::Node) -> Option<&usize> {
         self.leaf_to_index.get(key)
     }
 }

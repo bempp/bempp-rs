@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-use bempp_traits::{tree::MortonKeyInterface, types::RlstScalar};
+use bempp_traits::{tree::TreeNode, types::RlstScalar};
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 /// Returns an owned vector of Morton Keys, hence requires a copy.
@@ -979,12 +979,12 @@ impl Hash for MortonKey {
     }
 }
 
-impl<T: RlstScalar + Float + Default> MortonKeyInterface<T> for MortonKey {
-    type NodeIndices = MortonKeys;
+impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
+    type Nodes = MortonKeys;
 
     type Domain = Domain<T>;
 
-    fn children(&self) -> Self::NodeIndices {
+    fn children(&self) -> Self::Nodes {
         MortonKeys {
             keys: self.children(),
             index: 0,
@@ -999,7 +999,7 @@ impl<T: RlstScalar + Float + Default> MortonKeyInterface<T> for MortonKey {
         self.level()
     }
 
-    fn neighbors(&self) -> Self::NodeIndices {
+    fn neighbors(&self) -> Self::Nodes {
         MortonKeys {
             keys: self.neighbors(),
             index: 0,

@@ -42,7 +42,7 @@ where
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
-        let targets = self.tree.get_target_tree().get_keys(level).unwrap();
+        let targets = self.tree.target_tree().keys(level).unwrap();
 
         let targets_parents: HashSet<MortonKey> =
             targets.iter().map(|target| target.parent()).collect();
@@ -50,7 +50,7 @@ where
         targets_parents.sort();
         let ntargets_parents = targets_parents.len();
 
-        let sources = self.tree.get_source_tree().get_keys(level).unwrap();
+        let sources = self.tree.source_tree().keys(level).unwrap();
 
         let sources_parents: HashSet<MortonKey> =
             sources.iter().map(|source| source.parent()).collect();
@@ -103,11 +103,11 @@ where
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                let Some(targets) = self.tree.get_target_tree().get_keys(level) else {
+                let Some(targets) = self.tree.target_tree().keys(level) else {
                     return;
                 };
 
-                let Some(sources) = self.tree.get_source_tree().get_keys(level) else {
+                let Some(sources) = self.tree.source_tree().keys(level) else {
                     return;
                 };
 
@@ -142,8 +142,8 @@ where
                 // Lookup multipole data from source tree
                 let min = &sources[0];
                 let max = &sources[nsources - 1];
-                let min_idx = self.tree.get_source_tree().get_index(min).unwrap();
-                let max_idx = self.tree.get_source_tree().get_index(max).unwrap();
+                let min_idx = self.tree.source_tree().index(min).unwrap();
+                let max_idx = self.tree.source_tree().index(max).unwrap();
                 let multipoles =
                     &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
 

@@ -42,12 +42,12 @@ pub trait Fmm {
     type Tree: FmmTree;
     type Kernel: Kernel;
 
-    fn get_multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
-    fn get_local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
-    fn get_potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
-    fn get_expansion_order(&self) -> usize;
-    fn get_tree(&self) -> &Self::Tree;
-    fn get_kernel(&self) -> &Self::Kernel;
-    fn get_dim(&self) -> usize;
+    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
+    fn expansion_order(&self) -> usize;
+    fn tree(&self) -> &Self::Tree;
+    fn kernel(&self) -> &Self::Kernel;
+    fn dim(&self) -> usize;
     fn evaluate(&self);
 }
