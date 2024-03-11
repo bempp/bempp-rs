@@ -9,8 +9,6 @@
 
 extern crate superslice;
 
-use std::convert::TryInto;
-
 use rand::Rng;
 
 use mpi::collective::SystemOperation;
