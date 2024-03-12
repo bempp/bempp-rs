@@ -20,9 +20,9 @@ use rlst_sparse::sparse::csr_mat::CsrMatrix;
 pub fn get_all_quadrature_points<
     const NPTS: usize,
     T: RlstScalar<Real = T>,
-    GridImpl: GridType<T = T>,
+    Grid: GridType<T = T>,
 >(
-    grid: &GridImpl,
+    grid: &Grid,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> {
     let qrule = simplex_rule(ReferenceCellType::Triangle, NPTS).unwrap();
     let mut qpoints = rlst_dynamic_array2!(T, [NPTS, 2]);
@@ -45,7 +45,7 @@ pub fn get_all_quadrature_points<
         for i in 0..NPTS {
             evaluator.reference_to_physical(cell, i, &mut point);
             for j in 0..grid.physical_dimension() {
-                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = point[i];
+                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = point[j];
             }
         }
     }
@@ -55,13 +55,15 @@ pub fn get_all_quadrature_points<
 pub fn basis_to_quadrature_into_dense<
     const NPTS: usize,
     const BLOCKSIZE: usize,
-    T: RlstScalar<Real = T>,
-    Grid: GridType<T = T>,
+    RealT: RlstScalar<Real = RealT>,
+    T: RlstScalar<Real = RealT>,
+    Grid: GridType<T = RealT>,
 >(
     output: &mut Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-    space: &SerialFunctionSpace<'_, Grid>,
+    space: &SerialFunctionSpace<'_, T, Grid>,
 ) {
-    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, T, Grid>(output.shape(), space);
+    let sparse_matrix =
+        basis_to_quadrature::<NPTS, BLOCKSIZE, RealT, T, Grid>(output.shape(), space);
     let data = sparse_matrix.data;
     let rows = sparse_matrix.rows;
     let cols = sparse_matrix.cols;
@@ -73,15 +75,16 @@ pub fn basis_to_quadrature_into_dense<
 pub fn basis_to_quadrature_into_csr<
     const NPTS: usize,
     const BLOCKSIZE: usize,
-    T: RlstScalar<Real = T>,
-    Grid: GridType<T = T>,
+    RealT: RlstScalar<Real = RealT>,
+    T: RlstScalar<Real = RealT>,
+    Grid: GridType<T = RealT>,
 >(
-    space: &SerialFunctionSpace<'_, Grid>,
+    space: &SerialFunctionSpace<'_, T, Grid>,
 ) -> CsrMatrix<T> {
     let grid = space.grid();
     let ncells = grid.number_of_cells();
     let shape = [ncells * NPTS, space.dofmap().global_size()];
-    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, T, Grid>(shape, space);
+    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, RealT, T, Grid>(shape, space);
 
     CsrMatrix::<T>::from_aij(
         sparse_matrix.shape,
@@ -95,14 +98,15 @@ pub fn basis_to_quadrature_into_csr<
 pub fn transpose_basis_to_quadrature_into_dense<
     const NPTS: usize,
     const BLOCKSIZE: usize,
-    T: RlstScalar<Real = T>,
-    Grid: GridType<T = T>,
+    RealT: RlstScalar<Real = RealT>,
+    T: RlstScalar<Real = RealT>,
+    Grid: GridType<T = RealT>,
 >(
     output: &mut Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-    space: &SerialFunctionSpace<'_, Grid>,
+    space: &SerialFunctionSpace<'_, T, Grid>,
 ) {
     let shape = [output.shape()[1], output.shape()[0]];
-    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, T, Grid>(shape, space);
+    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, RealT, T, Grid>(shape, space);
     let data = sparse_matrix.data;
     let rows = sparse_matrix.rows;
     let cols = sparse_matrix.cols;
@@ -114,15 +118,16 @@ pub fn transpose_basis_to_quadrature_into_dense<
 pub fn transpose_basis_to_quadrature_into_csr<
     const NPTS: usize,
     const BLOCKSIZE: usize,
-    T: RlstScalar<Real = T>,
-    Grid: GridType<T = T>,
+    RealT: RlstScalar<Real = RealT>,
+    T: RlstScalar<Real = RealT>,
+    Grid: GridType<T = RealT>,
 >(
-    space: &SerialFunctionSpace<'_, Grid>,
+    space: &SerialFunctionSpace<'_, T, Grid>,
 ) -> CsrMatrix<T> {
     let grid = space.grid();
     let ncells = grid.number_of_cells();
     let shape = [ncells * NPTS, space.dofmap().global_size()];
-    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, T, Grid>(shape, space);
+    let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, RealT, T, Grid>(shape, space);
 
     CsrMatrix::<T>::from_aij(
         [space.dofmap().global_size(), ncells * NPTS],
@@ -136,11 +141,12 @@ pub fn transpose_basis_to_quadrature_into_csr<
 fn basis_to_quadrature<
     const NPTS: usize,
     const BLOCKSIZE: usize,
-    T: RlstScalar<Real = T>,
-    Grid: GridType<T = T>,
+    RealT: RlstScalar<Real = RealT>,
+    T: RlstScalar<Real = RealT>,
+    Grid: GridType<T = RealT>,
 >(
     shape: [usize; 2],
-    space: &SerialFunctionSpace<'_, Grid>,
+    space: &SerialFunctionSpace<'_, T, Grid>,
 ) -> SparseMatrixData<T> {
     if !space.is_serial() {
         panic!("Dense assembly can only be used for function spaces stored in serial");
@@ -153,11 +159,11 @@ fn basis_to_quadrature<
 
     // TODO: pass cell types into this function
     let qrule = simplex_rule(ReferenceCellType::Triangle, NPTS).unwrap();
-    let mut qpoints = rlst_dynamic_array2!(T, [NPTS, 2]);
+    let mut qpoints = rlst_dynamic_array2!(RealT, [NPTS, 2]);
     for i in 0..NPTS {
         for j in 0..2 {
             *qpoints.get_mut([i, j]).unwrap() =
-                num::cast::<f64, T>(qrule.points[2 * i + j]).unwrap();
+                num::cast::<f64, RealT>(qrule.points[2 * i + j]).unwrap();
         }
     }
     let qweights = qrule
@@ -175,18 +181,22 @@ fn basis_to_quadrature<
 
     let evaluator = grid.reference_to_physical_map(qpoints.data());
 
-    let mut jacobian = vec![num::cast::<f64, T>(0.0).unwrap(); NPTS];
+    let mut jacobian = vec![
+        num::cast::<f64, RealT>(0.0).unwrap();
+        grid.physical_dimension() * grid.domain_dimension()
+    ];
 
     // TODO: batch this?
     for cell in 0..ncells {
         let cell_dofs = space.dofmap().cell_dofs(cell).unwrap();
         for (qindex, w) in qweights.iter().enumerate() {
             evaluator.jacobian(cell, qindex, &mut jacobian);
-            let jdet = compute_det(
+            let jdet = num::cast::<RealT, T>(compute_det(
                 &jacobian,
                 grid.domain_dimension(),
                 grid.physical_dimension(),
-            );
+            ))
+            .unwrap();
             for (i, dof) in cell_dofs.iter().enumerate() {
                 output.rows.push(cell * NPTS + qindex);
                 output.cols.push(*dof);

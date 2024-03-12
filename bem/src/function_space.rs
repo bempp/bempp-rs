@@ -8,17 +8,14 @@ use bempp_traits::grid::{CellType, GridType, TopologyType};
 use rlst_dense::types::RlstScalar;
 use std::collections::HashMap;
 
-pub struct SerialFunctionSpace<'a, GridImpl: GridType> {
+pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
     grid: &'a GridImpl,
-    element: &'a CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real>,
+    element: &'a CiarletElement<T>,
     dofmap: SerialDofMap,
 }
 
-impl<'a, GridImpl: GridType> SerialFunctionSpace<'a, GridImpl> {
-    pub fn new(
-        grid: &'a GridImpl,
-        element: &'a CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real>,
-    ) -> Self {
+impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
+    pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<T>) -> Self {
         let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
@@ -84,10 +81,12 @@ impl<'a, GridImpl: GridType> SerialFunctionSpace<'a, GridImpl> {
     }
 }
 
-impl<'a, GridImpl: GridType> FunctionSpace for SerialFunctionSpace<'a, GridImpl> {
+impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
+    for SerialFunctionSpace<'a, T, GridImpl>
+{
     type DofMap = SerialDofMap;
     type Grid = GridImpl;
-    type FiniteElement = CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real>;
+    type FiniteElement = CiarletElement<T>;
 
     fn dofmap(&self) -> &Self::DofMap {
         &self.dofmap
@@ -95,7 +94,7 @@ impl<'a, GridImpl: GridType> FunctionSpace for SerialFunctionSpace<'a, GridImpl>
     fn grid(&self) -> &Self::Grid {
         self.grid
     }
-    fn element(&self) -> &CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real> {
+    fn element(&self) -> &CiarletElement<T> {
         self.element
     }
 }
@@ -112,7 +111,7 @@ mod test {
     #[test]
     fn test_colouring_p1() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             1,
@@ -155,7 +154,7 @@ mod test {
     #[test]
     fn test_colouring_dp0() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
             0,
@@ -185,7 +184,7 @@ mod test {
     #[test]
     fn test_colouring_rt1() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element(
+        let element = create_element::<f64>(
             ElementFamily::RaviartThomas,
             ReferenceCellType::Triangle,
             1,

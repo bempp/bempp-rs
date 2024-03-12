@@ -57,12 +57,12 @@ where
     let edges = reference_cell::edges(cell_type);
 
     for _e in 0..entity_counts[0] {
-        x[0].push(rlst_dynamic_array2!(T, [0, tdim]));
+        x[0].push(rlst_dynamic_array2!(T::Real, [0, tdim]));
         m[0].push(rlst_dynamic_array3!(T, [0, 2, 0]));
     }
 
     for e in &edges {
-        let mut pts = rlst_dynamic_array2!(T, [1, tdim]);
+        let mut pts = rlst_dynamic_array2!(T::Real, [1, tdim]);
         let mut mat = rlst_dynamic_array3!(T, [1, 2, 1]);
         let [vn0, vn1] = e[..] else {
             panic!();
@@ -70,7 +70,8 @@ where
         let v0 = &vertices[vn0];
         let v1 = &vertices[vn1];
         for i in 0..tdim {
-            *pts.get_mut([0, i]).unwrap() = T::from(v0[i] + v1[i]).unwrap() / T::from(2.0).unwrap();
+            *pts.get_mut([0, i]).unwrap() = num::cast::<_, T::Real>(v0[i] + v1[i]).unwrap()
+                / num::cast::<_, T::Real>(2.0).unwrap();
         }
         *mat.get_mut([0, 0, 0]).unwrap() = T::from(v0[1] - v1[1]).unwrap();
         *mat.get_mut([0, 1, 0]).unwrap() = T::from(v1[0] - v0[0]).unwrap();
@@ -79,7 +80,7 @@ where
     }
 
     for _e in 0..entity_counts[2] {
-        x[2].push(rlst_dynamic_array2!(T, [0, tdim]));
+        x[2].push(rlst_dynamic_array2!(T::Real, [0, tdim]));
         m[2].push(rlst_dynamic_array3!(T, [0, 2, 0]))
     }
 

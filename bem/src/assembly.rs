@@ -42,8 +42,8 @@ pub fn assemble<
     atype: AssemblyType,
     operator: BoundaryOperator,
     pde: PDEType,
-    trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-    test_space: &SerialFunctionSpace<'a, TestGrid>,
+    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
+    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
 ) {
     match atype {
         AssemblyType::Dense => match pde {

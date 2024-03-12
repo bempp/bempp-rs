@@ -59,7 +59,7 @@ where
         degree: usize,
         value_shape: Vec<usize>,
         polynomial_coeffs: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-        interpolation_points: EntityPoints<T>,
+        interpolation_points: EntityPoints<T::Real>,
         interpolation_weights: EntityWeights<T>,
         map_type: MapType,
         continuity: Continuity,
@@ -90,12 +90,12 @@ where
         }
 
         let new_pts = if continuity == Continuity::Discontinuous {
-            let mut new_pts: EntityPoints<T> = [vec![], vec![], vec![], vec![]];
+            let mut new_pts: EntityPoints<T::Real> = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
-            let mut all_pts = rlst_dynamic_array2![T, [npts, tdim]];
+            let mut all_pts = rlst_dynamic_array2![T::Real, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
                 for _pts in pts_i {
-                    new_pts[i].push(rlst_dynamic_array2![T, [0, tdim]]);
+                    new_pts[i].push(rlst_dynamic_array2![T::Real, [0, tdim]]);
                 }
             }
             for pts_i in interpolation_points.iter() {
@@ -282,7 +282,7 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
         self.family == ElementFamily::Lagrange
     }
     fn tabulate<
-        Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
         Array4Mut: RandomAccessMut<4, Item = T>,
     >(
         &self,

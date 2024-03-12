@@ -38,17 +38,17 @@ where
         }
         for (d, counts) in entity_counts.iter().enumerate() {
             for _e in 0..*counts {
-                x[d].push(rlst_dynamic_array2!(T, [0, tdim]));
+                x[d].push(rlst_dynamic_array2!(T::Real, [0, tdim]));
                 m[d].push(rlst_dynamic_array3!(T, [0, 1, 0]));
             }
         }
-        let mut midp = rlst_dynamic_array2!(T, [1, tdim]);
+        let mut midp = rlst_dynamic_array2!(T::Real, [1, tdim]);
         let nvertices = entity_counts[0];
         for i in 0..tdim {
             for vertex in &vertices {
-                *midp.get_mut([0, i]).unwrap() += T::from(vertex[i]).unwrap();
+                *midp.get_mut([0, i]).unwrap() += num::cast::<_, T::Real>(vertex[i]).unwrap();
             }
-            *midp.get_mut([0, i]).unwrap() /= T::from(nvertices).unwrap();
+            *midp.get_mut([0, i]).unwrap() /= num::cast::<_, T::Real>(nvertices).unwrap();
         }
         x[tdim].push(midp);
         let mut mentry = rlst_dynamic_array3!(T, [1, 1, 1]);
@@ -59,9 +59,9 @@ where
         let faces = reference_cell::faces(cell_type);
         // TODO: GLL points
         for vertex in &vertices {
-            let mut pts = rlst_dynamic_array2!(T, [1, tdim]);
+            let mut pts = rlst_dynamic_array2!(T::Real, [1, tdim]);
             for (i, v) in vertex.iter().enumerate() {
-                *pts.get_mut([0, i]).unwrap() = T::from(*v).unwrap();
+                *pts.get_mut([0, i]).unwrap() = num::cast::<_, T::Real>(*v).unwrap();
             }
             x[0].push(pts);
             let mut mentry = rlst_dynamic_array3!(T, [1, 1, 1]);
@@ -69,7 +69,7 @@ where
             m[0].push(mentry);
         }
         for e in &edges {
-            let mut pts = rlst_dynamic_array2!(T, [degree - 1, tdim]);
+            let mut pts = rlst_dynamic_array2!(T::Real, [degree - 1, tdim]);
             let [vn0, vn1] = e[..] else {
                 panic!();
             };
@@ -80,9 +80,10 @@ where
             for i in 1..degree {
                 *ident.get_mut([i - 1, 0, i - 1]).unwrap() = T::from(1.0).unwrap();
                 for j in 0..tdim {
-                    *pts.get_mut([i - 1, j]).unwrap() = T::from(v0[j]).unwrap()
-                        + T::from(i).unwrap() / T::from(degree).unwrap()
-                            * T::from(v1[j] - v0[j]).unwrap();
+                    *pts.get_mut([i - 1, j]).unwrap() = num::cast::<_, T::Real>(v0[j]).unwrap()
+                        + num::cast::<_, T::Real>(i).unwrap()
+                            / num::cast::<_, T::Real>(degree).unwrap()
+                            * num::cast::<_, T::Real>(v1[j] - v0[j]).unwrap();
                 }
             }
             x[1].push(pts);
@@ -105,7 +106,7 @@ where
                     panic!("Unsupported face type");
                 }
             };
-            let mut pts = rlst_dynamic_array2!(T, [npts, tdim]);
+            let mut pts = rlst_dynamic_array2!(T::Real, [npts, tdim]);
 
             let [vn0, vn1, vn2] = faces[e][..3] else {
                 panic!();
@@ -120,11 +121,14 @@ where
                     for i0 in 1..degree {
                         for i1 in 1..degree - i0 {
                             for j in 0..tdim {
-                                *pts.get_mut([n, j]).unwrap() = T::from(v0[j]).unwrap()
-                                    + T::from(i0).unwrap() / T::from(degree).unwrap()
-                                        * T::from(v1[j] - v0[j]).unwrap()
-                                    + T::from(i1).unwrap() / T::from(degree).unwrap()
-                                        * T::from(v2[j] - v0[j]).unwrap();
+                                *pts.get_mut([n, j]).unwrap() = num::cast::<_, T::Real>(v0[j])
+                                    .unwrap()
+                                    + num::cast::<_, T::Real>(i0).unwrap()
+                                        / num::cast::<_, T::Real>(degree).unwrap()
+                                        * num::cast::<_, T::Real>(v1[j] - v0[j]).unwrap()
+                                    + num::cast::<_, T::Real>(i1).unwrap()
+                                        / num::cast::<_, T::Real>(degree).unwrap()
+                                        * num::cast::<_, T::Real>(v2[j] - v0[j]).unwrap();
                             }
                             n += 1;
                         }
@@ -135,11 +139,14 @@ where
                     for i0 in 1..degree {
                         for i1 in 1..degree {
                             for j in 0..tdim {
-                                *pts.get_mut([n, j]).unwrap() = T::from(v0[j]).unwrap()
-                                    + T::from(i0).unwrap() / T::from(degree).unwrap()
-                                        * T::from(v1[j] - v0[j]).unwrap()
-                                    + T::from(i1).unwrap() / T::from(degree).unwrap()
-                                        * T::from(v2[j] - v0[j]).unwrap();
+                                *pts.get_mut([n, j]).unwrap() = num::cast::<_, T::Real>(v0[j])
+                                    .unwrap()
+                                    + num::cast::<_, T::Real>(i0).unwrap()
+                                        / num::cast::<_, T::Real>(degree).unwrap()
+                                        * num::cast::<_, T::Real>(v1[j] - v0[j]).unwrap()
+                                    + num::cast::<_, T::Real>(i1).unwrap()
+                                        / num::cast::<_, T::Real>(degree).unwrap()
+                                        * num::cast::<_, T::Real>(v2[j] - v0[j]).unwrap();
                             }
                             n += 1;
                         }

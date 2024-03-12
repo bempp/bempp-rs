@@ -33,7 +33,7 @@ fn equal_grids<TestGrid: GridType, TrialGrid: GridType>(
     test_grid: &TestGrid,
     trial_grid: &TrialGrid,
 ) -> bool {
-    std::ptr::addr_of!(test_grid) as usize != std::ptr::addr_of!(trial_grid) as usize
+    std::ptr::addr_of!(*test_grid) as usize == std::ptr::addr_of!(*trial_grid) as usize
 }
 fn neighbours<TestGrid: GridType, TrialGrid: GridType>(
     test_grid: &TestGrid,
@@ -180,14 +180,14 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
         cell_pairs: &[(usize, usize)],
         trial_points: &RlstArray<Self::RealT, 2>,
         test_points: &RlstArray<Self::RealT, 2>,
         weights: &[Self::RealT],
-        trial_table: &RlstArray<Self::RealT, 4>,
-        test_table: &RlstArray<Self::RealT, 4>,
+        trial_table: &RlstArray<Self::T, 4>,
+        test_table: &RlstArray<Self::T, 4>,
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::<Self::T>::new_known_size(
             shape,
@@ -271,14 +271,13 @@ pub trait BatchedAssembler: Sync {
                                 &test_normals,
                                 &trial_normals,
                                 index,
-                            ) * num::cast::<Self::RealT, Self::T>(
-                                *test_table.get_unchecked([0, index, test_i, 0])
-                                    * *trial_table.get_unchecked([0, index, trial_i, 0])
-                                    * *wt
-                                    * *test_jdet.get_unchecked(index)
-                                    * *trial_jdet.get_unchecked(index),
-                            )
-                            .unwrap();
+                            ) * *test_table.get_unchecked([0, index, test_i, 0])
+                                * *trial_table.get_unchecked([0, index, trial_i, 0])
+                                * num::cast::<Self::RealT, Self::T>(
+                                    *wt * *test_jdet.get_unchecked(index)
+                                        * *trial_jdet.get_unchecked(index),
+                                )
+                                .unwrap();
                         }
                     }
                     output.rows.push(*test_dof);
@@ -301,16 +300,16 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         output: &RawData2D<Self::T>,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         trial_cells: &[usize],
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
         test_cells: &[usize],
         trial_points: &RlstArray<Self::RealT, 2>,
         trial_weights: &[Self::RealT],
         test_points: &RlstArray<Self::RealT, 2>,
         test_weights: &[Self::RealT],
-        trial_table: &RlstArray<Self::RealT, 4>,
-        test_table: &RlstArray<Self::RealT, 4>,
+        trial_table: &RlstArray<Self::T, 4>,
+        test_table: &RlstArray<Self::T, 4>,
     ) -> usize {
         debug_assert!(test_weights.len() == NPTS_TEST);
         debug_assert!(test_points.shape()[0] == NPTS_TEST);
@@ -404,34 +403,30 @@ pub trait BatchedAssembler: Sync {
                         for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
                             trial_integrands[trial_index] = unsafe {
                                 num::cast::<Self::RealT, Self::T>(
-                                    *trial_wt
-                                        * trial_jdet[trial_cell_i][trial_index]
-                                        * *trial_table.get_unchecked([0, trial_index, trial_i, 0]),
+                                    *trial_wt * trial_jdet[trial_cell_i][trial_index],
                                 )
                                 .unwrap()
+                                    * *trial_table.get_unchecked([0, trial_index, trial_i, 0])
                             };
                         }
                         sum = num::cast::<f64, Self::T>(0.0).unwrap();
                         for (test_index, test_wt) in test_weights.iter().enumerate() {
                             let test_integrand = unsafe {
-                                num::cast::<Self::RealT, Self::T>(
-                                    *test_wt
-                                        * test_jdet[test_index]
-                                        * *test_table.get_unchecked([0, test_index, test_i, 0]),
-                                )
-                                .unwrap()
+                                num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
+                                    .unwrap()
+                                    * *test_table.get_unchecked([0, test_index, test_i, 0])
                             };
                             for trial_index in 0..NPTS_TRIAL {
-                                unsafe {
-                                    sum += self.nonsingular_kernel_value(
+                                sum += unsafe {
+                                    self.nonsingular_kernel_value(
                                         &k,
                                         &test_normals,
                                         &trial_normals[trial_cell_i],
                                         test_index,
                                         trial_index,
                                     ) * test_integrand
-                                        * *trial_integrands.get_unchecked(trial_index);
-                                }
+                                        * *trial_integrands.get_unchecked(trial_index)
+                                };
                             }
                         }
                         // TODO: should we write into a result array, then copy into output after this loop?
@@ -456,15 +451,15 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
         cell_pairs: &[(usize, usize)],
         trial_points: &RlstArray<Self::RealT, 2>,
         trial_weights: &[Self::RealT],
         test_points: &RlstArray<Self::RealT, 2>,
         test_weights: &[Self::RealT],
-        trial_table: &RlstArray<Self::RealT, 4>,
-        test_table: &RlstArray<Self::RealT, 4>,
+        trial_table: &RlstArray<Self::T, 4>,
+        test_table: &RlstArray<Self::T, 4>,
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::<Self::T>::new_known_size(
             shape,
@@ -546,35 +541,29 @@ pub trait BatchedAssembler: Sync {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                     for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
                         trial_integrands[trial_index] = unsafe {
-                            num::cast::<Self::RealT, Self::T>(
-                                *trial_wt
-                                    * trial_jdet[trial_index]
-                                    * *trial_table.get_unchecked([0, trial_index, trial_i, 0]),
-                            )
-                            .unwrap()
+                            num::cast::<Self::RealT, Self::T>(*trial_wt * trial_jdet[trial_index])
+                                .unwrap()
+                                * *trial_table.get_unchecked([0, trial_index, trial_i, 0])
                         };
                     }
                     sum = num::cast::<f64, Self::T>(0.0).unwrap();
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
                         let test_integrand = unsafe {
-                            num::cast::<Self::RealT, Self::T>(
-                                *test_wt
-                                    * test_jdet[test_index]
-                                    * *test_table.get_unchecked([0, test_index, test_i, 0]),
-                            )
-                            .unwrap()
+                            num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
+                                .unwrap()
+                                * *test_table.get_unchecked([0, test_index, test_i, 0])
                         };
                         for trial_index in 0..NPTS_TRIAL {
-                            unsafe {
-                                sum += self.nonsingular_kernel_value(
+                            sum += unsafe {
+                                self.nonsingular_kernel_value(
                                     &k,
                                     &test_normals,
                                     &trial_normals,
                                     test_index,
                                     trial_index,
                                 ) * test_integrand
-                                    * *trial_integrands.get_unchecked(trial_index);
-                            }
+                                    * *trial_integrands.get_unchecked(trial_index)
+                            };
                         }
                     }
                     output.rows.push(*test_dof);
@@ -596,8 +585,8 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::new(shape);
 
@@ -661,7 +650,7 @@ pub trait BatchedAssembler: Sync {
                 }
             }
             let mut table = rlst_dynamic_array4!(
-                Self::RealT,
+                Self::T,
                 trial_space
                     .element()
                     .tabulate_array_shape(0, points.shape()[0])
@@ -678,7 +667,7 @@ pub trait BatchedAssembler: Sync {
                 }
             }
             let mut table = rlst_dynamic_array4!(
-                Self::RealT,
+                Self::T,
                 test_space
                     .element()
                     .tabulate_array_shape(0, points.shape()[0])
@@ -772,8 +761,8 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> SparseMatrixData<Self::T> {
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
@@ -824,7 +813,7 @@ pub trait BatchedAssembler: Sync {
             .collect::<Vec<_>>();
 
         let mut test_table = rlst_dynamic_array4!(
-            Self::RealT,
+            Self::T,
             test_space.element().tabulate_array_shape(0, NPTS_TEST)
         );
         test_space
@@ -832,7 +821,7 @@ pub trait BatchedAssembler: Sync {
             .tabulate(&qpoints_test, 0, &mut test_table);
 
         let mut trial_table = rlst_dynamic_array4!(
-            Self::RealT,
+            Self::T,
             trial_space.element().tabulate_array_shape(0, NPTS_TRIAL)
         );
         trial_space
@@ -910,8 +899,8 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) {
         let sparse_matrix = self.assemble_singular::<QDEGREE, BLOCKSIZE, TestGrid, TrialGrid>(
             output.shape(),
@@ -935,8 +924,8 @@ pub trait BatchedAssembler: Sync {
         TrialGrid: GridType<T = Self::RealT> + Sync,
     >(
         &self,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> CsrMatrix<Self::T> {
         let shape = [
             test_space.dofmap().global_size(),
@@ -970,8 +959,8 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) {
         let sparse_matrix = self
             .assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE, TestGrid, TrialGrid>(
@@ -999,8 +988,8 @@ pub trait BatchedAssembler: Sync {
         TrialGrid: GridType<T = Self::RealT> + Sync,
     >(
         &self,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> CsrMatrix<Self::T> {
         let shape = [
             test_space.dofmap().global_size(),
@@ -1031,8 +1020,8 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) {
         let test_colouring = test_space.compute_cell_colouring();
         let trial_colouring = trial_space.compute_cell_colouring();
@@ -1062,8 +1051,8 @@ pub trait BatchedAssembler: Sync {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &SerialFunctionSpace<'a, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, TestGrid>,
+        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
+        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
         trial_colouring: &Vec<Vec<usize>>,
         test_colouring: &Vec<Vec<usize>>,
     ) {
@@ -1105,7 +1094,7 @@ pub trait BatchedAssembler: Sync {
             .collect::<Vec<_>>();
 
         let mut test_table = rlst_dynamic_array4!(
-            Self::RealT,
+            Self::T,
             test_space.element().tabulate_array_shape(0, NPTS_TEST)
         );
         test_space
@@ -1113,7 +1102,7 @@ pub trait BatchedAssembler: Sync {
             .tabulate(&qpoints_test, 0, &mut test_table);
 
         let mut trial_table = rlst_dynamic_array4!(
-            Self::RealT,
+            Self::T,
             trial_space.element().tabulate_array_shape(0, NPTS_TRIAL)
         );
         trial_space
