@@ -16,7 +16,6 @@ use rlst_dense::{
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
-// TODO: use T not f64
 pub fn get_all_quadrature_points<
     const NPTS: usize,
     T: RlstScalar<Real = T>,
