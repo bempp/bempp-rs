@@ -27,6 +27,8 @@ use rlst_dense::{
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
+type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
+
 fn equal_grids<TestGrid: GridType, TrialGrid: GridType>(
     test_grid: &TestGrid,
     trial_grid: &TrialGrid,
@@ -130,17 +132,9 @@ pub trait BatchedAssembler: Sync {
     /// This method is unsafe to allow `get_unchecked` may be used
     unsafe fn singular_kernel_value(
         &self,
-        k: &Array<Self::T, BaseArray<Self::T, VectorContainer<Self::T>, 2>, 2>,
-        test_normals: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
-        trial_normals: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        k: &RlstArray<Self::T, 2>,
+        test_normals: &RlstArray<Self::RealT, 2>,
+        trial_normals: &RlstArray<Self::RealT, 2>,
         index: usize,
     ) -> Self::T;
 
@@ -150,17 +144,9 @@ pub trait BatchedAssembler: Sync {
     /// This method is unsafe to allow `get_unchecked` may be used
     unsafe fn nonsingular_kernel_value(
         &self,
-        k: &Array<Self::T, BaseArray<Self::T, VectorContainer<Self::T>, 3>, 3>,
-        test_normals: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
-        trial_normals: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        k: &RlstArray<Self::T, 3>,
+        test_normals: &RlstArray<Self::RealT, 2>,
+        trial_normals: &RlstArray<Self::RealT, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> Self::T;
@@ -197,23 +183,11 @@ pub trait BatchedAssembler: Sync {
         trial_space: &SerialFunctionSpace<'a, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, TestGrid>,
         cell_pairs: &[(usize, usize)],
-        trial_points: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
-        test_points: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        trial_points: &RlstArray<Self::RealT, 2>,
+        test_points: &RlstArray<Self::RealT, 2>,
         weights: &[Self::RealT],
-        trial_table: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 4>,
-            4,
-        >,
-        test_table: &Array<Self::RealT, BaseArray<Self::RealT, VectorContainer<Self::RealT>, 4>, 4>,
+        trial_table: &RlstArray<Self::RealT, 4>,
+        test_table: &RlstArray<Self::RealT, 4>,
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::<Self::T>::new_known_size(
             shape,
@@ -331,24 +305,12 @@ pub trait BatchedAssembler: Sync {
         trial_cells: &[usize],
         test_space: &SerialFunctionSpace<'a, TestGrid>,
         test_cells: &[usize],
-        trial_points: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        trial_points: &RlstArray<Self::RealT, 2>,
         trial_weights: &[Self::RealT],
-        test_points: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        test_points: &RlstArray<Self::RealT, 2>,
         test_weights: &[Self::RealT],
-        trial_table: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 4>,
-            4,
-        >,
-        test_table: &Array<Self::RealT, BaseArray<Self::RealT, VectorContainer<Self::RealT>, 4>, 4>,
+        trial_table: &RlstArray<Self::RealT, 4>,
+        test_table: &RlstArray<Self::RealT, 4>,
     ) -> usize {
         debug_assert!(test_weights.len() == NPTS_TEST);
         debug_assert!(test_points.shape()[0] == NPTS_TEST);
@@ -406,9 +368,9 @@ pub trait BatchedAssembler: Sync {
         let mut trial_integrands = [num::cast::<f64, Self::T>(0.0).unwrap(); NPTS_TRIAL];
 
         for test_cell in test_cells {
-            for pt in 0..NPTS_TEST {
+            for (pt, jdet) in test_jdet.iter_mut().enumerate() {
                 test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                test_jdet[pt] = compute_det23(&jacobian);
+                *jdet = compute_det23(&jacobian);
                 compute_normal_from_jacobian23(&jacobian, &mut normal);
                 for (i, n) in normal.iter().enumerate() {
                     unsafe {
@@ -497,24 +459,12 @@ pub trait BatchedAssembler: Sync {
         trial_space: &SerialFunctionSpace<'a, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, TestGrid>,
         cell_pairs: &[(usize, usize)],
-        trial_points: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        trial_points: &RlstArray<Self::RealT, 2>,
         trial_weights: &[Self::RealT],
-        test_points: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 2>,
-            2,
-        >,
+        test_points: &RlstArray<Self::RealT, 2>,
         test_weights: &[Self::RealT],
-        trial_table: &Array<
-            Self::RealT,
-            BaseArray<Self::RealT, VectorContainer<Self::RealT>, 4>,
-            4,
-        >,
-        test_table: &Array<Self::RealT, BaseArray<Self::RealT, VectorContainer<Self::RealT>, 4>, 4>,
+        trial_table: &RlstArray<Self::RealT, 4>,
+        test_table: &RlstArray<Self::RealT, 4>,
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::<Self::T>::new_known_size(
             shape,
@@ -551,9 +501,9 @@ pub trait BatchedAssembler: Sync {
         let mut trial_integrands = [num::cast::<f64, Self::T>(0.0).unwrap(); NPTS_TRIAL];
 
         for (test_cell, trial_cell) in cell_pairs {
-            for pt in 0..NPTS_TEST {
+            for (pt, jdet) in test_jdet.iter_mut().enumerate() {
                 test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                test_jdet[pt] = compute_det23(&jacobian);
+                *jdet = compute_det23(&jacobian);
                 compute_normal_from_jacobian23(&jacobian, &mut normal);
                 for (i, n) in normal.iter().enumerate() {
                     unsafe {
@@ -567,9 +517,9 @@ pub trait BatchedAssembler: Sync {
                     }
                 }
             }
-            for pt in 0..NPTS_TRIAL {
+            for (pt, jdet) in trial_jdet.iter_mut().enumerate() {
                 trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                trial_jdet[pt] = compute_det23(&jacobian);
+                *jdet = compute_det23(&jacobian);
                 compute_normal_from_jacobian23(&jacobian, &mut normal);
                 for (i, n) in normal.iter().enumerate() {
                     unsafe {
@@ -959,7 +909,7 @@ pub trait BatchedAssembler: Sync {
         TrialGrid: GridType<T = Self::RealT> + Sync,
     >(
         &self,
-        output: &mut Array<Self::T, BaseArray<Self::T, VectorContainer<Self::T>, 2>, 2>,
+        output: &mut RlstArray<Self::T, 2>,
         trial_space: &SerialFunctionSpace<'a, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, TestGrid>,
     ) {
@@ -1019,7 +969,7 @@ pub trait BatchedAssembler: Sync {
         TrialGrid: GridType<T = Self::RealT> + Sync,
     >(
         &self,
-        output: &mut Array<Self::T, BaseArray<Self::T, VectorContainer<Self::T>, 2>, 2>,
+        output: &mut RlstArray<Self::T, 2>,
         trial_space: &SerialFunctionSpace<'a, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, TestGrid>,
     ) {
@@ -1080,7 +1030,7 @@ pub trait BatchedAssembler: Sync {
         TrialGrid: GridType<T = Self::RealT> + Sync,
     >(
         &self,
-        output: &mut Array<Self::T, BaseArray<Self::T, VectorContainer<Self::T>, 2>, 2>,
+        output: &mut RlstArray<Self::T, 2>,
         trial_space: &SerialFunctionSpace<'a, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, TestGrid>,
     ) {
@@ -1111,7 +1061,7 @@ pub trait BatchedAssembler: Sync {
         TrialGrid: GridType<T = Self::RealT> + Sync,
     >(
         &self,
-        output: &mut Array<Self::T, BaseArray<Self::T, VectorContainer<Self::T>, 2>, 2>,
+        output: &mut RlstArray<Self::T, 2>,
         trial_space: &SerialFunctionSpace<'a, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, TestGrid>,
         trial_colouring: &Vec<Vec<usize>>,
@@ -1245,34 +1195,18 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
     type T = T;
     unsafe fn singular_kernel_value(
         &self,
-        k: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        _test_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
-        _trial_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
+        k: &RlstArray<T, 2>,
+        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
         index: usize,
     ) -> T {
         *k.get_unchecked([0, index])
     }
     unsafe fn nonsingular_kernel_value(
         &self,
-        k: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-        _test_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
-        _trial_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
+        k: &RlstArray<T, 3>,
+        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> T {
@@ -1311,17 +1245,9 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceDoubleLayerAssembler<T> {
     type T = T;
     unsafe fn singular_kernel_value(
         &self,
-        k: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        _test_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
-        trial_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
+        k: &RlstArray<T, 2>,
+        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
         index: usize,
     ) -> T {
         *k.get_unchecked([1, index])
@@ -1333,17 +1259,9 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceDoubleLayerAssembler<T> {
     }
     unsafe fn nonsingular_kernel_value(
         &self,
-        k: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-        _test_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
-        trial_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
+        k: &RlstArray<T, 3>,
+        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> T {
@@ -1387,17 +1305,9 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     type T = T;
     unsafe fn singular_kernel_value(
         &self,
-        k: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        test_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
-        _trial_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
+        k: &RlstArray<T, 2>,
+        test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
         index: usize,
     ) -> T {
         -*k.get_unchecked([1, index])
@@ -1409,17 +1319,9 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     }
     unsafe fn nonsingular_kernel_value(
         &self,
-        k: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-        test_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
-        _trial_normals: &Array<
-            <T as RlstScalar>::Real,
-            BaseArray<<T as RlstScalar>::Real, VectorContainer<<T as RlstScalar>::Real>, 2>,
-            2,
-        >,
+        k: &RlstArray<T, 3>,
+        test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> T {

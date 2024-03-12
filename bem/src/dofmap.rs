@@ -9,7 +9,7 @@ pub struct SerialDofMap {
 }
 
 impl SerialDofMap {
-    pub fn new<'a>(grid: &impl GridType, element: &impl FiniteElement) -> Self {
+    pub fn new(grid: &impl GridType, element: &impl FiniteElement) -> Self {
         let mut size = 0;
         let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
         let tdim = grid.domain_dimension();
