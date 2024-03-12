@@ -1,8 +1,6 @@
 //! FMM traits
-use std::collections::HashMap;
-
 use crate::kernel::Kernel;
-use crate::tree::Tree;
+use crate::tree::FmmTree;
 
 /// Interface for source box translations.
 pub trait SourceTranslation {
@@ -38,98 +36,47 @@ pub trait TargetTranslation {
     fn p2p(&self);
 }
 
-/// Interface for an FMM algorithm, this is uniquely specified by the type of tree
-/// (single/multi node), the order of expansions being used, as well as the kernel function
-/// being evaluated.
+/// Interface for FMM
 pub trait Fmm {
+    /// Precision of data associated with FMM
+    type Precision;
+
+    /// Type of node index
+    type NodeIndex;
+
+    /// Type of tree, must implement FmmTree, allowing for separate source and target trees
+    type Tree: FmmTree;
+
+    /// Type of kernel associated with this FMM
     type Kernel: Kernel;
-    type Tree: Tree;
 
-    /// Expansion order.
-    fn order(&self) -> usize;
+    /// Get the multipole expansion data associated with a node index as a slice
+    /// # Arguments
+    /// * `key` - The source node index.
+    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
 
-    /// Kernel function
+    /// Get the local expansion data associated with a node index as a slice
+    /// # Arguments
+    /// * `key` - The target node index.
+    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+
+    /// Get the potential data associated with the particles contained at a given node
+    /// # Arguments
+    /// * `key` - The target leaf node index.
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
+
+    /// Get the expansion order associated with this FMM
+    fn expansion_order(&self) -> usize;
+
+    /// Get the tree associated with this FMM
+    fn tree(&self) -> &Self::Tree;
+
+    /// Get the kernel associated with this FMM
     fn kernel(&self) -> &Self::Kernel;
 
-    /// Associated tree
-    fn tree(&self) -> &Self::Tree;
-}
+    /// Get the dimension of the data in this FMM
+    fn dim(&self) -> usize;
 
-pub trait KiFmm
-where
-    Self: Fmm,
-{
-    /// Scaling of inner check or equivalent surface with respect to a box.
-    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
-
-    /// Scaling of outer check or equivalent surface with respect to a box.
-    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T;
-}
-
-/// Dictionary containing timings
-pub type TimeDict = HashMap<String, u128>;
-
-/// Interface for running the FMM loop.
-pub trait FmmLoop {
-    /// Compute the upward pass, optionally collect timing for each operator.
-    ///
-    /// # Arguments
-    /// `time` - If true, method returns a dictionary of times for the downward pass operators.
-    fn upward_pass(&self, time: bool) -> Option<TimeDict>;
-
-    /// Compute the downward pass, optionally collect timing for each operator.
-    ///
-    /// # Arguments
-    /// `time` - If true, method returns a dictionary of times for the upward pass operators.
-    fn downward_pass(&self, time: bool) -> Option<TimeDict>;
-
-    /// Compute the upward and downward pass, optionally collect timing for each operator.
-    ///
-    /// # Arguments
-    /// `time` - If true, method returns a dictionary of times for all operators.
-    fn run(&self, time: bool) -> Option<TimeDict>;
-}
-
-/// Interface to compute interaction lists given a tree.
-pub trait InteractionLists {
-    type Tree: Tree;
-
-    /// The interaction list defining multipole to local translations, i.e. for well separated boxes.
-    ///
-    /// # Arguments
-    /// * `key` - The target key for which this interaction list is being calculated.
-    fn get_v_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-
-    /// The interaction list defining particle to local translations, i.e. where the box in the in
-    /// the interaction list is too large for the multipole expansion to apply at the target box
-    /// specified by `key`.
-    ///
-    /// # Arguments
-    /// * `key` - The target key for which this interaction list is being calculated.
-    fn get_x_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-
-    /// The interaction list defining multiopole to particle translations, i.e. where the multipole
-    /// expansion of the source key applies at the target key, only applies to leaf nodes.
-    ///
-    /// # Arguments
-    /// * `leaf` - The target leaf key for which this interaction list is being calculated.
-    fn get_w_list(
-        &self,
-        leaf: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
-
-    /// The interaction list defining the near field of each leaf box, i.e. adjacent boxes.
-    ///
-    /// # Arguments
-    /// * `key` - The target key for which this interaction list is being calculated.
-    fn get_u_list(
-        &self,
-        key: &<Self::Tree as Tree>::NodeIndex,
-    ) -> Option<<Self::Tree as Tree>::NodeIndices>;
+    /// Evaluate the potentials, or potential gradients, for this FMM
+    fn evaluate(&self);
 }

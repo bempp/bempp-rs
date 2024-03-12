@@ -23,9 +23,11 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
     npoints: usize,
     min: Option<T>,
     max: Option<T>,
+    seed: Option<u64>,
 ) -> PointsMat<T> {
     // Generate a set of randomly distributed points
-    let mut range = StdRng::seed_from_u64(0);
+    let seed = seed.unwrap_or(0);
+    let mut range = StdRng::seed_from_u64(seed);
 
     let between;
     if let (Some(min), Some(max)) = (min, max) {

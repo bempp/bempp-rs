@@ -1,4 +1,5 @@
-//! Types for storing field translation data.
+//! Types for storing field translation metadata.
+
 use num::{Complex, Float};
 use rlst_dense::{
     array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
@@ -16,15 +17,12 @@ pub type SvdM2lEntry<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// of the halo box.
 pub type FftKernelData<C> = Vec<Vec<C>>;
 
-/// A type to store the M2L field translation meta-data and data for an FFT based sparsification in the kernel independent FMM.
+#[derive(Default)]
 pub struct FftFieldTranslationKiFmm<T, U>
 where
     T: Default + RlstScalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
 {
-    /// Amount to dilate inner check surface by
-    pub alpha: T,
-
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
 
@@ -39,58 +37,8 @@ where
 
     /// The associated kernel with this translation operator.
     pub kernel: U,
-}
 
-/// A type to store the M2L field translation meta-data and data for an SVD based sparsification in the kernel independent FMM.
-/// Here the SVD is computed over all transfer vectors, which leaves some redundancy as the singular values are dictated by the
-/// highest rank interactions.
-pub struct SvdFieldTranslationKiFmm<T, U>
-where
-    T: RlstScalar<Real = T>,
-    U: Kernel<T = T> + Default,
-{
-    /// Amount to dilate inner check surface by when computing operator.
-    pub alpha: T,
-
-    /// Maximum rank taken for SVD compression, if unspecified estimated from data.
-    pub k: usize,
-
-    /// Precomputed data required for SVD compressed M2L interaction.
-    pub operator_data: SvdM2lOperatorData<T>,
-
-    /// Unique transfer vectors to lookup m2l unique kernel interactions.
-    pub transfer_vectors: Vec<TransferVector>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: U,
-}
-
-/// A type to store the M2L field translation meta-data and data for an SVD based sparsification in the kernel independent FMM.
-/// Here we take individual compressions (IA) of each M2L matrix, this leads to the optimal compression for each M2L interaction
-/// matrix, controlled by the threshold parameter which dictates the percentage of the energy of the M2L matrix, as measured by the
-/// sum of the squares of the singular values.
-pub struct SvdFieldTranslationKiFmmIA<T, U>
-where
-    T: RlstScalar<Real = T>,
-    U: Kernel<T = T> + Default,
-{
-    /// Amount to dilate inner check surface by when computing operator.
-    pub alpha: T,
-
-    /// Maximum rank taken for SVD compression
-    pub k: usize,
-
-    /// Amount of energy of each M2L operator retained in SVD compression
-    pub threshold: T,
-
-    /// Precomputed data required for SVD compressed M2L interaction.
-    pub operator_data: SvdM2lOperatorDataIA<T>,
-
-    /// Unique transfer vectors to lookup m2l unique kernel interactions.
-    pub transfer_vectors: Vec<TransferVector>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: U,
+    pub expansion_order: usize,
 }
 
 /// A type to store the M2L field translation meta-data and data for an SVD based sparsification in the kernel independent FMM.
@@ -98,28 +46,26 @@ where
 /// in rank due to some M2L matrices being of higher rank. This recompression is controlled by the threshold parameter which is
 /// which is computed as the percentage of the energy of the compressed M2L matrix, as measured by the sum of the squares of the
 /// singular values.
-pub struct SvdFieldTranslationKiFmmRcmp<T, U>
+#[derive(Default)]
+pub struct BlasFieldTranslationKiFmm<T, U>
 where
     T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
-    /// Amount to dilate inner check surface by when computing operator.
-    pub alpha: T,
-
-    /// Maximum rank taken for SVD compression
-    pub k: usize,
-
-    /// Amount of energy of each M2L operator retained in SVD re-compression
     pub threshold: T,
 
     /// Precomputed data required for SVD compressed M2L interaction.
-    pub operator_data: SvdM2lOperatorDataRcmp<T>,
+    pub operator_data: BlasSourceToTargetOperatorData<T>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions.
     pub transfer_vectors: Vec<TransferVector>,
 
     /// The associated kernel with this translation operator.
     pub kernel: U,
+
+    pub expansion_order: usize,
+
+    pub cutoff_rank: usize,
 }
 
 /// A type to store a transfer vector between a `source` and `target` Morton key.
@@ -148,56 +94,10 @@ pub struct FftM2lOperatorData<C> {
     pub kernel_data_f: FftKernelData<C>,
 }
 
-/// Container to store precomputed data required for SVD field translations when computed over all M2L matrices.
-/// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
-pub struct SvdM2lOperatorData<T>
-where
-    T: RlstScalar,
-{
-    /// Left singular vectors from SVD of fat M2L matrix.
-    pub u: SvdM2lEntry<T>,
-
-    /// Right singular vectors from SVD of thin M2L matrix, cutoff to a maximum rank of 'k'.
-    pub st_block: SvdM2lEntry<T>,
-
-    /// The quantity $C_{block} = \Sigma \cdot V^T_{block} S_{block} $, where $\Sigma$ is diagonal matrix of singular values
-    /// from the SVD of the fat M2L matrix, $V^T_{block}$ is a is a block of the right singular vectors corresponding
-    /// to each transfer vector from the same SVD, and $S_{block}$ is a block of the transposed right singular vectors
-    /// from the SVD of the thin M2L matrix. $C$ is composed of $C_{block}$, with one for each unique transfer vector.
-    pub c: SvdM2lEntry<T>,
-}
-
-impl<T> Default for SvdM2lOperatorData<T>
-where
-    T: RlstScalar,
-{
-    fn default() -> Self {
-        let u = rlst_dynamic_array2!(T, [1, 1]);
-        let st_block = rlst_dynamic_array2!(T, [1, 1]);
-        let c = rlst_dynamic_array2!(T, [1, 1]);
-
-        SvdM2lOperatorData { u, st_block, c }
-    }
-}
-
-/// Container to store precomputed data required for SVD field translations.
-/// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
-#[derive(Default)]
-pub struct SvdM2lOperatorDataIA<T>
-where
-    T: RlstScalar,
-{
-    /// The left singular vectors of each M2L matrix.
-    pub u: Vec<SvdM2lEntry<T>>,
-
-    /// Right singular vectors of each singular matrix (inner index) at each level (outer index)
-    pub vt: Vec<Vec<SvdM2lEntry<T>>>,
-}
-
 /// Container to store precomputed data required for SVD field translations.
 /// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
 // #[derive(Default)]
-pub struct SvdM2lOperatorDataRcmp<T>
+pub struct BlasSourceToTargetOperatorData<T>
 where
     T: RlstScalar,
 {
@@ -223,7 +123,7 @@ where
     pub c_vt: Vec<SvdM2lEntry<T>>,
 }
 
-impl<T> Default for SvdM2lOperatorDataRcmp<T>
+impl<T> Default for BlasSourceToTargetOperatorData<T>
 where
     T: RlstScalar,
 {
@@ -231,7 +131,7 @@ where
         let u = rlst_dynamic_array2!(T, [1, 1]);
         let st_block = rlst_dynamic_array2!(T, [1, 1]);
 
-        SvdM2lOperatorDataRcmp {
+        BlasSourceToTargetOperatorData {
             u,
             st_block,
             c_u: Vec::default(),

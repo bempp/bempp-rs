@@ -15,107 +15,105 @@ pub trait Tree {
 
     type Precision: RlstScalar<Real = Self::Precision> + Float + Default;
 
-    /// The type of points that define a tree.
-    type Point: Point<Self::Precision>;
-
-    /// Slice of points.
-    type PointSlice<'a>: IntoIterator<Item = &'a Self::Point>
-    where
-        Self: 'a;
-
     /// A tree node.
-    type NodeIndex: MortonKeyInterface;
+    type Node: TreeNode<Self::Precision, Domain = Self::Domain> + Clone + Copy;
 
     /// Slice of nodes.
-    type NodeIndexSlice<'a>: IntoIterator<Item = &'a Self::NodeIndex>
+    type NodeSlice<'a>: IntoIterator<Item = &'a Self::Node>
     where
         Self: 'a;
 
     /// Copy of nodes
-    type NodeIndices: IntoIterator<Item = Self::NodeIndex>;
+    type Nodes: IntoIterator<Item = Self::Node>;
 
-    /// Global indices of points
-    type GlobalIndex;
-
-    /// Slice of global indices
-    type GlobalIndexSlice<'a>: IntoIterator<Item = &'a Self::GlobalIndex>
-    where
-        Self: 'a;
+    fn nleaves(&self) -> Option<usize>;
+    fn nkeys_tot(&self) -> Option<usize>;
+    fn nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
     fn get_depth(&self) -> u64;
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
-    fn get_all_leaves(&self) -> Option<Self::NodeIndexSlice<'_>>;
+    fn all_leaves(&self) -> Option<Self::NodeSlice<'_>>;
 
     /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
-    fn get_keys(&self, level: u64) -> Option<Self::NodeIndexSlice<'_>>;
+    fn keys(&self, level: u64) -> Option<Self::NodeSlice<'_>>;
 
     /// Get a reference to all keys, gets local keys in a multi-node setting.
-    fn get_all_keys(&self) -> Option<Self::NodeIndexSlice<'_>>;
+    fn all_keys(&self) -> Option<Self::NodeSlice<'_>>;
 
     /// Get a reference to all keys as a set, gets local keys in a multi-node setting.
-    fn get_all_keys_set(&self) -> &'_ HashSet<Self::NodeIndex>;
+    fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>>;
 
     /// Get a reference to all leaves as a set, gets local keys in a multi-node setting.
-    fn get_all_leaves_set(&self) -> &'_ HashSet<Self::NodeIndex>;
-
-    /// Gets a reference to the points contained with a leaf node.
-    fn get_points<'a>(&'a self, key: &Self::NodeIndex) -> Option<Self::PointSlice<'a>>;
-
-    /// Gets a reference to the points contained with a leaf node.
-    fn get_all_points(&self) -> Option<Self::PointSlice<'_>>;
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
-    fn get_coordinates<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [Self::Precision]>;
+    fn coordinates<'a>(&'a self, key: &Self::Node) -> Option<&'a [Self::Precision]>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
-    fn get_all_coordinates(&self) -> Option<&[Self::Precision]>;
+    fn all_coordinates(&self) -> Option<&[Self::Precision]>;
 
     /// Gets global indices at a leaf (local in multinode setting)
-    fn get_global_indices<'a>(&'a self, key: &Self::NodeIndex) -> Option<&'a [usize]>;
+    fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]>;
 
     /// Gets all global indices (local in multinode setting)
-    fn get_all_global_indices(&self) -> Option<&[usize]>;
+    fn all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points, gets global domain in multi-node setting.
-    fn get_domain(&self) -> &'_ Self::Domain;
+    fn domain(&self) -> &'_ Self::Domain;
 
     /// Get a map from the key to index position in sorted keys
-    fn get_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
+    fn index(&self, key: &Self::Node) -> Option<&usize>;
+
+    fn node(&self, idx: usize) -> Option<&Self::Node>;
 
     /// Get a map from the key to leaf index position in sorted leaves
-    fn get_leaf_index(&self, key: &Self::NodeIndex) -> Option<&usize>;
-
-    /// Checks whether a a given node corresponds to a leaf
-    fn is_leaf(&self, key: &Self::NodeIndex) -> bool;
-
-    /// Checks whether a a given node is contained in the tree
-    fn is_node(&self, key: &Self::NodeIndex) -> bool;
+    fn leaf_index(&self, key: &Self::Node) -> Option<&usize>;
 }
 
-pub trait Point<T>
-where
-    T: RlstScalar<Real = T> + Float + Default,
-{
+pub trait FmmTree {
+    type Precision;
+    type Node;
+
+    type Tree: Tree<Precision = Self::Precision, Node = Self::Node>;
+
+    fn source_tree(&self) -> &Self::Tree;
+
+    fn target_tree(&self) -> &Self::Tree;
+
+    fn domain(&self) -> &<Self::Tree as Tree>::Domain;
+
+    fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
 }
 
-/// A minimal interface for Morton Key like nodes.
-pub trait MortonKeyInterface
+pub trait TreeNode<T>
 where
     Self: Hash + Eq,
+    T: RlstScalar,
 {
+    type Domain;
+
     // Copy of nodes
-    type NodeIndices: IntoIterator<Item = Self>;
+    type Nodes: IntoIterator<Item = Self>;
 
     /// The parent of a key.
     fn parent(&self) -> Self;
 
+    fn level(&self) -> u64;
+
+    fn compute_surface(
+        &self,
+        domain: &Self::Domain,
+        expansion_order: usize,
+        alpha: T,
+    ) -> Vec<<T as RlstScalar>::Real>;
+
     /// Neighbours defined by keys sharing a vertex, edge, or face.
-    fn neighbors(&self) -> Self::NodeIndices;
+    fn neighbors(&self) -> Self::Nodes;
 
     /// Childen of a key.
-    fn children(&self) -> Self::NodeIndices;
+    fn children(&self) -> Self::Nodes;
 
     /// Checks adjacency, defined by sharing a vertex, edge, or face, between two keys.
     fn is_adjacent(&self, other: &Self) -> bool;

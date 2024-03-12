@@ -3,6 +3,7 @@ use fftw::{plan::*, types::*};
 use num::Complex;
 use rayon::prelude::*;
 
+/// Interface for taking FFTs over containers of this type using the FFTW library.
 pub trait Fft
 where
     Self: Sized,

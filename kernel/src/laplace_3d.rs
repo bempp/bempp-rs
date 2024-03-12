@@ -6,7 +6,7 @@ use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use bempp_traits::{
-    kernel::{Kernel, ScaleInvariantKernel},
+    kernel::Kernel,
     types::{EvalType, RlstScalar},
 };
 use num::traits::FloatConst;
@@ -15,18 +15,6 @@ use rayon::prelude::*;
 #[derive(Clone)]
 pub struct Laplace3dKernel<T: RlstScalar> {
     _phantom_t: std::marker::PhantomData<T>,
-}
-
-impl<T: RlstScalar<Real = T>> ScaleInvariantKernel for Laplace3dKernel<T> {
-    type T = T;
-
-    fn scale(&self, level: u64) -> Self::T {
-        let numerator = T::from(1).unwrap();
-        let denominator = T::from(2.).unwrap();
-        let power = T::from(level).unwrap();
-        let denominator = denominator.powf(power);
-        numerator / denominator
-    }
 }
 
 impl<T: RlstScalar> Laplace3dKernel<T> {

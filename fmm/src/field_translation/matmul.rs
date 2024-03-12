@@ -1,8 +1,8 @@
-//! Implementations of 8x8 operation for Hadamard product in FFT based M2L operations.
+//! Implementations of 8x8 matrix multiplication operation during Hadamard product in FFT based M2L operations.
 use bempp_traits::types::RlstScalar;
 use num::{complex::Complex, Zero};
 
-/// The 8x8 matmul operation, always inlined
+/// The 8x8 matmul operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
 ///
 /// # Arguments
 /// * - `kernel` - The kernel data for a specific translation for a specific frequency for a set of 8 siblings.

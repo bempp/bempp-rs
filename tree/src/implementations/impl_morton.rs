@@ -5,6 +5,7 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     error::Error,
+    fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
     vec,
@@ -24,7 +25,7 @@ use crate::{
     },
 };
 
-use bempp_traits::{tree::MortonKeyInterface, types::RlstScalar};
+use bempp_traits::{tree::TreeNode, types::RlstScalar};
 
 /// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
 /// Returns an owned vector of Morton Keys, hence requires a copy.
@@ -234,18 +235,18 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-pub fn point_to_anchor<T: Float + ToPrimitive + Default>(
+pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
     point: &[PointType<T>; 3],
     level: KeyType,
     domain: &Domain<T>,
 ) -> Result<[KeyType; 3], Box<dyn Error>> {
     // Check if point is in the domain
 
-    let mut contained = Vec::new();
+    let mut tmp = Vec::new();
     for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
-        contained.push((o <= p) && (p <= o + d));
+        tmp.push((o <= p) && (p <= o + d));
     }
-    let contained = contained.iter().all(|&x| x);
+    let contained = tmp.iter().all(|&x| x);
 
     match contained {
         true => {
@@ -318,7 +319,7 @@ impl MortonKey {
     /// * `point` - Cartesian coordinate for a given point.
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
-    pub fn from_point<T: Float + Default>(
+    pub fn from_point<T: Float + Default + Debug>(
         point: &[PointType<T>; 3],
         domain: &Domain<T>,
         level: u64,
@@ -978,10 +979,12 @@ impl Hash for MortonKey {
     }
 }
 
-impl MortonKeyInterface for MortonKey {
-    type NodeIndices = MortonKeys;
+impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
+    type Nodes = MortonKeys;
 
-    fn children(&self) -> Self::NodeIndices {
+    type Domain = Domain<T>;
+
+    fn children(&self) -> Self::Nodes {
         MortonKeys {
             keys: self.children(),
             index: 0,
@@ -992,11 +995,24 @@ impl MortonKeyInterface for MortonKey {
         self.parent()
     }
 
-    fn neighbors(&self) -> Self::NodeIndices {
+    fn level(&self) -> u64 {
+        self.level()
+    }
+
+    fn neighbors(&self) -> Self::Nodes {
         MortonKeys {
             keys: self.neighbors(),
             index: 0,
         }
+    }
+
+    fn compute_surface(
+        &self,
+        domain: &Self::Domain,
+        order: usize,
+        alpha: T,
+    ) -> Vec<<T as RlstScalar>::Real> {
+        self.compute_surface(domain, order, alpha)
     }
 
     fn is_adjacent(&self, other: &Self) -> bool {
@@ -1183,7 +1199,7 @@ mod test {
     #[test]
     fn test_sorting() {
         let npoints = 1000;
-        let points = points_fixture(npoints, Some(-1.), Some(1.0));
+        let points = points_fixture(npoints, Some(-1.), Some(1.0), None);
 
         let domain = Domain::from_local_points(points.data());
 
@@ -1469,7 +1485,7 @@ mod test {
         let min = Some(-1.01);
         let max = Some(0.99);
 
-        let points = points_fixture(npoints, min, max);
+        let points = points_fixture(npoints, min, max, None);
 
         let mut keys = Vec::new();
 
