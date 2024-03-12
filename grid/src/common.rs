@@ -84,7 +84,9 @@ pub fn compute_normal_from_jacobian23<T: Float + RlstScalar<Real = T>>(
 /// Compute a normal from a Jacobian
 pub fn compute_normal_from_jacobian<T: Float + RlstScalar<Real = T>>(
     jacobian: &[T],
-    normal: &mut [T], tdim: usize, gdim: usize
+    normal: &mut [T],
+    tdim: usize,
+    gdim: usize,
 ) {
     assert_eq!(jacobian.len(), tdim * gdim);
     assert_eq!(normal.len(), gdim);
@@ -100,7 +102,6 @@ pub fn compute_normal_from_jacobian<T: Float + RlstScalar<Real = T>>(
             unimplemented!("compute_det() not implemented for topological dimension {tdim}");
         }
     }
-
 }
 
 /// Compute the determinant of a 1 by 1 matrix
@@ -122,26 +123,25 @@ pub fn compute_det22<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
 /// Compute the determinant of a 2 by 3 matrix
 pub fn compute_det23<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
     T::sqrt(
-                [(1, 2), (2, 0), (0, 1)]
-                    .iter()
-                    .map(|(j, k)| {
-                        (jacobian[*j] * jacobian[3 + *k] - jacobian[*k] * jacobian[3 + *j]).powi(2)
-                    })
-                    .sum(),
-            )
+        [(1, 2), (2, 0), (0, 1)]
+            .iter()
+            .map(|(j, k)| {
+                (jacobian[*j] * jacobian[3 + *k] - jacobian[*k] * jacobian[3 + *j]).powi(2)
+            })
+            .sum(),
+    )
 }
 /// Compute the determinant of a 3 by 3 matrix
 pub fn compute_det33<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
-T::abs(
-                [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
-                    .iter()
-                    .map(|(i, j, k)| {
-                        jacobian[*i]
-                            * (jacobian[3 + *j] * jacobian[6 + *k]
-                                - jacobian[3 + *k] * jacobian[6 + *j])
-                    })
-                    .sum(),
-            )
+    T::abs(
+        [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
+            .iter()
+            .map(|(i, j, k)| {
+                jacobian[*i]
+                    * (jacobian[3 + *j] * jacobian[6 + *k] - jacobian[3 + *k] * jacobian[6 + *j])
+            })
+            .sum(),
+    )
 }
 
 /// Compute the determinant of a matrix

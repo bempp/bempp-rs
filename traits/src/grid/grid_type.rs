@@ -1,13 +1,11 @@
 //! Definition of a grid
 
-use super::{CellType, PointType};
+use super::{CellType, PointType, ReferenceMapType};
 use crate::types::cell_iterator::CellIterator;
 use crate::types::point_iterator::PointIterator;
 use crate::types::CellLocalIndexPair;
 use rlst_dense::types::RlstScalar;
 use std::hash::Hash;
-
-use super::ReferenceMapType;
 
 pub trait GridType: std::marker::Sized {
     //! A grid
@@ -25,7 +23,7 @@ pub trait GridType: std::marker::Sized {
     where
         Self: 'a;
     /// The type of a reference map
-    type ReferenceMap<'a>: ReferenceMapType<Grid=Self>
+    type ReferenceMap<'a>: ReferenceMapType<Grid = Self>
     where
         Self: 'a;
 

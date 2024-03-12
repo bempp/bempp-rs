@@ -2,8 +2,8 @@
 
 use super::GridType;
 use crate::types::ReferenceCellType;
-use std::hash::Hash;
 use rlst_dense::types::RlstScalar;
+use std::hash::Hash;
 
 pub trait CellType {
     //! A cell
@@ -70,7 +70,6 @@ pub trait TopologyType {
     /// Get the flat index from the index of an entity
     fn flat_index(&self, index: Self::IndexType) -> usize;
 }
-
 
 pub trait GeometryType {
     //! Cell geometry

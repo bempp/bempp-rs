@@ -5,16 +5,20 @@ use bempp_element::element::CiarletElement;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, TopologyType};
+use rlst_dense::types::RlstScalar;
 use std::collections::HashMap;
 
 pub struct SerialFunctionSpace<'a, GridImpl: GridType> {
     grid: &'a GridImpl,
-    element: &'a CiarletElement<f64>,
+    element: &'a CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real>,
     dofmap: SerialDofMap,
 }
 
 impl<'a, GridImpl: GridType> SerialFunctionSpace<'a, GridImpl> {
-    pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<f64>) -> Self {
+    pub fn new(
+        grid: &'a GridImpl,
+        element: &'a CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real>,
+    ) -> Self {
         let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
@@ -83,7 +87,7 @@ impl<'a, GridImpl: GridType> SerialFunctionSpace<'a, GridImpl> {
 impl<'a, GridImpl: GridType> FunctionSpace for SerialFunctionSpace<'a, GridImpl> {
     type DofMap = SerialDofMap;
     type Grid = GridImpl;
-    type FiniteElement = CiarletElement<f64>;
+    type FiniteElement = CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real>;
 
     fn dofmap(&self) -> &Self::DofMap {
         &self.dofmap
@@ -91,7 +95,7 @@ impl<'a, GridImpl: GridType> FunctionSpace for SerialFunctionSpace<'a, GridImpl>
     fn grid(&self) -> &Self::Grid {
         self.grid
     }
-    fn element(&self) -> &CiarletElement<f64> {
+    fn element(&self) -> &CiarletElement<<<GridImpl as GridType>::T as RlstScalar>::Real> {
         self.element
     }
 }

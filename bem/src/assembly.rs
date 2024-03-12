@@ -1,11 +1,12 @@
 pub mod batched;
 pub mod common;
-//pub mod fmm_tools;
+pub mod fmm_tools;
 use crate::assembly::batched::BatchedAssembler;
 use crate::function_space::SerialFunctionSpace;
 use bempp_traits::grid::GridType;
-use rlst_dense::{array::Array, base_array::BaseArray, data_container::VectorContainer};
-
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, types::RlstScalar,
+};
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum BoundaryOperator {
@@ -31,8 +32,13 @@ pub enum AssemblyType {
 }
 
 /// Assemble an operator into a dense matrix using batched parallelisation
-pub fn assemble<'a, TestGrid: GridType, TrialGrid: GridType>(
-    output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
+pub fn assemble<
+    'a,
+    T: RlstScalar,
+    TestGrid: GridType<T = T::Real> + Sync,
+    TrialGrid: GridType<T = T::Real> + Sync,
+>(
+    output: &mut Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
     atype: AssemblyType,
     operator: BoundaryOperator,
     pde: PDEType,
