@@ -235,14 +235,14 @@ pub enum FmmEvalType {
 ///     .unwrap();
 /// ````
 #[derive(Default)]
-pub struct KiFmmBuilderSingleNode<'builder, T, U, V>
+pub struct KiFmmBuilderSingleNode<T, U, V>
 where
     T: SourceToTargetData<V>,
     U: RlstScalar<Real = U> + Float + Default,
     V: Kernel,
 {
     pub tree: Option<SingleNodeFmmTree<U>>,
-    pub charges: Option<&'builder Charges<U>>,
+    pub charges: Option<Charges<U>>,
     pub source_to_target: Option<T>,
     pub domain: Option<Domain<U>>,
     pub kernel: Option<V>,

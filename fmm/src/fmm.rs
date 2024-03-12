@@ -172,8 +172,6 @@ where
             level_index_pointer_multipoles: Vec::default(),
             potentials: Vec::default(),
             potentials_send_pointers: Vec::default(),
-            // upward_surfaces: Vec::default(),
-            // downward_surfaces: Vec::default(),
             leaf_upward_surfaces_sources: Vec::default(),
             leaf_upward_surfaces_targets: Vec::default(),
             leaf_downward_surfaces: Vec::default(),
@@ -297,13 +295,12 @@ where
 #[cfg(test)]
 mod test {
 
-    use bempp_field::helpers::ncoeffs_kifmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::{
-        constants::{ALPHA_INNER, ROOT},
-        implementations::helpers::points_fixture,
-    };
+    use bempp_tree::constants::{ALPHA_INNER, ROOT};
+    use bempp_tree::implementations::helpers::points_fixture;
     use num::Float;
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
     use rlst_dense::array::Array;
     use rlst_dense::base_array::BaseArray;
     use rlst_dense::data_container::VectorContainer;
@@ -314,6 +311,322 @@ mod test {
     use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 
     use super::*;
+
+    fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
+        fmm: Box<
+            dyn Fmm<
+                Precision = T,
+                NodeIndex = MortonKey,
+                Kernel = Laplace3dKernel<T>,
+                Tree = SingleNodeFmmTree<T>,
+            >,
+        >,
+        eval_type: EvalType,
+        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T,
+    ) {
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
+
+        let leaf_idx = 0;
+        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let potential = fmm.potential(&leaf).unwrap()[0];
+
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
+
+        let ntargets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::zero(); ntargets * eval_size];
+
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
+        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
+
+        fmm.kernel().evaluate_st(
+            eval_type,
+            sources.data(),
+            leaf_coordinates_col_major.data(),
+            charges.data(),
+            &mut direct,
+        );
+
+        direct.iter().zip(potential).for_each(|(&d, &p)| {
+            let abs_error = num::Float::abs(d - p);
+            let rel_error = abs_error / p;
+            println!("err {:?} \nd {:?} \np {:?}", rel_error, direct, potential);
+            assert!(rel_error <= threshold)
+        });
+    }
+
+    fn test_single_node_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
+        fmm: Box<
+            dyn Fmm<
+                Precision = T,
+                NodeIndex = MortonKey,
+                Kernel = Laplace3dKernel<T>,
+                Tree = SingleNodeFmmTree<T>,
+            >,
+        >,
+        eval_type: EvalType,
+        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T,
+    ) {
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
+
+        let leaf_idx = 0;
+        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
+
+        let ntargets = leaf_targets.len() / fmm.dim();
+
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
+        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
+
+        let [nsources, nmatvec] = charges.shape();
+
+        for i in 0..nmatvec {
+            let potential_i = fmm.potential(&leaf).unwrap()[i];
+            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
+            let mut direct_i = vec![T::zero(); ntargets * eval_size];
+            fmm.kernel().evaluate_st(
+                eval_type,
+                sources.data(),
+                leaf_coordinates_col_major.data(),
+                charges_i,
+                &mut direct_i,
+            );
+
+            println!(
+                "i {:?} \n direct_i {:?}\n potential_i {:?}",
+                i, direct_i, potential_i
+            );
+            direct_i.iter().zip(potential_i).for_each(|(&d, &p)| {
+                let abs_error = num::Float::abs(d - p);
+                let rel_error = abs_error / p;
+                assert!(rel_error <= threshold)
+            })
+        }
+    }
+
+    #[test]
+    fn test_laplace_fmm_vector() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+        let threshold_pot = 1e-5;
+        let threshold_deriv = 1e-4;
+        let threshold_deriv_blas = 1e-3;
+        let singular_value_threshold = Some(1e-2);
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        // fmm with fft based field translation
+        {
+            // Evaluate potentials
+            let fmm_fft = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    bempp_traits::types::EvalType::Value,
+                    FftFieldTranslationKiFmm::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_fft.evaluate();
+            let eval_type = fmm_fft.kernel_eval_type;
+            let fmm_fft = Box::new(fmm_fft);
+            test_single_node_fmm_vector_helper(
+                fmm_fft,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_pot,
+            );
+
+            // Evaluate potentials + derivatives
+            let fmm_fft = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    bempp_traits::types::EvalType::ValueDeriv,
+                    FftFieldTranslationKiFmm::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_fft.evaluate();
+            let eval_type = fmm_fft.kernel_eval_type;
+            let fmm_fft = Box::new(fmm_fft);
+            test_single_node_fmm_vector_helper(
+                fmm_fft,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
+            );
+        }
+
+        // fmm with BLAS based field translation
+        {
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_vector_helper(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_pot,
+            );
+
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_vector_helper(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv_blas,
+            );
+        }
+    }
+
+    #[test]
+    fn test_laplace_fmm_matrix() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        // FMM parameters
+        let n_crit = Some(10);
+        let expansion_order = 6;
+        let sparse = true;
+        let threshold = 1e-5;
+        let threshold_deriv = 1e-3;
+        let singular_value_threshold = Some(1e-2);
+
+        // Charge data
+        let nvecs = 5;
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut rng = StdRng::seed_from_u64(0);
+        charges
+            .data_mut()
+            .chunks_exact_mut(nsources)
+            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
+
+        // fmm with blas based field translation
+        {
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_matrix_helper(fmm_blas, eval_type, &sources, &charges, threshold);
+
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_matrix_helper(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
+            );
+        }
+    }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
@@ -361,162 +674,6 @@ mod test {
         assert!(rel_error <= threshold);
     }
 
-    fn test_single_node_laplace_fmm<T: RlstScalar<Real = T> + Float + Default>(
-        fmm: Box<
-            dyn Fmm<
-                Precision = T,
-                NodeIndex = MortonKey,
-                Kernel = Laplace3dKernel<T>,
-                Tree = SingleNodeFmmTree<T>,
-            >,
-        >,
-        eval_type: EvalType,
-        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        threshold: T,
-    ) {
-        let eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => 4,
-        };
-
-        let leaf_idx = 0;
-        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
-        let potential = fmm.potential(&leaf).unwrap()[0];
-
-        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
-
-        let ntargets = leaf_targets.len() / fmm.dim();
-        let mut direct = vec![T::zero(); ntargets * eval_size];
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        fmm.kernel().evaluate_st(
-            eval_type,
-            sources.data(),
-            leaf_coordinates_col_major.data(),
-            charges.data(),
-            &mut direct,
-        );
-
-        direct.iter().zip(potential).for_each(|(&d, &p)| {
-            let abs_error = num::Float::abs(d - p);
-            let rel_error = abs_error / p;
-            println!("err {:?} d {:?} \np {:?}", rel_error, direct, potential);
-            assert!(rel_error <= threshold)
-        });
-    }
-
-    fn test_single_node_laplace_fmm_matrix<T: RlstScalar<Real = T> + Float + Default>(
-        fmm: Box<
-            dyn Fmm<
-                Precision = T,
-                NodeIndex = MortonKey,
-                Kernel = Laplace3dKernel<T>,
-                Tree = SingleNodeFmmTree<T>,
-            >,
-        >,
-        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        threshold: T,
-    ) {
-        let leaf_idx = 0;
-        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
-
-        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
-
-        let ntargets = leaf_targets.len() / fmm.dim();
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        let [nsources, nmatvec] = charges.shape();
-
-        for i in 0..nmatvec {
-            let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
-            let mut direct_i = vec![T::zero(); ntargets];
-            fmm.kernel().evaluate_st(
-                EvalType::Value,
-                sources.data(),
-                leaf_coordinates_col_major.data(),
-                charges_i,
-                &mut direct_i,
-            );
-
-            println!(
-                "i {:?} \n direct_i {:?}\n potential_i {:?}",
-                i, direct_i, potential_i
-            );
-            direct_i.iter().zip(potential_i).for_each(|(&d, &p)| {
-                let abs_error = num::Float::abs(d - p);
-                let rel_error = abs_error / p;
-                assert!(rel_error <= threshold)
-            });
-        }
-    }
-
-    fn test_root_multipole_laplace_single_node_matrix<T: RlstScalar<Real = T> + Float + Default>(
-        fmm: Box<
-            dyn Fmm<
-                Precision = T,
-                NodeIndex = MortonKey,
-                Kernel = Laplace3dKernel<T>,
-                Tree = SingleNodeFmmTree<T>,
-            >,
-        >,
-        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-        threshold: T,
-    ) {
-        let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.compute_surface(
-            fmm.tree().domain(),
-            fmm.expansion_order(),
-            T::from(ALPHA_INNER).unwrap(),
-        );
-        let test_point = vec![T::from(100000.).unwrap(), T::zero(), T::zero()];
-
-        let [nsources, nmatvecs] = charges.shape();
-
-        let mut expected = vec![T::zero(); nmatvecs];
-        let mut found = vec![T::zero(); nmatvecs];
-
-        let ncoeffs = ncoeffs_kifmm(fmm.expansion_order());
-
-        for eval_idx in 0..nmatvecs {
-            fmm.kernel().evaluate_st(
-                bempp_traits::types::EvalType::Value,
-                sources.data(),
-                &test_point,
-                &charges.data()[eval_idx * nsources..(eval_idx + 1) * nsources],
-                &mut expected[eval_idx..eval_idx + 1],
-            );
-        }
-
-        for eval_idx in 0..nmatvecs {
-            let multipole_i = &multipole[eval_idx * ncoeffs..(eval_idx + 1) * ncoeffs];
-            fmm.kernel().evaluate_st(
-                bempp_traits::types::EvalType::Value,
-                &upward_equivalent_surface,
-                &test_point,
-                multipole_i,
-                &mut found[eval_idx..eval_idx + 1],
-            );
-        }
-        for (&a, &b) in expected.iter().zip(found.iter()) {
-            let abs_error = num::Float::abs(b - a);
-            let rel_error = abs_error / a;
-            assert!(rel_error <= threshold);
-        }
-    }
-
     #[test]
     fn test_upward_pass_vector() {
         // Setup random sources and targets
@@ -532,9 +689,9 @@ mod test {
 
         // Charge data
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
+        let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm_fft = KiFmmBuilderSingleNode::new()
             .tree(&sources, &targets, n_crit, sparse)
@@ -571,211 +728,5 @@ mod test {
         let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
         test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
-    }
-
-    #[test]
-    fn test_fmm_vector() {
-        // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-
-        let min = None;
-        let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
-        // FMM parameters
-        let n_crit = Some(10);
-        let expansion_order = 6;
-        let sparse = true;
-        let threshold_pot = 1e-5;
-        let threshold_deriv = 1e-4;
-        let threshold_deriv_blas = 1e-3;
-        let singular_value_threshold = Some(1e-2);
-
-        // Charge data
-        let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
-
-        // fmm with fft based field translation
-        {
-            // Evaluate potentials
-            let fmm_fft = KiFmmBuilderSingleNode::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    bempp_traits::types::EvalType::Value,
-                    FftFieldTranslationKiFmm::new(),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_fft.evaluate();
-            let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
-            test_single_node_laplace_fmm(fmm_fft, eval_type, &sources, &charges, threshold_pot);
-
-            // Evaluate potentials + derivatives
-            let fmm_fft = KiFmmBuilderSingleNode::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    bempp_traits::types::EvalType::ValueDeriv,
-                    FftFieldTranslationKiFmm::new(),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_fft.evaluate();
-            let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
-            test_single_node_laplace_fmm(fmm_fft, eval_type, &sources, &charges, threshold_deriv);
-        }
-
-        // fmm with BLAS based field translation
-        {
-            // Evaluate potentials
-            let fmm_blas = KiFmmBuilderSingleNode::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    bempp_traits::types::EvalType::Value,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate();
-            let eval_type = fmm_blas.kernel_eval_type;
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm(fmm_blas, eval_type, &sources, &charges, threshold_pot);
-
-            // Evaluate potentials + derivatives
-            let fmm_blas = KiFmmBuilderSingleNode::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    bempp_traits::types::EvalType::ValueDeriv,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate();
-            let eval_type = fmm_blas.kernel_eval_type;
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv_blas,
-            );
-        }
-    }
-
-    #[test]
-    fn test_fmm_matrix() {
-        // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-
-        let min = None;
-        let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
-        // FMM parameters
-        let n_crit = Some(10);
-        let expansion_order = 6;
-        let sparse = true;
-        let threshold = 1e-5;
-        let singular_value_threshold = Some(1e-2);
-
-        // Charge data
-        let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-
-        charges
-            .data_mut()
-            .chunks_exact_mut(nsources)
-            .enumerate()
-            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
-
-        // fmm with blas based field translation
-        {
-            let fmm_blas = KiFmmBuilderSingleNode::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    bempp_traits::types::EvalType::Value,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate();
-
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_matrix(fmm_blas, &sources, &charges, threshold);
-        }
-    }
-
-    #[test]
-    fn test_upward_pass_matrix() {
-        // Setup random sources and targets
-        let npoints = 10000;
-        let sources = points_fixture::<f64>(npoints, None, None, Some(0));
-        let targets = points_fixture::<f64>(npoints, None, None, Some(1));
-
-        // FMM parameters
-        let n_crit = Some(100);
-        let expansion_order = 6;
-        let sparse = false;
-        let threshold = 1e-5;
-        let svd_threshold = Some(1e-5);
-
-        // Charge data
-        let nvecs = 3;
-        let mut charges = rlst_dynamic_array2!(f64, [npoints, nvecs]);
-
-        charges
-            .data_mut()
-            .chunks_exact_mut(npoints)
-            .enumerate()
-            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (i + 1) as f64));
-
-        let fmm_blas = KiFmmBuilderSingleNode::new()
-            .tree(&sources, &targets, n_crit, sparse)
-            .unwrap()
-            .parameters(
-                &charges,
-                expansion_order,
-                Laplace3dKernel::new(),
-                bempp_traits::types::EvalType::Value,
-                BlasFieldTranslationKiFmm::new(svd_threshold),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm_blas.evaluate();
-
-        let fmm_blas = Box::new(fmm_blas);
-        test_root_multipole_laplace_single_node_matrix(fmm_blas, &sources, &charges, threshold);
     }
 }

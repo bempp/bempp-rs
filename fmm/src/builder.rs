@@ -29,7 +29,7 @@ use crate::{
     types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode, SendPtrMut},
 };
 
-impl<'builder, T, U, V> KiFmmBuilderSingleNode<'builder, T, U, V>
+impl<T, U, V> KiFmmBuilderSingleNode<T, U, V>
 where
     T: SourceToTargetData<V, Domain = Domain<U>> + Default,
     U: RlstScalar<Real = U> + Float + Default,
@@ -100,7 +100,7 @@ where
 
     pub fn parameters(
         mut self,
-        charges: &'builder Charges<U>,
+        charges: &Charges<U>,
         expansion_order: usize,
         kernel: V,
         eval_type: EvalType,
@@ -110,9 +110,28 @@ where
             Err("Must build tree before specifying FMM parameters".to_string())
         } else {
             // Set FMM parameters
-            self.charges = Some(charges);
+            let global_idxs = self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree()
+                .all_global_indices()
+                .unwrap();
 
-            let [_ncharges, nmatvec] = charges.shape();
+            let [ncharges, nmatvec] = charges.shape();
+
+            let mut reordered_charges = rlst_dynamic_array2!(U, [ncharges, nmatvec]);
+
+            for eval_idx in 0..nmatvec {
+                let eval_displacement = eval_idx * ncharges;
+                for (new_idx, old_idx) in global_idxs.iter().enumerate() {
+                    reordered_charges.data_mut()[new_idx + eval_displacement] =
+                        charges.data()[old_idx + eval_displacement];
+                }
+            }
+
+            self.charges = Some(reordered_charges);
+
             if nmatvec > 1 {
                 self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvec))
             } else {
@@ -166,7 +185,7 @@ where
             result.set_source_and_target_operator_data();
 
             // Compute metadata and allocate storage buffers for results
-            result.set_metadata(self.kernel_eval_type.unwrap(), self.charges.unwrap());
+            result.set_metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
 
             Ok(result)
         }
