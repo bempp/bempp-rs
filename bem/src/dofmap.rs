@@ -1,6 +1,6 @@
 use bempp_traits::bem::DofMap;
-use bempp_traits::grid::{GridType, CellType, TopologyType};
 use bempp_traits::element::FiniteElement;
+use bempp_traits::grid::{CellType, GridType, TopologyType};
 
 pub struct SerialDofMap {
     entity_dofs: [Vec<Vec<usize>>; 4],
@@ -27,7 +27,7 @@ impl SerialDofMap {
         for d in 0..tdim + 1 {
             entity_dofs[d] = vec![vec![]; entity_counts[d]];
         }
-        let mut cell_dofs = vec![vec![0; element.dim()];entity_counts[tdim]];
+        let mut cell_dofs = vec![vec![0; element.dim()]; entity_counts[tdim]];
 
         for cell in grid.iter_all_cells() {
             let topology = cell.topology();
@@ -106,7 +106,10 @@ impl DofMap for SerialDofMap {
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         if cell < self.cell_dofs.len() {
             Some(&self.cell_dofs[cell])
-        } else { None }}
+        } else {
+            None
+        }
+    }
     fn is_serial(&self) -> bool {
         true
     }
@@ -117,8 +120,8 @@ mod test {
     use crate::dofmap::*;
     use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
-    use bempp_traits::types::ReferenceCellType;
     use bempp_traits::element::Continuity;
+    use bempp_traits::types::ReferenceCellType;
 
     #[test]
     fn test_dofmap_lagrange0() {
@@ -131,10 +134,7 @@ mod test {
         );
         let dofmap = SerialDofMap::new(&grid, &element);
         assert_eq!(dofmap.local_size(), dofmap.global_size());
-        assert_eq!(
-            dofmap.local_size(),
-            grid.number_of_cells()
-        );
+        assert_eq!(dofmap.local_size(), grid.number_of_cells());
     }
 
     #[test]

@@ -2,6 +2,7 @@
 
 use super::GridType;
 use crate::types::ReferenceCellType;
+use std::hash::Hash;
 
 pub trait TopologyType {
     //! Cell topology
@@ -9,7 +10,7 @@ pub trait TopologyType {
     /// The type of the grid that the cell is part of
     type Grid: GridType;
     /// The type used to index cells
-    type IndexType: std::fmt::Debug + Eq + Copy;
+    type IndexType: std::fmt::Debug + Eq + Copy + Hash;
     /// The type of the iterator over vertices
     type VertexIndexIter<'a>: std::iter::Iterator<Item = Self::IndexType>
     where

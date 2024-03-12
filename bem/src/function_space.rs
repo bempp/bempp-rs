@@ -1,9 +1,11 @@
+//! Funciton space
+
 use crate::dofmap::SerialDofMap;
 use bempp_element::element::CiarletElement;
-use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::bem::FunctionSpace;
-use bempp_traits::grid::GridType;
 use bempp_traits::element::FiniteElement;
+use bempp_traits::grid::{CellType, GridType, TopologyType};
+use std::collections::HashMap;
 
 pub struct SerialFunctionSpace<'a, GridImpl: GridType> {
     grid: &'a GridImpl,
@@ -27,40 +29,51 @@ impl<'a, GridImpl: GridType> SerialFunctionSpace<'a, GridImpl> {
         while self.element.entity_dofs(edim, 0).unwrap().is_empty() {
             edim += 1;
         }
-        let cell_entities = self
-            .grid
-            .topology()
-            .connectivity(self.grid.topology().dim(), edim);
-        for i in 0..self
-            .grid
-            .topology()
-            .entity_count(self.grid.topology().dim())
-        {
-            let i_t = self.grid.topology().index_map()[i];
-            let vs = cell_entities.row(i_t).unwrap();
-            let mut c = 0;
-            while c < colouring.len() {
-                let mut found = false;
-                for cell in &colouring[c] {
-                    let cell_vs = cell_entities.row(*cell).unwrap();
-                    for v in vs {
-                        if cell_vs.contains(v) {
-                            found = true;
-                            break;
+
+        let mut entity_colours: HashMap<GridImpl::IndexType, Vec<usize>> = HashMap::new();
+
+        for cell in self.grid.iter_all_cells() {
+            let indices = if edim == 0 {
+                cell.topology().vertex_indices().collect::<Vec<_>>()
+            } else if edim == 1 {
+                cell.topology().edge_indices().collect::<Vec<_>>()
+            } else if edim == 2 {
+                cell.topology().face_indices().collect::<Vec<_>>()
+            } else {
+                panic!("");
+            };
+
+            let c = {
+                let mut c = 0;
+                while c < colouring.len() {
+                    let mut found = false;
+                    for v in &indices {
+                        if let Some(vc) = entity_colours.get(v) {
+                            if vc.contains(&c) {
+                                found = true;
+                                break;
+                            }
                         }
                     }
-                    if found {
+
+                    if !found {
                         break;
                     }
+                    c += 1;
                 }
-                if !found {
-                    colouring[c].push(i);
-                    break;
-                }
-                c += 1;
-            }
+                c
+            };
             if c == colouring.len() {
-                colouring.push(vec![i]);
+                colouring.push(vec![cell.index()]);
+            } else {
+                colouring[c].push(cell.index());
+            }
+            for v in &indices {
+                if let Some(vc) = entity_colours.get_mut(v) {
+                    vc.push(c);
+                } else {
+                    entity_colours.insert(*v, vec![c]);
+                }
             }
         }
         colouring
@@ -88,12 +101,13 @@ mod test {
     use crate::function_space::*;
     use bempp_element::element::{create_element, ElementFamily};
     use bempp_grid::shapes::regular_sphere;
-    use bempp_traits::types::ReferenceCellType;
     use bempp_traits::element::Continuity;
+    use bempp_traits::grid::{CellType, TopologyType};
+    use bempp_traits::types::ReferenceCellType;
 
     #[test]
     fn test_colouring_p1() {
-        let grid = regular_sphere(2);
+        let grid = regular_sphere::<f64>(2);
         let element = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -102,12 +116,12 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
-        let c20 = grid.topology().connectivity(2, 0);
+        let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
         for i in &colouring {
             n += i.len()
         }
-        assert_eq!(n, grid.topology().entity_count(2));
+        assert_eq!(n, grid.number_of_cells());
         for (i, ci) in colouring.iter().enumerate() {
             for (j, cj) in colouring.iter().enumerate() {
                 if i != j {
@@ -123,8 +137,8 @@ mod test {
             for cell0 in &ci {
                 for cell1 in &ci {
                     if cell0 != cell1 {
-                        for v0 in c20.row(*cell0).unwrap() {
-                            for v1 in c20.row(*cell1).unwrap() {
+                        for v0 in cells[*cell0].topology().vertex_indices() {
+                            for v1 in cells[*cell1].topology().vertex_indices() {
                                 assert!(v0 != v1);
                             }
                         }
@@ -136,7 +150,7 @@ mod test {
 
     #[test]
     fn test_colouring_dp0() {
-        let grid = regular_sphere(2);
+        let grid = regular_sphere::<f64>(2);
         let element = create_element(
             ElementFamily::Lagrange,
             ReferenceCellType::Triangle,
@@ -149,7 +163,7 @@ mod test {
         for i in &colouring {
             n += i.len()
         }
-        assert_eq!(n, grid.topology().entity_count(2));
+        assert_eq!(n, grid.number_of_cells());
         for (i, ci) in colouring.iter().enumerate() {
             for (j, cj) in colouring.iter().enumerate() {
                 if i != j {
@@ -166,7 +180,7 @@ mod test {
 
     #[test]
     fn test_colouring_rt1() {
-        let grid = regular_sphere(2);
+        let grid = regular_sphere::<f64>(2);
         let element = create_element(
             ElementFamily::RaviartThomas,
             ReferenceCellType::Triangle,
@@ -175,12 +189,12 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
-        let c21 = grid.topology().connectivity(2, 1);
+        let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
         for i in &colouring {
             n += i.len()
         }
-        assert_eq!(n, grid.topology().entity_count(2));
+        assert_eq!(n, grid.number_of_cells());
         for (i, ci) in colouring.iter().enumerate() {
             for (j, cj) in colouring.iter().enumerate() {
                 if i != j {
@@ -196,8 +210,8 @@ mod test {
             for cell0 in &ci {
                 for cell1 in &ci {
                     if cell0 != cell1 {
-                        for e0 in c21.row(*cell0).unwrap() {
-                            for e1 in c21.row(*cell1).unwrap() {
+                        for e0 in cells[*cell0].topology().edge_indices() {
+                            for e1 in cells[*cell1].topology().edge_indices() {
                                 assert!(e0 != e1);
                             }
                         }

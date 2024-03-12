@@ -5,6 +5,7 @@ use crate::types::cell_iterator::CellIterator;
 use crate::types::point_iterator::PointIterator;
 use crate::types::CellLocalIndexPair;
 use rlst_dense::types::RlstScalar;
+use std::hash::Hash;
 
 use super::ReferenceMapType;
 
@@ -14,13 +15,13 @@ pub trait GridType: std::marker::Sized {
     /// The floating point type used for coordinates
     type T: RlstScalar;
     /// The type used to index cells
-    type IndexType: std::fmt::Debug + Eq + Copy;
+    type IndexType: std::fmt::Debug + Eq + Copy + Hash;
     /// The type used for a point
     type Point<'a>: PointType
     where
         Self: 'a;
     /// The type used for a cell
-    type Cell<'a>: CellType
+    type Cell<'a>: CellType<Grid = Self>
     where
         Self: 'a;
     /// The type of a reference map

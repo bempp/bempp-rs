@@ -4,6 +4,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
 use rlst_dense::types::RlstScalar;
+use std::hash::Hash;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ownership {
@@ -15,7 +16,7 @@ pub enum Ownership {
 ///
 /// This provides information about which mesh entities are connected to other mesh entities
 pub trait Topology {
-    type IndexType: std::fmt::Debug + Eq + Copy;
+    type IndexType: std::fmt::Debug + Eq + Copy + Hash;
 
     /// The dimension of the topology (eg a triangle's dimension is 2, tetrahedron's dimension is 3)
     fn dim(&self) -> usize;

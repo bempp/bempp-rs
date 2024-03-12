@@ -115,13 +115,6 @@ where
             let normal_length = normals[cell_i].view().norm_2();
             normals[cell_i].scale_in_place(T::one() / normal_length);
 
-            println!("== {cell_i} ==");
-            println!("{:?}", v0.data());
-            println!("{:?}", v1.data());
-            println!("{:?}", v2.data());
-            println!("{normal_length}");
-            println!();
-
             volumes.push(normal_length / T::from(2.0).unwrap());
             diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
         }

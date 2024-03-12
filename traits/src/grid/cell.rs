@@ -7,7 +7,7 @@ pub trait CellType {
     /// The type of the grid that the cell is part of
     type Grid: GridType;
     /// The type of the cell topology
-    type Topology<'a>: TopologyType
+    type Topology<'a>: TopologyType<IndexType = <Self::Grid as GridType>::IndexType>
     where
         Self: 'a;
     /// The type of the cell geometry
