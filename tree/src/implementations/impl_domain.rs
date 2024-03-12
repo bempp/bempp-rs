@@ -53,6 +53,10 @@ impl<T: Float + Default + Debug> Domain<T> {
         Domain { origin, diameter }
     }
 
+    /// Find the union of two domains such that the returned domain is a superset and contains both sets of corresponding points
+    ///
+    /// # Arguments
+    /// * `other` - Other domain with which to find union
     pub fn union(&self, other: &Self) -> Self {
         // Find minimum origin
         let min_x = self.origin[0].min(other.origin[0]);
