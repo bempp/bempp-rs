@@ -5,7 +5,7 @@ use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::FiniteElement;
-use bempp_traits::grid::{Geometry, Grid, Topology};
+use bempp_traits::grid::{GridType};
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
@@ -53,9 +53,9 @@ pub fn get_all_quadrature_points<const NPTS: usize>(
     all_points
 }
 
-pub fn basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize>(
+pub fn basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize, Grid: GridType>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    space: &SerialFunctionSpace,
+    space: &SerialFunctionSpace<'_, Grid>,
 ) {
     let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE>(output.shape(), space);
     let data = sparse_matrix.data;
@@ -66,8 +66,8 @@ pub fn basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize>
     }
 }
 
-pub fn basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
-    space: &SerialFunctionSpace,
+pub fn basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize, Grid: GridType>(
+    space: &SerialFunctionSpace<'_, Grid>,
 ) -> CsrMatrix<f64> {
     let grid = space.grid();
     let ncells = grid.topology().entity_count(grid.topology().dim());
@@ -83,9 +83,9 @@ pub fn basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
     .unwrap()
 }
 
-pub fn transpose_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize>(
+pub fn transpose_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSIZE: usize, Grid: GridType>(
     output: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    space: &SerialFunctionSpace,
+    space: &SerialFunctionSpace<'_, Grid>,
 ) {
     let shape = [output.shape()[1], output.shape()[0]];
     let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE>(shape, space);
@@ -97,8 +97,8 @@ pub fn transpose_basis_to_quadrature_into_dense<const NPTS: usize, const BLOCKSI
     }
 }
 
-pub fn transpose_basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize>(
-    space: &SerialFunctionSpace,
+pub fn transpose_basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE: usize, Grid: GridType>(
+    space: &SerialFunctionSpace<'_, Grid>,
 ) -> CsrMatrix<f64> {
     let grid = space.grid();
     let ncells = grid.topology().entity_count(grid.topology().dim());
@@ -114,9 +114,9 @@ pub fn transpose_basis_to_quadrature_into_csr<const NPTS: usize, const BLOCKSIZE
     .unwrap()
 }
 
-fn basis_to_quadrature<const NPTS: usize, const BLOCKSIZE: usize>(
+fn basis_to_quadrature<const NPTS: usize, const BLOCKSIZE: usize, Grid: GridType>(
     shape: [usize; 2],
-    space: &SerialFunctionSpace,
+    space: &SerialFunctionSpace<'_, Grid>,
 ) -> SparseMatrixData<f64> {
     if !space.is_serial() {
         panic!("Dense assembly can only be used for function spaces stored in serial");

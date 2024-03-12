@@ -25,7 +25,7 @@ pub trait GridType: std::marker::Sized {
     where
         Self: 'a;
     /// The type of a reference map
-    type ReferenceMap<'a>: ReferenceMapType
+    type ReferenceMap<'a>: ReferenceMapType<Grid=Self>
     where
         Self: 'a;
 

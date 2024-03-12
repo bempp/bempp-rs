@@ -81,34 +81,58 @@ pub fn compute_normal_from_jacobian23<T: Float + RlstScalar<Real = T>>(
     }
 }
 
-/// Compute the determinant of a matrix
-pub fn compute_det<T: RlstScalar<Real = T>>(jacobian: &[T], tdim: usize, gdim: usize) -> T {
+/// Compute a normal from a Jacobian
+pub fn compute_normal_from_jacobian<T: Float + RlstScalar<Real = T>>(
+    jacobian: &[T],
+    normal: &mut [T], tdim: usize, gdim: usize
+) {
     assert_eq!(jacobian.len(), tdim * gdim);
+    assert_eq!(normal.len(), gdim);
+
     match tdim {
-        1 => match gdim {
-            1 => T::abs(jacobian[0]),
-            2 => T::sqrt(jacobian.iter().map(|x| x.powi(2)).sum()),
-            3 => T::sqrt(jacobian.iter().map(|x| x.powi(2)).sum()),
+        2 => match gdim {
+            3 => compute_normal_from_jacobian23(jacobian, normal),
             _ => {
                 unimplemented!("compute_det() not implemented for topological dimension {tdim} and geometric dimension: {gdim}");
             }
         },
-        2 => match gdim {
-            2 => T::abs(jacobian[0] * jacobian[3] - jacobian[1] * jacobian[2]),
-            3 => T::sqrt(
+        _ => {
+            unimplemented!("compute_det() not implemented for topological dimension {tdim}");
+        }
+    }
+
+}
+
+/// Compute the determinant of a 1 by 1 matrix
+pub fn compute_det11<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
+    T::abs(jacobian[0])
+}
+/// Compute the determinant of a 1 by 2 matrix
+pub fn compute_det12<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
+    T::sqrt(jacobian.iter().map(|x| x.powi(2)).sum())
+}
+/// Compute the determinant of a 1 by 3 matrix
+pub fn compute_det13<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
+    T::sqrt(jacobian.iter().map(|x| x.powi(2)).sum())
+}
+/// Compute the determinant of a 2 by 2 matrix
+pub fn compute_det22<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
+    T::abs(jacobian[0] * jacobian[3] - jacobian[1] * jacobian[2])
+}
+/// Compute the determinant of a 2 by 3 matrix
+pub fn compute_det23<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
+    T::sqrt(
                 [(1, 2), (2, 0), (0, 1)]
                     .iter()
                     .map(|(j, k)| {
                         (jacobian[*j] * jacobian[3 + *k] - jacobian[*k] * jacobian[3 + *j]).powi(2)
                     })
                     .sum(),
-            ),
-            _ => {
-                unimplemented!("compute_det() not implemented for topological dimension {tdim} and geometric dimension: {gdim}");
-            }
-        },
-        3 => match gdim {
-            3 => T::abs(
+            )
+}
+/// Compute the determinant of a 3 by 3 matrix
+pub fn compute_det33<T: RlstScalar<Real = T>>(jacobian: &[T]) -> T {
+T::abs(
                 [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
                     .iter()
                     .map(|(i, j, k)| {
@@ -117,7 +141,30 @@ pub fn compute_det<T: RlstScalar<Real = T>>(jacobian: &[T], tdim: usize, gdim: u
                                 - jacobian[3 + *k] * jacobian[6 + *j])
                     })
                     .sum(),
-            ),
+            )
+}
+
+/// Compute the determinant of a matrix
+pub fn compute_det<T: RlstScalar<Real = T>>(jacobian: &[T], tdim: usize, gdim: usize) -> T {
+    assert_eq!(jacobian.len(), tdim * gdim);
+    match tdim {
+        1 => match gdim {
+            1 => compute_det11(jacobian),
+            2 => compute_det12(jacobian),
+            3 => compute_det13(jacobian),
+            _ => {
+                unimplemented!("compute_det() not implemented for topological dimension {tdim} and geometric dimension: {gdim}");
+            }
+        },
+        2 => match gdim {
+            2 => compute_det22(jacobian),
+            3 => compute_det23(jacobian),
+            _ => {
+                unimplemented!("compute_det() not implemented for topological dimension {tdim} and geometric dimension: {gdim}");
+            }
+        },
+        3 => match gdim {
+            3 => compute_det33(jacobian),
             _ => {
                 unimplemented!("compute_det() not implemented for topological dimension {tdim} and geometric dimension: {gdim}");
             }
