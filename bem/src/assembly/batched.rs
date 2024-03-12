@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
@@ -27,6 +26,7 @@ use rlst_dense::{
     types::RlstScalar,
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
+use std::collections::HashMap;
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
 
@@ -714,14 +714,17 @@ pub trait BatchedAssembler: Sync {
                             if test_v == trial_v {
                                 if test_v < vertex {
                                     smallest = false;
+                                    break;
                                 }
                                 pairs.push((test_i, trial_i));
                             }
                         }
+                        if !smallest {
+                            break;
+                        }
                     }
                     if smallest {
-                        cell_pairs[pair_indices[&pairs]]
-                            .push((*test_cell, *trial_cell))
+                        cell_pairs[pair_indices[&pairs]].push((*test_cell, *trial_cell));
                     }
                 }
             }
@@ -843,30 +846,34 @@ pub trait BatchedAssembler: Sync {
             .tabulate(&qpoints_test, 0, &mut trial_table);
 
         let mut cell_pairs: Vec<(usize, usize)> = vec![];
-        // TODO: iterator over vertices, then cells adjacent to vertices
-        for test_cell in 0..grid.number_of_cells() {
-            let test_vertices = grid
-                .cell_from_index(test_cell)
-                .topology()
-                .vertex_indices()
-                .collect::<Vec<_>>();
-            for trial_cell in 0..grid.number_of_cells() {
-                let trial_vertices = grid
-                    .cell_from_index(trial_cell)
-                    .topology()
-                    .vertex_indices()
-                    .collect::<Vec<_>>();
 
-                let mut pairs = vec![];
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                    for (test_i, test_v) in test_vertices.iter().enumerate() {
-                        if test_v == trial_v {
-                            pairs.push((test_i, trial_i));
+        for vertex in 0..grid.number_of_vertices() {
+            let cells = grid
+                .vertex_to_cells(vertex)
+                .iter()
+                .map(|c| c.cell)
+                .collect::<Vec<_>>();
+            for test_cell in &cells {
+                for trial_cell in &cells {
+                    let mut smallest = true;
+                    for trial_v in grid
+                        .cell_from_index(*trial_cell)
+                        .topology()
+                        .vertex_indices()
+                    {
+                        for test_v in grid.cell_from_index(*test_cell).topology().vertex_indices() {
+                            if test_v == trial_v && test_v < vertex {
+                                smallest = false;
+                                break;
+                            }
+                        }
+                        if !smallest {
+                            break;
                         }
                     }
-                }
-                if !pairs.is_empty() {
-                    cell_pairs.push((test_cell, trial_cell))
+                    if smallest {
+                        cell_pairs.push((*test_cell, *trial_cell));
+                    }
                 }
             }
         }
