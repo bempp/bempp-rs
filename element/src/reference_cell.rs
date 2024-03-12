@@ -263,7 +263,7 @@ pub fn entity_counts(cell: ReferenceCellType) -> Vec<usize> {
 
 /// The connectivity of the reference cell
 ///
-/// The indices of the result are [i][j][k][l]
+/// The indices of the result are \[i\]\[j\]\[k\]\[l\]
 pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
     match cell {
         ReferenceCellType::Point => vec![vec![vec![vec![0]]]],
