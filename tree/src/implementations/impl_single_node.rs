@@ -642,9 +642,7 @@ mod test {
 
     use rlst_dense::traits::RawAccess;
 
-    use crate::implementations::helpers::{
-        points_fixture, points_fixture_col,
-    };
+    use crate::implementations::helpers::{points_fixture, points_fixture_col};
 
     use super::*;
 
@@ -655,8 +653,7 @@ mod test {
 
         // Test uniformly distributed data
         let points = points_fixture(npoints, Some(-1.0), Some(1.0), None);
-        let tree =
-            SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -673,8 +670,7 @@ mod test {
 
         // Test a column distribution of data
         let points = points_fixture_col::<f64>(npoints);
-        let tree =
-            SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -701,8 +697,6 @@ mod test {
         let expected = 2u64.pow(depth.try_into().unwrap()) as usize; // Number of octants at encoding level that should be filled
         assert_eq!(unique_leaves.len(), expected);
     }
-
-
 
     pub fn test_no_overlaps_helper(nodes: &[MortonKey]) {
         let key_set: HashSet<MortonKey> = nodes.iter().cloned().collect();
@@ -862,8 +856,7 @@ mod test {
         let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None, None);
         let depth = 3;
-        let tree =
-            SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None);
 
         let keys = tree.all_keys().unwrap();
 
@@ -899,8 +892,7 @@ mod test {
         let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None, None);
         let depth = 3;
-        let tree =
-            SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None);
 
         let keys = tree.keys(3).unwrap();
 
