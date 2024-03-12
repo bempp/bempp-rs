@@ -43,3 +43,10 @@ rayon = "1.7"
 [[example]]
 name = "single_node_laplace"
 path = "examples/single_node_laplace.rs"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"]}
+
+[[bench]]
+name = "single_node"
+harness = false
