@@ -1,11 +1,10 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use bempp_field::{
-    constants::{NHALO, NSIBLINGS},
-    fft::Fft,
-    types::FftFieldTranslationKiFmm,
-};
+use bempp_field::{fft::Fft, types::FftFieldTranslationKiFmm};
 use bempp_traits::tree::FmmTree;
-use bempp_tree::types::single_node::SingleNodeTree;
+use bempp_tree::{
+    constants::{NHALO, NSIBLINGS},
+    types::{morton::MortonKey, single_node::SingleNodeTree},
+};
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
@@ -15,13 +14,10 @@ use rlst_dense::{array::Array, types::RlstScalar};
 use std::{collections::HashSet, sync::RwLock};
 
 use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
-use bempp_tree::types::morton::MortonKey;
 
-use crate::fmm::KiFmm;
 use crate::{
-    builder::FmmEvalType,
     helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
-    types::SendPtrMut,
+    types::{FmmEvalType, KiFmm, SendPtrMut},
 };
 use rlst_dense::{
     array::empty_array,
@@ -189,7 +185,10 @@ where
                 let scale = Complex::from(m2l_scale::<U>(level) * homogenous_kernel_scale(level));
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
-                let kernel_data_ft = &self.source_to_target_data.operator_data.kernel_data_f;
+                let kernel_data_ft = &self
+                    .source_to_target_translation_data
+                    .operator_data
+                    .kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
                 let mut check_potential_hat = vec![U::zero(); fft_size_real * ntargets * 2];
@@ -218,7 +217,7 @@ where
                                     &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
                                 let signal = &mut signal_chunk[i * fft_size..(i + 1) * fft_size];
                                 for (surf_idx, &conv_idx) in self
-                                    .source_to_target_data
+                                    .source_to_target_translation_data
                                     .surf_to_conv_map
                                     .iter()
                                     .enumerate()
@@ -375,7 +374,7 @@ where
 
                             for i in 0..NSIBLINGS {
                                 for (surf_idx, &conv_idx) in self
-                                    .source_to_target_data
+                                    .source_to_target_translation_data
                                     .conv_to_surf_map
                                     .iter()
                                     .enumerate()

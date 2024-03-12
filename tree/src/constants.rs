@@ -235,3 +235,24 @@ pub const BYTE_DISPLACEMENT: KeyType = 8;
 
 /// Mask encapsulating a bit.
 pub const NINE_BIT_MASK: KeyType = 0x1FF;
+
+/// Ratio of side length of inner surface with respect to surface of a box.
+pub const ALPHA_INNER: f64 = 1.05;
+
+/// Ratio of side length of outer surface with respect to surface of a box.
+pub const ALPHA_OUTER: f64 = 2.95;
+
+/// Number of siblings for each node in octree
+pub const NSIBLINGS: usize = 8;
+
+/// Number of siblings squared for each node in octree.
+pub const NSIBLINGS_SQUARED: usize = 64;
+
+/// Number of corners for each box.
+pub const NCORNERS: usize = 8;
+
+/// Number of unique transfer vectors for homogenous, scale invariant, kernels.
+pub const NTRANSFER_VECTORS_KIFMM: usize = 316;
+
+/// Maximum number of boxes in a 1 box deep halo around a given box in 3D.
+pub const NHALO: usize = 26;

@@ -1,7 +1,6 @@
 //! Multipole field translations
 use std::collections::HashSet;
 
-use bempp_field::constants::NSIBLINGS;
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
@@ -13,13 +12,12 @@ use bempp_traits::{
     tree::{FmmTree, Tree},
     types::EvalType,
 };
-use bempp_tree::types::single_node::SingleNodeTree;
+use bempp_tree::{constants::NSIBLINGS, types::single_node::SingleNodeTree};
 
 use crate::{
-    builder::FmmEvalType,
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
-    fmm::KiFmm,
     helpers::find_chunk_size,
+    types::{FmmEvalType, KiFmm},
 };
 use rlst_dense::{
     array::empty_array,
@@ -96,7 +94,7 @@ where
                     .par_chunks_exact(self.ncoeffs * chunk_size)
                     .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
                     .zip(
-                        self.source_scales
+                        self.leaf_scales_sources
                             .par_chunks_exact(self.ncoeffs * chunk_size),
                     )
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
@@ -182,7 +180,7 @@ where
                     .data()
                     .par_chunks_exact(self.ncoeffs * nmatvecs)
                     .zip(self.leaf_multipoles.into_par_iter())
-                    .zip(self.source_scales.par_chunks_exact(self.ncoeffs))
+                    .zip(self.leaf_scales_sources.par_chunks_exact(self.ncoeffs))
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
                             rlst_array_from_slice2!(W, check_potential, [self.ncoeffs, nmatvecs]);
@@ -333,7 +331,7 @@ where
                             );
 
                             let result_i = empty_array::<W, 2>().simple_mult_into_resize(
-                                self.source_data_vec[i].view(),
+                                self.source_translation_data_vec[i].view(),
                                 child_multipoles_i,
                             );
 

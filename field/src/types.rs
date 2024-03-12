@@ -1,4 +1,5 @@
-//! Types for storing field translation data.
+//! Types for storing field translation metadata.
+
 use num::{Complex, Float};
 use rlst_dense::{
     array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,

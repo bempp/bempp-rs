@@ -1,29 +1,16 @@
 //! Functionality for handling 3D arrays
 //! # Warning
 //! This module awaits deprecation with the addition of N-Dimensional tensor handling in rlst.
-use itertools::Itertools;
 use num::traits::Num;
 
-use rlst_dense::types::RlstScalar;
 use rlst_dense::{
     array::Array,
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_dynamic_array3,
     traits::{RandomAccessByRef, RandomAccessMut, Shape},
+    types::RlstScalar,
 };
-
-/// Return indices that sort a vec.
-///
-/// # Arguments
-/// * `arr` - An array to be sorted.
-pub fn argsort<T: Ord>(arr: &[T]) -> Vec<usize> {
-    arr.iter()
-        .enumerate()
-        .sorted_by(|a, b| a.1.cmp(b.1))
-        .map(|(idx, _)| idx)
-        .collect()
-}
 
 /// Pad an Array3D from a given `pad_index` with an amount of zeros specified by `pad_size` to the right of each axis.
 ///
@@ -91,23 +78,6 @@ mod test {
 
     use super::*;
     use approx::*;
-
-    #[test]
-    fn test_argsort() {
-        // Test unique elements
-        let arr = vec![5, 2, 1, 3, 6];
-        let expected: Vec<usize> = vec![2, 1, 3, 0, 4];
-
-        let result = argsort(&arr);
-        assert_eq!(expected, result);
-
-        // Test duplicate elements
-        let arr = vec![5, 1, 2, 3, 5];
-        let expected: Vec<usize> = vec![1, 2, 3, 0, 4];
-
-        let result = argsort(&arr);
-        assert_eq!(expected, result);
-    }
 
     #[test]
     fn test_flip3() {

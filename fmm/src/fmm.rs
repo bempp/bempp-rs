@@ -1,6 +1,4 @@
 //! Implementation of FmmData and Fmm traits.
-use std::collections::HashMap;
-
 use num::Float;
 use rlst_dense::{rlst_dynamic_array2, types::RlstScalar};
 
@@ -14,106 +12,7 @@ use bempp_traits::{
 
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::{
-    builder::FmmEvalType,
-    types::{C2EType, SendPtrMut},
-};
-
-/// Combines the old datatree + Fmm structs into a single storage of metadata
-pub struct KiFmm<
-    T: FmmTree<Tree = SingleNodeTree<W>>,
-    U: SourceToTargetData<V>,
-    V: Kernel,
-    W: RlstScalar<Real = W> + Float + Default,
-> {
-    pub tree: T,
-    pub source_to_target_data: U,
-    pub kernel: V,
-    pub expansion_order: usize,
-    pub ncoeffs: usize,
-    pub fmm_eval_type: FmmEvalType,
-    pub kernel_eval_type: EvalType,
-    pub source_data_vec: Vec<C2EType<W>>,
-    pub eval_size: usize,
-    pub charge_index_pointer_sources: Vec<(usize, usize)>,
-    pub charge_index_pointer_targets: Vec<(usize, usize)>,
-    pub dim: usize,
-    pub leaf_upward_surfaces_sources: Vec<W>,
-    pub leaf_upward_surfaces_targets: Vec<W>,
-
-    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
-    /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_1: C2EType<W>,
-
-    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
-    /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_2: C2EType<W>,
-
-    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
-    /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_1: C2EType<W>,
-
-    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
-    /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_2: C2EType<W>,
-
-    /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
-    pub source_data: C2EType<W>,
-
-    /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_data: Vec<C2EType<W>>,
-
-    /// The multipole expansion data at each box.
-    pub multipoles: Vec<W>,
-
-    /// Multipole expansions at leaf level
-    pub leaf_multipoles: Vec<Vec<SendPtrMut<W>>>,
-
-    /// Multipole expansions at each level
-    pub level_multipoles: Vec<Vec<Vec<SendPtrMut<W>>>>,
-
-    /// The local expansion at each box
-    pub locals: Vec<W>,
-
-    /// Local expansions at the leaf level
-    pub leaf_locals: Vec<Vec<SendPtrMut<W>>>,
-
-    /// The local expansion data at each level.
-    pub level_locals: Vec<Vec<Vec<SendPtrMut<W>>>>,
-
-    /// index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_locals: Vec<HashMap<MortonKey, usize>>,
-
-    /// index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey, usize>>,
-
-    /// The evaluated potentials at each leaf box.
-    pub potentials: Vec<W>,
-
-    /// The evaluated potentials at each leaf box.
-    pub potentials_send_pointers: Vec<SendPtrMut<W>>,
-
-    /// All upward surfaces
-    pub upward_surfaces: Vec<W>,
-
-    /// All downward surfaces
-    pub downward_surfaces: Vec<W>,
-
-    /// Leaf downward surfaces
-    pub leaf_downward_surfaces: Vec<W>,
-
-    /// The charge data at each leaf box.
-    pub charges: Vec<W>,
-
-    /// Scales of each leaf operator
-    pub target_scales: Vec<W>,
-
-    /// Scales of each leaf operator
-    pub source_scales: Vec<W>,
-
-    /// Global indices of each charge
-    pub global_indices: Vec<usize>,
-}
+use crate::types::{FmmEvalType, KiFmm, KiFmmDummy};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
@@ -171,7 +70,7 @@ where
 
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(vec![
-                    &self.potentials[l * self.eval_size..r * self.eval_size],
+                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
                 ]),
                 FmmEvalType::Matrix(nmatvecs) => {
                     let nleaves = self.tree.target_tree().nleaves().unwrap();
@@ -182,7 +81,7 @@ where
                         slices.push(unsafe {
                             std::slice::from_raw_parts(
                                 potentials_pointer,
-                                ntargets * self.eval_size,
+                                ntargets * self.kernel_eval_size,
                             )
                         });
                     }
@@ -248,12 +147,12 @@ where
         let source = rlst_dynamic_array2!(W, [1, 1]);
         KiFmm {
             tree: T::default(),
-            source_to_target_data: U::default(),
+            source_to_target_translation_data: U::default(),
             kernel: V::default(),
             expansion_order: 0,
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
-            eval_size: 0,
+            kernel_eval_size: 0,
             dim: 0,
             ncoeffs: 0,
             uc2e_inv_1,
@@ -261,7 +160,7 @@ where
             dc2e_inv_1,
             dc2e_inv_2,
             source_data: source,
-            source_data_vec: Vec::default(),
+            source_translation_data_vec: Vec::default(),
             target_data: Vec::default(),
             multipoles: Vec::default(),
             locals: Vec::default(),
@@ -273,37 +172,18 @@ where
             level_index_pointer_multipoles: Vec::default(),
             potentials: Vec::default(),
             potentials_send_pointers: Vec::default(),
-            upward_surfaces: Vec::default(),
-            downward_surfaces: Vec::default(),
+            // upward_surfaces: Vec::default(),
+            // downward_surfaces: Vec::default(),
             leaf_upward_surfaces_sources: Vec::default(),
             leaf_upward_surfaces_targets: Vec::default(),
             leaf_downward_surfaces: Vec::default(),
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),
-            source_scales: Vec::default(),
-            target_scales: Vec::default(),
+            leaf_scales_sources: Vec::default(),
             global_indices: Vec::default(),
         }
     }
-}
-
-// Dummy implementation that simply calls a direct evaluation
-pub struct KiFmmDummy<T, U, V>
-where
-    T: FmmTree<Tree = SingleNodeTree<U>>,
-    U: RlstScalar<Real = U> + Float + Default,
-    V: Kernel<T = U> + Send + Sync,
-{
-    pub tree: T,
-    pub charges: Vec<U>,
-    pub potentials: Vec<U>,
-    pub expansion_order: usize,
-    pub kernel: V,
-    pub kernel_eval_type: EvalType,
-    pub fmm_eval_type: FmmEvalType,
-    pub eval_size: usize,
-    pub charge_index_pointer_targets: Vec<(usize, usize)>,
 }
 
 impl<T, U, V> Fmm for KiFmmDummy<T, U, V>
@@ -338,7 +218,7 @@ where
 
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(vec![
-                    &self.potentials[l * self.eval_size..r * self.eval_size],
+                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
                 ]),
                 FmmEvalType::Matrix(nmatvecs) => {
                     let mut slices = Vec::new();
@@ -417,10 +297,12 @@ where
 #[cfg(test)]
 mod test {
 
-    use bempp_field::constants::ALPHA_INNER;
     use bempp_field::helpers::ncoeffs_kifmm;
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::{constants::ROOT, implementations::helpers::points_fixture};
+    use bempp_tree::{
+        constants::{ALPHA_INNER, ROOT},
+        implementations::helpers::points_fixture,
+    };
     use num::Float;
     use rlst_dense::array::Array;
     use rlst_dense::base_array::BaseArray;
@@ -428,7 +310,7 @@ mod test {
     use rlst_dense::rlst_array_from_slice2;
     use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
 
-    use crate::{builder::KiFmmBuilderSingleNode, tree::SingleNodeFmmTree};
+    use crate::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
     use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 
     use super::*;

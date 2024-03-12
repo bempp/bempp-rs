@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use bempp_field::{
-    constants::{ALPHA_INNER, ALPHA_OUTER},
-    helpers::ncoeffs_kifmm,
-};
+use bempp_field::helpers::ncoeffs_kifmm;
 
 use bempp_traits::{
     field::SourceToTargetData,
@@ -12,7 +9,7 @@ use bempp_traits::{
     types::EvalType,
 };
 use bempp_tree::{
-    constants::{N_CRIT, ROOT},
+    constants::{ALPHA_INNER, ALPHA_OUTER, N_CRIT, ROOT},
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree},
 };
 use num::Float;
@@ -26,36 +23,11 @@ use rlst_dense::{
 };
 
 use crate::{
-    fmm::KiFmm,
     helpers::homogenous_kernel_scale,
     pinv::pinv,
     tree::SingleNodeFmmTree,
-    types::{Charges, Coordinates, SendPtrMut},
+    types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode, SendPtrMut},
 };
-
-#[derive(Clone, Copy)]
-pub enum FmmEvalType {
-    Vector,
-    Matrix(usize),
-}
-
-#[derive(Default)]
-pub struct KiFmmBuilderSingleNode<'builder, T, U, V>
-where
-    T: SourceToTargetData<V>,
-    U: RlstScalar<Real = U> + Float + Default,
-    V: Kernel,
-{
-    tree: Option<SingleNodeFmmTree<U>>,
-    charges: Option<&'builder Charges<U>>,
-    source_to_target: Option<T>,
-    domain: Option<Domain<U>>,
-    kernel: Option<V>,
-    expansion_order: Option<usize>,
-    ncoeffs: Option<usize>,
-    kernel_eval_type: Option<EvalType>,
-    fmm_eval_type: Option<FmmEvalType>,
-}
 
 impl<'builder, T, U, V> KiFmmBuilderSingleNode<'builder, T, U, V>
 where
@@ -137,6 +109,7 @@ where
         if self.tree.is_none() {
             Err("Must build tree before specifying FMM parameters".to_string())
         } else {
+            // Set FMM parameters
             self.charges = Some(charges);
 
             let [_ncharges, nmatvec] = charges.shape();
@@ -145,12 +118,12 @@ where
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
-
             self.expansion_order = Some(expansion_order);
             self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);
 
+            // Calculate source to target translation metadata
             // Set the expansion order
             source_to_target.set_expansion_order(self.expansion_order.unwrap());
 
@@ -171,7 +144,7 @@ where
     pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
         if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
         {
-            Err("Missing fields for constructing KiFmm".to_string())
+            Err("Must create a tree, and FMM parameters before building".to_string())
         } else {
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();
@@ -181,7 +154,7 @@ where
                 tree: self.tree.unwrap(),
                 expansion_order: self.expansion_order.unwrap(),
                 ncoeffs: self.ncoeffs.unwrap(),
-                source_to_target_data: self.source_to_target.unwrap(),
+                source_to_target_translation_data: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
                 kernel,
@@ -332,7 +305,7 @@ where
         }
 
         self.source_data = m2m;
-        self.source_data_vec = m2m_vec;
+        self.source_translation_data_vec = m2m_vec;
         self.target_data = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
@@ -407,14 +380,9 @@ where
         let mut charge_index_pointer_targets = vec![(0usize, 0usize); ntarget_leaves];
 
         // Kernel scale at each target and source leaf
-        let mut target_leaf_scales = vec![W::default(); ntarget_leaves * self.ncoeffs * nmatvecs];
         let mut source_leaf_scales = vec![W::default(); nsource_leaves * self.ncoeffs * nmatvecs];
 
         // Pre compute check surfaces
-        let mut upward_surfaces_sources =
-            vec![W::default(); self.ncoeffs * nsource_keys * self.dim];
-        let mut downward_surfaces_targets =
-            vec![W::default(); self.ncoeffs * ntarget_keys * self.dim];
         let mut leaf_upward_surfaces_sources =
             vec![W::default(); self.ncoeffs * nsource_leaves * self.dim];
         let mut leaf_upward_surfaces_targets =
@@ -548,12 +516,6 @@ where
                 .into_iter()
                 .enumerate()
             {
-                let l = i * self.ncoeffs;
-                let r = l + self.ncoeffs;
-                target_leaf_scales[l..r].copy_from_slice(
-                    vec![homogenous_kernel_scale(leaf.level()); self.ncoeffs].as_slice(),
-                );
-
                 let npoints;
                 let nevals;
 
@@ -614,39 +576,6 @@ where
 
         // Compute surfaces
         {
-            // All upward and downward surfaces
-            for (i, key) in self
-                .tree
-                .source_tree()
-                .all_keys()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let l = i * self.ncoeffs * self.dim;
-                let r = l + self.ncoeffs * self.dim;
-                let upward_surface =
-                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
-
-                upward_surfaces_sources[l..r].copy_from_slice(&upward_surface);
-            }
-
-            for (i, key) in self
-                .tree
-                .target_tree()
-                .all_keys()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let l = i * self.ncoeffs * self.dim;
-                let r = l + self.ncoeffs * self.dim;
-                let downward_surface =
-                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
-
-                downward_surfaces_targets[l..r].copy_from_slice(&downward_surface);
-            }
-
             // Leaf upward and downward surfaces
             for (i, key) in self
                 .tree
@@ -698,17 +627,14 @@ where
             self.level_index_pointer_multipoles = level_index_pointer_multipoles;
             self.potentials = potentials;
             self.potentials_send_pointers = potentials_send_pointers;
-            self.upward_surfaces = upward_surfaces_sources;
-            self.downward_surfaces = downward_surfaces_targets;
             self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
             self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
             self.leaf_downward_surfaces = leaf_downward_surfaces_targets;
             self.charges = charges.data().to_vec();
             self.charge_index_pointer_targets = charge_index_pointer_targets;
             self.charge_index_pointer_sources = charge_index_pointer_sources;
-            self.target_scales = target_leaf_scales;
-            self.source_scales = source_leaf_scales;
-            self.eval_size = eval_size;
+            self.leaf_scales_sources = source_leaf_scales;
+            self.kernel_eval_size = eval_size;
         }
     }
 }

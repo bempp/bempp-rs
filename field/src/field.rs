@@ -1,38 +1,39 @@
 //! Implementation of traits for field translations via the FFT and SVD.
 use bempp_traits::kernel::Kernel;
 use itertools::Itertools;
-use num::Zero;
-use num::{Complex, Float};
-use rlst_dense::gemm::Gemm;
-use rlst_dense::rlst_array_from_slice2;
-use rlst_dense::types::RlstScalar;
+use num::{Complex, Float, Zero};
 use rlst_dense::{
     array::{empty_array, Array},
     base_array::BaseArray,
     data_container::VectorContainer,
+    gemm::Gemm,
     linalg::svd::SvdMode,
-    rlst_dynamic_array2, rlst_dynamic_array3,
+    rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3,
     traits::{
         MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
         UnsafeRandomAccessMut,
     },
+    types::RlstScalar,
 };
 use std::collections::HashSet;
 
 use bempp_traits::{field::SourceToTargetData, types::EvalType};
 use bempp_tree::{
-    implementations::helpers::find_corners, types::domain::Domain, types::morton::MortonKey,
+    constants::{
+        ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
+    },
+    implementations::helpers::find_corners,
+    types::domain::Domain,
+    types::morton::MortonKey,
 };
 
-use crate::constants::{
-    ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
-};
-use crate::helpers::ncoeffs_kifmm;
-use crate::types::{
-    BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm,
-};
 use crate::{
-    array::flip3, fft::Fft, transfer_vector::compute_transfer_vectors, types::FftM2lOperatorData,
+    array::flip3,
+    fft::Fft,
+    helpers::ncoeffs_kifmm,
+    transfer_vector::compute_transfer_vectors,
+    types::FftM2lOperatorData,
+    types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
 
 fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(

@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use bempp_field::constants::NSIBLINGS;
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;
@@ -11,7 +10,10 @@ use bempp_traits::{
     kernel::Kernel,
     tree::{FmmTree, Tree},
 };
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_tree::{
+    constants::NSIBLINGS,
+    types::{morton::MortonKey, single_node::SingleNodeTree},
+};
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
@@ -20,7 +22,9 @@ use rlst_dense::{
 };
 
 use crate::{
-    builder::FmmEvalType, constants::L2L_MAX_CHUNK_SIZE, fmm::KiFmm, helpers::find_chunk_size,
+    constants::L2L_MAX_CHUNK_SIZE,
+    helpers::find_chunk_size,
+    types::{FmmEvalType, KiFmm},
 };
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
@@ -209,7 +213,7 @@ where
                                 let result = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         potential_send_ptr.raw,
-                                        ntargets * self.eval_size,
+                                        ntargets * self.kernel_eval_size,
                                     )
                                 };
 
@@ -273,7 +277,7 @@ where
                                     let result = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             potential_send_ptr.raw,
-                                            ntargets * self.eval_size,
+                                            ntargets * self.kernel_eval_size,
                                         )
                                     };
 
@@ -369,7 +373,7 @@ where
                                         let result = unsafe {
                                             std::slice::from_raw_parts_mut(
                                                 potential_send_pointer.raw,
-                                                ntargets * self.eval_size,
+                                                ntargets * self.kernel_eval_size,
                                             )
                                         };
 
@@ -459,7 +463,7 @@ where
                                             let result = unsafe {
                                                 std::slice::from_raw_parts_mut(
                                                     potential_send_ptr.raw,
-                                                    ntargets * self.eval_size,
+                                                    ntargets * self.kernel_eval_size,
                                                 )
                                             };
 

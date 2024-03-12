@@ -328,10 +328,10 @@ where
         let mut level = 0;
         while tmp > n_crit {
             level += 1;
-            tmp /= 8i32.pow(level) as u64;
+            tmp /= 8;
         }
 
-        level.into()
+        level as u64
     }
 
     /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified

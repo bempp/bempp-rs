@@ -4,6 +4,7 @@ pub mod constants;
 pub mod fmm;
 pub mod helpers;
 pub mod pinv;
+pub mod send_ptr;
 pub mod tree;
 pub mod types;
 

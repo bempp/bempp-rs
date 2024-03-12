@@ -1,8 +1,5 @@
-//! Fast Field Translations for kernel independent FMMs arranged on regular grids.
-//! Examples include the Kernel Independent FMM (KiFMM) of Ying et. al (2004) and the
-//! Black Box FMM (bbFMM) of Fong & Darve (2009).
+//! Functionality for computing the metadata required for field translations for the kernel independent fast multipole method.
 pub mod array;
-pub mod constants;
 pub mod fft;
 pub mod field;
 pub mod helpers;
