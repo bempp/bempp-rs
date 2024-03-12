@@ -13,7 +13,6 @@ impl<T: Float + Default + Debug> Domain<T> {
     /// # Arguments
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     pub fn from_local_points(points: &[PointType<T>]) -> Domain<T> {
-        // TODO: Should be parametrised by dimension
         let dim = 3;
         let npoints = points.len() / dim;
         let x = points[0..npoints].to_vec();
