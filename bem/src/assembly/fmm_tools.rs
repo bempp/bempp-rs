@@ -44,8 +44,8 @@ pub fn get_all_quadrature_points<
     for cell in 0..grid.number_of_cells() {
         for i in 0..NPTS {
             evaluator.reference_to_physical(cell, i, &mut point);
-            for j in 0..grid.physical_dimension() {
-                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = point[j];
+            for (j, p) in point.iter().enumerate() {
+                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = *p;
             }
         }
     }
