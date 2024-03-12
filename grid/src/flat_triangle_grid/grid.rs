@@ -366,7 +366,7 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
     fn dim(&self) -> usize {
         2
     }
-    fn index_map(&self) -> &[Self::IndexType] {
+    fn index_map(&self) -> &[usize] {
         &self.index_map
     }
     fn entity_count(&self, etype: ReferenceCellType) -> usize {
@@ -379,14 +379,14 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
     fn entity_count_by_dim(&self, dim: usize) -> usize {
         self.entity_count(self.entity_types[dim])
     }
-    fn cell(&self, index: Self::IndexType) -> Option<&[usize]> {
+    fn cell(&self, index: usize) -> Option<&[usize]> {
         if index < self.cells_to_entities[2].len() {
             Some(&self.cells_to_entities[2][index])
         } else {
             None
         }
     }
-    fn cell_type(&self, index: Self::IndexType) -> Option<ReferenceCellType> {
+    fn cell_type(&self, index: usize) -> Option<ReferenceCellType> {
         if index < self.cells_to_entities[2].len() {
             Some(self.entity_types[2])
         } else {
@@ -398,21 +398,20 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn entity_ownership(&self, _dim: usize, _index: Self::IndexType) -> Ownership {
+    fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
         Ownership::Owned
     }
-    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[Self::IndexType]> {
+    fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
         if dim <= 2 && index < self.cells_to_entities[dim].len() {
             Some(&self.cells_to_entities[dim][index])
         } else {
             None
         }
     }
-    fn entity_to_cells(
-        &self,
-        dim: usize,
-        index: Self::IndexType,
-    ) -> Option<&[CellLocalIndexPair<Self::IndexType>]> {
+    fn cell_to_flat_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
+        self.cell_to_entities(index, dim)
+    }
+    fn entity_to_cells(&self, dim: usize, index: usize) -> Option<&[CellLocalIndexPair<usize>]> {
         if dim <= 2 && index < self.entities_to_cells[dim].len() {
             Some(&self.entities_to_cells[dim][index])
         } else {
@@ -420,7 +419,15 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
         }
     }
 
-    fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]> {
+    fn entity_to_flat_cells(
+        &self,
+        dim: usize,
+        index: Self::IndexType,
+    ) -> Option<&[CellLocalIndexPair<usize>]> {
+        self.entity_to_cells(dim, index)
+    }
+
+    fn entity_vertices(&self, dim: usize, index: usize) -> Option<&[usize]> {
         if dim == 2 {
             self.cell_to_entities(index, 0)
         } else if dim < 2 && index < self.entities_to_vertices[dim].len() {
@@ -442,7 +449,22 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
     fn cell_id_to_index(&self, id: usize) -> usize {
         self.cell_ids_to_indices[&id]
     }
-    fn flat_index(&self, index: usize) -> usize {
+    fn vertex_index_to_flat_index(&self, index: usize) -> usize {
+        index
+    }
+    fn edge_index_to_flat_index(&self, index: usize) -> usize {
+        index
+    }
+    fn face_index_to_flat_index(&self, index: usize) -> usize {
+        index
+    }
+    fn vertex_flat_index_to_index(&self, index: usize) -> usize {
+        index
+    }
+    fn edge_flat_index_to_index(&self, index: usize) -> usize {
+        index
+    }
+    fn face_flat_index_to_index(&self, index: usize) -> usize {
         index
     }
 }

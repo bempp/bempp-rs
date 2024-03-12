@@ -6,7 +6,6 @@ use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, TopologyType};
 use rlst_dense::types::RlstScalar;
-use std::collections::HashMap;
 
 pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
     grid: &'a GridImpl,
@@ -31,7 +30,18 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
             edim += 1;
         }
 
-        let mut entity_colours: HashMap<GridImpl::IndexType, Vec<usize>> = HashMap::new();
+        let mut entity_colours = vec![
+            vec![];
+            if edim == 0 {
+                self.grid.number_of_vertices()
+            } else if edim == 1 {
+                self.grid.number_of_edges()
+            } else if edim == 2 && self.grid.domain_dimension() == 2 {
+                self.grid.number_of_cells()
+            } else {
+                unimplemented!();
+            }
+        ];
 
         for cell in self.grid.iter_all_cells() {
             let indices = if edim == 0 {
@@ -41,7 +51,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
             } else if edim == 2 {
                 cell.topology().face_indices().collect::<Vec<_>>()
             } else {
-                panic!("");
+                unimplemented!();
             };
 
             let c = {
@@ -49,11 +59,9 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
                 while c < colouring.len() {
                     let mut found = false;
                     for v in &indices {
-                        if let Some(vc) = entity_colours.get(v) {
-                            if vc.contains(&c) {
-                                found = true;
-                                break;
-                            }
+                        if entity_colours[*v].contains(&c) {
+                            found = true;
+                            break;
                         }
                     }
 
@@ -70,11 +78,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
                 colouring[c].push(cell.index());
             }
             for v in &indices {
-                if let Some(vc) = entity_colours.get_mut(v) {
-                    vc.push(c);
-                } else {
-                    entity_colours.insert(*v, vec![c]);
-                }
+                entity_colours[*v].push(c);
             }
         }
         colouring

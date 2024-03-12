@@ -144,8 +144,7 @@ where
     GridImpl: 'grid,
 {
     type Grid = WrappedGrid<GridImpl>;
-    type IndexType = <<GridImpl as Grid>::Topology as Topology>::IndexType;
-    type VertexIndexIter<'a> = Copied<std::slice::Iter<'a, Self::IndexType>>
+    type VertexIndexIter<'a> = Copied<std::slice::Iter<'a, usize>>
     where
         Self: 'a;
     type EdgeIndexIter<'a> = Self::VertexIndexIter<'a>
@@ -157,7 +156,7 @@ where
 
     fn vertex_indices(&self) -> Self::VertexIndexIter<'_> {
         self.topology
-            .cell_to_entities(self.index, 0)
+            .cell_to_flat_entities(self.index, 0)
             .unwrap()
             .iter()
             .copied()
@@ -165,7 +164,7 @@ where
 
     fn edge_indices(&self) -> Self::EdgeIndexIter<'_> {
         self.topology
-            .cell_to_entities(self.index, 1)
+            .cell_to_flat_entities(self.index, 1)
             .unwrap()
             .iter()
             .copied()
@@ -173,7 +172,7 @@ where
 
     fn face_indices(&self) -> Self::FaceIndexIter<'_> {
         self.topology
-            .cell_to_entities(self.index, 2)
+            .cell_to_flat_entities(self.index, 2)
             .unwrap()
             .iter()
             .copied()
@@ -181,10 +180,6 @@ where
 
     fn cell_type(&self) -> ReferenceCellType {
         self.topology.cell_type(self.index).unwrap()
-    }
-
-    fn flat_index(&self, index: Self::IndexType) -> usize {
-        self.topology.flat_index(index)
     }
 }
 
@@ -282,7 +277,6 @@ where
     GridImpl: 'grid,
 {
     type T = T;
-    type IndexType = <<GridImpl as Grid>::Topology as Topology>::IndexType;
 
     type ReferenceMap<'a> = ReferenceMap<'a, GridImpl>
     where
@@ -344,19 +338,22 @@ where
         }
     }
 
-    fn vertex_to_cells(
-        &self,
-        vertex_index: Self::IndexType,
-    ) -> &[CellLocalIndexPair<Self::IndexType>] {
-        self.topology().entity_to_cells(0, vertex_index).unwrap()
+    fn vertex_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>] {
+        self.topology()
+            .entity_to_flat_cells(0, self.topology().vertex_flat_index_to_index(vertex_index))
+            .unwrap()
     }
 
-    fn edge_to_cells(&self, edge_index: Self::IndexType) -> &[CellLocalIndexPair<Self::IndexType>] {
-        self.topology().entity_to_cells(1, edge_index).unwrap()
+    fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>] {
+        self.topology()
+            .entity_to_flat_cells(1, self.topology().edge_flat_index_to_index(edge_index))
+            .unwrap()
     }
 
-    fn face_to_cells(&self, face_index: Self::IndexType) -> &[CellLocalIndexPair<Self::IndexType>] {
-        self.topology().entity_to_cells(2, face_index).unwrap()
+    fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>] {
+        self.topology()
+            .entity_to_flat_cells(2, self.topology().face_flat_index_to_index(face_index))
+            .unwrap()
     }
 
     fn is_serial(&self) -> bool {

@@ -29,9 +29,12 @@ type IndexType = (ReferenceCellType, usize);
 pub struct SerialMixedTopology {
     dim: usize,
     index_map: Vec<IndexType>,
+    reverse_index_map: HashMap<IndexType, usize>,
     entities_to_vertices: Vec<HashMap<ReferenceCellType, Vec<Vec<IndexType>>>>,
     cells_to_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<IndexType>>>>,
+    cells_to_flat_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<usize>>>>,
     entities_to_cells: Vec<HashMap<ReferenceCellType, Vec<Vec<CellLocalIndexPair<IndexType>>>>>,
+    entities_to_flat_cells: Vec<HashMap<ReferenceCellType, Vec<Vec<CellLocalIndexPair<usize>>>>>,
     entity_types: Vec<Vec<ReferenceCellType>>,
     vertex_indices_to_ids: HashMap<IndexType, usize>,
     vertex_ids_to_indices: HashMap<usize, IndexType>,
@@ -50,6 +53,7 @@ impl SerialMixedTopology {
         grid_cell_indices_to_ids: &[usize],
     ) -> Self {
         let mut index_map = vec![(ReferenceCellType::Point, 0); cell_types.len()];
+        let mut reverse_index_map = HashMap::new();
         let mut vertices = vec![];
         let dim = reference_cell::dim(cell_types[0]);
 
@@ -62,7 +66,9 @@ impl SerialMixedTopology {
 
         let mut entities_to_vertices = vec![HashMap::new(); dim];
         let mut cells_to_entities = vec![HashMap::new(); dim + 1];
+        let mut cells_to_flat_entities = vec![HashMap::new(); dim + 1];
         let mut entities_to_cells = vec![HashMap::new(); dim + 1];
+        let mut entities_to_flat_cells = vec![HashMap::new(); dim + 1];
 
         for c in cell_types {
             if dim != reference_cell::dim(*c) {
@@ -74,8 +80,12 @@ impl SerialMixedTopology {
                         entity_types[dim0].push(*e);
 
                         entities_to_cells[dim0].insert(*e, vec![]);
+                        entities_to_flat_cells[dim0].insert(*e, vec![]);
                         if dim0 == dim {
                             for ce in cells_to_entities.iter_mut() {
+                                ce.insert(*e, vec![]);
+                            }
+                            for ce in cells_to_flat_entities.iter_mut() {
                                 ce.insert(*e, vec![]);
                             }
                         } else {
@@ -95,6 +105,7 @@ impl SerialMixedTopology {
                     let cell = &cells_input[start..start + n];
                     let cell_i = (*c, cells_to_entities[0][c].len());
                     index_map[i] = cell_i;
+                    reverse_index_map.insert(cell_i, i);
 
                     cell_indices_to_ids.insert(cell_i, grid_cell_indices_to_ids[i]);
                     cell_ids_to_indices.insert(grid_cell_indices_to_ids[i], cell_i);
@@ -103,6 +114,9 @@ impl SerialMixedTopology {
                     for v in cell {
                         if !vertices.contains(v) {
                             for (_, ec) in entities_to_cells[0].iter_mut() {
+                                ec.push(vec![]);
+                            }
+                            for (_, ec) in entities_to_flat_cells[0].iter_mut() {
                                 ec.push(vec![]);
                             }
                             vertices.push(*v);
@@ -120,12 +134,23 @@ impl SerialMixedTopology {
                     for (local_index, v) in row.iter().enumerate() {
                         entities_to_cells[0].get_mut(&v.0).unwrap()[v.1]
                             .push(CellLocalIndexPair::new(cell_i, local_index));
+                        entities_to_flat_cells[0].get_mut(&v.0).unwrap()[v.1].push(
+                            CellLocalIndexPair::new(reverse_index_map[&cell_i], local_index),
+                        );
                     }
                     entities_to_cells[dim]
                         .get_mut(c)
                         .unwrap()
                         .push(vec![CellLocalIndexPair::new(cell_i, 0)]);
 
+                    cells_to_flat_entities[0]
+                        .get_mut(c)
+                        .unwrap()
+                        .push(row.iter().map(|i| i.1).collect::<Vec<_>>());
+                    cells_to_flat_entities[dim]
+                        .get_mut(c)
+                        .unwrap()
+                        .push(vec![i]);
                     cells_to_entities[0].get_mut(c).unwrap().push(row);
                     cells_to_entities[dim]
                         .get_mut(c)
@@ -146,9 +171,11 @@ impl SerialMixedTopology {
             for etype in etypes0 {
                 for cell_type in &entity_types[dim] {
                     let mut c_to_e = vec![];
+                    let mut c_to_e_flat = vec![];
                     let ref_conn = &reference_cell::connectivity(*cell_type)[d];
                     for (cell_i, cell) in cells_to_entities[0][&cell_type].iter().enumerate() {
                         let mut entity_ids = vec![];
+                        let mut entity_ids_flat = vec![];
 
                         for (local_index, rc) in ref_conn.iter().enumerate() {
                             let vertices = rc[0].iter().map(|x| cell[*x]).collect::<Vec<_>>();
@@ -158,6 +185,7 @@ impl SerialMixedTopology {
                             {
                                 if all_equal(entity, &vertices) {
                                     entity_ids.push((*etype, entity_index));
+                                    entity_ids_flat.push(entity_index);
                                     entities_to_cells[d].get_mut(etype).unwrap()[entity_index]
                                         .push(CellLocalIndexPair::new(
                                             (*cell_type, cell_i),
@@ -180,7 +208,9 @@ impl SerialMixedTopology {
                             }
                         }
                         c_to_e.push(entity_ids);
+                        c_to_e_flat.push(entity_ids_flat);
                     }
+                    *cells_to_flat_entities[d].get_mut(cell_type).unwrap() = c_to_e_flat;
                     *cells_to_entities[d].get_mut(cell_type).unwrap() = c_to_e;
                 }
             }
@@ -189,9 +219,12 @@ impl SerialMixedTopology {
         Self {
             dim,
             index_map,
+            reverse_index_map,
             entities_to_vertices,
             cells_to_entities,
+            cells_to_flat_entities,
             entities_to_cells,
+            entities_to_flat_cells,
             entity_types,
             vertex_indices_to_ids,
             vertex_ids_to_indices,
@@ -265,12 +298,38 @@ impl Topology for SerialMixedTopology {
             None
         }
     }
+
+    fn entity_to_flat_cells(
+        &self,
+        dim: usize,
+        index: Self::IndexType,
+    ) -> Option<&[CellLocalIndexPair<usize>]> {
+        if dim <= self.dim
+            && self.entities_to_flat_cells[dim].contains_key(&index.0)
+            && index.1 < self.entities_to_flat_cells[dim][&index.0].len()
+        {
+            Some(&self.entities_to_flat_cells[dim][&index.0][index.1])
+        } else {
+            None
+        }
+    }
+
     fn cell_to_entities(&self, index: IndexType, dim: usize) -> Option<&[IndexType]> {
         if dim <= self.dim
             && self.cells_to_entities[dim].contains_key(&index.0)
             && index.1 < self.cells_to_entities[dim][&index.0].len()
         {
             Some(&self.cells_to_entities[dim][&index.0][index.1])
+        } else {
+            None
+        }
+    }
+    fn cell_to_flat_entities(&self, index: IndexType, dim: usize) -> Option<&[usize]> {
+        if dim <= self.dim
+            && self.cells_to_flat_entities[dim].contains_key(&index.0)
+            && index.1 < self.cells_to_flat_entities[dim][&index.0].len()
+        {
+            Some(&self.cells_to_flat_entities[dim][&index.0][index.1])
         } else {
             None
         }
@@ -305,15 +364,23 @@ impl Topology for SerialMixedTopology {
     fn cell_id_to_index(&self, id: usize) -> IndexType {
         self.cell_ids_to_indices[&id]
     }
-    fn flat_index(&self, index: IndexType) -> usize {
-        let mut out = 0;
-        for etype in self.entity_types(reference_cell::dim(index.0)) {
-            if *etype == index.0 {
-                break;
-            }
-            out += self.entity_count(*etype);
-        }
-        out + index.1
+    fn vertex_index_to_flat_index(&self, index: IndexType) -> usize {
+        index.1
+    }
+    fn edge_index_to_flat_index(&self, index: IndexType) -> usize {
+        index.1
+    }
+    fn face_index_to_flat_index(&self, index: IndexType) -> usize {
+        self.reverse_index_map[&index]
+    }
+    fn vertex_flat_index_to_index(&self, index: usize) -> IndexType {
+        (ReferenceCellType::Point, index)
+    }
+    fn edge_flat_index_to_index(&self, index: usize) -> IndexType {
+        (ReferenceCellType::Interval, index)
+    }
+    fn face_flat_index_to_index(&self, index: usize) -> IndexType {
+        self.index_map[index]
     }
 }
 

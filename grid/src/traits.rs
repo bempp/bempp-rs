@@ -42,12 +42,22 @@ pub trait Topology {
     /// Get the indices of entities of dimension `dim` that are connected to the cell with index `index`
     fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[Self::IndexType]>;
 
-    /// Get the indices of entities of cell that are connected to the entity with dimension `dim` and index `index`
+    /// Get the flat indices of entities of dimension `dim` that are connected to the cell with index `index`
+    fn cell_to_flat_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]>;
+
+    /// Get the indices of cells that are connected to the entity with dimension `dim` and index `index`
     fn entity_to_cells(
         &self,
         dim: usize,
         index: Self::IndexType,
     ) -> Option<&[CellLocalIndexPair<Self::IndexType>]>;
+
+    /// Get the flat indices of cells that are connected to the entity with dimension `dim` and index `index`
+    fn entity_to_flat_cells(
+        &self,
+        dim: usize,
+        index: Self::IndexType,
+    ) -> Option<&[CellLocalIndexPair<usize>]>;
 
     /// Get the indices of the vertices that are connect to theentity with dimension `dim` and index `index`
     fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]>;
@@ -67,8 +77,23 @@ pub trait Topology {
     /// Get the index of a cell from its id
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType;
 
-    /// Get the flat index from the index of an entity
-    fn flat_index(&self, index: Self::IndexType) -> usize;
+    /// Get the flat index from the index of a vertex
+    fn vertex_index_to_flat_index(&self, index: Self::IndexType) -> usize;
+
+    /// Get the flat index from the index of an edge
+    fn edge_index_to_flat_index(&self, index: Self::IndexType) -> usize;
+
+    /// Get the flat index from the index of a face
+    fn face_index_to_flat_index(&self, index: Self::IndexType) -> usize;
+
+    /// Get the index from the flat index of a vertex
+    fn vertex_flat_index_to_index(&self, index: usize) -> Self::IndexType;
+
+    /// Get the index from the flat index of an edge
+    fn edge_flat_index_to_index(&self, index: usize) -> Self::IndexType;
+
+    /// Get the index from the flat index of a face
+    fn face_flat_index_to_index(&self, index: usize) -> Self::IndexType;
 }
 
 /// The geometry of a grid

@@ -5,15 +5,12 @@ use crate::types::cell_iterator::CellIterator;
 use crate::types::point_iterator::PointIterator;
 use crate::types::CellLocalIndexPair;
 use rlst_dense::types::RlstScalar;
-use std::hash::Hash;
 
 pub trait GridType: std::marker::Sized {
     //! A grid
 
     /// The floating point type used for coordinates
     type T: RlstScalar;
-    /// The type used to index cells
-    type IndexType: std::fmt::Debug + Eq + Copy + Hash;
     /// The type used for a point
     type Point<'a>: PointType
     where
@@ -94,16 +91,13 @@ pub trait GridType: std::marker::Sized {
     ) -> Self::ReferenceMap<'a>;
 
     /// Get the cells that are attached to a vertex
-    fn vertex_to_cells(
-        &self,
-        vertex_index: Self::IndexType,
-    ) -> &[CellLocalIndexPair<Self::IndexType>];
+    fn vertex_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>];
 
     /// Get the cells that are attached to an edge
-    fn edge_to_cells(&self, edge_index: Self::IndexType) -> &[CellLocalIndexPair<Self::IndexType>];
+    fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>];
 
     /// Get the cells that are attached to a face
-    fn face_to_cells(&self, face_index: Self::IndexType) -> &[CellLocalIndexPair<Self::IndexType>];
+    fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>];
 
     /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool;

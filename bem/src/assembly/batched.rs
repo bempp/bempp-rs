@@ -115,7 +115,6 @@ fn get_quadrature_rule(
     }
 }
 
-// TODO: use T not f64
 pub trait BatchedAssembler: Sync {
     //! Batched assembler
     //!
@@ -684,31 +683,41 @@ pub trait BatchedAssembler: Sync {
             );
         }
         let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
-        // TODO: iterator over vertices, then cells adjacent to vertices
-        for test_cell in 0..grid.number_of_cells() {
-            let test_vertices = grid
-                .cell_from_index(test_cell)
-                .topology()
-                .vertex_indices()
+        for vertex in 0..grid.number_of_vertices() {
+            let cells = grid
+                .vertex_to_cells(vertex)
+                .iter()
+                .map(|c| c.cell)
                 .collect::<Vec<_>>();
-            for trial_cell in 0..grid.number_of_cells() {
-                let trial_vertices = grid
-                    .cell_from_index(trial_cell)
+            for test_cell in &cells {
+                let test_vertices = grid
+                    .cell_from_index(*test_cell)
                     .topology()
                     .vertex_indices()
                     .collect::<Vec<_>>();
+                for trial_cell in &cells {
+                    let trial_vertices = grid
+                        .cell_from_index(*trial_cell)
+                        .topology()
+                        .vertex_indices()
+                        .collect::<Vec<_>>();
 
-                let mut pairs = vec![];
-                for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                    for (test_i, test_v) in test_vertices.iter().enumerate() {
-                        if test_v == trial_v {
-                            pairs.push((test_i, trial_i));
+                    let mut smallest = true;
+                    let mut pairs = vec![];
+                    for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
+                        for (test_i, test_v) in test_vertices.iter().enumerate() {
+                            if test_v == trial_v {
+                                if *test_v < vertex {
+                                    smallest = false;
+                                }
+                                pairs.push((test_i, trial_i));
+                            }
                         }
                     }
-                }
-                if !pairs.is_empty() {
-                    cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
-                        .push((test_cell, trial_cell))
+                    if smallest {
+                        cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
+                            .push((*test_cell, *trial_cell))
+                    }
                 }
             }
         }

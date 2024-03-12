@@ -34,14 +34,14 @@ impl SerialDofMap {
             for (i, e) in topology.vertex_indices().enumerate() {
                 let e_dofs = element.entity_dofs(0, i).unwrap();
                 if !e_dofs.is_empty() {
-                    if entity_dofs[0][topology.flat_index(e)].is_empty() {
+                    if entity_dofs[0][e].is_empty() {
                         for _ in e_dofs {
-                            entity_dofs[0][topology.flat_index(e)].push(size);
+                            entity_dofs[0][e].push(size);
                             size += 1
                         }
                     }
                     for (j, k) in e_dofs.iter().enumerate() {
-                        cell_dofs[cell.index()][*k] = entity_dofs[0][topology.flat_index(e)][j];
+                        cell_dofs[cell.index()][*k] = entity_dofs[0][e][j];
                     }
                 }
             }
@@ -49,14 +49,14 @@ impl SerialDofMap {
                 for (i, e) in topology.edge_indices().enumerate() {
                     let e_dofs = element.entity_dofs(1, i).unwrap();
                     if !e_dofs.is_empty() {
-                        if entity_dofs[1][topology.flat_index(e)].is_empty() {
+                        if entity_dofs[1][e].is_empty() {
                             for _ in e_dofs {
-                                entity_dofs[1][topology.flat_index(e)].push(size);
+                                entity_dofs[1][e].push(size);
                                 size += 1
                             }
                         }
                         for (j, k) in e_dofs.iter().enumerate() {
-                            cell_dofs[cell.index()][*k] = entity_dofs[1][topology.flat_index(e)][j];
+                            cell_dofs[cell.index()][*k] = entity_dofs[1][e][j];
                         }
                     }
                 }
@@ -65,14 +65,14 @@ impl SerialDofMap {
                 for (i, e) in topology.face_indices().enumerate() {
                     let e_dofs = element.entity_dofs(2, i).unwrap();
                     if !e_dofs.is_empty() {
-                        if entity_dofs[2][topology.flat_index(e)].is_empty() {
+                        if entity_dofs[2][e].is_empty() {
                             for _ in e_dofs {
-                                entity_dofs[2][topology.flat_index(e)].push(size);
+                                entity_dofs[2][e].push(size);
                                 size += 1
                             }
                         }
                         for (j, k) in e_dofs.iter().enumerate() {
-                            cell_dofs[cell.index()][*k] = entity_dofs[2][topology.flat_index(e)][j];
+                            cell_dofs[cell.index()][*k] = entity_dofs[2][e][j];
                         }
                     }
                 }
