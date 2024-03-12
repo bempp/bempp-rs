@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
@@ -627,6 +628,11 @@ pub trait BatchedAssembler: Sync {
         // Same cell
         possible_pairs.push(vec![(0, 0), (1, 1), (2, 2)]);
 
+        let mut pair_indices: HashMap<Vec<(usize, usize)>, usize> = HashMap::new();
+        for (i, pairs) in possible_pairs.iter().enumerate() {
+            pair_indices.insert(pairs.clone(), i);
+        }
+
         let mut qweights = vec![];
         let mut trial_points = vec![];
         let mut test_points = vec![];
@@ -690,24 +696,23 @@ pub trait BatchedAssembler: Sync {
                 .map(|c| c.cell)
                 .collect::<Vec<_>>();
             for test_cell in &cells {
-                let test_vertices = grid
-                    .cell_from_index(*test_cell)
-                    .topology()
-                    .vertex_indices()
-                    .collect::<Vec<_>>();
                 for trial_cell in &cells {
-                    let trial_vertices = grid
+                    let mut smallest = true;
+                    let mut pairs = vec![];
+                    for (trial_i, trial_v) in grid
                         .cell_from_index(*trial_cell)
                         .topology()
                         .vertex_indices()
-                        .collect::<Vec<_>>();
-
-                    let mut smallest = true;
-                    let mut pairs = vec![];
-                    for (trial_i, trial_v) in trial_vertices.iter().enumerate() {
-                        for (test_i, test_v) in test_vertices.iter().enumerate() {
+                        .enumerate()
+                    {
+                        for (test_i, test_v) in grid
+                            .cell_from_index(*test_cell)
+                            .topology()
+                            .vertex_indices()
+                            .enumerate()
+                        {
                             if test_v == trial_v {
-                                if *test_v < vertex {
+                                if test_v < vertex {
                                     smallest = false;
                                 }
                                 pairs.push((test_i, trial_i));
@@ -715,7 +720,7 @@ pub trait BatchedAssembler: Sync {
                         }
                     }
                     if smallest {
-                        cell_pairs[possible_pairs.iter().position(|r| *r == pairs).unwrap()]
+                        cell_pairs[pair_indices[&pairs]]
                             .push((*test_cell, *trial_cell))
                     }
                 }
