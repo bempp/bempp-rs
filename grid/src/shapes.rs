@@ -24,14 +24,13 @@ where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     let mut b = SerialFlatTriangleGridBuilder::new_with_capacity(
-        2 + 4 * usize::pow(6, refinement_level),
-        8 * usize::pow(6, refinement_level),
+        2 + usize::pow(4, refinement_level + 1),
+        8 * usize::pow(4, refinement_level),
         (),
     );
     let zero = T::from(0.0).unwrap();
     let one = T::from(1.0).unwrap();
     let half = T::from(0.5).unwrap();
-    let three = T::from(3.0).unwrap();
     b.add_point(0, [zero, zero, one]);
     b.add_point(1, [one, zero, zero]);
     b.add_point(2, [zero, one, zero]);
@@ -89,24 +88,10 @@ where
                     edge_points[&(pt_i, pt_j)]
                 })
                 .collect::<Vec<_>>();
-            let mid = point_n;
-            let mut new_pt = [
-                (v[0][0] + v[1][0] + v[2][0]) / three,
-                (v[0][1] + v[1][1] + v[2][1]) / three,
-                (v[0][2] + v[1][2] + v[2][2]) / three,
-            ];
-            let size = Float::sqrt(new_pt.iter().map(|x| Float::powi(*x, 2)).sum::<T>());
-            for i in new_pt.iter_mut() {
-                *i /= size;
-            }
-            b.add_point(point_n, new_pt);
-            point_n += 1;
-            new_cells.push([c[0], edges[2], mid]);
-            new_cells.push([c[0], mid, edges[1]]);
-            new_cells.push([c[1], edges[0], mid]);
-            new_cells.push([c[1], mid, edges[2]]);
-            new_cells.push([c[2], edges[1], mid]);
-            new_cells.push([c[2], mid, edges[0]]);
+            new_cells.push([c[0], edges[2], edges[1]]);
+            new_cells.push([c[1], edges[0], edges[2]]);
+            new_cells.push([c[2], edges[1], edges[0]]);
+            new_cells.push([edges[0], edges[1], edges[2]]);
         }
         cells = new_cells;
     }

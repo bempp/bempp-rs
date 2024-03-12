@@ -4,8 +4,8 @@ use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
-use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::Continuity;
+use bempp_traits::types::ReferenceCellType;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rlst_dense::rlst_dynamic_array2;
 
@@ -37,7 +37,11 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.dofmap().global_size(),
                 space.dofmap().global_size()
             ),
-            |b| b.iter(|| a.assemble_singular_into_dense::<4, 128>(&mut matrix, &space, &space)),
+            |b| {
+                b.iter(|| {
+                    a.assemble_singular_into_dense::<4, 128, _, _>(&mut matrix, &space, &space)
+                })
+            },
         );
         group.bench_function(
             &format!(
@@ -47,7 +51,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    a.assemble_nonsingular_into_dense::<16, 16, 128>(
+                    a.assemble_nonsingular_into_dense::<16, 16, 128, _, _>(
                         &mut matrix,
                         &space,
                         &space,
