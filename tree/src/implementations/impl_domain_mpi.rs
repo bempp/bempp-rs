@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 use num::traits::Float;
 
-use crate::types::{domain::Domain, point::PointType};
+use crate::types::domain::Domain;
 
 unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
     type Out = UserDatatype;
@@ -40,7 +40,7 @@ where
     /// # Arguments
     /// * `local_points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// * `comm` - An MPI (User) communicator over which the domain is defined.
-    pub fn from_global_points(local_points: &[PointType<T>], comm: &UserCommunicator) -> Domain<T> {
+    pub fn from_global_points(local_points: &[T], comm: &UserCommunicator) -> Domain<T> {
         let size = comm.size();
 
         let local_domain = Domain::<T>::from_local_points(local_points);

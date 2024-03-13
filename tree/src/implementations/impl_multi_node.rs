@@ -14,7 +14,7 @@ use num::traits::Float;
 
 use hyksort::hyksort;
 
-// use bempp_traits::tree::Tree;
+use bempp_traits::tree::Tree;
 
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, N_CRIT, ROOT},
@@ -23,7 +23,7 @@ use crate::{
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
         multi_node::MultiNodeTree,
-        point::{Point, PointType, Points},
+        point::{Point, Points},
         single_node::SingleNodeTree,
     },
 };
@@ -44,7 +44,7 @@ where
     pub fn uniform_tree(
         world: &UserCommunicator,
         k: i32,
-        points: &[PointType<T>],
+        points: &[T],
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
@@ -185,212 +185,7 @@ where
             global_indices,
             leaves,
             keys,
-            leaves_to_points,
-            levels_to_keys,
-            leaves_set,
-            keys_set,
-            range,
-        }
-    }
-
-    /// Constructor for adaptive tree.
-    ///
-    /// # Arguments
-    /// * `world` - A global communicator for the tree.
-    /// * `k` - Size of subcommunicator used in Hyksort. Must be a power of 2.
-    /// * `points` - Cartesian point data in column major order.
-    /// * `domain` - Domain associated with the global point set.
-    /// * `depth` - The maximum depth of recursion for the tree.
-    /// * `n_crit` - Maximum number of particles in a leaf node.
-    /// * `global_idxs` - Globally unique indices for point data.
-    pub fn adaptive_tree(
-        world: &UserCommunicator,
-        k: i32,
-        points: &[PointType<T>],
-        domain: &Domain<T>,
-        n_crit: u64,
-        global_idxs: &[usize],
-    ) -> MultiNodeTree<T> {
-        // 1. Encode Points to Leaf Morton Keys, add a global index related to the processor
-        let dim = 3;
-        let npoints = points.len() / dim;
-
-        let mut tmp = Points::default();
-        for i in 0..npoints {
-            let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
-            let key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
-            tmp.points.push(Point {
-                coordinate: point,
-                base_key: key,
-                encoded_key: key,
-                global_idx: global_idxs[i],
-            })
-        }
-        let mut points = tmp;
-
-        // 2.i Perform parallel Morton sort over encoded points
-        let comm = world.duplicate();
-
-        hyksort(&mut points.points, k, comm);
-
-        // 2.ii Find unique leaf keys on each processor
-        let mut local = MortonKeys {
-            keys: points.points.iter().map(|p| p.encoded_key).collect(),
-            index: 0,
-        };
-
-        // 3. Linearise received keys (remove overlaps if they exist).
-        local.linearize();
-
-        // 4. Complete region spanned by node.
-        local.complete();
-
-        // 5.i Find seeds and compute the coarse blocktree
-        let mut seeds = SingleNodeTree::<T>::find_seeds(&local);
-
-        let blocktree = MultiNodeTree::<T>::complete_blocktree(world, &mut seeds);
-
-        // 5.ii any data below the min seed sent to partner process
-        let mut points =
-            MultiNodeTree::<T>::transfer_points_to_blocktree(world, &points.points[..], &blocktree);
-
-        // 6. Split blocks based on ncrit constraint
-        let mut locally_balanced =
-            SingleNodeTree::split_blocks(&mut points, blocktree, n_crit as usize);
-
-        // 7. Create a minimal balanced octree for local octants spanning their domain and linearize
-        locally_balanced.sort();
-        locally_balanced.balance();
-        locally_balanced.linearize();
-
-        // // 8. Find new maps between points and locally balanced tree
-        let _unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&locally_balanced, &mut points);
-
-        // 9. Perform another distributed sort and remove overlaps locally
-        let comm = world.duplicate();
-
-        hyksort(&mut points.points, k, comm);
-
-        let mut globally_balanced = MortonKeys {
-            keys: points.points.iter().map(|p| p.encoded_key).collect(),
-            index: 0,
-        };
-        globally_balanced.linearize();
-
-        // Group points by leaves
-        points.sort();
-
-        let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0];
-        let mut curr_idx = 0;
-
-        for (i, point) in points.points.iter().enumerate() {
-            if point.encoded_key != curr.encoded_key {
-                leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
-                curr_idx = i;
-                curr = *point;
-            }
-        }
-        leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
-
-        // 10. Find final maps to non-overlapping tree
-        let unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&globally_balanced, &mut points);
-
-        // Add unmapped leaves
-        let globally_balanced = MortonKeys {
-            keys: leaves_to_points
-                .keys()
-                .cloned()
-                .chain(unmapped.iter().copied())
-                .collect_vec(),
-            index: 0,
-        };
-
-        // Find all keys in tree
-        let tmp: HashSet<MortonKey> = globally_balanced
-            .iter()
-            .flat_map(|leaf| leaf.ancestors().into_iter())
-            .collect();
-
-        let mut keys = MortonKeys {
-            keys: tmp.into_iter().collect_vec(),
-            index: 0,
-        };
-
-        let leaves_set: HashSet<MortonKey> = globally_balanced.iter().cloned().collect();
-        let mut keys_set: HashSet<MortonKey> = HashSet::new();
-
-        // Create maps between points and globally balanced tree
-        let mut leaves_to_points = HashMap::new();
-        let mut curr = points.points[0];
-        let mut curr_idx = 0;
-
-        for (i, point) in points.points.iter().enumerate() {
-            if point.encoded_key != curr.encoded_key {
-                leaves_to_points.insert(curr.encoded_key, (curr_idx, i));
-                curr_idx = i;
-                curr = *point;
-            }
-        }
-        leaves_to_points.insert(curr.encoded_key, (curr_idx, points.points.len()));
-
-        for key in globally_balanced.iter() {
-            let ancestors = key.ancestors();
-            keys_set.extend(&ancestors);
-        }
-
-        let min = globally_balanced.iter().min().unwrap();
-        let max = globally_balanced.iter().max().unwrap();
-        let range = [world.rank() as KeyType, min.morton, max.morton];
-
-        // Group by level to perform efficient lookup of nodes
-        keys.sort_by_key(|a| a.level());
-
-        let mut levels_to_keys = HashMap::new();
-        let mut curr = keys[0];
-        let mut curr_idx = 0;
-        for (i, key) in keys.iter().enumerate() {
-            if key.level() != curr.level() {
-                levels_to_keys.insert(curr.level(), (curr_idx, i));
-                curr_idx = i;
-                curr = *key;
-            }
-        }
-        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
-
-        // Find depth
-        let depth = points
-            .points
-            .iter()
-            .map(|p| p.encoded_key.level())
-            .max()
-            .unwrap();
-
-        // Return tree in sorted order
-        for l in 0..=depth {
-            let &(l, r) = levels_to_keys.get(&l).unwrap();
-            let subset = &mut keys[l..r];
-            subset.sort();
-        }
-
-        let coordinates = points
-            .points
-            .iter()
-            .map(|p| p.coordinate)
-            .flat_map(|[x, y, z]| vec![x, y, z])
-            .collect_vec();
-        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
-
-        MultiNodeTree {
-            world: world.duplicate(),
-            depth,
-            domain: *domain,
-            points,
-            coordinates,
-            global_indices,
-            leaves: globally_balanced,
-            keys,
-            leaves_to_points,
+            leaves_to_coordinates: leaves_to_points,
             levels_to_keys,
             leaves_set,
             keys_set,
@@ -411,8 +206,7 @@ where
     /// * `global_idxs` - Globally unique indices for point data.
     pub fn new(
         world: &UserCommunicator,
-        points: &[PointType<T>],
-        adaptive: bool,
+        points: &[T],
         n_crit: Option<u64>,
         depth: Option<u64>,
         k: i32,
@@ -425,11 +219,7 @@ where
         let n_crit = n_crit.unwrap_or(N_CRIT);
         let depth = depth.unwrap_or(DEFAULT_LEVEL);
 
-        if adaptive {
-            MultiNodeTree::adaptive_tree(world, k, points, &domain, n_crit, global_idxs)
-        } else {
-            MultiNodeTree::uniform_tree(world, k, points, &domain, depth, global_idxs)
-        }
+        MultiNodeTree::uniform_tree(world, k, points, &domain, depth, global_idxs)
     }
 
     /// Complete a minimal distributed block tree from the seed octants.

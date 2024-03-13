@@ -13,13 +13,10 @@ use crate::types::{
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: Float + Default + RlstScalar<Real = T> ,
 {
     /// Depth of a tree.
     pub depth: u64,
-
-    /// Whether the tree is adaptive.
-    pub adaptive: bool,
 
     /// Domain spanned by the points.
     pub domain: Domain<T>,

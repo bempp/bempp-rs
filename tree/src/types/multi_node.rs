@@ -42,7 +42,7 @@ where
     pub keys: MortonKeys,
 
     /// Associate leaves with point indices.
-    pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,

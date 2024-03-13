@@ -74,13 +74,13 @@ mod test {
     use crate::types::{
         domain::Domain,
         morton::MortonKey,
-        point::{Point, PointType},
+        point::Point,
     };
 
     pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
         let mut range = StdRng::seed_from_u64(0);
         let between = rand::distributions::Uniform::from(0.0..1.0);
-        let mut points: Vec<[PointType<f64>; 3]> = Vec::new();
+        let mut points: Vec<[f64; 3]> = Vec::new();
 
         for _ in 0..npoints {
             points.push([

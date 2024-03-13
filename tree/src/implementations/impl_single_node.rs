@@ -11,7 +11,7 @@ use crate::{
     types::{
         domain::Domain,
         morton::{MortonKey, MortonKeys},
-        point::{Point, PointType, Points},
+        point::{Point, Points},
         single_node::SingleNodeTree,
     },
 };
@@ -163,7 +163,6 @@ where
 
         SingleNodeTree {
             depth,
-            adaptive: false,
             coordinates,
             global_indices,
             domain: *domain,
@@ -187,7 +186,7 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     fn uniform_tree_sparse(
-        points: &[PointType<T>],
+        points: &[T],
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
@@ -308,7 +307,6 @@ where
         }
         SingleNodeTree {
             depth,
-            adaptive: false,
             coordinates,
             global_indices,
             domain: *domain,

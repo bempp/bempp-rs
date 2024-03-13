@@ -21,7 +21,6 @@ use crate::{
     types::{
         domain::Domain,
         morton::{KeyType, MortonKey, MortonKeys},
-        point::PointType,
     },
 };
 
@@ -236,7 +235,7 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
 pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
-    point: &[PointType<T>; 3],
+    point: &[T; 3],
     level: KeyType,
     domain: &Domain<T>,
 ) -> Result<[KeyType; 3], Box<dyn Error>> {
@@ -320,7 +319,7 @@ impl MortonKey {
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
     pub fn from_point<T: Float + Default + Debug>(
-        point: &[PointType<T>; 3],
+        point: &[T; 3],
         domain: &Domain<T>,
         level: u64,
     ) -> Self {
@@ -590,8 +589,8 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The domain with which we are calculating with respect to.
-    pub fn to_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> [PointType<T>; 3] {
-        let mut coord: [PointType<T>; 3] = [T::zero(); 3];
+    pub fn to_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
+        let mut coord: [T; 3] = [T::zero(); 3];
 
         for (anchor_value, coord_ref, origin_value, diameter_value) in
             izip!(self.anchor, &mut coord, &domain.origin, &domain.diameter)
