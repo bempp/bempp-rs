@@ -2,8 +2,6 @@
 
 use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
 use crate::reference_cell;
-use bempp_tools::arrays::AdjacencyList;
-use bempp_traits::arrays::AdjacencyListAccess;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
 use bempp_traits::types::ReferenceCellType;
 use rlst_dense::linalg::inverse::MatrixInverse;
@@ -42,7 +40,7 @@ pub struct CiarletElement<T: RlstScalar> {
     continuity: Continuity,
     dim: usize,
     coefficients: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-    entity_dofs: [AdjacencyList<usize>; 4],
+    entity_dofs: [Vec<Vec<usize>>; 4],
     // interpolation_points: EntityPoints,
     // interpolation_weights: EntityWeights,
 }
@@ -212,17 +210,12 @@ where
             }
         }
 
-        let mut entity_dofs = [
-            AdjacencyList::<usize>::new(),
-            AdjacencyList::<usize>::new(),
-            AdjacencyList::<usize>::new(),
-            AdjacencyList::<usize>::new(),
-        ];
+        let mut entity_dofs = [vec![], vec![], vec![], vec![]];
         let mut dof = 0;
         for i in 0..4 {
             for pts in &new_pts[i] {
-                let dofs: Vec<usize> = (dof..dof + pts.shape()[0]).collect();
-                entity_dofs[i].add_row(&dofs);
+                let dofs = (dof..dof + pts.shape()[0]).collect::<Vec<_>>();
+                entity_dofs[i].push(dofs);
                 dof += pts.shape()[0];
             }
         }
@@ -318,7 +311,11 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
         }
     }
     fn entity_dofs(&self, entity_dim: usize, entity_number: usize) -> Option<&[usize]> {
-        self.entity_dofs[entity_dim].row(entity_number)
+        if entity_dim < 4 && entity_number < self.entity_dofs[entity_dim].len() {
+            Some(&self.entity_dofs[entity_dim][entity_number])
+        } else {
+            None
+        }
     }
 }
 
