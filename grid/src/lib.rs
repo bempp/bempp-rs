@@ -1,7 +1,6 @@
 //! A Rust grid library
 #![cfg_attr(feature = "strict", deny(warnings))]
-
-//pub mod io;
+#![warn(missing_docs)]
 
 pub mod common;
 pub mod flat_triangle_grid;

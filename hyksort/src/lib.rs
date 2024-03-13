@@ -6,6 +6,7 @@
 //!
 //! \[2\] <https://github.com/hsundar/usort>
 #![cfg_attr(feature = "strict", deny(warnings))]
+#![warn(missing_docs)]
 
 extern crate superslice;
 

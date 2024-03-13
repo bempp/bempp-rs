@@ -1,4 +1,7 @@
 //! A a general framework for implementing Fast Multipole Methods.
+#![cfg_attr(feature = "strict", deny(warnings))]
+#![warn(missing_docs)]
+
 pub mod builder;
 pub mod constants;
 pub mod fmm;
