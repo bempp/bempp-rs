@@ -5,6 +5,7 @@
 mod builder;
 mod geometry;
 mod grid;
+mod io;
 mod topology;
 
 pub use self::builder::SerialSingleElementGridBuilder;
