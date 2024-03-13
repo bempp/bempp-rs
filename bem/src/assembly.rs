@@ -1,3 +1,4 @@
+//! Boundary operator assembly
 pub mod batched;
 pub mod common;
 pub mod fmm_tools;
@@ -7,27 +8,40 @@ use bempp_traits::grid::GridType;
 use rlst_dense::{
     array::Array, base_array::BaseArray, data_container::VectorContainer, types::RlstScalar,
 };
+
+/// Boundary operator type
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum BoundaryOperator {
+    /// Single layer operator
     SingleLayer,
+    /// Double layer operator
     DoubleLayer,
+    /// Adjoint double layer operator
     AdjointDoubleLayer,
+    /// Hypersingular operator
     Hypersingular,
+    /// Electric field operator
     ElectricField,
+    /// Magnetic field operator
     MagneticField,
 }
 
+/// PDE type
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum PDEType {
+    /// Laplace
     Laplace,
+    /// Hemlholtz
     Helmholtz(f64),
 }
 
+/// Assembly type
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum AssemblyType {
+    /// Dense assembly
     Dense,
 }
 

@@ -1,7 +1,9 @@
+//! DOF map
 use bempp_traits::bem::DofMap;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, TopologyType};
 
+/// A serial DOF map
 pub struct SerialDofMap {
     entity_dofs: [Vec<Vec<usize>>; 4],
     cell_dofs: Vec<Vec<usize>>,
@@ -9,6 +11,7 @@ pub struct SerialDofMap {
 }
 
 impl SerialDofMap {
+    /// Create new DOF map
     pub fn new(grid: &impl GridType, element: &impl FiniteElement) -> Self {
         let mut size = 0;
         let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];

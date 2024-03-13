@@ -1,3 +1,4 @@
+//! Batched dense assembly
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
@@ -121,9 +122,11 @@ pub trait BatchedAssembler: Sync {
     //!
     //! Assemble operators by processing batches of cells in parallel
 
+    /// Real scalar type
     type RealT: RlstScalar<Real = Self::RealT> + Float;
+    /// Scalar type
     type T: RlstScalar<Real = Self::RealT>;
-
+    /// Number of derivatives
     const DERIV_SIZE: usize;
 
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
