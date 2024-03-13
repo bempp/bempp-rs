@@ -10,7 +10,3 @@ pub mod shapes;
 pub mod single_element_grid;
 pub mod traits;
 pub mod traits_impl;
-
-pub use self::traits::Geometry;
-pub use self::traits::Grid;
-pub use self::traits::Topology;
