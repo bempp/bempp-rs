@@ -3,6 +3,7 @@ use bempp_traits::types::RlstScalar;
 
 use crate::types::morton::MortonKey;
 
+/// Point type
 pub type PointType<T> = T;
 
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for

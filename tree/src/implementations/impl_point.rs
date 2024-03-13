@@ -49,6 +49,7 @@ impl<T> Points<T>
 where
     T: RlstScalar<Real = T>,
 {
+    /// Create new
     pub fn new() -> Points<T> {
         Points {
             points: Vec::new(),
@@ -56,10 +57,12 @@ where
         }
     }
 
+    /// Add a point
     pub fn add(&mut self, item: Point<T>) {
         self.points.push(item);
     }
 
+    /// Sort points
     pub fn sort(&mut self) {
         self.points.sort();
     }

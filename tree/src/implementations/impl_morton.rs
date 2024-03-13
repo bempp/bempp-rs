@@ -122,6 +122,7 @@ pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
 }
 
 impl MortonKeys {
+    /// Create new
     pub fn new() -> MortonKeys {
         MortonKeys {
             keys: Vec::new(),
@@ -129,6 +130,7 @@ impl MortonKeys {
         }
     }
 
+    /// Add a key
     pub fn add(&mut self, item: MortonKey) {
         self.keys.push(item);
     }
