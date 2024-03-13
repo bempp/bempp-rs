@@ -108,6 +108,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
     }
 }
 
+#[cfg(not(debug_assertions))]
 fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> + Sync>(
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
@@ -270,11 +271,9 @@ fn test_fmm_prototype_p1_p1() {
     fmm_prototype(&space, &space);
 }
 
+#[cfg(not(debug_assertions))]
 #[test]
 fn test_fmm_prototype_dp0_p1() {
-    #[cfg(debug_assertions)]
-    let grid = regular_sphere(0);
-    #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
     let element0 = create_element(
@@ -295,11 +294,9 @@ fn test_fmm_prototype_dp0_p1() {
     fmm_prototype(&space0, &space1);
 }
 
+#[cfg(not(debug_assertions))]
 #[test]
 fn test_fmm_dp0_dp0() {
-    #[cfg(debug_assertions)]
-    let grid = regular_sphere(0);
-    #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
     let element = create_element(
@@ -313,11 +310,9 @@ fn test_fmm_dp0_dp0() {
     fmm_matvec(&space, &space);
 }
 
+#[cfg(not(debug_assertions))]
 #[test]
 fn test_fmm_p1_p1() {
-    #[cfg(debug_assertions)]
-    let grid = regular_sphere(0);
-    #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
     let element = create_element(
@@ -331,11 +326,9 @@ fn test_fmm_p1_p1() {
     fmm_matvec(&space, &space);
 }
 
+#[cfg(not(debug_assertions))]
 #[test]
 fn test_fmm_dp0_p1() {
-    #[cfg(debug_assertions)]
-    let grid = regular_sphere(0);
-    #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
     let element0 = create_element(
