@@ -230,7 +230,7 @@ where
             .flat_map(|k| k.siblings())
             .collect();
 
-        // Store in a sorted vector
+        // Store in a sorted buffer
         let mut leaves = MortonKeys {
             keys: leaves.into_iter().collect_vec(),
             index: 0,
@@ -347,6 +347,9 @@ where
         domain: Option<Domain<T>>,
     ) -> SingleNodeTree<T> {
         let dim = 3;
+
+        // TODO, Domain should contain information about number of global and local points
+        // So that I can infer the tree depth
         let domain = domain.unwrap_or(Domain::from_local_points(points));
         let npoints = points.len() / dim;
         let global_idxs = (0..npoints).collect_vec();
