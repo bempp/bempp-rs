@@ -24,6 +24,13 @@ fn main() {
 
     // Print the vertices of each cell
     for cell in grid.iter_all_cells() {
-        println!("cell {}: {:?} ", cell.index(), cell.geometry().vertices().map(|v| v.index()).collect::<Vec<_>>());
+        println!(
+            "cell {}: {:?} ",
+            cell.index(),
+            cell.geometry()
+                .vertices()
+                .map(|v| v.index())
+                .collect::<Vec<_>>()
+        );
     }
 }
