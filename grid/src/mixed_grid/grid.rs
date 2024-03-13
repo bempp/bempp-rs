@@ -20,7 +20,7 @@ use std::collections::HashMap;
 /// A mixed grid
 pub struct SerialMixedGrid<T: Float + RlstScalar<Real = T>> {
     topology: SerialMixedTopology,
-    geometry: SerialMixedGeometry<T>,
+    pub(crate) geometry: SerialMixedGeometry<T>,
 }
 
 impl<T: Float + RlstScalar<Real = T>> SerialMixedGrid<T>

@@ -1,5 +1,5 @@
 //! Input/output
-use super::SerialSingleElementGrid;
+use super::SerialMixedGrid;
 use crate::io::{get_gmsh_cell, get_permutation_to_gmsh};
 use crate::traits::Geometry;
 use bempp_traits::{element::FiniteElement, grid::GmshIO};
@@ -9,13 +9,10 @@ use rlst_dense::{
     types::RlstScalar,
 };
 
-impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialSingleElementGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialMixedGrid<T> {
     fn to_gmsh_string(&self) -> String {
         let cell_count = self.geometry.cell_count();
         let node_count = self.geometry.coordinates.shape()[0];
-        let edim = self.geometry.element.dim();
-        let cell_type = self.geometry.element.cell_type();
-        let degree = self.geometry.element.embedded_superdegree();
 
         let mut gmsh_s = String::from("");
         gmsh_s.push_str("$MeshFormat\n");
@@ -42,18 +39,29 @@ impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialSingleElementGrid<T> {
         gmsh_s.push_str("$EndNodes\n");
         gmsh_s.push_str("$Elements\n");
 
-        gmsh_s.push_str(&format!("1 {cell_count} 1 {cell_count}\n"));
         gmsh_s.push_str(&format!(
-            "2 1 {} {cell_count}\n",
-            get_gmsh_cell(cell_type, degree)
+            "{} {cell_count} 1 {cell_count}\n",
+            self.geometry.elements.len()
         ));
-        let gmsh_perm = get_permutation_to_gmsh(cell_type, degree);
-        for i in 0..cell_count {
-            gmsh_s.push_str(&format!("{}", i + 1));
-            for j in &gmsh_perm {
-                gmsh_s.push_str(&format!(" {}", self.geometry.cells[i * edim + *j] + 1))
+
+        for (e_index, element) in self.geometry.elements.iter().enumerate() {
+            let cell_type = element.cell_type();
+            let degree = element.embedded_superdegree();
+            let gmsh_perm = get_permutation_to_gmsh(cell_type, degree);
+
+            gmsh_s.push_str(&format!(
+                "2 1 {} {}\n",
+                get_gmsh_cell(cell_type, degree),
+                self.geometry.cell_indices[e_index].len()
+            ));
+            for (i, index) in self.geometry.cell_indices[e_index].iter().enumerate() {
+                let points = self.geometry.cell_points(*index).unwrap();
+                gmsh_s.push_str(&format!("{}", i + 1));
+                for j in &gmsh_perm {
+                    gmsh_s.push_str(&format!(" {}", points[*j] + 1))
+                }
+                gmsh_s.push('\n');
             }
-            gmsh_s.push('\n');
         }
         gmsh_s.push_str("$EndElements\n");
 
