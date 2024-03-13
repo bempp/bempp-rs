@@ -17,6 +17,7 @@ pub type SvdM2lEntry<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// of the halo box.
 pub type FftKernelData<C> = Vec<Vec<C>>;
 
+/// FFT field translation for KiFMM
 #[derive(Default)]
 pub struct FftFieldTranslationKiFmm<T, U>
 where
@@ -38,6 +39,7 @@ where
     /// The associated kernel with this translation operator.
     pub kernel: U,
 
+    /// Expansion order
     pub expansion_order: usize,
 }
 
@@ -52,6 +54,7 @@ where
     T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
 {
+    /// Threshold
     pub threshold: T,
 
     /// Precomputed data required for SVD compressed M2L interaction.
@@ -63,8 +66,10 @@ where
     /// The associated kernel with this translation operator.
     pub kernel: U,
 
+    /// Expansion order
     pub expansion_order: usize,
 
+    /// Cutoff rank
     pub cutoff_rank: usize,
 }
 
@@ -87,16 +92,15 @@ pub struct TransferVector {
 /// Container for the precomputed data required for FFT field translation.
 #[derive(Default)]
 pub struct FftM2lOperatorData<C> {
-    // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set
+    /// FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set
     pub kernel_data: FftKernelData<C>,
 
-    // FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set, re-arranged in frequency order
+    /// FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set, re-arranged in frequency order
     pub kernel_data_f: FftKernelData<C>,
 }
 
 /// Container to store precomputed data required for SVD field translations.
 /// See Fong & Darve (2009) for the definitions of 'fat' and 'thin' M2L matrices.
-// #[derive(Default)]
 pub struct BlasSourceToTargetOperatorData<T>
 where
     T: RlstScalar,
