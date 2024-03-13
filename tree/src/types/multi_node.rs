@@ -53,6 +53,12 @@ where
     /// All keys, returned as a set.
     pub keys_set: HashSet<MortonKey>,
 
+    /// Map between a key and its index
+    pub key_to_index: HashMap<MortonKey, usize>,
+
+    /// Map between a leaf and its index
+    pub leaf_to_index: HashMap<MortonKey, usize>,
+
     /// Range of Morton keys at this processor, and their current rank [rank, min, max]
     pub range: [KeyType; 3],
 }

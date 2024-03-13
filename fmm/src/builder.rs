@@ -357,32 +357,16 @@ where
         let locals = vec![W::default(); self.ncoeffs * ntarget_keys * nmatvecs];
 
         // Mutable pointers to multipole and local data, indexed by level
-        let mut level_multipoles = vec![
-            Vec::new();
-            (self.tree.source_tree().depth() + 1)
-                .try_into()
-                .unwrap()
-        ];
-        let mut level_locals = vec![
-            Vec::new();
-            (self.tree.target_tree().depth() + 1)
-                .try_into()
-                .unwrap()
-        ];
+        let mut level_multipoles =
+            vec![Vec::new(); (self.tree.source_tree().depth() + 1).try_into().unwrap()];
+        let mut level_locals =
+            vec![Vec::new(); (self.tree.target_tree().depth() + 1).try_into().unwrap()];
 
         // Index pointers of multipole and local data, indexed by level
-        let mut level_index_pointer_multipoles = vec![
-            HashMap::new();
-            (self.tree.source_tree().depth() + 1)
-                .try_into()
-                .unwrap()
-        ];
-        let mut level_index_pointer_locals = vec![
-            HashMap::new();
-            (self.tree.target_tree().depth() + 1)
-                .try_into()
-                .unwrap()
-        ];
+        let mut level_index_pointer_multipoles =
+            vec![HashMap::new(); (self.tree.source_tree().depth() + 1).try_into().unwrap()];
+        let mut level_index_pointer_locals =
+            vec![HashMap::new(); (self.tree.target_tree().depth() + 1).try_into().unwrap()];
 
         // Mutable pointers to multipole and local data only at leaf level
         let mut leaf_multipoles = vec![Vec::new(); nsource_leaves];

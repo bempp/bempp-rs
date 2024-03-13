@@ -71,11 +71,7 @@ mod test {
     use rand::SeedableRng;
 
     use crate::constants::DEEPEST_LEVEL;
-    use crate::types::{
-        domain::Domain,
-        morton::MortonKey,
-        point::Point,
-    };
+    use crate::types::{domain::Domain, morton::MortonKey, point::Point};
 
     pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
         let mut range = StdRng::seed_from_u64(0);

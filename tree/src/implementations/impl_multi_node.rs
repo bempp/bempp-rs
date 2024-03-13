@@ -175,6 +175,17 @@ where
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+        let mut key_to_index = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
+
+        let mut leaf_to_index = HashMap::new();
+
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
 
         MultiNodeTree {
             world: world.duplicate(),
@@ -190,6 +201,8 @@ where
             leaves_set,
             keys_set,
             range,
+            key_to_index,
+            leaf_to_index,
         }
     }
 
@@ -220,11 +233,10 @@ where
     }
 }
 
-impl <T> Tree for MultiNodeTree<T>
+impl<T> Tree for MultiNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>
+    T: Float + Default + RlstScalar<Real = T>,
 {
-
     type Precision = T;
     type Domain = Domain<T>;
     type Node = MortonKey;
@@ -233,19 +245,23 @@ where
     type Nodes = MortonKeys;
 
     fn node(&self, idx: usize) -> Option<&Self::Node> {
-        None
+        Some(&self.keys[idx])
     }
 
     fn nkeys_tot(&self) -> Option<usize> {
-        None
+        Some(self.keys.len())
     }
 
     fn nkeys(&self, level: u64) -> Option<usize> {
-        None
+        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+            Some(r - l)
+        } else {
+            None
+        }
     }
 
     fn nleaves(&self) -> Option<usize> {
-        None
+        Some(self.leaves.len())
     }
 
     fn domain(&self) -> &'_ Self::Domain {
@@ -253,43 +269,51 @@ where
     }
 
     fn keys(&self, level: u64) -> Option<Self::NodeSlice<'_>> {
-        None
+        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+            Some(&self.keys[l..r])
+        } else {
+            None
+        }
     }
 
     fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>> {
-        None
+        Some(&self.keys_set)
     }
 
     fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>> {
-        None
+        Some(&self.leaves_set)
     }
 
     fn coordinates<'a>(&'a self, key: &Self::Node) -> Option<&'a [Self::Precision]> {
-        None
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
+            Some(&self.coordinates[l * 3..r * 3])
+        } else {
+            None
+        }
     }
 
     fn all_coordinates(&self) -> Option<&[Self::Precision]> {
-        None
+        Some(&self.coordinates)
     }
 
     fn all_global_indices(&self) -> Option<&[usize]> {
-        None
+        Some(&self.global_indices)
     }
 
     fn index(&self, key: &Self::Node) -> Option<&usize> {
-        None
+        self.key_to_index.get(key)
     }
 
     fn leaf_index(&self, key: &Self::Node) -> Option<&usize> {
-        None
+        self.leaf_to_index.get(key)
     }
 
     fn all_keys(&self) -> Option<Self::NodeSlice<'_>> {
-        None
+        Some(&self.keys)
     }
 
     fn all_leaves(&self) -> Option<Self::NodeSlice<'_>> {
-        None
+        Some(&self.leaves)
     }
 
     fn depth(&self) -> u64 {
@@ -297,6 +321,10 @@ where
     }
 
     fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]> {
-        None
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
+            Some(&self.global_indices[l..r])
+        } else {
+            None
+        }
     }
 }

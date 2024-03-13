@@ -13,7 +13,7 @@ use crate::types::{
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T> ,
+    T: Float + Default + RlstScalar<Real = T>,
 {
     /// Depth of a tree.
     pub depth: u64,
