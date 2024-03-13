@@ -1,7 +1,6 @@
 //! Helper Routines for MPI functionality
 use mpi::{
-    datatype::Equivalence,
-    topology::{Communicator, UserCommunicator},
+    topology::{UserCommunicator},
     traits::*,
     Count, Rank,
 };
