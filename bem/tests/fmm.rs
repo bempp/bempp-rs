@@ -13,6 +13,8 @@ use bempp_traits::fmm::Fmm;
 use bempp_traits::grid::GridType;
 use bempp_traits::kernel::Kernel;
 use bempp_traits::tree::FmmTree;
+#[cfg(not(debug_assertions))]
+use bempp_traits::tree::Tree;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::ReferenceCellType;
 use rand::prelude::*;

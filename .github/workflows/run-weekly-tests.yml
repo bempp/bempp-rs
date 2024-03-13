@@ -38,13 +38,13 @@ jobs:
 
 
       - name: Run unit tests
-        run: cargo test --lib --features "strict"
+        run: cargo test --features "strict"
       - name: Run unit tests in release mode
-        run: cargo test --lib --release --features "strict"
+        run: cargo test --release --features "strict"
       - name: Run unit tests with mpi enabled
-        run: cargo test --lib --features "mpi,strict"
+        run: cargo test --features "mpi,strict"
       - name: Run unit tests in release mode with mpi enabled
-        run: cargo test --lib --release --features "mpi,strict"
+        run: cargo test --release --features "mpi,strict"
       - name: Run tests
         run: cargo test --examples --release --features "mpi,strict"
       - name: Test benchmarks build
