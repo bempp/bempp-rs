@@ -17,7 +17,7 @@ use hyksort::hyksort;
 // use bempp_traits::tree::Tree;
 
 use crate::{
-    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, NCRIT, ROOT},
+    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, N_CRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
@@ -422,7 +422,7 @@ where
 
         let domain = Domain::from_global_points(points, world);
 
-        let n_crit = n_crit.unwrap_or(NCRIT);
+        let n_crit = n_crit.unwrap_or(N_CRIT);
         let depth = depth.unwrap_or(DEFAULT_LEVEL);
 
         if adaptive {

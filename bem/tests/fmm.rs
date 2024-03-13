@@ -4,21 +4,18 @@ use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_field::types::FftFieldTranslationKiFmm;
-use bempp_fmm::{
-    charge::build_charge_dict,
-    types::{FmmDataUniform, KiFmmLinear},
-};
+use bempp_fmm::types::KiFmmBuilderSingleNode;
+use bempp_traits::tree::FmmTree;
+
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::bem::{DofMap, FunctionSpace};
 use bempp_traits::element::Continuity;
-use bempp_traits::fmm::{Fmm, FmmLoop};
+use bempp_traits::fmm::Fmm;
 use bempp_traits::grid::GridType;
 use bempp_traits::kernel::Kernel;
 use bempp_traits::tree::Tree;
 use bempp_traits::types::EvalType;
-use bempp_traits::types::ReferenceCellType;
-use bempp_tree::types::single_node::SingleNodeTree;
 use rand::prelude::*;
 use rlst_dense::{
     array::empty_array,
@@ -128,7 +125,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     let test_ndofs = test_space.dofmap().global_size();
     let trial_ndofs = trial_space.dofmap().global_size();
     let nqpts = NPTS * grid.number_of_cells();
-    let kernel = Laplace3dKernel::new();
+
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
     let a = batched::LaplaceSingleLayerAssembler::default();
@@ -138,11 +135,9 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     let all_points = fmm_tools::get_all_quadrature_points::<NPTS, f64, TrialGrid>(grid);
 
     // FMM parameters
-    let order = 6;
-    let alpha_inner = 1.05;
-    let alpha_outer = 2.95;
-    let depth = 3;
-    let global_idxs: Vec<_> = (0..nqpts).collect();
+    let expansion_order = 6;
+    let n_crit = Some(150);
+    let sparse = true;
 
     let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128, f64, f64, TestGrid>(
         test_space,
@@ -198,33 +193,29 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
             *temp0.get_mut([row, 0]).unwrap() += data * vec.get([*index, 0]).unwrap();
         }
 
-        let tree = SingleNodeTree::new(
-            all_points.data(),
-            false,
-            None,
-            Some(depth),
-            &global_idxs,
-            true,
-        );
-        let m2l_data =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinear::new(
-            order,
-            alpha_inner,
-            alpha_outer,
-            kernel.clone(),
-            tree,
-            m2l_data,
-        );
-        let charge_dict = build_charge_dict(&global_idxs, temp0.data());
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-        datatree.run(false);
+        let fmm = KiFmmBuilderSingleNode::new()
+            .tree(&all_points, &all_points, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &temp0,
+                expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                FftFieldTranslationKiFmm::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        fmm.evaluate();
 
         let mut temp1 = rlst_dynamic_array2!(f64, [nqpts, 1]);
-        let indices = &datatree.fmm.tree().global_indices;
+        let indices = &fmm.tree().target_tree().all_global_indices().unwrap();
+
         for (i, j) in indices.iter().enumerate() {
-            *temp1.get_mut([*j, 0]).unwrap() = datatree.potentials[i];
+            *temp1.get_mut([*j, 0]).unwrap() = fmm.potentials[i];
         }
+
         let mut row = 0;
         for (i, (index, data)) in p_t.indices().iter().zip(p_t.data()).enumerate() {
             while i >= p_t.indptr()[row + 1] {
@@ -376,11 +367,9 @@ fn test_fmm_result() {
 
     let all_points = fmm_tools::get_all_quadrature_points::<NPTS, f64, _>(&grid);
 
-    let order = 6;
-    let alpha_inner = 1.05;
-    let alpha_outer = 2.95;
-    let depth = 3;
-    let global_idxs: Vec<_> = (0..nqpts).collect();
+    let expansion_order = 6;
+    let n_crit = Some(1);
+    let sparse = true;
 
     let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
     kernel.assemble_st(
@@ -390,7 +379,8 @@ fn test_fmm_result() {
         k.data_mut(),
     );
 
-    let mut rng = rand::thread_rng();
+    // let mut rng: ThreadRng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0);
 
     let mut vec = rlst_dynamic_array2!(f64, [nqpts, 1]);
     for i in 0..nqpts {
@@ -398,34 +388,26 @@ fn test_fmm_result() {
     }
     let dense_result = empty_array::<f64, 2>().simple_mult_into_resize(k.view(), vec.view());
 
-    let tree = SingleNodeTree::new(
-        all_points.data(),
-        false,
-        None,
-        Some(depth),
-        &global_idxs,
-        true,
-    );
+    let fmm = KiFmmBuilderSingleNode::new()
+        .tree(&all_points, &all_points, n_crit, sparse)
+        .unwrap()
+        .parameters(
+            &vec,
+            expansion_order,
+            Laplace3dKernel::new(),
+            EvalType::Value,
+            FftFieldTranslationKiFmm::new(),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
 
-    let m2l_data =
-        FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-    let fmm = KiFmmLinear::new(
-        order,
-        alpha_inner,
-        alpha_outer,
-        kernel.clone(),
-        tree,
-        m2l_data,
-    );
-    let charge_dict = build_charge_dict(&global_idxs, vec.data());
-    let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-    datatree.run(false);
+    fmm.evaluate();
 
-    let indices = &datatree.fmm.tree().global_indices;
-
+    let indices = &fmm.tree().target_tree().global_indices;
     let mut fmm_result = rlst_dynamic_array2!(f64, [nqpts, 1]);
     for (i, j) in indices.iter().enumerate() {
-        *fmm_result.get_mut([*j, 0]).unwrap() = datatree.potentials[i];
+        *fmm_result.get_mut([*j, 0]).unwrap() = fmm.potentials[i];
     }
 
     for i in 0..nqpts {

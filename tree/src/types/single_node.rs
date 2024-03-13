@@ -7,11 +7,10 @@ use num::Float;
 use crate::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},
-    point::Points,
 };
 
 /// Local Trees (non-distributed).
-#[derive(Debug)]
+#[derive(Default)]
 pub struct SingleNodeTree<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
@@ -25,9 +24,6 @@ where
     /// Domain spanned by the points.
     pub domain: Domain<T>,
 
-    ///  All Points.
-    pub points: Points<T>,
-
     /// All coordinates
     pub coordinates: Vec<T>,
 
@@ -40,8 +36,8 @@ where
     /// All nodes in tree, and associated Node data.
     pub keys: MortonKeys,
 
-    /// Associate leaves with point indices.
-    pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
+    /// Associate leaves with coordinate indices.
+    pub leaves_to_coordinates: HashMap<MortonKey, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,

@@ -24,6 +24,7 @@ bempp-traits = { path = "../traits" }
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 num = "0.4"
+cauchy = "0.4.0"
 
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]

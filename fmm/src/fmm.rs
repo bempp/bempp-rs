@@ -1,211 +1,286 @@
 //! Implementation of FmmData and Fmm traits.
-use itertools::Itertools;
 use num::Float;
-use rlst_dense::types::RlstScalar;
-use std::time::Instant;
-
-use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
-};
+use rlst_dense::{rlst_dynamic_array2, types::RlstScalar};
 
 use bempp_traits::{
-    field::{FieldTranslation, FieldTranslationData},
-    fmm::{Fmm, FmmLoop, KiFmm as KiFmmTrait, SourceTranslation, TargetTranslation, TimeDict},
-    kernel::{Kernel, ScaleInvariantKernel},
-    tree::Tree,
+    field::{SourceToTarget, SourceToTargetData},
+    fmm::{Fmm, SourceTranslation, TargetTranslation},
+    kernel::Kernel,
+    tree::{FmmTree, Tree},
     types::EvalType,
 };
 
-use bempp_tree::{constants::ROOT, types::single_node::SingleNodeTree};
+use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::types::{FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinearMatrix};
-use crate::{pinv::pinv, types::KiFmmLinear};
+use crate::types::{FmmEvalType, KiFmm, KiFmmDummy};
 
-/// Implementation of constructor for single node KiFMM
-impl<T, U, V> KiFmmLinear<SingleNodeTree<V>, T, U, V>
+impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
-    U: FieldTranslationData<T>,
-    V: RlstScalar<Real = V> + Float + Default,
-    Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
+    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
+    U: SourceToTargetData<V> + Send + Sync,
+    V: Kernel<T = W> + Send + Sync,
+    W: RlstScalar<Real = W> + Float + Default,
+    Self: SourceToTarget,
 {
-    /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
-    /// the associated single node octree, and the associated kernel function.
-    ///
-    /// # Arguments
-    /// * `order` - The expansion order for the multipole and local expansions.
-    /// * `alpha_inner` - The ratio of the inner check surface diamater in comparison to the surface discretising a box.
-    /// * `alpha_order` - The ratio of the outer check surface diamater in comparison to the surface discretising a box.
-    /// * `kernel` - The kernel function for this FMM.
-    /// * `tree` - The type of tree associated with this FMM, can be single or multi node.
-    /// * `m2l` - The M2L operator matrices, as well as metadata associated with this FMM.
-    pub fn new(
-        order: usize,
-        alpha_inner: V,
-        alpha_outer: V,
-        kernel: T,
-        tree: SingleNodeTree<V>,
-        m2l: U,
-    ) -> Self {
-        let upward_equivalent_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
-        let upward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
-        let downward_equivalent_surface =
-            ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
-        let downward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
+    type NodeIndex = T::Node;
+    type Precision = W;
+    type Kernel = V;
+    type Tree = T;
 
-        let nequiv_surface = upward_equivalent_surface.len() / kernel.space_dimension();
-        let ncheck_surface = upward_check_surface.len() / kernel.space_dimension();
+    fn dim(&self) -> usize {
+        self.dim
+    }
 
-        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
-        // as well as their inverses using DGESVD.
-        let mut uc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-        kernel.assemble_st(
-            EvalType::Value,
-            &upward_equivalent_surface[..],
-            &upward_check_surface[..],
-            uc2e_t.data_mut(),
-        );
-
-        // Need to tranapose so that rows correspond to targets and columns to sources
-        let mut uc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-        uc2e.fill_from(uc2e_t.transpose());
-
-        let mut dc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-        kernel.assemble_st(
-            EvalType::Value,
-            &downward_equivalent_surface[..],
-            &downward_check_surface[..],
-            dc2e_t.data_mut(),
-        );
-
-        // Need to tranapose so that rows correspond to targets and columns to sources
-        let mut dc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-        dc2e.fill_from(dc2e_t.transpose());
-
-        let (s, ut, v) = pinv::<V>(&uc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = V::from_real(s[i]);
+    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+        if let Some(index) = self.tree.source_tree().index(key) {
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => {
+                    Some(&self.multipoles[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                }
+                FmmEvalType::Matrix(nmatvecs) => Some(
+                    &self.multipoles
+                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
+                ),
+            }
+        } else {
+            None
         }
-        let uc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let uc2e_inv_2 = ut;
+    }
 
-        let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = V::from_real(s[i]);
+    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+        if let Some(index) = self.tree.target_tree().index(key) {
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => {
+                    Some(&self.locals[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                }
+                FmmEvalType::Matrix(nmatvecs) => Some(
+                    &self.locals
+                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
+                ),
+            }
+        } else {
+            None
         }
+    }
 
-        let dc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let dc2e_inv_2 = ut;
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
+            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
+            let ntargets = r - l;
 
-        // Calculate M2M/L2L matrices
-        let children = ROOT.children();
-        let mut m2m = rlst_dynamic_array2!(V, [nequiv_surface, 8 * nequiv_surface]);
-        let mut l2l = Vec::new();
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => Some(vec![
+                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
+                ]),
+                FmmEvalType::Matrix(nmatvecs) => {
+                    let nleaves = self.tree.target_tree().nleaves().unwrap();
+                    let mut slices = Vec::new();
+                    for eval_idx in 0..nmatvecs {
+                        let potentials_pointer =
+                            self.potentials_send_pointers[eval_idx * nleaves + leaf_idx].raw;
+                        slices.push(unsafe {
+                            std::slice::from_raw_parts(
+                                potentials_pointer,
+                                ntargets * self.kernel_eval_size,
+                            )
+                        });
+                    }
+                    Some(slices)
+                }
+            }
+        } else {
+            None
+        }
+    }
 
-        for (i, child) in children.iter().enumerate() {
-            let child_upward_equivalent_surface =
-                child.compute_surface(tree.get_domain(), order, alpha_inner);
-            let child_downward_check_surface =
-                child.compute_surface(tree.get_domain(), order, alpha_inner);
+    fn expansion_order(&self) -> usize {
+        self.expansion_order
+    }
 
-            let mut pc2ce_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
 
-            kernel.assemble_st(
-                EvalType::Value,
-                &child_upward_equivalent_surface,
-                &upward_check_surface,
-                pc2ce_t.data_mut(),
-            );
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
+    }
 
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut pc2ce = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-            pc2ce.fill_from(pc2ce_t.transpose());
-
-            let tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                uc2e_inv_1.view(),
-                empty_array::<V, 2>().simple_mult_into_resize(uc2e_inv_2.view(), pc2ce.view()),
-            );
-            let l = i * nequiv_surface * nequiv_surface;
-            let r = l + nequiv_surface * nequiv_surface;
-
-            m2m.data_mut()[l..r].copy_from_slice(tmp.data());
-
-            let mut cc2pe_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-
-            kernel.assemble_st(
-                EvalType::Value,
-                &downward_equivalent_surface,
-                &child_downward_check_surface,
-                cc2pe_t.data_mut(),
-            );
-
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut cc2pe = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-            cc2pe.fill_from(cc2pe_t.transpose());
-            let mut tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                dc2e_inv_1.view(),
-                empty_array::<V, 2>().simple_mult_into_resize(dc2e_inv_2.view(), cc2pe.view()),
-            );
-            tmp.data_mut()
-                .iter_mut()
-                .for_each(|d| *d *= kernel.scale(child.level()));
-
-            l2l.push(tmp);
+    fn evaluate(&self) {
+        // Upward pass
+        {
+            self.p2m();
+            for level in (1..=self.tree.source_tree().get_depth()).rev() {
+                self.m2m(level);
+            }
         }
 
-        Self {
-            order,
+        // Downward pass
+        {
+            for level in 2..=self.tree.target_tree().get_depth() {
+                if level > 2 {
+                    self.l2l(level);
+                }
+                self.m2l(level);
+                self.p2l(level)
+            }
+
+            // Leaf level computations
+            self.m2p();
+            self.p2p();
+            self.l2p();
+        }
+    }
+}
+
+impl<T, U, V, W> Default for KiFmm<T, U, V, W>
+where
+    T: FmmTree<Tree = SingleNodeTree<W>> + Default,
+    U: SourceToTargetData<V> + Default,
+    V: Kernel + Default,
+    W: RlstScalar<Real = W> + Float + Default,
+{
+    fn default() -> Self {
+        let uc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
+        let uc2e_inv_2 = rlst_dynamic_array2!(W, [1, 1]);
+        let dc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
+        let dc2e_inv_2 = rlst_dynamic_array2!(W, [1, 1]);
+        let source = rlst_dynamic_array2!(W, [1, 1]);
+        KiFmm {
+            tree: T::default(),
+            source_to_target_translation_data: U::default(),
+            kernel: V::default(),
+            expansion_order: 0,
+            fmm_eval_type: FmmEvalType::Vector,
+            kernel_eval_type: EvalType::Value,
+            kernel_eval_size: 0,
+            dim: 0,
+            ncoeffs: 0,
             uc2e_inv_1,
             uc2e_inv_2,
             dc2e_inv_1,
             dc2e_inv_2,
-            alpha_inner,
-            alpha_outer,
-            m2m,
-            l2l,
-            kernel,
-            tree,
-            m2l,
+            source_data: source,
+            source_translation_data_vec: Vec::default(),
+            target_data: Vec::default(),
+            multipoles: Vec::default(),
+            locals: Vec::default(),
+            leaf_multipoles: Vec::default(),
+            level_multipoles: Vec::default(),
+            leaf_locals: Vec::default(),
+            level_locals: Vec::default(),
+            level_index_pointer_locals: Vec::default(),
+            level_index_pointer_multipoles: Vec::default(),
+            potentials: Vec::default(),
+            potentials_send_pointers: Vec::default(),
+            leaf_upward_surfaces_sources: Vec::default(),
+            leaf_upward_surfaces_targets: Vec::default(),
+            leaf_downward_surfaces: Vec::default(),
+            charges: Vec::default(),
+            charge_index_pointer_sources: Vec::default(),
+            charge_index_pointer_targets: Vec::default(),
+            leaf_scales_sources: Vec::default(),
+            global_indices: Vec::default(),
         }
     }
 }
 
-impl<T, U, V, W> KiFmmTrait for KiFmmLinear<T, U, V, W>
+impl<T, U, V> Fmm for KiFmmDummy<T, U, V>
 where
-    T: Tree,
-    U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
-    W: RlstScalar + Float + Default,
+    T: FmmTree<Tree = SingleNodeTree<U>, Node = MortonKey>,
+    U: RlstScalar<Real = U> + Float + Default,
+    V: Kernel<T = U> + Send + Sync,
 {
-    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_inner
-    }
-
-    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_outer
-    }
-}
-
-impl<T, U, V, W> Fmm for KiFmmLinear<T, U, V, W>
-where
-    T: Tree,
-    U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
-    W: RlstScalar + Float + Default,
-{
+    type NodeIndex = T::Node;
+    type Precision = U;
     type Tree = T;
-    type Kernel = U;
+    type Kernel = V;
 
-    fn order(&self) -> usize {
-        self.order
+    fn dim(&self) -> usize {
+        3
+    }
+
+    fn multipole(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+        None
+    }
+
+    fn local(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+        None
+    }
+
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+        let ntarget_coordinates =
+            self.tree.target_tree().all_coordinates().unwrap().len() / self.dim();
+
+        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
+            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
+
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => Some(vec![
+                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
+                ]),
+                FmmEvalType::Matrix(nmatvecs) => {
+                    let mut slices = Vec::new();
+                    for eval_idx in 0..nmatvecs {
+                        let vec_displacement = eval_idx * ntarget_coordinates;
+                        let slice = &self.potentials[vec_displacement + l..vec_displacement + r];
+                        slices.push(slice);
+                    }
+                    Some(slices)
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn evaluate(&self) {
+        let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
+        let ntarget_coordinates = all_target_coordinates.len() / self.dim();
+        let all_source_coordinates = self.tree.source_tree().all_coordinates().unwrap();
+        let nsource_coordinates = all_target_coordinates.len() / self.dim();
+
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
+                let charges = &self.charges;
+                let res = unsafe {
+                    std::slice::from_raw_parts_mut(
+                        self.potentials.as_ptr() as *mut U,
+                        ntarget_coordinates,
+                    )
+                };
+                self.kernel.evaluate_st(
+                    self.kernel_eval_type,
+                    all_source_coordinates,
+                    all_target_coordinates,
+                    charges,
+                    res,
+                )
+            }
+
+            FmmEvalType::Matrix(nmatvec) => {
+                for i in 0..nmatvec {
+                    let charges_i =
+                        &self.charges[i * nsource_coordinates..(i + 1) * nsource_coordinates];
+                    let res_i = unsafe {
+                        std::slice::from_raw_parts_mut(
+                            self.potentials.as_ptr().add(ntarget_coordinates) as *mut U,
+                            ntarget_coordinates,
+                        )
+                    };
+                    self.kernel.evaluate_st(
+                        self.kernel_eval_type,
+                        all_source_coordinates,
+                        all_target_coordinates,
+                        charges_i,
+                        res_i,
+                    )
+                }
+            }
+        }
+    }
+
+    fn expansion_order(&self) -> usize {
+        self.expansion_order
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -214,1763 +289,444 @@ where
 
     fn tree(&self) -> &Self::Tree {
         &self.tree
-    }
-}
-
-/// Implementation of constructor for single node KiFMM
-impl<T, U, V> KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>
-where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V>,
-    U: FieldTranslationData<T>,
-    V: RlstScalar<Real = V> + Float + Default,
-    Array<V, BaseArray<V, VectorContainer<V>, 2>, 2>: MatrixSvd<Item = V>,
-{
-    /// Constructor for single node kernel independent FMM (KiFMM). This object contains all the precomputed operator matrices and metadata, as well as references to
-    /// the associated single node octree, and the associated kernel function.
-    ///
-    /// # Arguments
-    /// * `order` - The expansion order for the multipole and local expansions.
-    /// * `alpha_inner` - The ratio of the inner check surface diamater in comparison to the surface discretising a box.
-    /// * `alpha_order` - The ratio of the outer check surface diamater in comparison to the surface discretising a box.
-    /// * `kernel` - The kernel function for this FMM.
-    /// * `tree` - The type of tree associated with this FMM, can be single or multi node.
-    /// * `m2l` - The M2L operator matrices, as well as metadata associated with this FMM.
-    pub fn new(
-        order: usize,
-        alpha_inner: V,
-        alpha_outer: V,
-        kernel: T,
-        tree: SingleNodeTree<V>,
-        m2l: U,
-    ) -> Self {
-        let upward_equivalent_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
-        let upward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
-        let downward_equivalent_surface =
-            ROOT.compute_surface(tree.get_domain(), order, alpha_outer);
-        let downward_check_surface = ROOT.compute_surface(tree.get_domain(), order, alpha_inner);
-
-        let nequiv_surface = upward_equivalent_surface.len() / kernel.space_dimension();
-        let ncheck_surface = upward_check_surface.len() / kernel.space_dimension();
-
-        // Compute upward check to equivalent, and downward check to equivalent Gram matrices
-        // as well as their inverses using DGESVD.
-        let mut uc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-        kernel.assemble_st(
-            EvalType::Value,
-            &upward_equivalent_surface,
-            &upward_check_surface,
-            uc2e_t.data_mut(),
-        );
-
-        // Need to tranapose so that rows correspond to targets and columns to sources
-        let mut uc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-        uc2e.fill_from(uc2e_t.transpose());
-
-        let mut dc2e_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-        kernel.assemble_st(
-            EvalType::Value,
-            &downward_equivalent_surface,
-            &downward_check_surface,
-            dc2e_t.data_mut(),
-        );
-
-        // Need to tranapose so that rows correspond to targets and columns to sources
-        let mut dc2e = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-        dc2e.fill_from(dc2e_t.transpose());
-
-        let (s, ut, v) = pinv::<V>(&uc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = V::from_real(s[i]);
-        }
-        let uc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let uc2e_inv_2 = ut;
-
-        let uc2e_inv_1_shape = uc2e_inv_1.shape();
-        let uc2e_inv_2_shape = uc2e_inv_2.shape();
-
-        // TODO: Can this be reduced to one copy?
-        let uc2e_inv_1 = uc2e_inv_1
-            .data()
-            .iter()
-            .map(|x| V::from(*x).unwrap())
-            .collect_vec();
-        let mut uc2e_inv_1_mat = rlst_dynamic_array2!(V, uc2e_inv_1_shape);
-        uc2e_inv_1_mat.data_mut().copy_from_slice(&uc2e_inv_1);
-
-        let uc2e_inv_2 = uc2e_inv_2
-            .data()
-            .iter()
-            .map(|x| V::from(*x).unwrap())
-            .collect_vec();
-        let mut uc2e_inv_2_mat = rlst_dynamic_array2!(V, uc2e_inv_2_shape);
-        uc2e_inv_2_mat.data_mut().copy_from_slice(&uc2e_inv_2);
-
-        let (s, ut, v) = pinv::<V>(&dc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(V, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = V::from_real(s[i]);
-        }
-
-        let dc2e_inv_1 = empty_array::<V, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let dc2e_inv_2 = ut;
-
-        let dc2e_inv_1_shape = dc2e_inv_1.shape();
-        let dc2e_inv_2_shape = dc2e_inv_2.shape();
-
-        let dc2e_inv_1 = dc2e_inv_1
-            .data()
-            .iter()
-            .map(|x| V::from(*x).unwrap())
-            .collect_vec();
-        let mut dc2e_inv_1_mat = rlst_dynamic_array2!(V, dc2e_inv_1_shape);
-        dc2e_inv_1_mat.data_mut().copy_from_slice(&dc2e_inv_1);
-
-        let dc2e_inv_2 = dc2e_inv_2
-            .data()
-            .iter()
-            .map(|x| V::from(*x).unwrap())
-            .collect_vec();
-        let mut dc2e_inv_2_mat = rlst_dynamic_array2!(V, dc2e_inv_2_shape);
-        dc2e_inv_2_mat.data_mut().copy_from_slice(&dc2e_inv_2);
-
-        // Calculate M2M/L2L matrices
-        let children = ROOT.children();
-        let mut m2m = Vec::new();
-        let mut l2l = Vec::new();
-
-        for child in children.iter() {
-            let child_upward_equivalent_surface =
-                child.compute_surface(tree.get_domain(), order, alpha_inner);
-            let child_downward_check_surface =
-                child.compute_surface(tree.get_domain(), order, alpha_inner);
-
-            let mut pc2ce_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-
-            kernel.assemble_st(
-                EvalType::Value,
-                &child_upward_equivalent_surface,
-                &upward_check_surface,
-                pc2ce_t.data_mut(),
-            );
-
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut pc2ce = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-            pc2ce.fill_from(pc2ce_t.transpose());
-
-            let tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                uc2e_inv_1_mat.view(),
-                empty_array::<V, 2>().simple_mult_into_resize(uc2e_inv_2_mat.view(), pc2ce.view()),
-            );
-            m2m.push(tmp);
-
-            let mut cc2pe_t = rlst_dynamic_array2!(V, [ncheck_surface, nequiv_surface]);
-
-            kernel.assemble_st(
-                EvalType::Value,
-                &downward_equivalent_surface,
-                &child_downward_check_surface,
-                cc2pe_t.data_mut(),
-            );
-
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut cc2pe = rlst_dynamic_array2!(V, [nequiv_surface, ncheck_surface]);
-            cc2pe.fill_from(cc2pe_t.transpose());
-            let mut tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                dc2e_inv_1_mat.view(),
-                empty_array::<V, 2>().simple_mult_into_resize(dc2e_inv_2_mat.view(), cc2pe.view()),
-            );
-            tmp.data_mut()
-                .iter_mut()
-                .for_each(|d| *d *= kernel.scale(child.level()));
-
-            l2l.push(tmp);
-        }
-
-        Self {
-            order,
-            uc2e_inv_1: uc2e_inv_1_mat,
-            uc2e_inv_2: uc2e_inv_2_mat,
-            dc2e_inv_1: dc2e_inv_1_mat,
-            dc2e_inv_2: dc2e_inv_2_mat,
-            alpha_inner,
-            alpha_outer,
-            m2m,
-            l2l,
-            kernel,
-            tree,
-            m2l,
-        }
-    }
-}
-
-impl<T, U, V, W> KiFmmTrait for KiFmmLinearMatrix<T, U, V, W>
-where
-    T: Tree,
-    U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
-    W: RlstScalar + Float + Default,
-{
-    fn alpha_inner(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_inner
-    }
-
-    fn alpha_outer(&self) -> <<Self as Fmm>::Kernel as Kernel>::T {
-        self.alpha_outer
-    }
-}
-
-impl<T, U, V, W> Fmm for KiFmmLinearMatrix<T, U, V, W>
-where
-    T: Tree,
-    U: Kernel<T = W>,
-    V: FieldTranslationData<U>,
-    W: RlstScalar + Float + Default,
-{
-    type Tree = T;
-    type Kernel = U;
-
-    fn order(&self) -> usize {
-        self.order
-    }
-
-    fn kernel(&self) -> &Self::Kernel {
-        &self.kernel
-    }
-
-    fn tree(&self) -> &Self::Tree {
-        &self.tree
-    }
-}
-
-impl<T, U> FmmLoop for FmmDataAdaptive<T, U>
-where
-    T: Fmm,
-    U: RlstScalar<Real = U> + Float + Default,
-    FmmDataAdaptive<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
-{
-    fn upward_pass(&self, time: bool) -> Option<TimeDict> {
-        match time {
-            true => {
-                let mut times = TimeDict::default();
-                // Particle to Multipole
-                let start = Instant::now();
-                self.p2m();
-                times.insert("p2m".to_string(), start.elapsed().as_millis());
-
-                // Multipole to Multipole
-                let depth = self.fmm.tree().get_depth();
-                let start = Instant::now();
-                for level in (1..=depth).rev() {
-                    self.m2m(level)
-                }
-                times.insert("m2m".to_string(), start.elapsed().as_millis());
-                Some(times)
-            }
-            false => {
-                // Particle to Multipole
-                self.p2m();
-
-                // Multipole to Multipole
-                let depth = self.fmm.tree().get_depth();
-                for level in (1..=depth).rev() {
-                    self.m2m(level)
-                }
-                None
-            }
-        }
-    }
-
-    fn downward_pass(&self, time: bool) -> Option<TimeDict> {
-        let depth = self.fmm.tree().get_depth();
-
-        match time {
-            true => {
-                let mut times = TimeDict::default();
-                let mut l2l_time = 0;
-                let mut m2l_time = 0;
-                let mut p2l_time = 0;
-
-                for level in 2..=depth {
-                    if level > 2 {
-                        let start = Instant::now();
-                        self.l2l(level);
-                        l2l_time += start.elapsed().as_millis();
-                    }
-                    let start = Instant::now();
-                    self.p2l(level);
-                    p2l_time += start.elapsed().as_millis();
-
-                    let start = Instant::now();
-                    self.m2l(level);
-                    m2l_time += start.elapsed().as_millis();
-                }
-
-                times.insert("l2l".to_string(), l2l_time);
-                times.insert("m2l".to_string(), m2l_time);
-                times.insert("p2l".to_string(), p2l_time);
-
-                // Leaf level computations
-                // Sum all potential contributions
-                let start = Instant::now();
-                self.m2p();
-                times.insert("m2p".to_string(), start.elapsed().as_millis());
-
-                let start = Instant::now();
-                self.p2p();
-                times.insert("p2p".to_string(), start.elapsed().as_millis());
-
-                let start = Instant::now();
-                self.l2p();
-                times.insert("l2p".to_string(), start.elapsed().as_millis());
-
-                Some(times)
-            }
-            false => {
-                for level in 2..=depth {
-                    if level > 2 {
-                        self.l2l(level);
-                    }
-                    self.m2l(level);
-                    self.p2l(level);
-                }
-                // Leaf level computations
-
-                // Sum all potential contributions
-                self.m2p();
-                self.p2p();
-                self.l2p();
-
-                None
-            }
-        }
-    }
-
-    fn run(&self, time: bool) -> Option<TimeDict> {
-        let t1 = self.upward_pass(time);
-        let t2 = self.downward_pass(time);
-
-        if let (Some(mut t1), Some(t2)) = (t1, t2) {
-            t1.extend(t2);
-            Some(t1)
-        } else {
-            None
-        }
-    }
-}
-
-impl<T, U> FmmLoop for FmmDataUniform<T, U>
-where
-    T: Fmm,
-    U: RlstScalar<Real = U> + Float + Default,
-    FmmDataUniform<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
-{
-    fn upward_pass(&self, time: bool) -> Option<TimeDict> {
-        match time {
-            true => {
-                let mut times = TimeDict::default();
-                // Particle to Multipole
-                let start = Instant::now();
-                self.p2m();
-                times.insert("p2m".to_string(), start.elapsed().as_millis());
-
-                // Multipole to Multipole
-                let depth = self.fmm.tree().get_depth();
-                let start = Instant::now();
-                for level in (1..=depth).rev() {
-                    self.m2m(level)
-                }
-                times.insert("m2m".to_string(), start.elapsed().as_millis());
-                Some(times)
-            }
-            false => {
-                // Particle to Multipole
-                self.p2m();
-
-                // Multipole to Multipole
-                let depth = self.fmm.tree().get_depth();
-                for level in (1..=depth).rev() {
-                    self.m2m(level)
-                }
-                None
-            }
-        }
-    }
-
-    fn downward_pass(&self, time: bool) -> Option<TimeDict> {
-        let depth = self.fmm.tree().get_depth();
-
-        match time {
-            true => {
-                let mut times = TimeDict::default();
-                let mut l2l_time = 0;
-                let mut m2l_time = 0;
-
-                for level in 2..=depth {
-                    if level > 2 {
-                        let start = Instant::now();
-                        self.l2l(level);
-                        l2l_time += start.elapsed().as_millis();
-                    }
-
-                    let start = Instant::now();
-                    self.m2l(level);
-                    m2l_time += start.elapsed().as_millis();
-                }
-
-                times.insert("l2l".to_string(), l2l_time);
-                times.insert("m2l".to_string(), m2l_time);
-
-                // Leaf level computations
-
-                // Sum all potential contributions
-                let start = Instant::now();
-                self.p2p();
-                times.insert("p2p".to_string(), start.elapsed().as_millis());
-
-                let start = Instant::now();
-                self.l2p();
-                times.insert("l2p".to_string(), start.elapsed().as_millis());
-
-                Some(times)
-            }
-            false => {
-                for level in 2..=depth {
-                    if level > 2 {
-                        self.l2l(level);
-                    }
-                    self.m2l(level);
-                }
-                // Leaf level computations
-                // Sum all potential contributions
-                self.p2p();
-                self.l2p();
-
-                None
-            }
-        }
-    }
-
-    fn run(&self, time: bool) -> Option<TimeDict> {
-        let t1 = self.upward_pass(time);
-        let t2 = self.downward_pass(time);
-
-        if let (Some(mut t1), Some(t2)) = (t1, t2) {
-            t1.extend(t2);
-            Some(t1)
-        } else {
-            None
-        }
-    }
-}
-
-impl<T, U> FmmLoop for FmmDataUniformMatrix<T, U>
-where
-    T: Fmm,
-    U: RlstScalar<Real = U> + Float + Default,
-    FmmDataUniformMatrix<T, U>: SourceTranslation + FieldTranslation<U> + TargetTranslation,
-{
-    fn upward_pass(&self, time: bool) -> Option<TimeDict> {
-        match time {
-            true => {
-                let mut times = TimeDict::default();
-                // Particle to Multipole
-                let start = Instant::now();
-                self.p2m();
-                times.insert("p2m".to_string(), start.elapsed().as_millis());
-
-                // Multipole to Multipole
-                let depth = self.fmm.tree().get_depth();
-                let start = Instant::now();
-                for level in (1..=depth).rev() {
-                    self.m2m(level)
-                }
-                times.insert("m2m".to_string(), start.elapsed().as_millis());
-                Some(times)
-            }
-            false => {
-                // Particle to Multipole
-                self.p2m();
-
-                // Multipole to Multipole
-                let depth = self.fmm.tree().get_depth();
-                for level in (1..=depth).rev() {
-                    self.m2m(level)
-                }
-                None
-            }
-        }
-    }
-
-    fn downward_pass(&self, time: bool) -> Option<TimeDict> {
-        let depth = self.fmm.tree().get_depth();
-
-        match time {
-            true => {
-                let mut times = TimeDict::default();
-                let mut l2l_time = 0;
-                let mut m2l_time = 0;
-
-                for level in 2..=depth {
-                    if level > 2 {
-                        let start = Instant::now();
-                        self.l2l(level);
-                        l2l_time += start.elapsed().as_millis();
-                    }
-
-                    let start = Instant::now();
-                    self.m2l(level);
-                    m2l_time += start.elapsed().as_millis();
-                }
-
-                times.insert("l2l".to_string(), l2l_time);
-                times.insert("m2l".to_string(), m2l_time);
-
-                // Leaf level computations
-
-                // Sum all potential contributions
-                let start = Instant::now();
-                self.p2p();
-                times.insert("p2p".to_string(), start.elapsed().as_millis());
-
-                let start = Instant::now();
-                self.l2p();
-                times.insert("l2p".to_string(), start.elapsed().as_millis());
-
-                Some(times)
-            }
-            false => {
-                for level in 2..=depth {
-                    if level > 2 {
-                        self.l2l(level);
-                    }
-                    self.m2l(level);
-                }
-                // Leaf level computations
-                // Sum all potential contributions
-                self.p2p();
-                self.l2p();
-
-                None
-            }
-        }
-    }
-
-    fn run(&self, time: bool) -> Option<TimeDict> {
-        let t1 = self.upward_pass(time);
-        let t2 = self.downward_pass(time);
-
-        if let (Some(mut t1), Some(t2)) = (t1, t2) {
-            t1.extend(t2);
-            Some(t1)
-        } else {
-            None
-        }
     }
 }
 
 #[cfg(test)]
 mod test {
 
-    use super::*;
-    use rlst_dense::rlst_array_from_slice2;
-
-    use bempp_field::types::{
-        FftFieldTranslationKiFmm, SvdFieldTranslationKiFmm, SvdFieldTranslationKiFmmIA,
-        SvdFieldTranslationKiFmmRcmp,
-    };
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::implementations::helpers::{points_fixture, points_fixture_sphere};
+    use bempp_tree::constants::{ALPHA_INNER, ROOT};
+    use bempp_tree::implementations::helpers::points_fixture;
+    use num::Float;
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use rlst_dense::array::Array;
+    use rlst_dense::base_array::BaseArray;
+    use rlst_dense::data_container::VectorContainer;
+    use rlst_dense::rlst_array_from_slice2;
+    use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
 
-    use crate::charge::build_charge_dict;
+    use crate::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
+    use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_f64_fft(
-        points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        charges: &[f64],
-        global_idxs: &[usize],
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        sparse: bool,
-        depth: u64,
+    use super::*;
+
+    fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
+        fmm: Box<
+            dyn Fmm<
+                Precision = T,
+                NodeIndex = MortonKey,
+                Kernel = Laplace3dKernel<T>,
+                Tree = SingleNodeFmmTree<T>,
+            >,
+        >,
+        eval_type: EvalType,
+        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T,
     ) {
-        // Test with FFT based field translation
-        let tree =
-            SingleNodeTree::new(points.data(), false, None, Some(depth), global_idxs, sparse);
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
 
-        let kernel = Laplace3dKernel::default();
-        let m2l_data: FftFieldTranslationKiFmm<f64, Laplace3dKernel<f64>> =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
+        let leaf_idx = 0;
+        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let potential = fmm.potential(&leaf).unwrap()[0];
 
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let potentials = &datatree.potentials[l..r];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
+        let ntargets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::zero(); ntargets * eval_size];
 
         let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
-        let mut direct = vec![0f64; ntargets];
-
-        let all_charges = charge_dict.into_values().collect_vec();
-
-        let kernel = Laplace3dKernel::default();
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            points.data(),
+        fmm.kernel().evaluate_st(
+            eval_type,
+            sources.data(),
             leaf_coordinates_col_major.data(),
-            &all_charges,
+            charges.data(),
             &mut direct,
         );
 
-        let abs_error: f64 = potentials
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        // TODO: remove this print
-        println!(
-            "rel_error = {rel_error} = {abs_error} / {}",
-            direct.iter().sum::<f64>()
-        );
-        assert!(rel_error <= 1e-5);
+        direct.iter().zip(potential).for_each(|(&d, &p)| {
+            let abs_error = num::Float::abs(d - p);
+            let rel_error = abs_error / p;
+            println!("err {:?} \nd {:?} \np {:?}", rel_error, direct, potential);
+            assert!(rel_error <= threshold)
+        });
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_f64_svd(
-        points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        charges: &[f64],
-        global_idxs: &[usize],
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        sparse: bool,
-        depth: u64,
+    fn test_single_node_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
+        fmm: Box<
+            dyn Fmm<
+                Precision = T,
+                NodeIndex = MortonKey,
+                Kernel = Laplace3dKernel<T>,
+                Tree = SingleNodeFmmTree<T>,
+            >,
+        >,
+        eval_type: EvalType,
+        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T,
     ) {
-        // Test with SVD field translation
-        let tree =
-            SingleNodeTree::new(points.data(), false, None, Some(depth), global_idxs, sparse);
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
 
-        let kernel = Laplace3dKernel::default();
+        let leaf_idx = 0;
+        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
 
-        let m2l_data = SvdFieldTranslationKiFmm::new(
-            kernel.clone(),
-            Some(50),
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-        );
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let potentials = &datatree.potentials[l..r];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
+        let ntargets = leaf_targets.len() / fmm.dim();
 
         let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
+            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
-        let mut direct = vec![0f64; ntargets];
-
-        let all_charges = charge_dict.into_values().collect_vec();
-
-        datatree.fmm.kernel().evaluate_st(
-            EvalType::Value,
-            points.data(),
-            leaf_coordinates_col_major.data(),
-            &all_charges,
-            &mut direct,
-        );
-
-        let abs_error: f64 = potentials
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        // TODO: remove this print
-        println!(
-            "rel_error = {rel_error} = {abs_error} / {}",
-            direct.iter().sum::<f64>()
-        );
-        assert!(rel_error <= 2e-5);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_f64_svd_rcmp(
-        points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        charges: &[f64],
-        global_idxs: &[usize],
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        sparse: bool,
-        depth: u64,
-    ) {
-        // Test with SVD field translation
-        let tree =
-            SingleNodeTree::new(points.data(), false, None, Some(depth), global_idxs, sparse);
-
-        let kernel = Laplace3dKernel::default();
-
-        let m2l_data = SvdFieldTranslationKiFmmRcmp::new(
-            kernel.clone(),
-            Some(70),
-            0.999999,
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-        );
-
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let potentials = &datatree.potentials[l..r];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        let mut direct = vec![0f64; ntargets];
-
-        let all_charges = charge_dict.into_values().collect_vec();
-
-        datatree.fmm.kernel().evaluate_st(
-            EvalType::Value,
-            points.data(),
-            leaf_coordinates_col_major.data(),
-            &all_charges,
-            &mut direct,
-        );
-
-        let abs_error: f64 = potentials
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        // TODO: remove this print
-        println!(
-            "rel_error = {rel_error} = {abs_error} / {}",
-            direct.iter().sum::<f64>()
-        );
-        assert!(rel_error <= 1e-5);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn test_adaptive_f64_fft(
-        points: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        charges: &[f64],
-        global_idxs: &[usize],
-        ncrit: u64,
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-    ) {
-        // Test with FFT based field translation
-
-        let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None, global_idxs, false);
-
-        let kernel = Laplace3dKernel::default();
-        let m2l_data: FftFieldTranslationKiFmm<f64, Laplace3dKernel<f64>> =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataAdaptive::new(fmm, &charge_dict).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
-
-        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let potentials = &datatree.potentials[l..r];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        let mut direct = vec![0f64; ntargets];
-
-        let all_charges = charge_dict.into_values().collect_vec();
-
-        let kernel = Laplace3dKernel::default();
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            points.data(),
-            leaf_coordinates_col_major.data(),
-            &all_charges,
-            &mut direct,
-        );
-
-        let abs_error: f64 = potentials
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        // TODO: remove this print
-        println!(
-            "rel_error = {rel_error} = {abs_error} / {}",
-            direct.iter().sum::<f64>()
-        );
-        assert!(rel_error <= 1e-5);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_f64_svd_ia(
-        points: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        charges: &[f64],
-        global_idxs: &[usize],
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        sparse: bool,
-        depth: u64,
-    ) {
-        // Test with SVD field translation
-        let tree =
-            SingleNodeTree::new(points.data(), false, None, Some(depth), global_idxs, sparse);
-
-        let kernel = Laplace3dKernel::default();
-
-        let m2l_data = SvdFieldTranslationKiFmmIA::new(
-            kernel.clone(),
-            0.999999,
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-            tree.get_depth(),
-        );
-
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let potentials = &datatree.potentials[l..r];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        let mut direct = vec![0f64; ntargets];
-
-        let all_charges = charge_dict.into_values().collect_vec();
-
-        datatree.fmm.kernel().evaluate_st(
-            EvalType::Value,
-            points.data(),
-            leaf_coordinates_col_major.data(),
-            &all_charges,
-            &mut direct,
-        );
-
-        let abs_error: f64 = potentials
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        // TODO: remove this print
-        println!(
-            "rel_error = {rel_error} = {abs_error} / {}",
-            direct.iter().sum::<f64>()
-        );
-        assert!(rel_error <= 2e-5);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn test_adaptive_f64_svd(
-        points: Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-        charges: &[f64],
-        global_idxs: &[usize],
-        ncrit: u64,
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-    ) {
-        // Test with SVD field translation
-        let tree = SingleNodeTree::new(points.data(), true, Some(ncrit), None, global_idxs, false);
-        let kernel = Laplace3dKernel::default();
-
-        let m2l_data = SvdFieldTranslationKiFmm::new(
-            kernel.clone(),
-            Some(1000),
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-        );
-
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataAdaptive::new(fmm, &charge_dict).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[3]];
-
-        let leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-
-        let potentials = &datatree.potentials[l..r];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[*leaf_idx];
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        let mut direct = vec![0f64; ntargets];
-
-        let all_charges = charge_dict.into_values().collect_vec();
-
-        let kernel = Laplace3dKernel::default();
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            points.data(),
-            leaf_coordinates_col_major.data(),
-            &all_charges,
-            &mut direct,
-        );
-
-        let abs_error: f64 = potentials
-            .iter()
-            .zip(direct.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-        // TODO: remove this print
-        println!(
-            "rel_error = {rel_error} = {abs_error} / {}",
-            direct.iter().sum::<f64>()
-        );
-        assert!(rel_error <= 1e-4);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_matrix_f64_svd(
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        depth: u64,
-        sparse: bool,
-        points: &[f64],
-        global_idxs: &[usize],
-        charge_mat: &[Vec<f64>],
-    ) {
-        // SVD based field translations
-        let ncharge_vecs = charge_mat.len();
-
-        let kernel = Laplace3dKernel::default();
-
-        // Create a tree
-        let tree = SingleNodeTree::new(points, false, None, Some(depth), global_idxs, sparse);
-
-        // Precompute the M2L data
-        let m2l_data = SvdFieldTranslationKiFmm::new(
-            kernel.clone(),
-            Some(1000),
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-        );
-
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dicts: Vec<_> = (0..ncharge_vecs)
-            .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
-            .collect();
-
-        // Associate data with the FMM
-        let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let &leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-        let (l, r) = datatree.charge_index_pointer[leaf_idx];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        for (i, charge_dict) in charge_dicts
-            .iter()
-            .enumerate()
-            .take(datatree.ncharge_vectors)
-        {
-            let potentials_ptr =
-                datatree.potentials_send_pointers[i * datatree.nleaves + leaf_idx].raw;
-            let potentials = unsafe { std::slice::from_raw_parts(potentials_ptr, ntargets) };
-
-            let all_charges = &charge_dict.values().cloned().collect_vec();
-
-            let mut direct = vec![0f64; ntargets];
-
-            datatree.fmm.kernel().evaluate_st(
-                EvalType::Value,
-                points,
+        let [nsources, nmatvec] = charges.shape();
+
+        for i in 0..nmatvec {
+            let potential_i = fmm.potential(&leaf).unwrap()[i];
+            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
+            let mut direct_i = vec![T::zero(); ntargets * eval_size];
+            fmm.kernel().evaluate_st(
+                eval_type,
+                sources.data(),
                 leaf_coordinates_col_major.data(),
-                all_charges,
-                &mut direct,
+                charges_i,
+                &mut direct_i,
             );
 
-            let abs_error: f64 = potentials
-                .iter()
-                .zip(direct.iter())
-                .map(|(a, b)| (a - b).abs())
-                .sum();
-            let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            // TODO: remove this print
             println!(
-                "rel_error = {rel_error} = {abs_error} / {}",
-                direct.iter().sum::<f64>()
+                "i {:?} \n direct_i {:?}\n potential_i {:?}",
+                i, direct_i, potential_i
             );
-            assert!(rel_error <= 1e-5);
+            direct_i.iter().zip(potential_i).for_each(|(&d, &p)| {
+                let abs_error = num::Float::abs(d - p);
+                let rel_error = abs_error / p;
+                assert!(rel_error <= threshold)
+            })
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_matrix_f64_svd_ia(
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        depth: u64,
-        sparse: bool,
-        points: &[f64],
-        global_idxs: &[usize],
-        charge_mat: &[Vec<f64>],
-    ) {
-        // SVD based field translations
-        let ncharge_vecs = charge_mat.len();
+    #[test]
+    fn test_laplace_fmm_vector() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
 
-        let kernel = Laplace3dKernel::default();
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
-        // Create a tree
-        let tree = SingleNodeTree::new(points, false, None, Some(depth), global_idxs, sparse);
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+        let threshold_pot = 1e-5;
+        let threshold_deriv = 1e-4;
+        let threshold_deriv_blas = 1e-3;
+        let singular_value_threshold = Some(1e-2);
 
-        // Precompute the M2L data
-        let m2l_data = SvdFieldTranslationKiFmmIA::new(
-            kernel.clone(),
-            0.999999,
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-            tree.get_depth(),
-        );
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dicts: Vec<_> = (0..ncharge_vecs)
-            .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
-            .collect();
-
-        // Associate data with the FMM
-        let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let &leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-        let (l, r) = datatree.charge_index_pointer[leaf_idx];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        for (i, charge_dict) in charge_dicts
-            .iter()
-            .enumerate()
-            .take(datatree.ncharge_vectors)
+        // fmm with fft based field translation
         {
-            let potentials_ptr =
-                datatree.potentials_send_pointers[i * datatree.nleaves + leaf_idx].raw;
-            let potentials = unsafe { std::slice::from_raw_parts(potentials_ptr, ntargets) };
-
-            let all_charges = &charge_dict.values().cloned().collect_vec();
-
-            let mut direct = vec![0f64; ntargets];
-
-            datatree.fmm.kernel().evaluate_st(
-                EvalType::Value,
-                points,
-                leaf_coordinates_col_major.data(),
-                all_charges,
-                &mut direct,
+            // Evaluate potentials
+            let fmm_fft = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    bempp_traits::types::EvalType::Value,
+                    FftFieldTranslationKiFmm::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_fft.evaluate();
+            let eval_type = fmm_fft.kernel_eval_type;
+            let fmm_fft = Box::new(fmm_fft);
+            test_single_node_fmm_vector_helper(
+                fmm_fft,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_pot,
             );
 
-            let abs_error: f64 = potentials
-                .iter()
-                .zip(direct.iter())
-                .map(|(a, b)| (a - b).abs())
-                .sum();
-            let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            // TODO: remove this print
-            println!(
-                "rel_error = {rel_error} = {abs_error} / {}",
-                direct.iter().sum::<f64>()
+            // Evaluate potentials + derivatives
+            let fmm_fft = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    bempp_traits::types::EvalType::ValueDeriv,
+                    FftFieldTranslationKiFmm::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_fft.evaluate();
+            let eval_type = fmm_fft.kernel_eval_type;
+            let fmm_fft = Box::new(fmm_fft);
+            test_single_node_fmm_vector_helper(
+                fmm_fft,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
             );
-            assert!(rel_error <= 1e-5);
         }
-    }
 
-    #[allow(clippy::too_many_arguments)]
-    fn test_uniform_matrix_f64_rcmp(
-        order: usize,
-        alpha_inner: f64,
-        alpha_outer: f64,
-        depth: u64,
-        sparse: bool,
-        points: &[f64],
-        global_idxs: &[usize],
-        charge_mat: &[Vec<f64>],
-    ) {
-        // SVD based field translations
-        let ncharge_vecs = charge_mat.len();
-
-        let kernel = Laplace3dKernel::default();
-
-        // Create a tree
-        let tree = SingleNodeTree::new(points, false, None, Some(depth), global_idxs, sparse);
-
-        // Precompute the M2L data
-        let m2l_data = SvdFieldTranslationKiFmmRcmp::new(
-            kernel.clone(),
-            Some(1000),
-            0.999999,
-            order,
-            *tree.get_domain(),
-            alpha_inner,
-        );
-
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dicts: Vec<_> = (0..ncharge_vecs)
-            .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
-            .collect();
-
-        // Associate data with the FMM
-        let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
-
-        datatree.run(false);
-
-        // Test that direct computation is close to the FMM.
-        let mut test_idx_vec = Vec::new();
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx_vec.push(idx);
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx_vec[0]];
-
-        let &leaf_idx = datatree.fmm.tree().get_leaf_index(leaf).unwrap();
-        let (l, r) = datatree.charge_index_pointer[leaf_idx];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let leaf_coordinates_row_major = &coordinates[l * 3..r * 3];
-
-        let dim = datatree.fmm.kernel.space_dimension();
-        let ntargets = leaf_coordinates_row_major.len() / dim;
-
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(f64, leaf_coordinates_row_major, [ntargets, dim], [dim, 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(f64, [ntargets, dim]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
-        for (i, charge_dict) in charge_dicts
-            .iter()
-            .enumerate()
-            .take(datatree.ncharge_vectors)
+        // fmm with BLAS based field translation
         {
-            let potentials_ptr =
-                datatree.potentials_send_pointers[i * datatree.nleaves + leaf_idx].raw;
-            let potentials = unsafe { std::slice::from_raw_parts(potentials_ptr, ntargets) };
-
-            let all_charges = &charge_dict.values().cloned().collect_vec();
-
-            let mut direct = vec![0f64; ntargets];
-
-            datatree.fmm.kernel().evaluate_st(
-                EvalType::Value,
-                points,
-                leaf_coordinates_col_major.data(),
-                all_charges,
-                &mut direct,
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_vector_helper(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_pot,
             );
 
-            let abs_error: f64 = potentials
-                .iter()
-                .zip(direct.iter())
-                .map(|(a, b)| (a - b).abs())
-                .sum();
-            let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
-            // TODO: remove this print
-            println!(
-                "rel_error = {rel_error} = {abs_error} / {}",
-                direct.iter().sum::<f64>()
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_vector_helper(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv_blas,
             );
-            assert!(rel_error <= 1e-5);
         }
     }
 
     #[test]
-    fn test_uniform_sphere_fft() {
-        let npoints = 10000;
+    fn test_laplace_fmm_matrix() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
 
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        // FMM parameters
+        let n_crit = Some(10);
+        let expansion_order = 6;
+        let sparse = true;
+        let threshold = 1e-5;
+        let threshold_deriv = 1e-3;
+        let singular_value_threshold = Some(1e-2);
 
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
+        // Charge data
+        let nvecs = 5;
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut rng = StdRng::seed_from_u64(0);
+        charges
+            .data_mut()
+            .chunks_exact_mut(nsources)
+            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
 
-        // Test case where points are distributed on surface of a sphere
-        let points_sphere = points_fixture_sphere::<f64>(npoints);
-        test_uniform_f64_fft(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64_fft(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
+        // fmm with blas based field translation
+        {
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_matrix_helper(fmm_blas, eval_type, &sources, &charges, threshold);
+
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = KiFmmBuilderSingleNode::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_fmm_matrix_helper(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
+            );
+        }
     }
-    #[test]
-    fn test_uniform_sphere_svd() {
-        let npoints = 10000;
 
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
-
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-
-        // Test case where points are distributed on surface of a sphere
-        let points_sphere = points_fixture_sphere::<f64>(npoints);
-        test_uniform_f64_svd(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64_svd(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
+    fn test_root_multipole_laplace_single_node<T: RlstScalar<Real = T> + Float + Default>(
+        fmm: Box<
+            dyn Fmm<
+                Precision = T,
+                NodeIndex = MortonKey,
+                Kernel = Laplace3dKernel<T>,
+                Tree = SingleNodeFmmTree<T>,
+            >,
+        >,
+        sources: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T,
+    ) {
+        let multipole = fmm.multipole(&ROOT).unwrap();
+        let upward_equivalent_surface = ROOT.compute_surface(
+            fmm.tree().domain(),
+            fmm.expansion_order(),
+            T::from(ALPHA_INNER).unwrap(),
         );
 
-        test_uniform_f64_svd_ia(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
+        let test_point = vec![T::from(100000.).unwrap(), T::zero(), T::zero()];
+        let mut expected = vec![T::zero()];
+        let mut found = vec![T::zero()];
+
+        fmm.kernel().evaluate_st(
+            bempp_traits::types::EvalType::Value,
+            sources.data(),
+            &test_point,
+            charges.data(),
+            &mut expected,
         );
 
-        test_uniform_f64_svd_ia(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
+        fmm.kernel().evaluate_st(
+            bempp_traits::types::EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            multipole,
+            &mut found,
         );
 
-        test_uniform_f64_svd_rcmp(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
+        let abs_error = num::Float::abs(expected[0] - found[0]);
+        let rel_error = abs_error / expected[0];
 
-        test_uniform_f64_svd_rcmp(
-            &points_sphere,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-    }
-    #[test]
-    fn test_uniform_box_fft() {
-        let npoints = 10000;
-
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
-
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-
-        // Test case where points are distributed randomly in a box
-        let points_cloud = points_fixture::<f64>(npoints, None, None);
-        test_uniform_f64_fft(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64_fft(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
-    }
-    #[test]
-    fn test_uniform_box_svd() {
-        let npoints = 10000;
-
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
-
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-
-        // Test case where points are distributed randomly in a box
-        let points_cloud = points_fixture::<f64>(npoints, None, None);
-        test_uniform_f64_svd_rcmp(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
-
-        test_uniform_f64_svd_rcmp(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64_svd(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-        test_uniform_f64_svd(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
-
-        test_uniform_f64_svd_ia(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            true,
-            3,
-        );
-
-        test_uniform_f64_svd_ia(
-            &points_cloud,
-            &charges,
-            &global_idxs,
-            order,
-            alpha_inner,
-            alpha_outer,
-            false,
-            3,
-        );
-    }
-    #[test]
-    fn test_uniform_box_matrix_svd() {
-        let npoints = 10000;
-
-        let global_idxs = (0..npoints).collect_vec();
-
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-
-        // Test matrix input
-        let points = points_fixture::<f64>(npoints, None, None);
-        let ncharge_vecs = 3;
-
-        let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
-        charge_mat
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
-
-        test_uniform_matrix_f64_svd(
-            order,
-            alpha_inner,
-            alpha_outer,
-            3,
-            true,
-            points.data(),
-            &global_idxs,
-            &charge_mat,
-        );
-
-        test_uniform_matrix_f64_svd_ia(
-            order,
-            alpha_inner,
-            alpha_outer,
-            3,
-            true,
-            points.data(),
-            &global_idxs,
-            &charge_mat,
-        );
-
-        test_uniform_matrix_f64_rcmp(
-            order,
-            alpha_inner,
-            alpha_outer,
-            3,
-            true,
-            points.data(),
-            &global_idxs,
-            &charge_mat,
-        );
+        assert!(rel_error <= threshold);
     }
 
     #[test]
-    fn test_adaptive_sphere_fft() {
-        let npoints = 10000;
+    fn test_upward_pass_vector() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
 
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-        let ncrit = 100;
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        // Test case where points are distributed on surface of a sphere
-        let points_sphere = points_fixture_sphere::<f64>(npoints);
-        test_adaptive_f64_fft(
-            points_sphere,
-            &charges,
-            &global_idxs,
-            ncrit,
-            order,
-            alpha_inner,
-            alpha_outer,
-        );
+        let fmm_fft = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                FftFieldTranslationKiFmm::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_fft.evaluate();
+
+        let svd_threshold = Some(1e-5);
+        let fmm_svd = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                BlasFieldTranslationKiFmm::new(svd_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_svd.evaluate();
+
+        let fmm_fft = Box::new(fmm_fft);
+        let fmm_svd = Box::new(fmm_svd);
+        test_root_multipole_laplace_single_node(fmm_fft, &sources, &charges, 1e-5);
+        test_root_multipole_laplace_single_node(fmm_svd, &sources, &charges, 1e-5);
     }
-    #[test]
-    fn test_adaptive_sphere_svd() {
-        let npoints = 10000;
-
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
-
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-        let ncrit = 100;
-
-        // Test case where points are distributed on surface of a sphere
-        let points_sphere = points_fixture_sphere::<f64>(npoints);
-        test_adaptive_f64_svd(
-            points_sphere,
-            &charges,
-            &global_idxs,
-            ncrit,
-            order,
-            alpha_inner,
-            alpha_outer,
-        );
-    }
-    #[test]
-    fn test_adaptive_box_fft() {
-        let npoints = 10000;
-
-        let global_idxs = (0..npoints).collect_vec();
-        let charges = vec![1.0; npoints];
-
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-        let ncrit = 100;
-
-        // Test case where points are distributed randomly in a box
-        let points_cloud = points_fixture::<f64>(npoints, None, None);
-        test_adaptive_f64_fft(
-            points_cloud,
-            &charges,
-            &global_idxs,
-            ncrit,
-            order,
-            alpha_inner,
-            alpha_outer,
-        );
-    }
-    // #[test]
-    // fn test_adaptive_box_svd() {
-    //     let npoints = 10000;
-
-    //     let global_idxs = (0..npoints).collect_vec();
-    //     let charges = vec![1.0; npoints];
-
-    //     let order = 6;
-    //     let alpha_inner = 1.05;
-    //     let alpha_outer = 2.95;
-    //     let ncrit = 100;
-
-    //     // Test case where points are distributed randomly in a box
-    //     let points_cloud = points_fixture::<f64>(npoints, None, None);
-    //     test_adaptive_f64_svd(
-    //         points_cloud,
-    //         &charges,
-    //         &global_idxs,
-    //         ncrit,
-    //         order,
-    //         alpha_inner,
-    //         alpha_outer,
-    //     );
-    // }
 }

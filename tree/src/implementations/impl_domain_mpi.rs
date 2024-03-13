@@ -6,6 +6,7 @@ use mpi::{
     traits::*,
     Address,
 };
+use std::fmt::Debug;
 
 use num::traits::Float;
 
@@ -28,7 +29,7 @@ unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
     }
 }
 
-impl<T: Float + Default> Domain<T>
+impl<T: Float + Default + Debug> Domain<T>
 where
     [Domain<T>]: BufferMut,
     Vec<Domain<T>>: Buffer,

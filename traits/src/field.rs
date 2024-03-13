@@ -1,20 +1,13 @@
-use num::Float;
-use rlst_dense::types::RlstScalar;
-
 use crate::kernel::Kernel;
 
 /// Container for metadata associated with a field translation implementation.
-pub trait FieldTranslationData<T>
+pub trait SourceToTargetData<T>
 where
     T: Kernel,
 {
-    /// A vector specifying the displacement between a source and target node.
-    /// Defines the field translation operator being applied
-    type TransferVector;
-
-    /// The specific data structure holding the field translation operators for this method.
-    /// Each translation operator corresponds to a transfer vector.
-    type M2LOperators;
+    /// Metadata for applying each to source to target translation, depends on both the kernel
+    /// and translation method
+    type OperatorData;
 
     /// The computational domain for these operators, defined by the input points distribution.
     type Domain;
@@ -24,33 +17,15 @@ where
     /// # Arguments
     /// * `order` - the order of expansions used in constructing the surface grid
     /// * `domain` - Domain associated with the global point set.
-    fn compute_m2l_operators(
-        &self,
-        order: usize,
-        domain: Self::Domain,
-        depth: u64,
-    ) -> Self::M2LOperators;
+    fn set_operator_data(&mut self, order: usize, domain: Self::Domain);
 
-    /// Number of coefficients for a given expansion order in a given FMM scheme.
-    ///
-    /// # Arguments
-    /// * `order` - the order of expansions used in constructing the surface grid
-    fn ncoeffs(&self, order: usize) -> usize;
+    fn set_expansion_order(&mut self, expansion_order: usize);
+
+    fn set_kernel(&mut self, kernel: T);
 }
 
 /// Interface for field translations.
-pub trait FieldTranslation<T>
-where
-    T: Float + RlstScalar<Real = T> + Default,
-{
-    /// # Warning
-    /// This method is only applicable to homogeneous kernels, which are currently
-    /// implemented by our software. This method is staged to be deprecated.
-    ///
-    /// # Arguments
-    /// * `level` - The level of the tree at which a field translation is being applied.
-    fn m2l_scale(&self, level: u64) -> T;
-
+pub trait SourceToTarget {
     /// Interface for a field translation operation, takes place over each level of an octree.
     ///
     /// # Arguments

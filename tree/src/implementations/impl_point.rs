@@ -2,9 +2,7 @@
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
-use bempp_traits::tree::Point as PointInterface;
 use bempp_traits::types::RlstScalar;
-use num::Float;
 
 use crate::types::point::{Point, Points};
 
@@ -66,32 +64,6 @@ where
         self.points.sort();
     }
 }
-
-impl<T> PointInterface<T> for Point<T> where T: RlstScalar<Real = T> + Float + Default {}
-
-// impl <T>Iterator for Points<T> {
-//     type Item = Point<T>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if self.index >= self.points.len() {
-//             return None;
-//         }
-
-//         self.index += 1;
-//         self.points.get(self.index)
-//     }
-// }
-
-// impl <T> FromIterator<Point<T>> for Points<T> {
-//     fn from_iter<I: IntoIterator<Item = Point<T>>>(iter: I) -> Self {
-//         let mut c = Points::new();
-
-//         for i in iter {
-//             c.add(i);
-//         }
-//         c
-//     }
-// }
 
 #[cfg(test)]
 mod test {

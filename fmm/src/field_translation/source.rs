@@ -1,4 +1,4 @@
-//! Multipole field translations for uniform and adaptive Kernel Indepenent FMMs
+//! Multipole field translations
 use std::collections::HashSet;
 
 use itertools::Itertools;
@@ -6,1161 +6,351 @@ use num::Float;
 use rayon::prelude::*;
 
 use bempp_traits::{
-    field::FieldTranslationData,
-    fmm::{Fmm, SourceTranslation},
-    kernel::{Kernel, ScaleInvariantKernel},
-    tree::Tree,
+    field::SourceToTargetData,
+    fmm::SourceTranslation,
+    kernel::Kernel,
+    tree::{FmmTree, Tree},
     types::EvalType,
 };
-use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use bempp_tree::{constants::NSIBLINGS, types::single_node::SingleNodeTree};
 
 use crate::{
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
     helpers::find_chunk_size,
-    types::{
-        FmmDataAdaptive, FmmDataUniform, FmmDataUniformMatrix, KiFmmLinear, KiFmmLinearMatrix,
-    },
+    types::{FmmEvalType, KiFmm},
 };
-use bempp_traits::types::RlstScalar;
 use rlst_dense::{
     array::empty_array,
     rlst_array_from_slice2, rlst_dynamic_array2,
     traits::{MultIntoResize, RawAccess, RawAccessMut},
+    types::RlstScalar,
 };
 
-impl<T, U, V> SourceTranslation for FmmDataUniform<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
+impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
 where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
-    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: RlstScalar<Real = V> + Float + Default,
+    T: FmmTree<Tree = SingleNodeTree<W>> + Send + Sync,
+    U: SourceToTargetData<V> + Send + Sync,
+    V: Kernel<T = W>,
+    W: RlstScalar<Real = W> + Float + Default,
 {
-    /// Point to multipole evaluations, multithreaded over each leaf box.
-    fn p2m<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
+    fn p2m(&self) {
+        let Some(_leaves) = self.tree.source_tree().all_leaves() else {
             return;
         };
 
-        let nleaves = leaves.len();
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
+        let nleaves = self.tree.source_tree().nleaves().unwrap();
+        let surface_size = self.ncoeffs * self.dim;
+        let coordinates = self.tree.source_tree().all_coordinates().unwrap();
+        let ncoordinates = coordinates.len() / self.dim;
 
-        let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
+                let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs, 1]);
 
-        let mut check_potentials = rlst_dynamic_array2!(V, [nleaves * ncoeffs, 1]);
-        let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
-        let dim = self.fmm.kernel.space_dimension();
+                // Compute check potential for each box
+                check_potentials
+                    .data_mut()
+                    .par_chunks_exact_mut(self.ncoeffs)
+                    .zip(
+                        self.leaf_upward_surfaces_sources
+                            .par_chunks_exact(surface_size),
+                    )
+                    .zip(&self.charge_index_pointer_sources)
+                    .for_each(
+                        |((check_potential, upward_check_surface), charge_index_pointer)| {
+                            let charges =
+                                &self.charges[charge_index_pointer.0..charge_index_pointer.1];
+                            let coordinates_row_major = &coordinates[charge_index_pointer.0
+                                * self.dim
+                                ..charge_index_pointer.1 * self.dim];
 
-        // 1. Compute the check potential for each box
-        check_potentials
-            .data_mut()
-            .par_chunks_exact_mut(ncoeffs)
-            .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
-            .zip(&self.charge_index_pointer)
-            .for_each(
-                |((check_potential, upward_check_surface), charge_index_pointer)| {
-                    let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
-                    let coordinates_row_major =
-                        &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
+                            let nsources = coordinates_row_major.len() / self.dim;
+                            if nsources > 0 {
+                                let coordinates_row_major = rlst_array_from_slice2!(
+                                    W,
+                                    coordinates_row_major,
+                                    [nsources, self.dim],
+                                    [self.dim, 1]
+                                );
+                                let mut coordinates_col_major =
+                                    rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                coordinates_col_major.fill_from(coordinates_row_major.view());
 
-                    let nsources = coordinates_row_major.len() / dim;
-
-                    if nsources > 0 {
-                        let coordinates_row_major = rlst_array_from_slice2!(
-                            V,
-                            coordinates_row_major,
-                            [nsources, dim],
-                            [dim, 1]
-                        );
-                        let mut coordinates_col_major = rlst_dynamic_array2!(V, [nsources, dim]);
-                        coordinates_col_major.fill_from(coordinates_row_major.view());
-
-                        self.fmm.kernel.evaluate_st(
-                            EvalType::Value,
-                            coordinates_col_major.data(),
-                            upward_check_surface,
-                            charges,
-                            check_potential,
-                        );
-                    }
-                },
-            );
-
-        // 2. Compute the multipole expansions, with each of chunk_size boxes at a time.
-        let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
-
-        check_potentials
-            .data()
-            .par_chunks_exact(ncoeffs * chunk_size)
-            .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
-            .zip(self.scales.par_chunks_exact(ncoeffs * chunk_size))
-            .for_each(|((check_potential, multipole_ptrs), scale)| {
-                let check_potential =
-                    rlst_array_from_slice2!(V, check_potential, [ncoeffs, chunk_size]);
-                let scale = rlst_array_from_slice2!(V, scale, [ncoeffs, chunk_size]);
-
-                let mut cmp_prod = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
-                cmp_prod.fill_from(check_potential * scale);
-
-                let tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                    self.fmm.uc2e_inv_1.view(),
-                    empty_array::<V, 2>()
-                        .simple_mult_into_resize(self.fmm.uc2e_inv_2.view(), cmp_prod),
-                );
-
-                for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size) {
-                    let multipole =
-                        unsafe { std::slice::from_raw_parts_mut(multipole_ptr.raw, ncoeffs) };
-                    multipole
-                        .iter_mut()
-                        .zip(&tmp.data()[i * ncoeffs..(i + 1) * ncoeffs])
-                        .for_each(|(m, t)| *m += *t);
-                }
-            })
-    }
-
-    /// Multipole to multipole translations, multithreaded over all boxes at a given level.
-    fn m2m<'a>(&self, level: u64) {
-        let Some(child_sources) = self.fmm.tree().get_keys(level) else {
-            return;
-        };
-
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        let nsiblings = 8;
-
-        // 1. Lookup parents and corresponding children that exist for this set of sources
-        //    Must explicitly lookup as boxes may be empty at this level, and the next.
-        let parent_targets: HashSet<MortonKey> =
-            child_sources.iter().map(|source| source.parent()).collect();
-        let mut parent_targets = parent_targets.into_iter().collect_vec();
-        parent_targets.sort();
-        let nparents = parent_targets.len();
-        let mut parent_multipoles = Vec::new();
-        for parent in parent_targets.iter() {
-            let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize]
-                .get(parent)
-                .unwrap();
-            let parent_multipole =
-                self.level_multipoles[(level - 1) as usize][parent_index_pointer];
-            parent_multipoles.push(parent_multipole);
-        }
-
-        let n_child_sources = child_sources.len();
-        let min: &MortonKey = &child_sources[0];
-        let max = &child_sources[n_child_sources - 1];
-        let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
-        let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
-
-        let child_multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
-
-        let mut max_chunk_size = nparents;
-        if max_chunk_size > M2M_MAX_CHUNK_SIZE {
-            max_chunk_size = M2M_MAX_CHUNK_SIZE
-        }
-        let chunk_size = find_chunk_size(nparents, max_chunk_size);
-
-        // 3. Compute M2M kernel over sets of siblings
-        child_multipoles
-            .par_chunks_exact(nsiblings * ncoeffs * chunk_size)
-            .zip(parent_multipoles.par_chunks_exact(chunk_size))
-            .for_each(
-                |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
-                    let child_multipoles_chunk_mat = rlst_array_from_slice2!(
-                        V,
-                        child_multipoles_chunk,
-                        [ncoeffs * nsiblings, chunk_size]
+                                self.kernel.evaluate_st(
+                                    EvalType::Value,
+                                    coordinates_col_major.data(),
+                                    upward_check_surface,
+                                    charges,
+                                    check_potential,
+                                );
+                            }
+                        },
                     );
 
-                    let parent_multipoles_chunk = empty_array::<V, 2>()
-                        .simple_mult_into_resize(self.fmm.m2m.view(), child_multipoles_chunk_mat);
+                // Use check potentials to compute the multipole expansion
+                let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
+                check_potentials
+                    .data()
+                    .par_chunks_exact(self.ncoeffs * chunk_size)
+                    .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
+                    .zip(
+                        self.leaf_scales_sources
+                            .par_chunks_exact(self.ncoeffs * chunk_size),
+                    )
+                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                        let check_potential =
+                            rlst_array_from_slice2!(W, check_potential, [self.ncoeffs, chunk_size]);
+                        let scale = rlst_array_from_slice2!(W, scale, [self.ncoeffs, chunk_size]);
 
-                    for (chunk_idx, parent_multipole_pointer) in parent_multipole_pointers_chunk
-                        .iter()
-                        .enumerate()
-                        .take(chunk_size)
-                    {
-                        let parent_multipole = unsafe {
-                            std::slice::from_raw_parts_mut(parent_multipole_pointer.raw, ncoeffs)
-                        };
-                        parent_multipole
-                            .iter_mut()
-                            .zip(
-                                &parent_multipoles_chunk.data()
-                                    [chunk_idx * ncoeffs..(chunk_idx + 1) * ncoeffs],
-                            )
-                            .for_each(|(p, t)| *p += *t);
-                    }
-                },
-            )
-    }
-}
+                        let mut cmp_prod = rlst_dynamic_array2!(W, [self.ncoeffs, chunk_size]);
+                        cmp_prod.fill_from(check_potential * scale);
 
-impl<T, U, V> SourceTranslation for FmmDataAdaptive<KiFmmLinear<SingleNodeTree<V>, T, U, V>, V>
-where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
-    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: RlstScalar<Real = V> + Float + Default,
-{
-    /// Point to multipole evaluations, multithreaded over each leaf box.
-    fn p2m<'a>(&self) {
-        let Some(leaves) = self.fmm.tree().get_all_leaves() else {
-            return;
-        };
-
-        let nleaves = leaves.len();
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-
-        let mut check_potentials = rlst_dynamic_array2!(V, [nleaves * ncoeffs, 1]);
-        let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
-        let dim = self.fmm.kernel.space_dimension();
-        let surface_size = ncoeffs * self.fmm.kernel.space_dimension();
-
-        // 1. Compute the check potential for each box
-        check_potentials
-            .data_mut()
-            .par_chunks_exact_mut(ncoeffs)
-            .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
-            .zip(&self.charge_index_pointer)
-            .for_each(
-                |((check_potential, upward_check_surface), charge_index_pointer)| {
-                    let charges = &self.charges[charge_index_pointer.0..charge_index_pointer.1];
-                    let coordinates_row_major =
-                        &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-
-                    let nsources = coordinates_row_major.len() / dim;
-
-                    if nsources > 0 {
-                        let coordinates_mat = rlst_array_from_slice2!(
-                            V,
-                            coordinates_row_major,
-                            [nsources, dim],
-                            [dim, 1]
+                        let tmp = empty_array::<W, 2>().simple_mult_into_resize(
+                            self.uc2e_inv_1.view(),
+                            empty_array::<W, 2>()
+                                .simple_mult_into_resize(self.uc2e_inv_2.view(), cmp_prod),
                         );
-                        let mut coordinates_col_major = rlst_dynamic_array2!(V, [nsources, dim]);
-                        coordinates_col_major.fill_from(coordinates_mat.view());
 
-                        self.fmm.kernel.evaluate_st(
-                            EvalType::Value,
-                            coordinates_col_major.data(),
-                            upward_check_surface,
-                            charges,
-                            check_potential,
-                        );
-                    }
-                },
-            );
-
-        // 2. Compute the multipole expansions, with each of chunk_size boxes at a time.
-        let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
-
-        check_potentials
-            .data()
-            .par_chunks_exact(ncoeffs * chunk_size)
-            .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
-            .zip(self.scales.par_chunks_exact(ncoeffs * chunk_size))
-            .for_each(|((check_potential, multipole_ptrs), scale)| {
-                let check_potential =
-                    rlst_array_from_slice2!(V, check_potential, [ncoeffs, chunk_size]);
-                let scale = rlst_array_from_slice2!(V, scale, [ncoeffs, chunk_size]);
-
-                let mut cmp_prod = rlst_dynamic_array2!(V, [ncoeffs, chunk_size]);
-                cmp_prod.fill_from(check_potential * scale);
-
-                let tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                    self.fmm.uc2e_inv_1.view(),
-                    empty_array::<V, 2>()
-                        .simple_mult_into_resize(self.fmm.uc2e_inv_2.view(), cmp_prod),
-                );
-                for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size) {
-                    let multipole =
-                        unsafe { std::slice::from_raw_parts_mut(multipole_ptr.raw, ncoeffs) };
-                    multipole
-                        .iter_mut()
-                        .zip(&tmp.data()[i * ncoeffs..(i + 1) * ncoeffs])
-                        .for_each(|(m, t)| *m += *t);
-                }
-            })
-    }
-
-    /// Multipole to multipole translations, multithreaded over all boxes at a given level.
-    fn m2m<'a>(&self, level: u64) {
-        let Some(child_sources) = self.fmm.tree().get_keys(level) else {
-            return;
-        };
-
-        let ncoeffs = self.fmm.m2l.ncoeffs(self.fmm.order);
-        let nsiblings = 8;
-
-        // 1. Lookup parents and corresponding children that exist for this set of sources
-        //    Must explicitly lookup as boxes may be empty at this level, and the next.
-        let parent_targets: HashSet<MortonKey> =
-            child_sources.iter().map(|source| source.parent()).collect();
-        let mut parent_targets = parent_targets.into_iter().collect_vec();
-        parent_targets.sort();
-        let nparents = parent_targets.len();
-        let mut parent_multipoles = Vec::new();
-        for parent in parent_targets.iter() {
-            let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize]
-                .get(parent)
-                .unwrap();
-            let parent_multipole =
-                self.level_multipoles[(level - 1) as usize][parent_index_pointer];
-            parent_multipoles.push(parent_multipole);
-        }
-
-        let n_child_sources = child_sources.len();
-        let min: &MortonKey = &child_sources[0];
-        let max = &child_sources[n_child_sources - 1];
-        let min_idx = self.fmm.tree().key_to_index.get(min).unwrap();
-        let max_idx = self.fmm.tree().key_to_index.get(max).unwrap();
-
-        let child_multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
-
-        let mut max_chunk_size = nparents;
-        if max_chunk_size > M2M_MAX_CHUNK_SIZE {
-            max_chunk_size = M2M_MAX_CHUNK_SIZE
-        }
-        let chunk_size = find_chunk_size(nparents, max_chunk_size);
-
-        // 2. Compute M2M kernel over sets of siblings
-        child_multipoles
-            .par_chunks_exact(nsiblings * ncoeffs * chunk_size)
-            .zip(parent_multipoles.par_chunks_exact(chunk_size))
-            .for_each(
-                |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
-                    let child_multipoles_chunk_mat = rlst_array_from_slice2!(
-                        V,
-                        child_multipoles_chunk,
-                        [ncoeffs * nsiblings, chunk_size]
-                    );
-                    let parent_multipoles_chunk = empty_array::<V, 2>()
-                        .simple_mult_into_resize(self.fmm.m2m.view(), child_multipoles_chunk_mat);
-
-                    for (chunk_idx, parent_multipole_pointer) in parent_multipole_pointers_chunk
-                        .iter()
-                        .enumerate()
-                        .take(chunk_size)
-                    {
-                        let parent_multipole = unsafe {
-                            std::slice::from_raw_parts_mut(parent_multipole_pointer.raw, ncoeffs)
-                        };
-                        parent_multipole
-                            .iter_mut()
-                            .zip(
-                                &parent_multipoles_chunk.data()
-                                    [chunk_idx * ncoeffs..(chunk_idx + 1) * ncoeffs],
-                            )
-                            .for_each(|(p, t)| *p += *t);
-                    }
-                },
-            )
-    }
-}
-
-impl<T, U, V> SourceTranslation
-    for FmmDataUniformMatrix<KiFmmLinearMatrix<SingleNodeTree<V>, T, U, V>, V>
-where
-    T: Kernel<T = V> + ScaleInvariantKernel<T = V> + std::marker::Send + std::marker::Sync,
-    U: FieldTranslationData<T> + std::marker::Sync + std::marker::Send,
-    V: RlstScalar<Real = V> + Float + Default,
-{
-    /// Point to multipole evaluations, multithreaded over each leaf box.
-    fn p2m<'a>(&self) {
-        let Some(_leaves) = self.fmm.tree().get_all_leaves() else {
-            return;
-        };
-
-        let surface_size = self.ncoeffs * self.fmm.kernel.space_dimension();
-        let coordinates = self.fmm.tree().get_all_coordinates().unwrap();
-        let dim = self.fmm.kernel.space_dimension();
-        let ncoordinates = coordinates.len() / dim;
-
-        let mut check_potentials =
-            rlst_dynamic_array2!(V, [self.nleaves * self.ncoeffs * self.ncharge_vectors, 1]);
-
-        // 1. Compute the check potential for each box for each charge vector
-        check_potentials
-            .data_mut()
-            .par_chunks_exact_mut(self.ncoeffs * self.ncharge_vectors)
-            .zip(self.leaf_upward_surfaces.par_chunks_exact(surface_size))
-            .zip(&self.charge_index_pointer)
-            .for_each(
-                |((check_potential, upward_check_surface), charge_index_pointer)| {
-                    let coordinates_row_major =
-                        &coordinates[charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                    let nsources = coordinates_row_major.len() / dim;
-
-                    if nsources > 0 {
-                        for i in 0..self.ncharge_vectors {
-                            let charge_vec_displacement = i * ncoordinates;
-                            let charges_i = &self.charges[charge_vec_displacement
-                                + charge_index_pointer.0
-                                ..charge_vec_displacement + charge_index_pointer.1];
-                            let check_potential_i =
-                                &mut check_potential[i * self.ncoeffs..(i + 1) * self.ncoeffs];
-
-                            let coordinates_mat = rlst_array_from_slice2!(
-                                V,
-                                coordinates_row_major,
-                                [nsources, dim],
-                                [dim, 1]
-                            );
-                            let mut coordinates_col_major =
-                                rlst_dynamic_array2!(V, [nsources, dim]);
-                            coordinates_col_major.fill_from(coordinates_mat.view());
-
-                            self.fmm.kernel.evaluate_st(
-                                EvalType::Value,
-                                coordinates_col_major.data(),
-                                upward_check_surface,
-                                charges_i,
-                                check_potential_i,
-                            );
+                        for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
+                        {
+                            let multipole = unsafe {
+                                std::slice::from_raw_parts_mut(multipole_ptr[0].raw, self.ncoeffs)
+                            };
+                            multipole
+                                .iter_mut()
+                                .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
+                                .for_each(|(m, t)| *m += *t);
                         }
-                    }
-                },
-            );
+                    })
+            }
 
-        // 2. Compute the multipole expansions
-        check_potentials
-            .data()
-            .par_chunks_exact(self.ncoeffs * self.ncharge_vectors)
-            .zip(self.leaf_multipoles.into_par_iter())
-            .zip(self.scales.par_chunks_exact(self.ncoeffs))
-            .for_each(|((check_potential, multipole_ptrs), scale)| {
-                let check_potential = rlst_array_from_slice2!(
-                    V,
-                    check_potential,
-                    [self.ncoeffs, self.ncharge_vectors]
-                );
+            FmmEvalType::Matrix(nmatvecs) => {
+                let mut check_potentials =
+                    rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
 
-                let mut scaled_check_potential =
-                    rlst_dynamic_array2!(V, [self.ncoeffs, self.ncharge_vectors]);
-                scaled_check_potential.fill_from(check_potential);
-                scaled_check_potential.scale_in_place(scale[0]);
+                // Compute the check potential for each box for each charge vector
+                check_potentials
+                    .data_mut()
+                    .par_chunks_exact_mut(self.ncoeffs * nmatvecs)
+                    .zip(
+                        self.leaf_upward_surfaces_sources
+                            .par_chunks_exact(surface_size),
+                    )
+                    .zip(&self.charge_index_pointer_sources)
+                    .for_each(
+                        |((check_potential, upward_check_surface), charge_index_pointer)| {
+                            let coordinates_row_major = &coordinates[charge_index_pointer.0
+                                * self.dim
+                                ..charge_index_pointer.1 * self.dim];
+                            let nsources = coordinates_row_major.len() / self.dim;
 
-                let tmp = empty_array::<V, 2>().simple_mult_into_resize(
-                    self.fmm.uc2e_inv_1.view(),
-                    empty_array::<V, 2>().simple_mult_into_resize(
-                        self.fmm.uc2e_inv_2.view(),
-                        scaled_check_potential.view(),
-                    ),
-                );
+                            if nsources > 0 {
+                                for i in 0..nmatvecs {
+                                    let charge_vec_displacement = i * ncoordinates;
+                                    let charges_i = &self.charges[charge_vec_displacement
+                                        + charge_index_pointer.0
+                                        ..charge_vec_displacement + charge_index_pointer.1];
+                                    let check_potential_i = &mut check_potential
+                                        [i * self.ncoeffs..(i + 1) * self.ncoeffs];
 
-                for (i, multipole_ptr) in
-                    multipole_ptrs.iter().enumerate().take(self.ncharge_vectors)
-                {
-                    let multipole =
-                        unsafe { std::slice::from_raw_parts_mut(multipole_ptr.raw, self.ncoeffs) };
-                    multipole
-                        .iter_mut()
-                        .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
-                        .for_each(|(m, t)| *m += *t);
-                }
-            })
+                                    let coordinates_mat = rlst_array_from_slice2!(
+                                        W,
+                                        coordinates_row_major,
+                                        [nsources, self.dim],
+                                        [self.dim, 1]
+                                    );
+                                    let mut coordinates_col_major =
+                                        rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                    coordinates_col_major.fill_from(coordinates_mat.view());
+
+                                    self.kernel.evaluate_st(
+                                        EvalType::Value,
+                                        coordinates_col_major.data(),
+                                        upward_check_surface,
+                                        charges_i,
+                                        check_potential_i,
+                                    );
+                                }
+                            }
+                        },
+                    );
+
+                // Compute multipole expansions
+                check_potentials
+                    .data()
+                    .par_chunks_exact(self.ncoeffs * nmatvecs)
+                    .zip(self.leaf_multipoles.into_par_iter())
+                    .zip(self.leaf_scales_sources.par_chunks_exact(self.ncoeffs))
+                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                        let check_potential =
+                            rlst_array_from_slice2!(W, check_potential, [self.ncoeffs, nmatvecs]);
+
+                        let mut scaled_check_potential =
+                            rlst_dynamic_array2!(W, [self.ncoeffs, nmatvecs]);
+
+                        scaled_check_potential.fill_from(check_potential);
+                        scaled_check_potential.scale_in_place(scale[0]);
+
+                        let tmp = empty_array::<W, 2>().simple_mult_into_resize(
+                            self.uc2e_inv_1.view(),
+                            empty_array::<W, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_2.view(),
+                                scaled_check_potential.view(),
+                            ),
+                        );
+
+                        for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(nmatvecs) {
+                            let multipole = unsafe {
+                                std::slice::from_raw_parts_mut(multipole_ptr.raw, self.ncoeffs)
+                            };
+                            multipole
+                                .iter_mut()
+                                .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
+                                .for_each(|(m, t)| *m += *t);
+                        }
+                    })
+            }
+        }
     }
 
-    /// Multipole to multipole translations, multithreaded over all boxes at a given level.
-    fn m2m<'a>(&self, level: u64) {
-        let Some(child_sources) = self.fmm.tree().get_keys(level) else {
+    fn m2m(&self, level: u64) {
+        let Some(child_sources) = self.tree.source_tree().keys(level) else {
             return;
         };
 
-        let nsiblings = 8;
+        let nchild_sources = self.tree.source_tree().nkeys(level).unwrap();
+        let min = &child_sources[0];
+        let max = &child_sources[nchild_sources - 1];
+        let min_idx = self.tree.source_tree().index(min).unwrap();
+        let max_idx = self.tree.source_tree().index(max).unwrap();
 
-        // 1. Lookup parents and corresponding children that exist for this set of sources
-        //    Must explicitly lookup as boxes may be empty at this level, and the next.
-        let parent_targets: HashSet<MortonKey> =
+        let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
+
         let mut parent_targets = parent_targets.into_iter().collect_vec();
+
         parent_targets.sort();
         let nparents = parent_targets.len();
-        let mut parent_multipoles = vec![Vec::new(); nparents];
 
-        for (parent_idx, parent) in parent_targets.iter().enumerate() {
-            for charge_vec_idx in 0..self.ncharge_vectors {
-                let parent_index_pointer = *self.level_index_pointer[(level - 1) as usize]
-                    .get(parent)
-                    .unwrap();
-                let parent_multipole = self.level_multipoles[(level - 1) as usize]
-                    [parent_index_pointer][charge_vec_idx];
-                parent_multipoles[parent_idx].push(parent_multipole);
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
+                let mut parent_multipoles = Vec::new();
+                for parent in parent_targets.iter() {
+                    let &parent_index_pointer = self.level_index_pointer_multipoles
+                        [(level - 1) as usize]
+                        .get(parent)
+                        .unwrap();
+                    let parent_multipole =
+                        &self.level_multipoles[(level - 1) as usize][parent_index_pointer][0];
+                    parent_multipoles.push(parent_multipole);
+                }
+
+                let child_multipoles =
+                    &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
+
+                let mut max_chunk_size = nparents;
+                if max_chunk_size > M2M_MAX_CHUNK_SIZE {
+                    max_chunk_size = M2M_MAX_CHUNK_SIZE
+                }
+                let chunk_size = find_chunk_size(nparents, max_chunk_size);
+
+                child_multipoles
+                    .par_chunks_exact(NSIBLINGS * self.ncoeffs * chunk_size)
+                    .zip(parent_multipoles.par_chunks_exact(chunk_size))
+                    .for_each(
+                        |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
+                            let child_multipoles_chunk_mat = rlst_array_from_slice2!(
+                                W,
+                                child_multipoles_chunk,
+                                [self.ncoeffs * NSIBLINGS, chunk_size]
+                            );
+
+                            let parent_multipoles_chunk = empty_array::<W, 2>()
+                                .simple_mult_into_resize(
+                                    self.source_data.view(),
+                                    child_multipoles_chunk_mat,
+                                );
+
+                            for (chunk_idx, parent_multipole_pointer) in
+                                parent_multipole_pointers_chunk
+                                    .iter()
+                                    .enumerate()
+                                    .take(chunk_size)
+                            {
+                                let parent_multipole = unsafe {
+                                    std::slice::from_raw_parts_mut(
+                                        parent_multipole_pointer.raw,
+                                        self.ncoeffs,
+                                    )
+                                };
+
+                                parent_multipole
+                                    .iter_mut()
+                                    .zip(
+                                        &parent_multipoles_chunk.data()[chunk_idx * self.ncoeffs
+                                            ..(chunk_idx + 1) * self.ncoeffs],
+                                    )
+                                    .for_each(|(p, t)| *p += *t);
+                            }
+                        },
+                    )
             }
-        }
 
-        let n_child_sources = child_sources.len();
-        let min: &MortonKey = &child_sources[0];
-        let max = &child_sources[n_child_sources - 1];
-        let min_idx = self.fmm.tree.get_index(min).unwrap();
-        let min_key_displacement = min_idx * self.ncoeffs * self.ncharge_vectors;
-        let max_idx = self.fmm.tree().get_index(max).unwrap();
-        let max_key_displacement = (max_idx + 1) * self.ncoeffs * self.ncharge_vectors;
-        let child_multipoles = &self.multipoles[min_key_displacement..max_key_displacement];
+            FmmEvalType::Matrix(nmatvecs) => {
+                let mut parent_multipoles = vec![Vec::new(); nparents];
 
-        // 2. Compute M2M kernel over sets of siblings
-        child_multipoles
-            .par_chunks_exact(self.ncharge_vectors * self.ncoeffs * nsiblings)
-            .zip(parent_multipoles.into_par_iter())
-            .for_each(|(child_multipoles, parent_multipole_pointers)| {
-                for i in 0..nsiblings {
-                    let sibling_displacement = i * self.ncoeffs * self.ncharge_vectors;
-
-                    let child_multipoles_i = rlst_array_from_slice2!(
-                        V,
-                        &child_multipoles[sibling_displacement
-                            ..sibling_displacement + self.ncoeffs * self.ncharge_vectors],
-                        [self.ncoeffs, self.ncharge_vectors]
-                    );
-
-                    let result_i = empty_array::<V, 2>()
-                        .simple_mult_into_resize(self.fmm.m2m[i].view(), child_multipoles_i);
-
-                    for (j, send_ptr) in parent_multipole_pointers
-                        .iter()
-                        .enumerate()
-                        .take(self.ncharge_vectors)
-                    {
-                        let raw = send_ptr.raw;
-                        let parent_multipole_j =
-                            unsafe { std::slice::from_raw_parts_mut(raw, self.ncoeffs) };
-                        let result_ij = &result_i.data()[j * self.ncoeffs..(j + 1) * self.ncoeffs];
-                        parent_multipole_j
-                            .iter_mut()
-                            .zip(result_ij.iter())
-                            .for_each(|(p, r)| *p += *r);
+                for (parent_idx, parent) in parent_targets.iter().enumerate() {
+                    for charge_vec_idx in 0..nmatvecs {
+                        let parent_index_pointer = *self.level_index_pointer_multipoles
+                            [(level - 1) as usize]
+                            .get(parent)
+                            .unwrap();
+                        let parent_multipole = self.level_multipoles[(level - 1) as usize]
+                            [parent_index_pointer][charge_vec_idx];
+                        parent_multipoles[parent_idx].push(parent_multipole);
                     }
                 }
-            });
-    }
-}
 
-#[cfg(test)]
-mod test {
-    use super::*;
+                let min_key_displacement = min_idx * self.ncoeffs * nmatvecs;
+                let max_key_displacement = (max_idx + 1) * self.ncoeffs * nmatvecs;
 
-    use float_cmp::assert_approx_eq;
-    use itertools::Itertools;
+                let child_multipoles = &self.multipoles[min_key_displacement..max_key_displacement];
 
-    use crate::charge::build_charge_dict;
-    use bempp_field::types::FftFieldTranslationKiFmm;
-    use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use bempp_tree::{
-        constants::ROOT,
-        implementations::helpers::{points_fixture, points_fixture_sphere},
-    };
+                child_multipoles
+                    .par_chunks_exact(nmatvecs * self.ncoeffs * NSIBLINGS)
+                    .zip(parent_multipoles.into_par_iter())
+                    .for_each(|(child_multipoles, parent_multipole_pointers)| {
+                        for i in 0..NSIBLINGS {
+                            let sibling_displacement = i * self.ncoeffs * nmatvecs;
 
-    fn test_upward_pass_f64(
-        points: &[f64],
-        global_idxs: &[usize],
-        charges: &[f64],
-        sparse: bool,
-        adaptive: bool,
-        depth: Option<u64>,
-        ncrit: Option<u64>,
-    ) {
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
+                            let child_multipoles_i = rlst_array_from_slice2!(
+                                W,
+                                &child_multipoles[sibling_displacement
+                                    ..sibling_displacement + self.ncoeffs * nmatvecs],
+                                [self.ncoeffs, nmatvecs]
+                            );
 
-        // Create a tree
-        let tree = SingleNodeTree::new(points, adaptive, ncrit, depth, global_idxs, sparse);
+                            let result_i = empty_array::<W, 2>().simple_mult_into_resize(
+                                self.source_translation_data_vec[i].view(),
+                                child_multipoles_i,
+                            );
 
-        let depth = tree.get_depth();
-
-        let kernel = Laplace3dKernel::<f64>::default();
-
-        // Precompute the M2L data
-        let m2l_data: FftFieldTranslationKiFmm<f64, Laplace3dKernel<f64>> =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        // Associate data with the FMM
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-
-        // Upward pass
-        {
-            datatree.p2m();
-
-            for level in (1..=depth).rev() {
-                datatree.m2m(level);
+                            for (j, send_ptr) in
+                                parent_multipole_pointers.iter().enumerate().take(nmatvecs)
+                            {
+                                let raw = send_ptr.raw;
+                                let parent_multipole_j =
+                                    unsafe { std::slice::from_raw_parts_mut(raw, self.ncoeffs) };
+                                let result_ij =
+                                    &result_i.data()[j * self.ncoeffs..(j + 1) * self.ncoeffs];
+                                parent_multipole_j
+                                    .iter_mut()
+                                    .zip(result_ij.iter())
+                                    .for_each(|(p, r)| *p += *r);
+                            }
+                        }
+                    });
             }
-        }
-
-        let raw = datatree.level_multipoles[ROOT.level() as usize][0].raw;
-        let multipole = unsafe { std::slice::from_raw_parts(raw, ncoeffs) };
-
-        let upward_equivalent_surface =
-            ROOT.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
-
-        let test_point = vec![100000., 0., 0.];
-
-        let mut expected = vec![0.];
-        let mut found = vec![0.];
-
-        datatree.fmm.kernel().evaluate_st(
-            EvalType::Value,
-            points,
-            &test_point,
-            charges,
-            &mut expected,
-        );
-
-        datatree.fmm.kernel().evaluate_st(
-            EvalType::Value,
-            upward_equivalent_surface.as_slice(),
-            &test_point,
-            multipole,
-            &mut found,
-        );
-
-        let abs_error = num::Float::abs(expected[0] - found[0]);
-        let rel_error = abs_error / expected[0];
-
-        println!("{}", rel_error);
-        assert!(rel_error <= 1e-5);
-    }
-
-    fn test_upward_pass_matrix_f64(points: &[f64], global_idxs: &[usize], charge_mat: &[Vec<f64>]) {
-        let order = 8;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-        let depth = 3;
-        let adaptive = false;
-        let ncharge_vecs = charge_mat.len();
-
-        let kernel = Laplace3dKernel::default();
-
-        // Create a tree
-        let tree = SingleNodeTree::new(points, adaptive, None, Some(depth), global_idxs, false);
-
-        // Precompute the M2L data
-        let m2l_data =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dicts: Vec<_> = (0..ncharge_vecs)
-            .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
-            .collect();
-
-        // Associate data with the FMM
-        let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
-
-        // Upward pass
-        {
-            datatree.p2m();
-
-            for level in (1..=depth).rev() {
-                datatree.m2m(level);
-            }
-        }
-
-        let multipoles = &datatree.level_multipoles[ROOT.level() as usize][0];
-
-        let upward_equivalent_surface =
-            ROOT.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
-
-        let test_point = vec![100000., 0., 0.];
-
-        let mut expected = vec![0.; datatree.ncharge_vectors];
-        let mut found = vec![0.; datatree.ncharge_vectors];
-
-        for i in 0..ncharge_vecs {
-            datatree.fmm.kernel().evaluate_st(
-                EvalType::Value,
-                points,
-                &test_point,
-                &charge_mat[i],
-                &mut expected[i..i + 1],
-            );
-        }
-
-        for i in 0..ncharge_vecs {
-            let multipole =
-                unsafe { std::slice::from_raw_parts(multipoles[i].raw, datatree.ncoeffs) };
-            datatree.fmm.kernel().evaluate_st(
-                EvalType::Value,
-                upward_equivalent_surface.as_slice(),
-                &test_point,
-                multipole,
-                &mut found[i..i + 1],
-            );
-        }
-
-        for (&a, &b) in expected.iter().zip(found.iter()) {
-            assert_approx_eq!(f64, a, b, epsilon = 1e-5);
-        }
-    }
-
-    #[test]
-    fn test_upward_pass() {
-        let npoints = 10000;
-
-        // Uniformly refined point cloud
-        {
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-            test_upward_pass_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                false,
-                Some(3),
-                None,
-            );
-        }
-        // Uniformly refined sphere surface
-        {
-            let points = points_fixture_sphere::<f64>(npoints);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-            test_upward_pass_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                false,
-                Some(3),
-                None,
-            );
-        }
-        // Adaptively refined point cloud
-        {
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-            test_upward_pass_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                true,
-                None,
-                Some(150),
-            );
-        }
-
-        // Adaptively refined sphere surface
-        {
-            let points = points_fixture_sphere::<f64>(npoints);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-            test_upward_pass_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                true,
-                None,
-                Some(150),
-            );
-        }
-
-        // Uniformly refined, matrix input point cloud
-        {
-            let npoints = 10000;
-            let ncharge_vecs = 3;
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-            let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
-            charge_mat
-                .iter_mut()
-                .enumerate()
-                .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
-
-            test_upward_pass_matrix_f64(points.data(), &global_idxs, &charge_mat)
-        }
-    }
-
-    fn test_p2m_adaptive_f64(
-        points: &[f64],
-        global_idxs: &[usize],
-        charges: &[f64],
-        sparse: bool,
-        adaptive: bool,
-        depth: Option<u64>,
-        ncrit: Option<u64>,
-    ) {
-        let kernel = Laplace3dKernel::<f64>::default();
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-
-        // Create a tree
-        let tree = SingleNodeTree::new(points, adaptive, ncrit, depth, global_idxs, sparse);
-
-        // Precompute the M2L data
-        let m2l_data =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataAdaptive::new(fmm, &charge_dict).unwrap();
-
-        // Associate data with the FMM
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-
-        // Run P2M
-        datatree.p2m();
-
-        // Lookup first leaf that contains point data
-        let mut test_idx = 0;
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx = idx;
-                break;
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx];
-        let &leaf_idx = datatree.fmm.tree.get_leaf_index(leaf).unwrap();
-        let raw = datatree.leaf_multipoles[leaf_idx].raw;
-        let multipole = unsafe { std::slice::from_raw_parts(raw, ncoeffs) };
-
-        let surface =
-            leaf.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
-
-        let test_point = vec![100000., 0., 0.];
-
-        let mut expected = vec![0.];
-        let mut found = vec![0.];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[leaf_idx];
-        let leaf_coordinates = &coordinates[l * 3..r * 3];
-
-        let charges = &datatree.charges[l..r];
-
-        let kernel = Laplace3dKernel::<f64>::default();
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            leaf_coordinates,
-            &test_point,
-            charges,
-            &mut expected,
-        );
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            surface.as_slice(),
-            &test_point,
-            multipole,
-            &mut found,
-        );
-
-        let abs_error = (expected[0] - found[0]).abs();
-        let rel_error = abs_error / expected[0];
-        assert!(rel_error <= 1e-5);
-    }
-
-    fn test_p2m_uniform_f64(
-        points: &[f64],
-        global_idxs: &[usize],
-        charges: &[f64],
-        sparse: bool,
-        adaptive: bool,
-        depth: Option<u64>,
-        ncrit: Option<u64>,
-    ) {
-        let kernel = Laplace3dKernel::<f64>::default();
-        let order = 6;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-
-        // Create a tree
-        let tree = SingleNodeTree::new(points, adaptive, ncrit, depth, global_idxs, sparse);
-
-        // Precompute the M2L data
-        let m2l_data =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinear::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dict = build_charge_dict(global_idxs, charges);
-
-        let datatree = FmmDataUniform::new(fmm, &charge_dict).unwrap();
-
-        // Associate data with the FMM
-        let ncoeffs = datatree.fmm.m2l.ncoeffs(datatree.fmm.order);
-
-        // Run P2M
-        datatree.p2m();
-
-        // Lookup first leaf that contains point data
-        let mut test_idx = 0;
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx = idx;
-                break;
-            }
-        }
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx];
-        let &leaf_idx = datatree.fmm.tree.get_leaf_index(leaf).unwrap();
-        let raw = datatree.leaf_multipoles[leaf_idx].raw;
-        let multipole = unsafe { std::slice::from_raw_parts(raw, ncoeffs) };
-
-        let surface =
-            leaf.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
-
-        let test_point = vec![100000., 0., 0.];
-
-        let mut expected = vec![0.];
-        let mut found = vec![0.];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let (l, r) = datatree.charge_index_pointer[leaf_idx];
-        let leaf_coordinates = &coordinates[l * 3..r * 3];
-
-        let charges = &datatree.charges[l..r];
-
-        let kernel = Laplace3dKernel::<f64>::default();
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            leaf_coordinates,
-            &test_point,
-            charges,
-            &mut expected,
-        );
-
-        kernel.evaluate_st(
-            EvalType::Value,
-            surface.as_slice(),
-            &test_point,
-            multipole,
-            &mut found,
-        );
-
-        let abs_error = (expected[0] - found[0]).abs();
-        let rel_error = abs_error / expected[0];
-        assert!(rel_error <= 1e-5);
-    }
-
-    fn test_p2m_matrix_f64(
-        points: &[f64],
-        global_idxs: &[usize],
-        charge_mat: &[Vec<f64>],
-        sparse: bool,
-    ) {
-        let order = 8;
-        let alpha_inner = 1.05;
-        let alpha_outer = 2.95;
-        let depth = 3;
-        let adaptive = false;
-        let ncharge_vecs = charge_mat.len();
-
-        let kernel = Laplace3dKernel::default();
-
-        // Create a tree
-        let tree = SingleNodeTree::new(points, adaptive, None, Some(depth), global_idxs, sparse);
-
-        // Precompute the M2L data
-        let m2l_data =
-            FftFieldTranslationKiFmm::new(kernel.clone(), order, *tree.get_domain(), alpha_inner);
-        let fmm = KiFmmLinearMatrix::new(order, alpha_inner, alpha_outer, kernel, tree, m2l_data);
-
-        // Form charge dict, matching charges with their associated global indices
-        let charge_dicts: Vec<_> = (0..ncharge_vecs)
-            .map(|i| build_charge_dict(global_idxs, &charge_mat[i]))
-            .collect();
-
-        // Associate data with the FMM
-        let datatree = FmmDataUniformMatrix::new(fmm, &charge_dicts).unwrap();
-
-        // Run P2M
-        datatree.p2m();
-
-        // Find first leaf that contains point data
-        let mut test_idx = 0;
-        for (idx, index_pointer) in datatree.charge_index_pointer.iter().enumerate() {
-            if index_pointer.1 - index_pointer.0 > 0 {
-                test_idx = idx;
-                break;
-            }
-        }
-
-        let leaf = &datatree.fmm.tree().get_all_leaves().unwrap()[test_idx];
-        let &leaf_idx = datatree.fmm.tree.get_leaf_index(leaf).unwrap();
-        let multipoles = &datatree.leaf_multipoles[leaf_idx];
-
-        let upward_equivalent_surface =
-            leaf.compute_surface(&datatree.fmm.tree().domain, order, datatree.fmm.alpha_inner);
-
-        let test_point = vec![100000., 0., 0.];
-
-        let mut expected = vec![0.; ncharge_vecs];
-        let mut found = vec![0.; ncharge_vecs];
-
-        let coordinates = datatree.fmm.tree().get_all_coordinates().unwrap();
-        let ncoordinates = coordinates.len() / datatree.fmm.kernel.space_dimension();
-        let (l, r) = datatree.charge_index_pointer[leaf_idx];
-        let leaf_coordinates = &coordinates[l * 3..r * 3];
-
-        for i in 0..ncharge_vecs {
-            let charge_vec_displacement = i * ncoordinates;
-            let charges =
-                &datatree.charges[charge_vec_displacement + l..charge_vec_displacement + r];
-
-            datatree.fmm.kernel.evaluate_st(
-                EvalType::Value,
-                leaf_coordinates,
-                &test_point,
-                charges,
-                &mut expected[i..i + 1],
-            );
-        }
-
-        for i in 0..ncharge_vecs {
-            let multipole =
-                unsafe { std::slice::from_raw_parts(multipoles[i].raw, datatree.ncoeffs) };
-            datatree.fmm.kernel.evaluate_st(
-                EvalType::Value,
-                upward_equivalent_surface.as_slice(),
-                &test_point,
-                multipole,
-                &mut found[i..i + 1],
-            );
-        }
-
-        for (&a, &b) in expected.iter().zip(found.iter()) {
-            assert_approx_eq!(f64, a, b, epsilon = 1e-5);
-        }
-    }
-
-    #[test]
-    fn test_p2m() {
-        // Adaptively refined, point cloud
-        {
-            let npoints: usize = 10000;
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-
-            test_p2m_adaptive_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                true,
-                None,
-                Some(150),
-            );
-        }
-        // Adaptively refined, sphere surface
-        {
-            let npoints: usize = 10000;
-            let points = points_fixture_sphere::<f64>(npoints);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-
-            test_p2m_adaptive_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                true,
-                None,
-                Some(150),
-            );
-        }
-
-        // Uniformly refined, point cloud
-        {
-            let npoints: usize = 10000;
-            let depth = 3;
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-
-            test_p2m_uniform_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                false,
-                Some(depth),
-                None,
-            );
-
-            test_p2m_uniform_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                true,
-                false,
-                Some(depth),
-                None,
-            );
-        }
-
-        // Uniformly refined, sphere surface
-        {
-            let npoints: usize = 10000;
-            let points = points_fixture_sphere::<f64>(npoints);
-            let global_idxs = (0..npoints).collect_vec();
-            let charges = vec![1.0; npoints];
-            let depth = 3;
-
-            test_p2m_uniform_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                false,
-                false,
-                Some(depth),
-                None,
-            );
-
-            test_p2m_uniform_f64(
-                points.data(),
-                &global_idxs,
-                &charges,
-                true,
-                false,
-                Some(depth),
-                None,
-            );
-        }
-
-        // Uniformly refined, matrix input point cloud
-        {
-            let npoints = 10000;
-            let ncharge_vecs = 3;
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-
-            let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
-            charge_mat
-                .iter_mut()
-                .enumerate()
-                .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
-
-            test_p2m_matrix_f64(points.data(), &global_idxs, &charge_mat, false);
-            test_p2m_matrix_f64(points.data(), &global_idxs, &charge_mat, true);
-        }
-
-        // Uniformly refined, matrix input sphere surface
-        {
-            let npoints = 10000;
-            let ncharge_vecs = 3;
-            let points = points_fixture::<f64>(npoints, None, None);
-            let global_idxs = (0..npoints).collect_vec();
-
-            let mut charge_mat = vec![vec![0.0; npoints]; ncharge_vecs];
-            charge_mat
-                .iter_mut()
-                .enumerate()
-                .for_each(|(i, charge_mat_i)| *charge_mat_i = vec![i as f64 + 1.0; npoints]);
-
-            test_p2m_matrix_f64(points.data(), &global_idxs, &charge_mat, false);
-            test_p2m_matrix_f64(points.data(), &global_idxs, &charge_mat, true);
         }
     }
 }

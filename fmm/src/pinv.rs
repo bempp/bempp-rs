@@ -14,8 +14,6 @@ pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 type PinvReturnType<T> = RlstResult<(Vec<<T as RlstScalar>::Real>, PinvMatrix<T>, PinvMatrix<T>)>;
 
-//pub type SvdRlstScalar<T> = <DenseMatrixLinAlgBuilder<T> as Svd>::T;
-
 /// Compute the (Moore-Penrose) pseudo-inverse of a matrix.
 ///
 /// Calculate a generalised inverse using its singular value decomposition `U @ S @ V*`.
