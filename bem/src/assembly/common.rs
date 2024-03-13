@@ -1,22 +1,31 @@
 //! Common utility functions
 use rlst_dense::types::RlstScalar;
 
-pub(crate) struct RawData2D<T: RlstScalar> {
-    pub(crate) data: *mut T,
-    pub(crate) shape: [usize; 2],
+/// Raw 2D data
+pub struct RawData2D<T: RlstScalar> {
+    /// Array containting data
+    pub data: *mut T,
+    /// Shape of data
+    pub shape: [usize; 2],
 }
 
 unsafe impl<T: RlstScalar> Sync for RawData2D<T> {}
 
-pub(crate) struct SparseMatrixData<T: RlstScalar> {
-    pub(crate) data: Vec<T>,
-    pub(crate) rows: Vec<usize>,
-    pub(crate) cols: Vec<usize>,
-    pub(crate) shape: [usize; 2],
+/// Data for a sparse matrix
+pub struct SparseMatrixData<T: RlstScalar> {
+    /// Data
+    pub data: Vec<T>,
+    /// Rows
+    pub rows: Vec<usize>,
+    /// Columns
+    pub cols: Vec<usize>,
+    /// Shape of the matrix
+    pub shape: [usize; 2],
 }
 
 impl<T: RlstScalar> SparseMatrixData<T> {
-    pub(crate) fn new(shape: [usize; 2]) -> Self {
+    /// Create new sparse matrix
+    pub fn new(shape: [usize; 2]) -> Self {
         Self {
             data: vec![],
             rows: vec![],
@@ -24,7 +33,8 @@ impl<T: RlstScalar> SparseMatrixData<T> {
             shape,
         }
     }
-    pub(crate) fn new_known_size(shape: [usize; 2], size: usize) -> Self {
+    /// Create new sparse matrix with a known size
+    pub fn new_known_size(shape: [usize; 2], size: usize) -> Self {
         Self {
             data: Vec::with_capacity(size),
             rows: Vec::with_capacity(size),
@@ -32,14 +42,16 @@ impl<T: RlstScalar> SparseMatrixData<T> {
             shape,
         }
     }
-    pub(crate) fn add(&mut self, other: SparseMatrixData<T>) {
+    /// Add another sparse matrix to this matrix
+    pub fn add(&mut self, other: SparseMatrixData<T>) {
         debug_assert!(self.shape[0] == other.shape[0]);
         debug_assert!(self.shape[1] == other.shape[1]);
         self.rows.extend(&other.rows);
         self.cols.extend(&other.cols);
         self.data.extend(&other.data);
     }
-    pub(crate) fn sum(&self, other: SparseMatrixData<T>) -> SparseMatrixData<T> {
+    /// Compute the sum of this sparse matrix and another sparse matrix
+    pub fn sum(&self, other: SparseMatrixData<T>) -> SparseMatrixData<T> {
         debug_assert!(self.shape[0] == other.shape[0]);
         debug_assert!(self.shape[1] == other.shape[1]);
         let mut out = SparseMatrixData::<T>::new(self.shape);
