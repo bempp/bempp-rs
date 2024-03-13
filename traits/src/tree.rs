@@ -31,7 +31,7 @@ pub trait Tree {
     fn nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
-    fn get_depth(&self) -> u64;
+    fn depth(&self) -> u64;
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
     fn all_leaves(&self) -> Option<Self::NodeSlice<'_>>;

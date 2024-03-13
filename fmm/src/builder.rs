@@ -359,13 +359,13 @@ where
         // Mutable pointers to multipole and local data, indexed by level
         let mut level_multipoles = vec![
             Vec::new();
-            (self.tree.source_tree().get_depth() + 1)
+            (self.tree.source_tree().depth() + 1)
                 .try_into()
                 .unwrap()
         ];
         let mut level_locals = vec![
             Vec::new();
-            (self.tree.target_tree().get_depth() + 1)
+            (self.tree.target_tree().depth() + 1)
                 .try_into()
                 .unwrap()
         ];
@@ -373,13 +373,13 @@ where
         // Index pointers of multipole and local data, indexed by level
         let mut level_index_pointer_multipoles = vec![
             HashMap::new();
-            (self.tree.source_tree().get_depth() + 1)
+            (self.tree.source_tree().depth() + 1)
                 .try_into()
                 .unwrap()
         ];
         let mut level_index_pointer_locals = vec![
             HashMap::new();
-            (self.tree.target_tree().get_depth() + 1)
+            (self.tree.target_tree().depth() + 1)
                 .try_into()
                 .unwrap()
         ];
@@ -411,7 +411,7 @@ where
 
         // Create mutable pointers to multipole and local data indexed by tree level
         {
-            for level in 0..=self.tree.source_tree().get_depth() {
+            for level in 0..=self.tree.source_tree().depth() {
                 let mut tmp_multipoles = Vec::new();
 
                 let keys = self.tree.source_tree().keys(level).unwrap();
@@ -434,7 +434,7 @@ where
                 level_multipoles[level as usize] = tmp_multipoles
             }
 
-            for level in 0..=self.tree.target_tree().get_depth() {
+            for level in 0..=self.tree.target_tree().depth() {
                 let mut tmp_locals = Vec::new();
 
                 let keys = self.tree.target_tree().keys(level).unwrap();
@@ -454,14 +454,14 @@ where
                 level_locals[level as usize] = tmp_locals
             }
 
-            for level in 0..=self.tree.source_tree().get_depth() {
+            for level in 0..=self.tree.source_tree().depth() {
                 let keys = self.tree.source_tree().keys(level).unwrap();
                 for (level_idx, key) in keys.into_iter().enumerate() {
                     level_index_pointer_multipoles[level as usize].insert(*key, level_idx);
                 }
             }
 
-            for level in 0..=self.tree.target_tree().get_depth() {
+            for level in 0..=self.tree.target_tree().depth() {
                 let keys = self.tree.target_tree().keys(level).unwrap();
                 for (level_idx, key) in keys.into_iter().enumerate() {
                     level_index_pointer_locals[level as usize].insert(*key, level_idx);

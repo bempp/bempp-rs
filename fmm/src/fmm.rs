@@ -109,14 +109,14 @@ where
         // Upward pass
         {
             self.p2m();
-            for level in (1..=self.tree.source_tree().get_depth()).rev() {
+            for level in (1..=self.tree.source_tree().depth()).rev() {
                 self.m2m(level);
             }
         }
 
         // Downward pass
         {
-            for level in 2..=self.tree.target_tree().get_depth() {
+            for level in 2..=self.tree.target_tree().depth() {
                 if level > 2 {
                     self.l2l(level);
                 }

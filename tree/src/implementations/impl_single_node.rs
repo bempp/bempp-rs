@@ -38,7 +38,6 @@ where
     ) -> SingleNodeTree<T> {
         // Encode points at deepest level, and map to specified depth
 
-        // TODO: Automatically infer dimension
         let dim = 3;
         let npoints = points.len() / dim;
 
@@ -570,7 +569,7 @@ where
         Some(self.leaves.len())
     }
 
-    fn get_depth(&self) -> u64 {
+    fn depth(&self) -> u64 {
         self.depth
     }
 
@@ -858,7 +857,7 @@ mod test {
 
         let keys = tree.all_keys().unwrap();
 
-        let depth = tree.get_depth();
+        let depth = tree.depth();
 
         let mut tot = 0;
         for level in (0..=depth).rev() {
