@@ -1,7 +1,6 @@
 //! Implementation of the Helmholtz kernel
-use num::{self, Zero};
+use num::Zero;
 use std::marker::PhantomData;
-
 use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };

@@ -29,3 +29,6 @@ cauchy = "0.4.0"
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]
 strict = []
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

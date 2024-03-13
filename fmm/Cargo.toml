@@ -11,7 +11,7 @@ description = "A fast multipole method (FMM) library."
 license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
-readme = "README.md"
+readme = "../README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
@@ -40,13 +40,12 @@ rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = { git = "https://github.com/skailasa/fftw.git" }
 rayon = "1.7"
 
-[[example]]
-name = "single_node_laplace"
-path = "examples/single_node_laplace.rs"
-
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"]}
 
 [[bench]]
 name = "single_node"
 harness = false
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

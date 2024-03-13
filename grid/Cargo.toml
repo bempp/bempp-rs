@@ -11,7 +11,7 @@ description = "A finite element grid library."
 license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
-readme = "README.md"
+readme = "../README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
@@ -31,3 +31,10 @@ itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
 rlst-proc-macro = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[[example]]
+name="flat_triangle_grid"
+doc-scrape-examples = true

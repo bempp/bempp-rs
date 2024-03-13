@@ -11,7 +11,7 @@ description = "Boundary element method library."
 license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
-readme = "README.md"
+readme = "../README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 
@@ -47,3 +47,5 @@ criterion = { version = "0.3", features = ["html_reports"]}
 name = "assembly_benchmark"
 harness = false
 
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

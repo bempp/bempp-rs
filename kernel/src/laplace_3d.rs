@@ -1,5 +1,4 @@
 //! Implementation of the Laplace kernel
-use num;
 use std::marker::PhantomData;
 
 use crate::helpers::{
