@@ -1,6 +1,6 @@
 //! Definition of simplex rules.
 
-use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::types::ReferenceCellType;
 use std::collections::HashMap;
 
 type HM = HashMap<usize, (usize, Vec<f64>, Vec<f64>)>;

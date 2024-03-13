@@ -1,6 +1,6 @@
 //! Finite element definitions
 
-use crate::cell::ReferenceCellType;
+use crate::types::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 use rlst_dense::types::RlstScalar;
 
@@ -62,7 +62,7 @@ pub trait FiniteElement {
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
     fn tabulate<
-        Array2: RandomAccessByRef<2, Item = Self::T> + Shape<2>,
+        Array2: RandomAccessByRef<2, Item = <Self::T as RlstScalar>::Real> + Shape<2>,
         Array4Mut: RandomAccessMut<4, Item = Self::T>,
     >(
         &self,

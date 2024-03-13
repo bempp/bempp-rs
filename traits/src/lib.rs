@@ -2,7 +2,6 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 pub mod arrays;
 pub mod bem;
-pub mod cell;
 pub mod element;
 pub mod field;
 pub mod fmm;

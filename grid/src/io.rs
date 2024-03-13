@@ -5,6 +5,8 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{Geometry, Grid, Topology};
 use std::fs;
 
+// TODO: update this
+
 fn get_permutation_to_gmsh(cell_type: ReferenceCellType, degree: usize) -> Vec<usize> {
     match cell_type {
         ReferenceCellType::Triangle => match degree {

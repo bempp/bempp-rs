@@ -4,8 +4,8 @@ use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::{DofMap, FunctionSpace};
-use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::Continuity;
+use bempp_traits::types::ReferenceCellType;
 use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
 
 #[test]

@@ -23,7 +23,10 @@ crate-type = ["lib", "cdylib"]
 bempp-tools = { path = "../tools"}
 bempp-traits = { path = "../traits"}
 bempp-element = { path = "../element"}
+bempp-quadrature = { path = "../quadrature" }
 approx = "0.5"
+num = "0.4"
+log = "0.4"
 itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
 rlst-proc-macro = { git = "https://github.com/linalg-rs/rlst.git" }

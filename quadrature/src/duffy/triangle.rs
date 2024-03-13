@@ -356,7 +356,7 @@ pub fn triangle_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
 ) -> Result<TestTrialNumericalQuadratureDefinition, QuadratureError> {
-    let rule = simplex_rule(bempp_traits::cell::ReferenceCellType::Interval, npoints)?;
+    let rule = simplex_rule(bempp_traits::types::ReferenceCellType::Interval, npoints)?;
 
     match connectivity.connectivity_dimension {
         // Identical triangles

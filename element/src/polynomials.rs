@@ -1,13 +1,14 @@
 //! Orthonormal polynomials
 
-use bempp_traits::cell::ReferenceCellType;
+use bempp_traits::types::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 use rlst_dense::types::RlstScalar;
 
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
-    T: RlstScalar,
-    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    RealT: RlstScalar<Real = RealT>,
+    T: RlstScalar<Real = RealT>,
+    Array2: RandomAccessByRef<2, Item = RealT> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
     points: &Array2,
@@ -39,7 +40,8 @@ fn tabulate_legendre_polynomials_interval<
             for i in 0..data.shape()[2] {
                 let d = *data.get([k, p - 1, i]).unwrap();
                 *data.get_mut([k, p, i]).unwrap() =
-                    (*points.get([i, 0]).unwrap() * T::from(2.0).unwrap() - T::from(1.0).unwrap())
+                    (T::from(*points.get([i, 0]).unwrap()).unwrap() * T::from(2.0).unwrap()
+                        - T::from(1.0).unwrap())
                         * d
                         * b;
             }
@@ -75,7 +77,7 @@ fn quad_index(i: usize, j: usize, n: usize) -> usize {
 /// Tabulate orthonormal polynomials on a quadrilateral
 fn tabulate_legendre_polynomials_quadrilateral<
     T: RlstScalar,
-    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
     points: &Array2,
@@ -116,7 +118,8 @@ fn tabulate_legendre_polynomials_quadrilateral<
                     .unwrap();
                 *data
                     .get_mut([tri_index(k, 0), quad_index(p, 0, degree), i])
-                    .unwrap() = (*points.get([i, 0]).unwrap() * T::from(2.0).unwrap()
+                    .unwrap() = (T::from(*points.get([i, 0]).unwrap()).unwrap()
+                    * T::from(2.0).unwrap()
                     - T::from(1.0).unwrap())
                     * d
                     * b;
@@ -170,7 +173,8 @@ fn tabulate_legendre_polynomials_quadrilateral<
                     .unwrap();
                 *data
                     .get_mut([tri_index(0, k), quad_index(0, p, degree), i])
-                    .unwrap() = (*points.get([i, 1]).unwrap() * T::from(2.0).unwrap()
+                    .unwrap() = (T::from(*points.get([i, 1]).unwrap()).unwrap()
+                    * T::from(2.0).unwrap()
                     - T::from(1.0).unwrap())
                     * d
                     * b;
@@ -226,7 +230,7 @@ fn tabulate_legendre_polynomials_quadrilateral<
 /// Tabulate orthonormal polynomials on a triangle
 fn tabulate_legendre_polynomials_triangle<
     T: RlstScalar,
-    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
     points: &Array2,
@@ -265,8 +269,9 @@ fn tabulate_legendre_polynomials_triangle<
                         .unwrap();
                     *data
                         .get_mut([tri_index(kx, ky), tri_index(0, p), i])
-                        .unwrap() = (*points.get([i, 0]).unwrap() * T::from(2.0).unwrap()
-                        + *points.get([i, 1]).unwrap()
+                        .unwrap() = (T::from(*points.get([i, 0]).unwrap()).unwrap()
+                        * T::from(2.0).unwrap()
+                        + T::from(*points.get([i, 1]).unwrap()).unwrap()
                         - T::from(1.0).unwrap())
                         * d
                         * a
@@ -303,7 +308,8 @@ fn tabulate_legendre_polynomials_triangle<
                     );
 
                     for i in 0..data.shape()[2] {
-                        let b = T::from(1.0).unwrap() - *points.get([i, 1]).unwrap();
+                        let b =
+                            T::from(1.0).unwrap() - T::from(*points.get([i, 1]).unwrap()).unwrap();
                         let d = *data
                             .get([tri_index(kx, ky), tri_index(0, p - 2), i])
                             .unwrap();
@@ -320,7 +326,8 @@ fn tabulate_legendre_polynomials_triangle<
                                 .get_mut([tri_index(kx, ky), tri_index(0, p), i])
                                 .unwrap() -= T::from(2.0).unwrap()
                                 * T::from(ky).unwrap()
-                                * (*points.get([i, 1]).unwrap() - T::from(1.0).unwrap())
+                                * (T::from(*points.get([i, 1]).unwrap()).unwrap()
+                                    - T::from(1.0).unwrap())
                                 * d
                                 * scale2
                                 * (a - T::from(1.0).unwrap());
@@ -352,7 +359,8 @@ fn tabulate_legendre_polynomials_triangle<
                         .get_mut([tri_index(kx, ky), tri_index(1, p), i])
                         .unwrap() = *data.get([tri_index(kx, ky), tri_index(0, p), i]).unwrap()
                         * scale3
-                        * ((*points.get([i, 1]).unwrap() * T::from(2.0).unwrap()
+                        * ((T::from(*points.get([i, 1]).unwrap()).unwrap()
+                            * T::from(2.0).unwrap()
                             - T::from(1.0).unwrap())
                             * (T::from(1.5).unwrap() + T::from(p).unwrap())
                             + T::from(0.5).unwrap()
@@ -394,7 +402,7 @@ fn tabulate_legendre_polynomials_triangle<
                             .get_mut([tri_index(kx, ky), tri_index(q + 1, p), i])
                             .unwrap() = d
                             * scale4
-                            * ((*points.get([i, 1]).unwrap()
+                            * ((T::from(*points.get([i, 1]).unwrap()).unwrap()
                                 * T::from(T::from(2.0).unwrap()).unwrap()
                                 - T::from(T::from(1.0).unwrap()).unwrap())
                                 * a1
@@ -447,7 +455,7 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
     }
 }
 
-pub fn legendre_shape<T: RlstScalar, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
+pub fn legendre_shape<T, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
     cell_type: ReferenceCellType,
     points: &Array2,
     degree: usize,
@@ -463,7 +471,7 @@ pub fn legendre_shape<T: RlstScalar, Array2: RandomAccessByRef<2, Item = T> + Sh
 /// Tabulate orthonormal polynomials
 pub fn tabulate_legendre_polynomials<
     T: RlstScalar,
-    Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+    Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
     cell_type: ReferenceCellType,

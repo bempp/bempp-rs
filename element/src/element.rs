@@ -1,11 +1,11 @@
-//! Finite Element definitions
+//! Finite element definitions
 
-use crate::cell::create_cell;
 use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_polynomials};
+use crate::reference_cell;
 use bempp_tools::arrays::AdjacencyList;
 use bempp_traits::arrays::AdjacencyListAccess;
-use bempp_traits::cell::ReferenceCellType;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
+use bempp_traits::types::ReferenceCellType;
 use rlst_dense::linalg::inverse::MatrixInverse;
 use rlst_dense::types::RlstScalar;
 use rlst_dense::{
@@ -59,7 +59,7 @@ where
         degree: usize,
         value_shape: Vec<usize>,
         polynomial_coeffs: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-        interpolation_points: EntityPoints<T>,
+        interpolation_points: EntityPoints<T::Real>,
         interpolation_weights: EntityWeights<T>,
         map_type: MapType,
         continuity: Continuity,
@@ -74,8 +74,7 @@ where
                 npts += mat.shape()[2];
             }
         }
-        let cell = create_cell(cell_type);
-        let tdim = cell.dim();
+        let tdim = reference_cell::dim(cell_type);
 
         let mut value_size = 1;
         for i in &value_shape {
@@ -91,12 +90,12 @@ where
         }
 
         let new_pts = if continuity == Continuity::Discontinuous {
-            let mut new_pts: EntityPoints<T> = [vec![], vec![], vec![], vec![]];
+            let mut new_pts: EntityPoints<T::Real> = [vec![], vec![], vec![], vec![]];
             let mut pn = 0;
-            let mut all_pts = rlst_dynamic_array2![T, [npts, tdim]];
+            let mut all_pts = rlst_dynamic_array2![T::Real, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
                 for _pts in pts_i {
-                    new_pts[i].push(rlst_dynamic_array2![T, [0, tdim]]);
+                    new_pts[i].push(rlst_dynamic_array2![T::Real, [0, tdim]]);
                 }
             }
             for pts_i in interpolation_points.iter() {
@@ -283,7 +282,7 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
         self.family == ElementFamily::Lagrange
     }
     fn tabulate<
-        Array2: RandomAccessByRef<2, Item = T> + Shape<2>,
+        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
         Array4Mut: RandomAccessMut<4, Item = T>,
     >(
         &self,
@@ -340,8 +339,34 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::element::*;
-    use bempp_traits::cell::ReferenceCellType;
+    use super::*;
+    use approx::*;
+    use bempp_traits::element::FiniteElement;
+    use bempp_traits::types::ReferenceCellType;
+    use rlst_dense::rlst_dynamic_array4;
+    use rlst_dense::traits::RandomAccessByRef;
+
+    fn check_dofs(e: impl FiniteElement) {
+        let mut ndofs = 0;
+        for (dim, entity_count) in match e.cell_type() {
+            ReferenceCellType::Point => vec![1],
+            ReferenceCellType::Interval => vec![2, 1],
+            ReferenceCellType::Triangle => vec![3, 3, 1],
+            ReferenceCellType::Quadrilateral => vec![4, 4, 1],
+            ReferenceCellType::Tetrahedron => vec![4, 6, 4, 1],
+            ReferenceCellType::Hexahedron => vec![8, 12, 6, 1],
+            ReferenceCellType::Prism => vec![6, 9, 5, 1],
+            ReferenceCellType::Pyramid => vec![5, 8, 5, 1],
+        }
+        .iter()
+        .enumerate()
+        {
+            for entity in 0..*entity_count {
+                ndofs += e.entity_dofs(dim, entity).unwrap().len();
+            }
+        }
+        assert_eq!(ndofs, e.dim());
+    }
 
     #[test]
     fn test_lagrange_1() {
@@ -352,5 +377,363 @@ mod test {
             Continuity::Continuous,
         );
         assert_eq!(e.value_size(), 1);
+    }
+
+    #[test]
+    fn test_lagrange_0_interval() {
+        let e = lagrange::create::<f64>(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
+        let mut points = rlst_dynamic_array2!(f64, [4, 1]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 0.2;
+        *points.get_mut([2, 0]).unwrap() = 0.4;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..4 {
+            assert_relative_eq!(*data.get([0, pt, 0, 0]).unwrap(), 1.0);
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_1_interval() {
+        let e = lagrange::create::<f64>(ReferenceCellType::Interval, 1, Continuity::Continuous);
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
+        let mut points = rlst_dynamic_array2!(f64, [4, 1]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 0.2;
+        *points.get_mut([2, 0]).unwrap() = 0.4;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..4 {
+            assert_relative_eq!(
+                *data.get([0, pt, 0, 0]).unwrap(),
+                1.0 - *points.get([pt, 0]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 1, 0]).unwrap(),
+                *points.get([pt, 0]).unwrap()
+            );
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_0_triangle() {
+        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
+
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
+
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(*data.get([0, pt, 0, 0]).unwrap(), 1.0);
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_1_triangle() {
+        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(
+                *data.get([0, pt, 0, 0]).unwrap(),
+                1.0 - *points.get([pt, 0]).unwrap() - *points.get([pt, 1]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 1, 0]).unwrap(),
+                *points.get([pt, 0]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 2, 0]).unwrap(),
+                *points.get([pt, 1]).unwrap()
+            );
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_higher_degree_triangle() {
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 3, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 4, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 5, Continuity::Continuous);
+
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 3, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 4, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCellType::Triangle, 5, Continuity::Discontinuous);
+    }
+
+    #[test]
+    fn test_lagrange_higher_degree_interval() {
+        lagrange::create::<f64>(ReferenceCellType::Interval, 2, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Interval, 3, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Interval, 4, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Interval, 5, Continuity::Continuous);
+
+        lagrange::create::<f64>(ReferenceCellType::Interval, 2, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCellType::Interval, 3, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCellType::Interval, 4, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCellType::Interval, 5, Continuity::Discontinuous);
+    }
+
+    #[test]
+    fn test_lagrange_higher_degree_quadrilateral() {
+        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 3, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 4, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 5, Continuity::Continuous);
+
+        lagrange::create::<f64>(
+            ReferenceCellType::Quadrilateral,
+            2,
+            Continuity::Discontinuous,
+        );
+        lagrange::create::<f64>(
+            ReferenceCellType::Quadrilateral,
+            3,
+            Continuity::Discontinuous,
+        );
+        lagrange::create::<f64>(
+            ReferenceCellType::Quadrilateral,
+            4,
+            Continuity::Discontinuous,
+        );
+        lagrange::create::<f64>(
+            ReferenceCellType::Quadrilateral,
+            5,
+            Continuity::Discontinuous,
+        );
+    }
+
+    #[test]
+    fn test_lagrange_0_quadrilateral() {
+        let e = lagrange::create::<f64>(
+            ReferenceCellType::Quadrilateral,
+            0,
+            Continuity::Discontinuous,
+        );
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(*data.get([0, pt, 0, 0]).unwrap(), 1.0);
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_1_quadrilateral() {
+        let e =
+            lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
+        *points.get_mut([3, 1]).unwrap() = 1.0;
+        *points.get_mut([4, 0]).unwrap() = 0.25;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.3;
+        *points.get_mut([5, 1]).unwrap() = 0.2;
+
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(
+                *data.get([0, pt, 0, 0]).unwrap(),
+                (1.0 - *points.get([pt, 0]).unwrap()) * (1.0 - *points.get([pt, 1]).unwrap())
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 1, 0]).unwrap(),
+                *points.get([pt, 0]).unwrap() * (1.0 - *points.get([pt, 1]).unwrap())
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 2, 0]).unwrap(),
+                (1.0 - *points.get([pt, 0]).unwrap()) * *points.get([pt, 1]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 3, 0]).unwrap(),
+                *points.get([pt, 0]).unwrap() * *points.get([pt, 1]).unwrap()
+            );
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_lagrange_2_quadrilateral() {
+        let e =
+            lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
+        assert_eq!(e.value_size(), 1);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 1.0;
+        *points.get_mut([3, 1]).unwrap() = 1.0;
+        *points.get_mut([4, 0]).unwrap() = 0.25;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.3;
+        *points.get_mut([5, 1]).unwrap() = 0.2;
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            let x = *points.get([pt, 0]).unwrap();
+            let y = *points.get([pt, 1]).unwrap();
+            assert_relative_eq!(
+                *data.get([0, pt, 0, 0]).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * (1.0 - y) * (1.0 - 2.0 * y),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 1, 0]).unwrap(),
+                x * (2.0 * x - 1.0) * (1.0 - y) * (1.0 - 2.0 * y),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 2, 0]).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * y * (2.0 * y - 1.0),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 3, 0]).unwrap(),
+                x * (2.0 * x - 1.0) * y * (2.0 * y - 1.0),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 4, 0]).unwrap(),
+                4.0 * x * (1.0 - x) * (1.0 - y) * (1.0 - 2.0 * y),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 5, 0]).unwrap(),
+                (1.0 - x) * (1.0 - 2.0 * x) * 4.0 * y * (1.0 - y),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 6, 0]).unwrap(),
+                x * (2.0 * x - 1.0) * 4.0 * y * (1.0 - y),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 7, 0]).unwrap(),
+                4.0 * x * (1.0 - x) * y * (2.0 * y - 1.0),
+                epsilon = 1e-14
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 8, 0]).unwrap(),
+                4.0 * x * (1.0 - x) * 4.0 * y * (1.0 - y),
+                epsilon = 1e-14
+            );
+        }
+        check_dofs(e);
+    }
+
+    #[test]
+    fn test_raviart_thomas_1_triangle() {
+        let e = raviart_thomas::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        assert_eq!(e.value_size(), 2);
+        let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
+        let mut points = rlst_dynamic_array2!(f64, [6, 2]);
+        *points.get_mut([0, 0]).unwrap() = 0.0;
+        *points.get_mut([0, 1]).unwrap() = 0.0;
+        *points.get_mut([1, 0]).unwrap() = 1.0;
+        *points.get_mut([1, 1]).unwrap() = 0.0;
+        *points.get_mut([2, 0]).unwrap() = 0.0;
+        *points.get_mut([2, 1]).unwrap() = 1.0;
+        *points.get_mut([3, 0]).unwrap() = 0.5;
+        *points.get_mut([3, 1]).unwrap() = 0.0;
+        *points.get_mut([4, 0]).unwrap() = 0.0;
+        *points.get_mut([4, 1]).unwrap() = 0.5;
+        *points.get_mut([5, 0]).unwrap() = 0.5;
+        *points.get_mut([5, 1]).unwrap() = 0.5;
+        e.tabulate(&points, 0, &mut data);
+
+        for pt in 0..6 {
+            assert_relative_eq!(
+                *data.get([0, pt, 0, 0]).unwrap(),
+                -*points.get([pt, 0]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 0, 1]).unwrap(),
+                -*points.get([pt, 1]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 1, 0]).unwrap(),
+                *points.get([pt, 0]).unwrap() - 1.0
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 1, 1]).unwrap(),
+                *points.get([pt, 1]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 2, 0]).unwrap(),
+                -*points.get([pt, 0]).unwrap()
+            );
+            assert_relative_eq!(
+                *data.get([0, pt, 2, 1]).unwrap(),
+                1.0 - *points.get([pt, 1]).unwrap()
+            );
+        }
+        check_dofs(e);
     }
 }
