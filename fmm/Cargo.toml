@@ -11,7 +11,7 @@ description = "A fast multipole method (FMM) library."
 license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
-readme = "../README.md"
+readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 

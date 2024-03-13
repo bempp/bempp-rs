@@ -4,13 +4,13 @@ strict = []
 [package]
 name = "bempp-traits"
 version = "0.0.1"
-authors = ["Timo Betcke"]
+authors = ["Timo Betcke", "Srinath Kailasa <srinathkailasa@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 edition = "2021"
 description = "Traits for all bempp components."
 license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
-readme = "../README.md"
+readme = "README.md"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
 

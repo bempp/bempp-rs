@@ -9,6 +9,7 @@ homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
+readme = "README.md"
 
 [lib]
 name = "bempp_tree"

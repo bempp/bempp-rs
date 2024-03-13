@@ -1,2 +1,1 @@
-# solvers-element
-Definition of single surface elements
+# bempp-element: Definitions of finite elements
