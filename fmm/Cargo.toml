@@ -20,7 +20,6 @@ name = "bempp_fmm"
 crate-type = ["lib", "cdylib"]
 bench = false
 
-
 [dependencies]
 bempp-tools = { path = "../tools" }
 bempp-tree = { path = "../tree" }
@@ -49,3 +48,7 @@ harness = false
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[[example]]
+name = "single_node_laplace"
+path = "examples/single_node_laplace.rs"
