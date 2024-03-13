@@ -1,6 +1,4 @@
 //! Implementation of the Helmholtz kernel
-use num::Zero;
-use std::marker::PhantomData;
 use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
@@ -9,7 +7,9 @@ use bempp_traits::{
     types::{EvalType, RlstScalar},
 };
 use num::traits::FloatConst;
+use num::Zero;
 use rayon::prelude::*;
+use std::marker::PhantomData;
 
 /// Kernel for Helmholtz in 3D
 #[derive(Clone)]
