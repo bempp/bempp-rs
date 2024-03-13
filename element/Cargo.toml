@@ -33,3 +33,6 @@ num = "0.4"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true

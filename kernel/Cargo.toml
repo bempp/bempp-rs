@@ -34,3 +34,6 @@ rand = "0.8.5"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true

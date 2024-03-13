@@ -17,3 +17,6 @@ superslice = "1"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true

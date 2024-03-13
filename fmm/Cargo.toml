@@ -52,3 +52,6 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 [[example]]
 name = "single_node_laplace"
 path = "examples/single_node_laplace.rs"
+
+[lints]
+workspace = true

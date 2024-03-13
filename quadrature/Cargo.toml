@@ -32,3 +32,6 @@ criterion = { version = "0.3", features = ["html_reports"] }
 [package.metadata.docs.rs]
 rustdoc-args = [ "--html-in-header", "katex-header.html" ]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true
