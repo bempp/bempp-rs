@@ -61,7 +61,7 @@ impl RustyDataContainer {
         }
     }
 
-    // To boxed pointer.
+    /// To boxed pointer.
     pub fn to_box(self) -> Box<RustyDataContainer> {
         Box::new(self)
     }
@@ -251,6 +251,7 @@ pub extern "C" fn rusty_data_container_get_data(
     RustyDataContainer::leak(ptr).data
 }
 
+/// New from pointer
 #[no_mangle]
 pub extern "C" fn new_from_pointer(
     ptr: *mut c_void,

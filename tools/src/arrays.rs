@@ -101,6 +101,7 @@ impl<'a, T: Num + 'a> AdjacencyListAccess<'a, T> for AdjacencyList<T> {
     }
 }
 
+/// REMOVED
 pub struct AdjacencyListRowIterator<'a, T: Num> {
     alist: &'a AdjacencyList<T>,
     index: usize,
