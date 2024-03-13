@@ -22,12 +22,14 @@ pub type C2EType<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// A threadsafe mutable raw pointer
 #[derive(Clone, Debug, Copy)]
 pub struct SendPtrMut<T> {
+    /// Raw pointer
     pub raw: *mut T,
 }
 
 /// A threadsafe raw pointer
 #[derive(Clone, Debug, Copy)]
 pub struct SendPtr<T> {
+    /// Raw pointer
     pub raw: *const T,
 }
 
@@ -183,7 +185,9 @@ where
 /// Specifies the nature of the input to the FMM, either a vector or an matrix where each column corresponds to a vector of charges.
 #[derive(Clone, Copy)]
 pub enum FmmEvalType {
+    /// Vector
     Vector,
+    /// Matrix
     Matrix(usize),
 }
 
@@ -241,13 +245,22 @@ where
     U: RlstScalar<Real = U> + Float + Default,
     V: Kernel,
 {
+    /// Tree
     pub tree: Option<SingleNodeFmmTree<U>>,
+    /// Charges
     pub charges: Option<Charges<U>>,
+    /// Source to target
     pub source_to_target: Option<T>,
+    /// Domain
     pub domain: Option<Domain<U>>,
+    /// Kernel
     pub kernel: Option<V>,
+    /// Expansion order
     pub expansion_order: Option<usize>,
+    /// Number of coefficients
     pub ncoeffs: Option<usize>,
+    /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,
+    /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
 }

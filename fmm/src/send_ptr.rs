@@ -1,3 +1,5 @@
+//! Send ptr
+
 use num::Complex;
 
 use crate::types::{SendPtr, SendPtrMut};

@@ -1,3 +1,4 @@
+//! Helpers
 use rlst_dense::types::RlstScalar;
 
 /// Euclidean algorithm to find greatest divisor of `n` less than or equal to `max_chunk_size`
