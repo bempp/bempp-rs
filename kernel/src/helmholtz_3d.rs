@@ -12,6 +12,7 @@ use bempp_traits::{
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
+/// Kernel for Helmholtz in 3D
 #[derive(Clone)]
 pub struct Helmholtz3dKernel<T: RlstScalar> {
     wavenumber: T::Real,
@@ -19,6 +20,7 @@ pub struct Helmholtz3dKernel<T: RlstScalar> {
 }
 
 impl<T: RlstScalar> Helmholtz3dKernel<T> {
+    /// Create new
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             wavenumber,
@@ -247,6 +249,7 @@ where
     }
 }
 
+/// Evaluate Helmholtz kernel for one target
 pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],
@@ -361,6 +364,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     }
 }
 
+/// Assemble Helmholtz kernel for one target
 pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],

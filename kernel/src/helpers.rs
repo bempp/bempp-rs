@@ -1,3 +1,5 @@
+//! Helpers
+
 use bempp_traits::{
     kernel::Kernel,
     types::{EvalType, RlstScalar},
