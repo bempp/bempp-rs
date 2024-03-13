@@ -393,6 +393,7 @@ fn vertex_adjacent_quadrilaterals(
     }
 }
 
+/// Create a Duffy rule on a quadrilateral
 pub fn quadrilateral_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,

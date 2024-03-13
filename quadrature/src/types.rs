@@ -2,6 +2,7 @@
 pub use bempp_traits::types::ReferenceCellType;
 use std::fmt;
 
+/// Invalid quadrature rule
 #[derive(Debug)]
 pub struct InvalidQuadrature;
 
@@ -13,9 +14,12 @@ impl fmt::Display for InvalidQuadrature {
 
 impl std::error::Error for InvalidQuadrature {}
 
+/// Quadrature error
 #[derive(Debug)]
 pub enum QuadratureError {
+    /// Rule not found
     RuleNotFound,
+    /// Connectivity error
     ConnectivityError,
 }
 
