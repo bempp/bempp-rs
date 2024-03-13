@@ -3,7 +3,6 @@ use num::Num;
 
 /// REMOVED
 pub trait AdjacencyListAccess<'a, T: Num> {
-
     /// removed
     type I: Iterator;
 
