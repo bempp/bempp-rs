@@ -5,8 +5,6 @@ use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::types::KiFmmBuilderSingleNode;
-use bempp_traits::tree::FmmTree;
-
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::bem::{DofMap, FunctionSpace};
@@ -14,8 +12,10 @@ use bempp_traits::element::Continuity;
 use bempp_traits::fmm::Fmm;
 use bempp_traits::grid::GridType;
 use bempp_traits::kernel::Kernel;
+use bempp_traits::tree::FmmTree;
 use bempp_traits::tree::Tree;
 use bempp_traits::types::EvalType;
+use bempp_traits::types::ReferenceCellType;
 use rand::prelude::*;
 use rlst_dense::{
     array::empty_array,
