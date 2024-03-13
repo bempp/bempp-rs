@@ -6,9 +6,12 @@ use num::Float;
 use rlst_dense::types::RlstScalar;
 use std::hash::Hash;
 
+/// Ownership
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ownership {
+    /// Owned
     Owned,
+    /// Ghost
     Ghost(usize, usize),
 }
 
@@ -16,6 +19,7 @@ pub enum Ownership {
 ///
 /// This provides information about which mesh entities are connected to other mesh entities
 pub trait Topology {
+    /// Type used to indices topological entities
     type IndexType: std::fmt::Debug + Eq + Copy + Hash;
 
     /// The dimension of the topology (eg a triangle's dimension is 2, tetrahedron's dimension is 3)
@@ -100,9 +104,13 @@ pub trait Topology {
 ///
 /// This provides information about the physical locations of mesh points in space
 pub trait Geometry {
+    /// Type used to index cells
     type IndexType: std::fmt::Debug + Eq + Copy;
+    /// Scalar type
     type T: Float + RlstScalar<Real = Self::T>;
+    /// Element type
     type Element: FiniteElement;
+    /// Type of geometry evaluator
     type Evaluator<'a>: GeometryEvaluator<T = Self::T>
     where
         Self: 'a;
@@ -164,6 +172,7 @@ pub trait Geometry {
 ///
 /// A geometry evaluator can compute points and jacobians on physical cells
 pub trait GeometryEvaluator {
+    /// Scalar type
     type T: Float + RlstScalar<Real = Self::T>;
 
     /// The number of points on the reference cell used by this evaluator
@@ -181,6 +190,7 @@ pub trait GeometryEvaluator {
 
 /// A grid
 pub trait Grid {
+    /// Scalar type
     type T: Float + RlstScalar<Real = Self::T>;
 
     /// The type that implements [Topology]

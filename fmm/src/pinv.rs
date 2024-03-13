@@ -10,6 +10,7 @@ use rlst_dense::{
     traits::{MatrixSvd, Shape},
 };
 
+/// Matrix type
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 type PinvReturnType<T> = RlstResult<(Vec<<T as RlstScalar>::Real>, PinvMatrix<T>, PinvMatrix<T>)>;

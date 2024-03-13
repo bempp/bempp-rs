@@ -7,6 +7,7 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, TopologyType};
 use rlst_dense::types::RlstScalar;
 
+/// A serial function space
 pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
     grid: &'a GridImpl,
     element: &'a CiarletElement<T>,
@@ -14,6 +15,7 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real
 }
 
 impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
+    /// Create new function space
     pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<T>) -> Self {
         let dofmap = SerialDofMap::new(grid, element);
         Self {
@@ -23,6 +25,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
         }
     }
 
+    /// Compute cell colouring
     pub fn compute_cell_colouring(&self) -> Vec<Vec<usize>> {
         let mut colouring: Vec<Vec<usize>> = vec![];
         let mut edim = 0;

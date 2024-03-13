@@ -231,6 +231,7 @@ where
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
+    /// Create new
     pub fn new(threshold: Option<T>) -> Self {
         let tmp = T::from(4).unwrap() * T::epsilon();
         BlasFieldTranslationKiFmm {
@@ -462,6 +463,7 @@ where
     Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
+    /// Create new
     pub fn new() -> Self {
         FftFieldTranslationKiFmm {
             transfer_vectors: compute_transfer_vectors(),

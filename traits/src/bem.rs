@@ -1,6 +1,8 @@
+//! Boundary element method traits
 use crate::element::FiniteElement;
 use crate::grid::GridType;
 
+/// A DOF map
 pub trait DofMap {
     /// Get the DOF numbers on the local process associated with the given entity
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize];
@@ -17,13 +19,17 @@ pub trait DofMap {
     /// Get the local DOF numbers associated with a cell
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]>;
 
-    // Check if the function space is stored in serial
+    /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool;
 }
 
+/// A function space
 pub trait FunctionSpace {
+    /// The DOF map type
     type DofMap: DofMap;
+    /// The grid type
     type Grid: GridType;
+    /// The finite element type
     type FiniteElement: FiniteElement;
 
     /// Get the function space's DOF map
@@ -35,7 +41,7 @@ pub trait FunctionSpace {
     /// Get the finite element used to define this function space
     fn element(&self) -> &Self::FiniteElement;
 
-    // Check if the function space is stored in serial
+    /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool {
         self.dofmap().is_serial() && self.grid().is_serial()
     }

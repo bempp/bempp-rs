@@ -13,6 +13,7 @@ pub trait Tree {
     /// The computational domain defined by the tree.
     type Domain;
 
+    /// Precision
     type Precision: RlstScalar<Real = Self::Precision> + Float + Default;
 
     /// A tree node.
@@ -26,8 +27,13 @@ pub trait Tree {
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self::Node>;
 
+    /// Number of leaves
     fn nleaves(&self) -> Option<usize>;
+
+    /// Total number of keys
     fn nkeys_tot(&self) -> Option<usize>;
+
+    /// Number of keys
     fn nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
@@ -66,42 +72,54 @@ pub trait Tree {
     /// Get a map from the key to index position in sorted keys
     fn index(&self, key: &Self::Node) -> Option<&usize>;
 
+    /// Get a node
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 
     /// Get a map from the key to leaf index position in sorted leaves
     fn leaf_index(&self, key: &Self::Node) -> Option<&usize>;
 }
 
+/// An FMM tree
 pub trait FmmTree {
+    /// Precision
     type Precision;
+    /// Node type
     type Node;
-
+    /// Tree type   
     type Tree: Tree<Precision = Self::Precision, Node = Self::Node>;
 
+    /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
 
+    /// Get the target tree
     fn target_tree(&self) -> &Self::Tree;
 
+    /// Get the domain
     fn domain(&self) -> &<Self::Tree as Tree>::Domain;
 
+    /// Get the near field
     fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
 }
 
+/// A tree node
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
     T: RlstScalar,
 {
+    /// Domain
     type Domain;
 
-    // Copy of nodes
+    /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
 
-    /// The parent of a key.
+    /// The parent of a key
     fn parent(&self) -> Self;
 
+    /// The level
     fn level(&self) -> u64;
 
+    /// Compute surface
     fn compute_surface(
         &self,
         domain: &Self::Domain,
@@ -109,12 +127,12 @@ where
         alpha: T,
     ) -> Vec<<T as RlstScalar>::Real>;
 
-    /// Neighbours defined by keys sharing a vertex, edge, or face.
+    /// Neighbours defined by keys sharing a vertex, edge, or face
     fn neighbors(&self) -> Self::Nodes;
 
-    /// Childen of a key.
+    /// Childen of a key
     fn children(&self) -> Self::Nodes;
 
-    /// Checks adjacency, defined by sharing a vertex, edge, or face, between two keys.
+    /// Checks adjacency, defined by sharing a vertex, edge, or face, between two keys
     fn is_adjacent(&self, other: &Self) -> bool;
 }

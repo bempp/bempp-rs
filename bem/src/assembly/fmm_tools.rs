@@ -1,3 +1,4 @@
+//! FMM tools
 use crate::assembly::common::SparseMatrixData;
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::compute_det;
@@ -16,6 +17,7 @@ use rlst_dense::{
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
+/// Generate an array of all the quadrature points
 pub fn get_all_quadrature_points<
     const NPTS: usize,
     T: RlstScalar<Real = T>,
@@ -51,6 +53,7 @@ pub fn get_all_quadrature_points<
     all_points
 }
 
+/// Generate a dense matrix mapping between basis functions and quadrature points
 pub fn basis_to_quadrature_into_dense<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -71,6 +74,7 @@ pub fn basis_to_quadrature_into_dense<
     }
 }
 
+/// Generate a CSR matrix mapping between basis functions and quadrature points
 pub fn basis_to_quadrature_into_csr<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -94,6 +98,7 @@ pub fn basis_to_quadrature_into_csr<
     .unwrap()
 }
 
+/// Generate a dense transpose matrix mapping between basis functions and quadrature points
 pub fn transpose_basis_to_quadrature_into_dense<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -114,6 +119,7 @@ pub fn transpose_basis_to_quadrature_into_dense<
     }
 }
 
+/// Generate a CSR transpose matrix mapping between basis functions and quadrature points
 pub fn transpose_basis_to_quadrature_into_csr<
     const NPTS: usize,
     const BLOCKSIZE: usize,

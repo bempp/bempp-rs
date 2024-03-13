@@ -36,6 +36,7 @@ where
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {
+    /// Displacements
     pub fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
         let sources = self.tree.source_tree().keys(level).unwrap();
         let nsources = sources.len();

@@ -1,6 +1,6 @@
 //! Representation of basic types
 
-// Specification of data types
+/// Specification of data types
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum DTYPE {
@@ -24,39 +24,31 @@ pub enum DTYPE {
     Usize = 8,
 }
 
-// macro_rules! iterate_over_type {
-//     ($macro:ident) => {
-//         $macro!(f32);
-//         $macro!(f64);
-//         $macro!(i8);
-//         $macro!(i32);
-//         $macro!(i64);
-//         $macro!(u8);
-//         $macro!(u32);
-//         $macro!(u64);
-//     };
-// }
-
-// pub(crate) use iterate_over_type;
-
-// Mutability Property
+/// Mutability Property
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum MUTABILITY {
+    /// Not mutable
     NotMutable = 0,
+    /// Mutable
     Mutable = 1,
 }
 
-// Ownership Property
+/// Ownership Property
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum OWNERSHIP {
+    /// Not owner
     NotOwner = 0,
+    /// Owner
     Owner = 1,
 }
 
+/// Conversion type
 pub trait ConversionType: 'static {
+    /// Dtype
     const D: DTYPE;
+    /// Size
     const SIZE: usize;
 }
 
@@ -98,18 +90,22 @@ impl ConversionType for usize {
     const SIZE: usize = 8;
 }
 
+/// Get dtype
 pub fn get_dtype<T: ConversionType>() -> DTYPE {
     T::D
 }
 
+/// Assert dtype
 pub fn assert_dtype<T: ConversionType>(d: DTYPE) {
     assert_eq!(get_dtype::<T>(), d);
 }
 
+/// Get size
 pub fn get_size<T: ConversionType>() -> usize {
     T::SIZE
 }
 
+/// Get itemsize
 pub fn get_itemsize(dtype: DTYPE) -> usize {
     match dtype {
         DTYPE::Float32 => crate::get_size::<f32>(),

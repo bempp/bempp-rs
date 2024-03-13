@@ -323,6 +323,7 @@ where
         }
     }
 
+    /// Minimum depth
     pub fn minimum_depth(npoints: u64, n_crit: u64) -> u64 {
         let mut tmp = npoints;
         let mut level = 0;

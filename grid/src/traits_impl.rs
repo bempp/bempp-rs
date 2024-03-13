@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 
 /// A grid
 pub struct WrappedGrid<GridImpl: Grid> {
-    pub grid: GridImpl,
+    pub(crate) grid: GridImpl,
 }
 
 impl<GridImpl: Grid> Grid for WrappedGrid<GridImpl> {

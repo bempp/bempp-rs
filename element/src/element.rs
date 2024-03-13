@@ -25,10 +25,13 @@ type EntityWeights<T> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>; 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum ElementFamily {
+    /// Lagrange H(1) element
     Lagrange = 0,
+    /// Raviart-Thomas H(div) element
     RaviartThomas = 1,
 }
 
+/// A Ciarlet element
 pub struct CiarletElement<T: RlstScalar> {
     cell_type: ReferenceCellType,
     family: ElementFamily,
@@ -236,12 +239,12 @@ where
         }
     }
 
-    // The element family
+    /// The element family
     pub fn family(&self) -> ElementFamily {
         self.family
     }
 
-    // The polynomial degree
+    /// The polynomial degree
     pub fn degree(&self) -> usize {
         self.degree
     }
@@ -319,6 +322,7 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
     }
 }
 
+/// Create an element
 pub fn create_element<T: RlstScalar>(
     family: ElementFamily,
     cell_type: ReferenceCellType,

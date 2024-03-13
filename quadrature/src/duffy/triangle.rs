@@ -352,6 +352,7 @@ fn vertex_adjacent_triangles(
     }
 }
 
+/// Create a Duffy rule on a triangle
 pub fn triangle_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
