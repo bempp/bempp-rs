@@ -1,7 +1,10 @@
 //! Containers to store multi-dimensional data
 use num::Num;
 
+/// REMOVED
 pub trait AdjacencyListAccess<'a, T: Num> {
+
+    /// removed
     type I: Iterator;
 
     /// Get an item from the adjacency list

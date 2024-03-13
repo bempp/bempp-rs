@@ -4,6 +4,7 @@ use crate::types::RlstScalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel: Sync {
+    /// The scalar type
     type T: RlstScalar;
 
     /// Evaluate the Green's fct. for a single source and single target.

@@ -4,10 +4,17 @@ use crate::types::ReferenceCellType;
 use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
 use rlst_dense::types::RlstScalar;
 
+/// Continuity type
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum Continuity {
+    /// The element has standard continuity between cells
+    ///
+    /// For some element, this option does not indicate that the values are fully continuous.
+    /// For example, for Raviart-Thomas elements it only indicates that the normal components
+    /// are continuous across edges
     Continuous = 0,
+    /// The element is discontinuous betweeen cells
     Discontinuous = 1,
 }
 
@@ -15,9 +22,17 @@ pub enum Continuity {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum MapType {
+    /// Identity map
     Identity = 0,
+    /// Covariant Piola map
+    ///
+    /// This map is used by H(curl) elements
     CovariantPiola = 1,
+    /// Contravariant Piola map
+    ///
+    /// This map is used by H(div) elements
     ContravariantPiola = 2,
+    /// L2 Piola map
     L2Piola = 3,
 }
 
@@ -37,6 +52,7 @@ fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usi
 
 pub trait FiniteElement {
     //! A finite element defined on a reference cell
+    /// The scalar type
     type T: RlstScalar;
 
     /// The reference cell type

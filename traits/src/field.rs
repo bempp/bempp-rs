@@ -1,3 +1,4 @@
+//! Field traits
 use crate::kernel::Kernel;
 
 /// Container for metadata associated with a field translation implementation.
@@ -19,8 +20,10 @@ where
     /// * `domain` - Domain associated with the global point set.
     fn set_operator_data(&mut self, order: usize, domain: Self::Domain);
 
+    /// Set expansion order
     fn set_expansion_order(&mut self, expansion_order: usize);
 
+    /// Set the kernel
     fn set_kernel(&mut self, kernel: T);
 }
 

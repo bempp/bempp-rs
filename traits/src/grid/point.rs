@@ -11,9 +11,9 @@ pub trait PointType {
     /// Get the coordinates of the point
     fn coords(&self, data: &mut [<Self::T as RlstScalar>::Real]);
 
-    // Get the point's index
+    /// Get the point's index
     fn index(&self) -> usize;
 
-    // Get the point's id
+    /// Get the point's id
     fn id(&self) -> usize;
 }
