@@ -1,3 +1,4 @@
+//! Finite elements
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![warn(missing_docs)]
 

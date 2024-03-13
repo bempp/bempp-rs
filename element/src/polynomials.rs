@@ -433,6 +433,7 @@ fn tabulate_legendre_polynomials_triangle<
     }
 }
 
+/// The number of polynomials
 pub fn polynomial_count(cell_type: ReferenceCellType, degree: usize) -> usize {
     match cell_type {
         ReferenceCellType::Interval => degree + 1,
@@ -444,6 +445,7 @@ pub fn polynomial_count(cell_type: ReferenceCellType, degree: usize) -> usize {
     }
 }
 
+/// The total number of partial derivatives up to a give degree
 pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usize {
     match cell_type {
         ReferenceCellType::Interval => derivatives + 1,
@@ -455,6 +457,7 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
     }
 }
 
+/// The shape of a table containing the values of Legendre polynomials
 pub fn legendre_shape<T, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
     cell_type: ReferenceCellType,
     points: &Array2,
