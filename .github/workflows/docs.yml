@@ -54,20 +54,6 @@ jobs:
       - name: Build docs
         run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "mpi"
 
-      - name: make index.html
-        run: |
-          echo "<html><body>"
-          echo "<h1>Bempp-rs documentation</h1>"
-          echo "<ul>" >> target/doc/index.html
-          for f in target/doc/bempp_*
-          do
-          if [ -d "$f" ]
-          then
-          echo "<li><a href='${f##*/}'>${f##*/}</a></li>" >> target/doc/index.html
-          fi
-          done
-          echo "</ul></body></html>" >> target/doc/index.html
-
       - name: Set file permissions
         run: |
           rm target/doc/.lock
