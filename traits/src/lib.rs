@@ -2,7 +2,6 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![warn(missing_docs)]
 
-pub mod arrays;
 pub mod bem;
 pub mod element;
 pub mod field;
