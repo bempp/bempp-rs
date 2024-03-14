@@ -1181,17 +1181,21 @@ pub trait BatchedAssembler: Sync {
     }
 }
 
-/// Single layer assembler
-trait SingleLayerAssembler: Sync {
-    /// Type of the kernel
-    type K: Kernel;
-    /// Get the kernsl
-    fn kernel(&self) -> &Self::K;
+/// Assembler for a Laplace single layer operator
+pub struct LaplaceSingleLayerAssembler<T: RlstScalar> {
+    kernel: Laplace3dKernel<T>,
 }
-impl<K: Kernel, A: SingleLayerAssembler<K = K>> BatchedAssembler for A {
+impl<T: RlstScalar> Default for LaplaceSingleLayerAssembler<T> {
+    fn default() -> Self {
+        Self {
+            kernel: Laplace3dKernel::<T>::new(),
+        }
+    }
+}
+impl<T: RlstScalar> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
     const DERIV_SIZE: usize = 1;
-    type RealT = <K::T as RlstScalar>::Real;
-    type T = K::T;
+    type RealT = T::Real;
+    type T = T;
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<Self::T, 2>,
@@ -1217,7 +1221,7 @@ impl<K: Kernel, A: SingleLayerAssembler<K = K>> BatchedAssembler for A {
         targets: &[Self::RealT],
         result: &mut [Self::T],
     ) {
-        self.kernel()
+        self.kernel
             .assemble_diagonal_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(
@@ -1226,7 +1230,7 @@ impl<K: Kernel, A: SingleLayerAssembler<K = K>> BatchedAssembler for A {
         targets: &[Self::RealT],
         result: &mut [Self::T],
     ) {
-        self.kernel()
+        self.kernel
             .assemble_st(EvalType::Value, sources, targets, result);
     }
 }
@@ -1243,28 +1247,46 @@ impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> SingleLayerAssembler for HelmholtzSingleLayerAssembler<T> {
-    type K = Helmholtz3dKernel<T>;
-    fn kernel(&self) -> &Self::K {
-        &self.kernel
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzSingleLayerAssembler<T> {
+    const DERIV_SIZE: usize = 1;
+    type RealT = T::Real;
+    type T = T;
+    unsafe fn singular_kernel_value(
+        &self,
+        k: &RlstArray<Self::T, 2>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        _trial_normals: &RlstArray<Self::RealT, 2>,
+        index: usize,
+    ) -> Self::T {
+        *k.get_unchecked([0, index])
     }
-}
-
-/// Assembler for a Laplace single layer operator
-pub struct LaplaceSingleLayerAssembler<T: RlstScalar> {
-    kernel: Laplace3dKernel<T>,
-}
-impl<T: RlstScalar> Default for LaplaceSingleLayerAssembler<T> {
-    fn default() -> Self {
-        Self {
-            kernel: Laplace3dKernel::<T>::new(),
-        }
+    unsafe fn nonsingular_kernel_value(
+        &self,
+        k: &RlstArray<Self::T, 3>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        _trial_normals: &RlstArray<Self::RealT, 2>,
+        test_index: usize,
+        trial_index: usize,
+    ) -> Self::T {
+        *k.get_unchecked([test_index, 0, trial_index])
     }
-}
-impl<T: RlstScalar> SingleLayerAssembler for LaplaceSingleLayerAssembler<T> {
-    type K = Laplace3dKernel<T>;
-    fn kernel(&self) -> &Self::K {
-        &self.kernel
+    fn kernel_assemble_diagonal_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
+        self.kernel
+            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+    }
+    fn kernel_assemble_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
+        self.kernel
+            .assemble_st(EvalType::Value, sources, targets, result);
     }
 }
 
@@ -1279,50 +1301,129 @@ impl<T: RlstScalar> Default for LaplaceDoubleLayerAssembler<T> {
         }
     }
 }
-unsafe impl<T: RlstScalar> Sync for LaplaceDoubleLayerAssembler<T> {}
 impl<T: RlstScalar> BatchedAssembler for LaplaceDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     type RealT = T::Real;
     type T = T;
     unsafe fn singular_kernel_value(
         &self,
-        k: &RlstArray<T, 2>,
-        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        k: &RlstArray<Self::T, 2>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        trial_normals: &RlstArray<Self::RealT, 2>,
         index: usize,
-    ) -> T {
+    ) -> Self::T {
         *k.get_unchecked([1, index])
-            * num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 0])).unwrap()
+            * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([index, 0])).unwrap()
             + *k.get_unchecked([2, index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 1])).unwrap()
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([index, 1]))
+                    .unwrap()
             + *k.get_unchecked([3, index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 2])).unwrap()
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([index, 2]))
+                    .unwrap()
     }
     unsafe fn nonsingular_kernel_value(
         &self,
-        k: &RlstArray<T, 3>,
-        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        k: &RlstArray<Self::T, 3>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        trial_normals: &RlstArray<Self::RealT, 2>,
         test_index: usize,
         trial_index: usize,
-    ) -> T {
+    ) -> Self::T {
         *k.get_unchecked([test_index, 1, trial_index])
-            * num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 0])).unwrap()
+            * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([trial_index, 0]))
+                .unwrap()
             + *k.get_unchecked([test_index, 2, trial_index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 1])).unwrap()
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([trial_index, 1]))
+                    .unwrap()
             + *k.get_unchecked([test_index, 3, trial_index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 2])).unwrap()
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([trial_index, 2]))
+                    .unwrap()
     }
     fn kernel_assemble_diagonal_st(
         &self,
-        sources: &[T::Real],
-        targets: &[T::Real],
-        result: &mut [T],
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
     ) {
         self.kernel
             .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
     }
-    fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
+    fn kernel_assemble_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
+        self.kernel
+            .assemble_st(EvalType::ValueDeriv, sources, targets, result);
+    }
+}
+
+/// Assembler for a Helmholtz double layer boundary operator
+pub struct HelmholtzDoubleLayerAssembler<T: RlstScalar<Complex = T>> {
+    kernel: Helmholtz3dKernel<T>,
+}
+impl<T: RlstScalar<Complex = T>> HelmholtzDoubleLayerAssembler<T> {
+    /// Create a new assembler
+    pub fn new(wavenumber: T::Real) -> Self {
+        Self {
+            kernel: Helmholtz3dKernel::<T>::new(wavenumber),
+        }
+    }
+}
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzDoubleLayerAssembler<T> {
+    const DERIV_SIZE: usize = 4;
+    type RealT = T::Real;
+    type T = T;
+    unsafe fn singular_kernel_value(
+        &self,
+        k: &RlstArray<Self::T, 2>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        trial_normals: &RlstArray<Self::RealT, 2>,
+        index: usize,
+    ) -> Self::T {
+        *k.get_unchecked([1, index])
+            * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([index, 0])).unwrap()
+            + *k.get_unchecked([2, index])
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([index, 1]))
+                    .unwrap()
+            + *k.get_unchecked([3, index])
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([index, 2]))
+                    .unwrap()
+    }
+    unsafe fn nonsingular_kernel_value(
+        &self,
+        k: &RlstArray<Self::T, 3>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        trial_normals: &RlstArray<Self::RealT, 2>,
+        test_index: usize,
+        trial_index: usize,
+    ) -> Self::T {
+        *k.get_unchecked([test_index, 1, trial_index])
+            * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([trial_index, 0]))
+                .unwrap()
+            + *k.get_unchecked([test_index, 2, trial_index])
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([trial_index, 1]))
+                    .unwrap()
+            + *k.get_unchecked([test_index, 3, trial_index])
+                * num::cast::<Self::RealT, Self::T>(*trial_normals.get_unchecked([trial_index, 2]))
+                    .unwrap()
+    }
+    fn kernel_assemble_diagonal_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
+        self.kernel
+            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+    }
+    fn kernel_assemble_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
         self.kernel
             .assemble_st(EvalType::ValueDeriv, sources, targets, result);
     }
@@ -1339,7 +1440,6 @@ impl<T: RlstScalar> Default for LaplaceAdjointDoubleLayerAssembler<T> {
         }
     }
 }
-unsafe impl<T: RlstScalar> Sync for LaplaceAdjointDoubleLayerAssembler<T> {}
 impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     type RealT = T::Real;

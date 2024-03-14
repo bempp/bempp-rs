@@ -193,7 +193,6 @@ fn test_helmholtz_single_layer_dp0_dp0() {
         }
     }
 }
-/*
 
 #[test]
 fn test_helmholtz_double_layer_dp0_dp0() {
@@ -207,16 +206,10 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
+    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::DoubleLayer,
-        PDEType::Helmholtz(3.0),
-        &space,
-        &space,
-    );
+    let a = batched::HelmholtzDoubleLayerAssembler::new(3.0);
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -224,12 +217,11 @@ fn test_helmholtz_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            assert_relative_eq!(matrix.get([i, j]).unwrap().re, entry.re, epsilon = 1e-4);
-            assert_relative_eq!(matrix.get([i, j]).unwrap().im, entry.im, epsilon = 1e-4);
+            assert_relative_eq!(matrix.get([i, j]).unwrap(), entry, epsilon = 1e-4);
         }
     }
 }
-
+/*
 #[test]
 fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
