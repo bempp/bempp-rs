@@ -3,7 +3,7 @@ use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
-use bempp_traits::bem::{DofMap, FunctionSpace};
+use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
 use bempp_traits::types::ReferenceCellType;
 use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
@@ -19,7 +19,7 @@ fn test_laplace_single_layer_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
 
@@ -48,7 +48,7 @@ fn test_laplace_double_layer_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     let a = batched::LaplaceDoubleLayerAssembler::default();
@@ -76,7 +76,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     let a = batched::LaplaceAdjointDoubleLayerAssembler::default();
@@ -106,7 +106,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
@@ -136,7 +136,7 @@ fn test_laplace_hypersingular_p1_p1() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
@@ -176,7 +176,7 @@ fn test_helmholtz_single_layer_real_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     assemble(
@@ -209,7 +209,7 @@ fn test_helmholtz_single_layer_complex_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
     assemble(
@@ -243,7 +243,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
     assemble(
@@ -278,7 +278,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
     assemble(
@@ -313,7 +313,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     );
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.dofmap().global_size();
+    let ndofs = space.global_size();
 
     let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
     assemble(

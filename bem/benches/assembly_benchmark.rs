@@ -2,7 +2,6 @@ use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
-use bempp_traits::bem::DofMap;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
 use bempp_traits::types::ReferenceCellType;
@@ -23,10 +22,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = rlst_dynamic_array2!(
-            f64,
-            [space.dofmap().global_size(), space.dofmap().global_size()]
-        );
+        let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.compute_cell_colouring();
         let a = batched::LaplaceSingleLayerAssembler::default();
@@ -34,8 +30,8 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         group.bench_function(
             &format!(
                 "Assembly of singular terms of {}x{} matrix",
-                space.dofmap().global_size(),
-                space.dofmap().global_size()
+                space.global_size(),
+                space.global_size()
             ),
             |b| {
                 b.iter(|| {
@@ -46,8 +42,8 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         group.bench_function(
             &format!(
                 "Assembly of non-singular terms of {}x{} matrix",
-                space.dofmap().global_size(),
-                space.dofmap().global_size()
+                space.global_size(),
+                space.global_size()
             ),
             |b| {
                 b.iter(|| {
