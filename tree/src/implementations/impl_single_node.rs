@@ -320,16 +320,12 @@ where
         }
     }
 
-<<<<<<< HEAD
     /// Estimate the minimum depth such that leaf boxes have at most
     /// 'n_crit' particles, using a uniform distribution of particles.
     ///
     /// # Arguments
     /// * `npoints` - Total number of particles
     /// * `n_crit` - Constraint on max number of particles per leaf box
-=======
-    /// Minimum depth
->>>>>>> main
     pub fn minimum_depth(npoints: u64, n_crit: u64) -> u64 {
         let mut tmp = npoints;
         let mut level = 0;

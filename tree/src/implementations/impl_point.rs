@@ -85,21 +85,6 @@ mod test {
             npoints,
         };
 
-<<<<<<< HEAD
-        let mut coordinates = points_fixture(npoints, None, None, None);
-
-        let mut points = Vec::new();
-        for i in 0..npoints {
-            let point = [
-                coordinates.data()[i],
-                coordinates.data()[npoints + i],
-                coordinates.data()[2 * npoints + i],
-            ];
-            points.push(Point {
-                coordinate: point,
-                base_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
-                encoded_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
-=======
         let npoints = 1000;
         let coords = points_fixture(npoints, None, None, None);
         let mut points = Vec::new();
@@ -114,7 +99,6 @@ mod test {
                 coordinate: p,
                 base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
                 encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
->>>>>>> main
                 global_idx: i,
             })
         }

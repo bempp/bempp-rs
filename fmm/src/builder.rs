@@ -364,27 +364,9 @@ where
         let multipoles = vec![W::default(); self.ncoeffs * nsource_keys * nmatvecs];
         let locals = vec![W::default(); self.ncoeffs * ntarget_keys * nmatvecs];
 
-<<<<<<< HEAD
-        // Mutable pointers to multipole and local data, indexed by level
-        let mut level_multipoles =
-            vec![Vec::new(); (self.tree.source_tree().depth() + 1).try_into().unwrap()];
-        let mut level_locals =
-            vec![Vec::new(); (self.tree.target_tree().depth() + 1).try_into().unwrap()];
-
-        // Index pointers of multipole and local data, indexed by level
-        let mut level_index_pointer_multipoles =
-            vec![HashMap::new(); (self.tree.source_tree().depth() + 1).try_into().unwrap()];
-        let mut level_index_pointer_locals =
-            vec![HashMap::new(); (self.tree.target_tree().depth() + 1).try_into().unwrap()];
-
-        // Mutable pointers to multipole and local data only at leaf level
-        let mut leaf_multipoles = vec![Vec::new(); nsource_leaves];
-        let mut leaf_locals = vec![Vec::new(); ntarget_leaves];
-=======
         // Index pointers of multipole and local data, indexed by level
         let level_index_pointer_multipoles = level_index_pointer(self.tree.source_tree());
         let level_index_pointer_locals = level_index_pointer(self.tree.target_tree());
->>>>>>> main
 
         // Buffer to store evaluated potentials and/or gradients at target points
         let potentials = vec![W::default(); ntarget_points * eval_size * nmatvecs];
@@ -412,24 +394,13 @@ where
             self.expansion_order,
         );
 
-<<<<<<< HEAD
-        // Create mutable pointers to multipole and local data indexed by tree level
-        {
-            for level in 0..=self.tree.source_tree().depth() {
-                let mut tmp_multipoles = Vec::new();
-=======
         // Mutable pointers to multipole and local data, indexed by level
         let level_multipoles =
             level_expansion_pointers(self.tree.source_tree(), self.ncoeffs, nmatvecs, &multipoles);
->>>>>>> main
 
         let level_locals =
             level_expansion_pointers(self.tree.source_tree(), self.ncoeffs, nmatvecs, &locals);
 
-<<<<<<< HEAD
-            for level in 0..=self.tree.target_tree().depth() {
-                let mut tmp_locals = Vec::new();
-=======
         // Mutable pointers to multipole and local data only at leaf level
         let leaf_multipoles = leaf_expansion_pointers(
             self.tree.source_tree(),
@@ -438,7 +409,6 @@ where
             nsource_leaves,
             &multipoles,
         );
->>>>>>> main
 
         let leaf_locals = leaf_expansion_pointers(
             self.tree.target_tree(),
@@ -448,187 +418,6 @@ where
             &locals,
         );
 
-<<<<<<< HEAD
-            for level in 0..=self.tree.source_tree().depth() {
-                let keys = self.tree.source_tree().keys(level).unwrap();
-                for (level_idx, key) in keys.into_iter().enumerate() {
-                    level_index_pointer_multipoles[level as usize].insert(*key, level_idx);
-                }
-            }
-
-            for level in 0..=self.tree.target_tree().depth() {
-                let keys = self.tree.target_tree().keys(level).unwrap();
-                for (level_idx, key) in keys.into_iter().enumerate() {
-                    level_index_pointer_locals[level as usize].insert(*key, level_idx);
-                }
-            }
-        }
-
-        // Create mutable pointers to multipole and local data at leaf level
-        {
-            for (leaf_idx, leaf) in self
-                .tree
-                .source_tree()
-                .all_leaves()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let key_idx = self.tree.source_tree().index(leaf).unwrap();
-                let key_displacement = self.ncoeffs * nmatvecs * key_idx;
-                for eval_idx in 0..nmatvecs {
-                    let eval_displacement = self.ncoeffs * eval_idx;
-                    let raw = unsafe {
-                        multipoles
-                            .as_ptr()
-                            .add(eval_displacement + key_displacement)
-                            as *mut W
-                    };
-
-                    leaf_multipoles[leaf_idx].push(SendPtrMut { raw });
-                }
-            }
-
-            for (leaf_idx, leaf) in self
-                .tree
-                .target_tree()
-                .all_leaves()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let key_idx = self.tree.target_tree().index(leaf).unwrap();
-                let key_displacement = self.ncoeffs * nmatvecs * key_idx;
-                for eval_idx in 0..nmatvecs {
-                    let eval_displacement = self.ncoeffs * eval_idx;
-                    let raw = unsafe {
-                        locals.as_ptr().add(eval_displacement + key_displacement) as *mut W
-                    };
-                    leaf_locals[leaf_idx].push(SendPtrMut { raw });
-                }
-            }
-        }
-
-        // Set index pointers for evaluated potentials
-        {
-            let mut index_pointer = 0;
-            let mut potential_raw_pointers = Vec::new();
-            for eval_idx in 0..nmatvecs {
-                let ptr = unsafe {
-                    potentials
-                        .as_mut_ptr()
-                        .add(eval_idx * ntarget_points * eval_size)
-                };
-                potential_raw_pointers.push(ptr)
-            }
-
-            for (i, leaf) in self
-                .tree
-                .target_tree()
-                .all_leaves()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let npoints;
-                let nevals;
-
-                if let Some(coordinates) = self.tree.target_tree().coordinates(leaf) {
-                    npoints = coordinates.len() / self.dim;
-                    nevals = npoints * eval_size;
-                } else {
-                    npoints = 0;
-                    nevals = 0;
-                }
-
-                for j in 0..nmatvecs {
-                    potentials_send_pointers[ntarget_leaves * j + i] = SendPtrMut {
-                        raw: potential_raw_pointers[j],
-                    }
-                }
-
-                // Update charge index pointer
-                let bounds_points = (index_pointer, index_pointer + npoints);
-                charge_index_pointer_targets[i] = bounds_points;
-                index_pointer += npoints;
-
-                // Update raw pointer with number of points at this leaf
-                for ptr in potential_raw_pointers.iter_mut() {
-                    *ptr = unsafe { ptr.add(nevals) }
-                }
-            }
-
-            let mut index_pointer = 0;
-
-            for (i, leaf) in self
-                .tree
-                .source_tree()
-                .all_leaves()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                // Assign scales
-                let l = i * self.ncoeffs;
-                let r = l + self.ncoeffs;
-                source_leaf_scales[l..r].copy_from_slice(
-                    vec![homogenous_kernel_scale(leaf.level()); self.ncoeffs].as_slice(),
-                );
-
-                let npoints;
-                if let Some(coordinates) = self.tree.source_tree().coordinates(leaf) {
-                    npoints = coordinates.len() / self.dim;
-                } else {
-                    npoints = 0;
-                }
-
-                let bounds_points = (index_pointer, index_pointer + npoints);
-                charge_index_pointer_sources[i] = bounds_points;
-                index_pointer += npoints;
-            }
-        }
-
-        // Compute surfaces
-        {
-            // Leaf upward and downward surfaces
-            for (i, key) in self
-                .tree
-                .source_tree()
-                .all_leaves()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let l = i * self.ncoeffs * self.dim;
-                let r = l + self.ncoeffs * self.dim;
-                let upward_surface =
-                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
-
-                leaf_upward_surfaces_sources[l..r].copy_from_slice(&upward_surface);
-            }
-
-            for (i, key) in self
-                .tree
-                .target_tree()
-                .all_leaves()
-                .unwrap()
-                .into_iter()
-                .enumerate()
-            {
-                let l = i * self.ncoeffs * self.dim;
-                let r = l + self.ncoeffs * self.dim;
-
-                let downward_surface =
-                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_inner);
-
-                let upward_surface =
-                    key.compute_surface(self.tree.domain(), self.expansion_order, alpha_outer);
-
-                leaf_downward_surfaces_targets[l..r].copy_from_slice(&downward_surface);
-                leaf_upward_surfaces_targets[l..r].copy_from_slice(&upward_surface);
-            }
-        }
-=======
         // Mutable pointers to potential data at each target leaf
         let potentials_send_pointers = potential_pointers(
             self.tree.target_tree(),
@@ -642,7 +431,6 @@ where
         // Index pointer of charge data at each target leaf
         let charge_index_pointer_targets = coordinate_index_pointer(self.tree.target_tree());
         let charge_index_pointer_sources = coordinate_index_pointer(self.tree.source_tree());
->>>>>>> main
 
         // Set data
         self.multipoles = multipoles;
