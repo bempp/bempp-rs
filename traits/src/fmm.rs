@@ -85,16 +85,10 @@ pub trait Fmm {
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&self);
 
-    /// Clear the data containers
-    fn clear(&mut self);
-
-    /// Add a new set of charges for the FMM
-    fn set_charges(
-        &mut self,
-        charges: &Array<
-            Self::Precision,
-            BaseArray<Self::Precision, VectorContainer<Self::Precision>, 2>,
-            2,
-        >,
-    );
+    /// Clear the data buffers and add new charge data
+    fn clear(&mut self, charges: &Array<
+                Self::Precision,
+                BaseArray<Self::Precision, VectorContainer<Self::Precision>, 2>,
+                2,
+            >);
 }

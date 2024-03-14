@@ -137,7 +137,7 @@ where
         }
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self, charges: &Charges<W>) {
         let nmatvecs = match self.fmm_eval_type {
             FmmEvalType::Vector => 1,
             FmmEvalType::Matrix(nmatvecs) => nmatvecs,
@@ -317,9 +317,7 @@ where
         self.leaf_locals = leaf_locals;
         self.leaf_multipoles = leaf_multipoles;
         self.potentials_send_pointers = potentials_send_pointers;
-    }
 
-    fn set_charges(&mut self, charges: &Charges<W>) {
         let [ncharges, nmatvec] = charges.shape();
 
         let mut reordered_charges = rlst_dynamic_array2!(W, [ncharges, nmatvec]);
@@ -496,9 +494,8 @@ where
         &self.tree
     }
 
-    fn clear(&mut self) {}
+    fn clear(&mut self, _charges: &Charges<U>) {}
 
-    fn set_charges(&mut self, charges: &Charges<U>) {}
 }
 
 #[cfg(test)]
@@ -645,7 +642,7 @@ mod test {
         let sparse = true;
         let threshold_pot = 1e-5;
 
-        // Charge data
+        // Set charge data and evaluate an FMM
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
@@ -672,11 +669,10 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        fmm.clear();
-        fmm.set_charges(&charges);
+        fmm.clear(&charges);
         fmm.evaluate();
-        let fmm = Box::new(fmm);
 
+        let fmm = Box::new(fmm);
         test_single_node_fmm_vector_helper(
             fmm,
             bempp_traits::types::EvalType::Value,
