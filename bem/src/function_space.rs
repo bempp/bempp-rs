@@ -1,6 +1,5 @@
 //! Funciton space
 
-use crate::dofmap::SerialDofMap;
 use bempp_element::element::CiarletElement;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
@@ -19,7 +18,6 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real
 impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
     /// Create new function space
     pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<T>) -> Self {
-
         let mut size = 0;
         let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
         let tdim = grid.domain_dimension();
@@ -92,12 +90,9 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
             }
         }
 
-
-        let dofmap = SerialDofMap::new(grid, element);
         Self {
             grid,
             element,
-            dofmap,
             entity_dofs,
             cell_dofs,
             size,
@@ -197,7 +192,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
         } else {
             None
         }
-    }    
+    }
 }
 
 #[cfg(test)]
