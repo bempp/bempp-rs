@@ -111,7 +111,7 @@ where
     /// For an FMM builder with an associated FMM tree, specify simulation specific parameters
     ///
     /// # Arguments
-    /// * `charges` - Charges corresponding to `nvecs`, in column major order such that the shape is `[ncharges, nvecs]`
+    /// * `charges` - 2D RLST array, of dimensions `[ncharges, nvecs]` where each of `nvecs` is associated with `ncharges`
     /// * `expansion_order` - The expansion order of the FMM
     /// * `kernel` - The kernel associated with this FMM
     /// * `eval_type` - Either `ValueDeriv` - to evaluate potentials and gradients, or `Value` to evaluate potentials alone
