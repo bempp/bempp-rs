@@ -113,8 +113,6 @@ where
     }
 
     fn evaluate(&self) {
-        // println!("HERE {:?}", self.charges);
-
         // Upward pass
         {
             self.p2m();
@@ -146,20 +144,13 @@ where
         let nsource_leaves = self.tree().source_tree().nleaves().unwrap();
         let ntarget_leaves = self.tree().target_tree().nleaves().unwrap();
 
-        // Clear buffers
-        let multipoles_shape = self.multipoles.len();
-        self.multipoles = vec![W::default(); multipoles_shape];
+        // Clear buffers and set new buffers
+        self.multipoles = vec![W::default(); self.multipoles.len()];
+        self.locals = vec![W::default(); self.locals.len()];
+        self.potentials = vec![W::default(); self.potentials.len()];
+        self.charges = vec![W::default(); self.charges.len()];
 
-        let locals_shape = self.locals.len();
-        self.locals = vec![W::default(); locals_shape];
-
-        let potentials_shape = self.potentials.len();
-        self.potentials = vec![W::default(); potentials_shape];
-
-        let charges_shape = self.charges.len();
-        self.charges = vec![W::default(); charges_shape];
-
-        // Recreate mutable pointers
+        // Recreate mutable pointers for new buffers
         let potentials_send_pointers = potential_pointers(
             &self.tree.target_tree(),
             nmatvecs,
@@ -206,7 +197,7 @@ where
         self.leaf_multipoles = leaf_multipoles;
         self.potentials_send_pointers = potentials_send_pointers;
 
-        // Map charges using global indices
+        // Set new charges
         self.charges = map_charges(
             self.tree.source_tree().all_global_indices().unwrap(),
             charges,
@@ -341,8 +332,8 @@ where
                 )
             }
 
-            FmmEvalType::Matrix(nmatvec) => {
-                for i in 0..nmatvec {
+            FmmEvalType::Matrix(nmatvecs) => {
+                for i in 0..nmatvecs {
                     let charges_i =
                         &self.charges[i * nsource_coordinates..(i + 1) * nsource_coordinates];
                     let res_i = unsafe {

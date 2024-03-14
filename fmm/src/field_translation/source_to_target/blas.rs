@@ -300,33 +300,33 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
             }
-            FmmEvalType::Matrix(nmatvec) => {
+            FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
                 let multipoles = rlst_array_from_slice2!(
                     U,
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            self.ncoeffs * nsources * nmatvec,
+                            self.ncoeffs * nsources * nmatvecs,
                         )
                     },
-                    [self.ncoeffs, nsources * nmatvec]
+                    [self.ncoeffs, nsources * nmatvecs]
                 );
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     U,
                     [
                         self.source_to_target_translation_data.cutoff_rank,
-                        nsources * nmatvec
+                        nsources * nmatvecs
                     ]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
                     let key_displacement =
-                        i * self.source_to_target_translation_data.cutoff_rank * nmatvec;
+                        i * self.source_to_target_translation_data.cutoff_rank * nmatvecs;
                     let mut tmp = Vec::new();
-                    for charge_vec_idx in 0..nmatvec {
+                    for charge_vec_idx in 0..nmatvecs {
                         let charge_vec_displacement =
                             charge_vec_idx * self.source_to_target_translation_data.cutoff_rank;
 
@@ -382,7 +382,7 @@ where
                                 U,
                                 [
                                     self.source_to_target_translation_data.cutoff_rank,
-                                    multipole_idxs.len() * nmatvec
+                                    multipole_idxs.len() * nmatvecs
                                 ]
                             );
 
@@ -391,13 +391,13 @@ where
                             {
                                 let key_displacement_global = global_multipole_idx
                                     * self.source_to_target_translation_data.cutoff_rank
-                                    * nmatvec;
+                                    * nmatvecs;
 
                                 let key_displacement_local = local_multipole_idx
                                     * self.source_to_target_translation_data.cutoff_rank
-                                    * nmatvec;
+                                    * nmatvecs;
 
-                                for charge_vec_idx in 0..nmatvec {
+                                for charge_vec_idx in 0..nmatvecs {
                                     let charge_vec_displacement = charge_vec_idx
                                         * self.source_to_target_translation_data.cutoff_rank;
 
@@ -435,7 +435,7 @@ where
                                     .lock()
                                     .unwrap();
 
-                                for charge_vec_idx in 0..nmatvec {
+                                for charge_vec_idx in 0..nmatvecs {
                                     let check_potential_ptr =
                                         check_potential_lock[charge_vec_idx].raw;
                                     let check_potential = unsafe {
@@ -447,7 +447,7 @@ where
 
                                     let key_displacement = local_multipole_idx
                                         * self.source_to_target_translation_data.cutoff_rank
-                                        * nmatvec;
+                                        * nmatvecs;
                                     let charge_vec_displacement = charge_vec_idx
                                         * self.source_to_target_translation_data.cutoff_rank;
 
@@ -484,7 +484,7 @@ where
                     rlst_blis::interface::threading::disable_threading();
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
-                        std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvec)
+                        std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)
                     };
                     all_locals
                         .iter_mut()

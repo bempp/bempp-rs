@@ -407,7 +407,7 @@ where
                 }
             }
 
-            FmmEvalType::Matrix(_nmatvec) => {
+            FmmEvalType::Matrix(_nmatvecs) => {
                 panic!("unimplemented FFT M2L for Matrix input")
             }
         }

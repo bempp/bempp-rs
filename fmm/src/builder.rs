@@ -24,7 +24,8 @@ use rlst_dense::{
 use crate::{
     helpers::{
         charge_index_pointer, compute_leaf_scales, compute_leaf_surfaces, homogenous_kernel_scale,
-        leaf_expansion_pointers, level_expansion_pointers, level_index_pointer, potential_pointers,
+        leaf_expansion_pointers, level_expansion_pointers, level_index_pointer, map_charges,
+        potential_pointers,
     },
     pinv::pinv,
     tree::SingleNodeFmmTree,
@@ -120,22 +121,12 @@ where
                 .all_global_indices()
                 .unwrap();
 
-            let [ncharges, nmatvec] = charges.shape();
+            let [_ncharges, nmatvecs] = charges.shape();
 
-            let mut reordered_charges = rlst_dynamic_array2!(U, [ncharges, nmatvec]);
+            self.charges = Some(map_charges(global_idxs, charges));
 
-            for eval_idx in 0..nmatvec {
-                let eval_displacement = eval_idx * ncharges;
-                for (new_idx, old_idx) in global_idxs.iter().enumerate() {
-                    reordered_charges.data_mut()[new_idx + eval_displacement] =
-                        charges.data()[old_idx + eval_displacement];
-                }
-            }
-
-            self.charges = Some(reordered_charges);
-
-            if nmatvec > 1 {
-                self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvec))
+            if nmatvecs > 1 {
+                self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
