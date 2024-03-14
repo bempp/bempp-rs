@@ -43,24 +43,30 @@ where
     pub fn from_global_points(local_points: &[T], comm: &UserCommunicator) -> Domain<T> {
         let size = comm.size();
 
+        let dim = 3;
+        let nlocal_points = local_points.len() / dim;
+
         let local_domain = Domain::<T>::from_local_points(local_points);
         let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];
-        let mut buffer = vec![Domain::<T>::default(); size as usize];
+        let mut buffer_bounds = vec![Domain::<T>::default(); size as usize];
 
-        comm.all_to_all_into(&local_bounds, &mut buffer[..]);
+        comm.all_to_all_into(&local_bounds, &mut buffer_bounds[..]);
+
+        let mut buffer_npoints = vec![0usize; size as usize];
+        comm.all_to_all_into(&nlocal_points, &mut buffer_npoints);
 
         // Find minimum origin
-        let min_x = buffer
+        let min_x = buffer_bounds
             .iter()
             .min_by(|a, b| a.origin[0].partial_cmp(&b.origin[0]).unwrap())
             .unwrap()
             .origin[0];
-        let min_y = buffer
+        let min_y = buffer_bounds
             .iter()
             .min_by(|a, b| a.origin[1].partial_cmp(&b.origin[1]).unwrap())
             .unwrap()
             .origin[1];
-        let min_z = buffer
+        let min_z = buffer_bounds
             .iter()
             .min_by(|a, b| a.origin[2].partial_cmp(&b.origin[2]).unwrap())
             .unwrap()
@@ -69,17 +75,17 @@ where
         let min_origin = [min_x, min_y, min_z];
 
         // Find maximum diameter (+max origin)
-        let max_x = buffer
+        let max_x = buffer_bounds
             .iter()
             .max_by(|a, b| a.diameter[0].partial_cmp(&b.diameter[0]).unwrap())
             .unwrap()
             .diameter[0];
-        let max_y = buffer
+        let max_y = buffer_bounds
             .iter()
             .max_by(|a, b| a.diameter[1].partial_cmp(&b.diameter[1]).unwrap())
             .unwrap()
             .diameter[1];
-        let max_z = buffer
+        let max_z = buffer_bounds
             .iter()
             .max_by(|a, b| a.diameter[2].partial_cmp(&b.diameter[2]).unwrap())
             .unwrap()
@@ -87,9 +93,12 @@ where
 
         let max_diameter = [max_x, max_y, max_z];
 
+        let nglobal_points: usize = buffer_npoints.iter().sum();
+
         Domain {
             origin: min_origin,
             diameter: max_diameter,
+            npoints: nglobal_points
         }
     }
 }

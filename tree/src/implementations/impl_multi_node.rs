@@ -16,6 +16,7 @@ use hyksort::hyksort;
 
 use bempp_traits::tree::Tree;
 
+use crate::constants::N_CRIT;
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL},
     implementations::impl_morton::encode_anchor,
@@ -383,6 +384,27 @@ where
         }
     }
 
+    /// Estimate the minimum depth such that leaf boxes have at most
+    /// 'n_crit' particles, using a uniform distribution of particles.
+    ///
+    /// # Arguments
+    /// * `npoints` - Total number of particles
+    /// * `n_crit` - Constraint on max number of particles per leaf box
+    /// * `world_size` - The size of the global MPI communicator
+    pub fn minimum_depth(nglobal_points: u64, n_crit: u64, world_size: u64) -> u64 {
+
+        // Assume that approximately nglobal_points/world_size particles per MPI node
+        let mut tmp = nglobal_points / world_size;
+
+        let mut level = 0;
+        while tmp > n_crit {
+            level += 1;
+            tmp /= 8;
+        }
+
+        level as u64
+    }
+
     /// Create a new multi-node tree. If non-adaptive (uniform) trees are created, they are specified
     /// by a user defined maximum depth, if an adaptive tree is created it is specified by only by the
     /// user defined maximum leaf maximum occupancy n_crit.
@@ -396,16 +418,15 @@ where
     pub fn new(
         world: &UserCommunicator,
         points: &[T],
-        depth: Option<u64>,
+        n_crit: Option<u64>,
         sparse: bool,
         subcomm_size: i32,
         global_idxs: &[usize],
     ) -> MultiNodeTree<T> {
 
-        // TODO, Domain should contain information about number of global and local points
-        // So that I can infer the tree depth
         let domain = Domain::from_global_points(points, world);
-        let depth = depth.unwrap_or(DEFAULT_LEVEL);
+        let n_crit = n_crit.unwrap_or(N_CRIT);
+        let depth = MultiNodeTree::<T>::minimum_depth(domain.npoints as u64, n_crit, world.size() as u64);
 
         if sparse {
             MultiNodeTree::uniform_tree_sparse(world, subcomm_size, points, &domain, depth, global_idxs)

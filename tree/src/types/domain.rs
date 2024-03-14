@@ -15,4 +15,7 @@ where
     /// The diameter of the domain along the [x, y, z] axes respectively, defined
     /// by the maximum width of the point distribution along a given axis.
     pub diameter: [T; 3],
+
+    /// Number of points in a domain
+    pub npoints: usize
 }

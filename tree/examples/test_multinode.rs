@@ -89,29 +89,39 @@ fn main() {
     let comm = world.duplicate();
 
     // Setup tree parameters
-    let k = 2;
-    let depth = Some(3);
+    let subcomm_size = 2;
+    let n_crit = Some(150);
     let n_points = 100000;
-    let sparse = false;
 
     // Generate some random test data local to each process
     let points = points_fixture::<f64>(n_points, None, None, None);
     let global_idxs: Vec<_> = (0..n_points).collect();
 
     // Create a uniform tree
-    let tree = MultiNodeTree::new(&comm, points.data(), depth, sparse, k, &global_idxs);
+    let uniform = MultiNodeTree::new(&comm, points.data(), n_crit, false, subcomm_size, &global_idxs);
 
-    println!("rank {:?} nleaves {:?}", tree.world.rank(), tree.nleaves());
+    println!("uniform: rank {:?} nleaves {:?}", uniform.world.rank(), uniform.nleaves());
 
     test_global_bounds::<f32>(&comm);
     if world.rank() == 0 {
         println!("\t ... test_global_bounds passed on uniform tree");
     }
 
-    test_no_overlaps(&comm, &tree);
+    test_no_overlaps(&comm, &uniform);
     if world.rank() == 0 {
         println!("\t ... test_no_overlaps passed on uniform tree");
     }
+
+    let sparse = MultiNodeTree::new(&comm, points.data(), n_crit, true, subcomm_size, &global_idxs);
+
+    println!("sparse: rank {:?} nleaves {:?}", sparse.world.rank(), sparse.nleaves());
+
+    test_no_overlaps(&comm, &sparse);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on sparse tree");
+    }
+
+
 }
 
 #[cfg(not(feature = "mpi"))]

@@ -49,7 +49,7 @@ impl<T: Float + Default + Debug> Domain<T> {
         // The origin is defined by the minimum point
         let origin = [*min_x - err, *min_y - err, *min_z - err];
 
-        Domain { origin, diameter }
+        Domain { origin, diameter , npoints}
     }
 
     /// Find the union of two domains such that the returned domain is a superset and contains both sets of corresponding points
@@ -62,18 +62,21 @@ impl<T: Float + Default + Debug> Domain<T> {
         let min_y = self.origin[1].min(other.origin[1]);
         let min_z = self.origin[2].min(other.origin[2]);
 
-        let min_origin = [min_x, min_y, min_z];
+        let origin = [min_x, min_y, min_z];
 
         // Find maximum diameter (+max origin)
         let max_x = self.diameter[0].max(other.diameter[0]);
         let max_y = self.diameter[0].max(other.diameter[0]);
         let max_z = self.diameter[0].max(other.diameter[0]);
 
-        let max_diameter = [max_x, max_y, max_z];
+        let diameter = [max_x, max_y, max_z];
+
+        let npoints = self.npoints + other.npoints;
 
         Domain {
-            origin: min_origin,
-            diameter: max_diameter,
+            origin,
+            diameter,
+            npoints
         }
     }
 
@@ -82,10 +85,11 @@ impl<T: Float + Default + Debug> Domain<T> {
     /// # Arguments
     /// * `origin` - The point from which to construct a cuboid domain.
     /// * `diameter` - The diameter along each axis of the domain.
-    pub fn new(origin: &[T; 3], diameter: &[T; 3]) -> Self {
+    pub fn new(origin: &[T; 3], diameter: &[T; 3], npoints: usize) -> Self {
         Domain {
             origin: *origin,
             diameter: *diameter,
+            npoints: npoints
         }
     }
 }
