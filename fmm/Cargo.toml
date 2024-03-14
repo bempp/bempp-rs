@@ -20,7 +20,6 @@ name = "bempp_fmm"
 crate-type = ["lib", "cdylib"]
 bench = false
 
-
 [dependencies]
 bempp-tools = { path = "../tools" }
 bempp-tree = { path = "../tree" }
@@ -40,13 +39,19 @@ rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = { git = "https://github.com/skailasa/fftw.git" }
 rayon = "1.7"
 
-[[example]]
-name = "single_node_laplace"
-path = "examples/single_node_laplace.rs"
-
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"]}
 
 [[bench]]
 name = "single_node"
 harness = false
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[[example]]
+name = "single_node_laplace"
+path = "examples/single_node_laplace.rs"
+
+[lints]
+workspace = true

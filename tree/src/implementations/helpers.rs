@@ -4,7 +4,6 @@
 use bempp_traits::types::RlstScalar;
 use num::Float;
 use rand::prelude::*;
-use rand::SeedableRng;
 
 use rlst_dense::{
     array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,

@@ -1,5 +1,8 @@
 //! Wrappers for FFTW functions, including multithreaded implementations.
-use fftw::{plan::*, types::*};
+use fftw::{
+    plan::{C2RPlan, C2RPlan32, C2RPlan64, R2CPlan, R2CPlan32, R2CPlan64},
+    types::Flag,
+};
 use num::Complex;
 use rayon::prelude::*;
 

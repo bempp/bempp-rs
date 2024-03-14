@@ -29,3 +29,7 @@ default-members = [
     "kernel",
     "traits",
 ]
+
+
+[workspace.lints.clippy]
+wildcard_imports = "forbid"

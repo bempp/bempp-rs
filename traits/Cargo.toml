@@ -4,7 +4,7 @@ strict = []
 [package]
 name = "bempp-traits"
 version = "0.0.1"
-authors = ["Timo Betcke"]
+authors = ["Timo Betcke", "Srinath Kailasa <srinathkailasa@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 edition = "2021"
 description = "Traits for all bempp components."
 license = "BSD-3-Clause"
@@ -23,3 +23,9 @@ cauchy="0.4.*"
 thiserror="1.*"
 num = "0.4"
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true

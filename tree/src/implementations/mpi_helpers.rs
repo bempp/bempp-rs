@@ -1,8 +1,7 @@
 //! Helper Routines for MPI functionality
 use mpi::{
-    datatype::Equivalence,
-    topology::{Communicator, UserCommunicator},
-    traits::*,
+    topology::UserCommunicator,
+    traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
     Count, Rank,
 };
 
@@ -18,7 +17,7 @@ use mpi::{
 /// packets this process expects to receive overall `recv_count`.
 pub fn all_to_allv_sparse<T>(
     comm: &UserCommunicator,
-    packets: &Vec<Vec<T>>,
+    packets: &[Vec<T>],
     packet_destinations: &[Rank],
     &recv_count: &Count,
 ) -> Vec<T>

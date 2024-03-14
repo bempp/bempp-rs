@@ -1,7 +1,6 @@
-# solvers-quadrature
-A simple quadrature library for boundary element computations.
+# bempp-quadrature: A simple quadrature library for boundary element computations.
 
-# LICENSE
+## LICENSE
 
 The library is licensed under a BSD 3-Clause license.
 

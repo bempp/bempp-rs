@@ -9,6 +9,7 @@ homepage = "https://github.com/bempp/bempp-rs"
 repository = "https://github.com/bempp/bempp-rs"
 keywords = ["numerics"]
 categories = ["mathematics", "science"]
+readme = "README.md"
 
 [lib]
 name = "bempp_tree"
@@ -29,3 +30,9 @@ cauchy = "0.4.0"
 [features]
 mpi = ["dep:mpi", "dep:hyksort"]
 strict = []
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true
