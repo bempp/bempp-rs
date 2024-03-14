@@ -2,8 +2,8 @@
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
-use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_kernel::helmholtz_3d::Helmholtz3dKernel;
+use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -1188,8 +1188,7 @@ trait SingleLayerAssembler: Sync {
     /// Get the kernsl
     fn kernel(&self) -> &Self::K;
 }
-impl<K: Kernel, A: SingleLayerAssembler<K=K>> BatchedAssembler for A
-{
+impl<K: Kernel, A: SingleLayerAssembler<K = K>> BatchedAssembler for A {
     const DERIV_SIZE: usize = 1;
     type RealT = <K::T as RlstScalar>::Real;
     type T = K::T;
@@ -1221,29 +1220,34 @@ impl<K: Kernel, A: SingleLayerAssembler<K=K>> BatchedAssembler for A
         self.kernel()
             .assemble_diagonal_st(EvalType::Value, sources, targets, result);
     }
-    fn kernel_assemble_st(&self, sources: &[Self::RealT], targets: &[Self::RealT], result: &mut [Self::T]) {
+    fn kernel_assemble_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
         self.kernel()
             .assemble_st(EvalType::Value, sources, targets, result);
     }
 }
 
 /// Assembler for a Helmholtz single layer boundary operator
-pub struct HelmholtzSingleLayerAssembler<T: RlstScalar<Complex=T>> {
+pub struct HelmholtzSingleLayerAssembler<T: RlstScalar<Complex = T>> {
     kernel: Helmholtz3dKernel<T>,
 }
-impl<T: RlstScalar<Complex=T>> HelmholtzSingleLayerAssembler<T> {
-    fn new(wavenumber: T::Real) -> Self {
+impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerAssembler<T> {
+    /// Create a new assembler
+    pub fn new(wavenumber: T::Real) -> Self {
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
         }
     }
 }
-impl<T: RlstScalar<Complex=T>> SingleLayerAssembler for HelmholtzSingleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T>> SingleLayerAssembler for HelmholtzSingleLayerAssembler<T> {
     type K = Helmholtz3dKernel<T>;
     fn kernel(&self) -> &Self::K {
         &self.kernel
     }
-
 }
 
 /// Assembler for a Laplace single layer operator
@@ -1262,7 +1266,6 @@ impl<T: RlstScalar> SingleLayerAssembler for LaplaceSingleLayerAssembler<T> {
     fn kernel(&self) -> &Self::K {
         &self.kernel
     }
-
 }
 
 /// Assembler for a Laplace double layer operator
