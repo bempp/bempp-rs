@@ -22,8 +22,8 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,
-        test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        _trn: &RlstArray<<T as RlstScalar>::Real, 2>,
+        test_normals: &RlstArray<T::Real, 2>,
+        _trial_normals: &RlstArray<T::Real, 2>,
         index: usize,
     ) -> T {
         -*k.get_unchecked([1, index])
@@ -36,8 +36,8 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     unsafe fn nonsingular_kernel_value(
         &self,
         k: &RlstArray<T, 3>,
-        test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        test_normals: &RlstArray<T::Real, 2>,
+        _trial_normals: &RlstArray<T::Real, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> T {
@@ -82,8 +82,8 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLaye
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,
-        test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        test_normals: &RlstArray<T::Real, 2>,
+        _trial_normals: &RlstArray<T::Real, 2>,
         index: usize,
     ) -> T {
         -*k.get_unchecked([1, index])
@@ -96,8 +96,8 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLaye
     unsafe fn nonsingular_kernel_value(
         &self,
         k: &RlstArray<T, 3>,
-        test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
+        test_normals: &RlstArray<T::Real, 2>,
+        _trial_normals: &RlstArray<T::Real, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> T {

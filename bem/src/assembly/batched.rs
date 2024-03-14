@@ -2,8 +2,6 @@
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
-use bempp_kernel::helmholtz_3d::Helmholtz3dKernel;
-use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -11,7 +9,6 @@ use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratu
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
-use bempp_traits::kernel::Kernel;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::ReferenceCellType;
 use num::Float;
