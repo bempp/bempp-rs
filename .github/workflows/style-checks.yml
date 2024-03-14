@@ -13,6 +13,9 @@ jobs:
   style-checks:
     name: Rust style checks
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        feature-flags: ['--features "mpi,strict"', '']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -31,6 +34,6 @@ jobs:
       - name: Style checks
         run: |
           cargo fmt -- --check
-          cargo clippy -- -D warnings
-          cargo clippy --tests -- -D warnings
-          cargo clippy --examples -- -D warnings
+          cargo clippy ${{ matrix.feature-flags }} -- -D warnings
+          cargo clippy --tests ${{ matrix.feature-flags }} -- -D warnings
+          cargo clippy --examples ${{ matrix.feature-flags }} -- -D warnings

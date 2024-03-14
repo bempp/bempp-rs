@@ -49,6 +49,7 @@ impl<T> Points<T>
 where
     T: RlstScalar<Real = T>,
 {
+    /// Create new
     pub fn new() -> Points<T> {
         Points {
             points: Vec::new(),
@@ -56,10 +57,12 @@ where
         }
     }
 
+    /// Add a point
     pub fn add(&mut self, item: Point<T>) {
         self.points.push(item);
     }
 
+    /// Sort points
     pub fn sort(&mut self) {
         self.points.sort();
     }
@@ -82,6 +85,7 @@ mod test {
             npoints,
         };
 
+<<<<<<< HEAD
         let mut coordinates = points_fixture(npoints, None, None, None);
 
         let mut points = Vec::new();
@@ -95,6 +99,22 @@ mod test {
                 coordinate: point,
                 base_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
                 encoded_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
+=======
+        let npoints = 1000;
+        let coords = points_fixture(npoints, None, None, None);
+        let mut points = Vec::new();
+
+        for i in 0..npoints {
+            let p = [
+                coords.data()[i],
+                coords.data()[i + npoints],
+                coords.data()[i + 2 * npoints],
+            ];
+            points.push(Point {
+                coordinate: p,
+                base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
+                encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
+>>>>>>> main
                 global_idx: i,
             })
         }

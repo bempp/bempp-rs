@@ -20,7 +20,7 @@ where
     /// Global communicator for this Tree
     pub world: UserCommunicator,
 
-    // Depth of the tree
+    /// Depth of the tree
     pub depth: u64,
 
     /// Domain spanned by the points.

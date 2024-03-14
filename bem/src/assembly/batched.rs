@@ -1,3 +1,4 @@
+//! Batched dense assembly
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
@@ -6,7 +7,7 @@ use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use bempp_traits::bem::{DofMap, FunctionSpace};
+use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
 use bempp_traits::kernel::Kernel;
@@ -121,9 +122,11 @@ pub trait BatchedAssembler: Sync {
     //!
     //! Assemble operators by processing batches of cells in parallel
 
+    /// Real scalar type
     type RealT: RlstScalar<Real = Self::RealT> + Float;
+    /// Scalar type
     type T: RlstScalar<Real = Self::RealT>;
-
+    /// Number of derivatives
     const DERIV_SIZE: usize;
 
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
@@ -258,8 +261,8 @@ pub trait BatchedAssembler: Sync {
                 k.data_mut(),
             );
 
-            let test_dofs = test_space.dofmap().cell_dofs(*test_cell).unwrap();
-            let trial_dofs = trial_space.dofmap().cell_dofs(*trial_cell).unwrap();
+            let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+            let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                     let mut sum = num::cast::<f64, Self::T>(0.0).unwrap();
@@ -395,8 +398,8 @@ pub trait BatchedAssembler: Sync {
                     k.data_mut(),
                 );
 
-                let test_dofs = test_space.dofmap().cell_dofs(*test_cell).unwrap();
-                let trial_dofs = trial_space.dofmap().cell_dofs(*trial_cell).unwrap();
+                let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+                let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
 
                 for (test_i, test_dof) in test_dofs.iter().enumerate() {
                     for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
@@ -535,8 +538,8 @@ pub trait BatchedAssembler: Sync {
                 k.data_mut(),
             );
 
-            let test_dofs = test_space.dofmap().cell_dofs(*test_cell).unwrap();
-            let trial_dofs = trial_space.dofmap().cell_dofs(*trial_cell).unwrap();
+            let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+            let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                     for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
@@ -598,9 +601,7 @@ pub trait BatchedAssembler: Sync {
         if !trial_space.is_serial() || !test_space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
-        if shape[0] != test_space.dofmap().global_size()
-            || shape[1] != trial_space.dofmap().global_size()
-        {
+        if shape[0] != test_space.global_size() || shape[1] != trial_space.global_size() {
             panic!("Matrix has wrong shape");
         }
 
@@ -789,9 +790,7 @@ pub trait BatchedAssembler: Sync {
         if !trial_space.is_serial() || !test_space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
-        if shape[0] != test_space.dofmap().global_size()
-            || shape[1] != trial_space.dofmap().global_size()
-        {
+        if shape[0] != test_space.global_size() || shape[1] != trial_space.global_size() {
             panic!("Matrix has wrong shape");
         }
 
@@ -948,10 +947,7 @@ pub trait BatchedAssembler: Sync {
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> CsrMatrix<Self::T> {
-        let shape = [
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ];
+        let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular::<QDEGREE, BLOCKSIZE, TestGrid, TrialGrid>(
             shape,
             trial_space,
@@ -1012,10 +1008,7 @@ pub trait BatchedAssembler: Sync {
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> CsrMatrix<Self::T> {
-        let shape = [
-            test_space.dofmap().global_size(),
-            trial_space.dofmap().global_size(),
-        ];
+        let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self
             .assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE, TestGrid, TrialGrid>(
                 shape,
@@ -1080,8 +1073,8 @@ pub trait BatchedAssembler: Sync {
         if !trial_space.is_serial() || !test_space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
-        if output.shape()[0] != test_space.dofmap().global_size()
-            || output.shape()[1] != trial_space.dofmap().global_size()
+        if output.shape()[0] != test_space.global_size()
+            || output.shape()[1] != trial_space.global_size()
         {
             panic!("Matrix has wrong shape");
         }
@@ -1381,7 +1374,7 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let ndofs = space.dofmap().global_size();
+        let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
         let assembler = LaplaceSingleLayerAssembler::default();
@@ -1412,7 +1405,7 @@ mod test {
         );
         let space = SerialFunctionSpace::new(&grid, &element);
 
-        let ndofs = space.dofmap().global_size();
+        let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
         let assembler = LaplaceSingleLayerAssembler::default();
@@ -1450,8 +1443,8 @@ mod test {
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 
-        let ndofs0 = space0.dofmap().global_size();
-        let ndofs1 = space1.dofmap().global_size();
+        let ndofs0 = space0.global_size();
+        let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
         let assembler = LaplaceSingleLayerAssembler::default();

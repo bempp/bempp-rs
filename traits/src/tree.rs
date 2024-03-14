@@ -1,6 +1,5 @@
 //! Traits
-use std::collections::HashSet;
-use std::hash::Hash;
+use std::{collections::HashSet, hash::Hash};
 
 use num::Float;
 use rlst_dense::types::RlstScalar;
@@ -13,6 +12,7 @@ pub trait Tree {
     /// The computational domain defined by the tree.
     type Domain;
 
+    /// Precision
     type Precision: RlstScalar<Real = Self::Precision> + Float + Default;
 
     /// A tree node.
@@ -26,8 +26,13 @@ pub trait Tree {
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self::Node>;
 
+    /// Number of leaves
     fn nleaves(&self) -> Option<usize>;
+
+    /// Total number of keys
     fn nkeys_tot(&self) -> Option<usize>;
+
+    /// Number of keys at a given tree level
     fn nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
@@ -49,10 +54,16 @@ pub trait Tree {
     fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
-    fn coordinates<'a>(&'a self, key: &Self::Node) -> Option<&'a [Self::Precision]>;
+    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Precision]>;
+
+    /// Number of coordinates
+    fn ncoordinates(&self, key: &Self::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
     fn all_coordinates(&self) -> Option<&[Self::Precision]>;
+
+    /// Total number of coordinates
+    fn ncoordinates_tot(&self) -> Option<usize>;
 
     /// Gets global indices at a leaf (local in multinode setting)
     fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]>;
@@ -66,55 +77,59 @@ pub trait Tree {
     /// Get a map from the key to index position in sorted keys
     fn index(&self, key: &Self::Node) -> Option<&usize>;
 
+    /// Get a node
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 
     /// Get a map from the key to leaf index position in sorted leaves
     fn leaf_index(&self, key: &Self::Node) -> Option<&usize>;
 }
 
+/// An FMM tree
 pub trait FmmTree {
+    /// Precision
     type Precision;
+    /// Node type
     type Node;
-
+    /// Tree type
     type Tree: Tree<Precision = Self::Precision, Node = Self::Node>;
 
+    /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
 
+    /// Get the target tree
     fn target_tree(&self) -> &Self::Tree;
 
+    /// Get the domain
     fn domain(&self) -> &<Self::Tree as Tree>::Domain;
 
+    /// Get the near field of a leaf node
     fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
 }
 
+/// A tree node
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
     T: RlstScalar,
 {
+    /// Domain
     type Domain;
 
-    // Copy of nodes
+    /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
 
-    /// The parent of a key.
+    /// The parent of this node
     fn parent(&self) -> Self;
 
+    /// The level of this node
     fn level(&self) -> u64;
 
-    fn compute_surface(
-        &self,
-        domain: &Self::Domain,
-        expansion_order: usize,
-        alpha: T,
-    ) -> Vec<<T as RlstScalar>::Real>;
-
-    /// Neighbours defined by keys sharing a vertex, edge, or face.
+    /// Neighbours of this node defined by nodes sharing a vertex, edge, or face
     fn neighbors(&self) -> Self::Nodes;
 
-    /// Childen of a key.
+    /// Children of this node
     fn children(&self) -> Self::Nodes;
 
-    /// Checks adjacency, defined by sharing a vertex, edge, or face, between two keys.
+    /// Checks adjacency, defined by sharing a vertex, edge, or face, between this node and another
     fn is_adjacent(&self, other: &Self) -> bool;
 }

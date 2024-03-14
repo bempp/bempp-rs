@@ -4,7 +4,7 @@ use crate::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use bempp_element::reference_cell;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{
-    CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
+    CellType, GeometryType, GmshIO, GridType, PointType, ReferenceMapType, TopologyType,
 };
 use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 
 /// A grid
 pub struct WrappedGrid<GridImpl: Grid> {
-    pub grid: GridImpl,
+    pub(crate) grid: GridImpl,
 }
 
 impl<GridImpl: Grid> Grid for WrappedGrid<GridImpl> {
@@ -30,6 +30,12 @@ impl<GridImpl: Grid> Grid for WrappedGrid<GridImpl> {
     }
     fn is_serial(&self) -> bool {
         self.grid.is_serial()
+    }
+}
+
+impl<GridImpl: Grid + GmshIO> GmshIO for WrappedGrid<GridImpl> {
+    fn to_gmsh_string(&self) -> String {
+        self.grid.to_gmsh_string()
     }
 }
 

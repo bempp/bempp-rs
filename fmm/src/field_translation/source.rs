@@ -16,7 +16,7 @@ use bempp_tree::{constants::NSIBLINGS, types::single_node::SingleNodeTree};
 
 use crate::{
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
-    helpers::find_chunk_size,
+    helpers::chunk_size,
     types::{FmmEvalType, KiFmm},
 };
 use rlst_dense::{
@@ -88,7 +88,7 @@ where
                     );
 
                 // Use check potentials to compute the multipole expansion
-                let chunk_size = find_chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
+                let chunk_size = chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
                 check_potentials
                     .data()
                     .par_chunks_exact(self.ncoeffs * chunk_size)
@@ -252,7 +252,7 @@ where
                 if max_chunk_size > M2M_MAX_CHUNK_SIZE {
                     max_chunk_size = M2M_MAX_CHUNK_SIZE
                 }
-                let chunk_size = find_chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(nparents, max_chunk_size);
 
                 child_multipoles
                     .par_chunks_exact(NSIBLINGS * self.ncoeffs * chunk_size)

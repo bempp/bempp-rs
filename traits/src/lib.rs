@@ -1,6 +1,7 @@
 //! Trait definitions for the solvers library
 #![cfg_attr(feature = "strict", deny(warnings))]
-pub mod arrays;
+#![warn(missing_docs)]
+
 pub mod bem;
 pub mod element;
 pub mod field;

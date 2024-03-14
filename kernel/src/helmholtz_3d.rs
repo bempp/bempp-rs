@@ -1,7 +1,4 @@
 //! Implementation of the Helmholtz kernel
-use num::{self, Zero};
-use std::marker::PhantomData;
-
 use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
@@ -10,8 +7,11 @@ use bempp_traits::{
     types::{EvalType, RlstScalar},
 };
 use num::traits::FloatConst;
+use num::Zero;
 use rayon::prelude::*;
+use std::marker::PhantomData;
 
+/// Kernel for Helmholtz in 3D
 #[derive(Clone)]
 pub struct Helmholtz3dKernel<T: RlstScalar> {
     wavenumber: T::Real,
@@ -19,6 +19,7 @@ pub struct Helmholtz3dKernel<T: RlstScalar> {
 }
 
 impl<T: RlstScalar> Helmholtz3dKernel<T> {
+    /// Create new
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             wavenumber,
@@ -247,6 +248,7 @@ where
     }
 }
 
+/// Evaluate Helmholtz kernel for one target
 pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],
@@ -361,6 +363,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     }
 }
 
+/// Assemble Helmholtz kernel for one target
 pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],

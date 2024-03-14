@@ -3,6 +3,12 @@ use bempp_traits::types::RlstScalar;
 
 use crate::types::morton::MortonKey;
 
+<<<<<<< HEAD
+=======
+/// Point type
+pub type PointType<T> = T;
+
+>>>>>>> main
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
 /// the octree node in which it lies. Each Point as an associated 'base key', which is its matching
 /// Morton encoding at the lowest possible level of discretization (DEEPEST_LEVEL), and an 'encoded key'

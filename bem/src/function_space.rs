@@ -1,28 +1,105 @@
 //! Funciton space
 
-use crate::dofmap::SerialDofMap;
 use bempp_element::element::CiarletElement;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, TopologyType};
 use rlst_dense::types::RlstScalar;
 
+/// A serial function space
 pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
     grid: &'a GridImpl,
     element: &'a CiarletElement<T>,
-    dofmap: SerialDofMap,
+    entity_dofs: [Vec<Vec<usize>>; 4],
+    cell_dofs: Vec<Vec<usize>>,
+    size: usize,
 }
 
 impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
+    /// Create new function space
     pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<T>) -> Self {
-        let dofmap = SerialDofMap::new(grid, element);
+        let mut size = 0;
+        let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
+        let tdim = grid.domain_dimension();
+
+        let mut entity_counts = vec![];
+        entity_counts.push(grid.number_of_vertices());
+        if tdim > 1 {
+            entity_counts.push(grid.number_of_edges());
+        }
+        if tdim > 2 {
+            unimplemented!("DOF maps not implemented for cells with tdim > 2.");
+        }
+        entity_counts.push(grid.number_of_cells());
+
+        for d in 0..tdim + 1 {
+            entity_dofs[d] = vec![vec![]; entity_counts[d]];
+        }
+        let mut cell_dofs = vec![vec![0; element.dim()]; entity_counts[tdim]];
+
+        for cell in grid.iter_all_cells() {
+            let topology = cell.topology();
+            for (i, e) in topology.vertex_indices().enumerate() {
+                let e_dofs = element.entity_dofs(0, i).unwrap();
+                if !e_dofs.is_empty() {
+                    if entity_dofs[0][e].is_empty() {
+                        for _ in e_dofs {
+                            entity_dofs[0][e].push(size);
+                            size += 1
+                        }
+                    }
+                    for (j, k) in e_dofs.iter().enumerate() {
+                        cell_dofs[cell.index()][*k] = entity_dofs[0][e][j];
+                    }
+                }
+            }
+            if tdim >= 1 {
+                for (i, e) in topology.edge_indices().enumerate() {
+                    let e_dofs = element.entity_dofs(1, i).unwrap();
+                    if !e_dofs.is_empty() {
+                        if entity_dofs[1][e].is_empty() {
+                            for _ in e_dofs {
+                                entity_dofs[1][e].push(size);
+                                size += 1
+                            }
+                        }
+                        for (j, k) in e_dofs.iter().enumerate() {
+                            cell_dofs[cell.index()][*k] = entity_dofs[1][e][j];
+                        }
+                    }
+                }
+            }
+            if tdim >= 2 {
+                for (i, e) in topology.face_indices().enumerate() {
+                    let e_dofs = element.entity_dofs(2, i).unwrap();
+                    if !e_dofs.is_empty() {
+                        if entity_dofs[2][e].is_empty() {
+                            for _ in e_dofs {
+                                entity_dofs[2][e].push(size);
+                                size += 1
+                            }
+                        }
+                        for (j, k) in e_dofs.iter().enumerate() {
+                            cell_dofs[cell.index()][*k] = entity_dofs[2][e][j];
+                        }
+                    }
+                }
+            }
+            if tdim >= 3 {
+                unimplemented!("DOF maps not implemented for cells with tdim > 2.");
+            }
+        }
+
         Self {
             grid,
             element,
-            dofmap,
+            entity_dofs,
+            cell_dofs,
+            size,
         }
     }
 
+    /// Compute cell colouring
     pub fn compute_cell_colouring(&self) -> Vec<Vec<usize>> {
         let mut colouring: Vec<Vec<usize>> = vec![];
         let mut edim = 0;
@@ -88,18 +165,33 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
 impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
     for SerialFunctionSpace<'a, T, GridImpl>
 {
-    type DofMap = SerialDofMap;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
 
-    fn dofmap(&self) -> &Self::DofMap {
-        &self.dofmap
-    }
     fn grid(&self) -> &Self::Grid {
         self.grid
     }
     fn element(&self) -> &CiarletElement<T> {
         self.element
+    }
+    fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
+        &self.entity_dofs[entity_dim][entity_number]
+    }
+    fn local_size(&self) -> usize {
+        self.size
+    }
+    fn get_global_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
+        self.get_local_dof_numbers(entity_dim, entity_number)
+    }
+    fn global_size(&self) -> usize {
+        self.local_size()
+    }
+    fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
+        if cell < self.cell_dofs.len() {
+            Some(&self.cell_dofs[cell])
+        } else {
+            None
+        }
     }
 }
 
@@ -111,6 +203,51 @@ mod test {
     use bempp_traits::element::Continuity;
     use bempp_traits::grid::{CellType, TopologyType};
     use bempp_traits::types::ReferenceCellType;
+
+    #[test]
+    fn test_dofmap_lagrange0() {
+        let grid = regular_sphere::<f64>(2);
+        let element = create_element::<f64>(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            0,
+            Continuity::Discontinuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+        assert_eq!(space.local_size(), space.global_size());
+        assert_eq!(space.local_size(), grid.number_of_cells());
+    }
+
+    #[test]
+    fn test_dofmap_lagrange1() {
+        let grid = regular_sphere::<f64>(2);
+        let element = create_element::<f64>(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            1,
+            Continuity::Continuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+        assert_eq!(space.local_size(), space.global_size());
+        assert_eq!(space.local_size(), grid.number_of_vertices());
+    }
+
+    #[test]
+    fn test_dofmap_lagrange2() {
+        let grid = regular_sphere::<f64>(2);
+        let element = create_element::<f64>(
+            ElementFamily::Lagrange,
+            ReferenceCellType::Triangle,
+            2,
+            Continuity::Continuous,
+        );
+        let space = SerialFunctionSpace::new(&grid, &element);
+        assert_eq!(space.local_size(), space.global_size());
+        assert_eq!(
+            space.local_size(),
+            grid.number_of_vertices() + grid.number_of_edges()
+        );
+    }
 
     #[test]
     fn test_colouring_p1() {

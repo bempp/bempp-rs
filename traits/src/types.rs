@@ -6,30 +6,32 @@ pub mod point_iterator;
 
 pub use cell::{CellLocalIndexPair, ReferenceCellType};
 
-// Declare if entity is local, a ghost, or remote.
+/// Locality of an entity
 pub enum Locality {
+    /// Owned by the local process
     Local,
+    /// A ghost of an entity owned by another process
     Ghost,
+    /// Owned by another process
     Remote,
 }
 
-//Generic error type
+/// Generic error type
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// A generic error
     #[error("Solver Error: {0}")]
     Generic(String),
 }
 
-// Result Type
+/// Result Type
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Evaluation Mode.
-///
-/// - `Value`: Declares that only values required.
-/// - `Deriv`: Declare that only derivative required.
-/// - `ValueDeriv` Both values and derivatives required.
+/// Evaluation Mode
 #[derive(Clone, Copy)]
 pub enum EvalType {
+    /// Only values required
     Value,
+    /// Both values and derivatives required
     ValueDeriv,
 }

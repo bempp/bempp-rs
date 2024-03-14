@@ -22,7 +22,7 @@ use std::collections::HashMap;
 /// A single element grid
 pub struct SerialSingleElementGrid<T: Float + RlstScalar<Real = T>> {
     topology: SerialSingleElementTopology,
-    geometry: SerialSingleElementGeometry<T>,
+    pub(crate) geometry: SerialSingleElementGeometry<T>,
 }
 
 impl<T: Float + RlstScalar<Real = T>> SerialSingleElementGrid<T>

@@ -1,8 +1,9 @@
+//! FMM tools
 use crate::assembly::common::SparseMatrixData;
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::compute_det;
 use bempp_quadrature::simplex_rules::simplex_rule;
-use bempp_traits::bem::{DofMap, FunctionSpace};
+use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{GridType, ReferenceMapType};
 use bempp_traits::types::ReferenceCellType;
@@ -16,6 +17,7 @@ use rlst_dense::{
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
+/// Generate an array of all the quadrature points
 pub fn get_all_quadrature_points<
     const NPTS: usize,
     T: RlstScalar<Real = T>,
@@ -51,6 +53,7 @@ pub fn get_all_quadrature_points<
     all_points
 }
 
+/// Generate a dense matrix mapping between basis functions and quadrature points
 pub fn basis_to_quadrature_into_dense<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -71,6 +74,7 @@ pub fn basis_to_quadrature_into_dense<
     }
 }
 
+/// Generate a CSR matrix mapping between basis functions and quadrature points
 pub fn basis_to_quadrature_into_csr<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -82,7 +86,7 @@ pub fn basis_to_quadrature_into_csr<
 ) -> CsrMatrix<T> {
     let grid = space.grid();
     let ncells = grid.number_of_cells();
-    let shape = [ncells * NPTS, space.dofmap().global_size()];
+    let shape = [ncells * NPTS, space.global_size()];
     let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, RealT, T, Grid>(shape, space);
 
     CsrMatrix::<T>::from_aij(
@@ -94,6 +98,7 @@ pub fn basis_to_quadrature_into_csr<
     .unwrap()
 }
 
+/// Generate a dense transpose matrix mapping between basis functions and quadrature points
 pub fn transpose_basis_to_quadrature_into_dense<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -114,6 +119,7 @@ pub fn transpose_basis_to_quadrature_into_dense<
     }
 }
 
+/// Generate a CSR transpose matrix mapping between basis functions and quadrature points
 pub fn transpose_basis_to_quadrature_into_csr<
     const NPTS: usize,
     const BLOCKSIZE: usize,
@@ -125,11 +131,11 @@ pub fn transpose_basis_to_quadrature_into_csr<
 ) -> CsrMatrix<T> {
     let grid = space.grid();
     let ncells = grid.number_of_cells();
-    let shape = [ncells * NPTS, space.dofmap().global_size()];
+    let shape = [ncells * NPTS, space.global_size()];
     let sparse_matrix = basis_to_quadrature::<NPTS, BLOCKSIZE, RealT, T, Grid>(shape, space);
 
     CsrMatrix::<T>::from_aij(
-        [space.dofmap().global_size(), ncells * NPTS],
+        [space.global_size(), ncells * NPTS],
         &sparse_matrix.cols,
         &sparse_matrix.rows,
         &sparse_matrix.data,
@@ -152,7 +158,7 @@ fn basis_to_quadrature<
     }
     let grid = space.grid();
     let ncells = grid.number_of_cells();
-    if shape[0] != ncells * NPTS || shape[1] != space.dofmap().global_size() {
+    if shape[0] != ncells * NPTS || shape[1] != space.global_size() {
         panic!("Matrix has wrong shape");
     }
 
@@ -187,7 +193,7 @@ fn basis_to_quadrature<
 
     // TODO: batch this?
     for cell in 0..ncells {
-        let cell_dofs = space.dofmap().cell_dofs(cell).unwrap();
+        let cell_dofs = space.cell_dofs(cell).unwrap();
         for (qindex, w) in qweights.iter().enumerate() {
             evaluator.jacobian(cell, qindex, &mut jacobian);
             let jdet = num::cast::<RealT, T>(compute_det(

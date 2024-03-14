@@ -4,7 +4,6 @@
 use bempp_traits::types::RlstScalar;
 use num::Float;
 use rand::prelude::*;
-use rand::SeedableRng;
 
 use rlst_dense::{
     array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
@@ -167,11 +166,11 @@ mod test {
 
     #[test]
     fn test_find_corners() {
-        let order = 5;
-        let grid_1 = MortonKey::surface_grid::<f64>(order);
+        let expansion_order = 5;
+        let grid_1 = MortonKey::kifmm_surface_grid::<f64>(expansion_order);
 
-        let order = 2;
-        let grid_2 = MortonKey::surface_grid::<f64>(order);
+        let expansion_order = 2;
+        let grid_2 = MortonKey::kifmm_surface_grid::<f64>(expansion_order);
 
         let corners_1 = find_corners(&grid_1);
         let corners_2 = find_corners(&grid_2);

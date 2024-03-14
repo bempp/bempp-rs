@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use mpi::traits::*;
+use mpi::traits::{Communicator, Destination, Source};
 
 use hyksort::hyksort;
 

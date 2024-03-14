@@ -13,10 +13,10 @@ use rlst_dense::data_container::VectorContainer;
 use rlst_dense::{array::Array, types::RlstScalar};
 use std::{collections::HashSet, sync::RwLock};
 
-use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
+use bempp_traits::{fmm::SourceToTargetTranslation, kernel::Kernel, tree::Tree};
 
 use crate::{
-    helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
+    helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
 use rlst_dense::{
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
     U: RlstScalar<Real = U> + Float + Default + Fft,
@@ -168,8 +168,8 @@ where
                 } else {
                     max_chunk_size = 128
                 }
-                let chunk_size_pre_proc = find_chunk_size(nsources_parents, max_chunk_size);
-                let chunk_size_kernel = find_chunk_size(ntargets_parents, max_chunk_size);
+                let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
+                let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
                 // Allocate check potentials (implicitly in frequency order)
                 let mut check_potentials_hat_f_buffer =
@@ -407,7 +407,7 @@ where
                 }
             }
 
-            FmmEvalType::Matrix(_nmatvec) => {
+            FmmEvalType::Matrix(_nmatvecs) => {
                 panic!("unimplemented FFT M2L for Matrix input")
             }
         }

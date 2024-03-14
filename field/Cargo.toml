@@ -38,3 +38,9 @@ rayon = "1.7"
 
 [dev-dependencies]
 approx_eq = "0.1.8"
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true

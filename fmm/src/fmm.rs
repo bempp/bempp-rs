@@ -1,10 +1,14 @@
 //! Implementation of FmmData and Fmm traits.
 use num::Float;
-use rlst_dense::{rlst_dynamic_array2, types::RlstScalar};
+use rlst_dense::{
+    rlst_dynamic_array2,
+    traits::{RawAccess, Shape},
+    types::RlstScalar,
+};
 
 use bempp_traits::{
-    field::{SourceToTarget, SourceToTargetData},
-    fmm::{Fmm, SourceTranslation, TargetTranslation},
+    field::SourceToTargetData,
+    fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
     kernel::Kernel,
     tree::{FmmTree, Tree},
     types::EvalType,
@@ -12,7 +16,10 @@ use bempp_traits::{
 
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
-use crate::types::{FmmEvalType, KiFmm, KiFmmDummy};
+use crate::{
+    helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
+    types::{Charges, FmmEvalType, KiFmm, KiFmmDummy},
+};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
@@ -20,7 +27,7 @@ where
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalar<Real = W> + Float + Default,
-    Self: SourceToTarget,
+    Self: SourceToTargetTranslation,
 {
     type NodeIndex = T::Node;
     type Precision = W;
@@ -129,6 +136,74 @@ where
             self.p2p();
             self.l2p();
         }
+    }
+
+    fn clear(&mut self, charges: &Charges<W>) {
+        let [_ncharges, nmatvecs] = charges.shape();
+        let ntarget_points = self.tree().target_tree().ncoordinates_tot().unwrap();
+        let nsource_leaves = self.tree().source_tree().nleaves().unwrap();
+        let ntarget_leaves = self.tree().target_tree().nleaves().unwrap();
+
+        // Clear buffers and set new buffers
+        self.multipoles = vec![W::default(); self.multipoles.len()];
+        self.locals = vec![W::default(); self.locals.len()];
+        self.potentials = vec![W::default(); self.potentials.len()];
+        self.charges = vec![W::default(); self.charges.len()];
+
+        // Recreate mutable pointers for new buffers
+        let potentials_send_pointers = potential_pointers(
+            self.tree.target_tree(),
+            nmatvecs,
+            ntarget_leaves,
+            ntarget_points,
+            self.kernel_eval_size,
+            &self.potentials,
+        );
+
+        let leaf_multipoles = leaf_expansion_pointers(
+            self.tree().source_tree(),
+            self.ncoeffs,
+            nmatvecs,
+            nsource_leaves,
+            &self.multipoles,
+        );
+
+        let level_multipoles = level_expansion_pointers(
+            self.tree().source_tree(),
+            self.ncoeffs,
+            nmatvecs,
+            &self.multipoles,
+        );
+
+        let level_locals = level_expansion_pointers(
+            self.tree().target_tree(),
+            self.ncoeffs,
+            nmatvecs,
+            &self.locals,
+        );
+
+        let leaf_locals = leaf_expansion_pointers(
+            self.tree().target_tree(),
+            self.ncoeffs,
+            nmatvecs,
+            ntarget_leaves,
+            &self.locals,
+        );
+
+        // Set mutable pointers
+        self.level_locals = level_locals;
+        self.level_multipoles = level_multipoles;
+        self.leaf_locals = leaf_locals;
+        self.leaf_multipoles = leaf_multipoles;
+        self.potentials_send_pointers = potentials_send_pointers;
+
+        // Set new charges
+        self.charges = map_charges(
+            self.tree.source_tree().all_global_indices().unwrap(),
+            charges,
+        )
+        .data()
+        .to_vec();
     }
 }
 
@@ -257,8 +332,8 @@ where
                 )
             }
 
-            FmmEvalType::Matrix(nmatvec) => {
-                for i in 0..nmatvec {
+            FmmEvalType::Matrix(nmatvecs) => {
+                for i in 0..nmatvecs {
                     let charges_i =
                         &self.charges[i * nsource_coordinates..(i + 1) * nsource_coordinates];
                     let res_i = unsafe {
@@ -290,6 +365,8 @@ where
     fn tree(&self) -> &Self::Tree {
         &self.tree
     }
+
+    fn clear(&mut self, _charges: &Charges<U>) {}
 }
 
 #[cfg(test)]
@@ -393,9 +470,9 @@ mod test {
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
-        let [nsources, nmatvec] = charges.shape();
+        let [nsources, nmatvecs] = charges.shape();
 
-        for i in 0..nmatvec {
+        for i in 0..nmatvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
             let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
             let mut direct_i = vec![T::zero(); ntargets * eval_size];
@@ -417,6 +494,61 @@ mod test {
                 assert!(rel_error <= threshold)
             })
         }
+    }
+
+    #[test]
+    fn test_fmm_api() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+        let threshold_pot = 1e-5;
+
+        // Set charge data and evaluate an FMM
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        let mut fmm = KiFmmBuilderSingleNode::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                bempp_traits::types::EvalType::Value,
+                FftFieldTranslationKiFmm::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm.evaluate();
+
+        // Reset Charge data and re-evaluate potential
+        let mut rng = StdRng::seed_from_u64(1);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        fmm.clear(&charges);
+        fmm.evaluate();
+
+        let fmm = Box::new(fmm);
+        test_single_node_fmm_vector_helper(
+            fmm,
+            bempp_traits::types::EvalType::Value,
+            &sources,
+            &charges,
+            threshold_pot,
+        );
     }
 
     #[test]
@@ -642,7 +774,7 @@ mod test {
         threshold: T,
     ) {
         let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.compute_surface(
+        let upward_equivalent_surface = ROOT.compute_kifmm_surface(
             fmm.tree().domain(),
             fmm.expansion_order(),
             T::from(ALPHA_INNER).unwrap(),

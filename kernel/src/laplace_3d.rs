@@ -1,5 +1,4 @@
 //! Implementation of the Laplace kernel
-use num;
 use std::marker::PhantomData;
 
 use crate::helpers::{
@@ -12,12 +11,14 @@ use bempp_traits::{
 use num::traits::FloatConst;
 use rayon::prelude::*;
 
+/// Kernel for Laplace in 3D
 #[derive(Clone)]
 pub struct Laplace3dKernel<T: RlstScalar> {
     _phantom_t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> Laplace3dKernel<T> {
+    /// Create new
     pub fn new() -> Self {
         Self {
             _phantom_t: PhantomData,
@@ -218,6 +219,7 @@ where
     }
 }
 
+/// Evaluate laplce kernel with one target
 pub fn evaluate_laplace_one_target<T: RlstScalar>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],
@@ -296,6 +298,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
     }
 }
 
+/// Assemble Laplace kernel with one target
 pub fn assemble_laplace_one_target<T: RlstScalar>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],
@@ -388,25 +391,6 @@ fn laplace_component_count(eval_type: EvalType) -> usize {
         EvalType::ValueDeriv => 4,
     }
 }
-
-// pub fn simd_wrapper_evaluate(
-//     eval_type: EvalType,
-//     target: &[f32],
-//     sources: &[f32],
-//     charges: &[f32],
-//     result: &mut [f32],
-// ) {
-//     evaluate_laplace_one_target(eval_type, target, sources, charges, result)
-// }
-
-// pub fn simd_wrapper_assemble(
-//     eval_type: EvalType,
-//     target: &[f32],
-//     sources: &[f32],
-//     result: &mut [f32],
-// ) {
-//     assemble_laplace_one_target(eval_type, target, sources, result);
-// }
 
 #[cfg(test)]
 mod test {
