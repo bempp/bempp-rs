@@ -23,7 +23,7 @@ use rlst_dense::{
 
 use crate::{
     constants::L2L_MAX_CHUNK_SIZE,
-    helpers::find_chunk_size,
+    helpers::chunk_size,
     types::{FmmEvalType, KiFmm},
 };
 
@@ -62,7 +62,7 @@ where
                 if max_chunk_size > L2L_MAX_CHUNK_SIZE {
                     max_chunk_size = L2L_MAX_CHUNK_SIZE
                 }
-                let chunk_size = find_chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(nparents, max_chunk_size);
 
                 let child_locals = &self.level_locals[level as usize];
 
@@ -110,10 +110,10 @@ where
                     });
             }
 
-            FmmEvalType::Matrix(nmatvec) => {
+            FmmEvalType::Matrix(nmatvecs) => {
                 let mut parent_locals = vec![Vec::new(); nparents];
                 for (parent_idx, parent) in parent_sources.iter().enumerate() {
-                    for charge_vec_idx in 0..nmatvec {
+                    for charge_vec_idx in 0..nmatvecs {
                         let parent_index_pointer = *self.level_index_pointer_locals
                             [(level - 1) as usize]
                             .get(parent)
@@ -129,10 +129,10 @@ where
                     .into_par_iter()
                     .zip(child_locals.par_chunks_exact(NSIBLINGS))
                     .for_each(|(parent_local_pointers, child_locals_pointers)| {
-                        let mut parent_locals = rlst_dynamic_array2!(W, [self.ncoeffs, nmatvec]);
+                        let mut parent_locals = rlst_dynamic_array2!(W, [self.ncoeffs, nmatvecs]);
 
                         for (charge_vec_idx, parent_local_pointer) in
-                            parent_local_pointers.iter().enumerate().take(nmatvec)
+                            parent_local_pointers.iter().enumerate().take(nmatvecs)
                         {
                             let tmp = unsafe {
                                 std::slice::from_raw_parts(parent_local_pointer.raw, self.ncoeffs)
@@ -151,7 +151,7 @@ where
                             );
 
                             for (j, child_locals_ij) in
-                                child_locals_i.iter().enumerate().take(nmatvec)
+                                child_locals_i.iter().enumerate().take(nmatvecs)
                             {
                                 let child_locals_ij = unsafe {
                                     std::slice::from_raw_parts_mut(

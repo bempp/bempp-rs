@@ -70,31 +70,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::prelude::*;
-    use rand::SeedableRng;
+    use rlst_dense::traits::RawAccess;
 
     use crate::constants::DEEPEST_LEVEL;
-    use crate::types::{
-        domain::Domain,
-        morton::MortonKey,
-        point::{Point, PointType},
-    };
-
-    pub fn points_fixture(npoints: i32) -> Vec<[f64; 3]> {
-        let mut range = StdRng::seed_from_u64(0);
-        let between = rand::distributions::Uniform::from(0.0..1.0);
-        let mut points: Vec<[PointType<f64>; 3]> = Vec::new();
-
-        for _ in 0..npoints {
-            points.push([
-                between.sample(&mut range),
-                between.sample(&mut range),
-                between.sample(&mut range),
-            ])
-        }
-
-        points
-    }
+    use crate::implementations::helpers::points_fixture;
+    use crate::types::{domain::Domain, morton::MortonKey, point::Point};
 
     #[test]
     pub fn test_ordering() {
@@ -103,16 +83,23 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
-        let mut points: Vec<Point<f64>> = points_fixture(1000)
-            .iter()
-            .enumerate()
-            .map(|(i, p)| Point {
-                coordinate: *p,
-                base_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
-                encoded_key: MortonKey::from_point(p, &domain, DEEPEST_LEVEL),
+        let npoints = 1000;
+        let coords = points_fixture(npoints, None, None, None);
+        let mut points = Vec::new();
+
+        for i in 0..npoints {
+            let p = [
+                coords.data()[i],
+                coords.data()[i + npoints],
+                coords.data()[i + 2 * npoints],
+            ];
+            points.push(Point {
+                coordinate: p,
+                base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
+                encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
                 global_idx: i,
             })
-            .collect();
+        }
 
         points.sort();
 
