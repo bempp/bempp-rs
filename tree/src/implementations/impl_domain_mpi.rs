@@ -44,7 +44,7 @@ where
         let size = comm.size();
 
         let dim = 3;
-        let nlocal_points = local_points.len() / dim;
+        let nlocal_points = vec![local_points.len() / dim; size as usize];
 
         let local_domain = Domain::<T>::from_local_points(local_points);
         let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];

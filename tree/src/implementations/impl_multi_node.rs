@@ -16,7 +16,8 @@ use hyksort::hyksort;
 
 use bempp_traits::tree::Tree;
 
-use crate::constants::N_CRIT;
+use crate::constants::{LEVEL_SIZE, N_CRIT};
+use crate::types::morton;
 use crate::{
     constants::{DEEPEST_LEVEL, DEFAULT_LEVEL},
     implementations::impl_morton::encode_anchor,
@@ -53,6 +54,7 @@ where
         // Encode points at deepest level, and map to specified depth.
         let dim = 3;
         let npoints = points.len() / dim;
+        let rank = world.rank();
 
         let mut tmp = Points::default();
         for i in 0..npoints {
@@ -72,9 +74,42 @@ where
         let comm = world.duplicate();
         hyksort(&mut points.points, subcomm_size, comm);
 
+        // For simplicity, do a top down encoding, in which case number of ranks must be a power of two
+        let n_global = 8i32.pow(depth as u32);
+        let n_local = n_global / world.size();
+        let n_prev = rank * n_local;
+        let n_min = n_prev as u64;
+        let n_max = (n_prev + n_local) as u64;
+
+        let diameter = 1 << (DEEPEST_LEVEL - depth);
+        let steps_per_dimension = LEVEL_SIZE / diameter;
+        let steps_per_dimension_2 = steps_per_dimension.pow(2);
+
+        let i_idx =( n_min / steps_per_dimension_2) * diameter;
+        let j_idx = ((n_min % steps_per_dimension_2) / steps_per_dimension) * diameter;
+        let k_idx = n_min % steps_per_dimension * diameter;
+        let anchor = [i_idx, j_idx, k_idx];
+        let morton = encode_anchor(&anchor, depth);
+        let min = MortonKey {
+            anchor,
+            morton
+        };
+
+        let i_idx =( n_max/ steps_per_dimension_2) * diameter;
+        let j_idx = ((n_max % steps_per_dimension_2) / steps_per_dimension) * diameter;
+        let k_idx = n_max % steps_per_dimension * diameter;
+        let anchor = [i_idx, j_idx, k_idx];
+        let morton = encode_anchor(&anchor, depth);
+        let max = MortonKey {
+            anchor,
+            morton
+        };
+
+
+        println!("RANK {:?} DEPTH {:?} MIN {:?} MAX {:?}", rank, depth, min.anchor(), max.anchor());
         // Find leaf keys on each processor
-        let min = points.points.iter().min().unwrap().encoded_key;
-        let max = points.points.iter().max().unwrap().encoded_key;
+        // let min = points.points.iter().min().unwrap().encoded_key;
+        // let max = points.points.iter().max().unwrap().encoded_key;
 
         let diameter = 1 << (DEEPEST_LEVEL - depth);
 
@@ -205,6 +240,8 @@ where
             key_to_index,
             leaf_to_index
         }
+
+        // MultiNodeTree {}
     }
 
     pub fn uniform_tree_sparse(
