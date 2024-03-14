@@ -613,6 +613,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
+            npoints: 0,
         };
         let alpha = 1.05;
         let threshold = 1e-5;
@@ -714,6 +715,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
+            npoints: 0,
         };
 
         // Some expansion data998
@@ -893,6 +895,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [5., 5., 5.],
+            npoints: 0,
         };
 
         let transfer_vectors = compute_transfer_vectors();

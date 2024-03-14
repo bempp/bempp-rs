@@ -7,19 +7,15 @@ use std::fmt::Debug;
 use mpi::{
     // collective::SystemOperation,
     topology::UserCommunicator,
-    traits::*,
-    Rank,
+    traits::{Communicator, Equivalence},
 };
 use num::traits::Float;
-
-use hyksort::hyksort;
 
 use bempp_traits::tree::Tree;
 
 use crate::constants::{LEVEL_SIZE, N_CRIT};
-use crate::types::morton;
 use crate::{
-    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL},
+    constants::DEEPEST_LEVEL,
     implementations::impl_morton::encode_anchor,
     types::{
         domain::Domain,
@@ -29,17 +25,6 @@ use crate::{
         single_node::SingleNodeTree,
     },
 };
-use bempp_traits::types::RlstScalar;
-use hyksort::hyksort;
-use itertools::Itertools;
-use mpi::{
-    topology::UserCommunicator,
-    traits::{Communicator, Destination, Equivalence, Source},
-    Rank,
-};
-use num::traits::Float;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
 
 impl<T> MultiNodeTree<T>
 where
@@ -83,7 +68,7 @@ where
 
         // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
-        hyksort(&mut points.points, subcomm_size, comm);
+        hyksort::hyksort(&mut points.points, subcomm_size, comm);
 
         // For simplicity, do a top down encoding, in which case number of ranks must be a power of two
         let n_global = 8i32.pow(depth as u32);
@@ -254,6 +239,7 @@ where
         // MultiNodeTree {}
     }
 
+    /// Constructor for uniform sparse trees
     pub fn uniform_tree_sparse(
         world: &UserCommunicator,
         subcomm_size: i32,
@@ -282,7 +268,7 @@ where
 
         // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
-        hyksort(&mut points.points, subcomm_size, comm);
+        hyksort::hyksort(&mut points.points, subcomm_size, comm);
 
         // Find leaf keys on each processor
         let min = points.points.iter().min().unwrap().encoded_key;
@@ -339,7 +325,7 @@ where
         let mut leaves_set: HashSet<MortonKey> = leaves_to_coordinates.keys().cloned().collect();
 
         // Add unmapped leaves if they are siblings of mapped leaves
-        for leaf in leaves_to_coordinates.keys().into_iter() {
+        for leaf in leaves_to_coordinates.keys() {
             let siblings = leaf.siblings();
             for sibling in siblings {
                 leaves_set.insert(sibling);
@@ -499,6 +485,13 @@ where
         where T: 'a;
     type Nodes = MortonKeys;
 
+    fn ncoordinates(&self, key: &Self::Node) -> Option<usize> {
+        self.coordinates(key).map(|coords| coords.len() / 3)
+    }
+
+    fn ncoordinates_tot(&self) -> Option<usize> {
+        self.all_coordinates().map(|coords| coords.len() / 3)
+    }
     fn node(&self, idx: usize) -> Option<&Self::Node> {
         Some(&self.keys[idx])
     }
