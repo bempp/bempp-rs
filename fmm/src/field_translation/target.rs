@@ -23,7 +23,7 @@ use rlst_dense::{
 
 use crate::{
     constants::L2L_MAX_CHUNK_SIZE,
-    helpers::find_chunk_size,
+    helpers::chunk_size,
     types::{FmmEvalType, KiFmm},
 };
 
@@ -62,7 +62,7 @@ where
                 if max_chunk_size > L2L_MAX_CHUNK_SIZE {
                     max_chunk_size = L2L_MAX_CHUNK_SIZE
                 }
-                let chunk_size = find_chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(nparents, max_chunk_size);
 
                 let child_locals = &self.level_locals[level as usize];
 

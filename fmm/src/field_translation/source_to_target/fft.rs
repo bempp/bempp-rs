@@ -16,7 +16,7 @@ use std::{collections::HashSet, sync::RwLock};
 use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
 
 use crate::{
-    helpers::{find_chunk_size, homogenous_kernel_scale, m2l_scale},
+    helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
 use rlst_dense::{
@@ -168,8 +168,8 @@ where
                 } else {
                     max_chunk_size = 128
                 }
-                let chunk_size_pre_proc = find_chunk_size(nsources_parents, max_chunk_size);
-                let chunk_size_kernel = find_chunk_size(ntargets_parents, max_chunk_size);
+                let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
+                let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
                 // Allocate check potentials (implicitly in frequency order)
                 let mut check_potentials_hat_f_buffer =

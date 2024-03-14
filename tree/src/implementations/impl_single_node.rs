@@ -553,6 +553,22 @@ where
         where T: 'a;
     type Nodes = MortonKeys;
 
+    fn ncoordinates(&self, key: &Self::Node) -> Option<usize> {
+        if let Some(coords) = self.coordinates(key) {
+            Some(coords.len() / 3)
+        } else {
+            None
+        }
+    }
+
+    fn ncoordinates_tot(&self) -> Option<usize> {
+        if let Some(coords) = self.all_coordinates() {
+            Some(coords.len() / 3)
+        } else {
+            None
+        }
+    }
+
     fn node(&self, idx: usize) -> Option<&Self::Node> {
         Some(&self.keys[idx])
     }
@@ -573,7 +589,7 @@ where
         Some(self.leaves.len())
     }
 
-    fn get_depth(&self) -> u64 {
+    fn depth(&self) -> u64 {
         self.depth
     }
 
@@ -605,7 +621,7 @@ where
         Some(&self.leaves)
     }
 
-    fn coordinates<'a>(&'a self, key: &Self::Node) -> Option<&'a [Self::Precision]> {
+    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Precision]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
@@ -617,7 +633,7 @@ where
         Some(&self.coordinates)
     }
 
-    fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]> {
+    fn global_indices(&self, key: &Self::Node) -> Option<&[usize]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
             Some(&self.global_indices[l..r])
         } else {
@@ -861,7 +877,7 @@ mod test {
 
         let keys = tree.all_keys().unwrap();
 
-        let depth = tree.get_depth();
+        let depth = tree.depth();
 
         let mut tot = 0;
         for level in (0..=depth).rev() {

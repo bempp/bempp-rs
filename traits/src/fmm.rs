@@ -86,9 +86,12 @@ pub trait Fmm {
     fn evaluate(&self);
 
     /// Clear the data buffers and add new charge data
-    fn clear(&mut self, charges: &Array<
-                Self::Precision,
-                BaseArray<Self::Precision, VectorContainer<Self::Precision>, 2>,
-                2,
-            >);
+    fn clear(
+        &mut self,
+        charges: &Array<
+            Self::Precision,
+            BaseArray<Self::Precision, VectorContainer<Self::Precision>, 2>,
+            2,
+        >,
+    );
 }

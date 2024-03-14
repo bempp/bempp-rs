@@ -37,7 +37,7 @@ pub trait Tree {
     fn nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
-    fn get_depth(&self) -> u64;
+    fn depth(&self) -> u64;
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
     fn all_leaves(&self) -> Option<Self::NodeSlice<'_>>;
@@ -55,10 +55,16 @@ pub trait Tree {
     fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
-    fn coordinates<'a>(&'a self, key: &Self::Node) -> Option<&'a [Self::Precision]>;
+    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Precision]>;
+
+    /// Number of coordinates
+    fn ncoordinates(&self, key: &Self::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
     fn all_coordinates(&self) -> Option<&[Self::Precision]>;
+
+    /// Total number of coordinates
+    fn ncoordinates_tot(&self) -> Option<usize>;
 
     /// Gets global indices at a leaf (local in multinode setting)
     fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]>;
@@ -85,7 +91,7 @@ pub trait FmmTree {
     type Precision;
     /// Node type
     type Node;
-    /// Tree type   
+    /// Tree type
     type Tree: Tree<Precision = Self::Precision, Node = Self::Node>;
 
     /// Get the source tree
