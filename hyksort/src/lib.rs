@@ -17,10 +17,9 @@ use mpi::datatype::PartitionMut;
 use mpi::request::WaitGuard;
 use mpi::topology::Rank;
 use mpi::topology::UserCommunicator;
-use mpi::traits::*;
+use mpi::traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Root, Source};
 use mpi::Count;
-
-use superslice::*;
+use superslice::Ext;
 
 /// Modulo function compatible with signed integers.
 pub fn modulo(a: i32, b: i32) -> i32 {

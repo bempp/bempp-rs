@@ -3,7 +3,7 @@ use memoffset::offset_of;
 use mpi::{
     datatype::{UncommittedUserDatatype, UserDatatype},
     topology::UserCommunicator,
-    traits::*,
+    traits::{Buffer, BufferMut, Communicator, CommunicatorCollectives, Equivalence},
     Address,
 };
 use std::fmt::Debug;
