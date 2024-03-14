@@ -29,11 +29,13 @@ use std::collections::HashMap;
 
 mod adjoint_double_layer;
 mod double_layer;
+mod hypersingular;
 mod single_layer;
 pub use adjoint_double_layer::{
     HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
 };
 pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
+pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
 pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
@@ -181,6 +183,20 @@ pub trait BatchedAssembler: Sync {
         result: &mut [Self::T],
     );
 
+    /// The product of a test and trial function
+    unsafe fn test_trial_product(
+        &self,
+        test_table: &RlstArray<Self::T, 4>,
+        trial_table: &RlstArray<Self::T, 4>,
+        test_point_index: usize,
+        trial_point_index: usize,
+        test_basis_index: usize,
+        trial_basis_index: usize,
+    ) -> Self::T {
+        *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
+            * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
+    }
+
     /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
     #[allow(clippy::too_many_arguments)]
     fn assemble_batch_singular<
@@ -281,13 +297,18 @@ pub trait BatchedAssembler: Sync {
                                 &test_normals,
                                 &trial_normals,
                                 index,
-                            ) * *test_table.get_unchecked([0, index, test_i, 0])
-                                * *trial_table.get_unchecked([0, index, trial_i, 0])
-                                * num::cast::<Self::RealT, Self::T>(
-                                    *wt * *test_jdet.get_unchecked(index)
-                                        * *trial_jdet.get_unchecked(index),
-                                )
-                                .unwrap();
+                            ) * self.test_trial_product(
+                                test_table,
+                                trial_table,
+                                index,
+                                index,
+                                test_i,
+                                trial_i,
+                            ) * num::cast::<Self::RealT, Self::T>(
+                                *wt * *test_jdet.get_unchecked(index)
+                                    * *trial_jdet.get_unchecked(index),
+                            )
+                            .unwrap();
                         }
                     }
                     output.rows.push(*test_dof);
@@ -411,21 +432,16 @@ pub trait BatchedAssembler: Sync {
                 for (test_i, test_dof) in test_dofs.iter().enumerate() {
                     for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                         for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                            trial_integrands[trial_index] = unsafe {
-                                num::cast::<Self::RealT, Self::T>(
-                                    *trial_wt * trial_jdet[trial_cell_i][trial_index],
-                                )
-                                .unwrap()
-                                    * *trial_table.get_unchecked([0, trial_index, trial_i, 0])
-                            };
+                            trial_integrands[trial_index] = num::cast::<Self::RealT, Self::T>(
+                                *trial_wt * trial_jdet[trial_cell_i][trial_index],
+                            )
+                            .unwrap();
                         }
                         sum = num::cast::<f64, Self::T>(0.0).unwrap();
                         for (test_index, test_wt) in test_weights.iter().enumerate() {
-                            let test_integrand = unsafe {
+                            let test_integrand =
                                 num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
-                                    .unwrap()
-                                    * *test_table.get_unchecked([0, test_index, test_i, 0])
-                            };
+                                    .unwrap();
                             for trial_index in 0..NPTS_TRIAL {
                                 sum += unsafe {
                                     self.nonsingular_kernel_value(
@@ -436,6 +452,14 @@ pub trait BatchedAssembler: Sync {
                                         trial_index,
                                     ) * test_integrand
                                         * *trial_integrands.get_unchecked(trial_index)
+                                        * self.test_trial_product(
+                                            test_table,
+                                            trial_table,
+                                            test_index,
+                                            trial_index,
+                                            test_i,
+                                            trial_i,
+                                        )
                                 };
                             }
                         }
@@ -550,11 +574,9 @@ pub trait BatchedAssembler: Sync {
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                     for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                        trial_integrands[trial_index] = unsafe {
+                        trial_integrands[trial_index] =
                             num::cast::<Self::RealT, Self::T>(*trial_wt * trial_jdet[trial_index])
-                                .unwrap()
-                                * *trial_table.get_unchecked([0, trial_index, trial_i, 0])
-                        };
+                                .unwrap();
                     }
                     sum = num::cast::<f64, Self::T>(0.0).unwrap();
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
@@ -572,7 +594,14 @@ pub trait BatchedAssembler: Sync {
                                     test_index,
                                     trial_index,
                                 ) * test_integrand
-                                    * *trial_integrands.get_unchecked(trial_index)
+                                    * self.test_trial_product(
+                                        test_table,
+                                        trial_table,
+                                        test_index,
+                                        trial_index,
+                                        test_i,
+                                        trial_i,
+                                    )
                             };
                         }
                     }

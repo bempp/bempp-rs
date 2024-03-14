@@ -94,8 +94,6 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     }
 }
 
-/*
-
 #[test]
 fn test_laplace_hypersingular_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -110,14 +108,8 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::Hypersingular,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+    let a = batched::LaplaceHypersingularAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     for i in 0..ndofs {
         for j in 0..ndofs {
@@ -140,14 +132,8 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::Hypersingular,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+    let a = batched::LaplaceHypersingularAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -165,7 +151,7 @@ fn test_laplace_hypersingular_p1_p1() {
         }
     }
 }
-*/
+
 #[test]
 fn test_helmholtz_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
