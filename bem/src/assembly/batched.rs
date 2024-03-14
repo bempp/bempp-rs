@@ -3,6 +3,7 @@ use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
 use bempp_kernel::laplace_3d::Laplace3dKernel;
+use bempp_kernel::helmholtz_3d::Helmholtz3dKernel;
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -1180,6 +1181,71 @@ pub trait BatchedAssembler: Sync {
     }
 }
 
+/// Single layer assembler
+trait SingleLayerAssembler: Sync {
+    /// Type of the kernel
+    type K: Kernel;
+    /// Get the kernsl
+    fn kernel(&self) -> &Self::K;
+}
+impl<K: Kernel, A: SingleLayerAssembler<K=K>> BatchedAssembler for A
+{
+    const DERIV_SIZE: usize = 1;
+    type RealT = <K::T as RlstScalar>::Real;
+    type T = K::T;
+    unsafe fn singular_kernel_value(
+        &self,
+        k: &RlstArray<Self::T, 2>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        _trial_normals: &RlstArray<Self::RealT, 2>,
+        index: usize,
+    ) -> Self::T {
+        *k.get_unchecked([0, index])
+    }
+    unsafe fn nonsingular_kernel_value(
+        &self,
+        k: &RlstArray<Self::T, 3>,
+        _test_normals: &RlstArray<Self::RealT, 2>,
+        _trial_normals: &RlstArray<Self::RealT, 2>,
+        test_index: usize,
+        trial_index: usize,
+    ) -> Self::T {
+        *k.get_unchecked([test_index, 0, trial_index])
+    }
+    fn kernel_assemble_diagonal_st(
+        &self,
+        sources: &[Self::RealT],
+        targets: &[Self::RealT],
+        result: &mut [Self::T],
+    ) {
+        self.kernel()
+            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+    }
+    fn kernel_assemble_st(&self, sources: &[Self::RealT], targets: &[Self::RealT], result: &mut [Self::T]) {
+        self.kernel()
+            .assemble_st(EvalType::Value, sources, targets, result);
+    }
+}
+
+/// Assembler for a Helmholtz single layer boundary operator
+pub struct HelmholtzSingleLayerAssembler<T: RlstScalar<Complex=T>> {
+    kernel: Helmholtz3dKernel<T>,
+}
+impl<T: RlstScalar<Complex=T>> HelmholtzSingleLayerAssembler<T> {
+    fn new(wavenumber: T::Real) -> Self {
+        Self {
+            kernel: Helmholtz3dKernel::<T>::new(wavenumber),
+        }
+    }
+}
+impl<T: RlstScalar<Complex=T>> SingleLayerAssembler for HelmholtzSingleLayerAssembler<T> {
+    type K = Helmholtz3dKernel<T>;
+    fn kernel(&self) -> &Self::K {
+        &self.kernel
+    }
+
+}
+
 /// Assembler for a Laplace single layer operator
 pub struct LaplaceSingleLayerAssembler<T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
@@ -1191,43 +1257,12 @@ impl<T: RlstScalar> Default for LaplaceSingleLayerAssembler<T> {
         }
     }
 }
-unsafe impl<T: RlstScalar> Sync for LaplaceSingleLayerAssembler<T> {}
-impl<T: RlstScalar> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
-    const DERIV_SIZE: usize = 1;
-    type RealT = T::Real;
-    type T = T;
-    unsafe fn singular_kernel_value(
-        &self,
-        k: &RlstArray<T, 2>,
-        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        index: usize,
-    ) -> T {
-        *k.get_unchecked([0, index])
+impl<T: RlstScalar> SingleLayerAssembler for LaplaceSingleLayerAssembler<T> {
+    type K = Laplace3dKernel<T>;
+    fn kernel(&self) -> &Self::K {
+        &self.kernel
     }
-    unsafe fn nonsingular_kernel_value(
-        &self,
-        k: &RlstArray<T, 3>,
-        _test_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        _trial_normals: &RlstArray<<T as RlstScalar>::Real, 2>,
-        test_index: usize,
-        trial_index: usize,
-    ) -> T {
-        *k.get_unchecked([test_index, 0, trial_index])
-    }
-    fn kernel_assemble_diagonal_st(
-        &self,
-        sources: &[T::Real],
-        targets: &[T::Real],
-        result: &mut [T],
-    ) {
-        self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
-    }
-    fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
-        self.kernel
-            .assemble_st(EvalType::Value, sources, targets, result);
-    }
+
 }
 
 /// Assembler for a Laplace double layer operator
