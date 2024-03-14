@@ -1,5 +1,5 @@
 use approx::*;
-use bempp_bem::assembly::{assemble, AssemblyType, BoundaryOperator, PDEType};
+use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::{create_element, ElementFamily};
 use bempp_grid::shapes::regular_sphere;
@@ -22,14 +22,9 @@ fn test_laplace_single_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::SingleLayer,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+
+    let a = batched::LaplaceSingleLayerAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -56,14 +51,8 @@ fn test_laplace_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::DoubleLayer,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+    let a = batched::LaplaceDoubleLayerAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -90,14 +79,8 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::AdjointDoubleLayer,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+    let a = batched::LaplaceAdjointDoubleLayerAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
