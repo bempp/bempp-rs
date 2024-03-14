@@ -33,9 +33,11 @@ use std::collections::HashMap;
 mod adjoint_double_layer;
 mod double_layer;
 mod single_layer;
-pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
+pub use adjoint_double_layer::{
+    HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
+};
 pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
-pub use adjoint_double_layer::{HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler};
+pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
 

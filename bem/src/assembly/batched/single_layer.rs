@@ -1,9 +1,8 @@
 //! Single layer assemblers
-use super::{RlstArray, EvalType, BatchedAssembler};
-use rlst_dense::{traits::UnsafeRandomAccessByRef,
-    types::RlstScalar};
+use super::{BatchedAssembler, EvalType, RlstArray};
 use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 use bempp_traits::kernel::Kernel;
+use rlst_dense::{traits::UnsafeRandomAccessByRef, types::RlstScalar};
 
 /// Assembler for a Laplace single layer operator
 pub struct LaplaceSingleLayerAssembler<T: RlstScalar> {
@@ -71,7 +70,7 @@ impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex=T>> BatchedAssembler for HelmholtzSingleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzSingleLayerAssembler<T> {
     const DERIV_SIZE: usize = 1;
     type RealT = T::Real;
     type T = T;

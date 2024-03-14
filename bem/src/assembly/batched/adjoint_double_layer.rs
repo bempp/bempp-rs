@@ -1,9 +1,8 @@
 //! Adjoint double layer assemblers
-use super::{RlstArray, EvalType, BatchedAssembler};
-use rlst_dense::{traits::UnsafeRandomAccessByRef,
-    types::RlstScalar};
+use super::{BatchedAssembler, EvalType, RlstArray};
 use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 use bempp_traits::kernel::Kernel;
+use rlst_dense::{traits::UnsafeRandomAccessByRef, types::RlstScalar};
 
 /// Assembler for a Laplace adjoint double layer operator
 pub struct LaplaceAdjointDoubleLayerAssembler<T: RlstScalar> {
@@ -64,7 +63,6 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     }
 }
 
-
 /// Assembler for a Helmholtz adjoint double layer boundary operator
 pub struct HelmholtzAdjointDoubleLayerAssembler<T: RlstScalar<Complex = T>> {
     kernel: Helmholtz3dKernel<T>,
@@ -77,7 +75,7 @@ impl<T: RlstScalar<Complex = T>> HelmholtzAdjointDoubleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex=T>> BatchedAssembler for HelmholtzAdjointDoubleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     type RealT = T::Real;
     type T = T;
