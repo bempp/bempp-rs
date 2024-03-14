@@ -1282,7 +1282,7 @@ mod test {
         let domain: Domain<f64> = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
         let point = [0.5, 0.5, 0.5];
 
@@ -1338,7 +1338,7 @@ mod test {
         let domain: Domain<f64> = Domain {
             diameter: [1., 1., 1.],
             origin: [0., 0., 0.],
-            npoints: 0
+            npoints: 0,
         };
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
@@ -1482,7 +1482,7 @@ mod test {
         let domain = Domain {
             origin: [-1.01, -1.01, -1.01],
             diameter: [2.0, 2.0, 2.0],
-            npoints
+            npoints,
         };
         let min = Some(-1.01);
         let max = Some(0.99);
@@ -1524,7 +1524,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         // Test points in the domain
@@ -1540,7 +1540,7 @@ mod test {
         let domain = Domain {
             origin: [-0.7, -0.6, -0.5],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         let point = [-0.499, -0.499, -0.499];
@@ -1559,7 +1559,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         // Test a point not in the domain
@@ -1574,7 +1574,7 @@ mod test {
         let domain = Domain {
             origin: [-0.5, -0.5, -0.5],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         // Test a point not in the domain
@@ -1729,7 +1729,7 @@ mod test {
         let domain = Domain {
             origin: [-0.1, -0.1, 0.1],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
@@ -1770,7 +1770,7 @@ mod test {
         let domain: Domain<f64> = Domain {
             origin: [-0.1, -0.1, -0.1],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         let a = MortonKey::from_point(&point, &domain, 1);
@@ -1785,7 +1785,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         // Test scale independence of transfer vectors
@@ -1819,7 +1819,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
@@ -1832,7 +1832,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
         let key = MortonKey::from_point(&point, &domain, 0);
 
@@ -1915,7 +1915,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints: 1
+            npoints: 1,
         };
 
         let order = 5;

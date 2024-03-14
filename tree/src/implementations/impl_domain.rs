@@ -49,7 +49,11 @@ impl<T: Float + Default + Debug> Domain<T> {
         // The origin is defined by the minimum point
         let origin = [*min_x - err, *min_y - err, *min_z - err];
 
-        Domain { origin, diameter , npoints}
+        Domain {
+            origin,
+            diameter,
+            npoints,
+        }
     }
 
     /// Find the union of two domains such that the returned domain is a superset and contains both sets of corresponding points
@@ -76,7 +80,7 @@ impl<T: Float + Default + Debug> Domain<T> {
         Domain {
             origin,
             diameter,
-            npoints
+            npoints,
         }
     }
 
@@ -89,7 +93,7 @@ impl<T: Float + Default + Debug> Domain<T> {
         Domain {
             origin: *origin,
             diameter: *diameter,
-            npoints: npoints
+            npoints,
         }
     }
 }

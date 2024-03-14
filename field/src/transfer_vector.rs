@@ -14,6 +14,7 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     let domain = Domain {
         origin: [0., 0., 0.],
         diameter: [1., 1., 1.],
+        npoints: 0
     };
 
     // Encode point in centre of domain

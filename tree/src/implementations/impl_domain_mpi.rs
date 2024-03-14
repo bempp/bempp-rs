@@ -98,7 +98,7 @@ where
         Domain {
             origin: min_origin,
             diameter: max_diameter,
-            npoints: nglobal_points
+            npoints: nglobal_points,
         }
     }
 }

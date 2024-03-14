@@ -79,22 +79,24 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1., 1., 1.],
-            npoints
+            npoints,
         };
 
         let mut coordinates = points_fixture(npoints, None, None, None);
 
         let mut points = Vec::new();
         for i in 0..npoints {
-            let point = [coordinates.data()[i], coordinates.data()[npoints + i], coordinates.data()[2*npoints + i]];
-            points.push(
-                Point {
-                    coordinate: point,
-                    base_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
-                    encoded_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
-                    global_idx: i,
-                }
-            )
+            let point = [
+                coordinates.data()[i],
+                coordinates.data()[npoints + i],
+                coordinates.data()[2 * npoints + i],
+            ];
+            points.push(Point {
+                coordinate: point,
+                base_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
+                encoded_key: MortonKey::from_point(&point, &domain, DEEPEST_LEVEL),
+                global_idx: i,
+            })
         }
 
         points.sort();

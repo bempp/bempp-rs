@@ -17,5 +17,5 @@ where
     pub diameter: [T; 3],
 
     /// Number of points in a domain
-    pub npoints: usize
+    pub npoints: usize,
 }

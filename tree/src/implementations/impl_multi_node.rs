@@ -85,28 +85,27 @@ where
         let steps_per_dimension = LEVEL_SIZE / diameter;
         let steps_per_dimension_2 = steps_per_dimension.pow(2);
 
-        let i_idx =( n_min / steps_per_dimension_2) * diameter;
+        let i_idx = (n_min / steps_per_dimension_2) * diameter;
         let j_idx = ((n_min % steps_per_dimension_2) / steps_per_dimension) * diameter;
         let k_idx = n_min % steps_per_dimension * diameter;
         let anchor = [i_idx, j_idx, k_idx];
         let morton = encode_anchor(&anchor, depth);
-        let min = MortonKey {
-            anchor,
-            morton
-        };
+        let min = MortonKey { anchor, morton };
 
-        let i_idx =( n_max/ steps_per_dimension_2) * diameter;
+        let i_idx = (n_max / steps_per_dimension_2) * diameter;
         let j_idx = ((n_max % steps_per_dimension_2) / steps_per_dimension) * diameter;
         let k_idx = n_max % steps_per_dimension * diameter;
         let anchor = [i_idx, j_idx, k_idx];
         let morton = encode_anchor(&anchor, depth);
-        let max = MortonKey {
-            anchor,
-            morton
-        };
+        let max = MortonKey { anchor, morton };
 
-
-        println!("RANK {:?} DEPTH {:?} MIN {:?} MAX {:?}", rank, depth, min.anchor(), max.anchor());
+        println!(
+            "RANK {:?} DEPTH {:?} MIN {:?} MAX {:?}",
+            rank,
+            depth,
+            min.anchor(),
+            max.anchor()
+        );
         // Find leaf keys on each processor
         // let min = points.points.iter().min().unwrap().encoded_key;
         // let max = points.points.iter().max().unwrap().encoded_key;
@@ -238,7 +237,7 @@ where
             keys_set,
             range,
             key_to_index,
-            leaf_to_index
+            leaf_to_index,
         }
 
         // MultiNodeTree {}
@@ -252,7 +251,6 @@ where
         depth: u64,
         global_idxs: &[usize],
     ) -> MultiNodeTree<T> {
-
         // Encode points at deepest level, and map to specified depth.
         let dim = 3;
         let npoints = points.len() / dim;
@@ -325,7 +323,7 @@ where
         // Add unmapped leaves if they are a sibling of a leaf that is mapped
         let mut leaves = MortonKeys {
             keys: leaves_to_coordinates.keys().cloned().collect_vec(),
-            index: 0
+            index: 0,
         };
         let mut leaves_set: HashSet<MortonKey> = leaves_to_coordinates.keys().cloned().collect();
 
@@ -417,7 +415,7 @@ where
             keys_set,
             range,
             key_to_index,
-            leaf_to_index
+            leaf_to_index,
         }
     }
 
@@ -429,7 +427,6 @@ where
     /// * `n_crit` - Constraint on max number of particles per leaf box
     /// * `world_size` - The size of the global MPI communicator
     pub fn minimum_depth(nglobal_points: u64, n_crit: u64, world_size: u64) -> u64 {
-
         // Assume that approximately nglobal_points/world_size particles per MPI node
         let mut tmp = nglobal_points / world_size;
 
@@ -460,24 +457,30 @@ where
         subcomm_size: i32,
         global_idxs: &[usize],
     ) -> MultiNodeTree<T> {
-
         let domain = Domain::from_global_points(points, world);
         let n_crit = n_crit.unwrap_or(N_CRIT);
-        let depth = MultiNodeTree::<T>::minimum_depth(domain.npoints as u64, n_crit, world.size() as u64);
+        let depth =
+            MultiNodeTree::<T>::minimum_depth(domain.npoints as u64, n_crit, world.size() as u64);
 
         if sparse {
-            MultiNodeTree::uniform_tree_sparse(world, subcomm_size, points, &domain, depth, global_idxs)
+            MultiNodeTree::uniform_tree_sparse(
+                world,
+                subcomm_size,
+                points,
+                &domain,
+                depth,
+                global_idxs,
+            )
         } else {
             MultiNodeTree::uniform_tree(world, subcomm_size, points, &domain, depth, global_idxs)
         }
     }
 }
 
-impl <T> Tree for MultiNodeTree<T>
+impl<T> Tree for MultiNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>
+    T: Float + Default + RlstScalar<Real = T>,
 {
-
     type Precision = T;
     type Domain = Domain<T>;
     type Node = MortonKey;
@@ -495,7 +498,7 @@ where
 
     fn nkeys(&self, level: u64) -> Option<usize> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
-            Some(r-l)
+            Some(r - l)
         } else {
             None
         }

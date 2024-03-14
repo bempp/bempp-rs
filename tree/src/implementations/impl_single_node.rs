@@ -723,7 +723,7 @@ mod test {
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
             diameter: [1.0, 1.0, 1.0],
-            npoints
+            npoints,
         };
 
         let mut tmp = Points::default();
@@ -779,7 +779,7 @@ mod test {
         let domain = Domain {
             origin: [0., 0., 0.],
             diameter: [1.0, 1.0, 1.0],
-            npoints
+            npoints,
         };
 
         let mut tmp = Points::default();

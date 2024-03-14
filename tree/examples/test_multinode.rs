@@ -18,7 +18,6 @@ use num::traits::Float;
 
 use rlst_dense::traits::RawAccess;
 
-
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
 fn test_no_overlaps<T: Float + Default + RlstScalar<Real = T>>(
@@ -61,7 +60,6 @@ fn test_no_overlaps<T: Float + Default + RlstScalar<Real = T>>(
 fn test_global_bounds<T: RlstScalar + Float + Default + Equivalence + SampleUniform>(
     world: &UserCommunicator,
 ) {
-
     let npoints = 10000;
     let points = points_fixture::<T>(npoints, None, None, None);
 
@@ -98,9 +96,20 @@ fn main() {
     let global_idxs: Vec<_> = (0..n_points).collect();
 
     // Create a uniform tree
-    let uniform = MultiNodeTree::new(&comm, points.data(), n_crit, false, subcomm_size, &global_idxs);
+    let uniform = MultiNodeTree::new(
+        &comm,
+        points.data(),
+        n_crit,
+        false,
+        subcomm_size,
+        &global_idxs,
+    );
 
-    println!("uniform: rank {:?} nleaves {:?}", uniform.world.rank(), uniform.nleaves());
+    println!(
+        "uniform: rank {:?} nleaves {:?}",
+        uniform.world.rank(),
+        uniform.nleaves()
+    );
 
     // test_global_bounds::<f32>(&comm);
     // if world.rank() == 0 {
@@ -120,8 +129,6 @@ fn main() {
     // if world.rank() == 0 {
     //     println!("\t ... test_no_overlaps passed on sparse tree");
     // }
-
-
 }
 
 #[cfg(not(feature = "mpi"))]
