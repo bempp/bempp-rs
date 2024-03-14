@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rand::Rng;
 
-use mpi::traits::*;
+use mpi::traits::{Communicator, Destination, Source};
 
 use hyksort::hyksort;
 

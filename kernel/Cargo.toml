@@ -32,4 +32,8 @@ rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 rand = "0.8.5"
 
-[dev-dependencies]
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true

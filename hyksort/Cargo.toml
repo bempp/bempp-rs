@@ -6,6 +6,7 @@ strict = []
 name = "hyksort"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,3 +14,9 @@ edition = "2021"
 mpi = "0.6.*"
 rand = "0.8.5"
 superslice = "1"
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints]
+workspace = true
