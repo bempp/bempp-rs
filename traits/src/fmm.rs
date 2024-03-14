@@ -1,4 +1,9 @@
 //! FMM traits
+use rlst_dense::array::Array;
+use rlst_dense::base_array::BaseArray;
+use rlst_dense::data_container::VectorContainer;
+use rlst_dense::types::RlstScalar;
+
 use crate::kernel::Kernel;
 use crate::tree::FmmTree;
 
@@ -39,7 +44,7 @@ pub trait TargetTranslation {
 /// Interface for FMM
 pub trait Fmm {
     /// Precision of data associated with FMM
-    type Precision;
+    type Precision: RlstScalar;
 
     /// Type of node index
     type NodeIndex;
@@ -79,4 +84,17 @@ pub trait Fmm {
 
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&self);
+
+    /// Clear the data containers
+    fn clear(&mut self);
+
+    /// Add a new set of charges for the FMM
+    fn set_charges(
+        &mut self,
+        charges: &Array<
+            Self::Precision,
+            BaseArray<Self::Precision, VectorContainer<Self::Precision>, 2>,
+            2,
+        >,
+    );
 }

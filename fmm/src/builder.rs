@@ -1,4 +1,3 @@
-//! Builder
 use std::collections::HashMap;
 
 use bempp_field::helpers::ncoeffs_kifmm;
@@ -37,7 +36,7 @@ where
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,
 {
-    /// Start building with mandatory parameters
+    // Start building with mandatory parameters
     pub fn new() -> Self {
         KiFmmBuilderSingleNode {
             tree: None,
@@ -52,7 +51,6 @@ where
         }
     }
 
-    /// Tree
     pub fn tree(
         mut self,
         sources: &Coordinates<U>,
@@ -100,7 +98,6 @@ where
         }
     }
 
-    /// Parameters
     pub fn parameters(
         mut self,
         charges: &Charges<U>,
@@ -162,7 +159,7 @@ where
         }
     }
 
-    /// Finalize and build the KiFmm
+    // Finalize and build the KiFmm
     pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
         if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
         {
