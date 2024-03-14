@@ -33,7 +33,7 @@ jobs:
 
       - name: Style checks
         run: |
-          cargo fmt -- --check ${{ matrix.feature-flags }}
-          cargo clippy -- -D warnings ${{ matrix.feature-flags }}
-          cargo clippy --tests -- -D warnings ${{ matrix.feature-flags }}
-          cargo clippy --examples -- -D warnings ${{ matrix.feature-flags }}
+          cargo fmt -- --check
+          cargo clippy ${{ matrix.feature-flags }} -- -D warnings
+          cargo clippy --tests ${{ matrix.feature-flags }} -- -D warnings
+          cargo clippy --examples ${{ matrix.feature-flags }} -- -D warnings

@@ -35,9 +35,5 @@ rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
-[[example]]
-name="flat_triangle_grid"
-doc-scrape-examples = true
-
 [lints]
 workspace = true
