@@ -12,9 +12,12 @@ use rlst_dense::{
 
 use crate::types::{Charges, SendPtrMut};
 
-/// Euclidean algorithm to find greatest divisor of `n` less than or equal to `max_chunk_size`
-pub fn chunk_size(n: usize, max_chunk_size: usize) -> usize {
-    let max_divisor = max_chunk_size;
+/// Euclidean algorithm to find greatest divisor of `n` less than or equal to `max`
+///
+/// # Arguments
+/// * `max` - The maximum chunk size
+pub fn chunk_size(n: usize, max: usize) -> usize {
+    let max_divisor = max;
     for divisor in (1..=max_divisor).rev() {
         if n % divisor == 0 {
             return divisor;
@@ -24,6 +27,9 @@ pub fn chunk_size(n: usize, max_chunk_size: usize) -> usize {
 }
 
 /// Scaling to apply to homogenous scale invariant kernels at a given octree level.
+///
+/// # Arguments
+/// * `level` - The octree level
 pub fn homogenous_kernel_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
     let numerator = T::from(1).unwrap();
     let denominator = T::from(2.).unwrap();
@@ -33,6 +39,9 @@ pub fn homogenous_kernel_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
 }
 
 /// Scaling to apply to M2L operators calculated using homogenous scale invariant kernels at a given octree level.
+///
+/// # Arguments
+/// * `level` - The octree level
 pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
     if level < 2 {
         panic!("M2L only perfomed on level 2 and below")
@@ -46,13 +55,18 @@ pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
     }
 }
 
-pub fn compute_leaf_scales<T>(tree: &SingleNodeTree<T>, ncoeffs: usize, nmatvecs: usize) -> Vec<T>
+/// Compute the scaling for each leaf box in a tree
+///
+/// # Arguments
+/// * `tree`- Single node tree
+/// * `ncoeffs`- Number of interpolation points on leaf box
+pub fn leaf_scales<T>(tree: &SingleNodeTree<T>, ncoeffs: usize) -> Vec<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
-    let mut result = vec![T::default(); tree.nleaves().unwrap() * ncoeffs * nmatvecs];
+    let mut result = vec![T::default(); tree.nleaves().unwrap() * ncoeffs];
 
-    for (i, leaf) in tree.all_leaves().unwrap().into_iter().enumerate() {
+    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         // Assign scales
         let l = i * ncoeffs;
         let r = l + ncoeffs;
@@ -62,7 +76,14 @@ where
     result
 }
 
-pub fn compute_leaf_surfaces<T>(
+/// Compute the surfaces for each leaf box
+///
+/// # Arguments
+/// * `tree`- Single node tree
+/// * `ncoeffs`- Number of interpolation points on leaf box
+/// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+/// * `expansion_order` - Expansion order of the FMM
+pub fn leaf_surfaces<T>(
     tree: &SingleNodeTree<T>,
     ncoeffs: usize,
     alpha: T,
@@ -75,10 +96,10 @@ where
     let nkeys = tree.nleaves().unwrap();
     let mut result = vec![T::default(); ncoeffs * dim * nkeys];
 
-    for (i, key) in tree.all_leaves().unwrap().into_iter().enumerate() {
+    for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
         let l = i * ncoeffs * dim;
         let r = l + ncoeffs * dim;
-        let surface = key.compute_surface(tree.domain(), expansion_order, alpha);
+        let surface = key.compute_kifmm_surface(tree.domain(), expansion_order, alpha);
 
         result[l..r].copy_from_slice(&surface);
     }
@@ -86,7 +107,9 @@ where
     result
 }
 
-pub fn charge_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
+/// Create an index pointer for the coordinates in a source and a target tree
+/// between the local indices for each leaf and their associated charges
+pub fn coordinate_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
@@ -94,7 +117,7 @@ where
 
     let mut result = vec![(0usize, 0usize); tree.nleaves().unwrap()];
 
-    for (i, leaf) in tree.all_leaves().unwrap().into_iter().enumerate() {
+    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         let npoints = if let Some(n) = tree.ncoordinates(leaf) {
             n
         } else {
@@ -110,7 +133,6 @@ where
 }
 
 /// Create index pointers for each key at each level of an octree
-/// TODO: Should be in tree
 pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey, usize>>
 where
     T: Float + Default + RlstScalar<Real = T>,
@@ -119,7 +141,7 @@ where
 
     for level in 0..=tree.depth() {
         let keys = tree.keys(level).unwrap();
-        for (level_idx, key) in keys.into_iter().enumerate() {
+        for (level_idx, key) in keys.iter().enumerate() {
             result[level as usize].insert(*key, level_idx);
         }
     }
@@ -142,7 +164,7 @@ where
         let mut tmp_multipoles = Vec::new();
 
         let keys = tree.keys(level).unwrap();
-        for key in keys.into_iter() {
+        for key in keys.iter() {
             let &key_idx = tree.index(key).unwrap();
             let key_displacement = ncoeffs * nmatvecs * key_idx;
             let mut key_multipoles = Vec::new();
@@ -176,7 +198,7 @@ where
 {
     let mut result = vec![Vec::new(); nleaves];
 
-    for (leaf_idx, leaf) in tree.all_leaves().unwrap().into_iter().enumerate() {
+    for (leaf_idx, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         let key_idx = tree.index(leaf).unwrap();
         let key_displacement = ncoeffs * nmatvecs * key_idx;
         for eval_idx in 0..nmatvecs {
@@ -219,7 +241,7 @@ where
         raw_pointers.push(ptr)
     }
 
-    for (i, leaf) in tree.all_leaves().unwrap().into_iter().enumerate() {
+    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         let npoints;
         let nevals;
 

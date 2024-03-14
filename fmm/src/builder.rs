@@ -23,13 +23,13 @@ use rlst_dense::{
 
 use crate::{
     helpers::{
-        charge_index_pointer, compute_leaf_scales, compute_leaf_surfaces, homogenous_kernel_scale,
-        leaf_expansion_pointers, level_expansion_pointers, level_index_pointer, map_charges,
+        coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
+        leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges,
         potential_pointers,
     },
     pinv::pinv,
     tree::SingleNodeFmmTree,
-    types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode, SendPtrMut},
+    types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode},
 };
 
 impl<T, U, V> KiFmmBuilderSingleNode<T, U, V>
@@ -39,7 +39,7 @@ where
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,
 {
-    /// Initialise a kernel independent FMM builder
+    /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
         KiFmmBuilderSingleNode {
             tree: None,
@@ -54,6 +54,13 @@ where
         }
     }
 
+    /// Associate FMM builder with an FMM Tree
+    ///
+    /// # Arguments
+    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [ncoords, dim]
+    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [ncoords, dim]
+    /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
+    /// * `sparse` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
         mut self,
         sources: &Coordinates<U>,
@@ -101,6 +108,13 @@ where
         }
     }
 
+    /// For an FMM builder with an associated FMM tree, specify simulation specific parameters
+    ///
+    /// # Arguments
+    /// * `charges` - Charges corresponding to `nvecs`, in column major order such that the shape is `[ncharges, nvecs]`
+    /// * `expansion_order` - The expansion order of the FMM
+    /// * `kernel` - The kernel associated with this FMM
+    /// * `eval_type` - Either `ValueDeriv` - to evaluate potentials and gradients, or `Value` to evaluate potentials alone
     pub fn parameters(
         mut self,
         charges: &Charges<U>,
@@ -152,7 +166,7 @@ where
         }
     }
 
-    // Finalize and build the KiFmm
+    /// Finalize and build the single node FMM
     pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
         if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
         {
@@ -194,6 +208,7 @@ where
     W: RlstScalar<Real = W> + Float + Default,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
 {
+    /// Calculate source and target field translation metadata
     fn set_source_and_target_operator_data(&mut self) {
         // Cast surface parameters
         let alpha_outer = W::from(ALPHA_OUTER).unwrap();
@@ -202,12 +217,13 @@ where
 
         // Compute required surfaces
         let upward_equivalent_surface =
-            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
-        let upward_check_surface = ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
+            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
+        let upward_check_surface =
+            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_outer);
         let downward_equivalent_surface =
-            ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
+            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_outer);
         let downward_check_surface =
-            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
+            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
 
         let nequiv_surface = upward_equivalent_surface.len() / self.dim;
         let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -266,9 +282,9 @@ where
 
         for (i, child) in children.iter().enumerate() {
             let child_upward_equivalent_surface =
-                child.compute_surface(domain, self.expansion_order, alpha_inner);
+                child.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
             let child_downward_check_surface =
-                child.compute_surface(domain, self.expansion_order, alpha_inner);
+                child.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
 
             let mut pc2ce_t = rlst_dynamic_array2!(W, [ncheck_surface, nequiv_surface]);
 
@@ -325,6 +341,7 @@ where
         self.uc2e_inv_2 = uc2e_inv_2;
     }
 
+    /// Calculate metadata required by the FMM
     fn set_metadata(&mut self, eval_type: EvalType, charges: &Charges<W>) {
         let alpha_outer = W::from(ALPHA_OUTER).unwrap();
         let alpha_inner = W::from(ALPHA_INNER).unwrap();
@@ -355,23 +372,22 @@ where
         let potentials = vec![W::default(); ntarget_points * eval_size * nmatvecs];
 
         // Kernel scale at each target and source leaf
-        let source_leaf_scales =
-            compute_leaf_scales(self.tree.source_tree(), self.ncoeffs, nmatvecs);
+        let source_leaf_scales = leaf_scales(self.tree.source_tree(), self.ncoeffs);
 
         // Pre compute check surfaces
-        let leaf_upward_surfaces_sources = compute_leaf_surfaces(
+        let leaf_upward_surfaces_sources = leaf_surfaces(
             self.tree.source_tree(),
             self.ncoeffs,
             alpha_outer,
             self.expansion_order,
         );
-        let leaf_upward_surfaces_targets = compute_leaf_surfaces(
+        let leaf_upward_surfaces_targets = leaf_surfaces(
             self.tree.target_tree(),
             self.ncoeffs,
             alpha_outer,
             self.expansion_order,
         );
-        let leaf_downward_surfaces_targets = compute_leaf_surfaces(
+        let leaf_downward_surfaces_targets = leaf_surfaces(
             self.tree.target_tree(),
             self.ncoeffs,
             alpha_inner,
@@ -379,19 +395,15 @@ where
         );
 
         // Mutable pointers to multipole and local data, indexed by level
-        let level_multipoles = level_expansion_pointers(
-            &self.tree.source_tree(),
-            self.ncoeffs,
-            nmatvecs,
-            &multipoles,
-        );
+        let level_multipoles =
+            level_expansion_pointers(self.tree.source_tree(), self.ncoeffs, nmatvecs, &multipoles);
 
         let level_locals =
-            level_expansion_pointers(&self.tree.source_tree(), self.ncoeffs, nmatvecs, &locals);
+            level_expansion_pointers(self.tree.source_tree(), self.ncoeffs, nmatvecs, &locals);
 
         // Mutable pointers to multipole and local data only at leaf level
         let leaf_multipoles = leaf_expansion_pointers(
-            &self.tree.source_tree(),
+            self.tree.source_tree(),
             self.ncoeffs,
             nmatvecs,
             nsource_leaves,
@@ -399,7 +411,7 @@ where
         );
 
         let leaf_locals = leaf_expansion_pointers(
-            &self.tree.target_tree(),
+            self.tree.target_tree(),
             self.ncoeffs,
             nmatvecs,
             ntarget_leaves,
@@ -408,7 +420,7 @@ where
 
         // Mutable pointers to potential data at each target leaf
         let potentials_send_pointers = potential_pointers(
-            &self.tree.target_tree(),
+            self.tree.target_tree(),
             nmatvecs,
             ntarget_leaves,
             ntarget_points,
@@ -417,8 +429,8 @@ where
         );
 
         // Index pointer of charge data at each target leaf
-        let charge_index_pointer_targets = charge_index_pointer(&self.tree.target_tree());
-        let charge_index_pointer_sources = charge_index_pointer(&self.tree.source_tree());
+        let charge_index_pointer_targets = coordinate_index_pointer(self.tree.target_tree());
+        let charge_index_pointer_sources = coordinate_index_pointer(self.tree.source_tree());
 
         // Set data
         self.multipoles = multipoles;

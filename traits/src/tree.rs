@@ -1,6 +1,5 @@
 //! Traits
-use std::collections::HashSet;
-use std::hash::Hash;
+use std::{collections::HashSet, hash::Hash};
 
 use num::Float;
 use rlst_dense::types::RlstScalar;
@@ -33,7 +32,7 @@ pub trait Tree {
     /// Total number of keys
     fn nkeys_tot(&self) -> Option<usize>;
 
-    /// Number of keys
+    /// Number of keys at a given tree level
     fn nkeys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
@@ -103,7 +102,7 @@ pub trait FmmTree {
     /// Get the domain
     fn domain(&self) -> &<Self::Tree as Tree>::Domain;
 
-    /// Get the near field
+    /// Get the near field of a leaf node
     fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
 }
 
@@ -119,26 +118,18 @@ where
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
 
-    /// The parent of a key
+    /// The parent of this node
     fn parent(&self) -> Self;
 
-    /// The level
+    /// The level of this node
     fn level(&self) -> u64;
 
-    /// Compute surface
-    fn compute_surface(
-        &self,
-        domain: &Self::Domain,
-        expansion_order: usize,
-        alpha: T,
-    ) -> Vec<<T as RlstScalar>::Real>;
-
-    /// Neighbours defined by keys sharing a vertex, edge, or face
+    /// Neighbours of this node defined by nodes sharing a vertex, edge, or face
     fn neighbors(&self) -> Self::Nodes;
 
-    /// Childen of a key
+    /// Children of this node
     fn children(&self) -> Self::Nodes;
 
-    /// Checks adjacency, defined by sharing a vertex, edge, or face, between two keys
+    /// Checks adjacency, defined by sharing a vertex, edge, or face, between this node and another
     fn is_adjacent(&self, other: &Self) -> bool;
 }

@@ -16,30 +16,19 @@ where
     /// Compute the field translation operators corresponding to each unique transfer vector.
     ///
     /// # Arguments
-    /// * `order` - the order of expansions used in constructing the surface grid
+    /// * `expansion_order` - The expansion order of the FMM
     /// * `domain` - Domain associated with the global point set.
-    fn set_operator_data(&mut self, order: usize, domain: Self::Domain);
+    fn set_operator_data(&mut self, expansion_order: usize, domain: Self::Domain);
 
     /// Set expansion order
+    ///
+    /// # Arguments
+    /// * `expansion_order` - The expansion order of the FMM
     fn set_expansion_order(&mut self, expansion_order: usize);
 
-    /// Set the kernel
+    /// Set the associated kernel
+    ///
+    /// # Arguments
+    /// * `kernel` - The kernel being used
     fn set_kernel(&mut self, kernel: T);
-}
-
-/// Interface for field translations.
-pub trait SourceToTarget {
-    /// Interface for a field translation operation, takes place over each level of an octree.
-    ///
-    /// # Arguments
-    /// * `level` - The level of the tree at which a field translation is being applied.
-    fn m2l(&self, level: u64);
-
-    /// Particle to local translations, applies to leaf boxes when a source box is within
-    /// the far field of a target box, but is too large for the multipole expansion to converge
-    /// at the target, so instead its contribution is computed directly.
-    ///
-    /// # Arguments
-    /// * `level` - The level of the tree at which a field translation is being applied.
-    fn p2l(&self, level: u64);
 }

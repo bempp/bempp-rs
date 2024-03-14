@@ -554,19 +554,11 @@ where
     type Nodes = MortonKeys;
 
     fn ncoordinates(&self, key: &Self::Node) -> Option<usize> {
-        if let Some(coords) = self.coordinates(key) {
-            Some(coords.len() / 3)
-        } else {
-            None
-        }
+        self.coordinates(key).map(|coords| coords.len() / 3)
     }
 
     fn ncoordinates_tot(&self) -> Option<usize> {
-        if let Some(coords) = self.all_coordinates() {
-            Some(coords.len() / 3)
-        } else {
-            None
-        }
+        self.all_coordinates().map(|coords| coords.len() / 3)
     }
 
     fn node(&self, idx: usize) -> Option<&Self::Node> {

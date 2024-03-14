@@ -13,7 +13,7 @@ use rlst_dense::data_container::VectorContainer;
 use rlst_dense::{array::Array, types::RlstScalar};
 use std::{collections::HashSet, sync::RwLock};
 
-use bempp_traits::{field::SourceToTarget, kernel::Kernel, tree::Tree};
+use bempp_traits::{fmm::SourceToTargetTranslation, kernel::Kernel, tree::Tree};
 
 use crate::{
     helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<T, U, V> SourceToTarget for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
     U: RlstScalar<Real = U> + Float + Default + Fft,

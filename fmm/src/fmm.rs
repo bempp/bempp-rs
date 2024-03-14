@@ -2,13 +2,13 @@
 use num::Float;
 use rlst_dense::{
     rlst_dynamic_array2,
-    traits::{RawAccess, RawAccessMut, Shape},
+    traits::{RawAccess, Shape},
     types::RlstScalar,
 };
 
 use bempp_traits::{
-    field::{SourceToTarget, SourceToTargetData},
-    fmm::{Fmm, SourceTranslation, TargetTranslation},
+    field::SourceToTargetData,
+    fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
     kernel::Kernel,
     tree::{FmmTree, Tree},
     types::EvalType,
@@ -18,7 +18,7 @@ use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 
 use crate::{
     helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
-    types::{Charges, FmmEvalType, KiFmm, KiFmmDummy, SendPtrMut},
+    types::{Charges, FmmEvalType, KiFmm, KiFmmDummy},
 };
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
@@ -27,7 +27,7 @@ where
     U: SourceToTargetData<V> + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalar<Real = W> + Float + Default,
-    Self: SourceToTarget,
+    Self: SourceToTargetTranslation,
 {
     type NodeIndex = T::Node;
     type Precision = W;
@@ -152,7 +152,7 @@ where
 
         // Recreate mutable pointers for new buffers
         let potentials_send_pointers = potential_pointers(
-            &self.tree.target_tree(),
+            self.tree.target_tree(),
             nmatvecs,
             ntarget_leaves,
             ntarget_points,
@@ -161,7 +161,7 @@ where
         );
 
         let leaf_multipoles = leaf_expansion_pointers(
-            &self.tree().source_tree(),
+            self.tree().source_tree(),
             self.ncoeffs,
             nmatvecs,
             nsource_leaves,
@@ -169,21 +169,21 @@ where
         );
 
         let level_multipoles = level_expansion_pointers(
-            &self.tree().source_tree(),
+            self.tree().source_tree(),
             self.ncoeffs,
             nmatvecs,
             &self.multipoles,
         );
 
         let level_locals = level_expansion_pointers(
-            &self.tree().target_tree(),
+            self.tree().target_tree(),
             self.ncoeffs,
             nmatvecs,
             &self.locals,
         );
 
         let leaf_locals = leaf_expansion_pointers(
-            &self.tree().target_tree(),
+            self.tree().target_tree(),
             self.ncoeffs,
             nmatvecs,
             ntarget_leaves,
@@ -470,9 +470,9 @@ mod test {
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
-        let [nsources, nmatvec] = charges.shape();
+        let [nsources, nmatvecs] = charges.shape();
 
-        for i in 0..nmatvec {
+        for i in 0..nmatvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
             let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
             let mut direct_i = vec![T::zero(); ntargets * eval_size];
@@ -774,7 +774,7 @@ mod test {
         threshold: T,
     ) {
         let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.compute_surface(
+        let upward_equivalent_surface = ROOT.compute_kifmm_surface(
             fmm.tree().domain(),
             fmm.expansion_order(),
             T::from(ALPHA_INNER).unwrap(),

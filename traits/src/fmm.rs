@@ -1,13 +1,12 @@
 //! FMM traits
-use rlst_dense::array::Array;
-use rlst_dense::base_array::BaseArray;
-use rlst_dense::data_container::VectorContainer;
-use rlst_dense::types::RlstScalar;
+use rlst_dense::{
+    array::Array, base_array::BaseArray, data_container::VectorContainer, types::RlstScalar,
+};
 
 use crate::kernel::Kernel;
 use crate::tree::FmmTree;
 
-/// Interface for source box translations.
+/// Interface for source field translations.
 pub trait SourceTranslation {
     /// Particle to multipole translations, applied at leaf level.
     fn p2m(&self);
@@ -19,7 +18,7 @@ pub trait SourceTranslation {
     fn m2m(&self, level: u64);
 }
 
-/// Interface for target box translations.
+/// Interface for target field translations.
 pub trait TargetTranslation {
     /// Local to local translations, applied during downward pass.
     ///
@@ -40,6 +39,26 @@ pub trait TargetTranslation {
     /// near field where the `p2l` and `m2p` do not apply.
     fn p2p(&self);
 }
+
+/// Interface for source to target field translations.
+pub trait SourceToTargetTranslation {
+    /// Interface for a field translation operation, takes place over each level of an octree.
+    ///
+    /// # Arguments
+    /// * `level` - The level of the tree at which a field translation is being applied.
+    fn m2l(&self, level: u64);
+
+    /// Particle to local translations, applies to leaf boxes when a source box is within
+    /// the far field of a target box, but is too large for the multipole expansion to converge
+    /// at the target, so instead its contribution is computed directly.
+    ///
+    /// # Arguments
+    /// * `level` - The level of the tree at which a field translation is being applied.
+    fn p2l(&self, level: u64);
+}
+
+/// Type alias for charge data
+type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Interface for FMM
 pub trait Fmm {
@@ -86,12 +105,8 @@ pub trait Fmm {
     fn evaluate(&self);
 
     /// Clear the data buffers and add new charge data
-    fn clear(
-        &mut self,
-        charges: &Array<
-            Self::Precision,
-            BaseArray<Self::Precision, VectorContainer<Self::Precision>, 2>,
-            2,
-        >,
-    );
+    ///
+    /// # Arguments
+    /// * `charges` - 2D RLST array, of dimensions `[ncharges, nvecs]` where each of `nvecs` is associated with `ncharges`
+    fn clear(&mut self, charges: &Charges<Self::Precision>);
 }
