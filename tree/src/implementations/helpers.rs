@@ -166,11 +166,11 @@ mod test {
 
     #[test]
     fn test_find_corners() {
-        let order = 5;
-        let grid_1 = MortonKey::surface_grid::<f64>(order);
+        let expansion_order = 5;
+        let grid_1 = MortonKey::kifmm_surface_grid::<f64>(expansion_order);
 
-        let order = 2;
-        let grid_2 = MortonKey::surface_grid::<f64>(order);
+        let expansion_order = 2;
+        let grid_2 = MortonKey::kifmm_surface_grid::<f64>(expansion_order);
 
         let corners_1 = find_corners(&grid_1);
         let corners_2 = find_corners(&grid_2);

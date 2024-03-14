@@ -762,20 +762,20 @@ impl MortonKey {
     }
 
     /// Compute the convolution grid centered at a given MortonKey and its respective surface grid. This method is used
-    /// in the FFT sparsification of the Multipole to Local translation operator for Fast Multipole Methods constructed
-    /// on regular grids, such as the kiFMM or bbFMM. Returns an owned vector corresponding to the coordinates of the
+    /// in the FFT sparsification of the Multipole to Local translation operator for kernel independent fast multipole method.
+    /// Returns an owned vector corresponding to the coordinates of the
     /// convolution grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N], as well as a
     /// vector of grid indices.
     ///
     /// # Arguments
-    /// * `order` - the order of expansions used in constructing the surface grid
+    /// * `expansion_order` - The expansion order of the FMM
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
     /// * `conv_point` - The corner point on the surface grid against which the surface and  convolution grids are aligned.
     /// * `conv_point_corner_index` - The index of the corner of the surface grid that the conv point lies on.
-    pub fn convolution_grid<T>(
+    pub fn kifmm_convolution_grid<T>(
         &self,
-        order: usize,
+        expansion_order: usize,
         domain: &Domain<T>,
         alpha: T,
         conv_point_corner: &[T],
@@ -785,7 +785,7 @@ impl MortonKey {
         T: Float + std::ops::MulAssign + std::ops::AddAssign + ToPrimitive + Default,
     {
         // Number of convolution points along each axis
-        let n = 2 * order - 1;
+        let n = 2 * expansion_order - 1;
 
         let dim: usize = 3;
         let ncoeffs = n.pow(dim as u32);
@@ -847,34 +847,33 @@ impl MortonKey {
         (grid, conv_idxs)
     }
 
-    /// Compute surface grid for a given expansion order. Used in the discretisation of Fast Multipole
-    /// Methods which require a regular grid, such as the kiFMM or bbFMM.
+    /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
     /// Returns a tuple, the first element is an owned vector of the physical coordinates of the
     /// surface grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// The second element is a vector of indices corresponding to each of these coordinates.
     ///
     /// # Arguments
-    /// * `order` - The expansion order being used in the FMM simulation.
-    pub fn surface_grid<T>(order: usize) -> Vec<T>
+    /// * `expansion_order` - The expansion order of the FMM
+    pub fn kifmm_surface_grid<T>(expansion_order: usize) -> Vec<T>
     where
         T: Float + std::ops::MulAssign + std::ops::SubAssign + ToPrimitive,
     {
         let dim = 3;
-        let n_coeffs = 6 * (order - 1).pow(2) + 2;
+        let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
 
         // Implicitly in column major order
         let mut surface: Vec<T> = vec![T::zero(); dim * n_coeffs];
 
         // Bounds of the surface grid
         let lower = 0;
-        let upper = order - 1;
+        let upper = expansion_order - 1;
 
         // Orders the surface grid, implicitly column major
         let mut idx = 0;
 
-        for k in 0..order {
-            for j in 0..order {
-                for i in 0..order {
+        for k in 0..expansion_order {
+            for j in 0..expansion_order {
+                for i in 0..expansion_order {
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
@@ -892,7 +891,7 @@ impl MortonKey {
         let two = T::from(2.0).unwrap();
 
         surface.iter_mut().for_each(|point| {
-            *point *= two / (T::from(order).unwrap() - T::one());
+            *point *= two / (T::from(expansion_order).unwrap() - T::one());
         });
 
         surface.iter_mut().for_each(|point| *point -= T::one());
@@ -900,15 +899,15 @@ impl MortonKey {
         surface
     }
 
-    /// Compute a surface grid centered at this Morton Key, used in the discretisation of Fast Multipole
-    /// Methods which require a regular grid, such as the kiFMM or bbFMM.
+    /// Scale a surface grid centered at this Morton Key, used in the discretisation of the kernel independent fast nultipole
+    /// method
     ///
     /// # Arguments
     /// * `surface` - A general surface grid, computed for a given expansion order computed with the
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn scale_surface<T: Float + Default + RlstScalar>(
+    pub fn scale_kifmm_surface<T: Float + Default + RlstScalar>(
         &self,
         surface: Vec<T::Real>,
         domain: &Domain<T>,
@@ -940,19 +939,24 @@ impl MortonKey {
     }
 
     /// Compute the surface grid, centered at this Morton Key, for a given expansion order and alpha parameter. This is used
-    /// in the discretisation of Fast Multipole Methods which require a regular grid, such as the kiFMM or bbFMM.
+    /// in the discretisation of the kernel independent fast multipole method
     ///
     /// # Arguments
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
-    /// * `order` - The expansion order being used in the FMM simulation.
+    /// * `expansion_order` - The expansion order of the FMM
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn compute_surface<T>(&self, domain: &Domain<T>, order: usize, alpha: T) -> Vec<T::Real>
+    pub fn compute_kifmm_surface<T>(
+        &self,
+        domain: &Domain<T>,
+        expansion_order: usize,
+        alpha: T,
+    ) -> Vec<T::Real>
     where
         T: Float + std::ops::MulAssign + std::ops::SubAssign + Default + RlstScalar,
     {
-        let surface = MortonKey::surface_grid(order);
+        let surface = MortonKey::kifmm_surface_grid(expansion_order);
 
-        self.scale_surface::<T>(surface, domain, alpha)
+        self.scale_kifmm_surface::<T>(surface, domain, alpha)
     }
 }
 
@@ -1006,15 +1010,6 @@ impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
             keys: self.neighbors(),
             index: 0,
         }
-    }
-
-    fn compute_surface(
-        &self,
-        domain: &Self::Domain,
-        order: usize,
-        alpha: T,
-    ) -> Vec<<T as RlstScalar>::Real> {
-        self.compute_surface(domain, order, alpha)
     }
 
     fn is_adjacent(&self, other: &Self) -> bool {
@@ -1827,25 +1822,25 @@ mod test {
         };
         let key = MortonKey::from_point(&point, &domain, 0);
 
-        let order = 2;
+        let expansion_order = 2;
         let alpha = 1.;
         let dim = 3;
-        let ncoeffs = 6 * (order - 1_usize).pow(2) + 2;
+        let ncoeffs = 6 * (expansion_order - 1_usize).pow(2) + 2;
 
         // Test lengths
-        let surface = key.compute_surface(&domain, order, alpha);
+        let surface = key.compute_kifmm_surface(&domain, expansion_order, alpha);
         assert_eq!(surface.len(), ncoeffs * dim);
 
-        let surface = MortonKey::surface_grid::<f64>(order);
+        let surface = MortonKey::kifmm_surface_grid::<f64>(expansion_order);
         assert_eq!(surface.len(), ncoeffs * dim);
 
         let mut expected = vec![[0usize; 3]; ncoeffs];
         let lower = 0;
-        let upper = order - 1;
+        let upper = expansion_order - 1;
         let mut idx = 0;
-        for k in 0..order {
-            for j in 0..order {
-                for i in 0..order {
+        for k in 0..expansion_order {
+            for j in 0..expansion_order {
+                for i in 0..expansion_order {
                     if (i >= lower && j >= lower && (k == lower || k == upper))
                         || (j >= lower && k >= lower && (i == lower || i == upper))
                         || (k >= lower && i >= lower && (j == lower || j == upper))
@@ -1860,7 +1855,7 @@ mod test {
         // Test scaling
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);
-        let surface = key.compute_surface(&domain, order, alpha);
+        let surface = key.compute_kifmm_surface(&domain, expansion_order, alpha);
 
         let min_x = surface
             .iter()
@@ -1878,7 +1873,7 @@ mod test {
         let point = [0.1, 0.2, 0.3];
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);
-        let surface = key.compute_surface(&domain, order, alpha);
+        let surface = key.compute_kifmm_surface(&domain, expansion_order, alpha);
         let expected = key.centre(&domain);
 
         let c_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
@@ -1908,12 +1903,12 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
-        let order = 5;
+        let expansion_order = 5;
         let alpha = 1.0;
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
-        let surface_grid = key.compute_surface(&domain, order, alpha);
+        let surface_grid = key.compute_kifmm_surface(&domain, expansion_order, alpha);
 
         // Place convolution grid on max corner
         let corners = find_corners(&surface_grid);
@@ -1926,8 +1921,13 @@ mod test {
             corners[2 * ncorners + conv_point_corner_index],
         ];
 
-        let (conv_grid, _) =
-            key.convolution_grid(order, &domain, alpha, &conv_point, conv_point_corner_index);
+        let (conv_grid, _) = key.kifmm_convolution_grid(
+            expansion_order,
+            &domain,
+            alpha,
+            &conv_point,
+            conv_point_corner_index,
+        );
 
         // Test that surface grid is embedded in convolution grid
         let mut surface = Vec::new();

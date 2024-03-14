@@ -10,10 +10,10 @@ use rlst_dense::{
 
 use crate::tree::SingleNodeFmmTree;
 
-/// Type alia to store charges corresponding to nvecs, in column major order such that the shape is [ncharges, nvecs]
+/// Type alias to store charges corresponding to nvecs, in column major order such that the shape is `[ncharges, nvecs]`
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Type alias for coordinate data stored in column major order such that the shame is [ncoords, dim]
+/// Type alias for coordinate data stored in column major order such that the shape is `[ncoords, dim]`
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Type alias for approximation of FMM operator matrices.
