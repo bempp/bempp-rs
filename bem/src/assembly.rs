@@ -108,7 +108,6 @@ mod test {
         flat_triangle_grid::SerialFlatTriangleGrid, shapes::regular_sphere,
         traits_impl::WrappedGrid,
     };
-    use bempp_traits::bem::DofMap;
     use bempp_traits::element::Continuity;
     use bempp_traits::types::ReferenceCellType;
     // use num::complex::Complex;
@@ -133,17 +132,11 @@ mod test {
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 
-        let mut matrix = rlst_dynamic_array2!(
-            f64,
-            [space1.dofmap().global_size(), space0.dofmap().global_size()]
-        );
+        let mut matrix = rlst_dynamic_array2!(f64, [space1.global_size(), space0.global_size()]);
         let a = batched::LaplaceSingleLayerAssembler::default();
         a.assemble_into_dense::<128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&mut matrix, &space0, &space1);
 
-        let mut matrix2 = rlst_dynamic_array2!(
-            f64,
-            [space1.dofmap().global_size(), space0.dofmap().global_size()]
-        );
+        let mut matrix2 = rlst_dynamic_array2!(f64, [space1.global_size(), space0.global_size()]);
 
         assemble(
             &mut matrix2,
@@ -154,8 +147,8 @@ mod test {
             &space1,
         );
 
-        for i in 0..space1.dofmap().global_size() {
-            for j in 0..space0.dofmap().global_size() {
+        for i in 0..space1.global_size() {
+            for j in 0..space0.global_size() {
                 assert_relative_eq!(
                     *matrix.get([i, j]).unwrap(),
                     *matrix2.get([i, j]).unwrap(),

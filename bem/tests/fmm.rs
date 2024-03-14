@@ -7,7 +7,7 @@ use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::types::KiFmmBuilderSingleNode;
 use bempp_grid::shapes::regular_sphere;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
-use bempp_traits::bem::{DofMap, FunctionSpace};
+use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
 use bempp_traits::fmm::Fmm;
 use bempp_traits::grid::GridType;
@@ -38,8 +38,8 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
 
     let grid = trial_space.grid();
 
-    let test_ndofs = test_space.dofmap().global_size();
-    let trial_ndofs = trial_space.dofmap().global_size();
+    let test_ndofs = test_space.global_size();
+    let trial_ndofs = trial_space.global_size();
     let nqpts = NPTS * grid.number_of_cells();
     let kernel = Laplace3dKernel::new();
 
@@ -124,8 +124,8 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
 
     let grid = trial_space.grid();
 
-    let test_ndofs = test_space.dofmap().global_size();
-    let trial_ndofs = trial_space.dofmap().global_size();
+    let test_ndofs = test_space.global_size();
+    let trial_ndofs = trial_space.global_size();
     let nqpts = NPTS * grid.number_of_cells();
 
     // Compute dense
