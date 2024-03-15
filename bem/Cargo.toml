@@ -35,10 +35,9 @@ itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
 num = "0.4"
 rayon = "1.7"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-blis-src = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-sparse = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst-sparse = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
 rand = "0.8.5"
 
 [dev-dependencies]
