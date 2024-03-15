@@ -1,7 +1,7 @@
 use approx::*;
 use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
@@ -12,8 +12,7 @@ use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -41,8 +40,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 #[test]
 fn test_laplace_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -69,8 +67,7 @@ fn test_laplace_double_layer_dp0_dp0() {
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -99,8 +96,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
 #[test]
 fn test_laplace_hypersingular_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -129,8 +125,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
 #[test]
 fn test_laplace_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         1,
         Continuity::Continuous,
@@ -169,8 +164,7 @@ fn test_laplace_hypersingular_p1_p1() {
 #[test]
 fn test_helmholtz_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -197,8 +191,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -224,8 +217,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -253,8 +245,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         1,
         Continuity::Continuous,

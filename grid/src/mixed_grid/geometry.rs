@@ -391,14 +391,13 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluato
 mod test {
     use super::*;
     use approx::*;
-    use bempp_element::element::{create_element, ElementFamily};
+    use bempp_element::element::lagrange;
     use bempp_traits::element::Continuity;
     use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessMut};
 
     fn example_geometry() -> SerialMixedGeometry<f64> {
         //! A geometry with a single cell type
-        let p1triangle = create_element(
-            ElementFamily::Lagrange,
+        let p1triangle = lagrange::create(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,
@@ -425,14 +424,12 @@ mod test {
 
     fn example_geometry_mixed() -> SerialMixedGeometry<f64> {
         //! A geometry with a mixture of cell types
-        let p1triangle = create_element(
-            ElementFamily::Lagrange,
+        let p1triangle = lagrange::create(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,
         );
-        let p1quad = create_element(
-            ElementFamily::Lagrange,
+        let p1quad = lagrange::create(
             ReferenceCellType::Quadrilateral,
             1,
             Continuity::Continuous,

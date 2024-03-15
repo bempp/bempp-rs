@@ -2,7 +2,7 @@
 
 use crate::mixed_grid::grid::SerialMixedGrid;
 use crate::traits_impl::WrappedGrid;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::grid::Builder;
 use bempp_traits::types::ReferenceCellType;
@@ -80,8 +80,7 @@ where
             if let Some(npts) = self.elements_to_npoints.get(&(cell_data.1, cell_data.2)) {
                 *npts
             } else {
-                let npts = create_element::<T>(
-                    ElementFamily::Lagrange,
+                let npts = lagrange::create::<T>(
                     cell_data.1,
                     cell_data.2,
                     Continuity::Continuous,

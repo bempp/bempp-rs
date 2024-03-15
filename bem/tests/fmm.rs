@@ -2,7 +2,7 @@ use approx::*;
 use bempp_bem::assembly::batched::BatchedAssembler;
 use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::types::KiFmmBuilderSingleNode;
 use bempp_grid::shapes::regular_sphere;
@@ -243,8 +243,7 @@ fn test_fmm_prototype_dp0_dp0() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -261,8 +260,7 @@ fn test_fmm_prototype_p1_p1() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         1,
         Continuity::Continuous,
@@ -277,14 +275,12 @@ fn test_fmm_prototype_p1_p1() {
 fn test_fmm_prototype_dp0_p1() {
     let grid = regular_sphere(2);
 
-    let element0 = create_element(
-        ElementFamily::Lagrange,
+    let element0 = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
     );
-    let element1 = create_element(
-        ElementFamily::Lagrange,
+    let element1 = lagrange::create(
         ReferenceCellType::Triangle,
         1,
         Continuity::Continuous,
@@ -300,8 +296,7 @@ fn test_fmm_prototype_dp0_p1() {
 fn test_fmm_dp0_dp0() {
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
@@ -316,8 +311,7 @@ fn test_fmm_dp0_dp0() {
 fn test_fmm_p1_p1() {
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
+    let element = lagrange::create(
         ReferenceCellType::Triangle,
         1,
         Continuity::Continuous,
@@ -332,14 +326,12 @@ fn test_fmm_p1_p1() {
 fn test_fmm_dp0_p1() {
     let grid = regular_sphere(2);
 
-    let element0 = create_element(
-        ElementFamily::Lagrange,
+    let element0 = lagrange::create(
         ReferenceCellType::Triangle,
         0,
         Continuity::Discontinuous,
     );
-    let element1 = create_element(
-        ElementFamily::Lagrange,
+    let element1 = lagrange::create(
         ReferenceCellType::Triangle,
         1,
         Continuity::Continuous,

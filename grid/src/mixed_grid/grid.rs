@@ -2,7 +2,7 @@
 
 use crate::mixed_grid::{geometry::SerialMixedGeometry, topology::SerialMixedTopology};
 use crate::traits::Grid;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::types::ReferenceCellType;
@@ -51,7 +51,7 @@ where
         let elements = element_info
             .iter()
             .map(|(i, j)| {
-                create_element::<T>(ElementFamily::Lagrange, *i, *j, Continuity::Continuous)
+                lagrange::create::<T>(*i, *j, Continuity::Continuous)
             })
             .collect::<Vec<_>>();
 

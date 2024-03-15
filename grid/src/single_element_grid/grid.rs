@@ -4,7 +4,7 @@ use crate::single_element_grid::{
     geometry::SerialSingleElementGeometry, topology::SerialSingleElementTopology,
 };
 use crate::traits::Grid;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::types::ReferenceCellType;
@@ -44,8 +44,7 @@ where
         if cell_type == ReferenceCellType::Triangle && cell_degree == 1 {
             warn!("Creating a single element grid with a P1 triangle. Using a FlatTriangleGrid would be faster.");
         }
-        let element = create_element::<T>(
-            ElementFamily::Lagrange,
+        let element = lagrange::create::<T>(
             cell_type,
             cell_degree,
             Continuity::Continuous,

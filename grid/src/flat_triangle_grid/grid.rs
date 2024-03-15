@@ -3,7 +3,7 @@
 use crate::common::compute_diameter_triangle;
 use crate::traits::Ownership;
 use crate::traits::{Geometry, GeometryEvaluator, Grid, Topology};
-use bempp_element::element::{create_element, CiarletElement, ElementFamily};
+use bempp_element::element::{lagrange, CiarletElement};
 use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
@@ -119,8 +119,7 @@ where
             diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
         }
 
-        let element = create_element(
-            ElementFamily::Lagrange,
+        let element = lagrange::create(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,

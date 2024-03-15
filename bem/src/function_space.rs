@@ -198,7 +198,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 #[cfg(test)]
 mod test {
     use crate::function_space::*;
-    use bempp_element::element::{create_element, ElementFamily};
+    use bempp_element::element::lagrange;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::element::Continuity;
     use bempp_traits::grid::{CellType, TopologyType};
@@ -207,8 +207,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange0() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element::<f64>(
-            ElementFamily::Lagrange,
+        let element = lagrange::create::<f64>(
             ReferenceCellType::Triangle,
             0,
             Continuity::Discontinuous,
@@ -221,8 +220,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange1() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element::<f64>(
-            ElementFamily::Lagrange,
+        let element = lagrange::create::<f64>(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,
@@ -235,8 +233,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange2() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element::<f64>(
-            ElementFamily::Lagrange,
+        let element = lagrange::create::<f64>(
             ReferenceCellType::Triangle,
             2,
             Continuity::Continuous,
@@ -252,8 +249,7 @@ mod test {
     #[test]
     fn test_colouring_p1() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element::<f64>(
-            ElementFamily::Lagrange,
+        let element = lagrange::create::<f64>(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,
@@ -295,8 +291,7 @@ mod test {
     #[test]
     fn test_colouring_dp0() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element::<f64>(
-            ElementFamily::Lagrange,
+        let element = lagrange::create::<f64>(
             ReferenceCellType::Triangle,
             0,
             Continuity::Discontinuous,
@@ -325,8 +320,7 @@ mod test {
     #[test]
     fn test_colouring_rt1() {
         let grid = regular_sphere::<f64>(2);
-        let element = create_element::<f64>(
-            ElementFamily::RaviartThomas,
+        let element = lagrange::create::<f64>(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,

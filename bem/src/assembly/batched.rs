@@ -1192,7 +1192,7 @@ mod test {
     use super::*;
     use crate::function_space::SerialFunctionSpace;
     use approx::*;
-    use bempp_element::element::{create_element, ElementFamily};
+    use bempp_element::element::lagrange;
     use bempp_grid::{
         flat_triangle_grid::SerialFlatTriangleGrid, shapes::regular_sphere,
         traits_impl::WrappedGrid,
@@ -1203,8 +1203,7 @@ mod test {
     #[test]
     fn test_singular_dp0() {
         let grid = regular_sphere::<f64>(0);
-        let element = create_element(
-            ElementFamily::Lagrange,
+        let element = lagrange::create(
             ReferenceCellType::Triangle,
             0,
             Continuity::Discontinuous,
@@ -1234,8 +1233,7 @@ mod test {
     #[test]
     fn test_singular_p1() {
         let grid = regular_sphere::<f64>(0);
-        let element = create_element(
-            ElementFamily::Lagrange,
+        let element = lagrange::create(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,
@@ -1265,14 +1263,12 @@ mod test {
     #[test]
     fn test_singular_dp0_p1() {
         let grid = regular_sphere::<f64>(0);
-        let element0 = create_element(
-            ElementFamily::Lagrange,
+        let element0 = lagrange::create(
             ReferenceCellType::Triangle,
             0,
             Continuity::Discontinuous,
         );
-        let element1 = create_element(
-            ElementFamily::Lagrange,
+        let element1 = lagrange::create(
             ReferenceCellType::Triangle,
             1,
             Continuity::Continuous,
