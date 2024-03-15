@@ -1,6 +1,6 @@
 //! Hypersingular assemblers
 use super::{BatchedAssembler, EvalType, RlstArray};
-use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
+use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::kernel::Kernel;
 use rlst_dense::{traits::UnsafeRandomAccessByRef, types::RlstScalar};
 
@@ -59,6 +59,7 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
         self.kernel
             .assemble_st(EvalType::Value, sources, targets, result);
     }
+    #[allow(clippy::too_many_arguments)]
     unsafe fn test_trial_product(
         &self,
         test_table: &RlstArray<Self::T, 4>,
@@ -141,59 +142,3 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
             .unwrap()
     }
 }
-
-/// Assembler for a Helmholtz hypersingular boundary operator
-pub struct HelmholtzHypersingularAssembler<T: RlstScalar<Complex = T>> {
-    kernel: Helmholtz3dKernel<T>,
-}
-impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularAssembler<T> {
-    /// Create a new assembler
-    pub fn new(wavenumber: T::Real) -> Self {
-        Self {
-            kernel: Helmholtz3dKernel::<T>::new(wavenumber),
-        }
-    }
-}
-/*impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAssembler<T> {
-    const DERIV_SIZE: usize = 1;
-    type RealT = T::Real;
-    type T = T;
-    unsafe fn singular_kernel_value(
-        &self,
-        k: &RlstArray<Self::T, 2>,
-        _test_normals: &RlstArray<Self::RealT, 2>,
-        _trial_normals: &RlstArray<Self::RealT, 2>,
-        index: usize,
-    ) -> Self::T {
-        *k.get_unchecked([0, index])
-    }
-    unsafe fn nonsingular_kernel_value(
-        &self,
-        k: &RlstArray<Self::T, 3>,
-        _test_normals: &RlstArray<Self::RealT, 2>,
-        _trial_normals: &RlstArray<Self::RealT, 2>,
-        test_index: usize,
-        trial_index: usize,
-    ) -> Self::T {
-        *k.get_unchecked([test_index, 0, trial_index])
-    }
-    fn kernel_assemble_diagonal_st(
-        &self,
-        sources: &[Self::RealT],
-        targets: &[Self::RealT],
-        result: &mut [Self::T],
-    ) {
-        self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
-    }
-    fn kernel_assemble_st(
-        &self,
-        sources: &[Self::RealT],
-        targets: &[Self::RealT],
-        result: &mut [Self::T],
-    ) {
-        self.kernel
-            .assemble_st(EvalType::Value, sources, targets, result);
-    }
-}
-*/

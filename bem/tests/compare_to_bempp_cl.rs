@@ -143,17 +143,6 @@ fn test_laplace_hypersingular_p1_p1() {
 
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
-            println!(
-                "{} {} {}",
-                *matrix.get([i, j]).unwrap(),
-                from_cl[*pi][*pj],
-                *matrix.get([i, j]).unwrap() / from_cl[*pi][*pj],
-            );
-        }
-        println!();
-    }
-    for (i, pi) in perm.iter().enumerate() {
-        for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
                 *matrix.get([i, j]).unwrap(),
                 from_cl[*pi][*pj],
@@ -246,7 +235,6 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     }
 }
 /*
-
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
@@ -273,7 +261,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
-                matrix.get([i, j]).unwrap(),
+                *matrix.get([i, j]).unwrap(),
                 from_cl[*pi][*pj],
                 epsilon = 1e-3
             );

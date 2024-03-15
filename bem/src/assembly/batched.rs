@@ -35,7 +35,7 @@ pub use adjoint_double_layer::{
     HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
 };
 pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
-pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
+pub use hypersingular::LaplaceHypersingularAssembler;
 pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
@@ -137,7 +137,7 @@ pub trait BatchedAssembler: Sync {
     type T: RlstScalar<Real = Self::RealT>;
     /// Number of derivatives
     const DERIV_SIZE: usize;
-
+    /// Number of derivatives needed in basis function tables
     fn ntablederivs(&self) -> usize {
         0
     }
@@ -188,6 +188,10 @@ pub trait BatchedAssembler: Sync {
     );
 
     /// The product of a test and trial function
+    ///
+    /// # Safety
+    /// This function uses unchecked access into tables
+    #[allow(clippy::too_many_arguments)]
     unsafe fn test_trial_product(
         &self,
         test_table: &RlstArray<Self::T, 4>,
