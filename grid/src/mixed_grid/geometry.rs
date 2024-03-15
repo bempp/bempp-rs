@@ -390,18 +390,13 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluato
 mod test {
     use super::*;
     use approx::*;
-    use bempp_element::element::{create_element, ElementFamily};
+    use bempp_element::element::lagrange;
     use bempp_traits::element::Continuity;
     use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessMut};
 
     fn example_geometry() -> SerialMixedGeometry<f64> {
         //! A geometry with a single cell type
-        let p1triangle = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [4, 2]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;
@@ -424,18 +419,8 @@ mod test {
 
     fn example_geometry_mixed() -> SerialMixedGeometry<f64> {
         //! A geometry with a mixture of cell types
-        let p1triangle = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
-        let p1quad = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Quadrilateral,
-            1,
-            Continuity::Continuous,
-        );
+        let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let p1quad = lagrange::create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [5, 2]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;

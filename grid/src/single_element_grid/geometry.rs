@@ -341,7 +341,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
 mod test {
     use super::*;
     use approx::*;
-    use bempp_element::element::{create_element, ElementFamily};
+    use bempp_element::element::lagrange;
     use bempp_traits::element::Continuity;
     use bempp_traits::types::ReferenceCellType;
     use rlst_dense::{
@@ -351,12 +351,7 @@ mod test {
 
     fn example_geometry_2d() -> SerialSingleElementGeometry<f64> {
         //! A 2D geometry
-        let p1triangle = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [4, 2]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;
@@ -379,12 +374,7 @@ mod test {
 
     fn example_geometry_3d() -> SerialSingleElementGeometry<f64> {
         //! A 3D geometry
-        let p2triangle = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            2,
-            Continuity::Continuous,
-        );
+        let p2triangle = lagrange::create(ReferenceCellType::Triangle, 2, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [9, 3]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;
@@ -436,12 +426,7 @@ mod test {
 
     fn example_geometry_quad() -> SerialSingleElementGeometry<f64> {
         //! A 3D quadrilateral geometry
-        let p1quad = create_element(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Quadrilateral,
-            1,
-            Continuity::Continuous,
-        );
+        let p1quad = lagrange::create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [6, 3]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;

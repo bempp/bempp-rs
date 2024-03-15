@@ -1,6 +1,6 @@
 //! Raviart-Thomas elements
 
-use crate::element::{reference_cell, CiarletElement, ElementFamily};
+use crate::element::{reference_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
 use bempp_traits::element::{Continuity, MapType};
 use bempp_traits::types::ReferenceCellType;
@@ -86,7 +86,6 @@ where
 
     CiarletElement::create(
         cell_type,
-        ElementFamily::RaviartThomas,
         degree,
         vec![2],
         wcoeffs,

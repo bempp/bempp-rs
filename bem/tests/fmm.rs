@@ -2,7 +2,7 @@ use approx::*;
 use bempp_bem::assembly::batched::BatchedAssembler;
 use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::types::KiFmmBuilderSingleNode;
 use bempp_grid::shapes::regular_sphere;
@@ -243,12 +243,7 @@ fn test_fmm_prototype_dp0_dp0() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_prototype(&space, &space);
@@ -261,12 +256,7 @@ fn test_fmm_prototype_p1_p1() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        1,
-        Continuity::Continuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_prototype(&space, &space);
@@ -277,18 +267,8 @@ fn test_fmm_prototype_p1_p1() {
 fn test_fmm_prototype_dp0_p1() {
     let grid = regular_sphere(2);
 
-    let element0 = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
-    let element1 = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        1,
-        Continuity::Continuous,
-    );
+    let element0 = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element1 = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
     let space0 = SerialFunctionSpace::new(&grid, &element0);
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 
@@ -300,12 +280,7 @@ fn test_fmm_prototype_dp0_p1() {
 fn test_fmm_dp0_dp0() {
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_matvec(&space, &space);
@@ -316,12 +291,7 @@ fn test_fmm_dp0_dp0() {
 fn test_fmm_p1_p1() {
     let grid = regular_sphere(2);
 
-    let element = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        1,
-        Continuity::Continuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_matvec(&space, &space);
@@ -332,18 +302,8 @@ fn test_fmm_p1_p1() {
 fn test_fmm_dp0_p1() {
     let grid = regular_sphere(2);
 
-    let element0 = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
-    let element1 = create_element(
-        ElementFamily::Lagrange,
-        ReferenceCellType::Triangle,
-        1,
-        Continuity::Continuous,
-    );
+    let element0 = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element1 = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
     let space0 = SerialFunctionSpace::new(&grid, &element0);
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 
