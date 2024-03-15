@@ -21,20 +21,9 @@ pub mod raviart_thomas;
 type EntityPoints<T> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>; 4];
 type EntityWeights<T> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>; 4];
 
-/// The family of an element
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-#[repr(u8)]
-pub enum ElementFamily {
-    /// Lagrange H(1) element
-    Lagrange = 0,
-    /// Raviart-Thomas H(div) element
-    RaviartThomas = 1,
-}
-
 /// A Ciarlet element
 pub struct CiarletElement<T: RlstScalar> {
     cell_type: ReferenceCellType,
-    family: ElementFamily,
     degree: usize,
     embedded_superdegree: usize,
     map_type: MapType,
@@ -56,7 +45,6 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         cell_type: ReferenceCellType,
-        family: ElementFamily,
         degree: usize,
         value_shape: Vec<usize>,
         polynomial_coeffs: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
@@ -224,7 +212,6 @@ where
         }
         CiarletElement::<T> {
             cell_type,
-            family,
             degree,
             embedded_superdegree,
             map_type,
@@ -237,11 +224,6 @@ where
             // interpolation_points: new_pts,
             // interpolation_weights: new_wts,
         }
-    }
-
-    /// The element family
-    pub fn family(&self) -> ElementFamily {
-        self.family
     }
 
     /// The polynomial degree
@@ -273,9 +255,6 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
     }
     fn dim(&self) -> usize {
         self.dim
-    }
-    fn is_lagrange(&self) -> bool {
-        self.family == ElementFamily::Lagrange
     }
     fn tabulate<
         Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
@@ -322,22 +301,6 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
     }
 }
 
-/// Create an element
-pub fn create_element<T: RlstScalar>(
-    family: ElementFamily,
-    cell_type: ReferenceCellType,
-    degree: usize,
-    continuity: Continuity,
-) -> CiarletElement<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
-    match family {
-        ElementFamily::Lagrange => lagrange::create::<T>(cell_type, degree, continuity),
-        ElementFamily::RaviartThomas => raviart_thomas::create::<T>(cell_type, degree, continuity),
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -371,12 +334,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1() {
-        let e = create_element::<f64>(
-            ElementFamily::Lagrange,
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
     }
 

@@ -61,9 +61,6 @@ pub trait FiniteElement {
     /// The highest degree polynomial in the element's polynomial set
     fn embedded_superdegree(&self) -> usize;
 
-    /// Check if the element is a Lagrange element
-    fn is_lagrange(&self) -> bool;
-
     /// The number of basis functions
     fn dim(&self) -> usize;
 

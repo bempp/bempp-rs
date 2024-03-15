@@ -2,7 +2,7 @@
 
 use crate::single_element_grid::grid::SerialSingleElementGrid;
 use crate::traits_impl::WrappedGrid;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::grid::Builder;
 use bempp_traits::types::ReferenceCellType;
@@ -40,13 +40,7 @@ where
     type GridMetadata = (ReferenceCellType, usize);
 
     fn new(data: (ReferenceCellType, usize)) -> Self {
-        let points_per_cell = create_element::<T>(
-            ElementFamily::Lagrange,
-            data.0,
-            data.1,
-            Continuity::Continuous,
-        )
-        .dim();
+        let points_per_cell = lagrange::create::<T>(data.0, data.1, Continuity::Continuous).dim();
         Self {
             element_data: data,
             points_per_cell,
@@ -60,13 +54,7 @@ where
     }
 
     fn new_with_capacity(npoints: usize, ncells: usize, data: (ReferenceCellType, usize)) -> Self {
-        let points_per_cell = create_element::<T>(
-            ElementFamily::Lagrange,
-            data.0,
-            data.1,
-            Continuity::Continuous,
-        )
-        .dim();
+        let points_per_cell = lagrange::create::<T>(data.0, data.1, Continuity::Continuous).dim();
         Self {
             element_data: data,
             points_per_cell,
