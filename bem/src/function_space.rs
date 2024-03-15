@@ -207,11 +207,8 @@ mod test {
     #[test]
     fn test_dofmap_lagrange0() {
         let grid = regular_sphere::<f64>(2);
-        let element = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            0,
-            Continuity::Discontinuous,
-        );
+        let element =
+            lagrange::create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(space.local_size(), grid.number_of_cells());
@@ -220,11 +217,8 @@ mod test {
     #[test]
     fn test_dofmap_lagrange1() {
         let grid = regular_sphere::<f64>(2);
-        let element = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let element =
+            lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(space.local_size(), grid.number_of_vertices());
@@ -233,11 +227,8 @@ mod test {
     #[test]
     fn test_dofmap_lagrange2() {
         let grid = regular_sphere::<f64>(2);
-        let element = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            2,
-            Continuity::Continuous,
-        );
+        let element =
+            lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(
@@ -249,11 +240,8 @@ mod test {
     #[test]
     fn test_colouring_p1() {
         let grid = regular_sphere::<f64>(2);
-        let element = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let element =
+            lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
         let cells = grid.iter_all_cells().collect::<Vec<_>>();
@@ -291,11 +279,8 @@ mod test {
     #[test]
     fn test_colouring_dp0() {
         let grid = regular_sphere::<f64>(2);
-        let element = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            0,
-            Continuity::Discontinuous,
-        );
+        let element =
+            lagrange::create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
         let mut n = 0;
@@ -320,11 +305,8 @@ mod test {
     #[test]
     fn test_colouring_rt1() {
         let grid = regular_sphere::<f64>(2);
-        let element = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let element =
+            lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
         let cells = grid.iter_all_cells().collect::<Vec<_>>();

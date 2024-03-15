@@ -12,11 +12,7 @@ use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -40,11 +36,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 #[test]
 fn test_laplace_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -67,11 +59,7 @@ fn test_laplace_double_layer_dp0_dp0() {
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -164,11 +152,7 @@ fn test_laplace_hypersingular_p1_p1() {
 #[test]
 fn test_helmholtz_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -191,11 +175,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -217,11 +197,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        0,
-        Continuity::Discontinuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
