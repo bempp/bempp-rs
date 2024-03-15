@@ -79,8 +79,6 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     }
 }
 
-/*
-
 #[test]
 fn test_laplace_hypersingular_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -94,14 +92,8 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::Hypersingular,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+    let a = batched::LaplaceHypersingularAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     for i in 0..ndofs {
         for j in 0..ndofs {
@@ -123,14 +115,8 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::Hypersingular,
-        PDEType::Laplace,
-        &space,
-        &space,
-    );
+    let a = batched::LaplaceHypersingularAssembler::default();
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -148,7 +134,7 @@ fn test_laplace_hypersingular_p1_p1() {
         }
     }
 }
-*/
+
 #[test]
 fn test_helmholtz_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -217,7 +203,6 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     }
 }
 /*
-
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
@@ -229,16 +214,10 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
+    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::Hypersingular,
-        PDEType::Helmholtz(3.0),
-        &space,
-        &space,
-    );
+    let a = batched::HelmholtzHypersingularAssembler::new(3.0);
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -249,13 +228,8 @@ fn test_helmholtz_hypersingular_p1_p1() {
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
-                matrix.get([i, j]).unwrap().re,
-                from_cl[*pi][*pj].re,
-                epsilon = 1e-3
-            );
-            assert_relative_eq!(
-                matrix.get([i, j]).unwrap().im,
-                from_cl[*pi][*pj].im,
+                *matrix.get([i, j]).unwrap(),
+                from_cl[*pi][*pj],
                 epsilon = 1e-3
             );
         }

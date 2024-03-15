@@ -29,11 +29,13 @@ use std::collections::HashMap;
 
 mod adjoint_double_layer;
 mod double_layer;
+mod hypersingular;
 mod single_layer;
 pub use adjoint_double_layer::{
     HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
 };
 pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
+pub use hypersingular::LaplaceHypersingularAssembler;
 pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
@@ -135,6 +137,10 @@ pub trait BatchedAssembler: Sync {
     type T: RlstScalar<Real = Self::RealT>;
     /// Number of derivatives
     const DERIV_SIZE: usize;
+    /// Number of derivatives needed in basis function tables
+    fn ntablederivs(&self) -> usize {
+        0
+    }
 
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
     ///
@@ -181,6 +187,28 @@ pub trait BatchedAssembler: Sync {
         result: &mut [Self::T],
     );
 
+    /// The product of a test and trial function
+    ///
+    /// # Safety
+    /// This function uses unchecked access into tables
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn test_trial_product(
+        &self,
+        test_table: &RlstArray<Self::T, 4>,
+        trial_table: &RlstArray<Self::T, 4>,
+        _test_jacobians: &RlstArray<Self::RealT, 2>,
+        _trial_jacobians: &RlstArray<Self::RealT, 2>,
+        _test_jdets: &[Self::RealT],
+        _trial_jdets: &[Self::RealT],
+        test_point_index: usize,
+        trial_point_index: usize,
+        test_basis_index: usize,
+        trial_basis_index: usize,
+    ) -> Self::T {
+        *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
+            * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
+    }
+
     /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
     #[allow(clippy::too_many_arguments)]
     fn assemble_batch_singular<
@@ -220,10 +248,12 @@ pub trait BatchedAssembler: Sync {
         let mut normal = [zero; 3];
         let mut point = [zero; 3];
         let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
+        let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [npts, 6]);
         let mut test_normals = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
 
         let mut trial_jdet = vec![zero; npts];
         let mut trial_mapped_pts = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
+        let mut trial_jacobians = rlst_dynamic_array2!(Self::RealT, [npts, 6]);
         let mut trial_normals = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
 
         let test_evaluator = grid.reference_to_physical_map(test_points.data());
@@ -245,6 +275,11 @@ pub trait BatchedAssembler: Sync {
                         *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
                     }
                 }
+                for (i, j) in jacobian.iter().enumerate() {
+                    unsafe {
+                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
+                    }
+                }
 
                 trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
                 trial_jdet[pt] = compute_det23(&jacobian);
@@ -258,6 +293,11 @@ pub trait BatchedAssembler: Sync {
                 for (i, p) in point.iter().enumerate() {
                     unsafe {
                         *trial_mapped_pts.get_unchecked_mut([pt, i]) = *p;
+                    }
+                }
+                for (i, j) in jacobian.iter().enumerate() {
+                    unsafe {
+                        *trial_jacobians.get_unchecked_mut([pt, i]) = *j;
                     }
                 }
             }
@@ -281,13 +321,22 @@ pub trait BatchedAssembler: Sync {
                                 &test_normals,
                                 &trial_normals,
                                 index,
-                            ) * *test_table.get_unchecked([0, index, test_i, 0])
-                                * *trial_table.get_unchecked([0, index, trial_i, 0])
-                                * num::cast::<Self::RealT, Self::T>(
-                                    *wt * *test_jdet.get_unchecked(index)
-                                        * *trial_jdet.get_unchecked(index),
-                                )
-                                .unwrap();
+                            ) * self.test_trial_product(
+                                test_table,
+                                trial_table,
+                                &test_jacobians,
+                                &trial_jacobians,
+                                &test_jdet,
+                                &trial_jdet,
+                                index,
+                                index,
+                                test_i,
+                                trial_i,
+                            ) * num::cast::<Self::RealT, Self::T>(
+                                *wt * *test_jdet.get_unchecked(index)
+                                    * *trial_jdet.get_unchecked(index),
+                            )
+                            .unwrap();
                         }
                     }
                     output.rows.push(*test_dof);
@@ -342,6 +391,7 @@ pub trait BatchedAssembler: Sync {
         let mut test_jdet = [zero; NPTS_TEST];
         let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
         let mut test_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
+        let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 6]);
 
         let test_evaluator = test_grid.reference_to_physical_map(test_points.data());
         let trial_evaluator = trial_grid.reference_to_physical_map(trial_points.data());
@@ -349,9 +399,11 @@ pub trait BatchedAssembler: Sync {
         let mut trial_jdet = vec![[zero; NPTS_TRIAL]; trial_cells.len()];
         let mut trial_mapped_pts = vec![];
         let mut trial_normals = vec![];
+        let mut trial_jacobians = vec![];
         for _i in 0..trial_cells.len() {
             trial_mapped_pts.push(rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]));
             trial_normals.push(rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]));
+            trial_jacobians.push(rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 6]));
         }
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
@@ -368,6 +420,11 @@ pub trait BatchedAssembler: Sync {
                 for (i, p) in point.iter().enumerate() {
                     unsafe {
                         *trial_mapped_pts[trial_cell_i].get_unchecked_mut([pt, i]) = *p;
+                    }
+                }
+                for (i, j) in jacobian.iter().enumerate() {
+                    unsafe {
+                        *trial_jacobians[trial_cell_i].get_unchecked_mut([pt, i]) = *j;
                     }
                 }
             }
@@ -392,6 +449,11 @@ pub trait BatchedAssembler: Sync {
                         *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
                     }
                 }
+                for (i, j) in jacobian.iter().enumerate() {
+                    unsafe {
+                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
+                    }
+                }
             }
 
             for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
@@ -411,21 +473,16 @@ pub trait BatchedAssembler: Sync {
                 for (test_i, test_dof) in test_dofs.iter().enumerate() {
                     for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                         for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                            trial_integrands[trial_index] = unsafe {
-                                num::cast::<Self::RealT, Self::T>(
-                                    *trial_wt * trial_jdet[trial_cell_i][trial_index],
-                                )
-                                .unwrap()
-                                    * *trial_table.get_unchecked([0, trial_index, trial_i, 0])
-                            };
+                            trial_integrands[trial_index] = num::cast::<Self::RealT, Self::T>(
+                                *trial_wt * trial_jdet[trial_cell_i][trial_index],
+                            )
+                            .unwrap();
                         }
                         sum = num::cast::<f64, Self::T>(0.0).unwrap();
                         for (test_index, test_wt) in test_weights.iter().enumerate() {
-                            let test_integrand = unsafe {
+                            let test_integrand =
                                 num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
-                                    .unwrap()
-                                    * *test_table.get_unchecked([0, test_index, test_i, 0])
-                            };
+                                    .unwrap();
                             for trial_index in 0..NPTS_TRIAL {
                                 sum += unsafe {
                                     self.nonsingular_kernel_value(
@@ -436,6 +493,18 @@ pub trait BatchedAssembler: Sync {
                                         trial_index,
                                     ) * test_integrand
                                         * *trial_integrands.get_unchecked(trial_index)
+                                        * self.test_trial_product(
+                                            test_table,
+                                            trial_table,
+                                            &test_jacobians,
+                                            &trial_jacobians[trial_cell_i],
+                                            &test_jdet,
+                                            &trial_jdet[trial_cell_i],
+                                            test_index,
+                                            trial_index,
+                                            test_i,
+                                            trial_i,
+                                        )
                                 };
                             }
                         }
@@ -494,10 +563,12 @@ pub trait BatchedAssembler: Sync {
         let mut test_jdet = vec![zero; NPTS_TEST];
         let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
         let mut test_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
+        let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 6]);
 
         let mut trial_jdet = vec![zero; NPTS_TRIAL];
         let mut trial_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]);
         let mut trial_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]);
+        let mut trial_jacobians = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 6]);
 
         let test_evaluator = grid.reference_to_physical_map(test_points.data());
         let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
@@ -521,6 +592,11 @@ pub trait BatchedAssembler: Sync {
                         *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
                     }
                 }
+                for (i, j) in jacobian.iter().enumerate() {
+                    unsafe {
+                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
+                    }
+                }
             }
             for (pt, jdet) in trial_jdet.iter_mut().enumerate() {
                 trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
@@ -537,6 +613,11 @@ pub trait BatchedAssembler: Sync {
                         *trial_mapped_pts.get_unchecked_mut([pt, i]) = *p;
                     }
                 }
+                for (i, j) in jacobian.iter().enumerate() {
+                    unsafe {
+                        *trial_jacobians.get_unchecked_mut([pt, i]) = *j;
+                    }
+                }
             }
 
             self.kernel_assemble_st(
@@ -550,19 +631,15 @@ pub trait BatchedAssembler: Sync {
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                     for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                        trial_integrands[trial_index] = unsafe {
+                        trial_integrands[trial_index] =
                             num::cast::<Self::RealT, Self::T>(*trial_wt * trial_jdet[trial_index])
-                                .unwrap()
-                                * *trial_table.get_unchecked([0, trial_index, trial_i, 0])
-                        };
+                                .unwrap();
                     }
                     sum = num::cast::<f64, Self::T>(0.0).unwrap();
                     for (test_index, test_wt) in test_weights.iter().enumerate() {
-                        let test_integrand = unsafe {
+                        let test_integrand =
                             num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
-                                .unwrap()
-                                * *test_table.get_unchecked([0, test_index, test_i, 0])
-                        };
+                                .unwrap();
                         for trial_index in 0..NPTS_TRIAL {
                             sum += unsafe {
                                 self.nonsingular_kernel_value(
@@ -573,6 +650,18 @@ pub trait BatchedAssembler: Sync {
                                     trial_index,
                                 ) * test_integrand
                                     * *trial_integrands.get_unchecked(trial_index)
+                                    * self.test_trial_product(
+                                        test_table,
+                                        trial_table,
+                                        &test_jacobians,
+                                        &trial_jacobians,
+                                        &test_jdet,
+                                        &trial_jdet,
+                                        test_index,
+                                        trial_index,
+                                        test_i,
+                                        trial_i,
+                                    )
                             };
                         }
                     }
@@ -666,9 +755,11 @@ pub trait BatchedAssembler: Sync {
                 Self::T,
                 trial_space
                     .element()
-                    .tabulate_array_shape(0, points.shape()[0])
+                    .tabulate_array_shape(self.ntablederivs(), points.shape()[0])
             );
-            trial_space.element().tabulate(&points, 0, &mut table);
+            trial_space
+                .element()
+                .tabulate(&points, self.ntablederivs(), &mut table);
             trial_points.push(points);
             trial_tables.push(table);
 
@@ -683,9 +774,11 @@ pub trait BatchedAssembler: Sync {
                 Self::T,
                 test_space
                     .element()
-                    .tabulate_array_shape(0, points.shape()[0])
+                    .tabulate_array_shape(self.ntablederivs(), points.shape()[0])
             );
-            test_space.element().tabulate(&points, 0, &mut table);
+            test_space
+                .element()
+                .tabulate(&points, self.ntablederivs(), &mut table);
             test_points.push(points);
             test_tables.push(table);
             qweights.push(
@@ -837,19 +930,23 @@ pub trait BatchedAssembler: Sync {
 
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
-            test_space.element().tabulate_array_shape(0, NPTS_TEST)
+            test_space
+                .element()
+                .tabulate_array_shape(self.ntablederivs(), NPTS_TEST)
         );
         test_space
             .element()
-            .tabulate(&qpoints_test, 0, &mut test_table);
+            .tabulate(&qpoints_test, self.ntablederivs(), &mut test_table);
 
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
-            trial_space.element().tabulate_array_shape(0, NPTS_TRIAL)
+            trial_space
+                .element()
+                .tabulate_array_shape(self.ntablederivs(), NPTS_TRIAL)
         );
         trial_space
             .element()
-            .tabulate(&qpoints_test, 0, &mut trial_table);
+            .tabulate(&qpoints_test, self.ntablederivs(), &mut trial_table);
 
         let mut cell_pairs: Vec<(usize, usize)> = vec![];
 
@@ -1116,19 +1213,23 @@ pub trait BatchedAssembler: Sync {
 
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
-            test_space.element().tabulate_array_shape(0, NPTS_TEST)
+            test_space
+                .element()
+                .tabulate_array_shape(self.ntablederivs(), NPTS_TEST)
         );
         test_space
             .element()
-            .tabulate(&qpoints_test, 0, &mut test_table);
+            .tabulate(&qpoints_test, self.ntablederivs(), &mut test_table);
 
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
-            trial_space.element().tabulate_array_shape(0, NPTS_TRIAL)
+            trial_space
+                .element()
+                .tabulate_array_shape(self.ntablederivs(), NPTS_TRIAL)
         );
         trial_space
             .element()
-            .tabulate(&qpoints_test, 0, &mut trial_table);
+            .tabulate(&qpoints_test, self.ntablederivs(), &mut trial_table);
 
         let output_raw = RawData2D {
             data: output.data_mut().as_mut_ptr(),
