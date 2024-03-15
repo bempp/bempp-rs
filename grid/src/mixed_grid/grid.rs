@@ -50,9 +50,7 @@ where
 
         let elements = element_info
             .iter()
-            .map(|(i, j)| {
-                lagrange::create::<T>(*i, *j, Continuity::Continuous)
-            })
+            .map(|(i, j)| lagrange::create::<T>(*i, *j, Continuity::Continuous))
             .collect::<Vec<_>>();
 
         if elements.len() == 1 {

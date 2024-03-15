@@ -40,12 +40,7 @@ where
     type GridMetadata = (ReferenceCellType, usize);
 
     fn new(data: (ReferenceCellType, usize)) -> Self {
-        let points_per_cell = lagrange::create::<T>(
-            data.0,
-            data.1,
-            Continuity::Continuous,
-        )
-        .dim();
+        let points_per_cell = lagrange::create::<T>(data.0, data.1, Continuity::Continuous).dim();
         Self {
             element_data: data,
             points_per_cell,
@@ -59,12 +54,7 @@ where
     }
 
     fn new_with_capacity(npoints: usize, ncells: usize, data: (ReferenceCellType, usize)) -> Self {
-        let points_per_cell = lagrange::create::<T>(
-            data.0,
-            data.1,
-            Continuity::Continuous,
-        )
-        .dim();
+        let points_per_cell = lagrange::create::<T>(data.0, data.1, Continuity::Continuous).dim();
         Self {
             element_data: data,
             points_per_cell,

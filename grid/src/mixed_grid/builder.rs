@@ -80,12 +80,8 @@ where
             if let Some(npts) = self.elements_to_npoints.get(&(cell_data.1, cell_data.2)) {
                 *npts
             } else {
-                let npts = lagrange::create::<T>(
-                    cell_data.1,
-                    cell_data.2,
-                    Continuity::Continuous,
-                )
-                .dim();
+                let npts =
+                    lagrange::create::<T>(cell_data.1, cell_data.2, Continuity::Continuous).dim();
                 self.elements_to_npoints
                     .insert((cell_data.1, cell_data.2), npts);
                 npts

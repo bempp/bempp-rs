@@ -357,11 +357,7 @@ mod test {
 
     fn example_geometry_2d() -> SerialSingleElementGeometry<f64> {
         //! A 2D geometry
-        let p1triangle = lagrange::create(
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [4, 2]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;
@@ -384,11 +380,7 @@ mod test {
 
     fn example_geometry_3d() -> SerialSingleElementGeometry<f64> {
         //! A 3D geometry
-        let p2triangle = lagrange::create(
-            ReferenceCellType::Triangle,
-            2,
-            Continuity::Continuous,
-        );
+        let p2triangle = lagrange::create(ReferenceCellType::Triangle, 2, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [9, 3]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;
@@ -440,11 +432,7 @@ mod test {
 
     fn example_geometry_quad() -> SerialSingleElementGeometry<f64> {
         //! A 3D quadrilateral geometry
-        let p1quad = lagrange::create(
-            ReferenceCellType::Quadrilateral,
-            1,
-            Continuity::Continuous,
-        );
+        let p1quad = lagrange::create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [6, 3]);
         *points.get_mut([0, 0]).unwrap() = 0.0;
         *points.get_mut([0, 1]).unwrap() = 0.0;

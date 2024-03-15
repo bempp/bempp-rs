@@ -119,11 +119,7 @@ where
             diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
         }
 
-        let element = lagrange::create(
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let cell_indices = (0..ncells).collect::<Vec<_>>();
 
         // Compute topology

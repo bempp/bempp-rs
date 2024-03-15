@@ -334,11 +334,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1() {
-        let e = lagrange::create::<f64>(
-            ReferenceCellType::Triangle,
-            1,
-            Continuity::Continuous,
-        );
+        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
     }
 

@@ -44,11 +44,7 @@ where
         if cell_type == ReferenceCellType::Triangle && cell_degree == 1 {
             warn!("Creating a single element grid with a P1 triangle. Using a FlatTriangleGrid would be faster.");
         }
-        let element = lagrange::create::<T>(
-            cell_type,
-            cell_degree,
-            Continuity::Continuous,
-        );
+        let element = lagrange::create::<T>(cell_type, cell_degree, Continuity::Continuous);
 
         let mut cell_vertices = vec![];
 
