@@ -345,7 +345,7 @@ mod test {
     use bempp_traits::element::Continuity;
     use bempp_traits::types::ReferenceCellType;
     use rlst_dense::{
-        rlst_dynamic_array2,
+        rlst_dynamic_array2, rlst_dynamic_array3,
         traits::{RandomAccessMut, RawAccess, RawAccessMut},
     };
 
@@ -521,7 +521,7 @@ mod test {
         let points = triangle_points();
 
         let evaluator = g.get_evaluator(points.data());
-        let mut mapped_point = vec![0.0; 2];
+        let mut mapped_points = rlst_dynamic_array2!(f64, [points.shape()[0], 2]);
         for (cell_i, points) in [
             vec![vec![0.7, 0.5], vec![0.7, 0.1]],
             vec![vec![0.2, 0.7], vec![0.6, 0.7]],
@@ -529,10 +529,10 @@ mod test {
         .iter()
         .enumerate()
         {
+            evaluator.compute_points(cell_i, mapped_points.data_mut());
             for (point_i, point) in points.iter().enumerate() {
-                evaluator.compute_point(cell_i, point_i, &mut mapped_point);
-                for (i, j) in mapped_point.iter().zip(point) {
-                    assert_relative_eq!(*i, *j, epsilon = 1e-12);
+                for (i, j) in point.iter().enumerate() {
+                    assert_relative_eq!(mapped_points[[point_i, i]], *j, epsilon = 1e-12);
                 }
             }
         }
@@ -545,7 +545,7 @@ mod test {
         let points = triangle_points();
         let evaluator = g.get_evaluator(points.data());
 
-        let mut mapped_point = vec![0.0; 3];
+        let mut mapped_points = rlst_dynamic_array2!(f64, [points.shape()[0], 3]);
         for (cell_i, points) in [
             vec![vec![0.7, 0.5, 0.12], vec![0.7, 0.1, 0.36]],
             vec![vec![0.2, 0.7, 0.0], vec![0.6, 0.7, 0.0]],
@@ -553,10 +553,10 @@ mod test {
         .iter()
         .enumerate()
         {
+            evaluator.compute_points(cell_i, mapped_points.data_mut());
             for (point_i, point) in points.iter().enumerate() {
-                evaluator.compute_point(cell_i, point_i, &mut mapped_point);
-                for (i, j) in mapped_point.iter().zip(point) {
-                    assert_relative_eq!(*i, *j, epsilon = 1e-12);
+                for (i, j) in point.iter().enumerate() {
+                    assert_relative_eq!(mapped_points[[point_i, i]], *j, epsilon = 1e-12);
                 }
             }
         }
@@ -569,7 +569,7 @@ mod test {
         let points = triangle_points();
         let evaluator = g.get_evaluator(points.data());
 
-        let mut computed_jacobian = rlst_dynamic_array2!(f64, [3, 2]);
+        let mut computed_jacobians = rlst_dynamic_array3!(f64, [points.shape()[0], 3, 2]);
         for (cell_i, jacobians) in [
             vec![
                 vec![vec![1.0, 1.0], vec![0.0, 1.0], vec![0.2, -0.4]],
@@ -583,13 +583,13 @@ mod test {
         .iter()
         .enumerate()
         {
+            evaluator.compute_jacobians(cell_i, computed_jacobians.data_mut());
             for (point_i, jacobian) in jacobians.iter().enumerate() {
-                evaluator.compute_jacobian(cell_i, point_i, computed_jacobian.data_mut());
                 for (i, row) in jacobian.iter().enumerate() {
                     for (j, entry) in row.iter().enumerate() {
                         assert_relative_eq!(
                             *entry,
-                            *computed_jacobian.get([i, j]).unwrap(),
+                            computed_jacobians[[point_i, i, j]],
                             epsilon = 1e-12
                         );
                     }
@@ -604,7 +604,7 @@ mod test {
         let points = triangle_points();
         let evaluator = g.get_evaluator(points.data());
 
-        let mut computed_normal = vec![0.0; 3];
+        let mut computed_normals = rlst_dynamic_array2!(f64, [points.shape()[0], 3]);
         for (cell_i, normals) in [
             vec![
                 vec![
@@ -623,17 +623,17 @@ mod test {
         .iter()
         .enumerate()
         {
+            evaluator.compute_normals(cell_i, computed_normals.data_mut());
             for (point_i, normal) in normals.iter().enumerate() {
-                evaluator.compute_normal(cell_i, point_i, &mut computed_normal);
                 assert_relative_eq!(
-                    computed_normal[0] * computed_normal[0]
-                        + computed_normal[1] * computed_normal[1]
-                        + computed_normal[2] * computed_normal[2],
+                    computed_normals[[point_i, 0]] * computed_normals[[point_i, 0]]
+                        + computed_normals[[point_i, 1]] * computed_normals[[point_i, 1]]
+                        + computed_normals[[point_i, 2]] * computed_normals[[point_i, 2]],
                     1.0,
                     epsilon = 1e-12
                 );
-                for (i, j) in computed_normal.iter().zip(normal) {
-                    assert_relative_eq!(*i, *j, epsilon = 1e-12);
+                for (i, j) in normal.iter().enumerate() {
+                    assert_relative_eq!(computed_normals[[point_i, i]], *j, epsilon = 1e-12);
                 }
             }
         }

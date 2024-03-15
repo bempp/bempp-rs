@@ -293,7 +293,6 @@ pub fn compute_normals_from_jacobians<T: Float + RlstScalar<Real = T>>(
 
 /// Compute determinants of 1 by 1 matrices
 pub fn compute_dets11<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) {
-    let npts = jdets.len();
     for (i, jdet) in jdets.iter_mut().enumerate() {
         *jdet = T::abs(jacobian[i]);
     }
@@ -340,14 +339,14 @@ pub fn compute_dets23<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) 
 /// Compute determinants of 3 by 3 matrices
 pub fn compute_dets33<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) {
     let npts = jdets.len();
-    for (i, jdet) in jdets.iter_mut().enumerate() {
+    for (p_i, jdet) in jdets.iter_mut().enumerate() {
         *jdet = T::abs(
             [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
                 .iter()
                 .map(|(i, j, k)| {
-                    jacobian[*i * npts + i]
-                        * (jacobian[(3 + *j) * npts + i] * jacobian[(6 + *k) * npts + i]
-                            - jacobian[(3 + *k) * npts + i] * jacobian[(6 + *j) * npts + i])
+                    jacobian[*i * npts + p_i]
+                        * (jacobian[(3 + *j) * npts + p_i] * jacobian[(6 + *k) * npts + p_i]
+                            - jacobian[(3 + *k) * npts + p_i] * jacobian[(6 + *j) * npts + p_i])
                 })
                 .sum(),
         );

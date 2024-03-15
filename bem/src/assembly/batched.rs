@@ -18,10 +18,7 @@ use rlst_dense::{
     base_array::BaseArray,
     data_container::VectorContainer,
     rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4,
-    traits::{
-        RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
-        UnsafeRandomAccessMut,
-    },
+    traits::{RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef},
     types::RlstScalar,
 };
 use rlst_sparse::sparse::csr_mat::CsrMatrix;
@@ -244,9 +241,6 @@ pub trait BatchedAssembler: Sync {
         let mut k = rlst_dynamic_array2!(Self::T, [Self::DERIV_SIZE, npts]);
         let zero = num::cast::<f64, Self::RealT>(0.0).unwrap();
         let mut test_jdet = vec![zero; npts];
-        let mut jacobian = [zero; 6];
-        let mut normal = [zero; 3];
-        let mut point = [zero; 3];
         let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
         let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [npts, 6]);
         let mut test_normals = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
@@ -353,9 +347,6 @@ pub trait BatchedAssembler: Sync {
 
         let mut k = rlst_dynamic_array3!(Self::T, [NPTS_TEST, Self::DERIV_SIZE, NPTS_TRIAL]);
         let zero = num::cast::<f64, Self::RealT>(0.0).unwrap();
-        let mut jacobian = [zero; 6];
-        let mut normal = [zero; 3];
-        let mut point = [zero; 3];
         let mut test_jdet = [zero; NPTS_TEST];
         let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
         let mut test_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
@@ -497,9 +488,6 @@ pub trait BatchedAssembler: Sync {
         let mut k = rlst_dynamic_array3!(Self::T, [NPTS_TEST, Self::DERIV_SIZE, NPTS_TRIAL]);
 
         let zero = num::cast::<f64, Self::RealT>(0.0).unwrap();
-        let mut jacobian = [zero; 6];
-        let mut normal = [zero; 3];
-        let mut point = [zero; 3];
 
         let mut test_jdet = vec![zero; NPTS_TEST];
         let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
