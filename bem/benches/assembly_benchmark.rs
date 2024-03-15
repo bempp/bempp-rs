@@ -1,6 +1,6 @@
 use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::{create_element, ElementFamily};
+use bempp_element::element::lagrange;
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
@@ -14,8 +14,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
 
     for i in 3..5 {
         let grid = regular_sphere(i);
-        let element = create_element(
-            ElementFamily::Lagrange,
+        let element = lagrange::create(
             ReferenceCellType::Triangle,
             0,
             Continuity::Discontinuous,
