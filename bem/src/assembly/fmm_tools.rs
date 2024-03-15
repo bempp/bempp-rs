@@ -1,7 +1,7 @@
 //! FMM tools
 use crate::assembly::common::SparseMatrixData;
 use crate::function_space::SerialFunctionSpace;
-use bempp_grid::common::compute_det;
+use bempp_grid::common::compute_dets;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
@@ -40,13 +40,13 @@ pub fn get_all_quadrature_points<
         T,
         [NPTS * grid.number_of_cells(), grid.physical_dimension()]
     );
-    let mut point = vec![num::cast::<f64, T>(0.0).unwrap(); grid.physical_dimension()];
+    let mut points = vec![num::cast::<f64, T>(0.0).unwrap(); NPTS * grid.physical_dimension()];
 
     for cell in 0..grid.number_of_cells() {
-        for i in 0..NPTS {
-            evaluator.reference_to_physical(cell, i, &mut point);
-            for (j, p) in point.iter().enumerate() {
-                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = *p;
+        evaluator.reference_to_physical(cell, &mut points);
+        for j in 0..grid.physical_dimension() {
+            for i in 0..NPTS {
+                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = points[j*NPTS + i];
             }
         }
     }
@@ -185,29 +185,28 @@ fn basis_to_quadrature<
     debug_assert!(qpoints.shape()[0] == NPTS);
 
     let evaluator = grid.reference_to_physical_map(qpoints.data());
+    let npts = qweights.len();
 
-    let mut jacobian = vec![
+    let mut jacobians = vec![
         num::cast::<f64, RealT>(0.0).unwrap();
-        grid.physical_dimension() * grid.domain_dimension()
+        grid.physical_dimension() * grid.domain_dimension() * npts
+    ];
+    let mut jdets = vec![
+        num::cast::<f64, RealT>(0.0).unwrap(); npts
     ];
 
     // TODO: batch this?
     for cell in 0..ncells {
         let cell_dofs = space.cell_dofs(cell).unwrap();
+        evaluator.jacobian(cell, &mut jacobians);
+        compute_dets(&jacobians, grid.domain_dimension(), grid.physical_dimension(), &mut jdets);
         for (qindex, w) in qweights.iter().enumerate() {
-            evaluator.jacobian(cell, qindex, &mut jacobian);
-            let jdet = num::cast::<RealT, T>(compute_det(
-                &jacobian,
-                grid.domain_dimension(),
-                grid.physical_dimension(),
-            ))
-            .unwrap();
             for (i, dof) in cell_dofs.iter().enumerate() {
                 output.rows.push(cell * NPTS + qindex);
                 output.cols.push(*dof);
                 output
                     .data
-                    .push(jdet * *w * *table.get([0, qindex, i, 0]).unwrap());
+                    .push(num::cast::<RealT, T>(jdets[qindex]).unwrap() * *w * *table.get([0, qindex, i, 0]).unwrap());
             }
         }
     }

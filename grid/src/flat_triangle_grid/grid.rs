@@ -334,28 +334,35 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
         self.points.shape()[0]
     }
 
-    fn compute_point(&self, cell_index: usize, point_index: usize, point: &mut [T]) {
+    fn compute_points(&self, cell_index: usize, points: &mut [T]) {
         let jacobian = &self.grid.jacobians[cell_index];
-        for (index, val_out) in point.iter_mut().enumerate() {
-            *val_out = self.grid.coordinates
-                [[self.grid.cells_to_entities[0][cell_index][0], index]]
-                + jacobian[[index, 0]] * self.points[[point_index, 0]]
-                + jacobian[[index, 1]] * self.points[[point_index, 1]];
+        let npts = self.points.shape()[0];
+        for d in 0..3 {
+            for point_index in 0..npts {
+                points[d * npts + point_index] = self.grid.coordinates
+                    [[self.grid.cells_to_entities[0][cell_index][0], d]]
+                    + jacobian[[d, 0]] * self.points[[point_index, 0]]
+                    + jacobian[[d, 1]] * self.points[[point_index, 1]];
+            }
         }
     }
 
-    fn compute_jacobian(&self, cell_index: usize, _point_index: usize, jacobian: &mut [T]) {
-        for (i, j) in jacobian
-            .iter_mut()
-            .zip(self.grid.jacobians[cell_index].iter())
+    fn compute_jacobians(&self, cell_index: usize, jacobians: &mut [T]) {
+        let npts = self.points.shape()[0];
+        for (i, j) in self.grid.jacobians[cell_index].iter().enumerate()
         {
-            *i = j;
+            for point_index in 0..npts {
+                jacobians[i * npts + point_index] = j;
+            }
         }
     }
 
-    fn compute_normal(&self, cell_index: usize, _point_index: usize, normal: &mut [T]) {
-        for (i, j) in normal.iter_mut().zip(self.grid.normals[cell_index].iter()) {
-            *i = j;
+    fn compute_normals(&self, cell_index: usize, normals: &mut [T]) {
+        let npts = self.points.shape()[0];
+        for (i, j) in self.grid.normals[cell_index].iter().enumerate() {
+            for point_index in 0..npts {
+                normals[i * npts + point_index] = j;
+            }
         }
     }
 }

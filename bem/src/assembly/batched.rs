@@ -1,7 +1,7 @@
 //! Batched dense assembly
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
-use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
+use bempp_grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -260,47 +260,15 @@ pub trait BatchedAssembler: Sync {
         let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
 
         for (test_cell, trial_cell) in cell_pairs {
-            for pt in 0..npts {
-                test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                test_jdet[pt] = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *test_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                test_evaluator.reference_to_physical(*test_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
+            test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
+            compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
+            compute_dets23(test_jacobians.data(), &mut test_jdet);
+            test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
 
-                trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                trial_jdet[pt] = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *trial_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                trial_evaluator.reference_to_physical(*trial_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *trial_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *trial_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
+            trial_evaluator.jacobian(*trial_cell, trial_jacobians.data_mut());
+            compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
+            compute_dets23(trial_jacobians.data(), &mut trial_jdet);
+            trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
 
             self.kernel_assemble_diagonal_st(
                 test_mapped_pts.data(),
@@ -407,54 +375,20 @@ pub trait BatchedAssembler: Sync {
         }
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
-            for pt in 0..NPTS_TRIAL {
-                trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                trial_jdet[trial_cell_i][pt] = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *trial_normals[trial_cell_i].get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                trial_evaluator.reference_to_physical(*trial_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *trial_mapped_pts[trial_cell_i].get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *trial_jacobians[trial_cell_i].get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
+            trial_evaluator.jacobian(*trial_cell, trial_jacobians[trial_cell_i].data_mut());
+            compute_dets23(trial_jacobians[trial_cell_i].data(), &mut trial_jdet[trial_cell_i]);
+            compute_normals_from_jacobians23(trial_jacobians[trial_cell_i].data(), trial_normals[trial_cell_i].data_mut());
+            trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
         }
 
         let mut sum: Self::T;
         let mut trial_integrands = [num::cast::<f64, Self::T>(0.0).unwrap(); NPTS_TRIAL];
 
         for test_cell in test_cells {
-            for (pt, jdet) in test_jdet.iter_mut().enumerate() {
-                test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                *jdet = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *test_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                test_evaluator.reference_to_physical(*test_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
+            test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
+            compute_dets23(test_jacobians.data(), &mut test_jdet);
+            compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
+            test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
 
             for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
                 if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
@@ -577,48 +511,15 @@ pub trait BatchedAssembler: Sync {
         let mut trial_integrands = [num::cast::<f64, Self::T>(0.0).unwrap(); NPTS_TRIAL];
 
         for (test_cell, trial_cell) in cell_pairs {
-            for (pt, jdet) in test_jdet.iter_mut().enumerate() {
-                test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                *jdet = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *test_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                test_evaluator.reference_to_physical(*test_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
-            for (pt, jdet) in trial_jdet.iter_mut().enumerate() {
-                trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                *jdet = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *trial_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                trial_evaluator.reference_to_physical(*trial_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *trial_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *trial_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
+            test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
+            compute_dets23(test_jacobians.data(), &mut test_jdet);
+            compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
+            test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+
+            trial_evaluator.jacobian(*trial_cell, trial_jacobians.data_mut());
+            compute_dets23(trial_jacobians.data(), &mut trial_jdet);
+            compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
+            trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
 
             self.kernel_assemble_st(
                 test_mapped_pts.data(),
