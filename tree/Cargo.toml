@@ -22,8 +22,8 @@ memoffset = "0.6"
 rand = "0.8.*"
 hyksort = { path = "../hyksort", optional = true }
 bempp-traits = { path = "../traits" }
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
 num = "0.4"
 cauchy = "0.4.0"
 

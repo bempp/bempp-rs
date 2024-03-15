@@ -28,9 +28,9 @@ bempp-kernel = { path = "../kernel" }
 bempp-tools = { path = "../tools" }
 itertools = "0.10"
 num = "0.4"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-blis = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst-blis = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
 fftw = {git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.*"
 approx = "0.5"

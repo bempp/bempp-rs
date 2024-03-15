@@ -29,8 +29,8 @@ num = "0.4"
 log = "0.4"
 itertools = "0.10"
 mpi = { version = "0.6.*", optional = true }
-rlst-proc-macro = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-proc-macro = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

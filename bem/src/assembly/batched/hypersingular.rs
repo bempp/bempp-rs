@@ -19,6 +19,9 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
     const DERIV_SIZE: usize = 1;
     type RealT = T::Real;
     type T = T;
+    fn ntablederivs(&self) -> usize {
+        1
+    }
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<Self::T, 2>,
@@ -60,15 +63,83 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
         &self,
         test_table: &RlstArray<Self::T, 4>,
         trial_table: &RlstArray<Self::T, 4>,
+        test_jacobians: &RlstArray<Self::RealT, 2>,
+        trial_jacobians: &RlstArray<Self::RealT, 2>,
+        test_jdets: &[Self::RealT],
+        trial_jdets: &[Self::RealT],
         test_point_index: usize,
         trial_point_index: usize,
         test_basis_index: usize,
         trial_basis_index: usize,
     ) -> Self::T {
-        *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
-            * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
-    }
+        let test0 = *test_table.get_unchecked([1, test_point_index, test_basis_index, 0]);
+        let test1 = *test_table.get_unchecked([2, test_point_index, test_basis_index, 0]);
+        let trial0 = *trial_table.get_unchecked([1, trial_point_index, trial_basis_index, 0]);
+        let trial1 = *trial_table.get_unchecked([2, trial_point_index, trial_basis_index, 0]);
 
+        ((num::cast::<Self::RealT, Self::T>(*test_jacobians.get_unchecked([test_point_index, 3]))
+            .unwrap()
+            * test0
+            - num::cast::<Self::RealT, Self::T>(
+                *test_jacobians.get_unchecked([test_point_index, 0]),
+            )
+            .unwrap()
+                * test1)
+            * (num::cast::<Self::RealT, Self::T>(
+                *trial_jacobians.get_unchecked([trial_point_index, 3]),
+            )
+            .unwrap()
+                * trial0
+                - num::cast::<Self::RealT, Self::T>(
+                    *trial_jacobians.get_unchecked([trial_point_index, 0]),
+                )
+                .unwrap()
+                    * trial1)
+            + (num::cast::<Self::RealT, Self::T>(
+                *test_jacobians.get_unchecked([test_point_index, 4]),
+            )
+            .unwrap()
+                * test0
+                - num::cast::<Self::RealT, Self::T>(
+                    *test_jacobians.get_unchecked([test_point_index, 1]),
+                )
+                .unwrap()
+                    * test1)
+                * (num::cast::<Self::RealT, Self::T>(
+                    *trial_jacobians.get_unchecked([trial_point_index, 4]),
+                )
+                .unwrap()
+                    * trial0
+                    - num::cast::<Self::RealT, Self::T>(
+                        *trial_jacobians.get_unchecked([trial_point_index, 1]),
+                    )
+                    .unwrap()
+                        * trial1)
+            + (num::cast::<Self::RealT, Self::T>(
+                *test_jacobians.get_unchecked([test_point_index, 5]),
+            )
+            .unwrap()
+                * test0
+                - num::cast::<Self::RealT, Self::T>(
+                    *test_jacobians.get_unchecked([test_point_index, 2]),
+                )
+                .unwrap()
+                    * test1)
+                * (num::cast::<Self::RealT, Self::T>(
+                    *trial_jacobians.get_unchecked([trial_point_index, 5]),
+                )
+                .unwrap()
+                    * trial0
+                    - num::cast::<Self::RealT, Self::T>(
+                        *trial_jacobians.get_unchecked([trial_point_index, 2]),
+                    )
+                    .unwrap()
+                        * trial1))
+            / num::cast::<Self::RealT, Self::T>(
+                test_jdets[test_point_index] * trial_jdets[trial_point_index],
+            )
+            .unwrap()
+    }
 }
 
 /// Assembler for a Helmholtz hypersingular boundary operator

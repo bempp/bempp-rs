@@ -143,6 +143,17 @@ fn test_laplace_hypersingular_p1_p1() {
 
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
+            println!(
+                "{} {} {}",
+                *matrix.get([i, j]).unwrap(),
+                from_cl[*pi][*pj],
+                *matrix.get([i, j]).unwrap() / from_cl[*pi][*pj],
+            );
+        }
+        println!();
+    }
+    for (i, pi) in perm.iter().enumerate() {
+        for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
                 *matrix.get([i, j]).unwrap(),
                 from_cl[*pi][*pj],
@@ -248,16 +259,10 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
+    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let mut matrix = Array2D::<Complex<f64>>::new([ndofs, ndofs]);
-    assemble(
-        &mut matrix,
-        AssemblyType::Dense,
-        BoundaryOperator::Hypersingular,
-        PDEType::Helmholtz(3.0),
-        &space,
-        &space,
-    );
+    let a = batched::HelmholtzHypersingularAssembler::new(3.0);
+    a.assemble_into_dense::<128, _, _>(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -268,13 +273,8 @@ fn test_helmholtz_hypersingular_p1_p1() {
     for (i, pi) in perm.iter().enumerate() {
         for (j, pj) in perm.iter().enumerate() {
             assert_relative_eq!(
-                matrix.get([i, j]).unwrap().re,
-                from_cl[*pi][*pj].re,
-                epsilon = 1e-3
-            );
-            assert_relative_eq!(
-                matrix.get([i, j]).unwrap().im,
-                from_cl[*pi][*pj].im,
+                matrix.get([i, j]).unwrap(),
+                from_cl[*pi][*pj],
                 epsilon = 1e-3
             );
         }
