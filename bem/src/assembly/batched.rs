@@ -376,9 +376,16 @@ pub trait BatchedAssembler: Sync {
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
             trial_evaluator.jacobian(*trial_cell, trial_jacobians[trial_cell_i].data_mut());
-            compute_dets23(trial_jacobians[trial_cell_i].data(), &mut trial_jdet[trial_cell_i]);
-            compute_normals_from_jacobians23(trial_jacobians[trial_cell_i].data(), trial_normals[trial_cell_i].data_mut());
-            trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
+            compute_dets23(
+                trial_jacobians[trial_cell_i].data(),
+                &mut trial_jdet[trial_cell_i],
+            );
+            compute_normals_from_jacobians23(
+                trial_jacobians[trial_cell_i].data(),
+                trial_normals[trial_cell_i].data_mut(),
+            );
+            trial_evaluator
+                .reference_to_physical(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
         }
 
         let mut sum: Self::T;

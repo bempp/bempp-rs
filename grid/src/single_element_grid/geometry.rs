@@ -311,12 +311,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
     }
 
     fn compute_points(&self, cell_index: usize, points: &mut [T]) {
-        compute_points(
-            self.geometry,
-            self.table.view(),
-            cell_index,
-            points,
-        );
+        compute_points(self.geometry, self.table.view(), cell_index, points);
     }
 
     fn compute_jacobians(&self, cell_index: usize, jacobians: &mut [T]) {

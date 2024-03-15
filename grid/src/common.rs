@@ -99,7 +99,9 @@ pub fn compute_normal_from_jacobian<T: Float + RlstScalar<Real = T>>(
             }
         },
         _ => {
-            unimplemented!("compute_normal_from_jacobian() not implemented for topological dimension {tdim}");
+            unimplemented!(
+                "compute_normal_from_jacobian() not implemented for topological dimension {tdim}"
+            );
         }
     }
 }
@@ -175,17 +177,6 @@ pub fn compute_det<T: RlstScalar<Real = T>>(jacobian: &[T], tdim: usize, gdim: u
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
 /// Compute physical points
 pub fn compute_points<
     T: Float + RlstScalar<Real = T>,
@@ -239,8 +230,9 @@ pub fn compute_jacobians<
         for point_index in 0..npts {
             for gd in 0..gdim {
                 for td in 0..tdim {
-                    jacobians[(td * gdim + gd) * npts + point_index] += *geometry.coordinate(*v, gd).unwrap()
-                        * unsafe { *table.get_unchecked([1 + td, point_index, i, 0]) };
+                    jacobians[(td * gdim + gd) * npts + point_index] +=
+                        *geometry.coordinate(*v, gd).unwrap()
+                            * unsafe { *table.get_unchecked([1 + td, point_index, i, 0]) };
                 }
             }
         }
@@ -258,9 +250,15 @@ pub fn compute_normals_from_jacobians23<T: Float + RlstScalar<Real = T>>(
 
     for point_index in 0..npts {
         for (i, j, k) in [(0, 1, 2), (1, 2, 0), (2, 0, 1)] {
-            normals[i * npts + point_index] = jacobians[j * npts + point_index] * jacobians[(3 + k) * npts + point_index] - jacobians[k * npts + point_index] * jacobians[(3 + j) * npts + point_index];
+            normals[i * npts + point_index] = jacobians[j * npts + point_index]
+                * jacobians[(3 + k) * npts + point_index]
+                - jacobians[k * npts + point_index] * jacobians[(3 + j) * npts + point_index];
         }
-        let size = RlstScalar::sqrt((0..3).map(|i| RlstScalar::powi(normals[i*npts + point_index], 2)).sum::<T>());
+        let size = RlstScalar::sqrt(
+            (0..3)
+                .map(|i| RlstScalar::powi(normals[i * npts + point_index], 2))
+                .sum::<T>(),
+        );
         for i in 0..3 {
             normals[i * npts + point_index] /= size;
         }
@@ -286,7 +284,9 @@ pub fn compute_normals_from_jacobians<T: Float + RlstScalar<Real = T>>(
             }
         },
         _ => {
-            unimplemented!("compute_normals_from_jacobians() not implemented for topological dimension {tdim}");
+            unimplemented!(
+                "compute_normals_from_jacobians() not implemented for topological dimension {tdim}"
+            );
         }
     }
 }
@@ -302,21 +302,23 @@ pub fn compute_dets11<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) 
 pub fn compute_dets12<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) {
     let npts = jdets.len();
     for (i, jdet) in jdets.iter_mut().enumerate() {
-        *jdet = T::sqrt((0..2).map(|j| jacobian[j*npts + i].powi(2)).sum());
+        *jdet = T::sqrt((0..2).map(|j| jacobian[j * npts + i].powi(2)).sum());
     }
 }
 /// Compute determinants of 1 by 3 matrices
 pub fn compute_dets13<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) {
     let npts = jdets.len();
     for (i, jdet) in jdets.iter_mut().enumerate() {
-        *jdet = T::sqrt((0..3).map(|j| jacobian[j*npts + i].powi(2)).sum());
+        *jdet = T::sqrt((0..3).map(|j| jacobian[j * npts + i].powi(2)).sum());
     }
 }
 /// Compute determinants of 2 by 2 matrices
 pub fn compute_dets22<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) {
     let npts = jdets.len();
     for (i, jdet) in jdets.iter_mut().enumerate() {
-        *jdet = T::abs(jacobian[i] * jacobian[3 * npts + i] - jacobian[npts + i] * jacobian[2 * npts + i]);
+        *jdet = T::abs(
+            jacobian[i] * jacobian[3 * npts + i] - jacobian[npts + i] * jacobian[2 * npts + i],
+        );
     }
 }
 /// Compute determinants of 2 by 3 matrices
@@ -327,7 +329,9 @@ pub fn compute_dets23<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) 
             [(1, 2), (2, 0), (0, 1)]
                 .iter()
                 .map(|(j, k)| {
-                    (jacobian[*j * npts + i] * jacobian[(3 + *k) * npts + i] - jacobian[*k * npts + i] * jacobian[(3 + *j) * npts + i]).powi(2)
+                    (jacobian[*j * npts + i] * jacobian[(3 + *k) * npts + i]
+                        - jacobian[*k * npts + i] * jacobian[(3 + *j) * npts + i])
+                        .powi(2)
                 })
                 .sum(),
         );
@@ -342,7 +346,8 @@ pub fn compute_dets33<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) 
                 .iter()
                 .map(|(i, j, k)| {
                     jacobian[*i * npts + i]
-                        * (jacobian[(3 + *j) * npts + i] * jacobian[(6 + *k) * npts + i] - jacobian[(3 + *k) * npts + i] * jacobian[(6 + *j) * npts + i])
+                        * (jacobian[(3 + *j) * npts + i] * jacobian[(6 + *k) * npts + i]
+                            - jacobian[(3 + *k) * npts + i] * jacobian[(6 + *j) * npts + i])
                 })
                 .sum(),
         );
@@ -350,7 +355,12 @@ pub fn compute_dets33<T: RlstScalar<Real = T>>(jacobian: &[T], jdets: &mut [T]) 
 }
 
 /// Compute determinants of matrices
-pub fn compute_dets<T: RlstScalar<Real = T>>(jacobians: &[T], tdim: usize, gdim: usize, jdets: &mut [T]) {
+pub fn compute_dets<T: RlstScalar<Real = T>>(
+    jacobians: &[T],
+    tdim: usize,
+    gdim: usize,
+    jdets: &mut [T],
+) {
     let npts = jdets.len();
     assert_eq!(jacobians.len(), npts * tdim * gdim);
     match tdim {
@@ -380,14 +390,6 @@ pub fn compute_dets<T: RlstScalar<Real = T>>(jacobians: &[T], tdim: usize, gdim:
         }
     }
 }
-
-
-
-
-
-
-
-
 
 /// Compute the diameter of a triangle
 pub fn compute_diameter_triangle<

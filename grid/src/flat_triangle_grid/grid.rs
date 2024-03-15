@@ -349,8 +349,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
 
     fn compute_jacobians(&self, cell_index: usize, jacobians: &mut [T]) {
         let npts = self.points.shape()[0];
-        for (i, j) in self.grid.jacobians[cell_index].iter().enumerate()
-        {
+        for (i, j) in self.grid.jacobians[cell_index].iter().enumerate() {
             for point_index in 0..npts {
                 jacobians[i * npts + point_index] = j;
             }

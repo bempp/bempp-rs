@@ -46,7 +46,7 @@ pub fn get_all_quadrature_points<
         evaluator.reference_to_physical(cell, &mut points);
         for j in 0..grid.physical_dimension() {
             for i in 0..NPTS {
-                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = points[j*NPTS + i];
+                *all_points.get_mut([cell * NPTS + i, j]).unwrap() = points[j * NPTS + i];
             }
         }
     }
@@ -191,22 +191,27 @@ fn basis_to_quadrature<
         num::cast::<f64, RealT>(0.0).unwrap();
         grid.physical_dimension() * grid.domain_dimension() * npts
     ];
-    let mut jdets = vec![
-        num::cast::<f64, RealT>(0.0).unwrap(); npts
-    ];
+    let mut jdets = vec![num::cast::<f64, RealT>(0.0).unwrap(); npts];
 
     // TODO: batch this?
     for cell in 0..ncells {
         let cell_dofs = space.cell_dofs(cell).unwrap();
         evaluator.jacobian(cell, &mut jacobians);
-        compute_dets(&jacobians, grid.domain_dimension(), grid.physical_dimension(), &mut jdets);
+        compute_dets(
+            &jacobians,
+            grid.domain_dimension(),
+            grid.physical_dimension(),
+            &mut jdets,
+        );
         for (qindex, w) in qweights.iter().enumerate() {
             for (i, dof) in cell_dofs.iter().enumerate() {
                 output.rows.push(cell * NPTS + qindex);
                 output.cols.push(*dof);
-                output
-                    .data
-                    .push(num::cast::<RealT, T>(jdets[qindex]).unwrap() * *w * *table.get([0, qindex, i, 0]).unwrap());
+                output.data.push(
+                    num::cast::<RealT, T>(jdets[qindex]).unwrap()
+                        * *w
+                        * *table.get([0, qindex, i, 0]).unwrap(),
+                );
             }
         }
     }

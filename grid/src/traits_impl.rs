@@ -257,22 +257,16 @@ impl<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> ReferenceMapTyp
         self.evaluator.point_count()
     }
 
-    fn reference_to_physical(
-        &self,
-        cell_index: usize,
-        value: &mut [<Self::Grid as GridType>::T],
-    ) {
+    fn reference_to_physical(&self, cell_index: usize, value: &mut [<Self::Grid as GridType>::T]) {
         self.evaluator.compute_points(cell_index, value);
     }
 
     fn jacobian(&self, cell_index: usize, value: &mut [T]) {
-        self.evaluator
-            .compute_jacobians(cell_index, value);
+        self.evaluator.compute_jacobians(cell_index, value);
     }
 
     fn normal(&self, cell_index: usize, value: &mut [T]) {
-        self.evaluator
-            .compute_normals(cell_index, value);
+        self.evaluator.compute_normals(cell_index, value);
     }
 }
 
