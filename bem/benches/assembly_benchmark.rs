@@ -14,11 +14,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
 
     for i in 3..5 {
         let grid = regular_sphere(i);
-        let element = lagrange::create(
-            ReferenceCellType::Triangle,
-            0,
-            Continuity::Discontinuous,
-        );
+        let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
 
         let space = SerialFunctionSpace::new(&grid, &element);
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
