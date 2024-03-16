@@ -1,6 +1,6 @@
 //! Grid builder
 use super::GridType;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 pub trait Builder<const GDIM: usize> {
     //! Object that can be used to build a mesh

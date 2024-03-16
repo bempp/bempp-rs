@@ -4,16 +4,13 @@ use crate::polynomials::{legendre_shape, polynomial_count, tabulate_legendre_pol
 use crate::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement, MapType};
 use bempp_traits::types::ReferenceCellType;
-use rlst_dense::linalg::inverse::MatrixInverse;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::views::ArrayViewMut,
-    array::Array,
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    traits::{RandomAccessByRef, RandomAccessMut, Shape, UnsafeRandomAccessMut},
+use rlst::MatrixInverse;
+use rlst::RlstScalar;
+use rlst::{
+    dense::array::views::ArrayViewMut, Array, BaseArray, RandomAccessByRef, RandomAccessMut, Shape,
+    UnsafeRandomAccessMut, VectorContainer,
 };
-use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3};
+use rlst::{rlst_dynamic_array2, rlst_dynamic_array3};
 
 pub mod lagrange;
 pub mod raviart_thomas;
@@ -166,7 +163,7 @@ where
             }
         }
 
-        let mut inverse = rlst_dense::rlst_dynamic_array2!(T, [dim, dim]);
+        let mut inverse = rlst::rlst_dynamic_array2!(T, [dim, dim]);
 
         for i in 0..dim {
             for j in 0..dim {
@@ -181,7 +178,7 @@ where
             }
         }
 
-        let mut ident = rlst_dense::rlst_dynamic_array2!(T, [dim, dim]);
+        let mut ident = rlst::rlst_dynamic_array2!(T, [dim, dim]);
         for i in 0..dim {
             unsafe {
                 *ident.get_unchecked_mut([i, i]) = T::from(1.0).unwrap();
@@ -307,8 +304,8 @@ mod test {
     use approx::*;
     use bempp_traits::element::FiniteElement;
     use bempp_traits::types::ReferenceCellType;
-    use rlst_dense::rlst_dynamic_array4;
-    use rlst_dense::traits::RandomAccessByRef;
+    use rlst::rlst_dynamic_array4;
+    use rlst::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let mut ndofs = 0;

@@ -4,13 +4,10 @@ use crate::flat_triangle_grid::grid::SerialFlatTriangleGrid;
 use crate::traits_impl::WrappedGrid;
 use bempp_traits::grid::Builder;
 use num::Float;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::{views::ArrayViewMut, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::MatrixInverse,
+use rlst::RlstScalar;
+use rlst::{
+    dense::array::{views::ArrayViewMut, Array},
+    rlst_array_from_slice2, rlst_dynamic_array2, BaseArray, MatrixInverse, VectorContainer,
 };
 use std::collections::HashMap;
 

@@ -4,6 +4,9 @@ use bempp_grid::single_element_grid::SerialSingleElementGridBuilder;
 use bempp_traits::grid::{Builder, CellType, GeometryType, GridType, PointType, TopologyType};
 use bempp_traits::types::ReferenceCellType;
 
+extern crate blas_src;
+extern crate lapack_src;
+
 #[test]
 fn test_grid_mixed_cell_type() {
     //! Build a mixed grid using its builder

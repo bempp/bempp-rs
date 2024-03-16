@@ -2,7 +2,7 @@
 use bempp_traits::tree::{FmmTree, Tree};
 use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
 use num::Float;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 /// A struct that holds the single node trees associated with both sources and targets as well as their shared domain.
 #[derive(Default)]

@@ -1,7 +1,5 @@
 //! FMM traits
-use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, types::RlstScalar,
-};
+use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
 
 use crate::kernel::Kernel;
 use crate::tree::FmmTree;

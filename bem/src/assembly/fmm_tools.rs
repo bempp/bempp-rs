@@ -7,15 +7,11 @@ use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{GridType, ReferenceMapType};
 use bempp_traits::types::ReferenceCellType;
-use rlst_dense::{
-    array::Array,
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_dynamic_array2, rlst_dynamic_array4,
-    traits::{RandomAccessByRef, RandomAccessMut, RawAccess, Shape},
-    types::RlstScalar,
+use rlst::CsrMatrix;
+use rlst::{
+    rlst_dynamic_array2, rlst_dynamic_array4, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
+    RawAccess, RlstScalar, Shape, VectorContainer,
 };
-use rlst_sparse::sparse::csr_mat::CsrMatrix;
 
 /// Generate an array of all the quadrature points
 pub fn get_all_quadrature_points<

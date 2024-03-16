@@ -22,10 +22,20 @@ crate-type = ["lib", "cdylib"]
 cauchy="0.4.*"
 thiserror="1.*"
 num = "0.4"
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints]
 workspace = true
+
+
+[target.aarch64-apple-darwin.dev-dependencies]
+blas-src = { version = "0.9", features = ["accelerate"]}
+lapack-src = { version = "0.9", features = ["accelerate"]}
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.9", features = ["blis"]}
+lapack-src = { version = "0.9", features = ["netlib"]}
+

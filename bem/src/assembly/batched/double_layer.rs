@@ -2,7 +2,7 @@
 use super::{BatchedAssembler, EvalType, RlstArray};
 use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 use bempp_traits::kernel::Kernel;
-use rlst_dense::{traits::UnsafeRandomAccessByRef, types::RlstScalar};
+use rlst::{RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace double layer operator
 pub struct LaplaceDoubleLayerAssembler<T: RlstScalar> {

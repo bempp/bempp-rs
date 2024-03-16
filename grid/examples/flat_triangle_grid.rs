@@ -1,6 +1,9 @@
 use bempp_grid::flat_triangle_grid::SerialFlatTriangleGridBuilder;
 use bempp_traits::grid::{Builder, CellType, GeometryType, GridType, PointType};
 
+extern crate blas_src;
+extern crate lapack_src;
+
 /// Creating a flat triangle grid
 ///
 /// In a flat triangle grid, all the cells are flat triangles in 3D space.

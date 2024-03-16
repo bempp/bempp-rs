@@ -4,7 +4,7 @@ use bempp_element::element::CiarletElement;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, TopologyType};
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 /// A serial function space
 pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {

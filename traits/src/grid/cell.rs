@@ -2,7 +2,7 @@
 
 use super::GridType;
 use crate::types::ReferenceCellType;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 pub trait CellType {
     //! A cell

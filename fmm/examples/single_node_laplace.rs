@@ -3,7 +3,10 @@ use bempp_fmm::types::KiFmmBuilderSingleNode;
 use bempp_kernel::laplace_3d::Laplace3dKernel;
 use bempp_traits::fmm::Fmm;
 use bempp_tree::implementations::helpers::points_fixture;
-use rlst_dense::{rlst_dynamic_array2, traits::RawAccessMut};
+use rlst::{rlst_dynamic_array2, RawAccessMut};
+
+extern crate blas_src;
+extern crate lapack_src;
 
 fn main() {
     // Setup random sources and targets

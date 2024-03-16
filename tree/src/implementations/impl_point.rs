@@ -70,7 +70,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use rlst_dense::traits::RawAccess;
+    use rlst::RawAccess;
 
     use crate::constants::DEEPEST_LEVEL;
     use crate::implementations::helpers::points_fixture;

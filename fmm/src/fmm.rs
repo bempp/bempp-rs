@@ -1,10 +1,6 @@
 //! Implementation of FmmData and Fmm traits.
 use num::Float;
-use rlst_dense::{
-    rlst_dynamic_array2,
-    traits::{RawAccess, Shape},
-    types::RlstScalar,
-};
+use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
 
 use bempp_traits::{
     field::SourceToTargetData,
@@ -378,11 +374,11 @@ mod test {
     use num::Float;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
-    use rlst_dense::array::Array;
-    use rlst_dense::base_array::BaseArray;
-    use rlst_dense::data_container::VectorContainer;
-    use rlst_dense::rlst_array_from_slice2;
-    use rlst_dense::traits::{RawAccess, RawAccessMut, Shape};
+    use rlst::rlst_array_from_slice2;
+    use rlst::Array;
+    use rlst::BaseArray;
+    use rlst::VectorContainer;
+    use rlst::{RawAccess, RawAccessMut, Shape};
 
     use crate::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
     use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};

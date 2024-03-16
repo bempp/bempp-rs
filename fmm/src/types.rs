@@ -4,9 +4,7 @@ use std::collections::HashMap;
 use bempp_traits::{field::SourceToTargetData, kernel::Kernel, tree::FmmTree, types::EvalType};
 use bempp_tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
 use num::Float;
-use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, types::RlstScalar,
-};
+use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
 
 use crate::tree::SingleNodeFmmTree;
 
@@ -195,13 +193,15 @@ pub enum FmmEvalType {
 ///
 /// # Example
 /// ```
+/// # extern crate blas_src;
+/// # extern crate lapack_src;
 /// use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 /// use bempp_fmm::types::KiFmmBuilderSingleNode;
 /// use bempp_kernel::laplace_3d::Laplace3dKernel;
 /// use bempp_traits::fmm::Fmm;
 /// use bempp_traits::tree::FmmTree;
 /// use bempp_tree::implementations::helpers::points_fixture;
-/// use rlst_dense::{rlst_dynamic_array2, traits::RawAccessMut};
+/// use rlst::{rlst_dynamic_array2, RawAccessMut};
 ///
 /// /// Particle data
 /// let nsources = 1000;

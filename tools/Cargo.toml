@@ -23,10 +23,11 @@ crate-type = ["lib", "cdylib"]
 libc = "0.2"
 num = "0.4"
 bempp-traits = { path = "../traits"}
-rayon = "1.7"
+rayon = "1.9"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints]
 workspace = true
+

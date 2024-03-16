@@ -12,13 +12,9 @@ use bempp_tree::{
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree},
 };
 use num::Float;
-use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape},
-    types::RlstScalar,
+use rlst::{
+    empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
+    RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
 use crate::{

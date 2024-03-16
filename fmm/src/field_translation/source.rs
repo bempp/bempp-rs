@@ -19,11 +19,9 @@ use crate::{
     helpers::chunk_size,
     types::{FmmEvalType, KiFmm},
 };
-use rlst_dense::{
-    array::empty_array,
-    rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut},
-    types::RlstScalar,
+use rlst::{
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
+    RawAccessMut, RlstScalar,
 };
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>

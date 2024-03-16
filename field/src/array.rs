@@ -3,13 +3,9 @@
 //! This module awaits deprecation with the addition of N-Dimensional tensor handling in rlst.
 use num::traits::Num;
 
-use rlst_dense::{
-    array::Array,
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_dynamic_array3,
-    traits::{RandomAccessByRef, RandomAccessMut, Shape},
-    types::RlstScalar,
+use rlst::{
+    rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape,
+    VectorContainer,
 };
 
 /// Pad an Array3D from a given `pad_index` with an amount of zeros specified by `pad_size` to the right of each axis.
