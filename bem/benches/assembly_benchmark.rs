@@ -8,6 +8,9 @@ use bempp_traits::types::ReferenceCellType;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rlst::rlst_dynamic_array2;
 
+extern crate blas_src;
+extern crate lapack_src;
+
 pub fn assembly_parts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("assembly");
     group.sample_size(20);
