@@ -22,8 +22,7 @@ memoffset = "0.6"
 rand = "0.8.*"
 hyksort = { path = "../hyksort", optional = true }
 bempp-traits = { path = "../traits" }
-rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 num = "0.4"
 cauchy = "0.4.0"
 
@@ -36,3 +35,12 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints]
 workspace = true
+
+[target.aarch64-apple-darwin.dev-dependencies]
+blas-src = { version = "0.9", features = ["accelerate"]}
+lapack-src = { version = "0.9", features = ["accelerate"]}
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.9", features = ["blis"]}
+lapack-src = { version = "0.9", features = ["netlib"]}
+

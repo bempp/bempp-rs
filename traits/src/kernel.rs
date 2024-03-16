@@ -1,6 +1,6 @@
 //! Trait for Green's function kernels
 use crate::types::EvalType;
-use crate::types::RlstScalar;
+use rlst::RlstScalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel: Sync {

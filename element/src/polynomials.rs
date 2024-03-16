@@ -1,9 +1,8 @@
 //! Orthonormal polynomials
 
 use bempp_traits::types::ReferenceCellType;
-use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
-use rlst_dense::types::RlstScalar;
-
+use rlst::RlstScalar;
+use rlst::{RandomAccessByRef, RandomAccessMut, Shape};
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
     RealT: RlstScalar<Real = RealT>,
@@ -504,7 +503,7 @@ mod test {
     use crate::polynomials::*;
     use approx::*;
     use bempp_quadrature::simplex_rules::simplex_rule;
-    use rlst_dense::{rlst_dynamic_array2, rlst_dynamic_array3, traits::RandomAccessMut};
+    use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut};
 
     #[test]
     fn test_legendre_interval() {

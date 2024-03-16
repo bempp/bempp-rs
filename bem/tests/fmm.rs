@@ -18,10 +18,9 @@ use bempp_traits::tree::Tree;
 use bempp_traits::types::EvalType;
 use bempp_traits::types::ReferenceCellType;
 use rand::prelude::*;
-use rlst_dense::{
-    array::empty_array,
-    rlst_dynamic_array2,
-    traits::{MultIntoResize, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut},
+use rlst::{
+    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RandomAccessMut,
+    RawAccess, RawAccessMut,
 };
 
 fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64> + Sync>(

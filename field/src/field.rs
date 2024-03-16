@@ -2,18 +2,10 @@
 use bempp_traits::kernel::Kernel;
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
-use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    gemm::Gemm,
-    linalg::svd::SvdMode,
-    rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3,
-    traits::{
-        MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef,
-        UnsafeRandomAccessMut,
-    },
-    types::RlstScalar,
+use rlst::{
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
+    BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
+    SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer,
 };
 use std::collections::HashSet;
 
@@ -600,8 +592,8 @@ where
 #[cfg(test)]
 mod test {
     use bempp_kernel::laplace_3d::Laplace3dKernel;
-    use rlst_dense::traits::RandomAccessByRef;
-    use rlst_dense::traits::RandomAccessMut;
+    use rlst::RandomAccessByRef;
+    use rlst::RandomAccessMut;
 
     use super::*;
 

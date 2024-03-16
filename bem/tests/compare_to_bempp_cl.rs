@@ -7,7 +7,7 @@ use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
 use bempp_traits::types::ReferenceCellType;
 use cauchy::c64;
-use rlst_dense::{rlst_dynamic_array2, traits::RandomAccessByRef};
+use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {

@@ -4,12 +4,9 @@ use crate::flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBu
 use crate::traits_impl::WrappedGrid;
 use bempp_traits::grid::Builder;
 use num::Float;
-use rlst_dense::{
-    array::{views::ArrayViewMut, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    traits::MatrixInverse,
-    types::RlstScalar,
+use rlst::{
+    dense::array::{views::ArrayViewMut, Array},
+    BaseArray, MatrixInverse, RlstScalar, VectorContainer,
 };
 use std::collections::{hash_map::Entry::Vacant, HashMap};
 /// Create a regular sphere

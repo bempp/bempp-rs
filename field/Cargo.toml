@@ -28,13 +28,11 @@ bempp-kernel = { path = "../kernel" }
 bempp-tools = { path = "../tools" }
 itertools = "0.10"
 num = "0.4"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
-rlst-blis = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw = {git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.*"
 approx = "0.5"
-rayon = "1.7"
+rayon = "1.9"
 
 [dev-dependencies]
 approx_eq = "0.1.8"
@@ -44,3 +42,12 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints]
 workspace = true
+
+[target.aarch64-apple-darwin.dev-dependencies]
+blas-src = { version = "0.9", features = ["accelerate"]}
+lapack-src = { version = "0.9", features = ["accelerate"]}
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.9", features = ["blis"]}
+lapack-src = { version = "0.9", features = ["netlib"]}
+

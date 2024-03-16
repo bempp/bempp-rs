@@ -1,9 +1,7 @@
 //! Types for storing field translation metadata.
 
 use num::{Complex, Float};
-use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
-};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
 
 use bempp_traits::kernel::Kernel;
 use bempp_traits::types::RlstScalar;

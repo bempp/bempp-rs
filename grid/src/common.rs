@@ -2,11 +2,8 @@
 
 use crate::traits::Geometry;
 use num::Float;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::Array,
-    traits::{Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessByValue},
-};
+use rlst::RlstScalar;
+use rlst::{Array, Shape, UnsafeRandomAccessByRef, UnsafeRandomAccessByValue};
 
 /// Compute a physical point
 pub fn compute_point<

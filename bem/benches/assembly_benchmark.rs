@@ -6,7 +6,7 @@ use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
 use bempp_traits::types::ReferenceCellType;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rlst_dense::rlst_dynamic_array2;
+use rlst::rlst_dynamic_array2;
 
 pub fn assembly_parts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("assembly");

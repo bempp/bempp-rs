@@ -512,21 +512,18 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use bempp_traits::types::RlstScalar;
-    use rlst_dense::{
-        array::Array,
-        base_array::BaseArray,
-        data_container::VectorContainer,
-        rlst_dynamic_array1, rlst_dynamic_array2,
-        traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
+    use rlst::RlstScalar;
+    use rlst::{
+        Array, BaseArray, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape,
+        VectorContainer,
     };
 
-    use rlst_dense::types::c64;
+    use rlst::c64;
 
     fn copy(
         m_in: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
     ) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
-        let mut m = rlst_dynamic_array2!(f64, m_in.shape());
+        let mut m = rlst::rlst_dynamic_array2!(f64, m_in.shape());
         for i in 0..m_in.shape()[0] {
             for j in 0..m_in.shape()[1] {
                 *m.get_mut([i, j]).unwrap() = *m_in.get([i, j]).unwrap();
@@ -544,15 +541,15 @@ mod test {
         let nsources = 5;
         let ntargets = 3;
 
-        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
-        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
-        let mut charges = rlst_dynamic_array1!(c64, [nsources]);
+        let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
+        let mut charges = rlst::rlst_dynamic_array1!(c64, [nsources]);
 
         sources.fill_from_seed_equally_distributed(0);
         targets.fill_from_seed_equally_distributed(1);
         charges.fill_from_seed_equally_distributed(2);
 
-        let mut green_value = rlst_dynamic_array1!(c64, [ntargets]);
+        let mut green_value = rlst::rlst_dynamic_array1!(c64, [ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
@@ -590,7 +587,7 @@ mod test {
             targets_z_eps[[index, 2]] += eps;
         }
 
-        let mut expected = rlst_dynamic_array2!(c64, [4, ntargets]);
+        let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::ValueDeriv,
@@ -600,7 +597,7 @@ mod test {
             expected.data_mut(),
         );
 
-        let mut green_value_x_eps = rlst_dynamic_array1![c64, [ntargets]];
+        let mut green_value_x_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
@@ -610,7 +607,7 @@ mod test {
             green_value_x_eps.data_mut(),
         );
 
-        let mut green_value_y_eps = rlst_dynamic_array1![c64, [ntargets]];
+        let mut green_value_y_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
@@ -619,7 +616,7 @@ mod test {
             charges.data(),
             green_value_y_eps.data_mut(),
         );
-        let mut green_value_z_eps = rlst_dynamic_array1![c64, [ntargets]];
+        let mut green_value_z_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
             EvalType::Value,
@@ -629,9 +626,9 @@ mod test {
             green_value_z_eps.data_mut(),
         );
 
-        let mut x_deriv = rlst_dynamic_array1![c64, [ntargets]];
-        let mut y_deriv = rlst_dynamic_array1![c64, [ntargets]];
-        let mut z_deriv = rlst_dynamic_array1![c64, [ntargets]];
+        let mut x_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        let mut y_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        let mut z_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
         x_deriv.fill_from(
             (green_value_x_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
@@ -676,13 +673,13 @@ mod test {
         let ntargets = 5;
         let wavenumber: f64 = 1.5;
 
-        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
-        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
+        let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
 
         sources.fill_from_seed_equally_distributed(1);
         targets.fill_from_seed_equally_distributed(2);
 
-        let mut green_value_t = rlst_dynamic_array2!(c64, [nsources, ntargets]);
+        let mut green_value_t = rlst::rlst_dynamic_array2!(c64, [nsources, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
             EvalType::Value,
@@ -694,12 +691,12 @@ mod test {
         // The matrix needs to be transposed so that the first row corresponds to the first target,
         // second row to the second target and so on.
 
-        let mut green_value = rlst_dynamic_array2!(c64, [ntargets, nsources]);
+        let mut green_value = rlst::rlst_dynamic_array2!(c64, [ntargets, nsources]);
         green_value.fill_from(green_value_t.transpose());
 
         for charge_index in 0..nsources {
-            let mut charges = rlst_dynamic_array1![c64, [nsources]];
-            let mut expected = rlst_dynamic_array1![c64, [ntargets]];
+            let mut charges = rlst::rlst_dynamic_array1![c64, [nsources]];
+            let mut expected = rlst::rlst_dynamic_array1![c64, [ntargets]];
             charges[[charge_index]] = c64::complex(1.0, 0.0);
 
             Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
@@ -719,7 +716,7 @@ mod test {
             }
         }
 
-        let mut green_value_deriv_t = rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
+        let mut green_value_deriv_t = rlst::rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
             EvalType::ValueDeriv,
@@ -730,12 +727,12 @@ mod test {
 
         // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-        let mut green_value_deriv = rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
+        let mut green_value_deriv = rlst::rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
         green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
         for charge_index in 0..nsources {
-            let mut charges = rlst_dynamic_array1![c64, [nsources]];
-            let mut expected = rlst_dynamic_array2!(c64, [4, ntargets]);
+            let mut charges = rlst::rlst_dynamic_array1![c64, [nsources]];
+            let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
             charges[[charge_index]] = c64::complex(1.0, 0.0);
 
@@ -765,14 +762,14 @@ mod test {
         let ntargets = 5;
         let wavenumber: f64 = 1.5;
 
-        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
-        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
+        let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
 
         sources.fill_from_seed_equally_distributed(1);
         targets.fill_from_seed_equally_distributed(2);
 
-        let mut green_value_diag = rlst_dynamic_array1!(c64, [ntargets]);
-        let mut green_value_diag_deriv = rlst_dynamic_array2!(c64, [4, ntargets]);
+        let mut green_value_diag = rlst::rlst_dynamic_array1!(c64, [ntargets]);
+        let mut green_value_diag_deriv = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
             EvalType::Value,
@@ -787,7 +784,7 @@ mod test {
             green_value_diag_deriv.data_mut(),
         );
 
-        let mut green_value_t = rlst_dynamic_array2!(c64, [nsources, ntargets]);
+        let mut green_value_t = rlst::rlst_dynamic_array2!(c64, [nsources, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
             EvalType::Value,
@@ -799,10 +796,10 @@ mod test {
         // The matrix needs to be transposed so that the first row corresponds to the first target,
         // second row to the second target and so on.
 
-        let mut green_value = rlst_dynamic_array2!(c64, [ntargets, nsources]);
+        let mut green_value = rlst::rlst_dynamic_array2!(c64, [ntargets, nsources]);
         green_value.fill_from(green_value_t.transpose());
 
-        let mut green_value_deriv_t = rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
+        let mut green_value_deriv_t = rlst::rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
             EvalType::ValueDeriv,
@@ -813,7 +810,7 @@ mod test {
 
         // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-        let mut green_value_deriv = rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
+        let mut green_value_deriv = rlst::rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
         green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
         for index in 0..nsources {

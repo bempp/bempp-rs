@@ -1020,7 +1020,7 @@ impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
-    use rlst_dense::traits::{RawAccess, Shape};
+    use rlst::{RawAccess, Shape};
     use std::vec;
 
     use crate::implementations::helpers::points_fixture;

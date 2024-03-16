@@ -4,10 +4,7 @@ use crate::io::{get_gmsh_cell, get_permutation_to_gmsh};
 use crate::traits::Geometry;
 use bempp_traits::{element::FiniteElement, grid::GmshIO};
 use num::Float;
-use rlst_dense::{
-    traits::{RandomAccessByRef, Shape},
-    types::RlstScalar,
-};
+use rlst::{RandomAccessByRef, RlstScalar, Shape};
 
 impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialMixedGrid<T> {
     fn to_gmsh_string(&self) -> String {

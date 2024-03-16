@@ -1,5 +1,5 @@
 //! General type definitions
-pub use rlst_dense::types::{c32, c64, RlstScalar};
+pub use rlst::{c32, c64, RlstScalar};
 pub mod cell;
 pub mod cell_iterator;
 pub mod point_iterator;

@@ -1,14 +1,7 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use num::Float;
-use rlst_dense::types::{RlstError, RlstResult, RlstScalar};
-use rlst_dense::{
-    array::Array,
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    linalg::svd::SvdMode,
-    rlst_dynamic_array2,
-    traits::{MatrixSvd, Shape},
-};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, MatrixSvd, Shape, SvdMode, VectorContainer};
+use rlst::{RlstError, RlstResult, RlstScalar};
 
 /// Matrix type
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -94,11 +87,7 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst_dense::{
-        array::empty_array,
-        rlst_dynamic_array2,
-        traits::{MultIntoResize, RandomAccessByRef},
-    };
+    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef};
 
     #[test]
     fn test_pinv() {

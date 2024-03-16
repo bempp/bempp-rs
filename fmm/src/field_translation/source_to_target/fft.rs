@@ -8,9 +8,9 @@ use bempp_tree::{
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;
-use rlst_dense::base_array::BaseArray;
-use rlst_dense::data_container::VectorContainer;
-use rlst_dense::{array::Array, types::RlstScalar};
+use rlst::BaseArray;
+use rlst::VectorContainer;
+use rlst::{Array, RlstScalar};
 use std::{collections::HashSet, sync::RwLock};
 
 use bempp_traits::{fmm::SourceToTargetTranslation, kernel::Kernel, tree::Tree};
@@ -19,13 +19,9 @@ use crate::{
     helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
-use rlst_dense::{
-    array::empty_array,
-    rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess},
-};
+use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess};
 
-use rlst_dense::traits::{MatrixSvd, RandomAccessMut};
+use rlst::{MatrixSvd, RandomAccessMut};
 
 use crate::field_translation::matmul::matmul8x8;
 
