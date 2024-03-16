@@ -5,6 +5,9 @@ use bempp_traits::fmm::Fmm;
 use bempp_tree::implementations::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
 
+extern crate blas_src;
+extern crate lapack_src;
+
 fn main() {
     // Setup random sources and targets
     let nsources = 1000;

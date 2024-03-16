@@ -193,6 +193,8 @@ pub enum FmmEvalType {
 ///
 /// # Example
 /// ```
+/// # extern crate blas_src;
+/// # extern crate lapack_src;
 /// use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 /// use bempp_fmm::types::KiFmmBuilderSingleNode;
 /// use bempp_kernel::laplace_3d::Laplace3dKernel;

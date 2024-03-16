@@ -5,6 +5,9 @@ use bempp_grid::single_element_grid::SerialSingleElementGridBuilder;
 use bempp_traits::grid::{Builder, GmshIO};
 use bempp_traits::types::ReferenceCellType;
 
+extern crate blas_src;
+extern crate lapack_src;
+
 #[test]
 fn test_regular_sphere_gmsh_io() {
     let g = regular_sphere::<f64>(2);
