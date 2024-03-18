@@ -16,7 +16,7 @@ use rlst::CsrMatrix;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, Array, BaseArray,
     RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
-    UnsafeRandomAccessMut, VectorContainer,
+    VectorContainer,
 };
 use std::collections::HashMap;
 
@@ -1057,6 +1057,7 @@ pub trait BatchedAssembler: Sync + Sized {
     }
 
     /// Assemble the non-singular contributions into a dense matrix
+    #[allow(clippy::too_many_arguments)]
     fn assemble_nonsingular_into_dense<
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
