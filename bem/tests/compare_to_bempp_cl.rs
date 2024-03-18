@@ -1,11 +1,10 @@
 use approx::*;
 use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::lagrange;
+use bempp_element::element::LagrangeElementFamily;
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
-use bempp_traits::types::ReferenceCellType;
 use cauchy::c64;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
@@ -15,7 +14,7 @@ extern crate lapack_src;
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -39,7 +38,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 #[test]
 fn test_laplace_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -62,7 +61,7 @@ fn test_laplace_double_layer_dp0_dp0() {
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -85,7 +84,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
 #[test]
 fn test_laplace_hypersingular_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -104,7 +103,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
 #[test]
 fn test_laplace_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -133,7 +132,7 @@ fn test_laplace_hypersingular_p1_p1() {
 #[test]
 fn test_helmholtz_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -156,7 +155,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -178,7 +177,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -200,7 +199,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<c64>::new(1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();

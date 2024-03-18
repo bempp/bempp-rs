@@ -3,7 +3,7 @@
 use super::{CellType, PointType, ReferenceMapType};
 use crate::types::cell_iterator::CellIterator;
 use crate::types::point_iterator::PointIterator;
-use crate::types::CellLocalIndexPair;
+use crate::types::{CellLocalIndexPair, ReferenceCellType};
 use rlst::RlstScalar;
 
 pub trait GridType: std::marker::Sized {
@@ -107,4 +107,7 @@ pub trait GridType: std::marker::Sized {
 
     /// The (geometric) dimension of cells in the physical grid
     fn physical_dimension(&self) -> usize;
+
+    /// Get the cell types included in this grid
+    fn cell_types(&self) -> &[ReferenceCellType];
 }

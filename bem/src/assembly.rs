@@ -8,7 +8,7 @@ mod test {
     use super::batched::BatchedAssembler;
     use super::*;
     use crate::function_space::SerialFunctionSpace;
-    use bempp_element::element::lagrange;
+    use bempp_element::element::LagrangeElementFamily;
     use bempp_grid::{
         shapes::regular_sphere,
         single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
@@ -87,7 +87,7 @@ mod test {
                 fn [<test_assembly_ $pde:lower _ $operator:lower _ $cell:lower _ $dtype>]() {
 
                     let grid = example_grid!($cell, $dtype);
-                    let element = lagrange::create(ReferenceCellType::[<$cell>], 0, Continuity::Discontinuous);
+                    let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
                     let space = SerialFunctionSpace::new(&grid, &element);
 
                     let ndofs = space.global_size();

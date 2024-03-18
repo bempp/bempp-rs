@@ -105,7 +105,7 @@ pub trait ElementFamily {
     /// The Scalar type       
     type T: RlstScalar;
     /// The finite element type
-    type FiniteElement: FiniteElement<T=Self::T>;
+    type FiniteElement: FiniteElement<T = Self::T>;
 
     /// Get an elenent for a cell type
     fn element(&self, cell_type: ReferenceCellType) -> Self::FiniteElement;

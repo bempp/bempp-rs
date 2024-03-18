@@ -1,15 +1,19 @@
 //! Funciton space
 
 use bempp_element::element::CiarletElement;
-use bempp_traits::bem::FunctionSpace;
-use bempp_traits::element::FiniteElement;
-use bempp_traits::grid::{CellType, GridType, TopologyType};
+use bempp_traits::{
+    bem::FunctionSpace,
+    element::{ElementFamily, FiniteElement},
+    grid::{CellType, GridType, TopologyType},
+    types::ReferenceCellType,
+};
 use rlst::RlstScalar;
+use std::collections::HashMap;
 
 /// A serial function space
 pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
     grid: &'a GridImpl,
-    element: &'a CiarletElement<T>,
+    elements: HashMap<ReferenceCellType, CiarletElement<T>>,
     entity_dofs: [Vec<Vec<usize>>; 4],
     cell_dofs: Vec<Vec<usize>>,
     size: usize,
@@ -17,10 +21,20 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real
 
 impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
     /// Create new function space
-    pub fn new(grid: &'a GridImpl, element: &'a CiarletElement<T>) -> Self {
+    pub fn new(
+        grid: &'a GridImpl,
+        e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
+    ) -> Self {
         let mut size = 0;
         let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
         let tdim = grid.domain_dimension();
+
+        let mut elements = HashMap::new();
+        let mut element_dims = HashMap::new();
+        for cell in grid.cell_types() {
+            elements.insert(*cell, e_family.element(*cell));
+            element_dims.insert(*cell, elements[cell].dim());
+        }
 
         let mut entity_counts = vec![];
         entity_counts.push(grid.number_of_vertices());
@@ -35,9 +49,11 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
         for d in 0..tdim + 1 {
             entity_dofs[d] = vec![vec![]; entity_counts[d]];
         }
-        let mut cell_dofs = vec![vec![0; element.dim()]; entity_counts[tdim]];
+        let mut cell_dofs = vec![vec![]; entity_counts[tdim]];
 
         for cell in grid.iter_all_cells() {
+            cell_dofs[cell.index()] = vec![0; element_dims[&cell.topology().cell_type()]];
+            let element = &elements[&cell.topology().cell_type()];
             let topology = cell.topology();
             for (i, e) in topology.vertex_indices().enumerate() {
                 let e_dofs = element.entity_dofs(0, i).unwrap();
@@ -92,7 +108,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
 
         Self {
             grid,
-            element,
+            elements,
             entity_dofs,
             cell_dofs,
             size,
@@ -103,7 +119,11 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
     pub fn compute_cell_colouring(&self) -> Vec<Vec<usize>> {
         let mut colouring: Vec<Vec<usize>> = vec![];
         let mut edim = 0;
-        while self.element.entity_dofs(edim, 0).unwrap().is_empty() {
+        while self.elements[&self.grid.cell_types()[0]]
+            .entity_dofs(edim, 0)
+            .unwrap()
+            .is_empty()
+        {
             edim += 1;
         }
 
@@ -171,8 +191,8 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
     fn grid(&self) -> &Self::Grid {
         self.grid
     }
-    fn element(&self) -> &CiarletElement<T> {
-        self.element
+    fn element(&self, cell_type: ReferenceCellType) -> &CiarletElement<T> {
+        &self.elements[&cell_type]
     }
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
         &self.entity_dofs[entity_dim][entity_number]
@@ -198,17 +218,15 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 #[cfg(test)]
 mod test {
     use super::*;
-    use bempp_element::element::lagrange;
+    use bempp_element::element::LagrangeElementFamily;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::element::Continuity;
     use bempp_traits::grid::{CellType, TopologyType};
-    use bempp_traits::types::ReferenceCellType;
 
     #[test]
     fn test_dofmap_lagrange0() {
         let grid = regular_sphere::<f64>(2);
-        let element =
-            lagrange::create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+        let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(space.local_size(), grid.number_of_cells());
@@ -217,8 +235,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange1() {
         let grid = regular_sphere::<f64>(2);
-        let element =
-            lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(space.local_size(), grid.number_of_vertices());
@@ -227,8 +244,7 @@ mod test {
     #[test]
     fn test_dofmap_lagrange2() {
         let grid = regular_sphere::<f64>(2);
-        let element =
-            lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(2, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(
@@ -240,8 +256,7 @@ mod test {
     #[test]
     fn test_colouring_p1() {
         let grid = regular_sphere::<f64>(2);
-        let element =
-            lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
         let cells = grid.iter_all_cells().collect::<Vec<_>>();
@@ -279,8 +294,7 @@ mod test {
     #[test]
     fn test_colouring_dp0() {
         let grid = regular_sphere::<f64>(2);
-        let element =
-            lagrange::create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+        let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
         let mut n = 0;
@@ -305,8 +319,7 @@ mod test {
     #[test]
     fn test_colouring_rt1() {
         let grid = regular_sphere::<f64>(2);
-        let element =
-            lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = space.compute_cell_colouring();
         let cells = grid.iter_all_cells().collect::<Vec<_>>();

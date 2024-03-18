@@ -2,7 +2,7 @@
 
 use crate::element::{reference_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_traits::element::{Continuity, MapType, ElementFamily};
+use bempp_traits::element::{Continuity, ElementFamily, MapType};
 use bempp_traits::types::ReferenceCellType;
 use rlst::MatrixInverse;
 use rlst::RlstScalar;
@@ -99,7 +99,8 @@ where
 
 /// Raviart-Thomas element family
 pub struct RaviartThomasElementFamily<T: RlstScalar>
-where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     degree: usize,
     continuity: Continuity,
@@ -107,18 +108,22 @@ where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 
 }
 
 impl<T: RlstScalar> RaviartThomasElementFamily<T>
-where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     /// Create new family
     pub fn new(degree: usize, continuity: Continuity) -> Self {
         Self {
-            degree, continuity, _t: PhantomData,
+            degree,
+            continuity,
+            _t: PhantomData,
         }
     }
 }
 
 impl<T: RlstScalar> ElementFamily for RaviartThomasElementFamily<T>
-where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+where
+    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     type T = T;
     type FiniteElement = CiarletElement<T>;

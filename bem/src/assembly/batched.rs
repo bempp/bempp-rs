@@ -141,7 +141,9 @@ fn assemble_batch_singular<
 ) -> SparseMatrixData<T> {
     let mut output = SparseMatrixData::<T>::new_known_size(
         shape,
-        cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
+        cell_pairs.len()
+            * trial_space.element(ReferenceCellType::Triangle).dim()
+            * test_space.element(ReferenceCellType::Triangle).dim(),
     );
     let npts = weights.len();
     debug_assert!(weights.len() == npts);
@@ -388,7 +390,9 @@ fn assemble_batch_singular_correction<
 ) -> SparseMatrixData<T> {
     let mut output = SparseMatrixData::<T>::new_known_size(
         shape,
-        cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
+        cell_pairs.len()
+            * trial_space.element(ReferenceCellType::Triangle).dim()
+            * test_space.element(ReferenceCellType::Triangle).dim(),
     );
     let npts_test = test_weights.len();
     let npts_trial = trial_weights.len();
@@ -645,12 +649,14 @@ pub trait BatchedAssembler: Sync + Sized {
             let mut table = rlst_dynamic_array4!(
                 Self::T,
                 trial_space
-                    .element()
+                    .element(ReferenceCellType::Triangle)
                     .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
             );
-            trial_space
-                .element()
-                .tabulate(&points, Self::TABLE_DERIVS, &mut table);
+            trial_space.element(ReferenceCellType::Triangle).tabulate(
+                &points,
+                Self::TABLE_DERIVS,
+                &mut table,
+            );
             trial_points.push(points);
             trial_tables.push(table);
 
@@ -667,12 +673,14 @@ pub trait BatchedAssembler: Sync + Sized {
             let mut table = rlst_dynamic_array4!(
                 Self::T,
                 test_space
-                    .element()
+                    .element(ReferenceCellType::Triangle)
                     .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
             );
-            test_space
-                .element()
-                .tabulate(&points, Self::TABLE_DERIVS, &mut table);
+            test_space.element(ReferenceCellType::Triangle).tabulate(
+                &points,
+                Self::TABLE_DERIVS,
+                &mut table,
+            );
             test_points.push(points);
             test_tables.push(table);
             qweights.push(
@@ -829,22 +837,26 @@ pub trait BatchedAssembler: Sync + Sized {
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
             test_space
-                .element()
+                .element(ReferenceCellType::Triangle)
                 .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
         );
-        test_space
-            .element()
-            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
+        test_space.element(ReferenceCellType::Triangle).tabulate(
+            &qpoints_test,
+            Self::TABLE_DERIVS,
+            &mut test_table,
+        );
 
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
             trial_space
-                .element()
+                .element(ReferenceCellType::Triangle)
                 .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
         );
-        trial_space
-            .element()
-            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
+        trial_space.element(ReferenceCellType::Triangle).tabulate(
+            &qpoints_test,
+            Self::TABLE_DERIVS,
+            &mut trial_table,
+        );
 
         let mut cell_pairs: Vec<(usize, usize)> = vec![];
 
@@ -1115,22 +1127,26 @@ pub trait BatchedAssembler: Sync + Sized {
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
             test_space
-                .element()
+                .element(ReferenceCellType::Triangle)
                 .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
         );
-        test_space
-            .element()
-            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
+        test_space.element(ReferenceCellType::Triangle).tabulate(
+            &qpoints_test,
+            Self::TABLE_DERIVS,
+            &mut test_table,
+        );
 
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
             trial_space
-                .element()
+                .element(ReferenceCellType::Triangle)
                 .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
         );
-        trial_space
-            .element()
-            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
+        trial_space.element(ReferenceCellType::Triangle).tabulate(
+            &qpoints_test,
+            Self::TABLE_DERIVS,
+            &mut trial_table,
+        );
 
         let output_raw = RawData2D {
             data: output.data_mut().as_mut_ptr(),
@@ -1196,7 +1212,7 @@ mod test {
     use super::*;
     use crate::function_space::SerialFunctionSpace;
     use approx::*;
-    use bempp_element::element::lagrange;
+    use bempp_element::element::LagrangeElementFamily;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::element::Continuity;
     use rlst::RandomAccessByRef;
@@ -1204,7 +1220,7 @@ mod test {
     #[test]
     fn test_singular_dp0() {
         let grid = regular_sphere::<f64>(0);
-        let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+        let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let ndofs = space.global_size();
@@ -1230,7 +1246,7 @@ mod test {
     #[test]
     fn test_singular_p1() {
         let grid = regular_sphere::<f64>(0);
-        let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let ndofs = space.global_size();
@@ -1256,8 +1272,8 @@ mod test {
     #[test]
     fn test_singular_dp0_p1() {
         let grid = regular_sphere::<f64>(0);
-        let element0 = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
-        let element1 = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
+        let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 

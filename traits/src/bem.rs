@@ -1,6 +1,7 @@
 //! Boundary element method traits
 use crate::element::FiniteElement;
 use crate::grid::GridType;
+use crate::types::ReferenceCellType;
 
 /// A function space
 pub trait FunctionSpace {
@@ -13,7 +14,7 @@ pub trait FunctionSpace {
     fn grid(&self) -> &Self::Grid;
 
     /// Get the finite element used to define this function space
-    fn element(&self) -> &Self::FiniteElement;
+    fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement;
 
     /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool {

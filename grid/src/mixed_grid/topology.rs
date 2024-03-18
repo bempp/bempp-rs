@@ -382,6 +382,9 @@ impl Topology for SerialMixedTopology {
     fn face_flat_index_to_index(&self, index: usize) -> IndexType {
         self.index_map[index]
     }
+    fn cell_types(&self) -> &[ReferenceCellType] {
+        &self.entity_types[self.dim]
+    }
 }
 
 #[cfg(test)]

@@ -463,6 +463,9 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
     fn face_flat_index_to_index(&self, index: usize) -> usize {
         index
     }
+    fn cell_types(&self) -> &[ReferenceCellType] {
+        &[ReferenceCellType::Triangle]
+    }
 }
 
 #[cfg(test)]

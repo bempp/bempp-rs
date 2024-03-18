@@ -34,6 +34,7 @@ pub struct SerialSingleElementTopology {
     vertex_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
+    cell_types: [ReferenceCellType; 1],
 }
 
 unsafe impl Sync for SerialSingleElementTopology {}
@@ -141,6 +142,7 @@ impl SerialSingleElementTopology {
             vertex_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
+            cell_types: [cell_type],
         }
     }
 }
@@ -255,6 +257,9 @@ impl Topology for SerialSingleElementTopology {
     }
     fn face_flat_index_to_index(&self, index: usize) -> usize {
         index
+    }
+    fn cell_types(&self) -> &[ReferenceCellType] {
+        &self.cell_types
     }
 }
 
