@@ -28,7 +28,7 @@ pub use adjoint_double_layer::{
     HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
 };
 pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
-pub use hypersingular::LaplaceHypersingularAssembler;
+pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
 pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
