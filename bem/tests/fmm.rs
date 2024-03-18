@@ -28,7 +28,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
-    const NPTS: usize = 16;
+    let npts = 16;
 
     let test_grid = test_space.grid();
     let trial_grid = test_space.grid();
@@ -40,16 +40,16 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
 
     let test_ndofs = test_space.global_size();
     let trial_ndofs = trial_space.global_size();
-    let nqpts = NPTS * grid.number_of_cells();
+    let nqpts = npts * grid.number_of_cells();
     let kernel = Laplace3dKernel::new();
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let a = batched::LaplaceSingleLayerAssembler::default();
-    a.assemble_into_dense::<128, TestGrid, TrialGrid>(&mut matrix, trial_space, test_space);
+    let a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+    a.assemble_into_dense(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
-    let all_points = fmm_tools::get_all_quadrature_points::<NPTS, f64, TrialGrid>(grid);
+    let all_points = fmm_tools::get_all_quadrature_points::<f64, TrialGrid>(npts, grid);
 
     // k is the matrix that FMM will give us
     let mut k = rlst_dynamic_array2!(f64, [nqpts, nqpts]);
@@ -61,32 +61,21 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
     );
 
     let mut p_t = rlst_dynamic_array2!(f64, [test_ndofs, nqpts]);
-    fmm_tools::transpose_basis_to_quadrature_into_dense::<NPTS, 128, f64, f64, TestGrid>(
-        &mut p_t, test_space,
+    fmm_tools::transpose_basis_to_quadrature_into_dense::<128, f64, TestGrid>(
+        &mut p_t, npts, test_space,
     );
 
     let mut p = rlst_dynamic_array2!(f64, [nqpts, trial_ndofs]);
-    fmm_tools::basis_to_quadrature_into_dense::<NPTS, 128, f64, f64, TrialGrid>(
-        &mut p,
-        trial_space,
-    );
+    fmm_tools::basis_to_quadrature_into_dense::<128, f64, TrialGrid>(&mut p, npts, trial_space);
 
     // matrix 2 = p_t @ k @ p - c + singular
     let mut matrix2 = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
 
     // matrix 2 = singular
-    a.assemble_singular_into_dense::<4, 128, TestGrid, TrialGrid>(
-        &mut matrix2,
-        trial_space,
-        test_space,
-    );
+    a.assemble_singular_into_dense(&mut matrix2, 4, trial_space, test_space);
 
     let mut correction = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    a.assemble_singular_correction_into_dense::<NPTS, NPTS, 128, TestGrid, TrialGrid>(
-        &mut correction,
-        trial_space,
-        test_space,
-    );
+    a.assemble_singular_correction_into_dense(&mut correction, npts, npts, trial_space, test_space);
 
     let temp = empty_array::<f64, 2>()
         .simple_mult_into_resize(empty_array::<f64, 2>().simple_mult_into_resize(p_t, k), p);
@@ -114,7 +103,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
-    const NPTS: usize = 16;
+    let npts = 16;
 
     let test_grid = test_space.grid();
     let trial_grid = test_space.grid();
@@ -126,7 +115,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
 
     let test_ndofs = test_space.global_size();
     let trial_ndofs = trial_space.global_size();
-    let nqpts = NPTS * grid.number_of_cells();
+    let nqpts = npts * grid.number_of_cells();
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
@@ -134,25 +123,25 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     a.assemble_into_dense::<128, TestGrid, TrialGrid>(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
-    let all_points = fmm_tools::get_all_quadrature_points::<NPTS, f64, TrialGrid>(grid);
+    let all_points = fmm_tools::get_all_quadrature_points::<f64, TrialGrid>(npts, grid);
 
     // FMM parameters
     let expansion_order = 6;
     let n_crit = Some(150);
     let sparse = true;
 
-    let p_t = fmm_tools::transpose_basis_to_quadrature_into_csr::<NPTS, 128, f64, f64, TestGrid>(
+    let p_t =
+        fmm_tools::transpose_basis_to_quadrature_into_csr::<128, f64, TestGrid>(npts, test_space);
+    let p = fmm_tools::basis_to_quadrature_into_csr::<128, f64, TrialGrid>(npts, trial_space);
+    let singular =
+        a.assemble_singular_into_csr::<128, TestGrid, TrialGrid>(4, trial_space, test_space);
+
+    let correction = a.assemble_singular_correction_into_csr::<128, TestGrid, TrialGrid>(
+        npts,
+        npts,
+        trial_space,
         test_space,
     );
-    let p = fmm_tools::basis_to_quadrature_into_csr::<NPTS, 128, f64, f64, TrialGrid>(trial_space);
-    let singular =
-        a.assemble_singular_into_csr::<4, 128, TestGrid, TrialGrid>(trial_space, test_space);
-
-    let correction = a
-        .assemble_singular_correction_into_csr::<NPTS, NPTS, 128, TestGrid, TrialGrid>(
-            trial_space,
-            test_space,
-        );
 
     // matrix2 = p_t @ k @ p - c + singular
     let mut rng = rand::thread_rng();
@@ -314,12 +303,12 @@ fn test_fmm_dp0_p1() {
 fn test_fmm_result() {
     let grid = regular_sphere(2);
 
-    const NPTS: usize = 1;
+    let npts = 1;
 
-    let nqpts = NPTS * grid.number_of_cells();
+    let nqpts = npts * grid.number_of_cells();
     let kernel = Laplace3dKernel::new();
 
-    let all_points = fmm_tools::get_all_quadrature_points::<NPTS, f64, _>(&grid);
+    let all_points = fmm_tools::get_all_quadrature_points::<f64, _>(npts, &grid);
 
     let expansion_order = 6;
     let n_crit = Some(1);

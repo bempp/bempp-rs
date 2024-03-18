@@ -5,19 +5,24 @@ use bempp_traits::kernel::Kernel;
 use rlst_dense::{traits::UnsafeRandomAccessByRef, types::RlstScalar};
 
 /// Assembler for a Laplace adjoint double layer operator
-pub struct LaplaceAdjointDoubleLayerAssembler<T: RlstScalar> {
+pub struct LaplaceAdjointDoubleLayerAssembler<const BATCHSIZE: usize, T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
 }
-impl<T: RlstScalar> Default for LaplaceAdjointDoubleLayerAssembler<T> {
+impl<const BATCHSIZE: usize, T: RlstScalar> Default
+    for LaplaceAdjointDoubleLayerAssembler<BATCHSIZE, T>
+{
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
         }
     }
 }
-impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
+impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
+    for LaplaceAdjointDoubleLayerAssembler<BATCHSIZE, T>
+{
     const DERIV_SIZE: usize = 4;
-    type RealT = T::Real;
+    const TABLE_DERIVS: usize = 0;
+    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     unsafe fn singular_kernel_value(
         &self,
@@ -64,10 +69,13 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
 }
 
 /// Assembler for a Helmholtz adjoint double layer boundary operator
-pub struct HelmholtzAdjointDoubleLayerAssembler<T: RlstScalar<Complex = T>> {
+pub struct HelmholtzAdjointDoubleLayerAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
+{
     kernel: Helmholtz3dKernel<T>,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzAdjointDoubleLayerAssembler<T> {
+impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
+    HelmholtzAdjointDoubleLayerAssembler<BATCHSIZE, T>
+{
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -75,9 +83,12 @@ impl<T: RlstScalar<Complex = T>> HelmholtzAdjointDoubleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLayerAssembler<T> {
+impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
+    for HelmholtzAdjointDoubleLayerAssembler<BATCHSIZE, T>
+{
     const DERIV_SIZE: usize = 4;
-    type RealT = T::Real;
+    const TABLE_DERIVS: usize = 0;
+    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     unsafe fn singular_kernel_value(
         &self,
