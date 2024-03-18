@@ -12,15 +12,12 @@ use bempp_traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
 use bempp_traits::types::EvalType;
 use bempp_traits::types::ReferenceCellType;
 use rayon::prelude::*;
-use rlst_dense::{
-    array::Array,
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4,
-    traits::{RandomAccessMut, RawAccess, RawAccessMut, Shape, UnsafeRandomAccessByRef},
-    types::RlstScalar,
+use rlst::CsrMatrix;
+use rlst::{
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, Array, BaseArray,
+    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
+    UnsafeRandomAccessMut, VectorContainer,
 };
-use rlst_sparse::sparse::csr_mat::CsrMatrix;
 use std::collections::HashMap;
 
 mod adjoint_double_layer;
@@ -1201,7 +1198,7 @@ mod test {
     use bempp_element::element::lagrange;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::element::Continuity;
-    use rlst_dense::traits::RandomAccessByRef;
+    use rlst::RandomAccessByRef;
 
     #[test]
     fn test_singular_dp0() {

@@ -26,9 +26,7 @@ bempp-quadrature = { path = "../quadrature" }
 paste = "1.*"
 libc = "0.2"
 approx = "0.5"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
-rlst-blis-src = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 num = "0.4"
 
 [package.metadata.docs.rs]
@@ -36,3 +34,12 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints]
 workspace = true
+
+[target.aarch64-apple-darwin.dev-dependencies]
+blas-src = { version = "0.9", features = ["accelerate"]}
+lapack-src = { version = "0.9", features = ["accelerate"]}
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.9", features = ["blis"]}
+lapack-src = { version = "0.9", features = ["netlib"]}
+

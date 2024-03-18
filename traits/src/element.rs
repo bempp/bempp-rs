@@ -1,8 +1,8 @@
 //! Finite element definitions
 
 use crate::types::ReferenceCellType;
-use rlst_dense::traits::{RandomAccessByRef, RandomAccessMut, Shape};
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
+use rlst::{RandomAccessByRef, RandomAccessMut, Shape};
 
 /// Continuity type
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

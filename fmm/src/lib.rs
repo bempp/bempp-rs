@@ -20,3 +20,9 @@ mod field_translation {
     }
     pub mod target;
 }
+
+#[cfg(test)]
+mod test {
+    extern crate blas_src;
+    extern crate lapack_src;
+}

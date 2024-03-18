@@ -4,11 +4,7 @@ use std::collections::HashMap;
 use bempp_traits::tree::Tree;
 use bempp_tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use num::Float;
-use rlst_dense::{
-    rlst_dynamic_array2,
-    traits::{RawAccess, RawAccessMut, Shape},
-    types::RlstScalar,
-};
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
 
 use crate::types::{Charges, SendPtrMut};
 

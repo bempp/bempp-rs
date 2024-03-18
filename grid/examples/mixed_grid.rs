@@ -4,6 +4,9 @@ use bempp_traits::{
     types::ReferenceCellType,
 };
 
+extern crate blas_src;
+extern crate lapack_src;
+
 /// Creating a mixed grid
 ///
 /// In a mixed grid, the geometry of each cell can be represented by a different element. This allows

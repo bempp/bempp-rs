@@ -2,7 +2,7 @@
 use std::{collections::HashSet, hash::Hash};
 
 use num::Float;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 /// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
 /// This trait makes no assumptions about the downstream usage of a struct implementing Tree,

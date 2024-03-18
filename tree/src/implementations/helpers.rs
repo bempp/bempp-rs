@@ -5,9 +5,7 @@ use bempp_traits::types::RlstScalar;
 use num::Float;
 use rand::prelude::*;
 
-use rlst_dense::{
-    array::Array, base_array::BaseArray, data_container::VectorContainer, rlst_dynamic_array2,
-};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
 
 /// Alias for an rlst container for point data.
 pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

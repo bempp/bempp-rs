@@ -4,7 +4,7 @@ use super::{CellType, PointType, ReferenceMapType};
 use crate::types::cell_iterator::CellIterator;
 use crate::types::point_iterator::PointIterator;
 use crate::types::CellLocalIndexPair;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 pub trait GridType: std::marker::Sized {
     //! A grid

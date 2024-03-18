@@ -4,12 +4,11 @@ use crate::element::{reference_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
 use bempp_traits::element::{Continuity, MapType};
 use bempp_traits::types::ReferenceCellType;
-use rlst_dense::linalg::inverse::MatrixInverse;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::views::ArrayViewMut, array::Array, base_array::BaseArray,
-    data_container::VectorContainer, rlst_dynamic_array2, rlst_dynamic_array3,
-    traits::RandomAccessMut,
+use rlst::MatrixInverse;
+use rlst::RlstScalar;
+use rlst::{
+    dense::array::views::ArrayViewMut, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray,
+    RandomAccessMut, VectorContainer,
 };
 
 /// Create a Raviart-Thomas element

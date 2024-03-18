@@ -1,5 +1,5 @@
 //! Common utility functions
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 /// Raw 2D data
 pub struct RawData2D<T: RlstScalar> {

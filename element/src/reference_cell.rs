@@ -1,7 +1,7 @@
 //! Cell definitions
 
 use bempp_traits::types::ReferenceCellType;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 /// The topological dimension of the cell
 pub fn dim(cell: ReferenceCellType) -> usize {

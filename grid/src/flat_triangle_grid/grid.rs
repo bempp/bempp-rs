@@ -8,19 +8,14 @@ use bempp_element::reference_cell;
 use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::{views::ArrayViewMut, Array, SliceArray},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_array_from_slice2,
-    traits::{
-        DefaultIterator, DefaultIteratorMut, MatrixInverse, RandomAccessByRef, RawAccess, Shape,
-        UnsafeRandomAccessByRef,
-    },
+use rlst::rlst_static_array;
+use rlst::rlst_static_type;
+use rlst::RlstScalar;
+use rlst::{
+    dense::array::{views::ArrayViewMut, Array, SliceArray},
+    rlst_array_from_slice2, BaseArray, DefaultIterator, DefaultIteratorMut, MatrixInverse,
+    RandomAccessByRef, RawAccess, Shape, UnsafeRandomAccessByRef, VectorContainer,
 };
-use rlst_proc_macro::rlst_static_array;
-use rlst_proc_macro::rlst_static_type;
 use std::collections::HashMap;
 
 /// A flat triangle grid
@@ -474,10 +469,7 @@ impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
 mod test {
     use super::*;
     use approx::*;
-    use rlst_dense::{
-        rlst_dynamic_array2, rlst_dynamic_array3,
-        traits::{RandomAccessMut, RawAccessMut},
-    };
+    use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut, RawAccessMut};
 
     fn example_grid_flat() -> SerialFlatTriangleGrid<f64> {
         //! Create a flat test grid

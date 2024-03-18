@@ -2,10 +2,7 @@
 use super::SerialFlatTriangleGrid;
 use bempp_traits::grid::GmshIO;
 use num::Float;
-use rlst_dense::{
-    traits::{RandomAccessByRef, Shape},
-    types::RlstScalar,
-};
+use rlst::{RandomAccessByRef, RlstScalar, Shape};
 
 impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialFlatTriangleGrid<T> {
     fn to_gmsh_string(&self) -> String {

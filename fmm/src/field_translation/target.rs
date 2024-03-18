@@ -14,11 +14,9 @@ use bempp_tree::{
     constants::NSIBLINGS,
     types::{morton::MortonKey, single_node::SingleNodeTree},
 };
-use rlst_dense::{
-    array::empty_array,
-    rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MultIntoResize, RawAccess, RawAccessMut},
-    types::RlstScalar,
+use rlst::{
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
+    RawAccessMut, RlstScalar,
 };
 
 use crate::{

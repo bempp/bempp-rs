@@ -399,12 +399,9 @@ mod test {
     use approx::assert_relative_eq;
     use bempp_traits::types::RlstScalar;
     use rand::prelude::*;
-    use rlst_dense::{
-        array::Array,
-        base_array::BaseArray,
-        data_container::VectorContainer,
-        rlst_dynamic_array1, rlst_dynamic_array2,
-        traits::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape},
+    use rlst::{
+        rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray, RandomAccessByRef,
+        RandomAccessMut, RawAccess, RawAccessMut, Shape, VectorContainer,
     };
 
     fn copy(

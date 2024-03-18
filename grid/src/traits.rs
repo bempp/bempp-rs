@@ -3,7 +3,7 @@
 use bempp_traits::element::FiniteElement;
 use bempp_traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 use std::hash::Hash;
 
 /// Ownership

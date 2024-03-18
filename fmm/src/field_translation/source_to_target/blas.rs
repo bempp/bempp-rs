@@ -20,13 +20,9 @@ use crate::{
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
 
-use rlst_dense::{
-    array::{empty_array, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_array_from_slice2, rlst_dynamic_array2,
-    traits::{MatrixSvd, MultIntoResize, RawAccess, RawAccessMut},
-    types::RlstScalar,
+use rlst::{
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MatrixSvd,
+    MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer,
 };
 
 impl<T, U, V> KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
@@ -192,7 +188,8 @@ where
                 // 1. Compute the SVD compressed multipole expansions at this level
                 let mut compressed_multipoles;
                 {
-                    rlst_blis::interface::threading::enable_threading();
+                    //TODO: Rework threading
+                    //rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
                         self.source_to_target_translation_data
                             .operator_data
@@ -200,7 +197,8 @@ where
                             .view(),
                         multipoles,
                     );
-                    rlst_blis::interface::threading::disable_threading();
+                    //TODO: Rework threading
+                    //rlst::threading::disable_threading();
 
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
                         *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level)
@@ -275,7 +273,8 @@ where
 
                 // 3. Compute local expansions from compressed check potentials
                 {
-                    rlst_blis::interface::threading::enable_threading();
+                    //TODO: Rework threading
+                    //rlst_blis::interface::threading::enable_threading();
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
@@ -289,7 +288,8 @@ where
                             ),
                         ),
                     );
-                    rlst_blis::interface::threading::disable_threading();
+                    //TODO: Rework threading
+                    //rlst_blis::interface::threading::disable_threading();
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals =
@@ -351,7 +351,8 @@ where
                 // 1. Compute the SVD compressed multipole expansions at this level
                 let mut compressed_multipoles;
                 {
-                    rlst_blis::interface::threading::enable_threading();
+                    //TODO: Rework threading
+                    //rlst_blis::interface::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
                         self.source_to_target_translation_data
                             .operator_data
@@ -359,7 +360,8 @@ where
                             .view(),
                         multipoles,
                     );
-                    rlst_blis::interface::threading::disable_threading();
+                    //TODO: Rework threading
+                    //rlst_blis::interface::threading::disable_threading();
 
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
                         *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level)
@@ -467,7 +469,8 @@ where
 
                 // 3. Compute local expansions from compressed check potentials
                 {
-                    rlst_blis::interface::threading::enable_threading();
+                    //TODO: Rework threading
+                    //t_blis::interface::threading::enable_threading();
                     let locals = empty_array::<U, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1.view(),
                         empty_array::<U, 2>().simple_mult_into_resize(
@@ -481,7 +484,8 @@ where
                             ),
                         ),
                     );
-                    rlst_blis::interface::threading::disable_threading();
+                    //TODO: Rework threading
+                    //rlst_blis::interface::threading::disable_threading();
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
                         std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)

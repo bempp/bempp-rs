@@ -10,3 +10,9 @@ pub mod shapes;
 pub mod single_element_grid;
 pub mod traits;
 pub mod traits_impl;
+
+#[cfg(test)]
+mod test {
+    extern crate blas_src;
+    extern crate lapack_src;
+}

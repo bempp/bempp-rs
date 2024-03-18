@@ -4,6 +4,9 @@ use bempp_traits::{
     types::ReferenceCellType,
 };
 
+extern crate blas_src;
+extern crate lapack_src;
+
 /// Creating a single element grid
 ///
 /// In a single element grid, the same finite element will be used to represent the geometry

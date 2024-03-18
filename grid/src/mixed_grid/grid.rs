@@ -8,12 +8,10 @@ use bempp_traits::element::{Continuity, FiniteElement};
 use bempp_traits::types::ReferenceCellType;
 use log::warn;
 use num::Float;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::{views::ArrayViewMut, Array},
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    traits::MatrixInverse,
+use rlst::RlstScalar;
+use rlst::{
+    dense::array::{views::ArrayViewMut, Array},
+    BaseArray, MatrixInverse, VectorContainer,
 };
 use std::collections::HashMap;
 

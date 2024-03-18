@@ -1,6 +1,6 @@
 //! Definition of a vertex
 
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 pub trait PointType {
     //! A point

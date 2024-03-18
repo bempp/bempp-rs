@@ -11,13 +11,10 @@ use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_traits::element::FiniteElement;
 use bempp_traits::types::ReferenceCellType;
 use num::Float;
-use rlst_dense::types::RlstScalar;
-use rlst_dense::{
-    array::Array,
-    base_array::BaseArray,
-    data_container::VectorContainer,
-    rlst_array_from_slice2, rlst_dynamic_array1, rlst_dynamic_array4,
-    traits::{DefaultIteratorMut, RandomAccessByRef, Shape, UnsafeRandomAccessByRef},
+use rlst::RlstScalar;
+use rlst::{
+    rlst_array_from_slice2, rlst_dynamic_array1, rlst_dynamic_array4, Array, BaseArray,
+    DefaultIteratorMut, RandomAccessByRef, Shape, UnsafeRandomAccessByRef, VectorContainer,
 };
 use std::collections::HashMap;
 
@@ -344,9 +341,8 @@ mod test {
     use bempp_element::element::lagrange;
     use bempp_traits::element::Continuity;
     use bempp_traits::types::ReferenceCellType;
-    use rlst_dense::{
-        rlst_dynamic_array2, rlst_dynamic_array3,
-        traits::{RandomAccessMut, RawAccess, RawAccessMut},
+    use rlst::{
+        rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut, RawAccess, RawAccessMut,
     };
 
     fn example_geometry_2d() -> SerialSingleElementGeometry<f64> {

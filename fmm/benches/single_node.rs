@@ -7,7 +7,10 @@ use bempp_traits::fmm::Fmm;
 use bempp_traits::types::EvalType;
 use bempp_tree::implementations::helpers::points_fixture;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rlst_dense::{rlst_dynamic_array2, traits::RawAccessMut};
+use rlst::{rlst_dynamic_array2, RawAccessMut};
+
+extern crate blas_src;
+extern crate lapack_src;
 
 fn laplace_potentials_f32(c: &mut Criterion) {
     // Setup random sources and targets

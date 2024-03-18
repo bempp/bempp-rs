@@ -1,7 +1,7 @@
 //! Map from reference to physical space.
 
 use crate::grid::GridType;
-use rlst_dense::types::RlstScalar;
+use rlst::RlstScalar;
 
 pub trait ReferenceMapType {
     //! Reference to physical map
