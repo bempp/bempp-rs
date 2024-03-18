@@ -50,7 +50,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(15));
 
-    group.bench_function(format!("(M2L=FFT, Kernel=Laplace N={nsources}"), |b| {
+    group.bench_function(format!("M2L=FFT, Kernel=Laplace N={nsources}"), |b| {
         b.iter(|| fmm_fft.evaluate())
     });
 
