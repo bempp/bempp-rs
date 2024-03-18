@@ -5,6 +5,60 @@ use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel}
 use bempp_traits::{bem::FunctionSpace, grid::GridType, kernel::Kernel};
 use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef};
 
+#[allow(clippy::too_many_arguments)]
+unsafe fn hyp_test_trial_product<T: RlstScalar>(
+    test_table: &RlstArray<T, 4>,
+    trial_table: &RlstArray<T, 4>,
+    test_jacobians: &RlstArray<T::Real, 2>,
+    trial_jacobians: &RlstArray<T::Real, 2>,
+    test_jdets: &[T::Real],
+    trial_jdets: &[T::Real],
+    test_point_index: usize,
+    trial_point_index: usize,
+    test_basis_index: usize,
+    trial_basis_index: usize,
+) -> T {
+    let test0 = *test_table.get_unchecked([1, test_point_index, test_basis_index, 0]);
+    let test1 = *test_table.get_unchecked([2, test_point_index, test_basis_index, 0]);
+    let trial0 = *trial_table.get_unchecked([1, trial_point_index, trial_basis_index, 0]);
+    let trial1 = *trial_table.get_unchecked([2, trial_point_index, trial_basis_index, 0]);
+
+    ((num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 3])).unwrap()
+        * test0
+        - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 0])).unwrap()
+            * test1)
+        * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 3]))
+            .unwrap()
+            * trial0
+            - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 0]))
+                .unwrap()
+                * trial1)
+        + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 4])).unwrap()
+            * test0
+            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 1]))
+                .unwrap()
+                * test1)
+            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 4]))
+                .unwrap()
+                * trial0
+                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 1]))
+                    .unwrap()
+                    * trial1)
+        + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 5])).unwrap()
+            * test0
+            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 2]))
+                .unwrap()
+                * test1)
+            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 5]))
+                .unwrap()
+                * trial0
+                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 2]))
+                    .unwrap()
+                    * trial1))
+        / num::cast::<T::Real, T>(test_jdets[test_point_index] * trial_jdets[trial_point_index])
+            .unwrap()
+}
+
 /// Assembler for a Laplace hypersingular operator
 pub struct LaplaceHypersingularAssembler<const BATCHSIZE: usize, T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
@@ -71,52 +125,18 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
         test_basis_index: usize,
         trial_basis_index: usize,
     ) -> T {
-        let test0 = *test_table.get_unchecked([1, test_point_index, test_basis_index, 0]);
-        let test1 = *test_table.get_unchecked([2, test_point_index, test_basis_index, 0]);
-        let trial0 = *trial_table.get_unchecked([1, trial_point_index, trial_basis_index, 0]);
-        let trial1 = *trial_table.get_unchecked([2, trial_point_index, trial_basis_index, 0]);
-
-        ((num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 3])).unwrap()
-            * test0
-            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 0]))
-                .unwrap()
-                * test1)
-            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 3]))
-                .unwrap()
-                * trial0
-                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 0]))
-                    .unwrap()
-                    * trial1)
-            + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 4]))
-                .unwrap()
-                * test0
-                - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 1]))
-                    .unwrap()
-                    * test1)
-                * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 4]))
-                    .unwrap()
-                    * trial0
-                    - num::cast::<T::Real, T>(
-                        *trial_jacobians.get_unchecked([trial_point_index, 1]),
-                    )
-                    .unwrap()
-                        * trial1)
-            + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 5]))
-                .unwrap()
-                * test0
-                - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 2]))
-                    .unwrap()
-                    * test1)
-                * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 5]))
-                    .unwrap()
-                    * trial0
-                    - num::cast::<T::Real, T>(
-                        *trial_jacobians.get_unchecked([trial_point_index, 2]),
-                    )
-                    .unwrap()
-                        * trial1))
-            / num::cast::<T::Real, T>(test_jdets[test_point_index] * trial_jdets[trial_point_index])
-                .unwrap()
+        hyp_test_trial_product::<T>(
+            test_table,
+            trial_table,
+            test_jacobians,
+            trial_jacobians,
+            test_jdets,
+            trial_jdets,
+            test_point_index,
+            trial_point_index,
+            test_basis_index,
+            trial_basis_index,
+        )
     }
 }
 
@@ -187,52 +207,18 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         test_basis_index: usize,
         trial_basis_index: usize,
     ) -> T {
-        let test0 = *test_table.get_unchecked([1, test_point_index, test_basis_index, 0]);
-        let test1 = *test_table.get_unchecked([2, test_point_index, test_basis_index, 0]);
-        let trial0 = *trial_table.get_unchecked([1, trial_point_index, trial_basis_index, 0]);
-        let trial1 = *trial_table.get_unchecked([2, trial_point_index, trial_basis_index, 0]);
-
-        ((num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 3])).unwrap()
-            * test0
-            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 0]))
-                .unwrap()
-                * test1)
-            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 3]))
-                .unwrap()
-                * trial0
-                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 0]))
-                    .unwrap()
-                    * trial1)
-            + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 4]))
-                .unwrap()
-                * test0
-                - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 1]))
-                    .unwrap()
-                    * test1)
-                * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 4]))
-                    .unwrap()
-                    * trial0
-                    - num::cast::<T::Real, T>(
-                        *trial_jacobians.get_unchecked([trial_point_index, 1]),
-                    )
-                    .unwrap()
-                        * trial1)
-            + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 5]))
-                .unwrap()
-                * test0
-                - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 2]))
-                    .unwrap()
-                    * test1)
-                * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 5]))
-                    .unwrap()
-                    * trial0
-                    - num::cast::<T::Real, T>(
-                        *trial_jacobians.get_unchecked([trial_point_index, 2]),
-                    )
-                    .unwrap()
-                        * trial1))
-            / num::cast::<T::Real, T>(test_jdets[test_point_index] * trial_jdets[trial_point_index])
-                .unwrap()
+        hyp_test_trial_product::<T>(
+            test_table,
+            trial_table,
+            test_jacobians,
+            trial_jacobians,
+            test_jdets,
+            trial_jdets,
+            test_point_index,
+            trial_point_index,
+            test_basis_index,
+            trial_basis_index,
+        )
     }
 }
 
@@ -366,22 +352,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
     }
     fn kernel_assemble_st(&self, _sources: &[T::Real], _targets: &[T::Real], _result: &mut [T]) {
-        panic!("Cannot directly use HelmholtzHypersingularAssembler");
-    }
-    #[allow(clippy::too_many_arguments)]
-    unsafe fn test_trial_product(
-        &self,
-        _test_table: &RlstArray<T, 4>,
-        _trial_table: &RlstArray<T, 4>,
-        _test_jacobians: &RlstArray<T::Real, 2>,
-        _trial_jacobians: &RlstArray<T::Real, 2>,
-        _test_jdets: &[T::Real],
-        _trial_jdets: &[T::Real],
-        _test_point_index: usize,
-        _trial_point_index: usize,
-        _test_basis_index: usize,
-        _trial_basis_index: usize,
-    ) -> T {
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
     }
 
