@@ -5,47 +5,76 @@ pub mod fmm_tools;
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::batched::BatchedAssembler;
+    use super::*;
     use crate::function_space::SerialFunctionSpace;
     use bempp_element::element::lagrange;
-    use bempp_grid::{shapes::regular_sphere, single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder}, traits_impl::WrappedGrid};
-    use bempp_traits::{element::Continuity, bem::FunctionSpace, types::ReferenceCellType, grid::Builder};
-    use rlst::{rlst_dynamic_array2, RlstScalar, Array, BaseArray, VectorContainer, MatrixInverse};
+    use bempp_grid::{
+        shapes::regular_sphere,
+        single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
+        traits_impl::WrappedGrid,
+    };
+    use bempp_traits::{
+        bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
+    };
     use cauchy::{c32, c64};
-    use paste::paste;
     use num::Float;
+    use paste::paste;
+    use rlst::{
+        dense::array::views::ArrayViewMut, rlst_dynamic_array2, Array, BaseArray, MatrixInverse,
+        RlstScalar, VectorContainer,
+    };
 
-    fn quadrilateral_grid<T: Float + RlstScalar<Real=T>>() -> WrappedGrid<SerialSingleElementGrid<T>>
-    where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+    fn quadrilateral_grid<T: Float + RlstScalar<Real = T>>(
+    ) -> WrappedGrid<SerialSingleElementGrid<T>>
+    where
+        for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
+            MatrixInverse,
     {
-        let mut b = SerialSingleElementGridBuilder::<3, T>::new((ReferenceCellType::Quadrilateral, 1));
+        let mut b =
+            SerialSingleElementGridBuilder::<3, T>::new((ReferenceCellType::Quadrilateral, 1));
         for j in 0..4 {
             for i in 0..4 {
-                b.add_point(4*j + i, [
-num::cast::<i32, T>(i).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
-num::cast::<i32, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(), num::cast::<f64, T>(0.0).unwrap()]);
+                b.add_point(
+                    4 * j + i,
+                    [
+                        num::cast::<usize, T>(i).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
+                        num::cast::<usize, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
+                        num::cast::<f64, T>(0.0).unwrap(),
+                    ],
+                );
             }
         }
         for j in 0..3 {
             for i in 0..3 {
-                b.add_cell(3*j + i, vec![4*j + i, 4*j + i + 1, 4*j + i + 4, 4*j + i + 5]);
+                b.add_cell(
+                    3 * j + i,
+                    vec![4 * j + i, 4 * j + i + 1, 4 * j + i + 4, 4 * j + i + 5],
+                );
             }
         }
         b.create_grid()
     }
 
     macro_rules! example_grid {
-        (Triangle, $dtype:ident) => { regular_sphere(0) };
-        (Quadrilateral, $dtype:ident) => { quadrilateral_grid::<<$dtype as RlstScalar>::Real>() };
+        (Triangle, $dtype:ident) => {
+            regular_sphere(0)
+        };
+        (Quadrilateral, $dtype:ident) => {
+            quadrilateral_grid::<<$dtype as RlstScalar>::Real>()
+        };
     }
     macro_rules! create_assembler {
-        (Laplace, $operator:ident, $dtype:ident) => {paste!{
-            batched::[<Laplace $operator Assembler>]::<128, [<$dtype>]>::default()
-        }};
-        (Helmholtz, $operator:ident, $dtype:ident) => {paste! {
-            batched::[<Helmholtz $operator Assembler>]::<128, [<$dtype>]>::new(3.0)
-        }};
+        (Laplace, $operator:ident, $dtype:ident) => {
+            paste! {
+                batched::[<Laplace $operator Assembler>]::<128, [<$dtype>]>::default()
+            }
+        };
+        (Helmholtz, $operator:ident, $dtype:ident) => {
+            paste! {
+                batched::[<Helmholtz $operator Assembler>]::<128, [<$dtype>]>::new(3.0)
+            }
+        };
     }
     macro_rules! test_assembly {
 
@@ -123,5 +152,4 @@ num::cast::<i32, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(), num::cast::
         (c64, Helmholtz, Hypersingular, Quadrilateral),
         (c32, Helmholtz, Hypersingular, Quadrilateral)
     );
-
 }
