@@ -2,7 +2,7 @@
 
 use crate::element::{reference_cell, CiarletElement};
 use crate::polynomials::polynomial_count;
-use bempp_traits::element::{Continuity, MapType};
+use bempp_traits::element::{Continuity, MapType, ElementFamily};
 use bempp_traits::types::ReferenceCellType;
 use rlst::MatrixInverse;
 use rlst::RlstScalar;
@@ -10,6 +10,7 @@ use rlst::{
     dense::array::views::ArrayViewMut, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray,
     RandomAccessMut, VectorContainer,
 };
+use std::marker::PhantomData;
 
 /// Create a Lagrange element
 pub fn create<T: RlstScalar>(
@@ -175,4 +176,34 @@ where
         continuity,
         degree,
     )
+}
+
+/// Lagrange element family
+pub struct LagrangeElementFamily<T: RlstScalar>
+where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+{
+    degree: usize,
+    continuity: Continuity,
+    _t: PhantomData<T>,
+}
+
+impl<T: RlstScalar> LagrangeElementFamily<T>
+where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+{
+    /// Create new family
+    pub fn new(degree: usize, continuity: Continuity) -> Self {
+        Self {
+            degree, continuity, _t: PhantomData,
+        }
+    }
+}
+
+impl<T: RlstScalar> ElementFamily for LagrangeElementFamily<T>
+where for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse
+{
+    type T = T;
+    type FiniteElement = CiarletElement<T>;
+    fn element(&self, cell_type: ReferenceCellType) -> CiarletElement<T> {
+        create::<T>(cell_type, self.degree, self.continuity)
+    }
 }
