@@ -197,15 +197,10 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
         }
     }
 }
-/*
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = lagrange::create(
-        ReferenceCellType::Triangle,
-        1,
-        Continuity::Continuous,
-    );
+    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -230,4 +225,3 @@ fn test_helmholtz_hypersingular_p1_p1() {
         }
     }
 }
-*/
