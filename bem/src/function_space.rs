@@ -197,7 +197,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 
 #[cfg(test)]
 mod test {
-    use crate::function_space::*;
+    use super::*;
     use bempp_element::element::lagrange;
     use bempp_grid::shapes::regular_sphere;
     use bempp_traits::element::Continuity;
