@@ -18,30 +18,30 @@ pub trait ReferenceMapType {
     /// The number of reference points that this map uses
     fn number_of_reference_points(&self) -> usize;
 
-    /// Get an iterator that returns a slice with the value of the
-    /// physical point for each reference point
+    /// Write the physical points for the cell with index `cell_index` into `value`
+    ///
+    /// `value` should have shape [npts, physical_dimension] and use column-major ordering
     fn reference_to_physical(
         &self,
         cell_index: usize,
-        point_index: usize,
         value: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real],
     );
 
-    /// Get an iterator that returns a slice with the value of the
-    /// Jacobian at the physical point for each reference point
+    /// Write the jacobians at the physical points for the cell with index `cell_index` into `value`
+    ///
+    /// `value` should have shape [npts, physical_dimension*domain_dimension] and use column-major ordering
     fn jacobian(
         &self,
         cell_index: usize,
-        point_index: usize,
         value: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real],
     );
 
-    /// Get an iterator that returns a slice with the normal direction
-    /// at each point
+    /// Write the normals at the physical points for the cell with index `cell_index` into `value`
+    ///
+    /// `value` should have shape [npts, physical_dimension] and use column-major ordering
     fn normal(
         &self,
         cell_index: usize,
-        point_index: usize,
         value: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real],
     );
 }

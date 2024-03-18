@@ -1,8 +1,8 @@
 //! Implementation of grid geometry
 
 use crate::common::{
-    compute_det, compute_diameter_quadrilateral, compute_diameter_triangle, compute_jacobian,
-    compute_normal_from_jacobian23, compute_point,
+    compute_det, compute_diameter_quadrilateral, compute_diameter_triangle, compute_jacobians,
+    compute_normals_from_jacobians23, compute_points,
 };
 use crate::traits::{Geometry, GeometryEvaluator};
 use bempp_element::element::CiarletElement;
@@ -349,38 +349,37 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluato
         self.tables[0].shape()[1]
     }
 
-    fn compute_point(&self, cell_index: usize, point_index: usize, point: &mut [T]) {
+    fn compute_points(&self, cell_index: usize, points: &mut [T]) {
         let cell = self.geometry.index_map()[cell_index];
-        compute_point(
+        compute_points(
             self.geometry,
             self.tables[cell.0].view(),
             cell_index,
-            point_index,
-            point,
+            points,
         );
     }
 
-    fn compute_jacobian(&self, cell_index: usize, point_index: usize, jacobian: &mut [T]) {
+    fn compute_jacobians(&self, cell_index: usize, jacobians: &mut [T]) {
         let cell = self.geometry.index_map()[cell_index];
-        compute_jacobian(
+        compute_jacobians(
             self.geometry,
             self.tables[cell.0].view(),
             self.tdim,
             cell_index,
-            point_index,
-            jacobian,
+            jacobians,
         );
     }
 
-    fn compute_normal(&self, cell_index: usize, point_index: usize, normal: &mut [T]) {
+    fn compute_normals(&self, cell_index: usize, normals: &mut [T]) {
         let gdim = self.geometry.dim();
         let tdim = self.tdim;
+        let npts = self.tables[0].shape()[1];
         assert_eq!(tdim, 2);
         assert_eq!(tdim, gdim - 1);
 
-        let mut jacobian = vec![T::from(0.0).unwrap(); gdim * tdim];
-        self.compute_jacobian(cell_index, point_index, &mut jacobian[..]);
-        compute_normal_from_jacobian23(&jacobian, normal);
+        let mut jacobians = vec![T::from(0.0).unwrap(); npts * gdim * tdim];
+        self.compute_jacobians(cell_index, &mut jacobians[..]);
+        compute_normals_from_jacobians23(&jacobians, normals);
     }
 }
 

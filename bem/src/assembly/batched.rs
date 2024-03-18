@@ -1,7 +1,7 @@
 //! Batched dense assembly
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
-use bempp_grid::common::{compute_det23, compute_normal_from_jacobian23};
+use bempp_grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
 use bempp_quadrature::simplex_rules::simplex_rule;
@@ -11,13 +11,12 @@ use bempp_traits::element::FiniteElement;
 use bempp_traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
 use bempp_traits::types::EvalType;
 use bempp_traits::types::ReferenceCellType;
-use num::Float;
 use rayon::prelude::*;
 use rlst::CsrMatrix;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, Array, BaseArray,
     RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
-    UnsafeRandomAccessMut, VectorContainer,
+    VectorContainer,
 };
 use std::collections::HashMap;
 
@@ -120,21 +119,382 @@ fn get_quadrature_rule(
     }
 }
 
-pub trait BatchedAssembler: Sync {
+/// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_singular<
+    'a,
+    T: RlstScalar,
+    TestGrid: GridType<T = T::Real>,
+    TrialGrid: GridType<T = T::Real>,
+>(
+    assembler: &impl BatchedAssembler<T = T>,
+    deriv_size: usize,
+    shape: [usize; 2],
+    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
+    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+    cell_pairs: &[(usize, usize)],
+    trial_points: &RlstArray<T::Real, 2>,
+    test_points: &RlstArray<T::Real, 2>,
+    weights: &[T::Real],
+    trial_table: &RlstArray<T, 4>,
+    test_table: &RlstArray<T, 4>,
+) -> SparseMatrixData<T> {
+    let mut output = SparseMatrixData::<T>::new_known_size(
+        shape,
+        cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
+    );
+    let npts = weights.len();
+    debug_assert!(weights.len() == npts);
+    debug_assert!(test_points.shape()[0] == npts);
+    debug_assert!(trial_points.shape()[0] == npts);
+
+    let grid = test_space.grid();
+    assert_eq!(grid.physical_dimension(), 3);
+    assert_eq!(grid.domain_dimension(), 2);
+
+    // Memory assignment to be moved elsewhere as passed into here mutable?
+    let mut k = rlst_dynamic_array2!(T, [deriv_size, npts]);
+    let zero = num::cast::<f64, T::Real>(0.0).unwrap();
+    let mut test_jdet = vec![zero; npts];
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
+
+    let mut trial_jdet = vec![zero; npts];
+    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
+    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
+    let mut trial_normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
+
+    let test_evaluator = grid.reference_to_physical_map(test_points.data());
+    let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
+
+    for (test_cell, trial_cell) in cell_pairs {
+        test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
+        compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
+        compute_dets23(test_jacobians.data(), &mut test_jdet);
+        test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+
+        trial_evaluator.jacobian(*trial_cell, trial_jacobians.data_mut());
+        compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
+        compute_dets23(trial_jacobians.data(), &mut trial_jdet);
+        trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
+
+        assembler.kernel_assemble_diagonal_st(
+            test_mapped_pts.data(),
+            trial_mapped_pts.data(),
+            k.data_mut(),
+        );
+
+        let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+        let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+        for (test_i, test_dof) in test_dofs.iter().enumerate() {
+            for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
+                let mut sum = num::cast::<f64, T>(0.0).unwrap();
+
+                for (index, wt) in weights.iter().enumerate() {
+                    unsafe {
+                        sum += assembler.singular_kernel_value(
+                            &k,
+                            &test_normals,
+                            &trial_normals,
+                            index,
+                        ) * assembler.test_trial_product(
+                            test_table,
+                            trial_table,
+                            &test_jacobians,
+                            &trial_jacobians,
+                            &test_jdet,
+                            &trial_jdet,
+                            index,
+                            index,
+                            test_i,
+                            trial_i,
+                        ) * num::cast::<T::Real, T>(
+                            *wt * *test_jdet.get_unchecked(index)
+                                * *trial_jdet.get_unchecked(index),
+                        )
+                        .unwrap();
+                    }
+                }
+                output.rows.push(*test_dof);
+                output.cols.push(*trial_dof);
+                output.data.push(sum);
+            }
+        }
+    }
+    output
+}
+
+/// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_nonadjacent<
+    'a,
+    T: RlstScalar,
+    TestGrid: GridType<T = T::Real>,
+    TrialGrid: GridType<T = T::Real>,
+>(
+    assembler: &impl BatchedAssembler<T = T>,
+    deriv_size: usize,
+    output: &RawData2D<T>,
+    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
+    trial_cells: &[usize],
+    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+    test_cells: &[usize],
+    trial_points: &RlstArray<T::Real, 2>,
+    trial_weights: &[T::Real],
+    test_points: &RlstArray<T::Real, 2>,
+    test_weights: &[T::Real],
+    trial_table: &RlstArray<T, 4>,
+    test_table: &RlstArray<T, 4>,
+) -> usize {
+    let npts_test = test_weights.len();
+    let npts_trial = trial_weights.len();
+    debug_assert!(test_points.shape()[0] == npts_test);
+    debug_assert!(trial_points.shape()[0] == npts_trial);
+
+    let test_grid = test_space.grid();
+    let trial_grid = trial_space.grid();
+
+    assert_eq!(test_grid.physical_dimension(), 3);
+    assert_eq!(test_grid.domain_dimension(), 2);
+    assert_eq!(trial_grid.physical_dimension(), 3);
+    assert_eq!(trial_grid.domain_dimension(), 2);
+
+    let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
+    let zero = num::cast::<f64, T::Real>(0.0).unwrap();
+    let mut test_jdet = vec![zero; npts_test];
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+
+    let test_evaluator = test_grid.reference_to_physical_map(test_points.data());
+    let trial_evaluator = trial_grid.reference_to_physical_map(trial_points.data());
+
+    let mut trial_jdet = vec![vec![zero; npts_trial]; trial_cells.len()];
+    let mut trial_mapped_pts = vec![];
+    let mut trial_normals = vec![];
+    let mut trial_jacobians = vec![];
+    for _i in 0..trial_cells.len() {
+        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
+        trial_normals.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
+        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [npts_trial, 6]));
+    }
+
+    for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
+        trial_evaluator.jacobian(*trial_cell, trial_jacobians[trial_cell_i].data_mut());
+        compute_dets23(
+            trial_jacobians[trial_cell_i].data(),
+            &mut trial_jdet[trial_cell_i],
+        );
+        compute_normals_from_jacobians23(
+            trial_jacobians[trial_cell_i].data(),
+            trial_normals[trial_cell_i].data_mut(),
+        );
+        trial_evaluator
+            .reference_to_physical(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
+    }
+
+    let mut sum: T;
+    let mut trial_integrands = vec![num::cast::<f64, T>(0.0).unwrap(); npts_trial];
+
+    for test_cell in test_cells {
+        test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
+        compute_dets23(test_jacobians.data(), &mut test_jdet);
+        compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
+        test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+
+        for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
+            if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
+                continue;
+            }
+
+            assembler.kernel_assemble_st(
+                test_mapped_pts.data(),
+                trial_mapped_pts[trial_cell_i].data(),
+                k.data_mut(),
+            );
+
+            let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+            let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+
+            for (test_i, test_dof) in test_dofs.iter().enumerate() {
+                for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
+                    for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
+                        trial_integrands[trial_index] = num::cast::<T::Real, T>(
+                            *trial_wt * trial_jdet[trial_cell_i][trial_index],
+                        )
+                        .unwrap();
+                    }
+                    sum = num::cast::<f64, T>(0.0).unwrap();
+                    for (test_index, test_wt) in test_weights.iter().enumerate() {
+                        let test_integrand =
+                            num::cast::<T::Real, T>(*test_wt * test_jdet[test_index]).unwrap();
+                        for trial_index in 0..npts_trial {
+                            sum += unsafe {
+                                assembler.nonsingular_kernel_value(
+                                    &k,
+                                    &test_normals,
+                                    &trial_normals[trial_cell_i],
+                                    test_index,
+                                    trial_index,
+                                ) * test_integrand
+                                    * *trial_integrands.get_unchecked(trial_index)
+                                    * assembler.test_trial_product(
+                                        test_table,
+                                        trial_table,
+                                        &test_jacobians,
+                                        &trial_jacobians[trial_cell_i],
+                                        &test_jdet,
+                                        &trial_jdet[trial_cell_i],
+                                        test_index,
+                                        trial_index,
+                                        test_i,
+                                        trial_i,
+                                    )
+                            };
+                        }
+                    }
+                    // TODO: should we write into a result array, then copy into output after this loop?
+                    unsafe {
+                        *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
+                    }
+                }
+            }
+        }
+    }
+    1
+}
+
+/// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells if an (incorrect) non-singular quadrature rule was used
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_singular_correction<
+    'a,
+    T: RlstScalar,
+    TestGrid: GridType<T = T::Real>,
+    TrialGrid: GridType<T = T::Real>,
+>(
+    assembler: &impl BatchedAssembler<T = T>,
+    deriv_size: usize,
+    shape: [usize; 2],
+    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
+    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+    cell_pairs: &[(usize, usize)],
+    trial_points: &RlstArray<T::Real, 2>,
+    trial_weights: &[T::Real],
+    test_points: &RlstArray<T::Real, 2>,
+    test_weights: &[T::Real],
+    trial_table: &RlstArray<T, 4>,
+    test_table: &RlstArray<T, 4>,
+) -> SparseMatrixData<T> {
+    let mut output = SparseMatrixData::<T>::new_known_size(
+        shape,
+        cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
+    );
+    let npts_test = test_weights.len();
+    let npts_trial = trial_weights.len();
+    debug_assert!(test_points.shape()[0] == npts_test);
+    debug_assert!(trial_points.shape()[0] == npts_trial);
+
+    let grid = test_space.grid();
+    assert_eq!(grid.physical_dimension(), 3);
+    assert_eq!(grid.domain_dimension(), 2);
+
+    let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
+
+    let zero = num::cast::<f64, T::Real>(0.0).unwrap();
+
+    let mut test_jdet = vec![zero; npts_test];
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+
+    let mut trial_jdet = vec![zero; npts_trial];
+    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_trial, 3]);
+    let mut trial_normals = rlst_dynamic_array2!(T::Real, [npts_trial, 3]);
+    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [npts_trial, 6]);
+
+    let test_evaluator = grid.reference_to_physical_map(test_points.data());
+    let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
+
+    let mut sum: T;
+    let mut trial_integrands = vec![num::cast::<f64, T>(0.0).unwrap(); npts_trial];
+
+    for (test_cell, trial_cell) in cell_pairs {
+        test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
+        compute_dets23(test_jacobians.data(), &mut test_jdet);
+        compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
+        test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+
+        trial_evaluator.jacobian(*trial_cell, trial_jacobians.data_mut());
+        compute_dets23(trial_jacobians.data(), &mut trial_jdet);
+        compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
+        trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
+
+        assembler.kernel_assemble_st(
+            test_mapped_pts.data(),
+            trial_mapped_pts.data(),
+            k.data_mut(),
+        );
+
+        let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+        let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+        for (test_i, test_dof) in test_dofs.iter().enumerate() {
+            for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
+                for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
+                    trial_integrands[trial_index] =
+                        num::cast::<T::Real, T>(*trial_wt * trial_jdet[trial_index]).unwrap();
+                }
+                sum = num::cast::<f64, T>(0.0).unwrap();
+                for (test_index, test_wt) in test_weights.iter().enumerate() {
+                    let test_integrand =
+                        num::cast::<T::Real, T>(*test_wt * test_jdet[test_index]).unwrap();
+                    for trial_index in 0..npts_trial {
+                        sum += unsafe {
+                            assembler.nonsingular_kernel_value(
+                                &k,
+                                &test_normals,
+                                &trial_normals,
+                                test_index,
+                                trial_index,
+                            ) * test_integrand
+                                * *trial_integrands.get_unchecked(trial_index)
+                                * assembler.test_trial_product(
+                                    test_table,
+                                    trial_table,
+                                    &test_jacobians,
+                                    &trial_jacobians,
+                                    &test_jdet,
+                                    &trial_jdet,
+                                    test_index,
+                                    trial_index,
+                                    test_i,
+                                    trial_i,
+                                )
+                        };
+                    }
+                }
+                output.rows.push(*test_dof);
+                output.cols.push(*trial_dof);
+                output.data.push(sum);
+            }
+        }
+    }
+    output
+}
+
+pub trait BatchedAssembler: Sync + Sized {
     //! Batched assembler
     //!
     //! Assemble operators by processing batches of cells in parallel
 
-    /// Real scalar type
-    type RealT: RlstScalar<Real = Self::RealT> + Float;
     /// Scalar type
-    type T: RlstScalar<Real = Self::RealT>;
+    type T: RlstScalar;
     /// Number of derivatives
     const DERIV_SIZE: usize;
     /// Number of derivatives needed in basis function tables
-    fn ntablederivs(&self) -> usize {
-        0
-    }
+    const TABLE_DERIVS: usize;
+    /// The number of cells in each batch
+    const BATCHSIZE: usize;
 
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
     ///
@@ -143,8 +503,8 @@ pub trait BatchedAssembler: Sync {
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<Self::T, 2>,
-        test_normals: &RlstArray<Self::RealT, 2>,
-        trial_normals: &RlstArray<Self::RealT, 2>,
+        test_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
+        trial_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
         index: usize,
     ) -> Self::T;
 
@@ -155,8 +515,8 @@ pub trait BatchedAssembler: Sync {
     unsafe fn nonsingular_kernel_value(
         &self,
         k: &RlstArray<Self::T, 3>,
-        test_normals: &RlstArray<Self::RealT, 2>,
-        trial_normals: &RlstArray<Self::RealT, 2>,
+        test_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
+        trial_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
         test_index: usize,
         trial_index: usize,
     ) -> Self::T;
@@ -166,8 +526,8 @@ pub trait BatchedAssembler: Sync {
     /// For each source, the kernel is evaluated for exactly one target. This is equivalent to taking the diagonal of the matrix assembled by `kernel_assemble_st`
     fn kernel_assemble_diagonal_st(
         &self,
-        sources: &[Self::RealT],
-        targets: &[Self::RealT],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     );
 
@@ -176,8 +536,8 @@ pub trait BatchedAssembler: Sync {
     /// For every source, the kernel is evaluated for every target.
     fn kernel_assemble_st(
         &self,
-        sources: &[Self::RealT],
-        targets: &[Self::RealT],
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
     );
 
@@ -190,10 +550,10 @@ pub trait BatchedAssembler: Sync {
         &self,
         test_table: &RlstArray<Self::T, 4>,
         trial_table: &RlstArray<Self::T, 4>,
-        _test_jacobians: &RlstArray<Self::RealT, 2>,
-        _trial_jacobians: &RlstArray<Self::RealT, 2>,
-        _test_jdets: &[Self::RealT],
-        _trial_jdets: &[Self::RealT],
+        _test_jacobians: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
+        _trial_jacobians: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
+        _test_jdets: &[<Self::T as RlstScalar>::Real],
+        _trial_jdets: &[<Self::T as RlstScalar>::Real],
         test_point_index: usize,
         trial_point_index: usize,
         test_basis_index: usize,
@@ -203,480 +563,14 @@ pub trait BatchedAssembler: Sync {
             * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
     }
 
-    /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
-    #[allow(clippy::too_many_arguments)]
-    fn assemble_batch_singular<
-        'a,
-        TestGrid: GridType<T = Self::RealT>,
-        TrialGrid: GridType<T = Self::RealT>,
-    >(
-        &self,
-        shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
-        cell_pairs: &[(usize, usize)],
-        trial_points: &RlstArray<Self::RealT, 2>,
-        test_points: &RlstArray<Self::RealT, 2>,
-        weights: &[Self::RealT],
-        trial_table: &RlstArray<Self::T, 4>,
-        test_table: &RlstArray<Self::T, 4>,
-    ) -> SparseMatrixData<Self::T> {
-        let mut output = SparseMatrixData::<Self::T>::new_known_size(
-            shape,
-            cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
-        );
-        let npts = weights.len();
-        debug_assert!(weights.len() == npts);
-        debug_assert!(test_points.shape()[0] == npts);
-        debug_assert!(trial_points.shape()[0] == npts);
-
-        let grid = test_space.grid();
-        assert_eq!(grid.physical_dimension(), 3);
-        assert_eq!(grid.domain_dimension(), 2);
-
-        // Memory assignment to be moved elsewhere as passed into here mutable?
-        let mut k = rlst_dynamic_array2!(Self::T, [Self::DERIV_SIZE, npts]);
-        let zero = num::cast::<f64, Self::RealT>(0.0).unwrap();
-        let mut test_jdet = vec![zero; npts];
-        let mut jacobian = [zero; 6];
-        let mut normal = [zero; 3];
-        let mut point = [zero; 3];
-        let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
-        let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [npts, 6]);
-        let mut test_normals = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
-
-        let mut trial_jdet = vec![zero; npts];
-        let mut trial_mapped_pts = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
-        let mut trial_jacobians = rlst_dynamic_array2!(Self::RealT, [npts, 6]);
-        let mut trial_normals = rlst_dynamic_array2!(Self::RealT, [npts, 3]);
-
-        let test_evaluator = grid.reference_to_physical_map(test_points.data());
-        let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
-
-        for (test_cell, trial_cell) in cell_pairs {
-            for pt in 0..npts {
-                test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                test_jdet[pt] = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *test_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                test_evaluator.reference_to_physical(*test_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-
-                trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                trial_jdet[pt] = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *trial_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                trial_evaluator.reference_to_physical(*trial_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *trial_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *trial_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
-
-            self.kernel_assemble_diagonal_st(
-                test_mapped_pts.data(),
-                trial_mapped_pts.data(),
-                k.data_mut(),
-            );
-
-            let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
-            let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
-            for (test_i, test_dof) in test_dofs.iter().enumerate() {
-                for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
-                    let mut sum = num::cast::<f64, Self::T>(0.0).unwrap();
-
-                    for (index, wt) in weights.iter().enumerate() {
-                        unsafe {
-                            sum += self.singular_kernel_value(
-                                &k,
-                                &test_normals,
-                                &trial_normals,
-                                index,
-                            ) * self.test_trial_product(
-                                test_table,
-                                trial_table,
-                                &test_jacobians,
-                                &trial_jacobians,
-                                &test_jdet,
-                                &trial_jdet,
-                                index,
-                                index,
-                                test_i,
-                                trial_i,
-                            ) * num::cast::<Self::RealT, Self::T>(
-                                *wt * *test_jdet.get_unchecked(index)
-                                    * *trial_jdet.get_unchecked(index),
-                            )
-                            .unwrap();
-                        }
-                    }
-                    output.rows.push(*test_dof);
-                    output.cols.push(*trial_dof);
-                    output.data.push(sum);
-                }
-            }
-        }
-        output
-    }
-
-    /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
-    #[allow(clippy::too_many_arguments)]
-    fn assemble_batch_nonadjacent<
-        'a,
-        const NPTS_TEST: usize,
-        const NPTS_TRIAL: usize,
-        TestGrid: GridType<T = Self::RealT>,
-        TrialGrid: GridType<T = Self::RealT>,
-    >(
-        &self,
-        output: &RawData2D<Self::T>,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        trial_cells: &[usize],
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
-        test_cells: &[usize],
-        trial_points: &RlstArray<Self::RealT, 2>,
-        trial_weights: &[Self::RealT],
-        test_points: &RlstArray<Self::RealT, 2>,
-        test_weights: &[Self::RealT],
-        trial_table: &RlstArray<Self::T, 4>,
-        test_table: &RlstArray<Self::T, 4>,
-    ) -> usize {
-        debug_assert!(test_weights.len() == NPTS_TEST);
-        debug_assert!(test_points.shape()[0] == NPTS_TEST);
-        debug_assert!(trial_weights.len() == NPTS_TRIAL);
-        debug_assert!(trial_points.shape()[0] == NPTS_TRIAL);
-
-        let test_grid = test_space.grid();
-        let trial_grid = trial_space.grid();
-
-        assert_eq!(test_grid.physical_dimension(), 3);
-        assert_eq!(test_grid.domain_dimension(), 2);
-        assert_eq!(trial_grid.physical_dimension(), 3);
-        assert_eq!(trial_grid.domain_dimension(), 2);
-
-        let mut k = rlst_dynamic_array3!(Self::T, [NPTS_TEST, Self::DERIV_SIZE, NPTS_TRIAL]);
-        let zero = num::cast::<f64, Self::RealT>(0.0).unwrap();
-        let mut jacobian = [zero; 6];
-        let mut normal = [zero; 3];
-        let mut point = [zero; 3];
-        let mut test_jdet = [zero; NPTS_TEST];
-        let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
-        let mut test_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
-        let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 6]);
-
-        let test_evaluator = test_grid.reference_to_physical_map(test_points.data());
-        let trial_evaluator = trial_grid.reference_to_physical_map(trial_points.data());
-
-        let mut trial_jdet = vec![[zero; NPTS_TRIAL]; trial_cells.len()];
-        let mut trial_mapped_pts = vec![];
-        let mut trial_normals = vec![];
-        let mut trial_jacobians = vec![];
-        for _i in 0..trial_cells.len() {
-            trial_mapped_pts.push(rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]));
-            trial_normals.push(rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]));
-            trial_jacobians.push(rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 6]));
-        }
-
-        for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
-            for pt in 0..NPTS_TRIAL {
-                trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                trial_jdet[trial_cell_i][pt] = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *trial_normals[trial_cell_i].get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                trial_evaluator.reference_to_physical(*trial_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *trial_mapped_pts[trial_cell_i].get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *trial_jacobians[trial_cell_i].get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
-        }
-
-        let mut sum: Self::T;
-        let mut trial_integrands = [num::cast::<f64, Self::T>(0.0).unwrap(); NPTS_TRIAL];
-
-        for test_cell in test_cells {
-            for (pt, jdet) in test_jdet.iter_mut().enumerate() {
-                test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                *jdet = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *test_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                test_evaluator.reference_to_physical(*test_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
-
-            for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
-                if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
-                    continue;
-                }
-
-                self.kernel_assemble_st(
-                    test_mapped_pts.data(),
-                    trial_mapped_pts[trial_cell_i].data(),
-                    k.data_mut(),
-                );
-
-                let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
-                let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
-
-                for (test_i, test_dof) in test_dofs.iter().enumerate() {
-                    for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
-                        for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                            trial_integrands[trial_index] = num::cast::<Self::RealT, Self::T>(
-                                *trial_wt * trial_jdet[trial_cell_i][trial_index],
-                            )
-                            .unwrap();
-                        }
-                        sum = num::cast::<f64, Self::T>(0.0).unwrap();
-                        for (test_index, test_wt) in test_weights.iter().enumerate() {
-                            let test_integrand =
-                                num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
-                                    .unwrap();
-                            for trial_index in 0..NPTS_TRIAL {
-                                sum += unsafe {
-                                    self.nonsingular_kernel_value(
-                                        &k,
-                                        &test_normals,
-                                        &trial_normals[trial_cell_i],
-                                        test_index,
-                                        trial_index,
-                                    ) * test_integrand
-                                        * *trial_integrands.get_unchecked(trial_index)
-                                        * self.test_trial_product(
-                                            test_table,
-                                            trial_table,
-                                            &test_jacobians,
-                                            &trial_jacobians[trial_cell_i],
-                                            &test_jdet,
-                                            &trial_jdet[trial_cell_i],
-                                            test_index,
-                                            trial_index,
-                                            test_i,
-                                            trial_i,
-                                        )
-                                };
-                            }
-                        }
-                        // TODO: should we write into a result array, then copy into output after this loop?
-                        unsafe {
-                            *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
-                        }
-                    }
-                }
-            }
-        }
-        1
-    }
-
-    /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells if an (incorrect) non-singular quadrature rule was used
-    #[allow(clippy::too_many_arguments)]
-    fn assemble_batch_singular_correction<
-        'a,
-        const NPTS_TEST: usize,
-        const NPTS_TRIAL: usize,
-        TestGrid: GridType<T = Self::RealT>,
-        TrialGrid: GridType<T = Self::RealT>,
-    >(
-        &self,
-        shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
-        cell_pairs: &[(usize, usize)],
-        trial_points: &RlstArray<Self::RealT, 2>,
-        trial_weights: &[Self::RealT],
-        test_points: &RlstArray<Self::RealT, 2>,
-        test_weights: &[Self::RealT],
-        trial_table: &RlstArray<Self::T, 4>,
-        test_table: &RlstArray<Self::T, 4>,
-    ) -> SparseMatrixData<Self::T> {
-        let mut output = SparseMatrixData::<Self::T>::new_known_size(
-            shape,
-            cell_pairs.len() * trial_space.element().dim() * test_space.element().dim(),
-        );
-        debug_assert!(test_weights.len() == NPTS_TEST);
-        debug_assert!(test_points.shape()[0] == NPTS_TEST);
-        debug_assert!(trial_weights.len() == NPTS_TRIAL);
-        debug_assert!(trial_points.shape()[0] == NPTS_TRIAL);
-
-        let grid = test_space.grid();
-        assert_eq!(grid.physical_dimension(), 3);
-        assert_eq!(grid.domain_dimension(), 2);
-
-        let mut k = rlst_dynamic_array3!(Self::T, [NPTS_TEST, Self::DERIV_SIZE, NPTS_TRIAL]);
-
-        let zero = num::cast::<f64, Self::RealT>(0.0).unwrap();
-        let mut jacobian = [zero; 6];
-        let mut normal = [zero; 3];
-        let mut point = [zero; 3];
-
-        let mut test_jdet = vec![zero; NPTS_TEST];
-        let mut test_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
-        let mut test_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 3]);
-        let mut test_jacobians = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 6]);
-
-        let mut trial_jdet = vec![zero; NPTS_TRIAL];
-        let mut trial_mapped_pts = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]);
-        let mut trial_normals = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 3]);
-        let mut trial_jacobians = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 6]);
-
-        let test_evaluator = grid.reference_to_physical_map(test_points.data());
-        let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
-
-        let mut sum: Self::T;
-        let mut trial_integrands = [num::cast::<f64, Self::T>(0.0).unwrap(); NPTS_TRIAL];
-
-        for (test_cell, trial_cell) in cell_pairs {
-            for (pt, jdet) in test_jdet.iter_mut().enumerate() {
-                test_evaluator.jacobian(*test_cell, pt, &mut jacobian);
-                *jdet = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *test_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                test_evaluator.reference_to_physical(*test_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *test_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *test_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
-            for (pt, jdet) in trial_jdet.iter_mut().enumerate() {
-                trial_evaluator.jacobian(*trial_cell, pt, &mut jacobian);
-                *jdet = compute_det23(&jacobian);
-                compute_normal_from_jacobian23(&jacobian, &mut normal);
-                for (i, n) in normal.iter().enumerate() {
-                    unsafe {
-                        *trial_normals.get_unchecked_mut([pt, i]) = *n;
-                    }
-                }
-                trial_evaluator.reference_to_physical(*trial_cell, pt, &mut point);
-                for (i, p) in point.iter().enumerate() {
-                    unsafe {
-                        *trial_mapped_pts.get_unchecked_mut([pt, i]) = *p;
-                    }
-                }
-                for (i, j) in jacobian.iter().enumerate() {
-                    unsafe {
-                        *trial_jacobians.get_unchecked_mut([pt, i]) = *j;
-                    }
-                }
-            }
-
-            self.kernel_assemble_st(
-                test_mapped_pts.data(),
-                trial_mapped_pts.data(),
-                k.data_mut(),
-            );
-
-            let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
-            let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
-            for (test_i, test_dof) in test_dofs.iter().enumerate() {
-                for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
-                    for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                        trial_integrands[trial_index] =
-                            num::cast::<Self::RealT, Self::T>(*trial_wt * trial_jdet[trial_index])
-                                .unwrap();
-                    }
-                    sum = num::cast::<f64, Self::T>(0.0).unwrap();
-                    for (test_index, test_wt) in test_weights.iter().enumerate() {
-                        let test_integrand =
-                            num::cast::<Self::RealT, Self::T>(*test_wt * test_jdet[test_index])
-                                .unwrap();
-                        for trial_index in 0..NPTS_TRIAL {
-                            sum += unsafe {
-                                self.nonsingular_kernel_value(
-                                    &k,
-                                    &test_normals,
-                                    &trial_normals,
-                                    test_index,
-                                    trial_index,
-                                ) * test_integrand
-                                    * *trial_integrands.get_unchecked(trial_index)
-                                    * self.test_trial_product(
-                                        test_table,
-                                        trial_table,
-                                        &test_jacobians,
-                                        &trial_jacobians,
-                                        &test_jdet,
-                                        &trial_jdet,
-                                        test_index,
-                                        trial_index,
-                                        test_i,
-                                        trial_i,
-                                    )
-                            };
-                        }
-                    }
-                    output.rows.push(*test_dof);
-                    output.cols.push(*trial_dof);
-                    output.data.push(sum);
-                }
-            }
-        }
-        output
-    }
-
     /// Assemble the singular contributions
     fn assemble_singular<
         'a,
-        const QDEGREE: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
+        qdegree: usize,
         shape: [usize; 2],
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
@@ -734,52 +628,58 @@ pub trait BatchedAssembler: Sync {
                 ReferenceCellType::Triangle,
                 ReferenceCellType::Triangle,
                 pairs,
-                QDEGREE,
+                qdegree,
             );
             let npts = qrule.weights.len();
 
-            let mut points = rlst_dynamic_array2!(Self::RealT, [npts, 2]);
+            let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
             for i in 0..npts {
                 for j in 0..2 {
                     *points.get_mut([i, j]).unwrap() =
-                        num::cast::<f64, Self::RealT>(qrule.trial_points[2 * i + j]).unwrap();
+                        num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                            qrule.trial_points[2 * i + j],
+                        )
+                        .unwrap();
                 }
             }
             let mut table = rlst_dynamic_array4!(
                 Self::T,
                 trial_space
                     .element()
-                    .tabulate_array_shape(self.ntablederivs(), points.shape()[0])
+                    .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
             );
             trial_space
                 .element()
-                .tabulate(&points, self.ntablederivs(), &mut table);
+                .tabulate(&points, Self::TABLE_DERIVS, &mut table);
             trial_points.push(points);
             trial_tables.push(table);
 
-            let mut points = rlst_dynamic_array2!(Self::RealT, [npts, 2]);
+            let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
             for i in 0..npts {
                 for j in 0..2 {
                     *points.get_mut([i, j]).unwrap() =
-                        num::cast::<f64, Self::RealT>(qrule.test_points[2 * i + j]).unwrap();
+                        num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                            qrule.test_points[2 * i + j],
+                        )
+                        .unwrap();
                 }
             }
             let mut table = rlst_dynamic_array4!(
                 Self::T,
                 test_space
                     .element()
-                    .tabulate_array_shape(self.ntablederivs(), points.shape()[0])
+                    .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
             );
             test_space
                 .element()
-                .tabulate(&points, self.ntablederivs(), &mut table);
+                .tabulate(&points, Self::TABLE_DERIVS, &mut table);
             test_points.push(points);
             test_tables.push(table);
             qweights.push(
                 qrule
                     .weights
                     .iter()
-                    .map(|w| num::cast::<f64, Self::RealT>(*w).unwrap())
+                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
                     .collect::<Vec<_>>(),
             );
         }
@@ -828,8 +728,8 @@ pub trait BatchedAssembler: Sync {
             let mut start = 0;
             let mut cell_blocks = vec![];
             while start < cells.len() {
-                let end = if start + BLOCKSIZE < cells.len() {
-                    start + BLOCKSIZE
+                let end = if start + Self::BATCHSIZE < cells.len() {
+                    start + Self::BATCHSIZE
                 } else {
                     cells.len()
                 };
@@ -841,7 +741,9 @@ pub trait BatchedAssembler: Sync {
             let r: SparseMatrixData<Self::T> = (0..numtasks)
                 .into_par_iter()
                 .map(&|t| {
-                    self.assemble_batch_singular(
+                    assemble_batch_singular::<Self::T, TestGrid, TrialGrid>(
+                        self,
+                        Self::DERIV_SIZE,
                         shape,
                         trial_space,
                         test_space,
@@ -865,13 +767,12 @@ pub trait BatchedAssembler: Sync {
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction<
         'a,
-        const NPTS_TEST: usize,
-        const NPTS_TRIAL: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
+        npts_test: usize,
+        npts_trial: usize,
         shape: [usize; 2],
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
@@ -888,59 +789,62 @@ pub trait BatchedAssembler: Sync {
             panic!("Matrix has wrong shape");
         }
 
-        if NPTS_TEST != NPTS_TRIAL {
+        if npts_test != npts_trial {
             panic!("FMM with different test and trial quadrature rules not yet supported");
         }
 
         let grid = test_space.grid();
 
         // TODO: pass cell types into this function
-        let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
-        let mut qpoints_test = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 2]);
-        for i in 0..NPTS_TEST {
+        let qrule_test = simplex_rule(ReferenceCellType::Triangle, npts_test).unwrap();
+        let mut qpoints_test = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+        for i in 0..npts_test {
             for j in 0..2 {
                 *qpoints_test.get_mut([i, j]).unwrap() =
-                    num::cast::<f64, Self::RealT>(qrule_test.points[2 * i + j]).unwrap();
+                    num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
+                        .unwrap();
             }
         }
         let qweights_test = qrule_test
             .weights
             .iter()
-            .map(|w| num::cast::<f64, Self::RealT>(*w).unwrap())
+            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
             .collect::<Vec<_>>();
-        let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
-        let mut qpoints_trial = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 2]);
-        for i in 0..NPTS_TRIAL {
+        let qrule_trial = simplex_rule(ReferenceCellType::Triangle, npts_trial).unwrap();
+        let mut qpoints_trial =
+            rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+        for i in 0..npts_trial {
             for j in 0..2 {
                 *qpoints_trial.get_mut([i, j]).unwrap() =
-                    num::cast::<f64, Self::RealT>(qrule_trial.points[2 * i + j]).unwrap();
+                    num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_trial.points[2 * i + j])
+                        .unwrap();
             }
         }
         let qweights_trial = qrule_trial
             .weights
             .iter()
-            .map(|w| num::cast::<f64, Self::RealT>(*w).unwrap())
+            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
             .collect::<Vec<_>>();
 
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
             test_space
                 .element()
-                .tabulate_array_shape(self.ntablederivs(), NPTS_TEST)
+                .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
         );
         test_space
             .element()
-            .tabulate(&qpoints_test, self.ntablederivs(), &mut test_table);
+            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
 
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
             trial_space
                 .element()
-                .tabulate_array_shape(self.ntablederivs(), NPTS_TRIAL)
+                .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
         );
         trial_space
             .element()
-            .tabulate(&qpoints_test, self.ntablederivs(), &mut trial_table);
+            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
 
         let mut cell_pairs: Vec<(usize, usize)> = vec![];
 
@@ -978,8 +882,8 @@ pub trait BatchedAssembler: Sync {
         let mut start = 0;
         let mut cell_blocks = vec![];
         while start < cell_pairs.len() {
-            let end = if start + BLOCKSIZE < cell_pairs.len() {
-                start + BLOCKSIZE
+            let end = if start + Self::BATCHSIZE < cell_pairs.len() {
+                start + Self::BATCHSIZE
             } else {
                 cell_pairs.len()
             };
@@ -991,7 +895,9 @@ pub trait BatchedAssembler: Sync {
         (0..numtasks)
             .into_par_iter()
             .map(&|t| {
-                self.assemble_batch_singular_correction::<NPTS_TEST, NPTS_TRIAL, TestGrid, TrialGrid>(
+                assemble_batch_singular_correction::<Self::T, TestGrid, TrialGrid>(
+                    self,
+                    Self::DERIV_SIZE,
                     shape,
                     trial_space,
                     test_space,
@@ -1010,17 +916,17 @@ pub trait BatchedAssembler: Sync {
     /// Assemble the singular contributions into a dense matrix
     fn assemble_singular_into_dense<
         'a,
-        const QDEGREE: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
+        qdegree: usize,
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) {
-        let sparse_matrix = self.assemble_singular::<QDEGREE, BLOCKSIZE, TestGrid, TrialGrid>(
+        let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid>(
+            qdegree,
             output.shape(),
             trial_space,
             test_space,
@@ -1036,21 +942,17 @@ pub trait BatchedAssembler: Sync {
     /// Assemble the singular contributions into a CSR sparse matrix
     fn assemble_singular_into_csr<
         'a,
-        const QDEGREE: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
+        qdegree: usize,
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular::<QDEGREE, BLOCKSIZE, TestGrid, TrialGrid>(
-            shape,
-            trial_space,
-            test_space,
-        );
+        let sparse_matrix =
+            self.assemble_singular::<TestGrid, TrialGrid>(qdegree, shape, trial_space, test_space);
 
         CsrMatrix::<Self::T>::from_aij(
             sparse_matrix.shape,
@@ -1066,23 +968,23 @@ pub trait BatchedAssembler: Sync {
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction_into_dense<
         'a,
-        const NPTS_TEST: usize,
-        const NPTS_TRIAL: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
+        npts_test: usize,
+        npts_trial: usize,
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) {
-        let sparse_matrix = self
-            .assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE, TestGrid, TrialGrid>(
-                output.shape(),
-                trial_space,
-                test_space,
-            );
+        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid>(
+            npts_test,
+            npts_trial,
+            output.shape(),
+            trial_space,
+            test_space,
+        );
         let data = sparse_matrix.data;
         let rows = sparse_matrix.rows;
         let cols = sparse_matrix.cols;
@@ -1096,23 +998,23 @@ pub trait BatchedAssembler: Sync {
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction_into_csr<
         'a,
-        const NPTS_TEST: usize,
-        const NPTS_TRIAL: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
+        npts_test: usize,
+        npts_trial: usize,
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self
-            .assemble_singular_correction::<NPTS_TEST, NPTS_TRIAL, BLOCKSIZE, TestGrid, TrialGrid>(
-                shape,
-                trial_space,
-                test_space,
-            );
+        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid>(
+            npts_test,
+            npts_trial,
+            shape,
+            trial_space,
+            test_space,
+        );
 
         CsrMatrix::<Self::T>::from_aij(
             sparse_matrix.shape,
@@ -1126,9 +1028,8 @@ pub trait BatchedAssembler: Sync {
     /// Assemble into a dense matrix
     fn assemble_into_dense<
         'a,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
@@ -1138,31 +1039,34 @@ pub trait BatchedAssembler: Sync {
         let test_colouring = test_space.compute_cell_colouring();
         let trial_colouring = trial_space.compute_cell_colouring();
 
-        self.assemble_nonsingular_into_dense::<16, 16, BLOCKSIZE, TestGrid, TrialGrid>(
+        self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid>(
             output,
+            16,
+            16,
             trial_space,
             test_space,
             &trial_colouring,
             &test_colouring,
         );
-        self.assemble_singular_into_dense::<4, BLOCKSIZE, TestGrid, TrialGrid>(
+        self.assemble_singular_into_dense::<TestGrid, TrialGrid>(
             output,
+            4,
             trial_space,
             test_space,
         );
     }
 
     /// Assemble the non-singular contributions into a dense matrix
+    #[allow(clippy::too_many_arguments)]
     fn assemble_nonsingular_into_dense<
         'a,
-        const NPTS_TEST: usize,
-        const NPTS_TRIAL: usize,
-        const BLOCKSIZE: usize,
-        TestGrid: GridType<T = Self::RealT> + Sync,
-        TrialGrid: GridType<T = Self::RealT> + Sync,
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
+        npts_test: usize,
+        npts_trial: usize,
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
         trial_colouring: &Vec<Vec<usize>>,
@@ -1178,52 +1082,55 @@ pub trait BatchedAssembler: Sync {
         }
 
         // TODO: pass cell types into this function
-        let qrule_test = simplex_rule(ReferenceCellType::Triangle, NPTS_TEST).unwrap();
-        let mut qpoints_test = rlst_dynamic_array2!(Self::RealT, [NPTS_TEST, 2]);
-        for i in 0..NPTS_TEST {
+        let qrule_test = simplex_rule(ReferenceCellType::Triangle, npts_test).unwrap();
+        let mut qpoints_test = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+        for i in 0..npts_test {
             for j in 0..2 {
                 *qpoints_test.get_mut([i, j]).unwrap() =
-                    num::cast::<f64, Self::RealT>(qrule_test.points[2 * i + j]).unwrap();
+                    num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
+                        .unwrap();
             }
         }
         let qweights_test = qrule_test
             .weights
             .iter()
-            .map(|w| num::cast::<f64, Self::RealT>(*w).unwrap())
+            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
             .collect::<Vec<_>>();
-        let qrule_trial = simplex_rule(ReferenceCellType::Triangle, NPTS_TRIAL).unwrap();
-        let mut qpoints_trial = rlst_dynamic_array2!(Self::RealT, [NPTS_TRIAL, 2]);
-        for i in 0..NPTS_TRIAL {
+        let qrule_trial = simplex_rule(ReferenceCellType::Triangle, npts_trial).unwrap();
+        let mut qpoints_trial =
+            rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+        for i in 0..npts_trial {
             for j in 0..2 {
                 *qpoints_trial.get_mut([i, j]).unwrap() =
-                    num::cast::<f64, Self::RealT>(qrule_trial.points[2 * i + j]).unwrap();
+                    num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_trial.points[2 * i + j])
+                        .unwrap();
             }
         }
         let qweights_trial = qrule_trial
             .weights
             .iter()
-            .map(|w| num::cast::<f64, Self::RealT>(*w).unwrap())
+            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
             .collect::<Vec<_>>();
 
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
             test_space
                 .element()
-                .tabulate_array_shape(self.ntablederivs(), NPTS_TEST)
+                .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
         );
         test_space
             .element()
-            .tabulate(&qpoints_test, self.ntablederivs(), &mut test_table);
+            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
 
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
             trial_space
                 .element()
-                .tabulate_array_shape(self.ntablederivs(), NPTS_TRIAL)
+                .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
         );
         trial_space
             .element()
-            .tabulate(&qpoints_test, self.ntablederivs(), &mut trial_table);
+            .tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
 
         let output_raw = RawData2D {
             data: output.data_mut().as_mut_ptr(),
@@ -1237,16 +1144,16 @@ pub trait BatchedAssembler: Sync {
 
                 let mut test_start = 0;
                 while test_start < test_c.len() {
-                    let test_end = if test_start + BLOCKSIZE < test_c.len() {
-                        test_start + BLOCKSIZE
+                    let test_end = if test_start + Self::BATCHSIZE < test_c.len() {
+                        test_start + Self::BATCHSIZE
                     } else {
                         test_c.len()
                     };
 
                     let mut trial_start = 0;
                     while trial_start < trial_c.len() {
-                        let trial_end = if trial_start + BLOCKSIZE < trial_c.len() {
-                            trial_start + BLOCKSIZE
+                        let trial_end = if trial_start + Self::BATCHSIZE < trial_c.len() {
+                            trial_start + Self::BATCHSIZE
                         } else {
                             trial_c.len()
                         };
@@ -1261,7 +1168,9 @@ pub trait BatchedAssembler: Sync {
                 let r: usize = (0..numtasks)
                     .into_par_iter()
                     .map(&|t| {
-                        self.assemble_batch_nonadjacent::<NPTS_TEST, NPTS_TRIAL, TestGrid, TrialGrid>(
+                        assemble_batch_nonadjacent::<Self::T, TestGrid, TrialGrid>(
+                            self,
+                            Self::DERIV_SIZE,
                             &output_raw,
                             trial_space,
                             trial_cells[t],
@@ -1288,10 +1197,7 @@ mod test {
     use crate::function_space::SerialFunctionSpace;
     use approx::*;
     use bempp_element::element::lagrange;
-    use bempp_grid::{
-        flat_triangle_grid::SerialFlatTriangleGrid, shapes::regular_sphere,
-        traits_impl::WrappedGrid,
-    };
+    use bempp_grid::shapes::regular_sphere;
     use bempp_traits::element::Continuity;
     use rlst::RandomAccessByRef;
 
@@ -1304,9 +1210,9 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = LaplaceSingleLayerAssembler::default();
-        assembler.assemble_singular_into_dense::<4, 128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&mut matrix, &space, &space);
-        let csr = assembler.assemble_singular_into_csr::<4, 128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&space, &space);
+        let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
+        assembler.assemble_singular_into_dense(&mut matrix, 4, &space, &space);
+        let csr = assembler.assemble_singular_into_csr(4, &space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
@@ -1330,9 +1236,9 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = LaplaceSingleLayerAssembler::default();
-        assembler.assemble_singular_into_dense::<4, 128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&mut matrix, &space, &space);
-        let csr = assembler.assemble_singular_into_csr::<4, 128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&space, &space);
+        let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
+        assembler.assemble_singular_into_dense(&mut matrix, 4, &space, &space);
+        let csr = assembler.assemble_singular_into_csr(4, &space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
@@ -1359,9 +1265,9 @@ mod test {
         let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
-        let assembler = LaplaceSingleLayerAssembler::default();
-        assembler.assemble_singular_into_dense::<4, 128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&mut matrix, &space0, &space1);
-        let csr = assembler.assemble_singular_into_csr::<4, 128, WrappedGrid<SerialFlatTriangleGrid<f64>>, WrappedGrid<SerialFlatTriangleGrid<f64>>>(&space0, &space1);
+        let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
+        assembler.assemble_singular_into_dense(&mut matrix, 4, &space0, &space1);
+        let csr = assembler.assemble_singular_into_csr(4, &space0, &space1);
         let indptr = csr.indptr();
         let indices = csr.indices();
         let data = csr.data();

@@ -23,7 +23,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.compute_cell_colouring();
-        let a = batched::LaplaceSingleLayerAssembler::default();
+        let a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
 
         group.bench_function(
             &format!(
@@ -31,11 +31,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.global_size(),
                 space.global_size()
             ),
-            |b| {
-                b.iter(|| {
-                    a.assemble_singular_into_dense::<4, 128, _, _>(&mut matrix, &space, &space)
-                })
-            },
+            |b| b.iter(|| a.assemble_singular_into_dense(&mut matrix, 4, &space, &space)),
         );
         group.bench_function(
             &format!(
@@ -45,8 +41,10 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    a.assemble_nonsingular_into_dense::<16, 16, 128, _, _>(
+                    a.assemble_nonsingular_into_dense(
                         &mut matrix,
+                        16,
+                        16,
                         &space,
                         &space,
                         &colouring,

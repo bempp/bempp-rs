@@ -125,8 +125,8 @@ mod test {
             let mut mapped_pt = vec![0.0; 3];
             let mut normal = vec![0.0; 3];
             for i in 0..g.number_of_cells() {
-                map.reference_to_physical(i, 0, &mut mapped_pt);
-                map.normal(i, 0, &mut normal);
+                map.reference_to_physical(i, &mut mapped_pt);
+                map.normal(i, &mut normal);
                 let dot = mapped_pt
                     .iter()
                     .zip(&normal)

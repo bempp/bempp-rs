@@ -5,9 +5,8 @@ use rlst::RlstScalar;
 use rlst::{RandomAccessByRef, RandomAccessMut, Shape};
 /// Tabulate orthonormal polynomials on a interval
 fn tabulate_legendre_polynomials_interval<
-    RealT: RlstScalar<Real = RealT>,
-    T: RlstScalar<Real = RealT>,
-    Array2: RandomAccessByRef<2, Item = RealT> + Shape<2>,
+    T: RlstScalar,
+    Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
     points: &Array2,

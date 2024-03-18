@@ -178,14 +178,14 @@ pub trait GeometryEvaluator {
     /// The number of points on the reference cell used by this evaluator
     fn point_count(&self) -> usize;
 
-    /// Compute a point on a physical cell
-    fn compute_point(&self, cell_index: usize, point_index: usize, point: &mut [Self::T]);
+    /// Compute points on a physical cell
+    fn compute_points(&self, cell_index: usize, point: &mut [Self::T]);
 
-    /// Compute a jacobian on a physical cell
-    fn compute_jacobian(&self, cell_index: usize, point_index: usize, jacobian: &mut [Self::T]);
+    /// Compute jacobians on a physical cell
+    fn compute_jacobians(&self, cell_index: usize, jacobian: &mut [Self::T]);
 
-    /// Compute a normal on a physical cell
-    fn compute_normal(&self, cell_index: usize, point_index: usize, normal: &mut [Self::T]);
+    /// Compute normals on a physical cell
+    fn compute_normals(&self, cell_index: usize, normal: &mut [Self::T]);
 }
 
 /// A grid
