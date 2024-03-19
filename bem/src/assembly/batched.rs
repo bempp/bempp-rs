@@ -1,6 +1,5 @@
 //! Batched dense assembly
 use crate::assembly::common::{RawData2D, SparseMatrixData};
-use crate::function_space::SerialFunctionSpace;
 use bempp_element::reference_cell;
 use bempp_grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
@@ -134,14 +133,15 @@ fn assemble_batch_singular<
     T: RlstScalar,
     TestGrid: GridType<T = T::Real>,
     TrialGrid: GridType<T = T::Real>,
+    Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
-    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
+    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
     cell_pairs: &[(usize, usize)],
     trial_points: &RlstArray<T::Real, 2>,
     test_points: &RlstArray<T::Real, 2>,
@@ -244,13 +244,14 @@ fn assemble_batch_nonadjacent<
     T: RlstScalar,
     TestGrid: GridType<T = T::Real>,
     TrialGrid: GridType<T = T::Real>,
+    Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedAssembler<T = T>,
     deriv_size: usize,
     output: &RawData2D<T>,
-    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
+    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
     trial_cells: &[usize],
-    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
     test_cells: &[usize],
     trial_points: &RlstArray<T::Real, 2>,
     trial_weights: &[T::Real],
@@ -384,14 +385,15 @@ fn assemble_batch_singular_correction<
     T: RlstScalar,
     TestGrid: GridType<T = T::Real>,
     TrialGrid: GridType<T = T::Real>,
+    Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
-    test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
+    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
     cell_pairs: &[(usize, usize)],
     trial_points: &RlstArray<T::Real, 2>,
     trial_weights: &[T::Real],
@@ -584,12 +586,13 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         qdegree: usize,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::new(shape);
 
@@ -776,7 +779,7 @@ pub trait BatchedAssembler: Sync + Sized {
                     let r: SparseMatrixData<Self::T> = (0..numtasks)
                         .into_par_iter()
                         .map(&|t| {
-                            assemble_batch_singular::<Self::T, TestGrid, TrialGrid>(
+                            assemble_batch_singular::<Self::T, TestGrid, TrialGrid, Element>(
                                 self,
                                 Self::DERIV_SIZE,
                                 shape,
@@ -808,13 +811,14 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         npts_test: usize,
         npts_trial: usize,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> SparseMatrixData<Self::T> {
         let mut output = SparseMatrixData::new(shape);
 
@@ -959,7 +963,7 @@ pub trait BatchedAssembler: Sync + Sized {
                 let r = (0..numtasks)
                     .into_par_iter()
                     .map(&|t| {
-                        assemble_batch_singular_correction::<Self::T, TestGrid, TrialGrid>(
+                        assemble_batch_singular_correction::<Self::T, TestGrid, TrialGrid, Element>(
                             self,
                             Self::DERIV_SIZE,
                             shape,
@@ -988,14 +992,15 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
         qdegree: usize,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) {
-        let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid>(
+        let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid, Element>(
             qdegree,
             output.shape(),
             trial_space,
@@ -1014,15 +1019,20 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         qdegree: usize,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix =
-            self.assemble_singular::<TestGrid, TrialGrid>(qdegree, shape, trial_space, test_space);
+        let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid, Element>(
+            qdegree,
+            shape,
+            trial_space,
+            test_space,
+        );
 
         CsrMatrix::<Self::T>::from_aij(
             sparse_matrix.shape,
@@ -1040,15 +1050,16 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
         npts_test: usize,
         npts_trial: usize,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) {
-        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid>(
+        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid, Element>(
             npts_test,
             npts_trial,
             output.shape(),
@@ -1070,15 +1081,16 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         npts_test: usize,
         npts_trial: usize,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid>(
+        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid, Element>(
             npts_test,
             npts_trial,
             shape,
@@ -1100,16 +1112,17 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) {
         let test_colouring = test_space.cell_colouring();
         let trial_colouring = trial_space.cell_colouring();
 
-        self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid>(
+        self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
             output,
             37, // TODO: Allow user to set npts (note: 37 used as rule exists with 37 for both triangles and quads)
             37, // TODO: Allow user to set npts
@@ -1118,7 +1131,7 @@ pub trait BatchedAssembler: Sync + Sized {
             &trial_colouring,
             &test_colouring,
         );
-        self.assemble_singular_into_dense::<TestGrid, TrialGrid>(
+        self.assemble_singular_into_dense::<TestGrid, TrialGrid, Element>(
             output,
             4, // TODO: Allow user to set this
             trial_space,
@@ -1132,13 +1145,14 @@ pub trait BatchedAssembler: Sync + Sized {
         'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
         npts_test: usize,
         npts_trial: usize,
-        trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
         test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
@@ -1248,7 +1262,7 @@ pub trait BatchedAssembler: Sync + Sized {
                         let r: usize = (0..numtasks)
                             .into_par_iter()
                             .map(&|t| {
-                                assemble_batch_nonadjacent::<Self::T, TestGrid, TrialGrid>(
+                                assemble_batch_nonadjacent::<Self::T, TestGrid, TrialGrid, Element>(
                                     self,
                                     Self::DERIV_SIZE,
                                     &output_raw,

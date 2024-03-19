@@ -1,8 +1,10 @@
 //! Hypersingular assemblers
 use super::{equal_grids, BatchedAssembler, EvalType, RlstArray, SparseMatrixData};
-use crate::function_space::SerialFunctionSpace;
 use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
-use bempp_traits::{bem::FunctionSpace, grid::GridType, kernel::Kernel, types::ReferenceCellType};
+use bempp_traits::{
+    bem::FunctionSpace, element::FiniteElement, grid::GridType, kernel::Kernel,
+    types::ReferenceCellType,
+};
 use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef};
 use std::collections::HashMap;
 
@@ -360,19 +362,30 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         'a,
         TestGrid: GridType<T = T::Real> + Sync,
         TrialGrid: GridType<T = T::Real> + Sync,
+        Element: FiniteElement<T = T> + Sync,
     >(
         &self,
         qdegree: usize,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> SparseMatrixData<T> {
         let mut curlcurl = self
             .curl_curl_assembler
-            .assemble_singular::<TestGrid, TrialGrid>(qdegree, shape, trial_space, test_space);
+            .assemble_singular::<TestGrid, TrialGrid, Element>(
+                qdegree,
+                shape,
+                trial_space,
+                test_space,
+            );
         curlcurl.add(
             self.normal_normal_assembler
-                .assemble_singular::<TestGrid, TrialGrid>(qdegree, shape, trial_space, test_space),
+                .assemble_singular::<TestGrid, TrialGrid, Element>(
+                    qdegree,
+                    shape,
+                    trial_space,
+                    test_space,
+                ),
         );
         curlcurl
     }
@@ -381,13 +394,14 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         'a,
         TestGrid: GridType<T = T::Real> + Sync,
         TrialGrid: GridType<T = T::Real> + Sync,
+        Element: FiniteElement<T = T> + Sync,
     >(
         &self,
         npts_test: usize,
         npts_trial: usize,
         shape: [usize; 2],
-        trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> SparseMatrixData<T> {
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
@@ -396,7 +410,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
 
         let mut curlcurl = self
             .curl_curl_assembler
-            .assemble_singular_correction::<TestGrid, TrialGrid>(
+            .assemble_singular_correction::<TestGrid, TrialGrid, Element>(
                 npts_test,
                 npts_trial,
                 shape,
@@ -405,7 +419,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
             );
         curlcurl.add(
             self.normal_normal_assembler
-                .assemble_singular_correction::<TestGrid, TrialGrid>(
+                .assemble_singular_correction::<TestGrid, TrialGrid, Element>(
                     npts_test,
                     npts_trial,
                     shape,
@@ -421,13 +435,14 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         'a,
         TestGrid: GridType<T = T::Real> + Sync,
         TrialGrid: GridType<T = T::Real> + Sync,
+        Element: FiniteElement<T = T> + Sync,
     >(
         &self,
         output: &mut RlstArray<T, 2>,
         npts_test: usize,
         npts_trial: usize,
-        trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
-        test_space: &SerialFunctionSpace<'a, T, TestGrid>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
         test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
@@ -441,7 +456,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         }
 
         self.curl_curl_assembler
-            .assemble_nonsingular_into_dense::<TestGrid, TrialGrid>(
+            .assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
                 output,
                 npts_test,
                 npts_trial,
@@ -451,7 +466,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
                 test_colouring,
             );
         self.normal_normal_assembler
-            .assemble_nonsingular_into_dense::<TestGrid, TrialGrid>(
+            .assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
                 output,
                 npts_test,
                 npts_trial,
