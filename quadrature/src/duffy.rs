@@ -7,11 +7,11 @@
 //! and quadrilateral surface elements. The corresponding formulas can be found
 //! in the book *Boundary Element Methods* by S. Sauter and C. Schwab.
 
+mod common;
 pub mod quadrilateral;
 pub mod triangle;
+pub mod triangle_quadrilateral;
 
 pub use quadrilateral::quadrilateral_duffy;
 pub use triangle::triangle_duffy;
-
-pub use quadrilateral::quadrilateral_duffy as triangle_quadrilateral_duffy;
-pub use quadrilateral::quadrilateral_duffy as quadrilateral_triangle_duffy;
+pub use triangle_quadrilateral::{quadrilateral_triangle_duffy, triangle_quadrilateral_duffy};
