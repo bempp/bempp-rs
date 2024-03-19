@@ -29,7 +29,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
-    let npts = 16;
+    let npts = 37;
 
     let test_grid = test_space.grid();
     let trial_grid = test_space.grid();
@@ -104,7 +104,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
-    let npts = 16;
+    let npts = 37;
 
     let test_grid = test_space.grid();
     let trial_grid = test_space.grid();

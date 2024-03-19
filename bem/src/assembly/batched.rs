@@ -1,6 +1,7 @@
 //! Batched dense assembly
 use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
+use bempp_element::reference_cell;
 use bempp_grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use bempp_quadrature::duffy::quadrilateral::quadrilateral_duffy;
 use bempp_quadrature::duffy::triangle::triangle_duffy;
@@ -66,21 +67,18 @@ fn neighbours<TestGrid: GridType, TrialGrid: GridType>(
     }
 }
 
-fn get_quadrature_rule(
+fn get_singular_quadrature_rule(
     test_celltype: ReferenceCellType,
     trial_celltype: ReferenceCellType,
     pairs: &[(usize, usize)],
     npoints: usize,
 ) -> TestTrialNumericalQuadratureDefinition {
     if pairs.is_empty() {
-        panic!("Non-singular rule");
-    } else {
-        // Singular rules
-        if test_celltype == ReferenceCellType::Triangle {
-            if trial_celltype != ReferenceCellType::Triangle {
-                unimplemented!("Mixed meshes not yet supported");
-            }
-            triangle_duffy(
+        panic!("Non-singular rule requested.");
+    }
+    match test_celltype {
+        ReferenceCellType::Triangle => match trial_celltype {
+            ReferenceCellType::Triangle => triangle_duffy(
                 &CellToCellConnectivity {
                     connectivity_dimension: if pairs.len() == 1 {
                         0
@@ -93,15 +91,19 @@ fn get_quadrature_rule(
                 },
                 npoints,
             )
-            .unwrap()
-        } else {
-            if test_celltype != ReferenceCellType::Quadrilateral {
+            .unwrap(),
+            ReferenceCellType::Quadrilateral => {
+                unimplemented!("Mixed meshes not yet supported");
+            }
+            _ => {
                 unimplemented!("Only triangles and quadrilaterals are currently supported");
             }
-            if trial_celltype != ReferenceCellType::Quadrilateral {
+        },
+        ReferenceCellType::Quadrilateral => match trial_celltype {
+            ReferenceCellType::Triangle => {
                 unimplemented!("Mixed meshes not yet supported");
             }
-            quadrilateral_duffy(
+            ReferenceCellType::Quadrilateral => quadrilateral_duffy(
                 &CellToCellConnectivity {
                     connectivity_dimension: if pairs.len() == 1 {
                         0
@@ -114,7 +116,13 @@ fn get_quadrature_rule(
                 },
                 npoints,
             )
-            .unwrap()
+            .unwrap(),
+            _ => {
+                unimplemented!("Only triangles and quadrilaterals are currently supported");
+            }
+        },
+        _ => {
+            unimplemented!("Only triangles and quadrilaterals are currently supported");
         }
     }
 }
@@ -130,6 +138,8 @@ fn assemble_batch_singular<
     assembler: &impl BatchedAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
+    trial_cell_type: ReferenceCellType,
+    test_cell_type: ReferenceCellType,
     trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
     test_space: &SerialFunctionSpace<'a, T, TestGrid>,
     cell_pairs: &[(usize, usize)],
@@ -142,8 +152,8 @@ fn assemble_batch_singular<
     let mut output = SparseMatrixData::<T>::new_known_size(
         shape,
         cell_pairs.len()
-            * trial_space.element(ReferenceCellType::Triangle).dim()
-            * test_space.element(ReferenceCellType::Triangle).dim(),
+            * trial_space.element(trial_cell_type).dim()
+            * test_space.element(test_cell_type).dim(),
     );
     let npts = weights.len();
     debug_assert!(weights.len() == npts);
@@ -388,6 +398,7 @@ fn assemble_batch_singular_correction<
     trial_table: &RlstArray<T, 4>,
     test_table: &RlstArray<T, 4>,
 ) -> SparseMatrixData<T> {
+    // TODO: cell_types
     let mut output = SparseMatrixData::<T>::new_known_size(
         shape,
         cell_pairs.len()
@@ -595,177 +606,196 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let grid = test_space.grid();
 
-        let mut possible_pairs = vec![];
-        // Vertex-adjacent
-        for i in 0..3 {
-            for j in 0..3 {
-                possible_pairs.push(vec![(i, j)]);
-            }
-        }
-        // edge-adjacent
-        for i in 0..3 {
-            for j in i + 1..3 {
-                for k in 0..3 {
-                    for l in 0..3 {
-                        if k != l {
-                            possible_pairs.push(vec![(k, i), (l, j)]);
-                        }
+        for test_cell_type in grid.cell_types() {
+            for trial_cell_type in grid.cell_types() {
+                let mut possible_pairs = vec![];
+                // Vertex-adjacent
+                for i in 0..reference_cell::entity_counts(*test_cell_type)[0] {
+                    for j in 0..reference_cell::entity_counts(*trial_cell_type)[0] {
+                        possible_pairs.push(vec![(i, j)]);
                     }
                 }
-            }
-        }
-        // Same cell
-        possible_pairs.push(vec![(0, 0), (1, 1), (2, 2)]);
-
-        let mut pair_indices: HashMap<Vec<(usize, usize)>, usize> = HashMap::new();
-        for (i, pairs) in possible_pairs.iter().enumerate() {
-            pair_indices.insert(pairs.clone(), i);
-        }
-
-        let mut qweights = vec![];
-        let mut trial_points = vec![];
-        let mut test_points = vec![];
-        let mut trial_tables = vec![];
-        let mut test_tables = vec![];
-        for pairs in &possible_pairs {
-            let qrule = get_quadrature_rule(
-                ReferenceCellType::Triangle,
-                ReferenceCellType::Triangle,
-                pairs,
-                qdegree,
-            );
-            let npts = qrule.weights.len();
-
-            let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
-            for i in 0..npts {
-                for j in 0..2 {
-                    *points.get_mut([i, j]).unwrap() =
-                        num::cast::<f64, <Self::T as RlstScalar>::Real>(
-                            qrule.trial_points[2 * i + j],
-                        )
-                        .unwrap();
+                // edge-adjacent
+                for test_e in reference_cell::edges(*test_cell_type) {
+                    for trial_e in reference_cell::edges(*trial_cell_type) {
+                        possible_pairs.push(vec![(test_e[0], trial_e[0]), (test_e[1], trial_e[1])]);
+                        possible_pairs.push(vec![(test_e[1], trial_e[0]), (test_e[0], trial_e[1])]);
+                    }
                 }
-            }
-            let mut table = rlst_dynamic_array4!(
-                Self::T,
-                trial_space
-                    .element(ReferenceCellType::Triangle)
-                    .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
-            );
-            trial_space.element(ReferenceCellType::Triangle).tabulate(
-                &points,
-                Self::TABLE_DERIVS,
-                &mut table,
-            );
-            trial_points.push(points);
-            trial_tables.push(table);
-
-            let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
-            for i in 0..npts {
-                for j in 0..2 {
-                    *points.get_mut([i, j]).unwrap() =
-                        num::cast::<f64, <Self::T as RlstScalar>::Real>(
-                            qrule.test_points[2 * i + j],
-                        )
-                        .unwrap();
+                // Same cell
+                if test_cell_type == trial_cell_type {
+                    possible_pairs.push(
+                        (0..reference_cell::entity_counts(*test_cell_type)[0])
+                            .map(&|i| (i, i))
+                            .collect::<Vec<_>>(),
+                    );
                 }
-            }
-            let mut table = rlst_dynamic_array4!(
-                Self::T,
-                test_space
-                    .element(ReferenceCellType::Triangle)
-                    .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
-            );
-            test_space.element(ReferenceCellType::Triangle).tabulate(
-                &points,
-                Self::TABLE_DERIVS,
-                &mut table,
-            );
-            test_points.push(points);
-            test_tables.push(table);
-            qweights.push(
-                qrule
-                    .weights
-                    .iter()
-                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
-                    .collect::<Vec<_>>(),
-            );
-        }
-        let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
-        for vertex in 0..grid.number_of_vertices() {
-            let cells = grid
-                .vertex_to_cells(vertex)
-                .iter()
-                .map(|c| c.cell)
-                .collect::<Vec<_>>();
-            for test_cell in &cells {
-                for trial_cell in &cells {
-                    let mut smallest = true;
-                    let mut pairs = vec![];
-                    for (trial_i, trial_v) in grid
-                        .cell_from_index(*trial_cell)
-                        .topology()
-                        .vertex_indices()
-                        .enumerate()
-                    {
-                        for (test_i, test_v) in grid
+
+                let mut pair_indices: HashMap<Vec<(usize, usize)>, usize> = HashMap::new();
+                for (i, pairs) in possible_pairs.iter().enumerate() {
+                    pair_indices.insert(pairs.clone(), i);
+                }
+
+                let mut qweights = vec![];
+                let mut trial_points = vec![];
+                let mut test_points = vec![];
+                let mut trial_tables = vec![];
+                let mut test_tables = vec![];
+                for pairs in &possible_pairs {
+                    let qrule = get_singular_quadrature_rule(
+                        *test_cell_type,
+                        *trial_cell_type,
+                        pairs,
+                        qdegree,
+                    );
+                    let npts = qrule.weights.len();
+
+                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+                    for i in 0..npts {
+                        for j in 0..2 {
+                            *points.get_mut([i, j]).unwrap() =
+                                num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                    qrule.trial_points[2 * i + j],
+                                )
+                                .unwrap();
+                        }
+                    }
+                    let mut table = rlst_dynamic_array4!(
+                        Self::T,
+                        trial_space
+                            .element(*trial_cell_type)
+                            .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                    );
+                    trial_space.element(*trial_cell_type).tabulate(
+                        &points,
+                        Self::TABLE_DERIVS,
+                        &mut table,
+                    );
+                    trial_points.push(points);
+                    trial_tables.push(table);
+
+                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+                    for i in 0..npts {
+                        for j in 0..2 {
+                            *points.get_mut([i, j]).unwrap() =
+                                num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                    qrule.test_points[2 * i + j],
+                                )
+                                .unwrap();
+                        }
+                    }
+                    let mut table = rlst_dynamic_array4!(
+                        Self::T,
+                        test_space
+                            .element(*test_cell_type)
+                            .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                    );
+                    test_space.element(*test_cell_type).tabulate(
+                        &points,
+                        Self::TABLE_DERIVS,
+                        &mut table,
+                    );
+                    test_points.push(points);
+                    test_tables.push(table);
+                    qweights.push(
+                        qrule
+                            .weights
+                            .iter()
+                            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; possible_pairs.len()];
+                for vertex in 0..grid.number_of_vertices() {
+                    let test_cells = grid
+                        .vertex_to_cells(vertex)
+                        .iter()
+                        .map(|c| c.cell)
+                        .filter(|c| {
+                            grid.cell_from_index(*c).topology().cell_type() == *test_cell_type
+                        })
+                        .collect::<Vec<_>>();
+                    let trial_cells = grid
+                        .vertex_to_cells(vertex)
+                        .iter()
+                        .map(|c| c.cell)
+                        .filter(|c| {
+                            grid.cell_from_index(*c).topology().cell_type() == *trial_cell_type
+                        })
+                        .collect::<Vec<_>>();
+                    for test_cell in &test_cells {
+                        let test_vertices = grid
                             .cell_from_index(*test_cell)
                             .topology()
                             .vertex_indices()
-                            .enumerate()
-                        {
-                            if test_v == trial_v {
-                                if test_v < vertex {
-                                    smallest = false;
+                            .collect::<Vec<_>>();
+                        for trial_cell in &trial_cells {
+                            let mut smallest = true;
+                            let mut pairs = vec![];
+                            for (trial_i, trial_v) in grid
+                                .cell_from_index(*trial_cell)
+                                .topology()
+                                .vertex_indices()
+                                .enumerate()
+                            {
+                                for (test_i, test_v) in test_vertices.iter().enumerate() {
+                                    if *test_v == trial_v {
+                                        if *test_v < vertex {
+                                            smallest = false;
+                                            break;
+                                        }
+                                        pairs.push((test_i, trial_i));
+                                    }
+                                }
+                                if !smallest {
                                     break;
                                 }
-                                pairs.push((test_i, trial_i));
+                            }
+                            if smallest {
+                                println!("{pairs:?}");
+                                cell_pairs[pair_indices[&pairs]].push((*test_cell, *trial_cell));
                             }
                         }
-                        if !smallest {
-                            break;
-                        }
-                    }
-                    if smallest {
-                        cell_pairs[pair_indices[&pairs]].push((*test_cell, *trial_cell));
                     }
                 }
-            }
-        }
-        for (i, cells) in cell_pairs.iter().enumerate() {
-            let mut start = 0;
-            let mut cell_blocks = vec![];
-            while start < cells.len() {
-                let end = if start + Self::BATCHSIZE < cells.len() {
-                    start + Self::BATCHSIZE
-                } else {
-                    cells.len()
-                };
-                cell_blocks.push(&cells[start..end]);
-                start = end;
-            }
+                for (i, cells) in cell_pairs.iter().enumerate() {
+                    let mut start = 0;
+                    let mut cell_blocks = vec![];
+                    while start < cells.len() {
+                        let end = if start + Self::BATCHSIZE < cells.len() {
+                            start + Self::BATCHSIZE
+                        } else {
+                            cells.len()
+                        };
+                        cell_blocks.push(&cells[start..end]);
+                        start = end;
+                    }
 
-            let numtasks = cell_blocks.len();
-            let r: SparseMatrixData<Self::T> = (0..numtasks)
-                .into_par_iter()
-                .map(&|t| {
-                    assemble_batch_singular::<Self::T, TestGrid, TrialGrid>(
-                        self,
-                        Self::DERIV_SIZE,
-                        shape,
-                        trial_space,
-                        test_space,
-                        cell_blocks[t],
-                        &trial_points[i],
-                        &test_points[i],
-                        &qweights[i],
-                        &trial_tables[i],
-                        &test_tables[i],
-                    )
-                })
-                .reduce(|| SparseMatrixData::<Self::T>::new(shape), |a, b| a.sum(b));
+                    let numtasks = cell_blocks.len();
+                    let r: SparseMatrixData<Self::T> = (0..numtasks)
+                        .into_par_iter()
+                        .map(&|t| {
+                            assemble_batch_singular::<Self::T, TestGrid, TrialGrid>(
+                                self,
+                                Self::DERIV_SIZE,
+                                shape,
+                                *trial_cell_type,
+                                *test_cell_type,
+                                trial_space,
+                                test_space,
+                                cell_blocks[t],
+                                &trial_points[i],
+                                &test_points[i],
+                                &qweights[i],
+                                &trial_tables[i],
+                                &test_tables[i],
+                            )
+                        })
+                        .reduce(|| SparseMatrixData::<Self::T>::new(shape), |a, b| a.sum(b));
 
-            output.add(r);
+                    output.add(r);
+                }
+            }
         }
         output
     }
@@ -803,7 +833,9 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let grid = test_space.grid();
 
-        // TODO: pass cell types into this function
+        // TODO: loop over cell types
+
+        // TODO: cell type
         let qrule_test = simplex_rule(ReferenceCellType::Triangle, npts_test).unwrap();
         let mut qpoints_test = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
         for i in 0..npts_test {
@@ -818,6 +850,7 @@ pub trait BatchedAssembler: Sync + Sized {
             .iter()
             .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
             .collect::<Vec<_>>();
+        // TODO: cell type
         let qrule_trial = simplex_rule(ReferenceCellType::Triangle, npts_trial).unwrap();
         let mut qpoints_trial =
             rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
@@ -834,24 +867,28 @@ pub trait BatchedAssembler: Sync + Sized {
             .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
             .collect::<Vec<_>>();
 
+        // TODO: cell_type
         let mut test_table = rlst_dynamic_array4!(
             Self::T,
             test_space
                 .element(ReferenceCellType::Triangle)
                 .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
         );
+        // TODO: cell_type
         test_space.element(ReferenceCellType::Triangle).tabulate(
             &qpoints_test,
             Self::TABLE_DERIVS,
             &mut test_table,
         );
 
+        // TODO: cell_type
         let mut trial_table = rlst_dynamic_array4!(
             Self::T,
             trial_space
                 .element(ReferenceCellType::Triangle)
                 .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
         );
+        // TODO: cell_type
         trial_space.element(ReferenceCellType::Triangle).tabulate(
             &qpoints_test,
             Self::TABLE_DERIVS,
@@ -1053,8 +1090,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
         self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid>(
             output,
-            16,
-            16,
+            37, // TODO: Allow user to set npts (note: 37 used as rule exists with 37 for both triangles and quads)
+            37, // TODO: Allow user to set npts
             trial_space,
             test_space,
             &trial_colouring,
@@ -1062,7 +1099,7 @@ pub trait BatchedAssembler: Sync + Sized {
         );
         self.assemble_singular_into_dense::<TestGrid, TrialGrid>(
             output,
-            4,
+            4, // TODO: Allow user to set this
             trial_space,
             test_space,
         );
@@ -1093,115 +1130,124 @@ pub trait BatchedAssembler: Sync + Sized {
             panic!("Matrix has wrong shape");
         }
 
-        // TODO: pass cell types into this function
-        let qrule_test = simplex_rule(ReferenceCellType::Triangle, npts_test).unwrap();
-        let mut qpoints_test = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
-        for i in 0..npts_test {
-            for j in 0..2 {
-                *qpoints_test.get_mut([i, j]).unwrap() =
-                    num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
-                        .unwrap();
-            }
-        }
-        let qweights_test = qrule_test
-            .weights
-            .iter()
-            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
-            .collect::<Vec<_>>();
-        let qrule_trial = simplex_rule(ReferenceCellType::Triangle, npts_trial).unwrap();
-        let mut qpoints_trial =
-            rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
-        for i in 0..npts_trial {
-            for j in 0..2 {
-                *qpoints_trial.get_mut([i, j]).unwrap() =
-                    num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_trial.points[2 * i + j])
-                        .unwrap();
-            }
-        }
-        let qweights_trial = qrule_trial
-            .weights
-            .iter()
-            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
-            .collect::<Vec<_>>();
-
-        let mut test_table = rlst_dynamic_array4!(
-            Self::T,
-            test_space
-                .element(ReferenceCellType::Triangle)
-                .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
-        );
-        test_space.element(ReferenceCellType::Triangle).tabulate(
-            &qpoints_test,
-            Self::TABLE_DERIVS,
-            &mut test_table,
-        );
-
-        let mut trial_table = rlst_dynamic_array4!(
-            Self::T,
-            trial_space
-                .element(ReferenceCellType::Triangle)
-                .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
-        );
-        trial_space.element(ReferenceCellType::Triangle).tabulate(
-            &qpoints_test,
-            Self::TABLE_DERIVS,
-            &mut trial_table,
-        );
-
-        let output_raw = RawData2D {
-            data: output.data_mut().as_mut_ptr(),
-            shape: output.shape(),
-        };
-
-        for test_c in test_colouring {
-            for trial_c in trial_colouring {
-                let mut test_cells: Vec<&[usize]> = vec![];
-                let mut trial_cells: Vec<&[usize]> = vec![];
-
-                let mut test_start = 0;
-                while test_start < test_c.len() {
-                    let test_end = if test_start + Self::BATCHSIZE < test_c.len() {
-                        test_start + Self::BATCHSIZE
-                    } else {
-                        test_c.len()
-                    };
-
-                    let mut trial_start = 0;
-                    while trial_start < trial_c.len() {
-                        let trial_end = if trial_start + Self::BATCHSIZE < trial_c.len() {
-                            trial_start + Self::BATCHSIZE
-                        } else {
-                            trial_c.len()
-                        };
-                        test_cells.push(&test_c[test_start..test_end]);
-                        trial_cells.push(&trial_c[trial_start..trial_end]);
-                        trial_start = trial_end;
+        for test_cell_type in test_space.grid().cell_types() {
+            for trial_cell_type in trial_space.grid().cell_types() {
+                let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
+                let mut qpoints_test =
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+                for i in 0..npts_test {
+                    for j in 0..2 {
+                        *qpoints_test.get_mut([i, j]).unwrap() =
+                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                qrule_test.points[2 * i + j],
+                            )
+                            .unwrap();
                     }
-                    test_start = test_end
                 }
+                let qweights_test = qrule_test
+                    .weights
+                    .iter()
+                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                    .collect::<Vec<_>>();
+                let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
+                let mut qpoints_trial =
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+                for i in 0..npts_trial {
+                    for j in 0..2 {
+                        *qpoints_trial.get_mut([i, j]).unwrap() =
+                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                qrule_trial.points[2 * i + j],
+                            )
+                            .unwrap();
+                    }
+                }
+                let qweights_trial = qrule_trial
+                    .weights
+                    .iter()
+                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                    .collect::<Vec<_>>();
 
-                let numtasks = test_cells.len();
-                let r: usize = (0..numtasks)
-                    .into_par_iter()
-                    .map(&|t| {
-                        assemble_batch_nonadjacent::<Self::T, TestGrid, TrialGrid>(
-                            self,
-                            Self::DERIV_SIZE,
-                            &output_raw,
-                            trial_space,
-                            trial_cells[t],
-                            test_space,
-                            test_cells[t],
-                            &qpoints_trial,
-                            &qweights_trial,
-                            &qpoints_test,
-                            &qweights_test,
-                            &trial_table,
-                            &test_table,
-                        )
-                    })
-                    .sum();
-                assert_eq!(r, numtasks);
+                let mut test_table = rlst_dynamic_array4!(
+                    Self::T,
+                    test_space
+                        .element(*test_cell_type)
+                        .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
+                );
+                test_space.element(*test_cell_type).tabulate(
+                    &qpoints_test,
+                    Self::TABLE_DERIVS,
+                    &mut test_table,
+                );
+
+                let mut trial_table = rlst_dynamic_array4!(
+                    Self::T,
+                    trial_space
+                        .element(*trial_cell_type)
+                        .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
+                );
+                trial_space.element(*trial_cell_type).tabulate(
+                    &qpoints_test,
+                    Self::TABLE_DERIVS,
+                    &mut trial_table,
+                );
+
+                let output_raw = RawData2D {
+                    data: output.data_mut().as_mut_ptr(),
+                    shape: output.shape(),
+                };
+
+                // TODO: store colouring by cell type, then only loop through cells with right type here
+                for test_c in test_colouring {
+                    for trial_c in trial_colouring {
+                        let mut test_cells: Vec<&[usize]> = vec![];
+                        let mut trial_cells: Vec<&[usize]> = vec![];
+
+                        let mut test_start = 0;
+                        while test_start < test_c.len() {
+                            let test_end = if test_start + Self::BATCHSIZE < test_c.len() {
+                                test_start + Self::BATCHSIZE
+                            } else {
+                                test_c.len()
+                            };
+
+                            let mut trial_start = 0;
+                            while trial_start < trial_c.len() {
+                                let trial_end = if trial_start + Self::BATCHSIZE < trial_c.len() {
+                                    trial_start + Self::BATCHSIZE
+                                } else {
+                                    trial_c.len()
+                                };
+                                test_cells.push(&test_c[test_start..test_end]);
+                                trial_cells.push(&trial_c[trial_start..trial_end]);
+                                trial_start = trial_end;
+                            }
+                            test_start = test_end
+                        }
+
+                        let numtasks = test_cells.len();
+                        let r: usize = (0..numtasks)
+                            .into_par_iter()
+                            .map(&|t| {
+                                assemble_batch_nonadjacent::<Self::T, TestGrid, TrialGrid>(
+                                    self,
+                                    Self::DERIV_SIZE,
+                                    &output_raw,
+                                    trial_space,
+                                    trial_cells[t],
+                                    test_space,
+                                    test_cells[t],
+                                    &qpoints_trial,
+                                    &qweights_trial,
+                                    &qpoints_test,
+                                    &qweights_test,
+                                    &trial_table,
+                                    &test_table,
+                                )
+                            })
+                            .sum();
+                        assert_eq!(r, numtasks);
+                    }
+                }
             }
         }
     }
