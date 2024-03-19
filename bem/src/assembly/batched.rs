@@ -729,7 +729,6 @@ pub trait BatchedAssembler: Sync + Sized {
                                 }
                             }
                             if smallest {
-                                println!("{pairs:?}");
                                 cell_pairs[pair_indices[&pairs]].push((*test_cell, *trial_cell));
                             }
                         }
