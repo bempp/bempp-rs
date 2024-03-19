@@ -3,9 +3,7 @@ use crate::assembly::common::{RawData2D, SparseMatrixData};
 use bempp_element::reference_cell;
 use bempp_grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use bempp_quadrature::duffy::{
-quadrilateral_duffy, triangle_duffy,
-quadrilateral_triangle_duffy,
-triangle_quadrilateral_duffy,
+    quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
@@ -79,13 +77,19 @@ fn get_singular_quadrature_rule(
         panic!("Non-singular rule requested.");
     }
     let con = CellToCellConnectivity {
-        connectivity_dimension: match pairs.len() { 1 => 0, 2 => 1, _ => 2},
+        connectivity_dimension: match pairs.len() {
+            1 => 0,
+            2 => 1,
+            _ => 2,
+        },
         local_indices: pairs.to_vec(),
     };
     match test_celltype {
         ReferenceCellType::Triangle => match trial_celltype {
             ReferenceCellType::Triangle => triangle_duffy(&con, npoints).unwrap(),
-            ReferenceCellType::Quadrilateral => triangle_quadrilateral_duffy(&con, npoints).unwrap(),
+            ReferenceCellType::Quadrilateral => {
+                triangle_quadrilateral_duffy(&con, npoints).unwrap()
+            }
             _ => {
                 unimplemented!("Only triangles and quadrilaterals are currently supported");
             }

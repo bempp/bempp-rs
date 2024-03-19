@@ -10,8 +10,8 @@ mod test {
     use crate::function_space::SerialFunctionSpace;
     use bempp_element::element::LagrangeElementFamily;
     use bempp_grid::{
-        shapes::regular_sphere,
         mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
+        shapes::regular_sphere,
         single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
         traits_impl::WrappedGrid,
     };
