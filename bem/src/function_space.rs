@@ -115,9 +115,14 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
         }
     }
 
+    // TODO: move to trait
     /// Compute cell colouring
-    pub fn compute_cell_colouring(&self) -> Vec<Vec<usize>> {
-        let mut colouring: Vec<Vec<usize>> = vec![];
+    pub fn compute_cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
+        let mut colouring = HashMap::new();
+        //: HashMap<ReferenceCellType, Vec<Vec<usize>>>
+        for cell in self.grid.cell_types() {
+            colouring.insert(*cell, vec![]);
+        }
         let mut edim = 0;
         while self.elements[&self.grid.cell_types()[0]]
             .entity_dofs(edim, 0)
@@ -141,6 +146,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
         ];
 
         for cell in self.grid.iter_all_cells() {
+            let cell_type = cell.topology().cell_type();
             let indices = if edim == 0 {
                 cell.topology().vertex_indices().collect::<Vec<_>>()
             } else if edim == 1 {
@@ -153,7 +159,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
 
             let c = {
                 let mut c = 0;
-                while c < colouring.len() {
+                while c < colouring[&cell_type].len() {
                     let mut found = false;
                     for v in &indices {
                         if entity_colours[*v].contains(&c) {
@@ -169,10 +175,12 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
                 }
                 c
             };
-            if c == colouring.len() {
-                colouring.push(vec![cell.index()]);
+            if c == colouring[&cell_type].len() {
+                for ct in self.grid.cell_types() {
+                    colouring.get_mut(ct).unwrap().push(if *ct == cell_type { vec![cell.index()] } else { vec![] });
+                }
             } else {
-                colouring[c].push(cell.index());
+                colouring.get_mut(&cell_type).unwrap()[c].push(cell.index());
             }
             for v in &indices {
                 entity_colours[*v].push(c);
@@ -258,10 +266,10 @@ mod test {
         let grid = regular_sphere::<f64>(2);
         let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = space.compute_cell_colouring();
+        let colouring = &space.compute_cell_colouring()[&ReferenceCellType::Triangle];
         let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
-        for i in &colouring {
+        for i in colouring {
             n += i.len()
         }
         assert_eq!(n, grid.number_of_cells());
@@ -277,8 +285,8 @@ mod test {
             }
         }
         for ci in colouring {
-            for cell0 in &ci {
-                for cell1 in &ci {
+            for cell0 in ci {
+                for cell1 in ci {
                     if cell0 != cell1 {
                         for v0 in cells[*cell0].topology().vertex_indices() {
                             for v1 in cells[*cell1].topology().vertex_indices() {
@@ -296,9 +304,9 @@ mod test {
         let grid = regular_sphere::<f64>(2);
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = space.compute_cell_colouring();
+        let colouring = &space.compute_cell_colouring()[&ReferenceCellType::Triangle];
         let mut n = 0;
-        for i in &colouring {
+        for i in colouring {
             n += i.len()
         }
         assert_eq!(n, grid.number_of_cells());
@@ -321,10 +329,10 @@ mod test {
         let grid = regular_sphere::<f64>(2);
         let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = space.compute_cell_colouring();
+        let colouring = &space.compute_cell_colouring()[&ReferenceCellType::Triangle];
         let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
-        for i in &colouring {
+        for i in colouring {
             n += i.len()
         }
         assert_eq!(n, grid.number_of_cells());
@@ -340,8 +348,8 @@ mod test {
             }
         }
         for ci in colouring {
-            for cell0 in &ci {
-                for cell1 in &ci {
+            for cell0 in ci {
+                for cell1 in ci {
                     if cell0 != cell1 {
                         for e0 in cells[*cell0].topology().edge_indices() {
                             for e1 in cells[*cell1].topology().edge_indices() {

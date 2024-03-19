@@ -2,8 +2,9 @@
 use super::{equal_grids, BatchedAssembler, EvalType, RlstArray, SparseMatrixData};
 use crate::function_space::SerialFunctionSpace;
 use bempp_kernel::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
-use bempp_traits::{bem::FunctionSpace, grid::GridType, kernel::Kernel};
+use bempp_traits::{bem::FunctionSpace, grid::GridType, kernel::Kernel, types::ReferenceCellType};
 use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef};
+use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
 unsafe fn hyp_test_trial_product<T: RlstScalar>(
@@ -427,8 +428,8 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         npts_trial: usize,
         trial_space: &SerialFunctionSpace<'a, T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, T, TestGrid>,
-        trial_colouring: &Vec<Vec<usize>>,
-        test_colouring: &Vec<Vec<usize>>,
+        trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
+        test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
         if !trial_space.is_serial() || !test_space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
