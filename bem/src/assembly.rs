@@ -11,6 +11,7 @@ mod test {
     use bempp_element::element::LagrangeElementFamily;
     use bempp_grid::{
         shapes::regular_sphere,
+        mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
         single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
         traits_impl::WrappedGrid,
     };
