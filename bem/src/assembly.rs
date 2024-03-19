@@ -57,7 +57,6 @@ mod test {
         b.create_grid()
     }
 
-    /*
     fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> WrappedGrid<SerialMixedGrid<T>>
     where
         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
@@ -116,7 +115,6 @@ mod test {
         }
         b.create_grid()
     }
-    */
 
     macro_rules! example_grid {
         (Triangle, $dtype:ident) => {
@@ -215,31 +213,30 @@ mod test {
         (c64, Helmholtz, AdjointDoubleLayer, Quadrilateral),
         (c32, Helmholtz, AdjointDoubleLayer, Quadrilateral),
         (c64, Helmholtz, Hypersingular, Quadrilateral),
-        (c32, Helmholtz, Hypersingular, Quadrilateral) /*
-                                                       (f64, Laplace, SingleLayer, Mixed),
-                                                       (f32, Laplace, SingleLayer, Mixed),
-                                                       (c64, Laplace, SingleLayer, Mixed),
-                                                       (c32, Laplace, SingleLayer, Mixed),
-                                                       (f64, Laplace, DoubleLayer, Mixed),
-                                                       (f32, Laplace, DoubleLayer, Mixed),
-                                                       (c64, Laplace, DoubleLayer, Mixed),
-                                                       (c32, Laplace, DoubleLayer, Mixed),
-                                                       (f64, Laplace, AdjointDoubleLayer, Mixed),
-                                                       (f32, Laplace, AdjointDoubleLayer, Mixed),
-                                                       (c64, Laplace, AdjointDoubleLayer, Mixed),
-                                                       (c32, Laplace, AdjointDoubleLayer, Mixed),
-                                                       (f64, Laplace, Hypersingular, Mixed),
-                                                       (f32, Laplace, Hypersingular, Mixed),
-                                                       (c64, Laplace, Hypersingular, Mixed),
-                                                       (c32, Laplace, Hypersingular, Mixed),
-                                                       (c64, Helmholtz, SingleLayer, Mixed),
-                                                       (c32, Helmholtz, SingleLayer, Mixed),
-                                                       (c64, Helmholtz, DoubleLayer, Mixed),
-                                                       (c32, Helmholtz, DoubleLayer, Mixed),
-                                                       (c64, Helmholtz, AdjointDoubleLayer, Mixed),
-                                                       (c32, Helmholtz, AdjointDoubleLayer, Mixed),
-                                                       (c64, Helmholtz, Hypersingular, Mixed),
-                                                       (c32, Helmholtz, Hypersingular, Mixed)
-                                                       */
+        (c32, Helmholtz, Hypersingular, Quadrilateral),
+        (f64, Laplace, SingleLayer, Mixed),
+        (f32, Laplace, SingleLayer, Mixed),
+        (c64, Laplace, SingleLayer, Mixed),
+        (c32, Laplace, SingleLayer, Mixed),
+        (f64, Laplace, DoubleLayer, Mixed),
+        (f32, Laplace, DoubleLayer, Mixed),
+        (c64, Laplace, DoubleLayer, Mixed),
+        (c32, Laplace, DoubleLayer, Mixed),
+        (f64, Laplace, AdjointDoubleLayer, Mixed),
+        (f32, Laplace, AdjointDoubleLayer, Mixed),
+        (c64, Laplace, AdjointDoubleLayer, Mixed),
+        (c32, Laplace, AdjointDoubleLayer, Mixed),
+        (f64, Laplace, Hypersingular, Mixed),
+        (f32, Laplace, Hypersingular, Mixed),
+        (c64, Laplace, Hypersingular, Mixed),
+        (c32, Laplace, Hypersingular, Mixed),
+        (c64, Helmholtz, SingleLayer, Mixed),
+        (c32, Helmholtz, SingleLayer, Mixed),
+        (c64, Helmholtz, DoubleLayer, Mixed),
+        (c32, Helmholtz, DoubleLayer, Mixed),
+        (c64, Helmholtz, AdjointDoubleLayer, Mixed),
+        (c32, Helmholtz, AdjointDoubleLayer, Mixed),
+        (c64, Helmholtz, Hypersingular, Mixed),
+        (c32, Helmholtz, Hypersingular, Mixed)
     );
 }
