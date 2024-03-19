@@ -591,12 +591,7 @@ pub trait BatchedAssembler: Sync + Sized {
         let mut trial_tables = vec![];
         let mut test_tables = vec![];
 
-        let mut cell_blocks: Vec<(
-            usize,
-            ReferenceCellType,
-            ReferenceCellType,
-            Vec<(usize, usize)>,
-        )> = vec![];
+        let mut cell_blocks = vec![];
 
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
