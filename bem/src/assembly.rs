@@ -57,6 +57,7 @@ mod test {
         b.create_grid()
     }
 
+    /*
     fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> WrappedGrid<SerialMixedGrid<T>>
     where
         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
@@ -115,6 +116,7 @@ mod test {
         }
         b.create_grid()
     }
+    */
 
     macro_rules! example_grid {
         (Triangle, $dtype:ident) => {

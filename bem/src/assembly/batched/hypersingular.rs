@@ -359,7 +359,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     }
 
     fn assemble_singular<
-        'a,
         TestGrid: GridType<T = T::Real> + Sync,
         TrialGrid: GridType<T = T::Real> + Sync,
         Element: FiniteElement<T = T> + Sync,
@@ -391,7 +390,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     }
 
     fn assemble_singular_correction<
-        'a,
         TestGrid: GridType<T = T::Real> + Sync,
         TrialGrid: GridType<T = T::Real> + Sync,
         Element: FiniteElement<T = T> + Sync,
@@ -432,7 +430,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
 
     #[allow(clippy::too_many_arguments)]
     fn assemble_nonsingular_into_dense<
-        'a,
         TestGrid: GridType<T = T::Real> + Sync,
         TrialGrid: GridType<T = T::Real> + Sync,
         Element: FiniteElement<T = T> + Sync,

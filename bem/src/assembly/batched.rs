@@ -129,7 +129,6 @@ fn get_singular_quadrature_rule(
 /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
-    'a,
     T: RlstScalar,
     TestGrid: GridType<T = T::Real>,
     TrialGrid: GridType<T = T::Real>,
@@ -240,7 +239,6 @@ fn assemble_batch_singular<
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<
-    'a,
     T: RlstScalar,
     TestGrid: GridType<T = T::Real>,
     TrialGrid: GridType<T = T::Real>,
@@ -381,7 +379,6 @@ fn assemble_batch_nonadjacent<
 /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells if an (incorrect) non-singular quadrature rule was used
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular_correction<
-    'a,
     T: RlstScalar,
     TestGrid: GridType<T = T::Real>,
     TrialGrid: GridType<T = T::Real>,
@@ -583,7 +580,6 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the singular contributions
     fn assemble_singular<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -808,7 +804,6 @@ pub trait BatchedAssembler: Sync + Sized {
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -989,7 +984,6 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the singular contributions into a dense matrix
     fn assemble_singular_into_dense<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -1016,7 +1010,6 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the singular contributions into a CSR sparse matrix
     fn assemble_singular_into_csr<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -1047,7 +1040,6 @@ pub trait BatchedAssembler: Sync + Sized {
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction_into_dense<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -1078,7 +1070,6 @@ pub trait BatchedAssembler: Sync + Sized {
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction_into_csr<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -1109,7 +1100,6 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble into a dense matrix
     fn assemble_into_dense<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
@@ -1142,7 +1132,6 @@ pub trait BatchedAssembler: Sync + Sized {
     /// Assemble the non-singular contributions into a dense matrix
     #[allow(clippy::too_many_arguments)]
     fn assemble_nonsingular_into_dense<
-        'a,
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
