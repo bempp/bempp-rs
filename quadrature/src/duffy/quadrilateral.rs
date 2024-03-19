@@ -39,7 +39,7 @@ fn create_quadrilateral_mapper(v0: usize, v1: usize) -> impl Fn((f64, f64)) -> (
         (2, 3) => 0,
         (0, 2) => 1,
         (2, 0) => 3,
-        _ => panic!("(v0, v1) is not an edge of the unit quadrilateral."),
+        _ => panic!("({v0}, {v1}) is not an edge of the unit quadrilateral."),
     };
 
     let get_reference_vertex = |index| -> Result<(f64, f64), ()> {

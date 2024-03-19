@@ -9,3 +9,9 @@
 
 pub mod quadrilateral;
 pub mod triangle;
+
+pub use quadrilateral::quadrilateral_duffy;
+pub use triangle::triangle_duffy;
+
+pub use quadrilateral::quadrilateral_duffy as triangle_quadrilateral_duffy;
+pub use quadrilateral::quadrilateral_duffy as quadrilateral_triangle_duffy;
