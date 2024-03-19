@@ -1,5 +1,8 @@
 use bempp_element::element::LagrangeElementFamily;
-use bempp_traits::{element::{Continuity, FiniteElement, ElementFamily}, types::ReferenceCellType};
+use bempp_traits::{
+    element::{Continuity, ElementFamily, FiniteElement},
+    types::ReferenceCellType,
+};
 
 extern crate blas_src;
 extern crate lapack_src;

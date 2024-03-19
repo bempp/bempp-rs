@@ -1,5 +1,8 @@
 use bempp_element::element::lagrange;
-use bempp_traits::{element::{Continuity, FiniteElement}, types::ReferenceCellType};
+use bempp_traits::{
+    element::{Continuity, FiniteElement},
+    types::ReferenceCellType,
+};
 use rlst::{rlst_dynamic_array2, rlst_dynamic_array4, RawAccess};
 
 extern crate blas_src;
@@ -19,12 +22,18 @@ fn main() {
     points[[0, 1]] = 1.0 / 3.0;
     // Tabulate the element's basis functions at the point
     element.tabulate(&points, 0, &mut basis_values);
-    println!("The values of the basis functions at the point (1/3, 1/3) are: {:?}", basis_values.data());
+    println!(
+        "The values of the basis functions at the point (1/3, 1/3) are: {:?}",
+        basis_values.data()
+    );
 
     // Set point to [1, 0]
     points[[0, 0]] = 1.0;
     points[[0, 1]] = 0.0;
     // Tabulate the element's basis functions at the point
     element.tabulate(&points, 0, &mut basis_values);
-    println!("The values of the basis functions at the point (1, 0) are: {:?}", basis_values.data());
+    println!(
+        "The values of the basis functions at the point (1, 0) are: {:?}",
+        basis_values.data()
+    );
 }
