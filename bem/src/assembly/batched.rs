@@ -839,12 +839,15 @@ pub trait BatchedAssembler: Sync + Sized {
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
-                let mut qpoints_test = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+                let mut qpoints_test =
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
                 for i in 0..npts_test {
                     for j in 0..2 {
                         *qpoints_test.get_mut([i, j]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
-                                .unwrap();
+                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                qrule_test.points[2 * i + j],
+                            )
+                            .unwrap();
                     }
                 }
                 let qweights_test = qrule_test
@@ -858,8 +861,10 @@ pub trait BatchedAssembler: Sync + Sized {
                 for i in 0..npts_trial {
                     for j in 0..2 {
                         *qpoints_trial.get_mut([i, j]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule_trial.points[2 * i + j])
-                                .unwrap();
+                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                qrule_trial.points[2 * i + j],
+                            )
+                            .unwrap();
                     }
                 }
                 let qweights_trial = qrule_trial
@@ -919,7 +924,9 @@ pub trait BatchedAssembler: Sync + Sized {
                                 .topology()
                                 .vertex_indices()
                             {
-                                for test_v in grid.cell_from_index(*test_cell).topology().vertex_indices() {
+                                for test_v in
+                                    grid.cell_from_index(*test_cell).topology().vertex_indices()
+                                {
                                     if test_v == trial_v && test_v < vertex {
                                         smallest = false;
                                         break;

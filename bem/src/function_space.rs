@@ -177,7 +177,11 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
             };
             if c == colouring[&cell_type].len() {
                 for ct in self.grid.cell_types() {
-                    colouring.get_mut(ct).unwrap().push(if *ct == cell_type { vec![cell.index()] } else { vec![] });
+                    colouring.get_mut(ct).unwrap().push(if *ct == cell_type {
+                        vec![cell.index()]
+                    } else {
+                        vec![]
+                    });
                 }
             } else {
                 colouring.get_mut(&cell_type).unwrap()[c].push(cell.index());
