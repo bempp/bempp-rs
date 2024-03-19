@@ -571,11 +571,9 @@ pub trait BatchedAssembler: Sync + Sized {
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> SparseMatrixData<Self::T> {
-        let mut output = SparseMatrixData::new(shape);
-
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
-            return output;
+            return SparseMatrixData::new(shape);
         }
 
         if !trial_space.is_serial() || !test_space.is_serial() {
@@ -587,8 +585,23 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let grid = test_space.grid();
 
+        let mut qweights = vec![];
+        let mut trial_points = vec![];
+        let mut test_points = vec![];
+        let mut trial_tables = vec![];
+        let mut test_tables = vec![];
+
+        let mut cell_blocks: Vec<(
+            usize,
+            ReferenceCellType,
+            ReferenceCellType,
+            Vec<(usize, usize)>,
+        )> = vec![];
+
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
+                let offset = qweights.len();
+
                 let mut possible_pairs = vec![];
                 // Vertex-adjacent
                 for i in 0..reference_cell::entity_counts(*test_cell_type)[0] {
@@ -617,11 +630,6 @@ pub trait BatchedAssembler: Sync + Sized {
                     pair_indices.insert(pairs.clone(), i);
                 }
 
-                let mut qweights = vec![];
-                let mut trial_points = vec![];
-                let mut test_points = vec![];
-                let mut trial_tables = vec![];
-                let mut test_tables = vec![];
                 for pairs in &possible_pairs {
                     let qrule = get_singular_quadrature_rule(
                         *test_cell_type,
@@ -641,17 +649,12 @@ pub trait BatchedAssembler: Sync + Sized {
                                 .unwrap();
                         }
                     }
+                    let trial_element = trial_space.element(*trial_cell_type);
                     let mut table = rlst_dynamic_array4!(
                         Self::T,
-                        trial_space
-                            .element(*trial_cell_type)
-                            .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                        trial_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
                     );
-                    trial_space.element(*trial_cell_type).tabulate(
-                        &points,
-                        Self::TABLE_DERIVS,
-                        &mut table,
-                    );
+                    trial_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
                     trial_points.push(points);
                     trial_tables.push(table);
 
@@ -665,17 +668,12 @@ pub trait BatchedAssembler: Sync + Sized {
                                 .unwrap();
                         }
                     }
+                    let test_element = test_space.element(*test_cell_type);
                     let mut table = rlst_dynamic_array4!(
                         Self::T,
-                        test_space
-                            .element(*test_cell_type)
-                            .tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                        test_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
                     );
-                    test_space.element(*test_cell_type).tabulate(
-                        &points,
-                        Self::TABLE_DERIVS,
-                        &mut table,
-                    );
+                    test_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
                     test_points.push(points);
                     test_tables.push(table);
                     qweights.push(
@@ -740,44 +738,49 @@ pub trait BatchedAssembler: Sync + Sized {
                 }
                 for (i, cells) in cell_pairs.iter().enumerate() {
                     let mut start = 0;
-                    let mut cell_blocks = vec![];
                     while start < cells.len() {
                         let end = if start + Self::BATCHSIZE < cells.len() {
                             start + Self::BATCHSIZE
                         } else {
                             cells.len()
                         };
-                        cell_blocks.push(&cells[start..end]);
+                        cell_blocks.push((
+                            offset + i,
+                            *trial_cell_type,
+                            *test_cell_type,
+                            cells[start..end].to_vec(),
+                        ));
                         start = end;
                     }
-
-                    let numtasks = cell_blocks.len();
-                    let r: SparseMatrixData<Self::T> = (0..numtasks)
-                        .into_par_iter()
-                        .map(&|t| {
-                            assemble_batch_singular::<Self::T, TestGrid, TrialGrid, Element>(
-                                self,
-                                Self::DERIV_SIZE,
-                                shape,
-                                *trial_cell_type,
-                                *test_cell_type,
-                                trial_space,
-                                test_space,
-                                cell_blocks[t],
-                                &trial_points[i],
-                                &test_points[i],
-                                &qweights[i],
-                                &trial_tables[i],
-                                &test_tables[i],
-                            )
-                        })
-                        .reduce(|| SparseMatrixData::<Self::T>::new(shape), |a, b| a.sum(b));
-
-                    output.add(r);
                 }
             }
         }
-        output
+        cell_blocks
+            .into_par_iter()
+            .map(|(i, trial_cell_type, test_cell_type, cell_block)| {
+                assemble_batch_singular::<Self::T, TestGrid, TrialGrid, Element>(
+                    self,
+                    Self::DERIV_SIZE,
+                    shape,
+                    trial_cell_type,
+                    test_cell_type,
+                    trial_space,
+                    test_space,
+                    &cell_block,
+                    &trial_points[i],
+                    &test_points[i],
+                    &qweights[i],
+                    &trial_tables[i],
+                    &test_tables[i],
+                )
+            })
+            .reduce(
+                || SparseMatrixData::<Self::T>::new(shape),
+                |mut a, b| {
+                    a.add(b);
+                    a
+                },
+            )
     }
 
     /// Assemble the singular correction
@@ -852,29 +855,19 @@ pub trait BatchedAssembler: Sync + Sized {
                     .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
                     .collect::<Vec<_>>();
 
+                let test_element = test_space.element(*test_cell_type);
                 let mut test_table = rlst_dynamic_array4!(
                     Self::T,
-                    test_space
-                        .element(*test_cell_type)
-                        .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
+                    test_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
                 );
-                test_space.element(*test_cell_type).tabulate(
-                    &qpoints_test,
-                    Self::TABLE_DERIVS,
-                    &mut test_table,
-                );
+                test_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
 
+                let trial_element = trial_space.element(*trial_cell_type);
                 let mut trial_table = rlst_dynamic_array4!(
                     Self::T,
-                    trial_space
-                        .element(*trial_cell_type)
-                        .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
+                    trial_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
                 );
-                trial_space.element(*trial_cell_type).tabulate(
-                    &qpoints_test,
-                    Self::TABLE_DERIVS,
-                    &mut trial_table,
-                );
+                trial_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
 
                 let mut cell_pairs: Vec<(usize, usize)> = vec![];
 
@@ -1171,29 +1164,19 @@ pub trait BatchedAssembler: Sync + Sized {
                     .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
                     .collect::<Vec<_>>();
 
+                let test_element = test_space.element(*test_cell_type);
                 let mut test_table = rlst_dynamic_array4!(
                     Self::T,
-                    test_space
-                        .element(*test_cell_type)
-                        .tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
+                    test_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
                 );
-                test_space.element(*test_cell_type).tabulate(
-                    &qpoints_test,
-                    Self::TABLE_DERIVS,
-                    &mut test_table,
-                );
+                test_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
 
+                let trial_element = trial_space.element(*trial_cell_type);
                 let mut trial_table = rlst_dynamic_array4!(
                     Self::T,
-                    trial_space
-                        .element(*trial_cell_type)
-                        .tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
+                    trial_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
                 );
-                trial_space.element(*trial_cell_type).tabulate(
-                    &qpoints_test,
-                    Self::TABLE_DERIVS,
-                    &mut trial_table,
-                );
+                trial_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
 
                 let output_raw = RawData2D {
                     data: output.data_mut().as_mut_ptr(),
