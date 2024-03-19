@@ -1217,7 +1217,6 @@ pub trait BatchedAssembler: Sync + Sized {
                     shape: output.shape(),
                 };
 
-                // TODO: store colouring by cell type, then only loop through cells with right type here
                 for test_c in &test_colouring[test_cell_type] {
                     for trial_c in &trial_colouring[trial_cell_type] {
                         let mut test_cells: Vec<&[usize]> = vec![];
