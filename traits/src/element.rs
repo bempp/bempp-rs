@@ -99,3 +99,14 @@ pub trait FiniteElement {
         [deriv_count, point_count, basis_count, value_size]
     }
 }
+
+pub trait ElementFamily {
+    //! A family of finite elements
+    /// The Scalar type       
+    type T: RlstScalar;
+    /// The finite element type
+    type FiniteElement: FiniteElement<T = Self::T>;
+
+    /// Get an elenent for a cell type
+    fn element(&self, cell_type: ReferenceCellType) -> Self::FiniteElement;
+}

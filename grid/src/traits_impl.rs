@@ -366,4 +366,8 @@ where
     fn physical_dimension(&self) -> usize {
         self.grid.geometry().dim()
     }
+
+    fn cell_types(&self) -> &[ReferenceCellType] {
+        self.grid.topology().cell_types()
+    }
 }

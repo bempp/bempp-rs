@@ -98,6 +98,9 @@ pub trait Topology {
 
     /// Get the index from the flat index of a face
     fn face_flat_index_to_index(&self, index: usize) -> Self::IndexType;
+
+    /// The cell types included in the grid topology
+    fn cell_types(&self) -> &[ReferenceCellType];
 }
 
 /// The geometry of a grid

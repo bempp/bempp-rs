@@ -160,11 +160,20 @@ fn basis_to_quadrature<const BLOCKSIZE: usize, T: RlstScalar, Grid: GridType<T =
         .map(|w| num::cast::<f64, T>(*w).unwrap())
         .collect::<Vec<_>>();
 
-    let mut table = rlst_dynamic_array4!(T, space.element().tabulate_array_shape(0, npts));
-    space.element().tabulate(&qpoints, 0, &mut table);
+    let mut table = rlst_dynamic_array4!(
+        T,
+        space
+            .element(ReferenceCellType::Triangle)
+            .tabulate_array_shape(0, npts)
+    );
+    space
+        .element(ReferenceCellType::Triangle)
+        .tabulate(&qpoints, 0, &mut table);
 
-    let mut output =
-        SparseMatrixData::<T>::new_known_size(shape, ncells * space.element().dim() * npts);
+    let mut output = SparseMatrixData::<T>::new_known_size(
+        shape,
+        ncells * space.element(ReferenceCellType::Triangle).dim() * npts,
+    );
     debug_assert!(qpoints.shape()[0] == npts);
 
     let evaluator = grid.reference_to_physical_map(qpoints.data());

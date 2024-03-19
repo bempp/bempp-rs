@@ -80,7 +80,7 @@ fn test_grid_single_element() {
     b.add_point(7, [0.5, 1.0, 0.0]);
     b.add_point(8, [1.0, 1.0, 0.0]);
     b.add_cell(0, vec![0, 2, 6, 4, 3, 1]);
-    b.add_cell(0, vec![2, 8, 6, 7, 4, 5]);
+    b.add_cell(1, vec![2, 8, 6, 7, 4, 5]);
     let grid = b.create_grid();
 
     assert_eq!(grid.number_of_vertices(), 4);

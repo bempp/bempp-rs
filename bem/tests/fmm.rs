@@ -2,7 +2,7 @@ use approx::*;
 use bempp_bem::assembly::batched::BatchedAssembler;
 use bempp_bem::assembly::{batched, fmm_tools};
 use bempp_bem::function_space::SerialFunctionSpace;
-use bempp_element::element::lagrange;
+use bempp_element::element::LagrangeElementFamily;
 use bempp_field::types::FftFieldTranslationKiFmm;
 use bempp_fmm::types::KiFmmBuilderSingleNode;
 use bempp_grid::shapes::regular_sphere;
@@ -16,7 +16,6 @@ use bempp_traits::tree::FmmTree;
 #[cfg(not(debug_assertions))]
 use bempp_traits::tree::Tree;
 use bempp_traits::types::EvalType;
-use bempp_traits::types::ReferenceCellType;
 use rand::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RandomAccessMut,
@@ -30,7 +29,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
-    let npts = 16;
+    let npts = 37;
 
     let test_grid = test_space.grid();
     let trial_grid = test_space.grid();
@@ -105,7 +104,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
-    let npts = 16;
+    let npts = 37;
 
     let test_grid = test_space.grid();
     let trial_grid = test_space.grid();
@@ -228,7 +227,7 @@ fn test_fmm_prototype_dp0_dp0() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_prototype(&space, &space);
@@ -241,7 +240,7 @@ fn test_fmm_prototype_p1_p1() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_prototype(&space, &space);
@@ -252,8 +251,8 @@ fn test_fmm_prototype_p1_p1() {
 fn test_fmm_prototype_dp0_p1() {
     let grid = regular_sphere(2);
 
-    let element0 = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
-    let element1 = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+    let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
+    let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
     let space0 = SerialFunctionSpace::new(&grid, &element0);
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 
@@ -265,7 +264,7 @@ fn test_fmm_prototype_dp0_p1() {
 fn test_fmm_dp0_dp0() {
     let grid = regular_sphere(2);
 
-    let element = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_matvec(&space, &space);
@@ -276,7 +275,7 @@ fn test_fmm_dp0_dp0() {
 fn test_fmm_p1_p1() {
     let grid = regular_sphere(2);
 
-    let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_matvec(&space, &space);
@@ -287,8 +286,8 @@ fn test_fmm_p1_p1() {
 fn test_fmm_dp0_p1() {
     let grid = regular_sphere(2);
 
-    let element0 = lagrange::create(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
-    let element1 = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+    let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
+    let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
     let space0 = SerialFunctionSpace::new(&grid, &element0);
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 

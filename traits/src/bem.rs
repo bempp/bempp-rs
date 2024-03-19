@@ -1,6 +1,8 @@
 //! Boundary element method traits
 use crate::element::FiniteElement;
 use crate::grid::GridType;
+use crate::types::ReferenceCellType;
+use std::collections::HashMap;
 
 /// A function space
 pub trait FunctionSpace {
@@ -13,7 +15,7 @@ pub trait FunctionSpace {
     fn grid(&self) -> &Self::Grid;
 
     /// Get the finite element used to define this function space
-    fn element(&self) -> &Self::FiniteElement;
+    fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement;
 
     /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool {
@@ -34,4 +36,7 @@ pub trait FunctionSpace {
 
     /// Get the local DOF numbers associated with a cell
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]>;
+
+    /// Compute a colouring of the cells so that no two cells that share an entity with DOFs associated with it are assigned the same colour
+    fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>>;
 }

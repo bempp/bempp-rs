@@ -325,7 +325,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorMixed<'a, T> {
         let tdim = reference_cell::dim(geometry.elements[0].cell_type());
         assert_eq!(points.len() % tdim, 0);
         let npoints = points.len() / tdim;
-        let rlst_points = rlst_array_from_slice2!(T, points, [tdim, npoints]);
+        let rlst_points = rlst_array_from_slice2!(T, points, [npoints, tdim]);
 
         let mut tables = vec![];
         for e in &geometry.elements {

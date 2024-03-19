@@ -286,7 +286,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorSingleElement<'a, T> 
         let tdim = reference_cell::dim(geometry.element.cell_type());
         assert_eq!(points.len() % tdim, 0);
         let npoints = points.len() / tdim;
-        let rlst_points = rlst_array_from_slice2!(T, points, [tdim, npoints]);
+        let rlst_points = rlst_array_from_slice2!(T, points, [npoints, tdim]);
 
         let mut table = rlst_dynamic_array4!(T, geometry.element.tabulate_array_shape(1, npoints));
         geometry.element.tabulate(&rlst_points, 1, &mut table);
