@@ -114,10 +114,40 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
             size,
         }
     }
+}
 
-    // TODO: move to trait
-    /// Compute cell colouring
-    pub fn compute_cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
+impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
+    for SerialFunctionSpace<'a, T, GridImpl>
+{
+    type Grid = GridImpl;
+    type FiniteElement = CiarletElement<T>;
+
+    fn grid(&self) -> &Self::Grid {
+        self.grid
+    }
+    fn element(&self, cell_type: ReferenceCellType) -> &CiarletElement<T> {
+        &self.elements[&cell_type]
+    }
+    fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
+        &self.entity_dofs[entity_dim][entity_number]
+    }
+    fn local_size(&self) -> usize {
+        self.size
+    }
+    fn get_global_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
+        self.get_local_dof_numbers(entity_dim, entity_number)
+    }
+    fn global_size(&self) -> usize {
+        self.local_size()
+    }
+    fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
+        if cell < self.cell_dofs.len() {
+            Some(&self.cell_dofs[cell])
+        } else {
+            None
+        }
+    }
+    fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
         let mut colouring = HashMap::new();
         //: HashMap<ReferenceCellType, Vec<Vec<usize>>>
         for cell in self.grid.cell_types() {
@@ -194,39 +224,6 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
     }
 }
 
-impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
-    for SerialFunctionSpace<'a, T, GridImpl>
-{
-    type Grid = GridImpl;
-    type FiniteElement = CiarletElement<T>;
-
-    fn grid(&self) -> &Self::Grid {
-        self.grid
-    }
-    fn element(&self, cell_type: ReferenceCellType) -> &CiarletElement<T> {
-        &self.elements[&cell_type]
-    }
-    fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        &self.entity_dofs[entity_dim][entity_number]
-    }
-    fn local_size(&self) -> usize {
-        self.size
-    }
-    fn get_global_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        self.get_local_dof_numbers(entity_dim, entity_number)
-    }
-    fn global_size(&self) -> usize {
-        self.local_size()
-    }
-    fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
-        if cell < self.cell_dofs.len() {
-            Some(&self.cell_dofs[cell])
-        } else {
-            None
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -270,7 +267,7 @@ mod test {
         let grid = regular_sphere::<f64>(2);
         let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = &space.compute_cell_colouring()[&ReferenceCellType::Triangle];
+        let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
         let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
         for i in colouring {
@@ -308,7 +305,7 @@ mod test {
         let grid = regular_sphere::<f64>(2);
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = &space.compute_cell_colouring()[&ReferenceCellType::Triangle];
+        let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
         let mut n = 0;
         for i in colouring {
             n += i.len()
@@ -333,7 +330,7 @@ mod test {
         let grid = regular_sphere::<f64>(2);
         let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
         let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = &space.compute_cell_colouring()[&ReferenceCellType::Triangle];
+        let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
         let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
         for i in colouring {

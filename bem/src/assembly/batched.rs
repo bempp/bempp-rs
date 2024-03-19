@@ -1106,8 +1106,8 @@ pub trait BatchedAssembler: Sync + Sized {
         trial_space: &SerialFunctionSpace<'a, Self::T, TrialGrid>,
         test_space: &SerialFunctionSpace<'a, Self::T, TestGrid>,
     ) {
-        let test_colouring = test_space.compute_cell_colouring();
-        let trial_colouring = trial_space.compute_cell_colouring();
+        let test_colouring = test_space.cell_colouring();
+        let trial_colouring = trial_space.cell_colouring();
 
         self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid>(
             output,
