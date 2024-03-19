@@ -1,11 +1,9 @@
-use approx::*;
 use bempp_bem::assembly::{batched, batched::BatchedAssembler};
 use bempp_bem::function_space::SerialFunctionSpace;
 use bempp_element::element::LagrangeElementFamily;
 use bempp_grid::shapes::regular_sphere;
 use bempp_traits::bem::FunctionSpace;
 use bempp_traits::element::Continuity;
-use cauchy::c64;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
 extern crate blas_src;
