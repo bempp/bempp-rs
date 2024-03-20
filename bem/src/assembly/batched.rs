@@ -801,12 +801,19 @@ pub trait BatchedAssembler: Sync + Sized {
         let mut qpoints_trial = vec![];
         let mut test_tables = vec![];
         let mut trial_tables = vec![];
+        let mut test_cell_types = vec![];
+        let mut trial_cell_types = vec![];
 
         let mut cell_blocks = vec![];
 
+        let mut cell_type_indices = HashMap::new();
+
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
-                let index = qweights_test.len();
+                test_cell_types.push(*test_cell_type);
+                trial_cell_types.push(*trial_cell_type);
+                cell_type_indices.insert((*test_cell_type, *trial_cell_type), qweights_test.len());
+
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut test_pts =
                     rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
@@ -862,81 +869,43 @@ pub trait BatchedAssembler: Sync + Sized {
                 trial_element.tabulate(&trial_pts, Self::TABLE_DERIVS, &mut trial_table);
                 trial_tables.push(trial_table);
                 qpoints_trial.push(trial_pts);
+            }
+        }
+        let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; qweights_test.len()];
 
-                let mut cell_pairs: Vec<(usize, usize)> = vec![];
+        for vertex in 0..grid.number_of_vertices() {
+            for test_cell_info in grid.vertex_to_cells(vertex) {
+                let test_cell = grid.cell_from_index(test_cell_info.cell);
+                let test_cell_type = test_cell.topology().cell_type();
+                for trial_cell_info in grid.vertex_to_cells(vertex) {
+                    let trial_cell = grid.cell_from_index(trial_cell_info.cell);
+                    let trial_cell_type = trial_cell.topology().cell_type();
 
-                for vertex in 0..grid.number_of_vertices() {
-                    let test_cells = grid
-                        .vertex_to_cells(vertex)
-                        .iter()
-                        .map(|c| c.cell)
-                        // TODO: store quadrature by cell type and remove this filter
-                        .filter(|c| {
-                            grid.cell_from_index(*c).topology().cell_type() == *test_cell_type
-                        })
-                        .collect::<Vec<_>>();
-                    let trial_cells = grid
-                        .vertex_to_cells(vertex)
-                        .iter()
-                        .map(|c| c.cell)
-                        // TODO: store quadrature by cell type and remove this filter
-                        .filter(|c| {
-                            grid.cell_from_index(*c).topology().cell_type() == *trial_cell_type
-                        })
-                        .collect::<Vec<_>>();
-                    for test_cell in &test_cells {
-                        for trial_cell in &trial_cells {
-                            let mut smallest = true;
-                            for trial_v in grid
-                                .cell_from_index(*trial_cell)
-                                .topology()
-                                .vertex_indices()
-                            {
-                                for test_v in
-                                    grid.cell_from_index(*test_cell).topology().vertex_indices()
-                                {
-                                    if test_v == trial_v && test_v < vertex {
-                                        smallest = false;
-                                        break;
-                                    }
-                                }
-                                if !smallest {
-                                    break;
-                                }
-                            }
-                            if smallest {
-                                cell_pairs.push((*test_cell, *trial_cell));
-                            }
-                        }
+                    if let Some(_) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex) {
+                        cell_pairs[cell_type_indices[&(test_cell_type, trial_cell_type)]]
+                            .push((test_cell_info.cell, trial_cell_info.cell));
                     }
-                }
-
-                let mut start = 0;
-                while start < cell_pairs.len() {
-                    let end = if start + Self::BATCHSIZE < cell_pairs.len() {
-                        start + Self::BATCHSIZE
-                    } else {
-                        cell_pairs.len()
-                    };
-                    cell_blocks.push((
-                        index,
-                        *trial_cell_type,
-                        *test_cell_type,
-                        cell_pairs[start..end].to_vec(),
-                    ));
-                    start = end;
                 }
             }
         }
+        for (i, cells) in cell_pairs.iter().enumerate() {
+            let mut start = 0;
+            while start < cells.len() {
+                let end = std::cmp::min(start + Self::BATCHSIZE, cells.len());
+                cell_blocks.push((i, &cells[start..end]));
+                start = end;
+            }
+        }
+
         cell_blocks
             .into_par_iter()
-            .map(|(i, trial_cell_type, test_cell_type, cell_block)| {
+            .map(|(i, cell_block)| {
                 assemble_batch_singular_correction::<Self::T, TestGrid, TrialGrid, Element>(
                     self,
                     Self::DERIV_SIZE,
                     shape,
-                    trial_cell_type,
-                    test_cell_type,
+                    trial_cell_types[i],
+                    test_cell_types[i],
                     trial_space,
                     test_space,
                     &cell_block,
