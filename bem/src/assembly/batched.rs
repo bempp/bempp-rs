@@ -613,10 +613,7 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let mut cell_blocks = vec![];
 
-        let mut pair_indices: HashMap<
-            (ReferenceCellType, ReferenceCellType, Vec<(usize, usize)>),
-            usize,
-        > = HashMap::new();
+        let mut pair_indices = HashMap::new();
 
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
@@ -881,7 +878,7 @@ pub trait BatchedAssembler: Sync + Sized {
                     let trial_cell = grid.cell_from_index(trial_cell_info.cell);
                     let trial_cell_type = trial_cell.topology().cell_type();
 
-                    if let Some(_) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex) {
+                    if get_pairs_if_smallest(&test_cell, &trial_cell, vertex).is_some() {
                         cell_pairs[cell_type_indices[&(test_cell_type, trial_cell_type)]]
                             .push((test_cell_info.cell, trial_cell_info.cell));
                     }
@@ -908,7 +905,7 @@ pub trait BatchedAssembler: Sync + Sized {
                     test_cell_types[i],
                     trial_space,
                     test_space,
-                    &cell_block,
+                    cell_block,
                     &qpoints_trial[i],
                     &qweights_trial[i],
                     &qpoints_test[i],
