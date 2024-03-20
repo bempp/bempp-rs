@@ -33,11 +33,11 @@ rayon = "1.9"
 rand = "0.8.5"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 green-kernels = { git = "https://github.com/bempp/green-kernels.git" }
-kifmm = { git = "https://github.com/bempp/kifmm.git" }
 thiserror="1.*"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"]}
+kifmm = { git = "https://github.com/bempp/kifmm.git" }
 
 [[bench]]
 name = "assembly_benchmark"
