@@ -22,7 +22,7 @@ crate-type = ["lib", "cdylib"]
 cauchy="0.4.*"
 thiserror="1.*"
 num = "0.4"
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" , rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4"}
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

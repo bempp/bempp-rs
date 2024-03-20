@@ -28,8 +28,8 @@ approx = { version = "0.5", features = ["num-complex"] }
 rayon = "1.7"
 num = "0.4"
 num_cpus = "1"
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
 rand = "0.8.5"
 
 [package.metadata.docs.rs]

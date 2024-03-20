@@ -26,9 +26,9 @@ bempp-quadrature = { path = "../quadrature" }
 paste = "1.*"
 libc = "0.2"
 approx = "0.5"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-blis-src = { git = "https://github.com/linalg-rs/rlst.git" }
-rlst-dense = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
+rlst-blis-src = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
+rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
 num = "0.4"
 
 [package.metadata.docs.rs]
