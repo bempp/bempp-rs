@@ -15,7 +15,7 @@ and the "mpi" features turned on.
 import os
 import argparse
 
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Parse inputs.')
 parser.add_argument('--features', default=None,
                     help='feature flags to pass to the examples')
 
@@ -28,20 +28,14 @@ if raw_features is not None:
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
 files = []
-for folder in os.listdir(root_dir):
-    if folder in ["fmm"]:
-        continue
-    if not folder.startswith("."):
-        sub_dir = os.path.join(root_dir, folder)
-        example_dir = os.path.join(sub_dir, "examples")
-        if os.path.isdir(sub_dir) and os.path.isdir(example_dir):
-            for file in os.listdir(example_dir):
-                if (
-                    not file.startswith(".")
-                    and file.endswith(".rs")
-                    and os.path.isfile(os.path.join(example_dir, file))
-                ):
-                    files.append((os.path.join(example_dir, file), file[:-3]))
+example_dir = os.path.join(root_dir, "examples")
+for file in os.listdir(example_dir):
+    if (
+        not file.startswith(".")
+        and file.endswith(".rs")
+        and os.path.isfile(os.path.join(example_dir, file))
+    ):
+        files.append((os.path.join(example_dir, file), file[:-3]))
 
 # Check that two examples do not share a name
 for i, j in files:

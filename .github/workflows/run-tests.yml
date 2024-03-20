@@ -48,26 +48,3 @@ jobs:
           python3 find_examples.py
           chmod +x examples.sh
           ./examples.sh
-
-  run-tests-python:
-    name: Run Python tests
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11"]
-    steps:
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - uses: actions/checkout@v3
-      - name: Install Python requirements
-        run: python3 -m pip install pytest-xdist flake8
-      - name: Style checks
-        run: |
-          python3 -m flake8 python/test
-      - name: Install tomllib (for Python <3.11)
-        run: python3 -m pip install tomli
-        if: ${{ matrix.python-version == '3.7' || matrix.python-version == '3.8' || matrix.python-version == '3.9' || matrix.python-version == '3.10' }}
-      - run: python3 -m pytest -n=auto python/test
-        name: Run tests
