@@ -477,12 +477,14 @@ fn assemble_batch_singular_correction<
     output
 }
 
-fn get_pairs_if_smallest(test_cell: &impl CellType, trial_cell: &impl CellType, vertex: usize) -> Option<Vec<(usize, usize)>> {
+fn get_pairs_if_smallest(
+    test_cell: &impl CellType,
+    trial_cell: &impl CellType,
+    vertex: usize,
+) -> Option<Vec<(usize, usize)>> {
     let mut pairs = vec![];
-    for (trial_i, trial_v) in trial_cell.topology().vertex_indices().enumerate()
-    {
-        for (test_i, test_v) in test_cell.topology().vertex_indices().enumerate()
-        {
+    for (trial_i, trial_v) in trial_cell.topology().vertex_indices().enumerate() {
+        for (test_i, test_v) in test_cell.topology().vertex_indices().enumerate() {
             if test_v == trial_v {
                 if test_v < vertex {
                     return None;
@@ -611,7 +613,10 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let mut cell_blocks = vec![];
 
-        let mut pair_indices: HashMap<(ReferenceCellType, ReferenceCellType, Vec<(usize, usize)>), usize> = HashMap::new();
+        let mut pair_indices: HashMap<
+            (ReferenceCellType, ReferenceCellType, Vec<(usize, usize)>),
+            usize,
+        > = HashMap::new();
 
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
@@ -641,7 +646,10 @@ pub trait BatchedAssembler: Sync + Sized {
                 }
 
                 for (i, pairs) in possible_pairs.iter().enumerate() {
-                    pair_indices.insert((*test_cell_type, *trial_cell_type, pairs.clone()), offset + i);
+                    pair_indices.insert(
+                        (*test_cell_type, *trial_cell_type, pairs.clone()),
+                        offset + i,
+                    );
                     test_cell_types.push(*test_cell_type);
                     trial_cell_types.push(*trial_cell_type);
                 }
@@ -712,7 +720,8 @@ pub trait BatchedAssembler: Sync + Sized {
                     let trial_cell_type = trial_cell.topology().cell_type();
 
                     if let Some(pairs) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex) {
-                        cell_pairs[pair_indices[&(test_cell_type, trial_cell_type, pairs)]].push((test_cell_info.cell, trial_cell_info.cell));
+                        cell_pairs[pair_indices[&(test_cell_type, trial_cell_type, pairs)]]
+                            .push((test_cell_info.cell, trial_cell_info.cell));
                     }
                 }
             }
