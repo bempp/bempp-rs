@@ -8,7 +8,7 @@ mod test {
     use super::batched::BatchedAssembler;
     use super::*;
     use crate::bem::function_space::SerialFunctionSpace;
-    use crate::element::element::LagrangeElementFamily;
+    use crate::element::ciarlet::LagrangeElementFamily;
     use crate::grid::{
         mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
         shapes::regular_sphere,

@@ -1,6 +1,6 @@
 //! Mixed grid
 
-use crate::element::element::lagrange;
+use crate::element::ciarlet::lagrange;
 use crate::element::reference_cell;
 use crate::grid::mixed_grid::{geometry::SerialMixedGeometry, topology::SerialMixedTopology};
 use crate::grid::traits::Grid;

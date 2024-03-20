@@ -1,6 +1,6 @@
 //! A parallel implementation of a grid
 use crate::grid::grid::{SerialGeometry, SerialTopology};
-use crate::element::element::CiarletElement;
+use crate::element::ciarlet::CiarletElement;
 use crate::tools::arrays::AdjacencyList;
 use crate::traits::arrays::AdjacencyListAccess;
 use crate::traits::cell::ReferenceCellType;

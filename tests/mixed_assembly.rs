@@ -1,7 +1,7 @@
 use approx::*;
 use bempp::bem::assembly::{batched, batched::BatchedAssembler};
 use bempp::bem::function_space::SerialFunctionSpace;
-use bempp::element::element::LagrangeElementFamily;
+use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::grid::{
     flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBuilder},
     mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},

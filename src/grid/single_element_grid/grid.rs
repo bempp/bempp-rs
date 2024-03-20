@@ -1,6 +1,6 @@
 //! Single element grid
 
-use crate::element::element::lagrange;
+use crate::element::ciarlet::lagrange;
 use crate::element::reference_cell;
 use crate::grid::single_element_grid::{
     geometry::SerialSingleElementGeometry, topology::SerialSingleElementTopology,

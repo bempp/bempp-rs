@@ -1210,7 +1210,7 @@ pub trait BatchedAssembler: Sync + Sized {
 mod test {
     use super::*;
     use crate::bem::function_space::SerialFunctionSpace;
-    use crate::element::element::LagrangeElementFamily;
+    use crate::element::ciarlet::LagrangeElementFamily;
     use crate::grid::shapes::regular_sphere;
     use crate::traits::element::Continuity;
     use approx::*;

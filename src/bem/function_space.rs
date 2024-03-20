@@ -1,6 +1,6 @@
 //! Funciton space
 
-use crate::element::element::CiarletElement;
+use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
     bem::FunctionSpace,
     element::{ElementFamily, FiniteElement},
@@ -227,7 +227,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::element::element::LagrangeElementFamily;
+    use crate::element::ciarlet::LagrangeElementFamily;
     use crate::grid::shapes::regular_sphere;
     use crate::traits::element::Continuity;
     use crate::traits::grid::{CellType, TopologyType};

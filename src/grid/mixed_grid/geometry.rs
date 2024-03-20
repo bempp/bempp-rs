@@ -1,6 +1,6 @@
 //! Implementation of grid geometry
 
-use crate::element::element::CiarletElement;
+use crate::element::ciarlet::CiarletElement;
 use crate::element::reference_cell;
 use crate::grid::common::{
     compute_det, compute_diameter_quadrilateral, compute_diameter_triangle, compute_jacobians,
@@ -386,7 +386,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator for GeometryEvaluato
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::element::element::lagrange;
+    use crate::element::ciarlet::lagrange;
     use crate::traits::element::Continuity;
     use approx::*;
     use rlst::{rlst_dynamic_array2, RandomAccessMut};

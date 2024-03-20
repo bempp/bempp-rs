@@ -1,6 +1,6 @@
 //! Flat triangle grid
 
-use crate::element::element::{lagrange, CiarletElement};
+use crate::element::ciarlet::{lagrange, CiarletElement};
 use crate::element::reference_cell;
 use crate::grid::common::compute_diameter_triangle;
 use crate::grid::traits::Ownership;

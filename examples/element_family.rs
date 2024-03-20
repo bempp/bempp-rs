@@ -1,4 +1,4 @@
-use bempp::element::element::LagrangeElementFamily;
+use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::traits::{
     element::{Continuity, ElementFamily, FiniteElement},
     types::ReferenceCellType,

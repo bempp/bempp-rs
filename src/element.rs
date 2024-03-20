@@ -1,9 +1,8 @@
 //! Finite elements
 
-pub mod element;
+pub mod ciarlet;
 pub mod polynomials;
 pub mod reference_cell;
-//pub mod map;
 
 #[cfg(test)]
 mod test {

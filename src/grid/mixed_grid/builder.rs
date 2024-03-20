@@ -1,6 +1,6 @@
 //! Grid builder
 
-use crate::element::element::lagrange;
+use crate::element::ciarlet::lagrange;
 use crate::grid::mixed_grid::grid::SerialMixedGrid;
 use crate::grid::traits_impl::WrappedGrid;
 use crate::traits::element::{Continuity, FiniteElement};

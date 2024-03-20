@@ -1,6 +1,6 @@
 //! Raviart-Thomas elements
 
-use crate::element::element::{reference_cell, CiarletElement};
+use crate::element::ciarlet::{reference_cell, CiarletElement};
 use crate::element::polynomials::polynomial_count;
 use crate::traits::element::{Continuity, ElementFamily, MapType};
 use crate::traits::types::ReferenceCellType;

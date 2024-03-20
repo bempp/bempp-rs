@@ -1,4 +1,4 @@
-use bempp::element::element::lagrange;
+use bempp::element::ciarlet::lagrange;
 use bempp::traits::{
     element::{Continuity, FiniteElement},
     types::ReferenceCellType,
