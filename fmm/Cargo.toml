@@ -37,7 +37,7 @@ num = "0.4"
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
 rlst-blis = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
 fftw = { git = "https://github.com/skailasa/fftw.git" }
-rayon = "1.7"
+rayon = "1.9"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"]}

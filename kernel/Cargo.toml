@@ -25,7 +25,7 @@ bempp-traits = { path = "../traits" }
 paste = "1.*"
 libc = "0.2"
 approx = { version = "0.5", features = ["num-complex"] }
-rayon = "1.7"
+rayon = "1.9"
 num = "0.4"
 num_cpus = "1"
 rlst-dense = { git = "https://github.com/linalg-rs/rlst.git", rev="d0cf6cb77332a1e8320f84abedfe387357e6feb4" }
