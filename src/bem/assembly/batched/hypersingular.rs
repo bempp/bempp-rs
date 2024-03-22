@@ -359,8 +359,8 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
     }
     fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
-        self.curl_curl_assembler.quadrature_rule(cell, degree);
-        self.normal_normal_assembler.quadrature_rule(cell, degree);
+        self.curl_curl_assembler.quadrature_degree(cell, degree);
+        self.normal_normal_assembler.quadrature_degree(cell, degree);
     }
 
     fn singular_quadrature_degree(
@@ -369,9 +369,9 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         degree: usize,
     ) {
         self.curl_curl_assembler
-            .singular_quadrature_rule(cells, degree);
+            .singular_quadrature_degree(cells, degree);
         self.normal_normal_assembler
-            .singular_quadrature_rule(cells, degree);
+            .singular_quadrature_degree(cells, degree);
     }
     unsafe fn singular_kernel_value(
         &self,
