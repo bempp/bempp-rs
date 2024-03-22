@@ -497,7 +497,9 @@ fn get_pairs_if_smallest(
 
 /// Options for a batched assembler
 pub struct BatchedAssemblerOptions {
+    /// Number of points used in quadrature for non-singular integrals
     quadrature_degrees: HashMap<ReferenceCellType, usize>,
+    /// Quadrature degrees to be used for singular integrals
     singular_quadrature_degrees: HashMap<(ReferenceCellType, ReferenceCellType), usize>,
 }
 
