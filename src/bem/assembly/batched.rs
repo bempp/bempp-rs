@@ -584,7 +584,7 @@ pub trait BatchedAssembler: Sync + Sized {
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
     ///
     /// # Safety
-    /// This method is unsafe to allow `get_unchecked` may be used
+    /// This method is unsafe to allow `get_unchecked` to be used
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<Self::T, 2>,
@@ -596,7 +596,7 @@ pub trait BatchedAssembler: Sync + Sized {
     /// Return the kernel value to use in the integrand when using a non-singular quadrature rule
     ///
     /// # Safety
-    /// This method is unsafe to allow `get_unchecked` may be used
+    /// This method is unsafe to allow `get_unchecked` to be used
     unsafe fn nonsingular_kernel_value(
         &self,
         k: &RlstArray<Self::T, 3>,
@@ -629,7 +629,7 @@ pub trait BatchedAssembler: Sync + Sized {
     /// The product of a test and trial function
     ///
     /// # Safety
-    /// This function uses unchecked access into tables
+    /// This method is unsafe to allow `get_unchecked` to be used
     #[allow(clippy::too_many_arguments)]
     unsafe fn test_trial_product(
         &self,
