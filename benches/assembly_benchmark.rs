@@ -21,12 +21,13 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.cell_colouring();
-        let mut a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+        let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
         a.quadrature_degree(ReferenceCellType::Triangle, 16);
         a.singular_quadrature_degree(
             (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
             4,
         );
+        a.batch_size(128);
 
         group.bench_function(
             &format!(

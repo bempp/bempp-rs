@@ -507,37 +507,14 @@ pub struct BatchedAssemblerOptions {
 
 impl Default for BatchedAssemblerOptions {
     fn default() -> Self {
+        use ReferenceCellType::{Quadrilateral, Triangle};
         Self {
-            quadrature_degrees: HashMap::from([
-                (ReferenceCellType::Triangle, 37),
-                (ReferenceCellType::Quadrilateral, 37),
-            ]),
+            quadrature_degrees: HashMap::from([(Triangle, 37), (Quadrilateral, 37)]),
             singular_quadrature_degrees: HashMap::from([
-                (
-                    (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
-                    4,
-                ),
-                (
-                    (
-                        ReferenceCellType::Quadrilateral,
-                        ReferenceCellType::Quadrilateral,
-                    ),
-                    4,
-                ),
-                (
-                    (
-                        ReferenceCellType::Quadrilateral,
-                        ReferenceCellType::Triangle,
-                    ),
-                    4,
-                ),
-                (
-                    (
-                        ReferenceCellType::Triangle,
-                        ReferenceCellType::Quadrilateral,
-                    ),
-                    4,
-                ),
+                ((Triangle, Triangle), 4),
+                ((Quadrilateral, Quadrilateral), 4),
+                ((Quadrilateral, Triangle), 4),
+                ((Triangle, Quadrilateral), 4),
             ]),
             batch_size: 128,
         }
