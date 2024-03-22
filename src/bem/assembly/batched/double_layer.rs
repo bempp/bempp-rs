@@ -4,11 +4,11 @@ use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel
 use rlst::{RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace double layer operator
-pub struct LaplaceDoubleLayerAssembler<const BATCHSIZE: usize, T: RlstScalar> {
+pub struct LaplaceDoubleLayerAssembler<T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<const BATCHSIZE: usize, T: RlstScalar> Default for LaplaceDoubleLayerAssembler<BATCHSIZE, T> {
+impl<T: RlstScalar> Default for LaplaceDoubleLayerAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -16,12 +16,9 @@ impl<const BATCHSIZE: usize, T: RlstScalar> Default for LaplaceDoubleLayerAssemb
         }
     }
 }
-impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
-    for LaplaceDoubleLayerAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar> BatchedAssembler for LaplaceDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
-    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     fn options(&self) -> &BatchedAssemblerOptions {
         &self.options
@@ -74,13 +71,11 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
 }
 
 /// Assembler for a Helmholtz double layer boundary operator
-pub struct HelmholtzDoubleLayerAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> {
+pub struct HelmholtzDoubleLayerAssembler<T: RlstScalar<Complex = T>> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
-    HelmholtzDoubleLayerAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> HelmholtzDoubleLayerAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -89,12 +84,9 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
         }
     }
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
-    for HelmholtzDoubleLayerAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
-    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     fn options(&self) -> &BatchedAssemblerOptions {
         &self.options

@@ -64,13 +64,11 @@ unsafe fn hyp_test_trial_product<T: RlstScalar>(
 }
 
 /// Assembler for a Laplace hypersingular operator
-pub struct LaplaceHypersingularAssembler<const BATCHSIZE: usize, T: RlstScalar> {
+pub struct LaplaceHypersingularAssembler<T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<const BATCHSIZE: usize, T: RlstScalar> Default
-    for LaplaceHypersingularAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar> Default for LaplaceHypersingularAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -78,12 +76,9 @@ impl<const BATCHSIZE: usize, T: RlstScalar> Default
         }
     }
 }
-impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
-    for LaplaceHypersingularAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
-    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     fn options(&self) -> &BatchedAssemblerOptions {
         &self.options
@@ -153,13 +148,11 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
 }
 
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
-struct HelmholtzHypersingularCurlCurlAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> {
+struct HelmholtzHypersingularCurlCurlAssembler<T: RlstScalar<Complex = T>> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
-    HelmholtzHypersingularCurlCurlAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularCurlCurlAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -168,12 +161,9 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
         }
     }
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
-    for HelmholtzHypersingularCurlCurlAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularCurlCurlAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
-    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     fn options(&self) -> &BatchedAssemblerOptions {
         &self.options
@@ -243,17 +233,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
 }
 
 /// Assembler for normal normal term of Helmholtz hypersingular boundary operator
-struct HelmholtzHypersingularNormalNormalAssembler<
-    const BATCHSIZE: usize,
-    T: RlstScalar<Complex = T>,
-> {
+struct HelmholtzHypersingularNormalNormalAssembler<T: RlstScalar<Complex = T>> {
     kernel: Helmholtz3dKernel<T>,
     wavenumber: T::Real,
     options: BatchedAssemblerOptions,
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
-    HelmholtzHypersingularNormalNormalAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularNormalNormalAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -263,12 +248,11 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
         }
     }
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
-    for HelmholtzHypersingularNormalNormalAssembler<BATCHSIZE, T>
+impl<T: RlstScalar<Complex = T>> BatchedAssembler
+    for HelmholtzHypersingularNormalNormalAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 0;
-    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     fn options(&self) -> &BatchedAssemblerOptions {
         &self.options
@@ -327,30 +311,24 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
 }
 
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
-pub struct HelmholtzHypersingularAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> {
-    curl_curl_assembler: HelmholtzHypersingularCurlCurlAssembler<BATCHSIZE, T>,
-    normal_normal_assembler: HelmholtzHypersingularNormalNormalAssembler<BATCHSIZE, T>,
+pub struct HelmholtzHypersingularAssembler<T: RlstScalar<Complex = T>> {
+    curl_curl_assembler: HelmholtzHypersingularCurlCurlAssembler<T>,
+    normal_normal_assembler: HelmholtzHypersingularNormalNormalAssembler<T>,
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
-    HelmholtzHypersingularAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
-            curl_curl_assembler: HelmholtzHypersingularCurlCurlAssembler::<BATCHSIZE, T>::new(
+            curl_curl_assembler: HelmholtzHypersingularCurlCurlAssembler::<T>::new(wavenumber),
+            normal_normal_assembler: HelmholtzHypersingularNormalNormalAssembler::<T>::new(
                 wavenumber,
             ),
-            normal_normal_assembler:
-                HelmholtzHypersingularNormalNormalAssembler::<BATCHSIZE, T>::new(wavenumber),
         }
     }
 }
-impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
-    for HelmholtzHypersingularAssembler<BATCHSIZE, T>
-{
+impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
-    const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
     fn options(&self) -> &BatchedAssemblerOptions {
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
@@ -362,7 +340,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         self.curl_curl_assembler.quadrature_degree(cell, degree);
         self.normal_normal_assembler.quadrature_degree(cell, degree);
     }
-
     fn singular_quadrature_degree(
         &mut self,
         cells: (ReferenceCellType, ReferenceCellType),
@@ -373,6 +350,11 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         self.normal_normal_assembler
             .singular_quadrature_degree(cells, degree);
     }
+    fn batch_size(&mut self, size: usize) {
+        self.curl_curl_assembler.batch_size(size);
+        self.normal_normal_assembler.batch_size(size);
+    }
+
     unsafe fn singular_kernel_value(
         &self,
         _k: &RlstArray<T, 2>,

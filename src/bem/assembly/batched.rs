@@ -501,42 +501,45 @@ pub struct BatchedAssemblerOptions {
     quadrature_degrees: HashMap<ReferenceCellType, usize>,
     /// Quadrature degrees to be used for singular integrals
     singular_quadrature_degrees: HashMap<(ReferenceCellType, ReferenceCellType), usize>,
+    /// Maximum size of each batch of cells to send to an assembly function
+    batch_size: usize,
 }
 
 impl Default for BatchedAssemblerOptions {
     fn default() -> Self {
-        let mut quadrature_degrees = HashMap::new();
-        quadrature_degrees.insert(ReferenceCellType::Triangle, 37);
-        quadrature_degrees.insert(ReferenceCellType::Quadrilateral, 37);
-        let mut singular_quadrature_degrees = HashMap::new();
-        singular_quadrature_degrees.insert(
-            (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
-            4,
-        );
-        singular_quadrature_degrees.insert(
-            (
-                ReferenceCellType::Quadrilateral,
-                ReferenceCellType::Quadrilateral,
-            ),
-            4,
-        );
-        singular_quadrature_degrees.insert(
-            (
-                ReferenceCellType::Quadrilateral,
-                ReferenceCellType::Triangle,
-            ),
-            4,
-        );
-        singular_quadrature_degrees.insert(
-            (
-                ReferenceCellType::Triangle,
-                ReferenceCellType::Quadrilateral,
-            ),
-            4,
-        );
         Self {
-            quadrature_degrees,
-            singular_quadrature_degrees,
+            quadrature_degrees: HashMap::from([
+                (ReferenceCellType::Triangle, 37),
+                (ReferenceCellType::Quadrilateral, 37),
+            ]),
+            singular_quadrature_degrees: HashMap::from([
+                (
+                    (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
+                    4,
+                ),
+                (
+                    (
+                        ReferenceCellType::Quadrilateral,
+                        ReferenceCellType::Quadrilateral,
+                    ),
+                    4,
+                ),
+                (
+                    (
+                        ReferenceCellType::Quadrilateral,
+                        ReferenceCellType::Triangle,
+                    ),
+                    4,
+                ),
+                (
+                    (
+                        ReferenceCellType::Triangle,
+                        ReferenceCellType::Quadrilateral,
+                    ),
+                    4,
+                ),
+            ]),
+            batch_size: 128,
         }
     }
 }
@@ -552,8 +555,6 @@ pub trait BatchedAssembler: Sync + Sized {
     const DERIV_SIZE: usize;
     /// Number of derivatives needed in basis function tables
     const TABLE_DERIVS: usize;
-    /// The number of cells in each batch
-    const BATCHSIZE: usize;
 
     /// Get assembler options
     fn options(&self) -> &BatchedAssemblerOptions;
@@ -581,6 +582,11 @@ pub trait BatchedAssembler: Sync + Sized {
             .singular_quadrature_degrees
             .get_mut(&cells)
             .unwrap() = degree;
+    }
+
+    /// Set the maximum size of a batch of cells to send to an assembly function
+    fn batch_size(&mut self, size: usize) {
+        self.options_mut().batch_size = size;
     }
 
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
@@ -797,10 +803,11 @@ pub trait BatchedAssembler: Sync + Sized {
                 }
             }
         }
+        let batch_size = self.options().batch_size;
         for (i, cells) in cell_pairs.iter().enumerate() {
             let mut start = 0;
             while start < cells.len() {
-                let end = std::cmp::min(start + Self::BATCHSIZE, cells.len());
+                let end = std::cmp::min(start + batch_size, cells.len());
                 cell_blocks.push((i, &cells[start..end]));
                 start = end;
             }
@@ -955,10 +962,11 @@ pub trait BatchedAssembler: Sync + Sized {
                 }
             }
         }
+        let batch_size = self.options().batch_size;
         for (i, cells) in cell_pairs.iter().enumerate() {
             let mut start = 0;
             while start < cells.len() {
-                let end = std::cmp::min(start + Self::BATCHSIZE, cells.len());
+                let end = std::cmp::min(start + batch_size, cells.len());
                 cell_blocks.push((i, &cells[start..end]));
                 start = end;
             }
@@ -1145,6 +1153,8 @@ pub trait BatchedAssembler: Sync + Sized {
             panic!("Matrix has wrong shape");
         }
 
+        let batch_size = self.options().batch_size;
+
         for test_cell_type in test_space.grid().cell_types() {
             let npts_test = self.options().quadrature_degrees[&test_cell_type];
             for trial_cell_type in trial_space.grid().cell_types() {
@@ -1210,16 +1220,16 @@ pub trait BatchedAssembler: Sync + Sized {
 
                         let mut test_start = 0;
                         while test_start < test_c.len() {
-                            let test_end = if test_start + Self::BATCHSIZE < test_c.len() {
-                                test_start + Self::BATCHSIZE
+                            let test_end = if test_start + batch_size < test_c.len() {
+                                test_start + batch_size
                             } else {
                                 test_c.len()
                             };
 
                             let mut trial_start = 0;
                             while trial_start < trial_c.len() {
-                                let trial_end = if trial_start + Self::BATCHSIZE < trial_c.len() {
-                                    trial_start + Self::BATCHSIZE
+                                let trial_end = if trial_start + batch_size < trial_c.len() {
+                                    trial_start + batch_size
                                 } else {
                                     trial_c.len()
                                 };
@@ -1278,7 +1288,7 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
+        let assembler = LaplaceSingleLayerAssembler::<f64>::default();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -1304,7 +1314,7 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
+        let assembler = LaplaceSingleLayerAssembler::<f64>::default();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -1333,7 +1343,7 @@ mod test {
         let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
-        let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
+        let assembler = LaplaceSingleLayerAssembler::<f64>::default();
         assembler.assemble_singular_into_dense(&mut matrix, &space0, &space1);
         let csr = assembler.assemble_singular_into_csr(&space0, &space1);
         let indptr = csr.indptr();

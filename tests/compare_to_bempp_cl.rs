@@ -21,7 +21,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
 
-    let a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+    let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -44,7 +44,7 @@ fn test_laplace_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceDoubleLayerAssembler::<128, f64>::default();
+    let a = batched::LaplaceDoubleLayerAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -67,7 +67,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceAdjointDoubleLayerAssembler::<128, f64>::default();
+    let a = batched::LaplaceAdjointDoubleLayerAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -90,7 +90,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceHypersingularAssembler::<128, f64>::default();
+    let a = batched::LaplaceHypersingularAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     for i in 0..ndofs {
@@ -109,7 +109,7 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceHypersingularAssembler::<128, f64>::default();
+    let a = batched::LaplaceHypersingularAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -138,7 +138,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzSingleLayerAssembler::<128, c64>::new(3.0);
+    let a = batched::HelmholtzSingleLayerAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -161,7 +161,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzDoubleLayerAssembler::<128, c64>::new(3.0);
+    let a = batched::HelmholtzDoubleLayerAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -183,7 +183,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzAdjointDoubleLayerAssembler::<128, c64>::new(3.0);
+    let a = batched::HelmholtzAdjointDoubleLayerAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -205,7 +205,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzHypersingularAssembler::<128, c64>::new(3.0);
+    let a = batched::HelmholtzHypersingularAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl

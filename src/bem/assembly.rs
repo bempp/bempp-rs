@@ -130,12 +130,12 @@ mod test {
     macro_rules! create_assembler {
         (Laplace, $operator:ident, $dtype:ident) => {
             paste! {
-                batched::[<Laplace $operator Assembler>]::<128, [<$dtype>]>::default()
+                batched::[<Laplace $operator Assembler>]::<[<$dtype>]>::default()
             }
         };
         (Helmholtz, $operator:ident, $dtype:ident) => {
             paste! {
-                batched::[<Helmholtz $operator Assembler>]::<128, [<$dtype>]>::new(3.0)
+                batched::[<Helmholtz $operator Assembler>]::<[<$dtype>]>::new(3.0)
             }
         };
     }

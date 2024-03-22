@@ -44,7 +44,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let mut a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+    let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
     a.quadrature_degree(ReferenceCellType::Triangle, npts);
     a.assemble_into_dense(&mut matrix, trial_space, test_space);
 
@@ -119,7 +119,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let mut a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+    let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
     a.quadrature_degree(ReferenceCellType::Triangle, npts);
     a.assemble_into_dense(&mut matrix, trial_space, test_space);
 
