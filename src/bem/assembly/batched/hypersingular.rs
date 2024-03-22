@@ -1,5 +1,7 @@
 //! Hypersingular assemblers
-use super::{equal_grids, BatchedAssembler, EvalType, RlstArray, SparseMatrixData};
+use super::{
+    equal_grids, BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData,
+};
 use crate::traits::{
     bem::FunctionSpace, element::FiniteElement, grid::GridType, types::ReferenceCellType,
 };
@@ -64,6 +66,7 @@ unsafe fn hyp_test_trial_product<T: RlstScalar>(
 /// Assembler for a Laplace hypersingular operator
 pub struct LaplaceHypersingularAssembler<const BATCHSIZE: usize, T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
+    options: BatchedAssemblerOptions,
 }
 impl<const BATCHSIZE: usize, T: RlstScalar> Default
     for LaplaceHypersingularAssembler<BATCHSIZE, T>
@@ -71,6 +74,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar> Default
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
+            options: BatchedAssemblerOptions::default(),
         }
     }
 }
@@ -81,6 +85,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
     const TABLE_DERIVS: usize = 1;
     const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
+    fn options(&self) -> &BatchedAssemblerOptions {
+        &self.options
+    }
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+        &mut self.options
+    }
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,
@@ -145,6 +155,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
 struct HelmholtzHypersingularCurlCurlAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> {
     kernel: Helmholtz3dKernel<T>,
+    options: BatchedAssemblerOptions,
 }
 impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
     HelmholtzHypersingularCurlCurlAssembler<BATCHSIZE, T>
@@ -153,6 +164,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
+            options: BatchedAssemblerOptions::default(),
         }
     }
 }
@@ -163,6 +175,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     const TABLE_DERIVS: usize = 1;
     const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
+    fn options(&self) -> &BatchedAssemblerOptions {
+        &self.options
+    }
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+        &mut self.options
+    }
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,
@@ -231,6 +249,7 @@ struct HelmholtzHypersingularNormalNormalAssembler<
 > {
     kernel: Helmholtz3dKernel<T>,
     wavenumber: T::Real,
+    options: BatchedAssemblerOptions,
 }
 impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
     HelmholtzHypersingularNormalNormalAssembler<BATCHSIZE, T>
@@ -240,6 +259,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
             wavenumber,
+            options: BatchedAssemblerOptions::default(),
         }
     }
 }
@@ -250,6 +270,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     const TABLE_DERIVS: usize = 0;
     const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
+    fn options(&self) -> &BatchedAssemblerOptions {
+        &self.options
+    }
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+        &mut self.options
+    }
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,
@@ -304,6 +330,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
 pub struct HelmholtzHypersingularAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> {
     curl_curl_assembler: HelmholtzHypersingularCurlCurlAssembler<BATCHSIZE, T>,
     normal_normal_assembler: HelmholtzHypersingularNormalNormalAssembler<BATCHSIZE, T>,
+    options: BatchedAssemblerOptions,
 }
 impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
     HelmholtzHypersingularAssembler<BATCHSIZE, T>
@@ -316,6 +343,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
             ),
             normal_normal_assembler:
                 HelmholtzHypersingularNormalNormalAssembler::<BATCHSIZE, T>::new(wavenumber),
+            options: BatchedAssemblerOptions::default(),
         }
     }
 }
@@ -326,6 +354,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     const TABLE_DERIVS: usize = 1;
     const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
+    fn options(&self) -> &BatchedAssemblerOptions {
+        &self.options
+    }
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+        &mut self.options
+    }
     unsafe fn singular_kernel_value(
         &self,
         _k: &RlstArray<T, 2>,
@@ -363,27 +397,16 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         Element: FiniteElement<T = T> + Sync,
     >(
         &self,
-        qdegree: usize,
         shape: [usize; 2],
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> SparseMatrixData<T> {
         let mut curlcurl = self
             .curl_curl_assembler
-            .assemble_singular::<TestGrid, TrialGrid, Element>(
-                qdegree,
-                shape,
-                trial_space,
-                test_space,
-            );
+            .assemble_singular::<TestGrid, TrialGrid, Element>(shape, trial_space, test_space);
         curlcurl.add(
             self.normal_normal_assembler
-                .assemble_singular::<TestGrid, TrialGrid, Element>(
-                    qdegree,
-                    shape,
-                    trial_space,
-                    test_space,
-                ),
+                .assemble_singular::<TestGrid, TrialGrid, Element>(shape, trial_space, test_space),
         );
         curlcurl
     }
@@ -394,8 +417,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         Element: FiniteElement<T = T> + Sync,
     >(
         &self,
-        npts_test: usize,
-        npts_trial: usize,
         shape: [usize; 2],
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
@@ -408,8 +429,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         let mut curlcurl = self
             .curl_curl_assembler
             .assemble_singular_correction::<TestGrid, TrialGrid, Element>(
-                npts_test,
-                npts_trial,
                 shape,
                 trial_space,
                 test_space,
@@ -417,8 +436,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         curlcurl.add(
             self.normal_normal_assembler
                 .assemble_singular_correction::<TestGrid, TrialGrid, Element>(
-                    npts_test,
-                    npts_trial,
                     shape,
                     trial_space,
                     test_space,
@@ -435,8 +452,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     >(
         &self,
         output: &mut RlstArray<T, 2>,
-        npts_test: usize,
-        npts_trial: usize,
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
@@ -454,8 +469,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         self.curl_curl_assembler
             .assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
                 output,
-                npts_test,
-                npts_trial,
                 trial_space,
                 test_space,
                 trial_colouring,
@@ -464,8 +477,6 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
         self.normal_normal_assembler
             .assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
                 output,
-                npts_test,
-                npts_trial,
                 trial_space,
                 test_space,
                 trial_colouring,

@@ -1,11 +1,12 @@
 //! Adjoint double layer assemblers
-use super::{BatchedAssembler, EvalType, RlstArray};
+use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace adjoint double layer operator
 pub struct LaplaceAdjointDoubleLayerAssembler<const BATCHSIZE: usize, T: RlstScalar> {
     kernel: Laplace3dKernel<T>,
+    options: BatchedAssemblerOptions,
 }
 impl<const BATCHSIZE: usize, T: RlstScalar> Default
     for LaplaceAdjointDoubleLayerAssembler<BATCHSIZE, T>
@@ -13,6 +14,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar> Default
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
+            options: BatchedAssemblerOptions::default(),
         }
     }
 }
@@ -23,6 +25,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
     const TABLE_DERIVS: usize = 0;
     const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
+    fn options(&self) -> &BatchedAssemblerOptions {
+        &self.options
+    }
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+        &mut self.options
+    }
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,
@@ -71,6 +79,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar> BatchedAssembler
 pub struct HelmholtzAdjointDoubleLayerAssembler<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
 {
     kernel: Helmholtz3dKernel<T>,
+    options: BatchedAssemblerOptions,
 }
 impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
     HelmholtzAdjointDoubleLayerAssembler<BATCHSIZE, T>
@@ -79,6 +88,7 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>>
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
+            options: BatchedAssemblerOptions::default(),
         }
     }
 }
@@ -89,6 +99,12 @@ impl<const BATCHSIZE: usize, T: RlstScalar<Complex = T>> BatchedAssembler
     const TABLE_DERIVS: usize = 0;
     const BATCHSIZE: usize = BATCHSIZE;
     type T = T;
+    fn options(&self) -> &BatchedAssemblerOptions {
+        &self.options
+    }
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+        &mut self.options
+    }
     unsafe fn singular_kernel_value(
         &self,
         k: &RlstArray<T, 2>,

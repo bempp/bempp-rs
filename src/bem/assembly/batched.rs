@@ -495,6 +495,50 @@ fn get_pairs_if_smallest(
     Some(pairs)
 }
 
+/// Options for a batched assembler
+pub struct BatchedAssemblerOptions {
+    quadrature_degrees: HashMap<ReferenceCellType, usize>,
+    singular_quadrature_degrees: HashMap<(ReferenceCellType, ReferenceCellType), usize>,
+}
+
+impl Default for BatchedAssemblerOptions {
+    fn default() -> Self {
+        let mut quadrature_degrees = HashMap::new();
+        quadrature_degrees.insert(ReferenceCellType::Triangle, 37);
+        quadrature_degrees.insert(ReferenceCellType::Quadrilateral, 37);
+        let mut singular_quadrature_degrees = HashMap::new();
+        singular_quadrature_degrees.insert(
+            (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
+            4,
+        );
+        singular_quadrature_degrees.insert(
+            (
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Quadrilateral,
+            ),
+            4,
+        );
+        singular_quadrature_degrees.insert(
+            (
+                ReferenceCellType::Quadrilateral,
+                ReferenceCellType::Triangle,
+            ),
+            4,
+        );
+        singular_quadrature_degrees.insert(
+            (
+                ReferenceCellType::Triangle,
+                ReferenceCellType::Quadrilateral,
+            ),
+            4,
+        );
+        Self {
+            quadrature_degrees,
+            singular_quadrature_degrees,
+        }
+    }
+}
+
 pub trait BatchedAssembler: Sync + Sized {
     //! Batched assembler
     //!
@@ -508,6 +552,34 @@ pub trait BatchedAssembler: Sync + Sized {
     const TABLE_DERIVS: usize;
     /// The number of cells in each batch
     const BATCHSIZE: usize;
+
+    /// Get assembler options
+    fn options(&self) -> &BatchedAssemblerOptions;
+
+    /// Get mutable assembler options
+    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions;
+
+    /// Set (non-singular) quadrature degree for a cell type
+    fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+        *self
+            .options_mut()
+            .quadrature_degrees
+            .get_mut(&cell)
+            .unwrap() = degree;
+    }
+
+    /// Set singular quadrature degree for a pair of cell types
+    fn singular_quadrature_degree(
+        &mut self,
+        cells: (ReferenceCellType, ReferenceCellType),
+        degree: usize,
+    ) {
+        *self
+            .options_mut()
+            .singular_quadrature_degrees
+            .get_mut(&cells)
+            .unwrap() = degree;
+    }
 
     /// Return the kernel value to use in the integrand when using a singular quadrature rule
     ///
@@ -583,7 +655,6 @@ pub trait BatchedAssembler: Sync + Sized {
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
-        qdegree: usize,
         shape: [usize; 2],
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
@@ -616,6 +687,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
         for test_cell_type in grid.cell_types() {
             for trial_cell_type in grid.cell_types() {
+                let qdegree = self.options().singular_quadrature_degrees
+                    [&(*test_cell_type, *trial_cell_type)];
                 let offset = qweights.len();
 
                 let mut possible_pairs = vec![];
@@ -767,8 +840,6 @@ pub trait BatchedAssembler: Sync + Sized {
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
-        npts_test: usize,
-        npts_trial: usize,
         shape: [usize; 2],
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
@@ -783,10 +854,6 @@ pub trait BatchedAssembler: Sync + Sized {
         }
         if shape[0] != test_space.global_size() || shape[1] != trial_space.global_size() {
             panic!("Matrix has wrong shape");
-        }
-
-        if npts_test != npts_trial {
-            panic!("FMM with different test and trial quadrature rules not yet supported");
         }
 
         let grid = test_space.grid();
@@ -805,7 +872,9 @@ pub trait BatchedAssembler: Sync + Sized {
         let mut cell_type_indices = HashMap::new();
 
         for test_cell_type in grid.cell_types() {
+            let npts_test = self.options().quadrature_degrees[&test_cell_type];
             for trial_cell_type in grid.cell_types() {
+                let npts_trial = self.options().quadrature_degrees[&trial_cell_type];
                 test_cell_types.push(*test_cell_type);
                 trial_cell_types.push(*trial_cell_type);
                 cell_type_indices.insert((*test_cell_type, *trial_cell_type), qweights_test.len());
@@ -930,12 +999,10 @@ pub trait BatchedAssembler: Sync + Sized {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        qdegree: usize,
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) {
         let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid, Element>(
-            qdegree,
             output.shape(),
             trial_space,
             test_space,
@@ -955,17 +1022,12 @@ pub trait BatchedAssembler: Sync + Sized {
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
-        qdegree: usize,
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid, Element>(
-            qdegree,
-            shape,
-            trial_space,
-            test_space,
-        );
+        let sparse_matrix =
+            self.assemble_singular::<TestGrid, TrialGrid, Element>(shape, trial_space, test_space);
 
         CsrMatrix::<Self::T>::from_aij(
             sparse_matrix.shape,
@@ -986,14 +1048,10 @@ pub trait BatchedAssembler: Sync + Sized {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        npts_test: usize,
-        npts_trial: usize,
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) {
         let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid, Element>(
-            npts_test,
-            npts_trial,
             output.shape(),
             trial_space,
             test_space,
@@ -1015,15 +1073,11 @@ pub trait BatchedAssembler: Sync + Sized {
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
-        npts_test: usize,
-        npts_trial: usize,
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid, Element>(
-            npts_test,
-            npts_trial,
             shape,
             trial_space,
             test_space,
@@ -1054,8 +1108,6 @@ pub trait BatchedAssembler: Sync + Sized {
 
         self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
             output,
-            37, // TODO: Allow user to set npts (note: 37 used as rule exists with 37 for both triangles and quads)
-            37, // TODO: Allow user to set npts
             trial_space,
             test_space,
             &trial_colouring,
@@ -1063,7 +1115,6 @@ pub trait BatchedAssembler: Sync + Sized {
         );
         self.assemble_singular_into_dense::<TestGrid, TrialGrid, Element>(
             output,
-            4, // TODO: Allow user to set this
             trial_space,
             test_space,
         );
@@ -1078,8 +1129,6 @@ pub trait BatchedAssembler: Sync + Sized {
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        npts_test: usize,
-        npts_trial: usize,
         trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
         test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
@@ -1095,7 +1144,9 @@ pub trait BatchedAssembler: Sync + Sized {
         }
 
         for test_cell_type in test_space.grid().cell_types() {
+            let npts_test = self.options().quadrature_degrees[&test_cell_type];
             for trial_cell_type in trial_space.grid().cell_types() {
+                let npts_trial = self.options().quadrature_degrees[&trial_cell_type];
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut qpoints_test =
                     rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
@@ -1226,8 +1277,8 @@ mod test {
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
         let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
-        assembler.assemble_singular_into_dense(&mut matrix, 4, &space, &space);
-        let csr = assembler.assemble_singular_into_csr(4, &space, &space);
+        assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
+        let csr = assembler.assemble_singular_into_csr(&space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
@@ -1252,8 +1303,8 @@ mod test {
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
         let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
-        assembler.assemble_singular_into_dense(&mut matrix, 4, &space, &space);
-        let csr = assembler.assemble_singular_into_csr(4, &space, &space);
+        assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
+        let csr = assembler.assemble_singular_into_csr(&space, &space);
 
         let indptr = csr.indptr();
         let indices = csr.indices();
@@ -1281,8 +1332,8 @@ mod test {
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
         let assembler = LaplaceSingleLayerAssembler::<128, f64>::default();
-        assembler.assemble_singular_into_dense(&mut matrix, 4, &space0, &space1);
-        let csr = assembler.assemble_singular_into_csr(4, &space0, &space1);
+        assembler.assemble_singular_into_dense(&mut matrix, &space0, &space1);
+        let csr = assembler.assemble_singular_into_csr(&space0, &space1);
         let indptr = csr.indptr();
         let indices = csr.indices();
         let data = csr.data();

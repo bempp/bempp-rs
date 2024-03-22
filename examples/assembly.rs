@@ -35,7 +35,7 @@ fn main() {
 
     // Assemble just the singular part
     let mut singular_matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    a.assemble_singular_into_dense(&mut singular_matrix, 4, &space, &space);
+    a.assemble_singular_into_dense(&mut singular_matrix, &space, &space);
     println!("Lagrange single layer matrix (singular part)");
     for i in 0..ndofs {
         for j in 0..ndofs {
@@ -47,7 +47,7 @@ fn main() {
 
     // For grids with a larger number of cells, the singular part will be sparse. It can be assembled as a CSR matrix as follows
     println!("Lagrange single layer matrix (singular part) as CSR matrix");
-    let singular_sparse_matrix = a.assemble_singular_into_csr(4, &space, &space);
+    let singular_sparse_matrix = a.assemble_singular_into_csr(&space, &space);
     println!("indices: {:?}", singular_sparse_matrix.indices());
     println!("indptr: {:?}", singular_sparse_matrix.indptr());
     println!("data: {:?}", singular_sparse_matrix.data());
@@ -58,8 +58,6 @@ fn main() {
     let mut nonsingular_matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
     a.assemble_nonsingular_into_dense(
         &mut nonsingular_matrix,
-        37,
-        37,
         &space,
         &space,
         &colouring,
