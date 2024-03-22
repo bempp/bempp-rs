@@ -2,8 +2,7 @@ use bempp::bem::assembly::{batched, batched::BatchedAssembler};
 use bempp::bem::function_space::SerialFunctionSpace;
 use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::grid::shapes::regular_sphere;
-use bempp::traits::bem::FunctionSpace;
-use bempp::traits::element::Continuity;
+use bempp::traits::{bem::FunctionSpace, element::Continuity, types::ReferenceCellType};
 use criterion::{criterion_group, criterion_main, Criterion};
 use rlst::rlst_dynamic_array2;
 
@@ -22,7 +21,12 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.cell_colouring();
-        let a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+        let mut a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+        a.quadrature_degree(ReferenceCellType::Triangle, 16);
+        a.singular_quadrature_degree(
+            (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
+            4,
+        );
 
         group.bench_function(
             &format!(
@@ -30,7 +34,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.global_size(),
                 space.global_size()
             ),
-            |b| b.iter(|| a.assemble_singular_into_dense(&mut matrix, 4, &space, &space)),
+            |b| b.iter(|| a.assemble_singular_into_dense(&mut matrix, &space, &space)),
         );
         group.bench_function(
             &format!(
@@ -42,8 +46,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 b.iter(|| {
                     a.assemble_nonsingular_into_dense(
                         &mut matrix,
-                        16,
-                        16,
                         &space,
                         &space,
                         &colouring,
