@@ -4,9 +4,9 @@ use bempp::bem::assembly::{batched, fmm_tools};
 use bempp::bem::function_space::SerialFunctionSpace;
 use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::grid::shapes::regular_sphere;
-use bempp::traits::bem::FunctionSpace;
-use bempp::traits::element::Continuity;
-use bempp::traits::grid::GridType;
+use bempp::traits::{
+    bem::FunctionSpace, element::Continuity, grid::GridType, types::ReferenceCellType,
+};
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
 use kifmm::field::types::FftFieldTranslationKiFmm;
@@ -44,7 +44,8 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+    let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+    a.quadrature_degree(ReferenceCellType::Triangle, npts);
     a.assemble_into_dense(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
@@ -71,10 +72,10 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
     let mut matrix2 = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
 
     // matrix 2 = singular
-    a.assemble_singular_into_dense(&mut matrix2, 4, trial_space, test_space);
+    a.assemble_singular_into_dense(&mut matrix2, trial_space, test_space);
 
     let mut correction = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    a.assemble_singular_correction_into_dense(&mut correction, npts, npts, trial_space, test_space);
+    a.assemble_singular_correction_into_dense(&mut correction, trial_space, test_space);
 
     let temp = empty_array::<f64, 2>()
         .simple_mult_into_resize(empty_array::<f64, 2>().simple_mult_into_resize(p_t, k), p);
@@ -118,7 +119,8 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let a = batched::LaplaceSingleLayerAssembler::<128, f64>::default();
+    let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+    a.quadrature_degree(ReferenceCellType::Triangle, npts);
     a.assemble_into_dense(&mut matrix, trial_space, test_space);
 
     // Compute using FMM method
@@ -132,9 +134,9 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
     let p_t =
         fmm_tools::transpose_basis_to_quadrature_into_csr::<128, f64, TestGrid>(npts, test_space);
     let p = fmm_tools::basis_to_quadrature_into_csr::<128, f64, TrialGrid>(npts, trial_space);
-    let singular = a.assemble_singular_into_csr(4, trial_space, test_space);
+    let singular = a.assemble_singular_into_csr(trial_space, test_space);
 
-    let correction = a.assemble_singular_correction_into_csr(npts, npts, trial_space, test_space);
+    let correction = a.assemble_singular_correction_into_csr(trial_space, test_space);
 
     // matrix2 = p_t @ k @ p - c + singular
     let mut rng = rand::thread_rng();
