@@ -57,7 +57,7 @@ mod test {
     use super::*;
     use paste::paste;
 
-    use approx;
+    use approx::*;
 
     fn get_volume(cell_type: ReferenceCellType) -> f64 {
         match cell_type {
@@ -87,7 +87,7 @@ mod test {
                         let rule = simplex_rule(cell_type, npoints).unwrap();
                         let volume_actual: f64 = rule.weights.iter().sum();
                         let volume_expected = get_volume(cell_type);
-                        approx::assert_relative_eq!(volume_actual, volume_expected, max_relative=1E-14);
+                        assert_relative_eq!(volume_actual, volume_expected, max_relative=1E-14);
                         }
 
                 }

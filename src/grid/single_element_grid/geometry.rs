@@ -339,7 +339,6 @@ mod test {
     use super::*;
     use crate::element::ciarlet::lagrange;
     use crate::traits::element::Continuity;
-    use crate::traits::types::ReferenceCellType;
     use approx::*;
     use rlst::{
         rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut, RawAccess, RawAccessMut,
