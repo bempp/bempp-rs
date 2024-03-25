@@ -502,7 +502,7 @@ mod test {
     use super::*;
     use crate::quadrature::simplex_rules::simplex_rule;
     use approx::*;
-    use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut};
+    use rlst::{rlst_dynamic_array2, rlst_dynamic_array3};
 
     #[test]
     fn test_legendre_interval() {

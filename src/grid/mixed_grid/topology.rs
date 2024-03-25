@@ -173,7 +173,7 @@ impl SerialMixedTopology {
                     let mut c_to_e = vec![];
                     let mut c_to_e_flat = vec![];
                     let ref_conn = &reference_cell::connectivity(*cell_type)[d];
-                    for (cell_i, cell) in cells_to_entities[0][&cell_type].iter().enumerate() {
+                    for (cell_i, cell) in cells_to_entities[0][cell_type].iter().enumerate() {
                         let mut entity_ids = vec![];
                         let mut entity_ids_flat = vec![];
 

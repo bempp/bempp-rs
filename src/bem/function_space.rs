@@ -230,7 +230,6 @@ mod test {
     use crate::element::ciarlet::LagrangeElementFamily;
     use crate::grid::shapes::regular_sphere;
     use crate::traits::element::Continuity;
-    use crate::traits::grid::{CellType, TopologyType};
 
     #[test]
     fn test_dofmap_lagrange0() {

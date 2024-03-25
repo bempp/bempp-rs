@@ -303,11 +303,8 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::element::FiniteElement;
-    use crate::traits::types::ReferenceCellType;
     use approx::*;
     use rlst::rlst_dynamic_array4;
-    use rlst::RandomAccessByRef;
 
     fn check_dofs(e: impl FiniteElement) {
         let mut ndofs = 0;
