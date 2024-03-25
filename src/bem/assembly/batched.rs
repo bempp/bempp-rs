@@ -858,9 +858,9 @@ pub trait BatchedAssembler: Sync + Sized {
         let mut cell_type_indices = HashMap::new();
 
         for test_cell_type in grid.cell_types() {
-            let npts_test = self.options().quadrature_degrees[&test_cell_type];
+            let npts_test = self.options().quadrature_degrees[test_cell_type];
             for trial_cell_type in grid.cell_types() {
-                let npts_trial = self.options().quadrature_degrees[&trial_cell_type];
+                let npts_trial = self.options().quadrature_degrees[trial_cell_type];
                 test_cell_types.push(*test_cell_type);
                 trial_cell_types.push(*trial_cell_type);
                 cell_type_indices.insert((*test_cell_type, *trial_cell_type), qweights_test.len());
@@ -1133,9 +1133,9 @@ pub trait BatchedAssembler: Sync + Sized {
         let batch_size = self.options().batch_size;
 
         for test_cell_type in test_space.grid().cell_types() {
-            let npts_test = self.options().quadrature_degrees[&test_cell_type];
+            let npts_test = self.options().quadrature_degrees[test_cell_type];
             for trial_cell_type in trial_space.grid().cell_types() {
-                let npts_trial = self.options().quadrature_degrees[&trial_cell_type];
+                let npts_trial = self.options().quadrature_degrees[trial_cell_type];
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut qpoints_test =
                     rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
