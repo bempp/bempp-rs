@@ -3,10 +3,9 @@
 use crate::element::ciarlet::{lagrange, CiarletElement};
 use crate::element::reference_cell;
 use crate::grid::common::compute_diameter_triangle;
-use crate::grid::traits::Ownership;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
 use num::Float;
 use rlst::rlst_static_array;
 use rlst::rlst_static_type;

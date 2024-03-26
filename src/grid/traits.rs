@@ -1,19 +1,10 @@
 //! Traits used in the implementation of a grid
 
 use crate::traits::element::FiniteElement;
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
 use num::Float;
 use rlst::RlstScalar;
 use std::hash::Hash;
-
-/// Ownership
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum Ownership {
-    /// Owned
-    Owned,
-    /// Ghost
-    Ghost(usize, usize),
-}
 
 /// The topology of a grid.
 ///

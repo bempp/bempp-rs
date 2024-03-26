@@ -1,6 +1,7 @@
 //! Definition of a vertex
 
 use rlst::RlstScalar;
+use crate::traits::types::Ownership;
 
 pub trait PointType {
     //! A point
@@ -16,4 +17,7 @@ pub trait PointType {
 
     /// Get the point's id
     fn id(&self) -> usize;
+
+    /// Get the point's ownership
+    fn ownership(&self) -> Ownership;
 }

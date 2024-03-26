@@ -6,7 +6,7 @@ use crate::traits::element::FiniteElement;
 use crate::traits::grid::{
     CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
 use num::Float;
 use rlst::RlstScalar;
 use std::iter::Copied;
@@ -78,6 +78,11 @@ impl<'a, T: Float + RlstScalar<Real = T>, G: Geometry<T = T>> PointType for Poin
     fn id(&self) -> usize {
         self.geometry.point_index_to_id(self.index)
     }
+    fn ownership(&self) -> Ownership {
+        // TODO
+        Ownership::Owned
+    }
+
 }
 
 impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> CellType

@@ -1,8 +1,8 @@
 //! Implementation of grid topology
 
 use crate::element::reference_cell;
-use crate::grid::traits::{Ownership, Topology};
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType};
+use crate::grid::traits::Topology;
+use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
 use std::collections::HashMap;
 
 fn all_equal<T: Eq>(a: &[T], b: &[T]) -> bool {

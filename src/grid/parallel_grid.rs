@@ -15,22 +15,21 @@ use rlst::{
     RandomAccessByRef, RandomAccessMut, Shape, RlstScalar
 };
 use num::Float;
-use crate::grid::flat_triangle_grid::{SerialFlatTriangleGridBuilder, SerialFlatTriangleGrid};
-use crate::grid::traits_impl::WrappedGrid;
+use crate::grid::flat_triangle_grid::{FlatTriangleGridBuilder, FlatTriangleGrid};
 use std::collections::HashMap;
 use crate::grid::traits::Geometry;
 
 // TODO: update this
 
-impl<T: Float + RlstScalar<Real=T>> SerialFlatTriangleGridBuilder<T> {
-    fn create_parallel_grid<C: Communicator>(
-        self, comm: &C, cell_owners: HashMap<usize, usize>,
-    ) -> WrappedGrid<SerialFlatTriangleGrid<T>> {
+impl<T: Float + RlstScalar<Real=T>> FlatTriangleGridBuilder<T> {
+    pub fn create_parallel_grid<C: Communicator>(
+        self, comm: &C, cell_owners: &HashMap<usize, usize>,
+    ) -> FlatTriangleGrid<T> {
         panic!();
     }
-    fn create_parallel_grid_receive<C: Communicator>(
+    pub fn create_parallel_grid_receive<C: Communicator>(
         self, comm: &C,
-    ) -> WrappedGrid<SerialFlatTriangleGrid<T>> {
+    ) -> FlatTriangleGrid<T> {
         panic!();
     }
 }
