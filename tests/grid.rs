@@ -1,6 +1,6 @@
-use bempp::grid::flat_triangle_grid::SerialFlatTriangleGridBuilder;
-use bempp::grid::mixed_grid::SerialMixedGridBuilder;
-use bempp::grid::single_element_grid::SerialSingleElementGridBuilder;
+use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
+use bempp::grid::mixed_grid::MixedGridBuilder;
+use bempp::grid::single_element_grid::SingleElementGridBuilder;
 use bempp::traits::grid::{Builder, CellType, GeometryType, GridType, PointType, TopologyType};
 use bempp::traits::types::ReferenceCellType;
 
@@ -10,7 +10,7 @@ extern crate lapack_src;
 #[test]
 fn test_grid_mixed_cell_type() {
     //! Build a mixed grid using its builder
-    let mut b = SerialMixedGridBuilder::<3, f64>::new(());
+    let mut b = MixedGridBuilder::<3, f64>::new(());
     b.add_point(0, [-1.0, 0.0, 0.0]);
     b.add_point(1, [-0.5, 0.0, 0.2]);
     b.add_point(2, [0.0, 0.0, 0.0]);
@@ -69,7 +69,7 @@ fn test_grid_mixed_cell_type() {
 #[test]
 fn test_grid_single_element() {
     //! Build a single element grid using its builder
-    let mut b = SerialSingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Triangle, 2));
+    let mut b = SingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Triangle, 2));
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [0.5, 0.0, 0.2]);
     b.add_point(2, [1.0, 0.0, 0.0]);
@@ -119,7 +119,7 @@ fn test_grid_single_element() {
 #[test]
 fn test_grid_flat_triangle() {
     //! Build a flat triangle grid using its builder
-    let mut b = SerialFlatTriangleGridBuilder::<f64>::new(());
+    let mut b = FlatTriangleGridBuilder::<f64>::new(());
     b.add_point(1, [0.0, 0.0, 0.0]);
     b.add_point(2, [1.0, 0.0, 1.0]);
     b.add_point(3, [1.0, 1.0, 0.0]);

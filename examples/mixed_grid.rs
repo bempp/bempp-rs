@@ -1,4 +1,4 @@
-use bempp::grid::mixed_grid::SerialMixedGridBuilder;
+use bempp::grid::mixed_grid::MixedGridBuilder;
 use bempp::traits::{
     grid::{Builder, CellType, GeometryType, GridType, PointType},
     types::ReferenceCellType,
@@ -13,7 +13,7 @@ extern crate lapack_src;
 /// for a mixture of flat and curved cells, and/or a mixture of cell types
 fn main() {
     // Create the grid builder, inputting the physical/geometric dimension (3)
-    let mut b = SerialMixedGridBuilder::<3, f64>::new(());
+    let mut b = MixedGridBuilder::<3, f64>::new(());
     // Add ten points
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [1.0, 0.0, 0.0]);

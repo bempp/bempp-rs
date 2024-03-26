@@ -1,10 +1,10 @@
 //! Input/output
-use super::SerialFlatTriangleGrid;
+use super::FlatTriangleGrid;
 use crate::traits::grid::GmshIO;
 use num::Float;
 use rlst::{RandomAccessByRef, RlstScalar, Shape};
 
-impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> GmshIO for FlatTriangleGrid<T> {
     fn to_gmsh_string(&self) -> String {
         let cell_count = self.cells_to_entities[0].len();
         let node_count = self.coordinates.shape()[0];

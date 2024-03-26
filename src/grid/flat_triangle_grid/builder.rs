@@ -1,7 +1,6 @@
 //! Grid builder
 
-use crate::grid::flat_triangle_grid::grid::SerialFlatTriangleGrid;
-use crate::grid::traits_impl::WrappedGrid;
+use crate::grid::flat_triangle_grid::grid::FlatTriangleGrid;
 use crate::traits::grid::Builder;
 use num::Float;
 use rlst::RlstScalar;
@@ -12,7 +11,7 @@ use rlst::{
 use std::collections::HashMap;
 
 /// Grid builder for a flat triangle grid
-pub struct SerialFlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
+pub struct FlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
     pub(crate) points: Vec<T>,
     cells: Vec<usize>,
     point_indices_to_ids: Vec<usize>,
@@ -21,11 +20,11 @@ pub struct SerialFlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> Builder<3> for SerialFlatTriangleGridBuilder<T>
+impl<T: Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBuilder<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    type GridType = WrappedGrid<SerialFlatTriangleGrid<T>>;
+    type GridType = FlatTriangleGrid<T>;
     type T = T;
     type CellData = [usize; 3];
     type GridMetadata = ();
@@ -73,15 +72,13 @@ where
         let npts = self.point_indices_to_ids.len();
         let mut points = rlst_dynamic_array2!(T, [npts, 3]);
         points.fill_from(rlst_array_from_slice2!(T, &self.points, [npts, 3], [3, 1]));
-        WrappedGrid {
-            grid: SerialFlatTriangleGrid::new(
-                points,
-                &self.cells,
-                self.point_indices_to_ids,
-                self.point_ids_to_indices,
-                self.cell_indices_to_ids,
-                self.cell_ids_to_indices,
-            ),
-        }
+        FlatTriangleGrid::new(
+            points,
+            &self.cells,
+            self.point_indices_to_ids,
+            self.point_ids_to_indices,
+            self.cell_indices_to_ids,
+            self.cell_ids_to_indices,
+        )
     }
 }
