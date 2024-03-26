@@ -3,9 +3,9 @@ use bempp::bem::assembly::{batched, batched::BatchedAssembler};
 use bempp::bem::function_space::SerialFunctionSpace;
 use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::grid::{
-    flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBuilder},
-    mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
-    single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
+    flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
+    mixed_grid::{MixedGrid, MixedGridBuilder},
+    single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
 };
 use bempp::traits::{
     bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
@@ -17,8 +17,8 @@ use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 extern crate blas_src;
 extern crate lapack_src;
 
-fn mixed_grid() -> SerialMixedGrid<f64> {
-    let mut b = SerialMixedGridBuilder::<3, f64>::new(());
+fn mixed_grid() -> MixedGrid<f64> {
+    let mut b = MixedGridBuilder::<3, f64>::new(());
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [0.5, 0.0, 0.0]);
     b.add_point(2, [1.0, 0.0, 0.0]);
@@ -37,9 +37,8 @@ fn mixed_grid() -> SerialMixedGrid<f64> {
     b.create_grid()
 }
 
-fn quad_grid() -> SerialSingleElementGrid<f64> {
-    let mut b =
-        SerialSingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
+fn quad_grid() -> SingleElementGrid<f64> {
+    let mut b = SingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [0.5, 0.0, 0.0]);
     b.add_point(3, [0.0, 0.5, 0.0]);
@@ -52,8 +51,8 @@ fn quad_grid() -> SerialSingleElementGrid<f64> {
     b.create_grid()
 }
 
-fn tri_grid() -> SerialFlatTriangleGrid<f64> {
-    let mut b = SerialFlatTriangleGridBuilder::<f64>::new(());
+fn tri_grid() -> FlatTriangleGrid<f64> {
+    let mut b = FlatTriangleGridBuilder::<f64>::new(());
     b.add_point(1, [0.5, 0.0, 0.0]);
     b.add_point(2, [1.0, 0.0, 0.0]);
     b.add_point(4, [0.5, 0.5, 0.0]);

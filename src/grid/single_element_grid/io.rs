@@ -1,12 +1,12 @@
 //! Input/output
-use super::SerialSingleElementGrid;
+use super::SingleElementGrid;
 use crate::grid::io::{get_gmsh_cell, get_permutation_to_gmsh};
 use crate::grid::traits::Geometry;
 use crate::traits::{element::FiniteElement, grid::GmshIO};
 use num::Float;
 use rlst::{RandomAccessByRef, RlstScalar, Shape};
 
-impl<T: Float + RlstScalar<Real = T>> GmshIO for SerialSingleElementGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> GmshIO for SingleElementGrid<T> {
     fn to_gmsh_string(&self) -> String {
         let cell_count = self.geometry.cell_count();
         let node_count = self.geometry.coordinates.shape()[0];

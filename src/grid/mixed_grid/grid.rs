@@ -2,7 +2,7 @@
 
 use crate::element::ciarlet::lagrange;
 use crate::element::reference_cell;
-use crate::grid::mixed_grid::{geometry::SerialMixedGeometry, topology::SerialMixedTopology};
+use crate::grid::mixed_grid::{geometry::MixedGeometry, topology::MixedTopology};
 use crate::grid::traits::Grid;
 use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::types::ReferenceCellType;
@@ -16,12 +16,12 @@ use rlst::{
 use std::collections::HashMap;
 
 /// A mixed grid
-pub struct SerialMixedGrid<T: Float + RlstScalar<Real = T>> {
-    topology: SerialMixedTopology,
-    pub(crate) geometry: SerialMixedGeometry<T>,
+pub struct MixedGrid<T: Float + RlstScalar<Real = T>> {
+    topology: MixedTopology,
+    pub(crate) geometry: MixedGeometry<T>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> SerialMixedGrid<T>
+impl<T: Float + RlstScalar<Real = T>> MixedGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -52,7 +52,7 @@ where
             .collect::<Vec<_>>();
 
         if elements.len() == 1 {
-            warn!("Creating a mixed grid with only one element. Using a SerialSingleElementGrid would be faster.");
+            warn!("Creating a mixed grid with only one element. Using a SingleElementGrid would be faster.");
         }
 
         let mut cell_vertices = vec![];
@@ -65,13 +65,13 @@ where
             start += npoints;
         }
 
-        let topology = SerialMixedTopology::new(
+        let topology = MixedTopology::new(
             &cell_vertices,
             cell_types,
             &point_indices_to_ids,
             &cell_indices_to_ids,
         );
-        let geometry = SerialMixedGeometry::<T>::new(
+        let geometry = MixedGeometry::<T>::new(
             points,
             cells,
             elements,
@@ -85,10 +85,10 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Grid for SerialMixedGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Grid for MixedGrid<T> {
     type T = T;
-    type Topology = SerialMixedTopology;
-    type Geometry = SerialMixedGeometry<T>;
+    type Topology = MixedTopology;
+    type Geometry = MixedGeometry<T>;
 
     fn topology(&self) -> &Self::Topology {
         &self.topology

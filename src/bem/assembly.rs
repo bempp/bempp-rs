@@ -10,9 +10,9 @@ mod test {
     use crate::bem::function_space::SerialFunctionSpace;
     use crate::element::ciarlet::LagrangeElementFamily;
     use crate::grid::{
-        mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
+        mixed_grid::{MixedGrid, MixedGridBuilder},
         shapes::regular_sphere,
-        single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
+        single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
     };
     use crate::traits::{
         bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
@@ -25,13 +25,12 @@ mod test {
         RlstScalar, VectorContainer,
     };
 
-    fn quadrilateral_grid<T: Float + RlstScalar<Real = T>>() -> SerialSingleElementGrid<T>
+    fn quadrilateral_grid<T: Float + RlstScalar<Real = T>>() -> SingleElementGrid<T>
     where
         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
             MatrixInverse,
     {
-        let mut b =
-            SerialSingleElementGridBuilder::<3, T>::new((ReferenceCellType::Quadrilateral, 1));
+        let mut b = SingleElementGridBuilder::<3, T>::new((ReferenceCellType::Quadrilateral, 1));
         for j in 0..4 {
             for i in 0..4 {
                 b.add_point(
@@ -55,12 +54,12 @@ mod test {
         b.create_grid()
     }
 
-    fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> SerialMixedGrid<T>
+    fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> MixedGrid<T>
     where
         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
             MatrixInverse,
     {
-        let mut b = SerialMixedGridBuilder::<3, T>::new(());
+        let mut b = MixedGridBuilder::<3, T>::new(());
         for j in 0..4 {
             for i in 0..4 {
                 b.add_point(

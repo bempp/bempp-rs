@@ -6,5 +6,5 @@ mod builder;
 mod grid;
 mod io;
 
-pub use self::builder::SerialFlatTriangleGridBuilder;
-pub use self::grid::SerialFlatTriangleGrid;
+pub use self::builder::FlatTriangleGridBuilder;
+pub use self::grid::FlatTriangleGrid;

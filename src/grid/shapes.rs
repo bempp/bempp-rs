@@ -1,6 +1,6 @@
 //! Functions to create simple example grids
 
-use crate::grid::flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBuilder};
+use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
 use crate::traits::grid::Builder;
 use num::Float;
 use rlst::{
@@ -13,13 +13,11 @@ use std::collections::{hash_map::Entry::Vacant, HashMap};
 /// A regular sphere is created by starting with a regular octahedron. The shape is then refined `refinement_level` times.
 /// Each time the grid is refined, each triangle is split into four triangles (by adding lines connecting the midpoints of
 /// each edge). The new points are then scaled so that they are a distance of 1 from the origin.
-pub fn regular_sphere<T: Float + RlstScalar<Real = T>>(
-    refinement_level: u32,
-) -> SerialFlatTriangleGrid<T>
+pub fn regular_sphere<T: Float + RlstScalar<Real = T>>(refinement_level: u32) -> FlatTriangleGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    let mut b = SerialFlatTriangleGridBuilder::new_with_capacity(
+    let mut b = FlatTriangleGridBuilder::new_with_capacity(
         2 + usize::pow(4, refinement_level + 1),
         8 * usize::pow(4, refinement_level),
         (),

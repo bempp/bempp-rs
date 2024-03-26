@@ -19,7 +19,7 @@ use rlst::{
 use std::collections::HashMap;
 
 /// A flat triangle grid
-pub struct SerialFlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
+pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     index_map: Vec<usize>,
 
     // Geometry information
@@ -45,7 +45,7 @@ pub struct SerialFlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> SerialFlatTriangleGrid<T>
+impl<T: Float + RlstScalar<Real = T>> FlatTriangleGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -189,7 +189,7 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Grid for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Grid for FlatTriangleGrid<T> {
     type T = T;
     type Topology = Self;
     type Geometry = Self;
@@ -207,7 +207,7 @@ impl<T: Float + RlstScalar<Real = T>> Grid for SerialFlatTriangleGrid<T> {
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Geometry for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Geometry for FlatTriangleGrid<T> {
     type IndexType = usize;
     type T = T;
     type Element = CiarletElement<T>;
@@ -298,13 +298,13 @@ impl<T: Float + RlstScalar<Real = T>> Geometry for SerialFlatTriangleGrid<T> {
 
 /// Geometry evaluator for a flat triangle grid
 pub struct GeometryEvaluatorFlatTriangle<'a, T: Float + RlstScalar<Real = T>> {
-    grid: &'a SerialFlatTriangleGrid<T>,
+    grid: &'a FlatTriangleGrid<T>,
     points: SliceArray<'a, T, 2>,
 }
 
 impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
     /// Create a geometry evaluator
-    fn new(grid: &'a SerialFlatTriangleGrid<T>, points: &'a [T]) -> Self {
+    fn new(grid: &'a FlatTriangleGrid<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(grid.element.cell_type());
         assert_eq!(points.len() % tdim, 0);
         let npoints = points.len() / tdim;
@@ -356,7 +356,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Topology for SerialFlatTriangleGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
     type IndexType = usize;
 
     fn dim(&self) -> usize {
@@ -474,7 +474,7 @@ mod test {
     use approx::*;
     use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut, RawAccessMut};
 
-    fn example_grid_flat() -> SerialFlatTriangleGrid<f64> {
+    fn example_grid_flat() -> FlatTriangleGrid<f64> {
         //! Create a flat test grid
         let mut points = rlst_dynamic_array2!(f64, [4, 3]);
         points[[0, 0]] = 0.0;
@@ -490,7 +490,7 @@ mod test {
         points[[3, 1]] = 1.0;
         points[[3, 2]] = 0.0;
         let cells = vec![0, 1, 2, 0, 2, 3];
-        SerialFlatTriangleGrid::new(
+        FlatTriangleGrid::new(
             points,
             &cells,
             vec![0, 1, 2, 3],
@@ -500,7 +500,7 @@ mod test {
         )
     }
 
-    fn example_grid_3d() -> SerialFlatTriangleGrid<f64> {
+    fn example_grid_3d() -> FlatTriangleGrid<f64> {
         //! Create a non-flat test grid
         let mut points = rlst_dynamic_array2!(f64, [4, 3]);
         points[[0, 0]] = 0.0;
@@ -516,7 +516,7 @@ mod test {
         points[[3, 1]] = 1.0;
         points[[3, 2]] = 0.0;
         let cells = vec![0, 1, 2, 0, 2, 3];
-        SerialFlatTriangleGrid::new(
+        FlatTriangleGrid::new(
             points,
             &cells,
             vec![0, 1, 2, 3],

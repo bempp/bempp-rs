@@ -1,7 +1,7 @@
 //! Test input/output
-use bempp::grid::mixed_grid::SerialMixedGridBuilder;
+use bempp::grid::mixed_grid::MixedGridBuilder;
 use bempp::grid::shapes::regular_sphere;
-use bempp::grid::single_element_grid::SerialSingleElementGridBuilder;
+use bempp::grid::single_element_grid::SingleElementGridBuilder;
 use bempp::traits::grid::{Builder, GmshIO};
 use bempp::traits::types::ReferenceCellType;
 
@@ -16,8 +16,7 @@ fn test_regular_sphere_gmsh_io() {
 
 #[test]
 fn test_gmsh_output_quads() {
-    let mut b =
-        SerialSingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
+    let mut b = SingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [1.0, 0.0, 0.0]);
     b.add_point(2, [0.0, 1.0, 0.0]);
@@ -38,7 +37,7 @@ fn test_gmsh_output_quads() {
 
 #[test]
 fn test_gmsh_output_mixed() {
-    let mut b = SerialMixedGridBuilder::<3, f64>::new(());
+    let mut b = MixedGridBuilder::<3, f64>::new(());
     b.add_point(0, [-1.0, 0.0, 0.0]);
     b.add_point(1, [-0.5, 0.0, 0.2]);
     b.add_point(2, [0.0, 0.0, 0.0]);

@@ -8,5 +8,5 @@ mod grid;
 mod io;
 mod topology;
 
-pub use self::builder::SerialSingleElementGridBuilder;
-pub use self::grid::SerialSingleElementGrid;
+pub use self::builder::SingleElementGridBuilder;
+pub use self::grid::SingleElementGrid;
