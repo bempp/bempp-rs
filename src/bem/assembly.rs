@@ -13,7 +13,6 @@ mod test {
         mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
         shapes::regular_sphere,
         single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
-        traits_impl::WrappedGrid,
     };
     use crate::traits::{
         bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
@@ -26,8 +25,7 @@ mod test {
         RlstScalar, VectorContainer,
     };
 
-    fn quadrilateral_grid<T: Float + RlstScalar<Real = T>>(
-    ) -> WrappedGrid<SerialSingleElementGrid<T>>
+    fn quadrilateral_grid<T: Float + RlstScalar<Real = T>>() -> SerialSingleElementGrid<T>
     where
         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
             MatrixInverse,
@@ -57,7 +55,7 @@ mod test {
         b.create_grid()
     }
 
-    fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> WrappedGrid<SerialMixedGrid<T>>
+    fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> SerialMixedGrid<T>
     where
         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
             MatrixInverse,

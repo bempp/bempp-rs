@@ -1,7 +1,6 @@
 //! Functions to create simple example grids
 
 use crate::grid::flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBuilder};
-use crate::grid::traits_impl::WrappedGrid;
 use crate::traits::grid::Builder;
 use num::Float;
 use rlst::{
@@ -16,7 +15,7 @@ use std::collections::{hash_map::Entry::Vacant, HashMap};
 /// each edge). The new points are then scaled so that they are a distance of 1 from the origin.
 pub fn regular_sphere<T: Float + RlstScalar<Real = T>>(
     refinement_level: u32,
-) -> WrappedGrid<SerialFlatTriangleGrid<T>>
+) -> SerialFlatTriangleGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {

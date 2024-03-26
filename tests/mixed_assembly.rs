@@ -6,7 +6,6 @@ use bempp::grid::{
     flat_triangle_grid::{SerialFlatTriangleGrid, SerialFlatTriangleGridBuilder},
     mixed_grid::{SerialMixedGrid, SerialMixedGridBuilder},
     single_element_grid::{SerialSingleElementGrid, SerialSingleElementGridBuilder},
-    traits_impl::WrappedGrid,
 };
 use bempp::traits::{
     bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
@@ -18,7 +17,7 @@ use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 extern crate blas_src;
 extern crate lapack_src;
 
-fn mixed_grid() -> WrappedGrid<SerialMixedGrid<f64>> {
+fn mixed_grid() -> SerialMixedGrid<f64> {
     let mut b = SerialMixedGridBuilder::<3, f64>::new(());
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [0.5, 0.0, 0.0]);
@@ -38,7 +37,7 @@ fn mixed_grid() -> WrappedGrid<SerialMixedGrid<f64>> {
     b.create_grid()
 }
 
-fn quad_grid() -> WrappedGrid<SerialSingleElementGrid<f64>> {
+fn quad_grid() -> SerialSingleElementGrid<f64> {
     let mut b =
         SerialSingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
     b.add_point(0, [0.0, 0.0, 0.0]);
@@ -53,7 +52,7 @@ fn quad_grid() -> WrappedGrid<SerialSingleElementGrid<f64>> {
     b.create_grid()
 }
 
-fn tri_grid() -> WrappedGrid<SerialFlatTriangleGrid<f64>> {
+fn tri_grid() -> SerialFlatTriangleGrid<f64> {
     let mut b = SerialFlatTriangleGridBuilder::<f64>::new(());
     b.add_point(1, [0.5, 0.0, 0.0]);
     b.add_point(2, [1.0, 0.0, 0.0]);
