@@ -1,28 +1,47 @@
 //! A parallel implementation of a grid
-use crate::grid::grid::{SerialGeometry, SerialTopology};
-use crate::element::ciarlet::CiarletElement;
-use crate::tools::arrays::AdjacencyList;
-use crate::traits::arrays::AdjacencyListAccess;
-use crate::traits::cell::ReferenceCellType;
-use crate::traits::element::FiniteElement;
-use crate::traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
+//use crate::grid::grid::{SerialGeometry, SerialTopology};
+//use crate::element::ciarlet::CiarletElement;
+//use crate::tools::arrays::AdjacencyList;
+//use crate::traits::arrays::AdjacencyListAccess;
+//use crate::traits::cell::ReferenceCellType;
+//use crate::traits::element::FiniteElement;
+//use crate::traits::grid::{Geometry, GeometryEvaluator, Grid, Ownership, Topology};
 use mpi::{request::WaitGuard, topology::Communicator, traits::*};
 use rlst::{
     Array,
     BaseArray,
     VectorContainer,
     rlst_dynamic_array2,
-    RandomAccessByRef, RandomAccessMut, Shape,
+    RandomAccessByRef, RandomAccessMut, Shape, RlstScalar
 };
+use num::Float;
+use crate::grid::flat_triangle_grid::{SerialFlatTriangleGridBuilder, SerialFlatTriangleGrid};
+use crate::grid::traits_impl::WrappedGrid;
+use std::collections::HashMap;
+use crate::grid::traits::Geometry;
 
 // TODO: update this
 
-/// Geometry of a parallel grid
-pub struct ParallelGeometry<'a, C: Communicator> {
-    comm: &'a C,
-    serial_geometry: SerialGeometry,
+impl<T: Float + RlstScalar<Real=T>> SerialFlatTriangleGridBuilder<T> {
+    fn create_parallel_grid<C: Communicator>(
+        self, comm: &C, cell_owners: HashMap<usize, usize>,
+    ) -> WrappedGrid<SerialFlatTriangleGrid<T>> {
+        panic!();
+    }
+    fn create_parallel_grid_receive<C: Communicator>(
+        self, comm: &C,
+    ) -> WrappedGrid<SerialFlatTriangleGrid<T>> {
+        panic!();
+    }
 }
 
+
+/// Geometry of a parallel grid
+pub struct ParallelGeometry<'comm, C: Communicator, G: Geometry> {
+    comm: &'comm C,
+    serial_geometry: G,
+}
+/*
 impl<'a, C: Communicator> ParallelGeometry<'a, C> {
     pub fn new(
         comm: &'a C,
@@ -48,97 +67,72 @@ impl<'a, C: Communicator> ParallelGeometry<'a, C> {
         self.comm
     }
 }
+*/
 
-impl<'a, C: Communicator> Geometry for ParallelGeometry<'a, C> {
-    type T = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
-    type TMut = Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>;
+impl<'comm, C: Communicator, G: Geometry> Geometry for ParallelGeometry<'comm, C, G> {
+    type IndexType = G::IndexType;
+    type T = G::T;
+    type Element = G::Element;
+    type Evaluator<'a> = G::Evaluator<'a> where Self: 'a;
 
     fn dim(&self) -> usize {
         self.serial_geometry.dim()
     }
 
-    fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&f64> {
+    fn index_map(&self) -> &[Self::IndexType] {
+        self.serial_geometry.index_map()
+    }
+    fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&Self::T> {
         self.serial_geometry.coordinate(point_index, coord_index)
     }
-
     fn point_count(&self) -> usize {
         self.serial_geometry.point_count()
     }
-
-    fn cell_vertices(&self, index: usize) -> Option<&[usize]> {
-        self.serial_geometry.cell_vertices(index)
+    fn cell_points(&self, index: Self::IndexType) -> Option<&[usize]> {
+        self.serial_geometry.cell_points(index)
     }
     fn cell_count(&self) -> usize {
         self.serial_geometry.cell_count()
     }
-    fn index_map(&self) -> &[usize] {
-        self.serial_geometry.index_map()
+    fn cell_element(&self, index: Self::IndexType) -> Option<&Self::Element> {
+        self.serial_geometry.cell_element(index)
     }
-    fn get_evaluator<'b>(
-        &'b self,
-        element: &impl FiniteElement<T = f64>,
-        points: &'b Self::T,
-    ) -> Box<dyn GeometryEvaluator<Self::T, Self::TMut> + 'b> {
-        self.serial_geometry.get_evaluator(element, points)
+    fn element_count(&self) -> usize {
+        self.serial_geometry.element_count()
     }
-    fn compute_points<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
-    >(
-        &self,
-        points: &T,
-        cell: usize,
-        physical_points: &mut TMut,
-    ) {
-        self.serial_geometry
-            .compute_points(points, cell, physical_points)
+    fn element(&self, i: usize) -> Option<&Self::Element> {
+        self.serial_geometry.element(i)
     }
-    fn compute_normals<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
-    >(
-        &self,
-        points: &T,
-        cell: usize,
-        normals: &mut TMut,
-    ) {
-        self.serial_geometry.compute_points(points, cell, normals)
+    fn cell_indices(&self, i: usize) -> Option<&[Self::IndexType]> {
+        self.serial_geometry.cell_indices(i)
     }
-    fn compute_jacobians<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
-    >(
-        &self,
-        points: &T,
-        cell: usize,
-        jacobians: &mut TMut,
-    ) {
-        self.serial_geometry
-            .compute_jacobians(points, cell, jacobians)
+    fn midpoint(&self, index: Self::IndexType, point: &mut [Self::T]) {
+        self.serial_geometry.midpoint(index, point)
     }
-    fn compute_jacobian_determinants<T: RandomAccessByRef<2, Item = f64> + Shape<2>>(
-        &self,
-        points: &T,
-        cell: usize,
-        jacobian_determinants: &mut [f64],
-    ) {
-        self.serial_geometry
-            .compute_jacobian_determinants(points, cell, jacobian_determinants)
+    fn diameter(&self, index: Self::IndexType) -> Self::T {
+        self.serial_geometry.diameter(index)
     }
-    fn compute_jacobian_inverses<
-        T: RandomAccessByRef<2, Item = f64> + Shape<2>,
-        TMut: RandomAccessByRef<2, Item = f64> + RandomAccessMut<2, Item = f64> + Shape<2>,
-    >(
-        &self,
-        points: &T,
-        cell: usize,
-        jacobian_inverses: &mut TMut,
-    ) {
-        self.serial_geometry
-            .compute_jacobian_inverses(points, cell, jacobian_inverses)
+    fn volume(&self, index: Self::IndexType) -> Self::T {
+        self.serial_geometry.volume(index)
+    }
+    fn get_evaluator<'a>(&'a self, points: &'a [Self::T]) -> Self::Evaluator<'a>{
+        self.serial_geometry.get_evaluator(points)
+    }
+    fn point_index_to_id(&self, index: usize) -> usize {
+        self.serial_geometry.point_index_to_id(index)
+    }
+    fn cell_index_to_id(&self, index: Self::IndexType) -> usize {
+        self.serial_geometry.cell_index_to_id(index)
+    }
+    fn point_id_to_index(&self, id: usize) -> usize {
+        self.serial_geometry.point_id_to_index(id)
+    }
+    fn cell_id_to_index(&self, id: usize) -> Self::IndexType {
+        self.serial_geometry.cell_id_to_index(id)
     }
 }
 
+/*
 /// Topology of a parallel grid
 pub struct ParallelTopology<'a, C: Communicator> {
     comm: &'a C,
@@ -468,3 +462,4 @@ impl<'a, C: Communicator> Grid<'a> for ParallelGrid<'a, C> {
         false
     }
 }
+*/
