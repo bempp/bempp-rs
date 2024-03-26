@@ -1,4 +1,4 @@
-use bempp::grid::single_element_grid::SerialSingleElementGridBuilder;
+use bempp::grid::single_element_grid::SingleElementGridBuilder;
 use bempp::traits::{
     grid::{Builder, CellType, GeometryType, GridType, PointType},
     types::ReferenceCellType,
@@ -15,8 +15,7 @@ extern crate lapack_src;
 fn main() {
     // When creating the grid builder, we give the physical/geometric dimension (3) and the cell type
     // and degree of the element
-    let mut b =
-        SerialSingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
+    let mut b = SingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Quadrilateral, 1));
     // Add six points with ids 0 to 5
     b.add_point(0, [0.0, 0.0, 0.0]);
     b.add_point(1, [1.0, 0.0, 0.0]);

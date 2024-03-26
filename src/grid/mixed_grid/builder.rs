@@ -1,8 +1,7 @@
 //! Grid builder
 
 use crate::element::ciarlet::lagrange;
-use crate::grid::mixed_grid::grid::SerialMixedGrid;
-use crate::grid::traits_impl::WrappedGrid;
+use crate::grid::mixed_grid::grid::MixedGrid;
 use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::grid::Builder;
 use crate::traits::types::ReferenceCellType;
@@ -15,7 +14,7 @@ use rlst::{
 use std::collections::HashMap;
 
 /// Grid builder for a mixed grid
-pub struct SerialMixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
+pub struct MixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
     elements_to_npoints: HashMap<(ReferenceCellType, usize), usize>,
     points: Vec<T>,
     cells: Vec<usize>,
@@ -27,12 +26,11 @@ pub struct SerialMixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real 
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM>
-    for SerialMixedGridBuilder<GDIM, T>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM> for MixedGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    type GridType = WrappedGrid<SerialMixedGrid<T>>;
+    type GridType = MixedGrid<T>;
     type T = T;
     type CellData = (Vec<usize>, ReferenceCellType, usize);
     type GridMetadata = ();
@@ -99,16 +97,14 @@ where
         let npts = self.point_indices_to_ids.len();
         let mut points = rlst_dynamic_array2!(T, [npts, 3]);
         points.fill_from(rlst_array_from_slice2!(T, &self.points, [npts, 3], [3, 1]));
-        WrappedGrid {
-            grid: SerialMixedGrid::new(
-                points,
-                &self.cells,
-                &self.cell_types,
-                &self.cell_degrees,
-                self.point_indices_to_ids,
-                self.point_ids_to_indices,
-                self.cell_indices_to_ids,
-            ),
-        }
+        MixedGrid::new(
+            points,
+            &self.cells,
+            &self.cell_types,
+            &self.cell_degrees,
+            self.point_indices_to_ids,
+            self.point_ids_to_indices,
+            self.cell_indices_to_ids,
+        )
     }
 }

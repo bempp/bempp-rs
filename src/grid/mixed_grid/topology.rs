@@ -26,7 +26,7 @@ fn all_in<T: Eq>(a: &[T], b: &[T]) -> bool {
 type IndexType = (ReferenceCellType, usize);
 
 /// Topology of a mixed grid
-pub struct SerialMixedTopology {
+pub struct MixedTopology {
     dim: usize,
     index_map: Vec<IndexType>,
     reverse_index_map: HashMap<IndexType, usize>,
@@ -42,9 +42,9 @@ pub struct SerialMixedTopology {
     cell_ids_to_indices: HashMap<usize, IndexType>,
 }
 
-unsafe impl Sync for SerialMixedTopology {}
+unsafe impl Sync for MixedTopology {}
 
-impl SerialMixedTopology {
+impl MixedTopology {
     /// Create a topology
     pub fn new(
         cells_input: &[usize],
@@ -234,7 +234,7 @@ impl SerialMixedTopology {
     }
 }
 
-impl Topology for SerialMixedTopology {
+impl Topology for MixedTopology {
     type IndexType = IndexType;
 
     fn dim(&self) -> usize {
@@ -391,9 +391,9 @@ impl Topology for SerialMixedTopology {
 mod test {
     use super::*;
 
-    fn example_topology() -> SerialMixedTopology {
+    fn example_topology() -> MixedTopology {
         //! A topology with a single cell type
-        SerialMixedTopology::new(
+        MixedTopology::new(
             &[0, 1, 2, 2, 1, 3],
             &[ReferenceCellType::Triangle; 2],
             &[0, 1, 2, 3],
@@ -401,9 +401,9 @@ mod test {
         )
     }
 
-    fn example_topology_mixed() -> SerialMixedTopology {
+    fn example_topology_mixed() -> MixedTopology {
         //! A topology with a mixture of cell types
-        SerialMixedTopology::new(
+        MixedTopology::new(
             &[0, 1, 2, 3, 1, 4, 3],
             &[
                 ReferenceCellType::Quadrilateral,

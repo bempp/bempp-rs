@@ -8,5 +8,5 @@ mod grid;
 mod io;
 mod topology;
 
-pub use self::builder::SerialMixedGridBuilder;
-pub use self::grid::SerialMixedGrid;
+pub use self::builder::MixedGridBuilder;
+pub use self::grid::MixedGrid;

@@ -3,7 +3,7 @@
 use crate::element::ciarlet::lagrange;
 use crate::element::reference_cell;
 use crate::grid::single_element_grid::{
-    geometry::SerialSingleElementGeometry, topology::SerialSingleElementTopology,
+    geometry::SingleElementGeometry, topology::SingleElementTopology,
 };
 use crate::grid::traits::Grid;
 use crate::traits::element::{Continuity, FiniteElement};
@@ -18,12 +18,12 @@ use rlst::{
 use std::collections::HashMap;
 
 /// A single element grid
-pub struct SerialSingleElementGrid<T: Float + RlstScalar<Real = T>> {
-    topology: SerialSingleElementTopology,
-    pub(crate) geometry: SerialSingleElementGeometry<T>,
+pub struct SingleElementGrid<T: Float + RlstScalar<Real = T>> {
+    topology: SingleElementTopology,
+    pub(crate) geometry: SingleElementGeometry<T>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> SerialSingleElementGrid<T>
+impl<T: Float + RlstScalar<Real = T>> SingleElementGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -54,13 +54,13 @@ where
             start += npoints;
         }
 
-        let topology = SerialSingleElementTopology::new(
+        let topology = SingleElementTopology::new(
             &cell_vertices,
             cell_type,
             &point_indices_to_ids,
             &cell_indices_to_ids,
         );
-        let geometry = SerialSingleElementGeometry::<T>::new(
+        let geometry = SingleElementGeometry::<T>::new(
             points,
             cells,
             element,
@@ -73,10 +73,10 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Grid for SerialSingleElementGrid<T> {
+impl<T: Float + RlstScalar<Real = T>> Grid for SingleElementGrid<T> {
     type T = T;
-    type Topology = SerialSingleElementTopology;
-    type Geometry = SerialSingleElementGeometry<T>;
+    type Topology = SingleElementTopology;
+    type Geometry = SingleElementGeometry<T>;
 
     fn topology(&self) -> &Self::Topology {
         &self.topology

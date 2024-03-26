@@ -19,7 +19,7 @@ use rlst::{
 use std::collections::HashMap;
 
 /// Geometry of a single element grid
-pub struct SerialSingleElementGeometry<T: Float + RlstScalar<Real = T>> {
+pub struct SingleElementGeometry<T: Float + RlstScalar<Real = T>> {
     dim: usize,
     index_map: Vec<usize>,
     pub(crate) coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -35,9 +35,9 @@ pub struct SerialSingleElementGeometry<T: Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-unsafe impl<T: Float + RlstScalar<Real = T>> Sync for SerialSingleElementGeometry<T> {}
+unsafe impl<T: Float + RlstScalar<Real = T>> Sync for SingleElementGeometry<T> {}
 
-impl<T: Float + RlstScalar<Real = T>> SerialSingleElementGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> SingleElementGeometry<T> {
     /// Create a geometry
     pub fn new(
         coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -183,7 +183,7 @@ impl<T: Float + RlstScalar<Real = T>> SerialSingleElementGeometry<T> {
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Geometry for SerialSingleElementGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> Geometry for SingleElementGeometry<T> {
     type IndexType = usize;
     type T = T;
     type Element = CiarletElement<T>;
@@ -275,14 +275,14 @@ impl<T: Float + RlstScalar<Real = T>> Geometry for SerialSingleElementGeometry<T
 
 /// Geometry evaluator for a single element grid
 pub struct GeometryEvaluatorSingleElement<'a, T: Float + RlstScalar<Real = T>> {
-    geometry: &'a SerialSingleElementGeometry<T>,
+    geometry: &'a SingleElementGeometry<T>,
     tdim: usize,
     table: Array<T, BaseArray<T, VectorContainer<T>, 4>, 4>,
 }
 
 impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorSingleElement<'a, T> {
     /// Create a geometry evaluator
-    fn new(geometry: &'a SerialSingleElementGeometry<T>, points: &'a [T]) -> Self {
+    fn new(geometry: &'a SingleElementGeometry<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(geometry.element.cell_type());
         assert_eq!(points.len() % tdim, 0);
         let npoints = points.len() / tdim;
@@ -344,7 +344,7 @@ mod test {
         rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut, RawAccess, RawAccessMut,
     };
 
-    fn example_geometry_2d() -> SerialSingleElementGeometry<f64> {
+    fn example_geometry_2d() -> SingleElementGeometry<f64> {
         //! A 2D geometry
         let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [4, 2]);
@@ -356,7 +356,7 @@ mod test {
         *points.get_mut([2, 1]).unwrap() = 1.0;
         *points.get_mut([3, 0]).unwrap() = 0.0;
         *points.get_mut([3, 1]).unwrap() = 1.0;
-        SerialSingleElementGeometry::new(
+        SingleElementGeometry::new(
             points,
             &[0, 1, 2, 0, 2, 3],
             p1triangle,
@@ -367,7 +367,7 @@ mod test {
         )
     }
 
-    fn example_geometry_3d() -> SerialSingleElementGeometry<f64> {
+    fn example_geometry_3d() -> SingleElementGeometry<f64> {
         //! A 3D geometry
         let p2triangle = lagrange::create(ReferenceCellType::Triangle, 2, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [9, 3]);
@@ -398,7 +398,7 @@ mod test {
         *points.get_mut([8, 0]).unwrap() = 1.0;
         *points.get_mut([8, 1]).unwrap() = 1.0;
         *points.get_mut([8, 2]).unwrap() = 0.0;
-        SerialSingleElementGeometry::new(
+        SingleElementGeometry::new(
             points,
             &[0, 2, 8, 5, 4, 1, 0, 8, 6, 7, 3, 4],
             p2triangle,
@@ -419,7 +419,7 @@ mod test {
         )
     }
 
-    fn example_geometry_quad() -> SerialSingleElementGeometry<f64> {
+    fn example_geometry_quad() -> SingleElementGeometry<f64> {
         //! A 3D quadrilateral geometry
         let p1quad = lagrange::create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [6, 3]);
@@ -441,7 +441,7 @@ mod test {
         *points.get_mut([5, 0]).unwrap() = 2.0;
         *points.get_mut([5, 1]).unwrap() = 1.0;
         *points.get_mut([5, 2]).unwrap() = 1.0;
-        SerialSingleElementGeometry::new(
+        SingleElementGeometry::new(
             points,
             &[0, 1, 3, 4, 1, 2, 4, 5],
             p1quad,

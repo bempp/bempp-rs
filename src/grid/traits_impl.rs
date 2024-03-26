@@ -4,40 +4,13 @@ use crate::element::reference_cell;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::FiniteElement;
 use crate::traits::grid::{
-    CellType, GeometryType, GmshIO, GridType, PointType, ReferenceMapType, TopologyType,
+    CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
 use crate::traits::types::{CellLocalIndexPair, ReferenceCellType};
 use num::Float;
 use rlst::RlstScalar;
 use std::iter::Copied;
 use std::marker::PhantomData;
-
-/// A grid
-pub struct WrappedGrid<GridImpl: Grid> {
-    pub(crate) grid: GridImpl,
-}
-
-impl<GridImpl: Grid> Grid for WrappedGrid<GridImpl> {
-    type T = GridImpl::T;
-    type Topology = GridImpl::Topology;
-    type Geometry = GridImpl::Geometry;
-
-    fn topology(&self) -> &Self::Topology {
-        self.grid.topology()
-    }
-    fn geometry(&self) -> &Self::Geometry {
-        self.grid.geometry()
-    }
-    fn is_serial(&self) -> bool {
-        self.grid.is_serial()
-    }
-}
-
-impl<GridImpl: Grid + GmshIO> GmshIO for WrappedGrid<GridImpl> {
-    fn to_gmsh_string(&self) -> String {
-        self.grid.to_gmsh_string()
-    }
-}
 
 /// A point
 pub struct Point<'a, T: Float + RlstScalar<Real = T>, G: Geometry> {
@@ -47,7 +20,7 @@ pub struct Point<'a, T: Float + RlstScalar<Real = T>, G: Geometry> {
 }
 /// A cell
 pub struct Cell<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
-    grid: &'a WrappedGrid<GridImpl>,
+    grid: &'a GridImpl,
     index: usize,
     _t: PhantomData<T>,
 }
@@ -64,7 +37,7 @@ pub struct CellGeometry<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
 }
 /// A reference to physical map
 pub struct ReferenceMap<'a, GridImpl: Grid> {
-    grid: &'a WrappedGrid<GridImpl>,
+    grid: &'a GridImpl,
     evaluator: <<GridImpl as Grid>::Geometry as Geometry>::Evaluator<'a>,
 }
 /// An iterator over points
@@ -112,7 +85,7 @@ impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> CellType
 where
     GridImpl: 'grid,
 {
-    type Grid = WrappedGrid<GridImpl>;
+    type Grid = GridImpl;
 
     type Topology<'a> = CellTopology<'a, GridImpl> where Self: 'a;
     type Geometry<'a> = CellGeometry<'a, T, GridImpl> where Self: 'a;
@@ -149,7 +122,7 @@ impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> TopologyType
 where
     GridImpl: 'grid,
 {
-    type Grid = WrappedGrid<GridImpl>;
+    type Grid = GridImpl;
     type VertexIndexIter<'a> = Copied<std::slice::Iter<'a, usize>>
     where
         Self: 'a;
@@ -194,7 +167,7 @@ impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GeometryType
 where
     GridImpl: 'grid,
 {
-    type Grid = WrappedGrid<GridImpl>;
+    type Grid = GridImpl;
 
     type VertexIterator<'iter> =
         PointIterator<'iter, Self::Grid, Copied<std::slice::Iter<'iter, usize>>> where Self: 'iter;
@@ -243,7 +216,7 @@ where
 impl<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> ReferenceMapType
     for ReferenceMap<'a, GridImpl>
 {
-    type Grid = WrappedGrid<GridImpl>;
+    type Grid = GridImpl;
 
     fn domain_dimension(&self) -> usize {
         self.grid.topology().dim()
@@ -270,8 +243,7 @@ impl<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> ReferenceMapTyp
     }
 }
 
-impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GridType
-    for WrappedGrid<GridImpl>
+impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GridType for GridImpl
 where
     GridImpl: 'grid,
 {
@@ -360,14 +332,14 @@ where
     }
 
     fn domain_dimension(&self) -> usize {
-        self.grid.topology().dim()
+        self.topology().dim()
     }
 
     fn physical_dimension(&self) -> usize {
-        self.grid.geometry().dim()
+        self.geometry().dim()
     }
 
     fn cell_types(&self) -> &[ReferenceCellType] {
-        self.grid.topology().cell_types()
+        self.topology().cell_types()
     }
 }

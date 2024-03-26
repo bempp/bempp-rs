@@ -18,8 +18,8 @@ use rlst::{
 };
 use std::collections::HashMap;
 
-/// Geometry of a serial grid
-pub struct SerialMixedGeometry<T: Float + RlstScalar<Real = T>> {
+/// Geometry of a mixed grid
+pub struct MixedGeometry<T: Float + RlstScalar<Real = T>> {
     dim: usize,
     index_map: Vec<(usize, usize)>,
     pub(crate) coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -35,9 +35,9 @@ pub struct SerialMixedGeometry<T: Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, (usize, usize)>,
 }
 
-unsafe impl<T: Float + RlstScalar<Real = T>> Sync for SerialMixedGeometry<T> {}
+unsafe impl<T: Float + RlstScalar<Real = T>> Sync for MixedGeometry<T> {}
 
-impl<T: Float + RlstScalar<Real = T>> SerialMixedGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> MixedGeometry<T> {
     /// Create a geometry
     pub fn new(
         coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -214,7 +214,7 @@ impl<T: Float + RlstScalar<Real = T>> SerialMixedGeometry<T> {
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Geometry for SerialMixedGeometry<T> {
+impl<T: Float + RlstScalar<Real = T>> Geometry for MixedGeometry<T> {
     type IndexType = (usize, usize);
     type T = T;
     type Element = CiarletElement<T>;
@@ -314,14 +314,14 @@ impl<T: Float + RlstScalar<Real = T>> Geometry for SerialMixedGeometry<T> {
 
 /// Geometry evaluator for a mixed grid
 pub struct GeometryEvaluatorMixed<'a, T: Float + RlstScalar<Real = T>> {
-    geometry: &'a SerialMixedGeometry<T>,
+    geometry: &'a MixedGeometry<T>,
     tdim: usize,
     tables: Vec<Array<T, BaseArray<T, VectorContainer<T>, 4>, 4>>,
 }
 
 impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorMixed<'a, T> {
     /// Create a geometry evaluator
-    fn new(geometry: &'a SerialMixedGeometry<T>, points: &'a [T]) -> Self {
+    fn new(geometry: &'a MixedGeometry<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(geometry.elements[0].cell_type());
         assert_eq!(points.len() % tdim, 0);
         let npoints = points.len() / tdim;
@@ -391,7 +391,7 @@ mod test {
     use approx::*;
     use rlst::{rlst_dynamic_array2, RandomAccessMut};
 
-    fn example_geometry() -> SerialMixedGeometry<f64> {
+    fn example_geometry() -> MixedGeometry<f64> {
         //! A geometry with a single cell type
         let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let mut points = rlst_dynamic_array2!(f64, [4, 2]);
@@ -403,7 +403,7 @@ mod test {
         *points.get_mut([2, 1]).unwrap() = 1.0;
         *points.get_mut([3, 0]).unwrap() = 0.0;
         *points.get_mut([3, 1]).unwrap() = 1.0;
-        SerialMixedGeometry::new(
+        MixedGeometry::new(
             points,
             &[0, 1, 2, 0, 2, 3],
             vec![p1triangle],
@@ -414,7 +414,7 @@ mod test {
         )
     }
 
-    fn example_geometry_mixed() -> SerialMixedGeometry<f64> {
+    fn example_geometry_mixed() -> MixedGeometry<f64> {
         //! A geometry with a mixture of cell types
         let p1triangle = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
         let p1quad = lagrange::create(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
@@ -429,7 +429,7 @@ mod test {
         *points.get_mut([3, 1]).unwrap() = 1.0;
         *points.get_mut([4, 0]).unwrap() = 2.0;
         *points.get_mut([4, 1]).unwrap() = 0.0;
-        SerialMixedGeometry::new(
+        MixedGeometry::new(
             points,
             &[0, 1, 2, 3, 1, 4, 3],
             vec![p1quad, p1triangle],

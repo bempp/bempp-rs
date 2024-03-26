@@ -23,7 +23,7 @@ fn all_in<T: Eq>(a: &[T], b: &[T]) -> bool {
 }
 
 /// Topology of a single element grid
-pub struct SerialSingleElementTopology {
+pub struct SingleElementTopology {
     dim: usize,
     index_map: Vec<usize>,
     entities_to_vertices: Vec<Vec<Vec<usize>>>,
@@ -37,9 +37,9 @@ pub struct SerialSingleElementTopology {
     cell_types: [ReferenceCellType; 1],
 }
 
-unsafe impl Sync for SerialSingleElementTopology {}
+unsafe impl Sync for SingleElementTopology {}
 
-impl SerialSingleElementTopology {
+impl SingleElementTopology {
     /// Create a topology
     pub fn new(
         cells_input: &[usize],
@@ -147,7 +147,7 @@ impl SerialSingleElementTopology {
     }
 }
 
-impl Topology for SerialSingleElementTopology {
+impl Topology for SingleElementTopology {
     type IndexType = usize;
 
     fn dim(&self) -> usize {
@@ -267,9 +267,9 @@ impl Topology for SerialSingleElementTopology {
 mod test {
     use super::*;
 
-    fn example_topology() -> SerialSingleElementTopology {
+    fn example_topology() -> SingleElementTopology {
         //! An example topology
-        SerialSingleElementTopology::new(
+        SingleElementTopology::new(
             &[0, 1, 2, 2, 1, 3],
             ReferenceCellType::Triangle,
             &[0, 1, 2, 3],

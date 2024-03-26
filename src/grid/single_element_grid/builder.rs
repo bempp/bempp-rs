@@ -1,8 +1,7 @@
 //! Grid builder
 
 use crate::element::ciarlet::lagrange;
-use crate::grid::single_element_grid::grid::SerialSingleElementGrid;
-use crate::grid::traits_impl::WrappedGrid;
+use crate::grid::single_element_grid::grid::SingleElementGrid;
 use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::grid::Builder;
 use crate::traits::types::ReferenceCellType;
@@ -15,7 +14,7 @@ use rlst::{
 use std::collections::HashMap;
 
 /// Grid builder for a single element grid
-pub struct SerialSingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
+pub struct SingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
     element_data: (ReferenceCellType, usize),
     points_per_cell: usize,
     points: Vec<T>,
@@ -27,11 +26,11 @@ pub struct SerialSingleElementGridBuilder<const GDIM: usize, T: Float + RlstScal
 }
 
 impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM>
-    for SerialSingleElementGridBuilder<GDIM, T>
+    for SingleElementGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
-    type GridType = WrappedGrid<SerialSingleElementGrid<T>>;
+    type GridType = SingleElementGrid<T>;
     type T = T;
     type CellData = Vec<usize>;
     type GridMetadata = (ReferenceCellType, usize);
@@ -86,17 +85,15 @@ where
         let npts = self.point_indices_to_ids.len();
         let mut points = rlst_dynamic_array2!(T, [npts, 3]);
         points.fill_from(rlst_array_from_slice2!(T, &self.points, [npts, 3], [3, 1]));
-        WrappedGrid {
-            grid: SerialSingleElementGrid::new(
-                points,
-                &self.cells,
-                self.element_data.0,
-                self.element_data.1,
-                self.point_indices_to_ids,
-                self.point_ids_to_indices,
-                self.cell_indices_to_ids,
-                self.cell_ids_to_indices,
-            ),
-        }
+        SingleElementGrid::new(
+            points,
+            &self.cells,
+            self.element_data.0,
+            self.element_data.1,
+            self.point_indices_to_ids,
+            self.point_ids_to_indices,
+            self.cell_indices_to_ids,
+            self.cell_ids_to_indices,
+        )
     }
 }
