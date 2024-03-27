@@ -1,35 +1,38 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
-fn test_parallel_flat_triangle_grid() {
-    use approx::assert_relative_eq;
-    use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
-    use bempp::traits::{
-        grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
-        types::Ownership,
-    };
-    use mpi::{
-        environment::Universe,
-        request::WaitGuard,
-        traits::{Communicator, Destination, Source},
-    };
-    use std::collections::HashMap;
+use approx::assert_relative_eq;
+#[cfg(feature = "mpi")]
+use bempp::{grid::{flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder}, parallel_grid::ParallelGrid},
+traits::{
+    grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
+    element::Continuity, 
+    types::Ownership,
+},
+    element::ciarlet::LagrangeElementFamily,
+    bem::{function_space::{SerialFunctionSpace, ParallelFunctionSpace}, assembly::batched, assembly::batched::BatchedAssembler},
+    
+};
+#[cfg(feature = "mpi")]
+use mpi::{
+    environment::Universe,
+    request::WaitGuard,
+    traits::{Communicator, Destination, Source},
+};
+#[cfg(feature = "mpi")]
+use std::collections::HashMap;
 
-    extern crate blas_src;
-    extern crate lapack_src;
+extern crate blas_src;
+extern crate lapack_src;
 
-    // Setup an MPI environment
-    let universe: Universe = mpi::initialize().unwrap();
-    let world = universe.world();
-
-    let rank = world.rank();
-    let size = world.size();
-
-    let n = 10;
+#[cfg(feature = "mpi")]
+fn example_flat_triangle_grid<'a, C: Communicator>(comm: &'a C, n: usize) -> ParallelGrid<'a, C, FlatTriangleGrid<f64>> {
+    let rank = comm.rank();
+    let size = comm.size();
 
     let mut b = FlatTriangleGridBuilder::<f64>::new(());
 
-    let grid = if rank == 0 {
+    if rank == 0 {
         for y in 0..n {
             for x in 0..n {
                 b.add_point(
@@ -66,10 +69,19 @@ fn test_parallel_flat_triangle_grid() {
                 c += 1;
             }
         }
-        b.create_parallel_grid(&world, &owners)
+        b.create_parallel_grid(comm, &owners)
     } else {
-        b.receive_parallel_grid(&world, 0)
-    };
+        b.receive_parallel_grid(comm, 0)
+    }
+}
+
+#[cfg(feature = "mpi")]
+fn test_parallel_flat_triangle_grid<C: Communicator>(comm: &C) {
+    let rank = comm.rank();
+    let size = comm.size();
+
+    let n = 10;
+    let grid = example_flat_triangle_grid(comm, n);
 
     let mut area = 0.0;
     for cell in grid.iter_all_cells() {
@@ -79,11 +91,11 @@ fn test_parallel_flat_triangle_grid() {
     }
     if rank != 0 {
         mpi::request::scope(|scope| {
-            let _sreq2 = WaitGuard::from(world.process_at_rank(0).immediate_send(scope, &area));
+            let _sreq2 = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, &area));
         });
     } else {
         for p in 1..size {
-            let (a, _status) = world.process_at_rank(p).receive::<f64>();
+            let (a, _status) = comm.process_at_rank(p).receive::<f64>();
             area += a;
         }
         assert_relative_eq!(area, 1.0, max_relative = 1e-10);
@@ -98,11 +110,11 @@ fn test_parallel_flat_triangle_grid() {
     if rank != 0 {
         mpi::request::scope(|scope| {
             let _sreq2 =
-                WaitGuard::from(world.process_at_rank(0).immediate_send(scope, &nvertices));
+                WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, &nvertices));
         });
     } else {
         for p in 1..size {
-            let (nv, _status) = world.process_at_rank(p).receive::<usize>();
+            let (nv, _status) = comm.process_at_rank(p).receive::<usize>();
             nvertices += nv;
         }
         assert_eq!(nvertices, n * n);
@@ -110,8 +122,37 @@ fn test_parallel_flat_triangle_grid() {
 }
 
 #[cfg(feature = "mpi")]
+fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
+    let rank = comm.rank();
+    let size = comm.size();
+
+    let grid = example_flat_triangle_grid(comm, 10);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let space = ParallelFunctionSpace::new(&grid, &element);
+
+    let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+
+    println!("[{rank}] Lagrange single layer matrix (singular part) as CSR matrix");
+    let singular_sparse_matrix = a.assemble_singular_into_csr(&space, &space);
+    println!("[{rank}] indices: {:?}", singular_sparse_matrix.indices());
+    println!("[{rank}] indptr: {:?}", singular_sparse_matrix.indptr());
+    println!("[{rank}] data: {:?}", singular_sparse_matrix.data());
+    println!();
+}
+
+#[cfg(feature = "mpi")]
 fn main() {
-    test_parallel_flat_triangle_grid()
+    let universe: Universe = mpi::initialize().unwrap();
+    let world = universe.world();
+    let rank = world.rank();
+    if rank == 1 {
+        println!("Testing FlatTriangleGrid in parallel.");
+    }
+    test_parallel_flat_triangle_grid(&world);
+    if rank == 1 {
+        println!("Testing assembly using FlatTriangleGrid in parallel.");
+    }
+    test_parallel_assembly_flat_triangle_grid(&world);
 }
 #[cfg(not(feature = "mpi"))]
 fn main() {}
