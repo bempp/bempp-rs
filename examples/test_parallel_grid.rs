@@ -1,7 +1,7 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
-fn test_parallel_grid() {
+fn test_parallel_flat_triangle_grid() {
     use approx::assert_relative_eq;
     use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
     use bempp::traits::{
@@ -111,7 +111,7 @@ fn test_parallel_grid() {
 
 #[cfg(feature = "mpi")]
 fn main() {
-    test_parallel_grid()
+    test_parallel_flat_triangle_grid()
 }
 #[cfg(not(feature = "mpi"))]
 fn main() {}
