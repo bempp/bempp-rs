@@ -6,8 +6,8 @@ use std::collections::HashMap;
 
 /// Parallel grid
 pub struct ParallelGrid<'comm, C: Communicator, G: Grid> {
-    comm: &'comm C,
-    serial_grid: G,
+    pub(crate) comm: &'comm C,
+    pub(crate) serial_grid: G,
     vertex_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
     cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
 }
@@ -26,11 +26,6 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             vertex_ownership,
             cell_ownership,
         }
-    }
-
-    /// The MPI communicator
-    pub fn comm(&self) -> &C {
-        self.comm
     }
 }
 

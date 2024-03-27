@@ -3,15 +3,21 @@
 #[cfg(feature = "mpi")]
 use approx::assert_relative_eq;
 #[cfg(feature = "mpi")]
-use bempp::{grid::{flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder}, parallel_grid::ParallelGrid},
-traits::{
-    grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
-    element::Continuity, 
-    types::Ownership,
-},
+use bempp::{
+    bem::{
+        assembly::batched, assembly::batched::BatchedAssembler,
+        function_space::ParallelFunctionSpace,
+    },
     element::ciarlet::LagrangeElementFamily,
-    bem::{function_space::{SerialFunctionSpace, ParallelFunctionSpace}, assembly::batched, assembly::batched::BatchedAssembler},
-    
+    grid::{
+        flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
+        parallel_grid::ParallelGrid,
+    },
+    traits::{
+        element::Continuity,
+        grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
+        types::Ownership,
+    },
 };
 #[cfg(feature = "mpi")]
 use mpi::{
@@ -26,7 +32,10 @@ extern crate blas_src;
 extern crate lapack_src;
 
 #[cfg(feature = "mpi")]
-fn example_flat_triangle_grid<'a, C: Communicator>(comm: &'a C, n: usize) -> ParallelGrid<'a, C, FlatTriangleGrid<f64>> {
+fn example_flat_triangle_grid<C: Communicator>(
+    comm: &C,
+    n: usize,
+) -> ParallelGrid<'_, C, FlatTriangleGrid<f64>> {
     let rank = comm.rank();
     let size = comm.size();
 
@@ -109,8 +118,7 @@ fn test_parallel_flat_triangle_grid<C: Communicator>(comm: &C) {
     }
     if rank != 0 {
         mpi::request::scope(|scope| {
-            let _sreq2 =
-                WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, &nvertices));
+            let _sreq2 = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, &nvertices));
         });
     } else {
         for p in 1..size {
@@ -124,7 +132,6 @@ fn test_parallel_flat_triangle_grid<C: Communicator>(comm: &C) {
 #[cfg(feature = "mpi")]
 fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
     let rank = comm.rank();
-    let size = comm.size();
 
     let grid = example_flat_triangle_grid(comm, 10);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
@@ -133,7 +140,8 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
     let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
 
     println!("[{rank}] Lagrange single layer matrix (singular part) as CSR matrix");
-    let singular_sparse_matrix = a.assemble_singular_into_csr(&space, &space);
+    let singular_sparse_matrix =
+        a.assemble_singular_into_csr(space.local_space(), space.local_space());
     println!("[{rank}] indices: {:?}", singular_sparse_matrix.indices());
     println!("[{rank}] indptr: {:?}", singular_sparse_matrix.indptr());
     println!("[{rank}] data: {:?}", singular_sparse_matrix.data());

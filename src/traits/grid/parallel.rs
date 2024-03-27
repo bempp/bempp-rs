@@ -24,3 +24,17 @@ pub trait ParallelBuilder<const GDIM: usize>: Builder<GDIM> {
         root_process: usize,
     ) -> Self::ParallelGridType<'_, C>;
 }
+
+pub trait ParallelGridType: GridType {
+    //! An MPI parallelised grid
+    /// The MPI communicator type
+    type Comm: Communicator;
+    /// The type of the subgrid on each process
+    type LocalGridType: GridType<T = <Self as GridType>::T>;
+
+    /// The MPI communicator
+    fn comm(&self) -> &Self::Comm;
+
+    /// The subgrid on the process
+    fn local_grid(&self) -> &Self::LocalGridType;
+}
