@@ -1,7 +1,7 @@
 //! Traits used in the implementation of a grid
 
 use crate::traits::element::FiniteElement;
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
+use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use num::Float;
 use rlst::RlstScalar;
 use std::hash::Hash;
@@ -57,8 +57,11 @@ pub trait Topology {
     /// Get the indices of the vertices that are connect to theentity with dimension `dim` and index `index`
     fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]>;
 
-    /// Get the ownership of a mesh entity
-    fn entity_ownership(&self, dim: usize, index: Self::IndexType) -> Ownership;
+    /// Get the ownership of a cell
+    fn cell_ownership(&self, index: Self::IndexType) -> Ownership;
+
+    /// Get the ownership of a vertex
+    fn vertex_ownership(&self, index: Self::IndexType) -> Ownership;
 
     /// Get the id of a vertex from its index
     fn vertex_index_to_id(&self, index: Self::IndexType) -> usize;

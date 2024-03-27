@@ -5,9 +5,19 @@ fn test_parallel_grid() {
     use approx::*;
     //use bempp::grid::parallel_grid::ParallelGrid;
     use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
-    use bempp::traits::{types::{ReferenceCellType, Ownership}, grid::{Builder, GridType, CellType, GeometryType, PointType}};
-    use mpi::{environment::Universe, request::WaitGuard, topology::Communicator, traits::*};
+    use bempp::traits::{
+        grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
+        types::Ownership,
+    };
+    use mpi::{
+        environment::Universe,
+        request::WaitGuard,
+        traits::{Communicator, Destination, Source},
+    };
     use std::collections::HashMap;
+
+    extern crate blas_src;
+    extern crate lapack_src;
 
     // Setup an MPI environment
     let universe: Universe = mpi::initialize().unwrap();
@@ -23,15 +33,24 @@ fn test_parallel_grid() {
     let grid = if rank == 0 {
         for y in 0..n {
             for x in 0..n {
-                b.add_point(y * n + x, [x as f64 / (n - 1) as f64, y as f64 / (n - 1) as f64, 0.0]);
+                b.add_point(
+                    y * n + x,
+                    [x as f64 / (n - 1) as f64, y as f64 / (n - 1) as f64, 0.0],
+                );
             }
         }
 
         let ncells = 2 * (n - 1).pow(2);
         for i in 0..n - 1 {
             for j in 0..n - 1 {
-                b.add_cell(2 * i * (n - 1) + j, [j * n + i, j * n + i + 1, j * n + i + n + 1]);
-                b.add_cell(2 * i * (n - 1) + j + 1, [j * n + i, j * n + i + n + 1, j * n + i + n]);
+                b.add_cell(
+                    2 * i * (n - 1) + j,
+                    [j * n + i, j * n + i + 1, j * n + i + n + 1],
+                );
+                b.add_cell(
+                    2 * i * (n - 1) + j + 1,
+                    [j * n + i, j * n + i + n + 1, j * n + i + n],
+                );
             }
         }
 
@@ -50,12 +69,12 @@ fn test_parallel_grid() {
         }
         b.create_parallel_grid(&world, &owners)
     } else {
-        b.create_parallel_grid_receive(&world)
+        b.receive_parallel_grid(&world, 0)
     };
 
     let mut area = 0.0;
     for cell in grid.iter_all_cells() {
-        if Ownership::Owned == Ownership::Owned {
+        if cell.ownership() == Ownership::Owned {
             area += cell.geometry().volume();
         }
     }
@@ -72,8 +91,8 @@ fn test_parallel_grid() {
     }
 
     let mut nvertices = 0;
-    for v in grid.iter_all_points() {
-        if v.ownership() == Ownership::Owned {
+    for v in 0..grid.number_of_vertices() {
+        if grid.vertex_from_index(v).ownership() == Ownership::Owned {
             nvertices += 1
         }
     }

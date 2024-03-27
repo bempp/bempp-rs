@@ -3,20 +3,19 @@
 use crate::grid::flat_triangle_grid::grid::FlatTriangleGrid;
 use crate::traits::grid::Builder;
 use num::Float;
-use rlst::RlstScalar;
 use rlst::{
-    dense::array::{views::ArrayViewMut, Array},
-    rlst_array_from_slice2, rlst_dynamic_array2, BaseArray, MatrixInverse, VectorContainer,
+    dense::array::views::ArrayViewMut, rlst_array_from_slice2, rlst_dynamic_array2, Array,
+    BaseArray, MatrixInverse, RlstScalar, VectorContainer,
 };
 use std::collections::HashMap;
 
 /// Grid builder for a flat triangle grid
 pub struct FlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
     pub(crate) points: Vec<T>,
-    cells: Vec<usize>,
-    point_indices_to_ids: Vec<usize>,
+    pub(crate) cells: Vec<usize>,
+    pub(crate) point_indices_to_ids: Vec<usize>,
     point_ids_to_indices: HashMap<usize, usize>,
-    cell_indices_to_ids: Vec<usize>,
+    pub(crate) cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 

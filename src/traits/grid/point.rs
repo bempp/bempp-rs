@@ -1,7 +1,7 @@
 //! Definition of a vertex
 
-use rlst::RlstScalar;
 use crate::traits::types::Ownership;
+use rlst::RlstScalar;
 
 pub trait PointType {
     //! A point

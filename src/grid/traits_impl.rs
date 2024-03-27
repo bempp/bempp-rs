@@ -6,7 +6,7 @@ use crate::traits::element::FiniteElement;
 use crate::traits::grid::{
     CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
+use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use num::Float;
 use rlst::RlstScalar;
 use std::iter::Copied;
@@ -16,6 +16,15 @@ use std::marker::PhantomData;
 pub struct Point<'a, T: Float + RlstScalar<Real = T>, G: Geometry> {
     geometry: &'a G,
     index: usize,
+    _t: PhantomData<T>,
+}
+/// A vertex
+pub struct Vertex<'a, T: Float + RlstScalar<Real = T>, G: Geometry, Top: Topology> {
+    geometry: &'a G,
+    topology: &'a Top,
+    index: usize,
+    gindex: usize,
+    tindex: Top::IndexType,
     _t: PhantomData<T>,
 }
 /// A cell
@@ -82,7 +91,27 @@ impl<'a, T: Float + RlstScalar<Real = T>, G: Geometry<T = T>> PointType for Poin
         // TODO
         Ownership::Owned
     }
+}
 
+impl<'a, T: Float + RlstScalar<Real = T>, G: Geometry<T = T>, Top: Topology> PointType
+    for Vertex<'a, T, G, Top>
+{
+    type T = T;
+    fn coords(&self, data: &mut [Self::T]) {
+        assert_eq!(data.len(), self.geometry.dim());
+        for (dim, d) in data.iter_mut().enumerate() {
+            *d = *self.geometry.coordinate(self.gindex, dim).unwrap();
+        }
+    }
+    fn index(&self) -> usize {
+        self.index
+    }
+    fn id(&self) -> usize {
+        self.topology.vertex_index_to_id(self.tindex)
+    }
+    fn ownership(&self) -> Ownership {
+        self.topology.vertex_ownership(self.tindex)
+    }
 }
 
 impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> CellType
@@ -119,6 +148,12 @@ where
             index: self.grid.geometry().index_map()[self.index],
             _t: PhantomData,
         }
+    }
+
+    fn ownership(&self) -> Ownership {
+        self.grid
+            .topology()
+            .cell_ownership(self.grid.topology().index_map()[self.index])
     }
 }
 
@@ -259,6 +294,7 @@ where
         Self: 'a;
 
     type Point<'a> = Point<'a, T, GridImpl::Geometry> where Self: 'a;
+    type Vertex<'a> = Vertex<'a, T, GridImpl::Geometry, GridImpl::Topology> where Self: 'a;
     type Cell<'a> = Cell<'a, T, GridImpl> where Self: 'a;
 
     fn number_of_points(&self) -> usize {
@@ -281,6 +317,15 @@ where
         index
     }
 
+    fn vertex_index_from_id(&self, id: usize) -> usize {
+        self.topology()
+            .vertex_index_to_flat_index(self.topology().vertex_id_to_index(id))
+    }
+    fn vertex_id_from_index(&self, index: usize) -> usize {
+        self.topology()
+            .vertex_index_to_id(self.topology().vertex_flat_index_to_index(index))
+    }
+
     fn cell_index_from_id(&self, id: usize) -> usize {
         id
     }
@@ -292,6 +337,17 @@ where
         Self::Point {
             geometry: self.geometry(),
             index,
+            _t: PhantomData,
+        }
+    }
+
+    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_> {
+        Self::Vertex {
+            geometry: self.geometry(),
+            topology: self.topology(),
+            index,
+            gindex: self.point_index_from_id(self.vertex_id_from_index(index)),
+            tindex: self.topology().vertex_flat_index_to_index(index),
             _t: PhantomData,
         }
     }

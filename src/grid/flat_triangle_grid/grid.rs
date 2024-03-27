@@ -5,7 +5,7 @@ use crate::element::reference_cell;
 use crate::grid::common::compute_diameter_triangle;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
+use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use num::Float;
 use rlst::rlst_static_array;
 use rlst::rlst_static_type;
@@ -393,7 +393,10 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
+    fn cell_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
+    }
+    fn vertex_ownership(&self, _index: usize) -> Ownership {
         Ownership::Owned
     }
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {

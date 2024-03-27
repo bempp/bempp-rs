@@ -2,7 +2,7 @@
 
 use crate::element::reference_cell;
 use crate::grid::traits::Topology;
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
+use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 
 use std::collections::HashMap;
 
@@ -280,7 +280,10 @@ impl Topology for MixedTopology {
         &self.entity_types[dim]
     }
 
-    fn entity_ownership(&self, _dim: usize, _index: IndexType) -> Ownership {
+    fn cell_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
+        Ownership::Owned
+    }
+    fn vertex_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
         Ownership::Owned
     }
 

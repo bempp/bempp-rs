@@ -15,6 +15,12 @@ pub trait GridType: std::marker::Sized {
     type Point<'a>: PointType
     where
         Self: 'a;
+    /// The type used for a vertex
+    ///
+    /// Vertices are the points that are at the vertex of a cell in the grid
+    type Vertex<'a>: PointType
+    where
+        Self: 'a;
     /// The type used for a cell
     type Cell<'a>: CellType<Grid = Self>
     where
@@ -46,6 +52,12 @@ pub trait GridType: std::marker::Sized {
     /// Get the id of a point from its index
     fn point_id_from_index(&self, index: usize) -> usize;
 
+    /// Get the index of a vertex from its id
+    fn vertex_index_from_id(&self, id: usize) -> usize;
+
+    /// Get the id of a vertex from its index
+    fn vertex_id_from_index(&self, index: usize) -> usize;
+
     /// Get the index of a cell from its id
     fn cell_index_from_id(&self, id: usize) -> usize;
 
@@ -54,6 +66,9 @@ pub trait GridType: std::marker::Sized {
 
     /// Get a point from its index
     fn point_from_index(&self, index: usize) -> Self::Point<'_>;
+
+    /// Get a vertex from its index
+    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_>;
 
     /// Get a cell from its index
     fn cell_from_index(&self, index: usize) -> Self::Cell<'_>;

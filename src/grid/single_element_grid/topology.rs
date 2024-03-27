@@ -2,7 +2,7 @@
 
 use crate::element::reference_cell;
 use crate::grid::traits::Topology;
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType, Ownership};
+use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use std::collections::HashMap;
 
 fn all_equal<T: Eq>(a: &[T], b: &[T]) -> bool {
@@ -185,9 +185,13 @@ impl Topology for SingleElementTopology {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn entity_ownership(&self, _dim: usize, _index: usize) -> Ownership {
+    fn cell_ownership(&self, _index: usize) -> Ownership {
         Ownership::Owned
     }
+    fn vertex_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
+    }
+
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
         if dim <= self.dim && index < self.cells_to_entities[dim].len() {
             Some(&self.cells_to_entities[dim][index])

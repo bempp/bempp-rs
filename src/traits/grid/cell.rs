@@ -1,7 +1,7 @@
 //! Definition of a cell.
 
 use super::GridType;
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::{Ownership, ReferenceCellType};
 use rlst::RlstScalar;
 
 pub trait CellType {
@@ -32,6 +32,9 @@ pub trait CellType {
 
     /// Get the cell's geometry
     fn geometry(&self) -> Self::Geometry<'_>;
+
+    /// Get the point's ownership
+    fn ownership(&self) -> Ownership;
 }
 
 pub trait TopologyType {
