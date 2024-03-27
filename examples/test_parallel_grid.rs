@@ -2,8 +2,7 @@
 
 #[cfg(feature = "mpi")]
 fn test_parallel_grid() {
-    use approx::*;
-    //use bempp::grid::parallel_grid::ParallelGrid;
+    use approx::assert_relative_eq;
     use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
     use bempp::traits::{
         grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
@@ -84,7 +83,7 @@ fn test_parallel_grid() {
         });
     } else {
         for p in 1..size {
-            let (a, _status) = world.process_at_rank(p as i32).receive::<f64>();
+            let (a, _status) = world.process_at_rank(p).receive::<f64>();
             area += a;
         }
         assert_relative_eq!(area, 1.0, max_relative = 1e-10);
@@ -103,7 +102,7 @@ fn test_parallel_grid() {
         });
     } else {
         for p in 1..size {
-            let (nv, _status) = world.process_at_rank(p as i32).receive::<usize>();
+            let (nv, _status) = world.process_at_rank(p).receive::<usize>();
             nvertices += nv;
         }
         assert_eq!(nvertices, n * n);
