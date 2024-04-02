@@ -8,8 +8,6 @@ use std::collections::HashMap;
 pub struct ParallelGrid<'comm, C: Communicator, G: Grid> {
     pub(crate) comm: &'comm C,
     pub(crate) serial_grid: G,
-    vertex_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
-    cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
 }
 
 impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
@@ -17,14 +15,10 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
     pub fn new(
         comm: &'comm C,
         serial_grid: G,
-        vertex_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
-        cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
     ) -> Self {
         Self {
             comm,
             serial_grid,
-            vertex_ownership,
-            cell_ownership,
         }
     }
 }
@@ -144,10 +138,10 @@ impl<'comm, C: Communicator, G: Grid> Topology for ParallelGrid<'comm, C, G> {
         self.serial_grid.topology().entity_vertices(dim, index)
     }
     fn cell_ownership(&self, index: Self::IndexType) -> Ownership {
-        self.cell_ownership[&index]
+        self.serial_grid.topology().cell_ownership(index)
     }
     fn vertex_ownership(&self, index: Self::IndexType) -> Ownership {
-        self.vertex_ownership[&index]
+        self.serial_grid.topology().vertex_ownership(index)
     }
     fn vertex_index_to_id(&self, index: Self::IndexType) -> usize {
         self.serial_grid.topology().vertex_index_to_id(index)
@@ -192,6 +186,10 @@ impl<'a, C: Communicator, G: Grid> Grid for ParallelGrid<'a, C, G> {
     type T = G::T;
     type Topology = Self;
     type Geometry = Self;
+
+    fn mpi_rank(&self) -> usize {
+        self.comm.rank() as usize
+    }
 
     fn topology(&self) -> &Self::Topology {
         self

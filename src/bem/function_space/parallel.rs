@@ -19,6 +19,7 @@ pub struct ParallelFunctionSpace<
 > {
     grid: &'a GridImpl,
     local_space: SerialFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>,
+    global_size: usize,
 }
 
 impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
@@ -29,9 +30,15 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         grid: &'a GridImpl,
         e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
     ) -> Self {
+
+        let comm = grid.comm();
+
+
+        let global_size = 100;
         Self {
             grid,
             local_space: SerialFunctionSpace::new(grid.local_grid(), e_family),
+            global_size,
         }
     }
     /// Get the local space on a process
@@ -66,7 +73,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> Func
             .get_global_dof_numbers(entity_dim, entity_number)
     }
     fn global_size(&self) -> usize {
-        panic!(); // TODO
+        self.global_size
     }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         self.local_space.cell_dofs(cell)

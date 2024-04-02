@@ -30,6 +30,11 @@ pub trait GridType: std::marker::Sized {
     where
         Self: 'a;
 
+    /// The MPI rank of this grid
+    ///
+    /// If the grid is stored in serial this will return 0
+    fn mpi_rank(&self) -> usize { 0 }
+
     /// The number of vertices in the grid
     ///
     /// The vertices are the points at the corners of the cell

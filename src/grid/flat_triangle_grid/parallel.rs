@@ -225,15 +225,6 @@ where
             cell_ids_to_indices.insert(*id, index);
         }
 
-        let serial_grid = FlatTriangleGrid::new(
-            coordinates,
-            cells,
-            point_ids.to_vec(),
-            point_ids_to_indices,
-            cell_ids.to_vec(),
-            cell_ids_to_indices,
-        );
-
         let mut cell_ownership = HashMap::new();
         for index in 0..ncells {
             cell_ownership.insert(
@@ -257,6 +248,18 @@ where
             );
         }
 
-        ParallelGrid::new(comm, serial_grid, vertex_ownership, cell_ownership)
+        let serial_grid = FlatTriangleGrid::new(
+            coordinates,
+            cells,
+            point_ids.to_vec(),
+            point_ids_to_indices,
+            cell_ids.to_vec(),
+            cell_ids_to_indices,
+            Some(cell_ownership),
+            Some(vertex_ownership),
+        );
+
+
+        ParallelGrid::new(comm, serial_grid)
     }
 }

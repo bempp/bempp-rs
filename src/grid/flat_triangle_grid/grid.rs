@@ -42,6 +42,10 @@ pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     point_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
+
+    // Ownership
+    pub(crate) cell_ownership: Option<HashMap<usize, Ownership>>,
+    pub(crate) vertex_ownership: Option<HashMap<usize, Ownership>>,
 }
 
 impl<T: Float + RlstScalar<Real = T>> FlatTriangleGrid<T>
@@ -56,6 +60,8 @@ where
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
+        cell_ownership: Option<HashMap<usize, Ownership>>,
+        vertex_ownership: Option<HashMap<usize, Ownership>>,
     ) -> Self {
         assert_eq!(coordinates.shape()[1], 3);
         let ncells = cells.len() / 3;
@@ -184,6 +190,7 @@ where
             point_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
+            cell_ownership, vertex_ownership,
         }
     }
 }
@@ -393,11 +400,19 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn cell_ownership(&self, _index: usize) -> Ownership {
-        Ownership::Owned
+    fn cell_ownership(&self, index: usize) -> Ownership {
+        if let Some(co) = &self.cell_ownership {
+            co[&index]
+        } else {
+            Ownership::Owned
+        }
     }
-    fn vertex_ownership(&self, _index: usize) -> Ownership {
-        Ownership::Owned
+    fn vertex_ownership(&self, index: usize) -> Ownership {
+        if let Some(vo) = &self.vertex_ownership {
+            vo[&index]
+        } else {
+            Ownership::Owned
+        }
     }
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
         if dim <= 2 && index < self.cells_to_entities[dim].len() {
