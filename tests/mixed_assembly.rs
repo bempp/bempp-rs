@@ -1,14 +1,14 @@
 use approx::*;
-use bempp::bem::assembly::{batched, batched::BatchedAssembler};
-use bempp::bem::function_space::SerialFunctionSpace;
+use bempp::assembly::{batched, batched::BatchedAssembler};
 use bempp::element::ciarlet::LagrangeElementFamily;
+use bempp::function::SerialFunctionSpace;
 use bempp::grid::{
     flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
     mixed_grid::{MixedGrid, MixedGridBuilder},
     single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
 };
 use bempp::traits::{
-    bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
+    element::Continuity, function::FunctionSpace, grid::Builder, types::ReferenceCellType,
 };
 use cauchy::c64;
 use paste::paste;
