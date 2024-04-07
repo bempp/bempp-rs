@@ -96,7 +96,7 @@ where
         // TODO: remove this transposing
         let npts = self.point_indices_to_ids.len();
         let mut points = rlst_dynamic_array2!(T, [npts, 3]);
-        points.fill_from(rlst_array_from_slice2!(T, &self.points, [npts, 3], [3, 1]));
+        points.fill_from(rlst_array_from_slice2!(&self.points, [npts, 3], [3, 1]));
         MixedGrid::new(
             points,
             &self.cells,
