@@ -9,7 +9,6 @@ use bempp::traits::{
 };
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
-use kifmm::traits::tree::Tree;
 #[cfg(not(debug_assertions))]
 use kifmm::traits::tree::Tree;
 use kifmm::traits::{fmm::Fmm, tree::FmmTree};
