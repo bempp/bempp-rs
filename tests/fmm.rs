@@ -9,6 +9,7 @@ use bempp::traits::{
 };
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
+use kifmm::traits::tree::Tree;
 #[cfg(not(debug_assertions))]
 use kifmm::traits::tree::Tree;
 use kifmm::traits::{fmm::Fmm, tree::FmmTree};
@@ -179,7 +180,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
             *temp0.get_mut([row, 0]).unwrap() += data * vec.get([*index, 0]).unwrap();
         }
 
-        let fmm = KiFmmBuilderSingleNode::new()
+        let fmm = SingleNodeBuilder::new()
             .tree(&all_points, &all_points, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -187,7 +188,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslationKiFmm::new(),
+                FftFieldTranslation::new(),
             )
             .unwrap()
             .build()
