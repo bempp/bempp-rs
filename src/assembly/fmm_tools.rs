@@ -1,10 +1,10 @@
 //! FMM tools
-use crate::bem::assembly::common::SparseMatrixData;
-use crate::bem::function_space::SerialFunctionSpace;
+use crate::assembly::common::SparseMatrixData;
+use crate::function::SerialFunctionSpace;
 use crate::grid::common::compute_dets;
 use crate::quadrature::simplex_rules::simplex_rule;
-use crate::traits::bem::FunctionSpace;
 use crate::traits::element::FiniteElement;
+use crate::traits::function::FunctionSpace;
 use crate::traits::grid::{GridType, ReferenceMapType};
 use crate::traits::types::ReferenceCellType;
 use rlst::CsrMatrix;

@@ -1,8 +1,8 @@
-use bempp::bem::assembly::{batched, batched::BatchedAssembler};
-use bempp::bem::function_space::SerialFunctionSpace;
+use bempp::assembly::{batched, batched::BatchedAssembler};
 use bempp::element::ciarlet::LagrangeElementFamily;
+use bempp::function::SerialFunctionSpace;
 use bempp::grid::shapes::regular_sphere;
-use bempp::traits::{bem::FunctionSpace, element::Continuity, types::ReferenceCellType};
+use bempp::traits::{element::Continuity, function::FunctionSpace, types::ReferenceCellType};
 use criterion::{criterion_group, criterion_main, Criterion};
 use rlst::rlst_dynamic_array2;
 

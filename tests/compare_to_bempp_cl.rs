@@ -1,10 +1,10 @@
 use approx::*;
-use bempp::bem::assembly::{batched, batched::BatchedAssembler};
-use bempp::bem::function_space::SerialFunctionSpace;
+use bempp::assembly::{batched, batched::BatchedAssembler};
 use bempp::element::ciarlet::LagrangeElementFamily;
+use bempp::function::SerialFunctionSpace;
 use bempp::grid::shapes::regular_sphere;
-use bempp::traits::bem::FunctionSpace;
 use bempp::traits::element::Continuity;
+use bempp::traits::function::FunctionSpace;
 use cauchy::c64;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 

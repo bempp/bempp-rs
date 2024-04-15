@@ -1,11 +1,11 @@
 use approx::*;
-use bempp::bem::assembly::batched::BatchedAssembler;
-use bempp::bem::assembly::{batched, fmm_tools};
-use bempp::bem::function_space::SerialFunctionSpace;
+use bempp::assembly::batched::BatchedAssembler;
+use bempp::assembly::{batched, fmm_tools};
 use bempp::element::ciarlet::LagrangeElementFamily;
+use bempp::function::SerialFunctionSpace;
 use bempp::grid::shapes::regular_sphere;
 use bempp::traits::{
-    bem::FunctionSpace, element::Continuity, grid::GridType, types::ReferenceCellType,
+    element::Continuity, function::FunctionSpace, grid::GridType, types::ReferenceCellType,
 };
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};

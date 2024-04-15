@@ -1,5 +1,5 @@
 //! Batched dense assembly
-use crate::bem::assembly::common::{RawData2D, SparseMatrixData};
+use crate::assembly::common::{RawData2D, SparseMatrixData};
 use crate::element::reference_cell;
 use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::duffy::{
@@ -7,8 +7,8 @@ use crate::quadrature::duffy::{
 };
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use crate::traits::bem::FunctionSpace;
 use crate::traits::element::FiniteElement;
+use crate::traits::function::FunctionSpace;
 use crate::traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
 use crate::traits::types::ReferenceCellType;
 use green_kernels::types::EvalType;
@@ -1249,8 +1249,8 @@ pub trait BatchedAssembler: Sync + Sized {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::bem::function_space::SerialFunctionSpace;
     use crate::element::ciarlet::LagrangeElementFamily;
+    use crate::function::SerialFunctionSpace;
     use crate::grid::shapes::regular_sphere;
     use crate::traits::element::Continuity;
     use approx::*;
