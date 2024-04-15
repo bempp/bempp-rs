@@ -3,7 +3,7 @@ use super::{
     equal_grids, BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData,
 };
 use crate::traits::{
-    bem::FunctionSpace, element::FiniteElement, grid::GridType, types::ReferenceCellType,
+    element::FiniteElement, function::FunctionSpace, grid::GridType, types::ReferenceCellType,
 };
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef};

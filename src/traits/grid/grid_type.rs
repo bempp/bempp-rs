@@ -1,9 +1,7 @@
 //! Definition of a grid
 
 use super::{CellType, PointType, ReferenceMapType};
-use crate::traits::types::cell_iterator::CellIterator;
-use crate::traits::types::point_iterator::PointIterator;
-use crate::traits::types::{CellLocalIndexPair, ReferenceCellType};
+use crate::traits::types::{CellIterator, CellLocalIndexPair, PointIterator, ReferenceCellType};
 use rlst::RlstScalar;
 
 pub trait GridType: std::marker::Sized {
