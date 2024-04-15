@@ -61,7 +61,7 @@ impl<T: Float + RlstScalar<Real = T>> SingleElementGeometry<T> {
 
         let mut mpt_table = rlst_dynamic_array4!(T, element.tabulate_array_shape(0, 1));
         element.tabulate(
-            &rlst_array_from_slice2!(T, &reference_cell::midpoint(element.cell_type()), [1, tdim]),
+            &rlst_array_from_slice2!(&reference_cell::midpoint(element.cell_type()), [1, tdim]),
             0,
             &mut mpt_table,
         );
@@ -83,7 +83,7 @@ impl<T: Float + RlstScalar<Real = T>> SingleElementGeometry<T> {
 
         let mut jdet_table = rlst_dynamic_array4!(T, element.tabulate_array_shape(1, nqpts));
         element.tabulate(
-            &rlst_array_from_slice2!(T, &qpoints, [nqpts, tdim], [tdim, 1]),
+            &rlst_array_from_slice2!(&qpoints, [nqpts, tdim], [tdim, 1]),
             1,
             &mut jdet_table,
         );
@@ -286,7 +286,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorSingleElement<'a, T> 
         let tdim = reference_cell::dim(geometry.element.cell_type());
         assert_eq!(points.len() % tdim, 0);
         let npoints = points.len() / tdim;
-        let rlst_points = rlst_array_from_slice2!(T, points, [npoints, tdim]);
+        let rlst_points = rlst_array_from_slice2!(points, [npoints, tdim]);
 
         let mut table = rlst_dynamic_array4!(T, geometry.element.tabulate_array_shape(1, npoints));
         geometry.element.tabulate(&rlst_points, 1, &mut table);

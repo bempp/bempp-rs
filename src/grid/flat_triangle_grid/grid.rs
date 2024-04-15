@@ -310,7 +310,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
         let npoints = points.len() / tdim;
         Self {
             grid,
-            points: rlst_array_from_slice2!(T, points, [npoints, tdim]),
+            points: rlst_array_from_slice2!(points, [npoints, tdim]),
         }
     }
 }
