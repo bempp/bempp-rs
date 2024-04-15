@@ -11,10 +11,9 @@ use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
 #[cfg(not(debug_assertions))]
 use kifmm::traits::tree::Tree;
-use kifmm::{
-    traits::{fmm::Fmm, tree::FmmTree},
-    FftFieldTranslation, SingleNodeBuilder,
-};
+use kifmm::traits::{fmm::Fmm, tree::FmmTree};
+use kifmm::FftFieldTranslation;
+use kifmm::SingleNodeBuilder;
 use rand::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RandomAccessMut,
