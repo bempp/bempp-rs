@@ -108,7 +108,7 @@ where
             a.cross(b.view(), normals[cell_i].view_mut());
 
             let normal_length = normals[cell_i].view().norm_2();
-            normals[cell_i].scale_in_place(T::one() / normal_length);
+            normals[cell_i].scale_inplace(T::one() / normal_length);
 
             volumes.push(normal_length / T::from(2.0).unwrap());
             diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
