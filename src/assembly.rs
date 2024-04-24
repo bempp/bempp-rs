@@ -7,15 +7,15 @@ pub mod fmm_tools;
 mod test {
     use super::batched::BatchedAssembler;
     use super::*;
-    use crate::bem::function_space::SerialFunctionSpace;
     use crate::element::ciarlet::LagrangeElementFamily;
+    use crate::function::SerialFunctionSpace;
     use crate::grid::{
         mixed_grid::{MixedGrid, MixedGridBuilder},
         shapes::regular_sphere,
         single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
     };
     use crate::traits::{
-        bem::FunctionSpace, element::Continuity, grid::Builder, types::ReferenceCellType,
+        element::Continuity, function::FunctionSpace, grid::Builder, types::ReferenceCellType,
     };
     use cauchy::{c32, c64};
     use num::Float;

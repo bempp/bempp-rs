@@ -1,9 +1,9 @@
 //! Parallel function space
 
-use crate::bem::function_space::SerialFunctionSpace;
+use crate::function::SerialFunctionSpace;
 use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
-    bem::FunctionSpace,
+    function::FunctionSpace,
     element::ElementFamily,
     grid::{GridType, ParallelGridType},
     types::ReferenceCellType,

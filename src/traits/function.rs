@@ -1,4 +1,4 @@
-//! Boundary element method traits
+//! Functions and functions spaces
 use crate::traits::element::FiniteElement;
 use crate::traits::grid::GridType;
 use crate::traits::types::ReferenceCellType;

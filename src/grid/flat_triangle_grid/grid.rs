@@ -113,7 +113,7 @@ where
             a.cross(b.view(), normals[cell_i].view_mut());
 
             let normal_length = normals[cell_i].view().norm_2();
-            normals[cell_i].scale_in_place(T::one() / normal_length);
+            normals[cell_i].scale_inplace(T::one() / normal_length);
 
             volumes.push(normal_length / T::from(2.0).unwrap());
             diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
@@ -316,7 +316,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
         let npoints = points.len() / tdim;
         Self {
             grid,
-            points: rlst_array_from_slice2!(T, points, [npoints, tdim]),
+            points: rlst_array_from_slice2!(points, [npoints, tdim]),
         }
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
-    bem::FunctionSpace,
+    function::FunctionSpace,
     element::{ElementFamily, FiniteElement},
     grid::{CellType, GridType, TopologyType},
     types::{Ownership, ReferenceCellType},

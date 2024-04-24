@@ -1,9 +1,11 @@
 //! General type definitions
-pub mod cell;
-pub mod cell_iterator;
-pub mod point_iterator;
+mod cell;
+mod cell_iterator;
+mod point_iterator;
 
-pub use cell::{CellLocalIndexPair, ReferenceCellType};
+pub use cell::*;
+pub use cell_iterator::*;
+pub use point_iterator::*;
 
 /// Ownership
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

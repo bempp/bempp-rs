@@ -4,17 +4,15 @@
 use approx::assert_relative_eq;
 #[cfg(feature = "mpi")]
 use bempp::{
-    bem::{
-        assembly::batched, assembly::batched::BatchedAssembler,
-        function_space::{ParallelFunctionSpace, SerialFunctionSpace},
-    },
+    assembly::batched, assembly::batched::BatchedAssembler,
+    function::{ParallelFunctionSpace, SerialFunctionSpace},
     element::ciarlet::LagrangeElementFamily,
     grid::{
         flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
         parallel_grid::ParallelGrid,
     },
     traits::{
-        bem::FunctionSpace,
+        function::FunctionSpace,
         element::Continuity,
         grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
         types::Ownership,
