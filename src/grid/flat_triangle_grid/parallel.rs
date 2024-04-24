@@ -259,7 +259,6 @@ where
             Some(vertex_ownership),
         );
 
-
         ParallelGrid::new(comm, serial_grid)
     }
 }

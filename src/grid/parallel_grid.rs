@@ -12,14 +12,8 @@ pub struct ParallelGrid<'comm, C: Communicator, G: Grid> {
 
 impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
     /// Create new parallel grid
-    pub fn new(
-        comm: &'comm C,
-        serial_grid: G,
-    ) -> Self {
-        Self {
-            comm,
-            serial_grid,
-        }
+    pub fn new(comm: &'comm C, serial_grid: G) -> Self {
+        Self { comm, serial_grid }
     }
 }
 

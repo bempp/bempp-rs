@@ -4,16 +4,17 @@
 use approx::assert_relative_eq;
 #[cfg(feature = "mpi")]
 use bempp::{
-    assembly::batched, assembly::batched::BatchedAssembler,
-    function::{ParallelFunctionSpace, SerialFunctionSpace},
+    assembly::batched,
+    assembly::batched::BatchedAssembler,
     element::ciarlet::LagrangeElementFamily,
+    function::{ParallelFunctionSpace, SerialFunctionSpace},
     grid::{
         flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
         parallel_grid::ParallelGrid,
     },
     traits::{
-        function::FunctionSpace,
         element::Continuity,
+        function::FunctionSpace,
         grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
         types::Ownership,
     },
@@ -25,9 +26,9 @@ use mpi::{
     traits::{Communicator, Destination, Source},
 };
 #[cfg(feature = "mpi")]
-use std::collections::HashMap;
-#[cfg(feature = "mpi")]
 use rlst::{AijIterator, CsrMatrix, Shape};
+#[cfg(feature = "mpi")]
+use std::collections::HashMap;
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -92,9 +93,7 @@ fn example_flat_triangle_grid<C: Communicator>(
 }
 
 #[cfg(feature = "mpi")]
-fn example_flat_triangle_grid_serial(
-    n: usize,
-) -> FlatTriangleGrid<f64> {
+fn example_flat_triangle_grid_serial(n: usize) -> FlatTriangleGrid<f64> {
     let mut b = FlatTriangleGridBuilder::<f64>::new(());
     create_flat_triangle_grid_data(&mut b, n);
     b.create_grid()
@@ -157,13 +156,11 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
     let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
 
     //println!("[{rank}] Lagrange single layer matrix (singular part) as CSR matrix");
-    let matrix =
-        a.assemble_singular_into_csr(space.local_space(), space.local_space());
+    let matrix = a.assemble_singular_into_csr(space.local_space(), space.local_space());
     //println!("[{rank}] indices: {:?}", singular_sparse_matrix.indices());
     //println!("[{rank}] indptr: {:?}", singular_sparse_matrix.indptr());
     //println!("[{rank}] data: {:?}", singular_sparse_matrix.data());
     //println!();
-
 
     if rank == 0 {
         // Gather sparse matrices onto process 0
@@ -173,7 +170,9 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
 
         let mut r = 0;
         for (i, index) in matrix.indices().iter().enumerate() {
-            while i < matrix.indptr()[r] { r += 1; }
+            while i < matrix.indptr()[r] {
+                r += 1;
+            }
             rows.push(r);
             cols.push(*index);
             data.push(matrix.data()[i]);
@@ -183,15 +182,28 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
             let (indices, _status) = process.receive_vec::<usize>();
             let (indptr, _status) = process.receive_vec::<usize>();
             let (subdata, _status) = process.receive_vec::<f64>();
-            let mat = CsrMatrix::new([indptr.len() + 1, indptr.len() + 1], indices, indptr, subdata);
+            let mat = CsrMatrix::new(
+                [indptr.len() + 1, indptr.len() + 1],
+                indices,
+                indptr,
+                subdata,
+            );
             for (i, index) in mat.indices().iter().enumerate() {
-                while i < mat.indptr()[r] { r += 1; }
+                while i < mat.indptr()[r] {
+                    r += 1;
+                }
                 rows.push(r);
                 cols.push(*index);
                 data.push(mat.data()[i]);
             }
         }
-        let full_matrix = CsrMatrix::from_aij([space.global_size(), space.global_size()], &rows, &cols, &data).unwrap();
+        let full_matrix = CsrMatrix::from_aij(
+            [space.global_size(), space.global_size()],
+            &rows,
+            &cols,
+            &data,
+        )
+        .unwrap();
 
         // Compare to matrix assembled on just this process
         let serial_grid = example_flat_triangle_grid_serial(10);
@@ -205,7 +217,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
             assert_eq!(i, j);
         }
         for (i, j) in full_matrix.data().iter().zip(serial_matrix.data()) {
-            assert_relative_eq!(i, j, epsilon=1e-10);
+            assert_relative_eq!(i, j, epsilon = 1e-10);
         }
     } else {
         mpi::request::scope(|scope| {
@@ -217,10 +229,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
                 comm.process_at_rank(0)
                     .immediate_send(scope, matrix.indptr()),
             );
-            let _ = WaitGuard::from(
-                comm.process_at_rank(0)
-                    .immediate_send(scope, matrix.data()),
-            );
+            let _ = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, matrix.data()));
         });
     }
 }

@@ -2,8 +2,8 @@
 
 use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
-    function::FunctionSpace,
     element::{ElementFamily, FiniteElement},
+    function::FunctionSpace,
     grid::{CellType, GridType, TopologyType},
     types::{Ownership, ReferenceCellType},
 };
@@ -23,7 +23,12 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real
 pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
     grid: &GridImpl,
     e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
-) -> (Vec<Vec<usize>>, [Vec<Vec<usize>>; 4], usize, Vec<(usize, usize, usize)>){
+) -> (
+    Vec<Vec<usize>>,
+    [Vec<Vec<usize>>; 4],
+    usize,
+    Vec<(usize, usize, usize)>,
+) {
     let mut size = 0;
     let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
     let mut owner_data = vec![];

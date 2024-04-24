@@ -197,7 +197,9 @@ pub trait Grid {
     type Geometry: Geometry<T = Self::T>;
 
     /// MPI rank
-    fn mpi_rank(&self) -> usize { 0 }
+    fn mpi_rank(&self) -> usize {
+        0
+    }
 
     /// Get the grid topology (See [Topology])
     fn topology(&self) -> &Self::Topology;

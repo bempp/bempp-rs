@@ -190,7 +190,8 @@ where
             point_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
-            cell_ownership, vertex_ownership,
+            cell_ownership,
+            vertex_ownership,
         }
     }
 }

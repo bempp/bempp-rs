@@ -1,10 +1,10 @@
 //! Parallel function space
 
-use crate::function::SerialFunctionSpace;
 use crate::element::ciarlet::CiarletElement;
+use crate::function::SerialFunctionSpace;
 use crate::traits::{
-    function::FunctionSpace,
     element::ElementFamily,
+    function::FunctionSpace,
     grid::{GridType, ParallelGridType},
     types::ReferenceCellType,
 };
@@ -30,9 +30,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         grid: &'a GridImpl,
         e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
     ) -> Self {
-
         let comm = grid.comm();
-
 
         let global_size = 100;
         Self {
