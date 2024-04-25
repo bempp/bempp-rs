@@ -4,7 +4,7 @@ use crate::element::ciarlet::CiarletElement;
 use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
 use crate::traits::{
     element::ElementFamily,
-    function::FunctionSpace,
+    function::{FunctionSpace, FunctionSpaceInParallel},
     grid::{GridType, ParallelGridType},
     types::{Ownership, ReferenceCellType},
 };
@@ -160,20 +160,28 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
             global_size,
         }
     }
-    /// Get the local space on a process
-    pub fn local_space(
+}
+
+impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> FunctionSpaceInParallel
+    for ParallelFunctionSpace<'a, T, GridImpl>
+{
+    type ParallelGrid = GridImpl;
+    type SerialSpace = SerialFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>;
+
+    /// Get the local space on the process
+    fn local_space(
         &self,
     ) -> &SerialFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType> {
         &self.local_space
     }
 
     /// Get the global DOF number associated with each local DOF
-    pub fn global_dof_numbers(&self) -> &Vec<usize> {
+    fn global_dof_numbers(&self) -> &Vec<usize> {
         &self.global_dof_numbers
     }
 
     /// Get ownership info
-    pub fn ownership(&self) -> &Vec<Ownership> {
+    fn ownership(&self) -> &Vec<Ownership> {
         &self.owners
     }
 }

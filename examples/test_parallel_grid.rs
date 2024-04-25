@@ -160,32 +160,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
 
     let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
 
-    let local_matrix = a.assemble_singular_into_csr(space.local_space(), space.local_space());
-
-    // TODO: move this mapping into a parallel_assemble_singular_into_csr function
-    let global_dof_numbers = space.global_dof_numbers();
-    let ownership = space.ownership();
-    let mut rows = vec![];
-    let mut cols = vec![];
-    let mut data = vec![];
-    let mut r = 0;
-    for (i, index) in local_matrix.indices().iter().enumerate() {
-        while i >= local_matrix.indptr()[r + 1] {
-            r += 1;
-        }
-        if ownership[*index] == Ownership::Owned {
-            rows.push(global_dof_numbers[r]);
-            cols.push(global_dof_numbers[*index]);
-            data.push(local_matrix.data()[i]);
-        }
-    }
-    let matrix = CsrMatrix::from_aij(
-        [space.global_size(), space.global_size()],
-        &rows,
-        &cols,
-        &data,
-    )
-    .unwrap();
+    let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
 
     if rank == 0 {
         // Gather sparse matrices onto process 0
