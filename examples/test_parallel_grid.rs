@@ -26,7 +26,7 @@ use mpi::{
     traits::{Communicator, Destination, Source},
 };
 #[cfg(feature = "mpi")]
-use rlst::{AijIterator, CsrMatrix, Shape};
+use rlst::CsrMatrix;
 #[cfg(feature = "mpi")]
 use std::collections::HashMap;
 
@@ -145,22 +145,44 @@ fn test_parallel_flat_triangle_grid<C: Communicator>(comm: &C) {
 }
 
 #[cfg(feature = "mpi")]
-fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
+fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
+    comm: &C,
+    degree: usize,
+    cont: Continuity,
+) {
+    let gridsize = 4;
     let rank = comm.rank();
     let size = comm.size();
 
-    let grid = example_flat_triangle_grid(comm, 10);
-    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let grid = example_flat_triangle_grid(comm, gridsize);
+    let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
     let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
 
-    //println!("[{rank}] Lagrange single layer matrix (singular part) as CSR matrix");
-    let matrix = a.assemble_singular_into_csr(space.local_space(), space.local_space());
-    //println!("[{rank}] indices: {:?}", singular_sparse_matrix.indices());
-    //println!("[{rank}] indptr: {:?}", singular_sparse_matrix.indptr());
-    //println!("[{rank}] data: {:?}", singular_sparse_matrix.data());
-    //println!();
+    let local_matrix = a.assemble_singular_into_csr(space.local_space(), space.local_space());
+
+    // TODO: move this mapping into a parallel_assemble_singular_into_csr function
+    let global_dof_numbers = space.global_dof_numbers();
+    let mut rows = vec![];
+    let mut cols = vec![];
+    let mut data = vec![];
+    let mut r = 0;
+    for (i, index) in local_matrix.indices().iter().enumerate() {
+        while i >= local_matrix.indptr()[r + 1] {
+            r += 1;
+        }
+        rows.push(global_dof_numbers[r]);
+        cols.push(global_dof_numbers[*index]);
+        data.push(local_matrix.data()[i]);
+    }
+    let matrix = CsrMatrix::from_aij(
+        [space.global_size(), space.global_size()],
+        &rows,
+        &cols,
+        &data,
+    )
+    .unwrap();
 
     if rank == 0 {
         // Gather sparse matrices onto process 0
@@ -170,7 +192,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
 
         let mut r = 0;
         for (i, index) in matrix.indices().iter().enumerate() {
-            while i < matrix.indptr()[r] {
+            while i >= matrix.indptr()[r + 1] {
                 r += 1;
             }
             rows.push(r);
@@ -182,19 +204,23 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
             let (indices, _status) = process.receive_vec::<usize>();
             let (indptr, _status) = process.receive_vec::<usize>();
             let (subdata, _status) = process.receive_vec::<f64>();
+            let (owned, _status) = process.receive_vec::<bool>();
             let mat = CsrMatrix::new(
                 [indptr.len() + 1, indptr.len() + 1],
                 indices,
                 indptr,
                 subdata,
             );
+            let mut r = 0;
             for (i, index) in mat.indices().iter().enumerate() {
-                while i < mat.indptr()[r] {
+                while i >= mat.indptr()[r + 1] {
                     r += 1;
                 }
-                rows.push(r);
-                cols.push(*index);
-                data.push(mat.data()[i]);
+                if owned[*index] {
+                    rows.push(r);
+                    cols.push(*index);
+                    data.push(mat.data()[i]);
+                }
             }
         }
         let full_matrix = CsrMatrix::from_aij(
@@ -206,7 +232,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
         .unwrap();
 
         // Compare to matrix assembled on just this process
-        let serial_grid = example_flat_triangle_grid_serial(10);
+        let serial_grid = example_flat_triangle_grid_serial(gridsize);
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
 
@@ -220,6 +246,12 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
             assert_relative_eq!(i, j, epsilon = 1e-10);
         }
     } else {
+        let mut owned = vec![false; space.global_size()];
+        for (g, o) in space.global_dof_numbers().iter().zip(space.ownership()) {
+            if *o == Ownership::Owned {
+                owned[*g] = true;
+            }
+        }
         mpi::request::scope(|scope| {
             let _ = WaitGuard::from(
                 comm.process_at_rank(0)
@@ -230,6 +262,8 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(comm: &C) {
                     .immediate_send(scope, matrix.indptr()),
             );
             let _ = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, matrix.data()));
+
+            let _ = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, &owned));
         });
     }
 }
@@ -244,9 +278,9 @@ fn main() {
     }
     test_parallel_flat_triangle_grid(&world);
     if rank == 1 {
-        println!("Testing assembly using FlatTriangleGrid in parallel.");
+        println!("Testing assembly with DP0 using FlatTriangleGrid in parallel.");
     }
-    test_parallel_assembly_flat_triangle_grid(&world);
+    test_parallel_assembly_flat_triangle_grid(&world, 0, Continuity::Discontinuous);
 }
 #[cfg(not(feature = "mpi"))]
 fn main() {}

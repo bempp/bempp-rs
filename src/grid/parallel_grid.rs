@@ -2,7 +2,6 @@
 use crate::grid::traits::{Geometry, Grid, Topology};
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use mpi::topology::Communicator;
-use std::collections::HashMap;
 
 /// Parallel grid
 pub struct ParallelGrid<'comm, C: Communicator, G: Grid> {

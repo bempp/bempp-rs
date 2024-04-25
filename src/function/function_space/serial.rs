@@ -12,12 +12,11 @@ use std::collections::HashMap;
 
 /// A serial function space
 pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
-    grid: &'a GridImpl,
-    elements: HashMap<ReferenceCellType, CiarletElement<T>>,
-    entity_dofs: [Vec<Vec<usize>>; 4],
-    cell_dofs: Vec<Vec<usize>>,
-    size: usize,
-    global_dof_numbers: Vec<usize>,
+    pub(crate) grid: &'a GridImpl,
+    pub(crate) elements: HashMap<ReferenceCellType, CiarletElement<T>>,
+    pub(crate) entity_dofs: [Vec<Vec<usize>>; 4],
+    pub(crate) cell_dofs: Vec<Vec<usize>>,
+    pub(crate) size: usize,
 }
 
 pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
@@ -94,7 +93,7 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                     for (j, k) in e_dofs.iter().enumerate() {
                         cell_dofs[cell.index()][*k] = entity_dofs[1][e][j];
                         if let Ownership::Ghost(process, index) = cell.ownership() {
-                            if process < owner_data[entity_dofs[0][e][j]].0 {
+                            if process < owner_data[entity_dofs[1][e][j]].0 {
                                 owner_data[entity_dofs[0][e][j]] = (process, index, *k);
                             }
                         }
@@ -116,7 +115,7 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                     for (j, k) in e_dofs.iter().enumerate() {
                         cell_dofs[cell.index()][*k] = entity_dofs[2][e][j];
                         if let Ownership::Ghost(process, index) = cell.ownership() {
-                            if process < owner_data[entity_dofs[0][e][j]].0 {
+                            if process < owner_data[entity_dofs[2][e][j]].0 {
                                 owner_data[entity_dofs[0][e][j]] = (process, index, *k);
                             }
                         }
@@ -150,7 +149,6 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
             entity_dofs,
             cell_dofs,
             size,
-            global_dof_numbers: (0..size).collect::<Vec<_>>(),
         }
     }
 }
@@ -172,9 +170,6 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
     }
     fn local_size(&self) -> usize {
         self.size
-    }
-    fn get_global_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        self.get_local_dof_numbers(entity_dim, entity_number)
     }
     fn global_size(&self) -> usize {
         self.local_size()
