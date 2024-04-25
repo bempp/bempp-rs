@@ -164,6 +164,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
 
     // TODO: move this mapping into a parallel_assemble_singular_into_csr function
     let global_dof_numbers = space.global_dof_numbers();
+    let ownership = space.ownership();
     let mut rows = vec![];
     let mut cols = vec![];
     let mut data = vec![];
@@ -172,9 +173,11 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
         while i >= local_matrix.indptr()[r + 1] {
             r += 1;
         }
-        rows.push(global_dof_numbers[r]);
-        cols.push(global_dof_numbers[*index]);
-        data.push(local_matrix.data()[i]);
+        if ownership[*index] == Ownership::Owned {
+            rows.push(global_dof_numbers[r]);
+            cols.push(global_dof_numbers[*index]);
+            data.push(local_matrix.data()[i]);
+        }
     }
     let matrix = CsrMatrix::from_aij(
         [space.global_size(), space.global_size()],
@@ -190,29 +193,20 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
         let mut cols = vec![];
         let mut data = vec![];
 
-        let mut owned = vec![false; space.global_size()];
-        for (g, o) in space.global_dof_numbers().iter().zip(space.ownership()) {
-            if *o == Ownership::Owned {
-                owned[*g] = true;
-            }
-        }
         let mut r = 0;
         for (i, index) in matrix.indices().iter().enumerate() {
             while i >= matrix.indptr()[r + 1] {
                 r += 1;
             }
-            if owned[*index] {
-                rows.push(r);
-                cols.push(*index);
-                data.push(matrix.data()[i]);
-            }
+            rows.push(r);
+            cols.push(*index);
+            data.push(matrix.data()[i]);
         }
         for p in 1..size {
             let process = comm.process_at_rank(p);
             let (indices, _status) = process.receive_vec::<usize>();
             let (indptr, _status) = process.receive_vec::<usize>();
             let (subdata, _status) = process.receive_vec::<f64>();
-            let (owned, _status) = process.receive_vec::<bool>();
             let mat = CsrMatrix::new(
                 [indptr.len() + 1, indptr.len() + 1],
                 indices,
@@ -225,11 +219,9 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
                 while i >= mat.indptr()[r + 1] {
                     r += 1;
                 }
-                if owned[*index] {
-                    rows.push(r);
-                    cols.push(*index);
-                    data.push(mat.data()[i]);
-                }
+                rows.push(r);
+                cols.push(*index);
+                data.push(mat.data()[i]);
             }
         }
         let full_matrix = CsrMatrix::from_aij(
@@ -255,12 +247,6 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
             assert_relative_eq!(i, j, epsilon = 1e-10);
         }
     } else {
-        let mut owned = vec![false; space.global_size()];
-        for (g, o) in space.global_dof_numbers().iter().zip(space.ownership()) {
-            if *o == Ownership::Owned {
-                owned[*g] = true;
-            }
-        }
         mpi::request::scope(|scope| {
             let _ = WaitGuard::from(
                 comm.process_at_rank(0)
@@ -271,8 +257,6 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
                     .immediate_send(scope, matrix.indptr()),
             );
             let _ = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, matrix.data()));
-
-            let _ = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, &owned));
         });
     }
 }
