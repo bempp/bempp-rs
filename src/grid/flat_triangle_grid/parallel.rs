@@ -115,35 +115,35 @@ where
             for p in 1..size {
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &points_per_proc[p][..]),
+                        .immediate_send(scope, &points_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cells_per_proc[p][..]),
+                        .immediate_send(scope, &cells_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &point_ids_per_proc[p][..]),
+                        .immediate_send(scope, &point_ids_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &vertex_owners_per_proc[p][..]),
+                        .immediate_send(scope, &vertex_owners_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &vertex_local_indices_per_proc[p][..]),
+                        .immediate_send(scope, &vertex_local_indices_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_ids_per_proc[p][..]),
+                        .immediate_send(scope, &cell_ids_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_owners_per_proc[p][..]),
+                        .immediate_send(scope, &cell_owners_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_local_indices_per_proc[p][..]),
+                        .immediate_send(scope, &cell_local_indices_per_proc[p]),
                 );
             }
         });

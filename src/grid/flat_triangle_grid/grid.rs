@@ -53,6 +53,7 @@ where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     /// Create a flat triangle grid
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         cells: &[usize],

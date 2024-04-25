@@ -150,7 +150,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
     degree: usize,
     cont: Continuity,
 ) {
-    let gridsize = 4;
+    let gridsize = 10;
     let rank = comm.rank();
     let size = comm.size();
 
@@ -190,14 +190,22 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
         let mut cols = vec![];
         let mut data = vec![];
 
+        let mut owned = vec![false; space.global_size()];
+        for (g, o) in space.global_dof_numbers().iter().zip(space.ownership()) {
+            if *o == Ownership::Owned {
+                owned[*g] = true;
+            }
+        }
         let mut r = 0;
         for (i, index) in matrix.indices().iter().enumerate() {
             while i >= matrix.indptr()[r + 1] {
                 r += 1;
             }
-            rows.push(r);
-            cols.push(*index);
-            data.push(matrix.data()[i]);
+            if owned[*index] {
+                rows.push(r);
+                cols.push(*index);
+                data.push(matrix.data()[i]);
+            }
         }
         for p in 1..size {
             let process = comm.process_at_rank(p);
@@ -211,6 +219,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
                 indptr,
                 subdata,
             );
+
             let mut r = 0;
             for (i, index) in mat.indices().iter().enumerate() {
                 while i >= mat.indptr()[r + 1] {
@@ -273,11 +282,11 @@ fn main() {
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let rank = world.rank();
-    if rank == 1 {
+    if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");
     }
     test_parallel_flat_triangle_grid(&world);
-    if rank == 1 {
+    if rank == 0 {
         println!("Testing assembly with DP0 using FlatTriangleGrid in parallel.");
     }
     test_parallel_assembly_flat_triangle_grid(&world, 0, Continuity::Discontinuous);

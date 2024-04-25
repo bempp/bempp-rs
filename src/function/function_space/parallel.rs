@@ -1,7 +1,7 @@
 //! Parallel function space
 
 use crate::element::ciarlet::CiarletElement;
-use crate::function::{function_space::serial::assign_dofs, SerialFunctionSpace};
+use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
 use crate::traits::{
     element::ElementFamily,
     function::FunctionSpace,
@@ -42,7 +42,8 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         let size = comm.size();
 
         // Create local space on current process
-        let (cell_dofs, entity_dofs, dofmap_size, owner_data) = assign_dofs(grid, e_family);
+        let (cell_dofs, entity_dofs, dofmap_size, owner_data) =
+            assign_dofs(rank as usize, grid, e_family);
 
         let mut elements = HashMap::new();
         for cell in grid.cell_types() {
@@ -101,19 +102,22 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
 
         // Communicate information about ghosts
         // send requests for ghost info
-        for (p, (gcells, gdofs)) in ghost_cells.iter().zip(&ghost_cell_dofs).enumerate() {
-            if p != rank as usize {
+        for p in 0..size {
+            if p != rank {
                 mpi::request::scope(|scope| {
-                    let process = comm.process_at_rank(p as i32);
-                    let _ = WaitGuard::from(process.immediate_send(scope, gcells));
-                    let _ = WaitGuard::from(process.immediate_send(scope, gdofs));
+                    let process = comm.process_at_rank(p);
+                    let _ =
+                        WaitGuard::from(process.immediate_send(scope, &ghost_cells[p as usize]));
+                    let _ = WaitGuard::from(
+                        process.immediate_send(scope, &ghost_cell_dofs[p as usize]),
+                    );
                 });
             }
         }
         // accept requests and send ghost info
         for p in 0..size {
             if p != rank {
-                let process = comm.process_at_rank(p as i32);
+                let process = comm.process_at_rank(p);
                 let (gcells, _status) = process.receive_vec::<usize>();
                 let (gdofs, _status) = process.receive_vec::<usize>();
                 let local_ghost_dofs = gcells
@@ -135,7 +139,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         let mut owners = vec![Ownership::Owned; local_space.local_size()];
         for p in 0..size {
             if p != rank {
-                let process = comm.process_at_rank(p as i32);
+                let process = comm.process_at_rank(p);
                 let (local_ghost_dofs, _status) = process.receive_vec::<usize>();
                 let (global_ghost_dofs, _status) = process.receive_vec::<usize>();
                 for (i, (l, g)) in ghost_indices[p as usize]
