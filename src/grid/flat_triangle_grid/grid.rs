@@ -516,6 +516,8 @@ mod test {
             HashMap::from([(0, 0), (1, 1), (2, 2), (3, 3)]),
             vec![0, 1],
             HashMap::from([(0, 0), (1, 1)]),
+            None,
+            None,
         )
     }
 
@@ -542,6 +544,8 @@ mod test {
             HashMap::from([(0, 0), (1, 1), (2, 2), (3, 3)]),
             vec![0, 1],
             HashMap::from([(0, 0), (1, 1)]),
+            None,
+            None,
         )
     }
 
