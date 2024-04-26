@@ -12,7 +12,6 @@ use crate::traits::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::function::FunctionSpaceInParallel;
 use crate::traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
-#[cfg(feature = "mpi")]
 use crate::traits::types::Ownership;
 use crate::traits::types::ReferenceCellType;
 use green_kernels::types::EvalType;
@@ -211,9 +210,11 @@ fn assemble_batch_singular<
                         .unwrap();
                     }
                 }
-                output.rows.push(*test_dof);
-                output.cols.push(*trial_dof);
-                output.data.push(sum);
+                if trial_space.ownership(*trial_dof) == Ownership::Owned {
+                    output.rows.push(test_space.global_dof_index(*test_dof));
+                    output.cols.push(trial_space.global_dof_index(*trial_dof));
+                    output.data.push(sum);
+                }
             }
         }
     }
@@ -471,9 +472,11 @@ fn assemble_batch_singular_correction<
                         };
                     }
                 }
-                output.rows.push(*test_dof);
-                output.cols.push(*trial_dof);
-                output.data.push(sum);
+                if trial_space.ownership(*trial_dof) == Ownership::Owned {
+                    output.rows.push(test_space.global_dof_index(*test_dof));
+                    output.cols.push(trial_space.global_dof_index(*trial_dof));
+                    output.data.push(sum);
+                }
             }
         }
     }
@@ -1042,34 +1045,7 @@ pub trait BatchedAssembler: Sync + Sized {
         trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
         test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
     ) -> CsrMatrix<Self::T> {
-        let local_matrix =
-            self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space());
-
-        let ownership = trial_space.ownership();
-        let test_global_dof_numbers = test_space.global_dof_numbers();
-        let trial_global_dof_numbers = trial_space.global_dof_numbers();
-
-        let mut rows = vec![];
-        let mut cols = vec![];
-        let mut data = vec![];
-        let mut r = 0;
-        for (i, index) in local_matrix.indices().iter().enumerate() {
-            while i >= local_matrix.indptr()[r + 1] {
-                r += 1;
-            }
-            if ownership[*index] == Ownership::Owned {
-                rows.push(test_global_dof_numbers[r]);
-                cols.push(trial_global_dof_numbers[*index]);
-                data.push(local_matrix.data()[i]);
-            }
-        }
-        CsrMatrix::from_aij(
-            [test_space.global_size(), trial_space.global_size()],
-            &rows,
-            &cols,
-            &data,
-        )
-        .unwrap()
+        self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
     }
 
     /// Assemble the singular correction into a dense matrix
@@ -1139,36 +1115,10 @@ pub trait BatchedAssembler: Sync + Sized {
         trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
         test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
     ) -> CsrMatrix<Self::T> {
-        let local_matrix = self.assemble_singular_correction_into_csr(
+        self.assemble_singular_correction_into_csr(
             trial_space.local_space(),
             test_space.local_space(),
-        );
-
-        let ownership = trial_space.ownership();
-        let test_global_dof_numbers = test_space.global_dof_numbers();
-        let trial_global_dof_numbers = trial_space.global_dof_numbers();
-
-        let mut rows = vec![];
-        let mut cols = vec![];
-        let mut data = vec![];
-        let mut r = 0;
-        for (i, index) in local_matrix.indices().iter().enumerate() {
-            while i >= local_matrix.indptr()[r + 1] {
-                r += 1;
-            }
-            if ownership[*index] == Ownership::Owned {
-                rows.push(test_global_dof_numbers[r]);
-                cols.push(trial_global_dof_numbers[*index]);
-                data.push(local_matrix.data()[i]);
-            }
-        }
-        CsrMatrix::from_aij(
-            [test_space.global_size(), trial_space.global_size()],
-            &rows,
-            &cols,
-            &data,
         )
-        .unwrap()
     }
 
     /// Assemble into a dense matrix

@@ -6,7 +6,7 @@ use crate::traits::{
     element::{ElementFamily, FiniteElement},
     function::FunctionSpace,
     grid::{CellType, GridType, TopologyType},
-    types::ReferenceCellType,
+    types::{Ownership, ReferenceCellType},
 };
 use rlst::RlstScalar;
 use std::collections::HashMap;
@@ -62,7 +62,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
         self.size
     }
     fn global_size(&self) -> usize {
-        self.local_size()
+        self.size
     }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         if cell < self.cell_dofs.len() {
@@ -145,6 +145,12 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
             }
         }
         colouring
+    }
+    fn global_dof_index(&self, local_dof_index: usize) -> usize {
+        local_dof_index
+    }
+    fn ownership(&self, _local_dof_index: usize) -> Ownership {
+        Ownership::Owned
     }
 }
 

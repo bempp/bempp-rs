@@ -3,7 +3,6 @@ use crate::traits::element::FiniteElement;
 use crate::traits::grid::GridType;
 #[cfg(feature = "mpi")]
 use crate::traits::grid::ParallelGridType;
-#[cfg(feature = "mpi")]
 use crate::traits::types::Ownership;
 use crate::traits::types::ReferenceCellType;
 use std::collections::HashMap;
@@ -40,6 +39,12 @@ pub trait FunctionSpace {
 
     /// Compute a colouring of the cells so that no two cells that share an entity with DOFs associated with it are assigned the same colour
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>>;
+
+    /// Get the global DOF indes associated with a local DOF indec
+    fn global_dof_index(&self, local_dof_index: usize) -> usize;
+
+    /// Get ownership of a local DOF
+    fn ownership(&self, local_dof_index: usize) -> Ownership;
 }
 
 #[cfg(feature = "mpi")]
@@ -52,10 +57,4 @@ pub trait FunctionSpaceInParallel {
 
     /// Get the local space on the process
     fn local_space(&self) -> &Self::SerialSpace;
-
-    /// Get the global DOF number associated with each local DOF
-    fn global_dof_numbers(&self) -> &Vec<usize>;
-
-    /// Get ownership info
-    fn ownership(&self) -> &Vec<Ownership>;
 }
