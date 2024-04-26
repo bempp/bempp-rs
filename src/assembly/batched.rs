@@ -9,7 +9,11 @@ use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use crate::traits::element::FiniteElement;
 use crate::traits::function::FunctionSpace;
+#[cfg(feature = "mpi")]
+use crate::traits::function::FunctionSpaceInParallel;
 use crate::traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
+#[cfg(feature = "mpi")]
+use crate::traits::types::Ownership;
 use crate::traits::types::ReferenceCellType;
 use green_kernels::types::EvalType;
 use rayon::prelude::*;
@@ -1025,6 +1029,49 @@ pub trait BatchedAssembler: Sync + Sized {
         .unwrap()
     }
 
+    #[cfg(feature = "mpi")]
+    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+    fn parallel_assemble_singular_into_csr<
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
+        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
+    >(
+        &self,
+        trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
+        test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
+    ) -> CsrMatrix<Self::T> {
+        let local_matrix =
+            self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space());
+
+        let ownership = trial_space.ownership();
+        let test_global_dof_numbers = test_space.global_dof_numbers();
+        let trial_global_dof_numbers = trial_space.global_dof_numbers();
+
+        let mut rows = vec![];
+        let mut cols = vec![];
+        let mut data = vec![];
+        let mut r = 0;
+        for (i, index) in local_matrix.indices().iter().enumerate() {
+            while i >= local_matrix.indptr()[r + 1] {
+                r += 1;
+            }
+            if ownership[*index] == Ownership::Owned {
+                rows.push(test_global_dof_numbers[r]);
+                cols.push(trial_global_dof_numbers[*index]);
+                data.push(local_matrix.data()[i]);
+            }
+        }
+        CsrMatrix::from_aij(
+            [test_space.global_size(), trial_space.global_size()],
+            &rows,
+            &cols,
+            &data,
+        )
+        .unwrap()
+    }
+
     /// Assemble the singular correction into a dense matrix
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
@@ -1079,6 +1126,51 @@ pub trait BatchedAssembler: Sync + Sized {
         .unwrap()
     }
 
+    #[cfg(feature = "mpi")]
+    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+    fn parallel_assemble_singular_correction_into_csr<
+        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
+        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
+    >(
+        &self,
+        trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
+        test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
+    ) -> CsrMatrix<Self::T> {
+        let local_matrix = self.assemble_singular_correction_into_csr(
+            trial_space.local_space(),
+            test_space.local_space(),
+        );
+
+        let ownership = trial_space.ownership();
+        let test_global_dof_numbers = test_space.global_dof_numbers();
+        let trial_global_dof_numbers = trial_space.global_dof_numbers();
+
+        let mut rows = vec![];
+        let mut cols = vec![];
+        let mut data = vec![];
+        let mut r = 0;
+        for (i, index) in local_matrix.indices().iter().enumerate() {
+            while i >= local_matrix.indptr()[r + 1] {
+                r += 1;
+            }
+            if ownership[*index] == Ownership::Owned {
+                rows.push(test_global_dof_numbers[r]);
+                cols.push(trial_global_dof_numbers[*index]);
+                data.push(local_matrix.data()[i]);
+            }
+        }
+        CsrMatrix::from_aij(
+            [test_space.global_size(), trial_space.global_size()],
+            &rows,
+            &cols,
+            &data,
+        )
+        .unwrap()
+    }
+
     /// Assemble into a dense matrix
     fn assemble_into_dense<
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
@@ -1108,7 +1200,6 @@ pub trait BatchedAssembler: Sync + Sized {
     }
 
     /// Assemble the non-singular contributions into a dense matrix
-    #[allow(clippy::too_many_arguments)]
     fn assemble_nonsingular_into_dense<
         TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
         TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,

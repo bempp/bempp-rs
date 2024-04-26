@@ -7,7 +7,7 @@ pub trait Builder<const GDIM: usize> {
 
     /// The geometric/physical dimension
     const GDIM: usize = GDIM;
-    /// The type of the grid that the builder created
+    /// The type of the grid that the builder creates
     type GridType: GridType;
     /// The floating point type used for coordinates
     type T: RlstScalar;

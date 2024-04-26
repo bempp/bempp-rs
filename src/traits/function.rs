@@ -1,6 +1,10 @@
 //! Functions and functions spaces
 use crate::traits::element::FiniteElement;
 use crate::traits::grid::GridType;
+#[cfg(feature = "mpi")]
+use crate::traits::grid::ParallelGridType;
+#[cfg(feature = "mpi")]
+use crate::traits::types::Ownership;
 use crate::traits::types::ReferenceCellType;
 use std::collections::HashMap;
 
@@ -25,9 +29,6 @@ pub trait FunctionSpace {
     /// Get the DOF numbers on the local process associated with the given entity
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize];
 
-    /// Get the global DOF numbers associated with the given entity
-    fn get_global_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize];
-
     /// Get the number of DOFs associated with the local process
     fn local_size(&self) -> usize;
 
@@ -39,4 +40,22 @@ pub trait FunctionSpace {
 
     /// Compute a colouring of the cells so that no two cells that share an entity with DOFs associated with it are assigned the same colour
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>>;
+}
+
+#[cfg(feature = "mpi")]
+/// A function space in parallel
+pub trait FunctionSpaceInParallel {
+    /// The parallel grid type
+    type ParallelGrid: GridType + ParallelGridType;
+    /// The type of the serial space on each process
+    type SerialSpace: FunctionSpace<Grid = <Self::ParallelGrid as ParallelGridType>::LocalGridType>;
+
+    /// Get the local space on the process
+    fn local_space(&self) -> &Self::SerialSpace;
+
+    /// Get the global DOF number associated with each local DOF
+    fn global_dof_numbers(&self) -> &Vec<usize>;
+
+    /// Get ownership info
+    fn ownership(&self) -> &Vec<Ownership>;
 }
