@@ -16,6 +16,50 @@ use mpi::{
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
+/// The local function space on a process
+pub struct LocalFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
+    serial_space: SerialFunctionSpace<'a, T, GridImpl>,
+    global_size: usize,
+    global_dof_numbers: Vec<usize>,
+    ownership: Vec<Ownership>,
+}
+
+impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
+    for LocalFunctionSpace<'a, T, GridImpl>
+{
+    type Grid = GridImpl;
+    type FiniteElement = CiarletElement<T>;
+
+    fn grid(&self) -> &Self::Grid {
+        self.serial_space.grid
+    }
+    fn element(&self, cell_type: ReferenceCellType) -> &CiarletElement<T> {
+        self.serial_space.element(cell_type)
+    }
+    fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
+        self.serial_space
+            .get_local_dof_numbers(entity_dim, entity_number)
+    }
+    fn local_size(&self) -> usize {
+        self.serial_space.local_size()
+    }
+    fn global_size(&self) -> usize {
+        self.global_size
+    }
+    fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
+        self.serial_space.cell_dofs(cell)
+    }
+    fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
+        self.serial_space.cell_colouring()
+    }
+    fn global_dof_index(&self, local_dof_index: usize) -> usize {
+        self.global_dof_numbers[local_dof_index]
+    }
+    fn ownership(&self, local_dof_index: usize) -> Ownership {
+        self.ownership[local_dof_index]
+    }
+}
+
 /// A parallel function space
 pub struct ParallelFunctionSpace<
     'a,
@@ -23,10 +67,7 @@ pub struct ParallelFunctionSpace<
     GridImpl: ParallelGridType + GridType<T = T::Real>,
 > {
     grid: &'a GridImpl,
-    local_space: SerialFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>,
-    global_dof_numbers: Vec<usize>,
-    owners: Vec<Ownership>,
-    global_size: usize,
+    local_space: LocalFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>,
 }
 
 impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
@@ -50,16 +91,8 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
             elements.insert(*cell, e_family.element(*cell));
         }
 
-        let local_space = SerialFunctionSpace {
-            grid: grid.local_grid(),
-            elements,
-            entity_dofs,
-            cell_dofs,
-            size: dofmap_size,
-        };
-
         // Assign global DOF numbers
-        let mut global_dof_numbers = vec![0; local_space.local_size()];
+        let mut global_dof_numbers = vec![0; dofmap_size];
         let mut ghost_indices = vec![vec![]; size as usize];
         let mut ghost_cells = vec![vec![]; size as usize];
         let mut ghost_cell_dofs = vec![vec![]; size as usize];
@@ -123,7 +156,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
                 let local_ghost_dofs = gcells
                     .iter()
                     .zip(&gdofs)
-                    .map(|(c, d)| local_space.cell_dofs(*c).unwrap()[*d])
+                    .map(|(c, d)| cell_dofs[*c][*d])
                     .collect::<Vec<_>>();
                 let global_ghost_dofs = local_ghost_dofs
                     .iter()
@@ -136,7 +169,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
             }
         }
         // receive ghost info
-        let mut owners = vec![Ownership::Owned; local_space.local_size()];
+        let mut ownership = vec![Ownership::Owned; dofmap_size];
         for p in 0..size {
             if p != rank {
                 let process = comm.process_at_rank(p);
@@ -147,18 +180,26 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
                     .zip(local_ghost_dofs.iter().zip(&global_ghost_dofs))
                 {
                     global_dof_numbers[*i] = *g;
-                    owners[*i] = Ownership::Ghost(p as usize, *l);
+                    ownership[*i] = Ownership::Ghost(p as usize, *l);
                 }
             }
         }
 
-        Self {
-            grid,
-            local_space,
-            global_dof_numbers,
-            owners,
+        let serial_space = SerialFunctionSpace {
+            grid: grid.local_grid(),
+            elements,
+            entity_dofs,
+            cell_dofs,
+            size: dofmap_size,
+        };
+        let local_space = LocalFunctionSpace {
+            serial_space,
             global_size,
-        }
+            global_dof_numbers,
+            ownership,
+        };
+
+        Self { grid, local_space }
     }
 }
 
@@ -166,23 +207,13 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> Func
     for ParallelFunctionSpace<'a, T, GridImpl>
 {
     type ParallelGrid = GridImpl;
-    type SerialSpace = SerialFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>;
+    type SerialSpace = LocalFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>;
 
     /// Get the local space on the process
     fn local_space(
         &self,
-    ) -> &SerialFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType> {
+    ) -> &LocalFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType> {
         &self.local_space
-    }
-
-    /// Get the global DOF number associated with each local DOF
-    fn global_dof_numbers(&self) -> &Vec<usize> {
-        &self.global_dof_numbers
-    }
-
-    /// Get ownership info
-    fn ownership(&self) -> &Vec<Ownership> {
-        &self.owners
     }
 }
 
@@ -206,12 +237,18 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> Func
         self.local_space.local_size()
     }
     fn global_size(&self) -> usize {
-        self.global_size
+        self.local_space.global_size()
     }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         self.local_space.cell_dofs(cell)
     }
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
         self.local_space.cell_colouring()
+    }
+    fn global_dof_index(&self, local_dof_index: usize) -> usize {
+        self.local_space.global_dof_index(local_dof_index)
+    }
+    fn ownership(&self, local_dof_index: usize) -> Ownership {
+        self.local_space.ownership(local_dof_index)
     }
 }
