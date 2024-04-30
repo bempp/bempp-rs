@@ -15,14 +15,14 @@ use std::collections::HashMap;
 
 /// Grid builder for a single element grid
 pub struct SingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
-    element_data: (ReferenceCellType, usize),
-    points_per_cell: usize,
-    points: Vec<T>,
-    cells: Vec<usize>,
-    point_indices_to_ids: Vec<usize>,
-    point_ids_to_indices: HashMap<usize, usize>,
-    cell_indices_to_ids: Vec<usize>,
-    cell_ids_to_indices: HashMap<usize, usize>,
+    pub(crate) element_data: (ReferenceCellType, usize),
+    pub(crate) points_per_cell: usize,
+    pub(crate) points: Vec<T>,
+    pub(crate) cells: Vec<usize>,
+    pub(crate) point_indices_to_ids: Vec<usize>,
+    pub(crate) point_ids_to_indices: HashMap<usize, usize>,
+    pub(crate) cell_indices_to_ids: Vec<usize>,
+    pub(crate) cell_ids_to_indices: HashMap<usize, usize>,
 }
 
 impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM>
@@ -94,6 +94,8 @@ where
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
             self.cell_ids_to_indices,
+            None,
+            None,
         )
     }
 }
