@@ -35,6 +35,8 @@ pub struct SingleElementTopology {
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
     cell_types: [ReferenceCellType; 1],
+    cell_ownership: Option<Vec<Ownership>>,
+    vertex_ownership: Option<Vec<Ownership>>,
 }
 
 unsafe impl Sync for SingleElementTopology {}
@@ -46,6 +48,8 @@ impl SingleElementTopology {
         cell_type: ReferenceCellType,
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
+        cell_ownership: Option<Vec<Ownership>>,
+        vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         let size = reference_cell::entity_counts(cell_type)[0];
         let ncells = cells_input.len() / size;
@@ -143,6 +147,8 @@ impl SingleElementTopology {
             cell_indices_to_ids,
             cell_ids_to_indices,
             cell_types: [cell_type],
+            cell_ownership,
+            vertex_ownership,
         }
     }
 }
@@ -185,11 +191,19 @@ impl Topology for SingleElementTopology {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn cell_ownership(&self, _index: usize) -> Ownership {
-        Ownership::Owned
+    fn cell_ownership(&self, index: usize) -> Ownership {
+        if let Some(co) = &self.cell_ownership {
+            co[index]
+        } else {
+            Ownership::Owned
+        }
     }
-    fn vertex_ownership(&self, _index: usize) -> Ownership {
-        Ownership::Owned
+    fn vertex_ownership(&self, index: usize) -> Ownership {
+        if let Some(vo) = &self.vertex_ownership {
+            vo[index]
+        } else {
+            Ownership::Owned
+        }
     }
 
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
@@ -278,6 +292,8 @@ mod test {
             ReferenceCellType::Triangle,
             &[0, 1, 2, 3],
             &[0, 1],
+            None,
+            None,
         )
     }
 

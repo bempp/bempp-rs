@@ -15,15 +15,15 @@ use std::collections::HashMap;
 
 /// Grid builder for a mixed grid
 pub struct MixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
-    elements_to_npoints: HashMap<(ReferenceCellType, usize), usize>,
-    points: Vec<T>,
-    cells: Vec<usize>,
-    cell_types: Vec<ReferenceCellType>,
-    cell_degrees: Vec<usize>,
-    point_indices_to_ids: Vec<usize>,
-    point_ids_to_indices: HashMap<usize, usize>,
-    cell_indices_to_ids: Vec<usize>,
-    cell_ids_to_indices: HashMap<usize, usize>,
+    pub(crate) elements_to_npoints: HashMap<(ReferenceCellType, usize), usize>,
+    pub(crate) points: Vec<T>,
+    pub(crate) cells: Vec<usize>,
+    pub(crate) cell_types: Vec<ReferenceCellType>,
+    pub(crate) cell_degrees: Vec<usize>,
+    pub(crate) point_indices_to_ids: Vec<usize>,
+    pub(crate) point_ids_to_indices: HashMap<usize, usize>,
+    pub(crate) cell_indices_to_ids: Vec<usize>,
+    pub(crate) cell_ids_to_indices: HashMap<usize, usize>,
 }
 
 impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM> for MixedGridBuilder<GDIM, T>
@@ -105,6 +105,8 @@ where
             self.point_indices_to_ids,
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
+            None,
+            None,
         )
     }
 }

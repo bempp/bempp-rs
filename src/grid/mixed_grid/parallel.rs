@@ -1,9 +1,9 @@
 //! Parallel grid builder
 
-use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
+use crate::grid::mixed_grid::{MixedGrid, MixedGridBuilder};
 use crate::grid::parallel_grid::ParallelGrid;
 use crate::traits::grid::ParallelBuilder;
-use crate::traits::types::Ownership;
+use crate::traits::types::{Ownership, ReferenceCellType};
 use mpi::{
     request::WaitGuard,
     topology::Communicator,
@@ -16,18 +16,18 @@ use rlst::{
 };
 use std::collections::HashMap;
 
-impl<T: Float + RlstScalar<Real = T> + Equivalence> ParallelBuilder<3>
-    for FlatTriangleGridBuilder<T>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T> + Equivalence> ParallelBuilder<GDIM>
+    for MixedGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
     [T]: Buffer,
 {
-    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, FlatTriangleGrid<T>>;
+    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, MixedGrid<T>>;
     fn create_parallel_grid<'a, C: Communicator>(
         self,
         comm: &'a C,
         cell_owners: &HashMap<usize, usize>,
-    ) -> ParallelGrid<'a, C, FlatTriangleGrid<T>> {
+    ) -> ParallelGrid<'a, C, MixedGrid<T>> {
         let rank = comm.rank() as usize;
         let size = comm.size() as usize;
 
@@ -43,6 +43,8 @@ where
         // data to send to other processes
         let mut points_per_proc = vec![vec![]; size];
         let mut cells_per_proc = vec![vec![]; size];
+        let mut cell_types_per_proc = vec![vec![]; size];
+        let mut cell_degrees_per_proc = vec![vec![]; size];
         let mut point_ids_per_proc = vec![vec![]; size];
         let mut cell_ids_per_proc = vec![vec![]; size];
         let mut vertex_owners_per_proc = vec![vec![]; size];
@@ -50,9 +52,19 @@ where
         let mut cell_owners_per_proc = vec![vec![]; size];
         let mut cell_local_indices_per_proc = vec![vec![]; size];
 
+        let mut cell_starts = vec![];
+        let mut cell_ends = vec![];
+        let mut cell_start = 0;
+        for index in 0..ncells {
+            cell_starts.push(cell_start);
+            cell_start +=
+                self.elements_to_npoints[&(self.cell_types[index], self.cell_degrees[index])];
+            cell_ends.push(cell_start);
+        }
+
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
             let owner = cell_owners[&id];
-            for v in &self.cells[3 * index..3 * (index + 1)] {
+            for v in &self.cells[cell_starts[index]..cell_ends[index]] {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
                     vertex_counts[owner] += 1;
@@ -61,8 +73,8 @@ where
                     vertex_indices_per_proc[owner].push(*v);
                     vertex_owners_per_proc[owner].push(vertex_owners[*v].0 as usize);
                     vertex_local_indices_per_proc[owner].push(vertex_owners[*v].1);
-                    for i in 0..3 {
-                        points_per_proc[owner].push(self.points[v * 3 + i])
+                    for i in 0..GDIM {
+                        points_per_proc[owner].push(self.points[v * GDIM + i])
                     }
                     point_ids_per_proc[owner].push(self.point_indices_to_ids[*v])
                 }
@@ -71,7 +83,7 @@ where
 
         for index in 0..ncells {
             for p in 0..size {
-                for v in &self.cells[3 * index..3 * (index + 1)] {
+                for v in &self.cells[cell_starts[index]..cell_ends[index]] {
                     if vertex_indices_per_proc[p].contains(v) {
                         cell_indices_per_proc[p].push(index);
                         break;
@@ -83,13 +95,13 @@ where
         for p in 0..size {
             for index in &cell_indices_per_proc[p] {
                 let id = self.cell_indices_to_ids[*index];
-                for v in &self.cells[3 * index..3 * (index + 1)] {
+                for v in &self.cells[cell_starts[*index]..cell_ends[*index]] {
                     if !vertex_indices_per_proc[p].contains(v) {
                         vertex_indices_per_proc[p].push(*v);
                         vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
                         vertex_local_indices_per_proc[p].push(vertex_owners[*v].1);
-                        for i in 0..3 {
-                            points_per_proc[p].push(self.points[v * 3 + i])
+                        for i in 0..GDIM {
+                            points_per_proc[p].push(self.points[v * GDIM + i])
                         }
                         point_ids_per_proc[p].push(self.point_indices_to_ids[*v])
                     }
@@ -100,6 +112,8 @@ where
                             .unwrap(),
                     );
                 }
+                cell_types_per_proc[p].push(self.cell_types[*index] as u8);
+                cell_degrees_per_proc[p].push(self.cell_degrees[*index]);
                 cell_ids_per_proc[p].push(id);
                 cell_owners_per_proc[p].push(cell_owners[&id]);
                 cell_local_indices_per_proc[p].push(
@@ -120,6 +134,14 @@ where
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
                         .immediate_send(scope, &cells_per_proc[p]),
+                );
+                let _ = WaitGuard::from(
+                    comm.process_at_rank(p as i32)
+                        .immediate_send(scope, &cell_types_per_proc[p]),
+                );
+                let _ = WaitGuard::from(
+                    comm.process_at_rank(p as i32)
+                        .immediate_send(scope, &cell_degrees_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
@@ -147,10 +169,16 @@ where
                 );
             }
         });
+        let cell_types = cell_types_per_proc[rank]
+            .iter()
+            .map(|i| ReferenceCellType::from(*i).unwrap())
+            .collect::<Vec<_>>();
         self.create_internal(
             comm,
             &points_per_proc[rank],
             &cells_per_proc[rank],
+            &cell_types,
+            &cell_degrees_per_proc[rank],
             &point_ids_per_proc[rank],
             &vertex_owners_per_proc[rank],
             &vertex_local_indices_per_proc[rank],
@@ -163,21 +191,29 @@ where
         self,
         comm: &C,
         root_rank: usize,
-    ) -> ParallelGrid<'_, C, FlatTriangleGrid<T>> {
+    ) -> ParallelGrid<'_, C, MixedGrid<T>> {
         let root_process = comm.process_at_rank(root_rank as i32);
 
         let (points, _status) = root_process.receive_vec::<T>();
         let (cells, _status) = root_process.receive_vec::<usize>();
+        let (cell_types_u8, _status) = root_process.receive_vec::<u8>();
+        let (cell_degrees, _status) = root_process.receive_vec::<usize>();
         let (point_ids, _status) = root_process.receive_vec::<usize>();
         let (vertex_owners, _status) = root_process.receive_vec::<usize>();
         let (vertex_local_indices, _status) = root_process.receive_vec::<usize>();
         let (cell_ids, _status) = root_process.receive_vec::<usize>();
         let (cell_owners, _status) = root_process.receive_vec::<usize>();
         let (cell_local_indices, _status) = root_process.receive_vec::<usize>();
+        let cell_types = cell_types_u8
+            .iter()
+            .map(|i| ReferenceCellType::from(*i).unwrap())
+            .collect::<Vec<_>>();
         self.create_internal(
             comm,
             &points,
             &cells,
+            &cell_types,
+            &cell_degrees,
             &point_ids,
             &vertex_owners,
             &vertex_local_indices,
@@ -188,7 +224,7 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> FlatTriangleGridBuilder<T>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> MixedGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -198,13 +234,15 @@ where
         comm: &'a C,
         points: &[T],
         cells: &[usize],
+        cell_types: &[ReferenceCellType],
+        cell_degrees: &[usize],
         point_ids: &[usize],
         vertex_owners: &[usize],
         vertex_local_indices: &[usize],
         cell_ids: &[usize],
         cell_owners: &[usize],
         cell_local_indices: &[usize],
-    ) -> ParallelGrid<'a, C, FlatTriangleGrid<T>> {
+    ) -> ParallelGrid<'a, C, MixedGrid<T>> {
         let rank = comm.rank() as usize;
         let npts = point_ids.len();
         let ncells = cell_ids.len();
@@ -242,13 +280,14 @@ where
             });
         }
 
-        let serial_grid = FlatTriangleGrid::new(
+        let serial_grid = MixedGrid::new(
             coordinates,
             cells,
+            cell_types,
+            cell_degrees,
             point_ids.to_vec(),
             point_ids_to_indices,
             cell_ids.to_vec(),
-            cell_ids_to_indices,
             Some(cell_ownership),
             Some(vertex_ownership),
         );
