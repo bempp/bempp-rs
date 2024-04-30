@@ -288,8 +288,8 @@ where
             point_ids.to_vec(),
             point_ids_to_indices,
             cell_ids.to_vec(),
-            Some(&cell_ownership),
-            Some(&vertex_ownership),
+            Some(cell_ownership),
+            Some(vertex_ownership),
         );
 
         ParallelGrid::new(comm, serial_grid)

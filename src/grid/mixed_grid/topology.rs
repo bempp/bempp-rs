@@ -53,8 +53,8 @@ impl MixedTopology {
         cell_types: &[ReferenceCellType],
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
-        cell_ownership_list: Option<&[Ownership]>,
-        vertex_ownership_list: Option<&[Ownership]>,
+        cell_ownership_list: Option<Vec<Ownership>>,
+        vertex_ownership_list: Option<Vec<Ownership>>,
     ) -> Self {
         let mut index_map = vec![(ReferenceCellType::Point, 0); cell_types.len()];
         let mut reverse_index_map = HashMap::new();
@@ -117,7 +117,7 @@ impl MixedTopology {
                     cell_indices_to_ids.insert(cell_i, grid_cell_indices_to_ids[i]);
                     cell_ids_to_indices.insert(grid_cell_indices_to_ids[i], cell_i);
 
-                    if let Some(co) = cell_ownership_list {
+                    if let Some(co) = &cell_ownership_list {
                         cell_ownership.insert(cell_i, co[i]);
                     }
 
@@ -136,7 +136,7 @@ impl MixedTopology {
                             vertex_ids_to_indices
                                 .insert(point_indices_to_ids[*v], (ReferenceCellType::Point, *v));
 
-                            if let Some(vo) = vertex_ownership_list {
+                            if let Some(vo) = &vertex_ownership_list {
                                 vertex_ownership.insert((ReferenceCellType::Point, *v), vo[*v]);
                             }
                         }

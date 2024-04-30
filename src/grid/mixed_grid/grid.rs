@@ -35,8 +35,8 @@ where
         point_indices_to_ids: Vec<usize>,
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
-        cell_ownership: Option<&[Ownership]>,
-        vertex_ownership: Option<&[Ownership]>,
+        cell_ownership: Option<Vec<Ownership>>,
+        vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         let mut element_info = vec![];
         let mut element_numbers = vec![];

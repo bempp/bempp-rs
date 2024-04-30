@@ -229,27 +229,21 @@ where
             cell_ids_to_indices.insert(*id, index);
         }
 
-        let mut cell_ownership = HashMap::new();
+        let mut cell_ownership = vec![];
         for index in 0..ncells {
-            cell_ownership.insert(
-                index,
-                if cell_owners[index] == rank {
-                    Ownership::Owned
-                } else {
-                    Ownership::Ghost(cell_owners[index], cell_local_indices[index])
-                },
-            );
+            cell_ownership.push(if cell_owners[index] == rank {
+                Ownership::Owned
+            } else {
+                Ownership::Ghost(cell_owners[index], cell_local_indices[index])
+            });
         }
-        let mut vertex_ownership = HashMap::new();
+        let mut vertex_ownership = vec![];
         for index in 0..npts {
-            vertex_ownership.insert(
-                index,
-                if vertex_owners[index] == rank {
-                    Ownership::Owned
-                } else {
-                    Ownership::Ghost(vertex_owners[index], vertex_local_indices[index])
-                },
-            );
+            vertex_ownership.push(if vertex_owners[index] == rank {
+                Ownership::Owned
+            } else {
+                Ownership::Ghost(vertex_owners[index], vertex_local_indices[index])
+            });
         }
 
         let serial_grid = SingleElementGrid::new(
