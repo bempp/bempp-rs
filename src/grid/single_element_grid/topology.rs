@@ -292,6 +292,8 @@ mod test {
             ReferenceCellType::Triangle,
             &[0, 1, 2, 3],
             &[0, 1],
+            None,
+            None,
         )
     }
 
