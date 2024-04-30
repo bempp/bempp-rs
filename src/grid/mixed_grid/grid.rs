@@ -5,7 +5,7 @@ use crate::element::reference_cell;
 use crate::grid::mixed_grid::{geometry::MixedGeometry, topology::MixedTopology};
 use crate::grid::traits::Grid;
 use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::{Ownership, ReferenceCellType};
 use log::warn;
 use num::Float;
 use rlst::RlstScalar;
@@ -25,6 +25,7 @@ impl<T: Float + RlstScalar<Real = T>> MixedGrid<T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
+    #[allow(clippy::too_many_arguments)]
     /// Create a mixed grid
     pub fn new(
         points: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -34,6 +35,8 @@ where
         point_indices_to_ids: Vec<usize>,
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
+        cell_ownership: Option<&[Ownership]>,
+        vertex_ownership: Option<&[Ownership]>,
     ) -> Self {
         let mut element_info = vec![];
         let mut element_numbers = vec![];
@@ -70,6 +73,8 @@ where
             cell_types,
             &point_indices_to_ids,
             &cell_indices_to_ids,
+            cell_ownership,
+            vertex_ownership,
         );
         let geometry = MixedGeometry::<T>::new(
             points,

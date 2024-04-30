@@ -31,8 +31,8 @@ where
         let rank = comm.rank() as usize;
         let size = comm.size() as usize;
 
-        let npts = self.points.len() / 3;
-        let ncells = self.cells.len() / 3;
+        let npts = self.point_indices_to_ids.len();
+        let ncells = self.cell_indices_to_ids.len();
 
         // data used in computation
         let mut vertex_owners = vec![(-1, 0); npts];
