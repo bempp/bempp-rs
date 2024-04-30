@@ -280,6 +280,9 @@ where
             });
         }
 
+        println!("{rank} {:?}", cells.iter().map(|i| point_ids[*i]).collect::<Vec<_>>());
+        println!("{rank} {cell_ownership:?}");
+
         let serial_grid = MixedGrid::new(
             coordinates,
             cells,

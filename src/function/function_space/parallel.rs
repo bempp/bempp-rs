@@ -86,6 +86,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         let (cell_dofs, entity_dofs, dofmap_size, owner_data) =
             assign_dofs(rank as usize, grid, e_family);
 
+
         let mut elements = HashMap::new();
         for cell in grid.cell_types() {
             elements.insert(*cell, e_family.element(*cell));
@@ -185,6 +186,8 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
                 }
             }
         }
+
+        println!("{rank} {:?}", cell_dofs.iter().map(|cell| cell.iter().map(|i| global_dof_numbers[*i]).collect::<Vec<_>>()).collect::<Vec<_>>());
 
         let serial_space = SerialFunctionSpace {
             grid: grid.local_grid(),

@@ -210,7 +210,7 @@ fn assemble_batch_singular<
                         .unwrap();
                     }
                 }
-                if trial_space.ownership(*trial_dof) == Ownership::Owned {
+                if trial_space.grid().cell_from_index(trial_space.grid().cell_index_from_id(*trial_cell)).ownership() == Ownership::Owned {
                     output.rows.push(test_space.global_dof_index(*test_dof));
                     output.cols.push(trial_space.global_dof_index(*trial_dof));
                     output.data.push(sum);
@@ -472,7 +472,7 @@ fn assemble_batch_singular_correction<
                         };
                     }
                 }
-                if trial_space.ownership(*trial_dof) == Ownership::Owned {
+                if trial_space.grid().cell_from_index(trial_space.grid().cell_index_from_id(*trial_cell)).ownership() == Ownership::Owned {
                     output.rows.push(test_space.global_dof_index(*test_dof));
                     output.cols.push(trial_space.global_dof_index(*trial_dof));
                     output.data.push(sum);

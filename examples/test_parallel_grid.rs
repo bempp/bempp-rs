@@ -280,7 +280,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
     let rank = comm.rank();
     let size = comm.size();
 
-    let n = 5;
+    let n = 10;
     let grid = example_flat_triangle_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
@@ -460,7 +460,7 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
     let rank = comm.rank();
     let size = comm.size();
 
-    let n = 10;
+    let n = 5;
     let grid = example_mixed_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
@@ -522,12 +522,11 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
         println!("== full_matrix ==");
         println!("{:?}", full_matrix.indptr());
         println!("{:?}", full_matrix.indices());
-        println!("{:?}", full_matrix.data());
-
+        //println!("{:?}", full_matrix.data());
         println!("== serial_matrix ==");
         println!("{:?}", serial_matrix.indptr());
         println!("{:?}", serial_matrix.indices());
-        println!("{:?}", serial_matrix.data());
+        //println!("{:?}", serial_matrix.data());
 
         for (i, j) in full_matrix.indices().iter().zip(serial_matrix.indices()) {
             assert_eq!(i, j);
@@ -559,11 +558,8 @@ fn main() {
     let world = universe.world();
     let rank = world.rank();
 
-    test_parallel_assembly_flat_triangle_grid(&world, 1, Continuity::Continuous);
-
-    if rank < 100 {
-        return;
-    }
+    test_parallel_assembly_mixed_grid(&world, 2, Continuity::Continuous);
+    if rank < 100 { return; }
 
     if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");
@@ -589,11 +585,11 @@ fn main() {
         }
         test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Continuous);
         if rank == 0 {
-            println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
+            println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
         }
         test_parallel_assembly_single_element_grid(&world, degree, Continuity::Continuous);
         if rank == 0 {
-            println!("Testing assembly with DP{degree} using MixedGrid in parallel.");
+            println!("Testing assembly with P{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Continuous);
     }
