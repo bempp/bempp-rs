@@ -44,6 +44,14 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
     }
     let mut cell_dofs = vec![vec![]; entity_counts[tdim]];
 
+    let mut max_rank = rank;
+    for cell in grid.iter_all_cells() {
+        if let Ownership::Ghost(process, _index) = cell.ownership() {
+            if process > max_rank {
+                max_rank = process;
+            }
+        }
+    }
     for cell in grid.iter_all_cells() {
         cell_dofs[cell.index()] = vec![0; element_dims[&cell.topology().cell_type()]];
         let element = &elements[&cell.topology().cell_type()];
@@ -52,9 +60,9 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
             let e_dofs = element.entity_dofs(0, i).unwrap();
             if !e_dofs.is_empty() {
                 if entity_dofs[0][e].is_empty() {
-                    for d in e_dofs {
+                    for _d in e_dofs {
                         entity_dofs[0][e].push(size);
-                        owner_data.push((rank, cell.index(), *d));
+                        owner_data.push((max_rank + 1, 0, 0));
                         size += 1;
                     }
                 }
@@ -64,6 +72,8 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                         if process < owner_data[entity_dofs[0][e][j]].0 {
                             owner_data[entity_dofs[0][e][j]] = (process, index, *k);
                         }
+                    } else if rank < owner_data[entity_dofs[0][e][j]].0 {
+                        owner_data[entity_dofs[0][e][j]] = (rank, cell.index(), *k);
                     }
                 }
             }
@@ -73,9 +83,9 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                 let e_dofs = element.entity_dofs(1, i).unwrap();
                 if !e_dofs.is_empty() {
                     if entity_dofs[1][e].is_empty() {
-                        for d in e_dofs {
+                        for _d in e_dofs {
                             entity_dofs[1][e].push(size);
-                            owner_data.push((rank, cell.index(), *d));
+                            owner_data.push((max_rank + 1, 0, 0));
                             size += 1;
                         }
                     }
@@ -85,6 +95,8 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                             if process < owner_data[entity_dofs[1][e][j]].0 {
                                 owner_data[entity_dofs[1][e][j]] = (process, index, *k);
                             }
+                        } else if rank < owner_data[entity_dofs[1][e][j]].0 {
+                            owner_data[entity_dofs[1][e][j]] = (rank, cell.index(), *k);
                         }
                     }
                 }
@@ -95,9 +107,9 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                 let e_dofs = element.entity_dofs(2, i).unwrap();
                 if !e_dofs.is_empty() {
                     if entity_dofs[2][e].is_empty() {
-                        for d in e_dofs {
+                        for _d in e_dofs {
                             entity_dofs[2][e].push(size);
-                            owner_data.push((rank, cell.index(), *d));
+                            owner_data.push((max_rank + 1, 0, 0));
                             size += 1;
                         }
                     }
@@ -105,6 +117,8 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                         cell_dofs[cell.index()][*k] = entity_dofs[2][e][j];
                         if let Ownership::Ghost(process, index) = cell.ownership() {
                             owner_data[entity_dofs[2][e][j]] = (process, index, *k);
+                        } else if rank < owner_data[entity_dofs[2][e][j]].0 {
+                            owner_data[entity_dofs[2][e][j]] = (rank, cell.index(), *k);
                         }
                     }
                 }
