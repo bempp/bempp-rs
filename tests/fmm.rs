@@ -193,7 +193,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
             .build()
             .unwrap();
 
-        fmm.evaluate();
+        let _ = fmm.evaluate();
 
         let mut temp1 = rlst_dynamic_array2!(f64, [nqpts, 1]);
         let indices = &fmm.tree().target_tree().all_global_indices().unwrap();
@@ -340,7 +340,7 @@ fn test_fmm_result() {
         .build()
         .unwrap();
 
-    fmm.evaluate();
+    let _ = fmm.evaluate();
 
     let indices = &fmm.tree().target_tree().global_indices;
     let mut fmm_result = rlst_dynamic_array2!(f64, [nqpts, 1]);

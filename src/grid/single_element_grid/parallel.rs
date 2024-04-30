@@ -1,7 +1,7 @@
 //! Parallel grid builder
 
-use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
 use crate::grid::parallel_grid::ParallelGrid;
+use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
 use crate::traits::grid::ParallelBuilder;
 use crate::traits::types::Ownership;
 use mpi::{
@@ -16,18 +16,18 @@ use rlst::{
 };
 use std::collections::HashMap;
 
-impl<T: Float + RlstScalar<Real = T> + Equivalence> ParallelBuilder<3>
-    for FlatTriangleGridBuilder<T>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T> + Equivalence> ParallelBuilder<GDIM>
+    for SingleElementGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
     [T]: Buffer,
 {
-    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, FlatTriangleGrid<T>>;
+    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, SingleElementGrid<T>>;
     fn create_parallel_grid<'a, C: Communicator>(
         self,
         comm: &'a C,
         cell_owners: &HashMap<usize, usize>,
-    ) -> ParallelGrid<'a, C, FlatTriangleGrid<T>> {
+    ) -> ParallelGrid<'a, C, SingleElementGrid<T>> {
         let rank = comm.rank() as usize;
         let size = comm.size() as usize;
 
@@ -52,7 +52,7 @@ where
 
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
             let owner = cell_owners[&id];
-            for v in &self.cells[3 * index..3 * (index + 1)] {
+            for v in &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)] {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
                     vertex_counts[owner] += 1;
@@ -61,8 +61,8 @@ where
                     vertex_indices_per_proc[owner].push(*v);
                     vertex_owners_per_proc[owner].push(vertex_owners[*v].0 as usize);
                     vertex_local_indices_per_proc[owner].push(vertex_owners[*v].1);
-                    for i in 0..3 {
-                        points_per_proc[owner].push(self.points[v * 3 + i])
+                    for i in 0..GDIM {
+                        points_per_proc[owner].push(self.points[v * GDIM + i])
                     }
                     point_ids_per_proc[owner].push(self.point_indices_to_ids[*v])
                 }
@@ -71,7 +71,9 @@ where
 
         for index in 0..ncells {
             for p in 0..size {
-                for v in &self.cells[3 * index..3 * (index + 1)] {
+                for v in
+                    &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
+                {
                     if vertex_indices_per_proc[p].contains(v) {
                         cell_indices_per_proc[p].push(index);
                         break;
@@ -83,13 +85,15 @@ where
         for p in 0..size {
             for index in &cell_indices_per_proc[p] {
                 let id = self.cell_indices_to_ids[*index];
-                for v in &self.cells[3 * index..3 * (index + 1)] {
+                for v in
+                    &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
+                {
                     if !vertex_indices_per_proc[p].contains(v) {
                         vertex_indices_per_proc[p].push(*v);
                         vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
                         vertex_local_indices_per_proc[p].push(vertex_owners[*v].1);
-                        for i in 0..3 {
-                            points_per_proc[p].push(self.points[v * 3 + i])
+                        for i in 0..GDIM {
+                            points_per_proc[p].push(self.points[v * GDIM + i])
                         }
                         point_ids_per_proc[p].push(self.point_indices_to_ids[*v])
                     }
@@ -163,7 +167,7 @@ where
         self,
         comm: &C,
         root_rank: usize,
-    ) -> ParallelGrid<'_, C, FlatTriangleGrid<T>> {
+    ) -> ParallelGrid<'_, C, SingleElementGrid<T>> {
         let root_process = comm.process_at_rank(root_rank as i32);
 
         let (points, _status) = root_process.receive_vec::<T>();
@@ -188,7 +192,7 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> FlatTriangleGridBuilder<T>
+impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> SingleElementGridBuilder<GDIM, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
@@ -204,7 +208,7 @@ where
         cell_ids: &[usize],
         cell_owners: &[usize],
         cell_local_indices: &[usize],
-    ) -> ParallelGrid<'a, C, FlatTriangleGrid<T>> {
+    ) -> ParallelGrid<'a, C, SingleElementGrid<T>> {
         let rank = comm.rank() as usize;
         let npts = point_ids.len();
         let ncells = cell_ids.len();
@@ -242,9 +246,11 @@ where
             });
         }
 
-        let serial_grid = FlatTriangleGrid::new(
+        let serial_grid = SingleElementGrid::new(
             coordinates,
             cells,
+            self.element_data.0,
+            self.element_data.1,
             point_ids.to_vec(),
             point_ids_to_indices,
             cell_ids.to_vec(),
