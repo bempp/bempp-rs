@@ -213,6 +213,7 @@ impl MixedTopology {
                             }
                             if !found {
                                 entity_ids.push((*etype, entities_to_vertices[d][etype].len()));
+                                entity_ids_flat.push(entities_to_vertices[d][etype].len());
                                 entities_to_cells[d].get_mut(etype).unwrap().push(vec![
                                     CellLocalIndexPair::new((*cell_type, cell_i), local_index),
                                 ]);
