@@ -135,7 +135,7 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
 mod test {
     use super::*;
     use crate::element::ciarlet::LagrangeElementFamily;
-    use crate::grid::shapes::{screen_triangles, screen_quadrilaterals, screen_mixed};
+    use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
     use crate::traits::element::Continuity;
 
     fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
@@ -224,6 +224,4 @@ mod test {
         let grid = screen_mixed::<f64>(8);
         run_test(&grid, 3, Continuity::Continuous);
     }
-
-
 }
