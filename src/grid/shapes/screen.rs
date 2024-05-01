@@ -43,15 +43,15 @@ where
                 [
                     y * (ncells + 1) + x,
                     y * (ncells + 1) + x + 1,
-                    y * (ncells + 1) + x + (ncells + 1) + 1,
+                    y * (ncells + 1) + x + ncells + 2,
                 ],
             );
             b.add_cell(
                 2 * y * ncells + 2 * x + 1,
                 [
                     y * (ncells + 1) + x,
-                    y * (ncells + 1) + x + (ncells + 1) + 1,
-                    y * (ncells + 1) + x + (ncells + 1),
+                    y * (ncells + 1) + x + ncells + 2,
+                    y * (ncells + 1) + x + ncells + 1,
                 ],
             );
         }
@@ -94,8 +94,8 @@ where
                 vec![
                     y * (ncells + 1) + x,
                     y * (ncells + 1) + x + 1,
-                    y * (ncells + 1) + x + (ncells + 1),
-                    y * (ncells + 1) + x + (ncells + 1) + 1,
+                    y * (ncells + 1) + x + ncells + 1,
+                    y * (ncells + 1) + x + ncells + 2,
                 ],
             );
         }
@@ -127,7 +127,7 @@ where
     for y in 0..ncells + 1 {
         for x in 0..2 * (ncells + 1) {
             b.add_point(
-                y * 2 * (ncells + 1) + x,
+                2 * y * (ncells + 1) + x,
                 [T::from(x).unwrap() / n, T::from(y).unwrap() / n, zero],
             );
         }
@@ -138,9 +138,9 @@ where
                 2 * y * ncells + 2 * x,
                 (
                     vec![
-                        y * 2 * (ncells + 1) + x,
-                        y * 2 * (ncells + 1) + x + 1,
-                        y * 2 * (ncells + 1) + x + 2 * (ncells + 1) + 1,
+                        2 * y * (ncells + 1) + x,
+                        2 * y * (ncells + 1) + x + 1,
+                        2 * y * (ncells + 1) + x + 2 * ncells + 3,
                     ],
                     ReferenceCellType::Triangle,
                     1,
@@ -150,9 +150,9 @@ where
                 2 * y * ncells + 2 * x + 1,
                 (
                     vec![
-                        y * 2 * (ncells + 1) + x,
-                        y * 2 * (ncells + 1) + x + 2 * (ncells + 1) + 1,
-                        y * 2 * (ncells + 1) + x + 2 * (ncells + 1),
+                        2 * y * (ncells + 1) + x,
+                        2 * y * (ncells + 1) + x + 2 * ncells + 3,
+                        2 * y * (ncells + 1) + x + 2 * ncells + 2,
                     ],
                     ReferenceCellType::Triangle,
                     1,
@@ -162,10 +162,10 @@ where
                 2 * ncells * ncells + y * ncells + x,
                 (
                     vec![
-                        (ncells + 1) + y * 2 * (ncells + 1) + x,
-                        (ncells + 1) + y * 2 * (ncells + 1) + x + 1,
-                        (ncells + 1) + y * 2 * (ncells + 1) + x + 2 * (ncells + 1) + 1,
-                        (ncells + 1) + y * 2 * (ncells + 1) + x + 2 * (ncells + 1),
+                        (ncells + 1) + 2 * y * (ncells + 1) + x,
+                        (ncells + 1) + 2 * y * (ncells + 1) + x + 1,
+                        (ncells + 1) + 2 * y * (ncells + 1) + x + 2 * ncells + 3,
+                        (ncells + 1) + 2 * y * (ncells + 1) + x + 2 * ncells + 2,
                     ],
                     ReferenceCellType::Quadrilateral,
                     1,
