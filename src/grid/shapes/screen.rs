@@ -11,7 +11,7 @@ use rlst::{
 };
 /// Create a square grid with triangle cells
 ///
-/// Create a grid of the square [0,1]^2 with triangle cells. The input ncells is the number of cells
+/// Create a grid of the square \[0,1\]^2 with triangle cells. The input ncells is the number of cells
 /// along each side of the square.
 pub fn screen_triangles<T: Float + RlstScalar<Real = T>>(ncells: usize) -> FlatTriangleGrid<T>
 where
@@ -62,7 +62,7 @@ where
 
 /// Create a square grid with quadrilateral cells
 ///
-/// Create a grid of the square [0,1]^2 with quadrilateral cells. The input ncells is the number of
+/// Create a grid of the square \[0,1\]^2 with quadrilateral cells. The input ncells is the number of
 /// cells along each side of the square.
 pub fn screen_quadrilaterals<T: Float + RlstScalar<Real = T>>(ncells: usize) -> SingleElementGrid<T>
 where
@@ -106,7 +106,7 @@ where
 
 /// Create a rectangular grid with quadrilateral cells
 ///
-/// Create a grid of the square [0,2]x[0,1] with triangle cells on the left half and quadrilateral
+/// Create a grid of the square \[0,2\]x\[0,1\] with triangle cells on the left half and quadrilateral
 /// cells on the right half. The input ncells is the number of cells along each side of the unit
 /// square.
 pub fn screen_mixed<T: Float + RlstScalar<Real = T>>(ncells: usize) -> MixedGrid<T>
