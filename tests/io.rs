@@ -26,11 +26,11 @@ fn test_gmsh_output_quads() {
     b.add_point(6, [0.0, 1.0, 1.0]);
     b.add_point(7, [1.0, 1.0, 1.0]);
     b.add_cell(0, vec![0, 2, 1, 3]);
-    b.add_cell(0, vec![0, 1, 4, 5]);
-    b.add_cell(0, vec![0, 4, 2, 6]);
-    b.add_cell(0, vec![1, 3, 5, 7]);
-    b.add_cell(0, vec![2, 6, 3, 7]);
-    b.add_cell(0, vec![4, 5, 6, 7]);
+    b.add_cell(1, vec![0, 1, 4, 5]);
+    b.add_cell(2, vec![0, 4, 2, 6]);
+    b.add_cell(3, vec![1, 3, 5, 7]);
+    b.add_cell(4, vec![2, 6, 3, 7]);
+    b.add_cell(5, vec![4, 5, 6, 7]);
     let g = b.create_grid();
     g.export_as_gmsh(String::from("_test_io_cube.msh"));
 }
