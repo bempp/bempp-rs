@@ -216,8 +216,7 @@ mod test {
     }
     #[test]
     fn test_p2_mixed() {
-        // let grid = screen_mixed::<f64>(8);
-        let grid = screen_mixed::<f64>(1);
+        let grid = screen_mixed::<f64>(8);
         run_test(&grid, 2, Continuity::Continuous);
     }
     #[test]

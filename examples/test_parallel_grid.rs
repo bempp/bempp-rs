@@ -460,7 +460,7 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
     let rank = comm.rank();
     let size = comm.size();
 
-    let n = 5;
+    let n = 10;
     let grid = example_mixed_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
@@ -519,15 +519,6 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
 
-        println!("== full_matrix ==");
-        println!("{:?}", full_matrix.indptr());
-        println!("{:?}", full_matrix.indices());
-        //println!("{:?}", full_matrix.data());
-        println!("== serial_matrix ==");
-        println!("{:?}", serial_matrix.indptr());
-        println!("{:?}", serial_matrix.indices());
-        //println!("{:?}", serial_matrix.data());
-
         for (i, j) in full_matrix.indices().iter().zip(serial_matrix.indices()) {
             assert_eq!(i, j);
         }
@@ -557,9 +548,6 @@ fn main() {
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let rank = world.rank();
-
-    test_parallel_assembly_mixed_grid(&world, 2, Continuity::Continuous);
-    if rank < 100 { return; }
 
     if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");
