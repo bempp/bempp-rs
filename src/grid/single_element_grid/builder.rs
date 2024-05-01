@@ -64,6 +64,9 @@ where
     }
 
     fn add_point(&mut self, id: usize, data: [T; GDIM]) {
+        if self.point_indices_to_ids.contains(&id) {
+            panic!("Cannot add point with duplicate id.");
+        }
         self.point_ids_to_indices
             .insert(id, self.point_indices_to_ids.len());
         self.point_indices_to_ids.push(id);
@@ -71,6 +74,9 @@ where
     }
 
     fn add_cell(&mut self, id: usize, cell_data: Vec<usize>) {
+        if self.cell_indices_to_ids.contains(&id) {
+            panic!("Cannot add cell with duplicate id.");
+        }
         assert_eq!(cell_data.len(), self.points_per_cell);
         self.cell_ids_to_indices
             .insert(id, self.cell_indices_to_ids.len());
@@ -97,5 +103,35 @@ where
             None,
             None,
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_duplicate_point_id() {
+        let mut b = SingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Triangle, 1));
+
+        b.add_point(2, [0.0, 0.0, 0.0]);
+        b.add_point(0, [1.0, 0.0, 0.0]);
+        b.add_point(1, [0.0, 1.0, 0.0]);
+        b.add_point(2, [1.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_duplicate_cell_id() {
+        let mut b = SingleElementGridBuilder::<3, f64>::new((ReferenceCellType::Triangle, 1));
+
+        b.add_point(0, [0.0, 0.0, 0.0]);
+        b.add_point(1, [1.0, 0.0, 0.0]);
+        b.add_point(2, [0.0, 1.0, 0.0]);
+        b.add_point(3, [1.0, 1.0, 0.0]);
+
+        b.add_cell(0, vec![0, 1, 2]);
+        b.add_cell(0, vec![1, 2, 3]);
     }
 }

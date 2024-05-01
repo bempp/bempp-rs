@@ -51,6 +51,9 @@ where
     }
 
     fn add_point(&mut self, id: usize, data: [T; 3]) {
+        if self.point_indices_to_ids.contains(&id) {
+            panic!("Cannot add point with duplicate id.");
+        }
         self.point_ids_to_indices
             .insert(id, self.point_indices_to_ids.len());
         self.point_indices_to_ids.push(id);
@@ -58,6 +61,9 @@ where
     }
 
     fn add_cell(&mut self, id: usize, cell_data: [usize; 3]) {
+        if self.cell_indices_to_ids.contains(&id) {
+            panic!("Cannot add cell with duplicate id.");
+        }
         self.cell_ids_to_indices
             .insert(id, self.cell_indices_to_ids.len());
         self.cell_indices_to_ids.push(id);
@@ -81,5 +87,35 @@ where
             None,
             None,
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_duplicate_point_id() {
+        let mut b = FlatTriangleGridBuilder::<f64>::new(());
+
+        b.add_point(2, [0.0, 0.0, 0.0]);
+        b.add_point(0, [1.0, 0.0, 0.0]);
+        b.add_point(1, [0.0, 1.0, 0.0]);
+        b.add_point(2, [1.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_duplicate_cell_id() {
+        let mut b = FlatTriangleGridBuilder::<f64>::new(());
+
+        b.add_point(0, [0.0, 0.0, 0.0]);
+        b.add_point(1, [1.0, 0.0, 0.0]);
+        b.add_point(2, [0.0, 1.0, 0.0]);
+        b.add_point(3, [1.0, 1.0, 0.0]);
+
+        b.add_cell(0, [0, 1, 2]);
+        b.add_cell(0, [1, 2, 3]);
     }
 }
