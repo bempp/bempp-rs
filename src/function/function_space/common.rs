@@ -134,12 +134,36 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::element::ciarlet::LagrangeElementFamily;
+    use crate::element::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
     use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
     use crate::traits::element::Continuity;
 
     fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
         let family = LagrangeElementFamily::<f64>::new(degree, continuity);
+        let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
+
+        for o in &owner_data {
+            assert_eq!(o.0, 0);
+        }
+        for d in &cell_dofs {
+            for (i, n) in d.iter().enumerate() {
+                assert!(*n < size);
+                for m in d.iter().skip(i + 1) {
+                    assert!(*n != *m);
+                }
+            }
+        }
+        for i in &entity_dofs {
+            for j in i {
+                for k in j {
+                    assert!(*k < size);
+                }
+            }
+        }
+    }
+
+    fn run_test_rt(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
+        let family = RaviartThomasElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 
         for o in &owner_data {
@@ -181,6 +205,11 @@ mod test {
     fn test_p3_triangles() {
         let grid = screen_triangles::<f64>(8);
         run_test(&grid, 3, Continuity::Continuous);
+    }
+    #[test]
+    fn test_rt1_triangles() {
+        let grid = screen_triangles::<f64>(8);
+        run_test_rt(&grid, 1, Continuity::Discontinuous);
     }
 
     #[test]
