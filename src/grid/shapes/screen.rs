@@ -39,7 +39,7 @@ where
     for y in 0..ncells {
         for x in 0..ncells {
             b.add_cell(
-                2 * y * ncells + x,
+                2 * y * ncells + 2 * x,
                 [
                     y * (ncells + 1) + x,
                     y * (ncells + 1) + x + 1,
@@ -47,7 +47,7 @@ where
                 ],
             );
             b.add_cell(
-                2 * y * ncells + x + 1,
+                2 * y * ncells + 2 * x + 1,
                 [
                     y * (ncells + 1) + x,
                     y * (ncells + 1) + x + (ncells + 1) + 1,
@@ -135,7 +135,7 @@ where
     for y in 0..ncells {
         for x in 0..ncells {
             b.add_cell(
-                2 * y * ncells + x,
+                2 * y * ncells + 2 * x,
                 (
                     vec![
                         y * 2 * (ncells + 1) + x,
@@ -147,7 +147,7 @@ where
                 ),
             );
             b.add_cell(
-                2 * y * ncells + x + 1,
+                2 * y * ncells + 2 * x + 1,
                 (
                     vec![
                         y * 2 * (ncells + 1) + x,
@@ -159,7 +159,7 @@ where
                 ),
             );
             b.add_cell(
-                2 * ncells * ncells + y * ncells + x + 1,
+                2 * ncells * ncells + y * ncells + x,
                 (
                     vec![
                         (ncells + 1) + y * 2 * (ncells + 1) + x,
@@ -173,7 +173,6 @@ where
             );
         }
     }
-
     b.create_grid()
 }
 
