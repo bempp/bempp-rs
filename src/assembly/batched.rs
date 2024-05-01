@@ -210,11 +210,9 @@ fn assemble_batch_singular<
                         .unwrap();
                     }
                 }
-                if trial_space.ownership(*trial_dof) == Ownership::Owned {
-                    output.rows.push(test_space.global_dof_index(*test_dof));
-                    output.cols.push(trial_space.global_dof_index(*trial_dof));
-                    output.data.push(sum);
-                }
+                output.rows.push(test_space.global_dof_index(*test_dof));
+                output.cols.push(trial_space.global_dof_index(*trial_dof));
+                output.data.push(sum);
             }
         }
     }
@@ -472,11 +470,9 @@ fn assemble_batch_singular_correction<
                         };
                     }
                 }
-                if trial_space.ownership(*trial_dof) == Ownership::Owned {
-                    output.rows.push(test_space.global_dof_index(*test_dof));
-                    output.cols.push(trial_space.global_dof_index(*trial_dof));
-                    output.data.push(sum);
-                }
+                output.rows.push(test_space.global_dof_index(*test_dof));
+                output.cols.push(trial_space.global_dof_index(*trial_dof));
+                output.data.push(sum);
             }
         }
     }
@@ -775,14 +771,17 @@ pub trait BatchedAssembler: Sync + Sized {
         for vertex in 0..grid.number_of_vertices() {
             for test_cell_info in grid.vertex_to_cells(vertex) {
                 let test_cell = grid.cell_from_index(test_cell_info.cell);
-                let test_cell_type = test_cell.topology().cell_type();
-                for trial_cell_info in grid.vertex_to_cells(vertex) {
-                    let trial_cell = grid.cell_from_index(trial_cell_info.cell);
-                    let trial_cell_type = trial_cell.topology().cell_type();
+                if test_cell.ownership() == Ownership::Owned {
+                    let test_cell_type = test_cell.topology().cell_type();
+                    for trial_cell_info in grid.vertex_to_cells(vertex) {
+                        let trial_cell = grid.cell_from_index(trial_cell_info.cell);
+                        let trial_cell_type = trial_cell.topology().cell_type();
 
-                    if let Some(pairs) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex) {
-                        cell_pairs[pair_indices[&(test_cell_type, trial_cell_type, pairs)]]
-                            .push((test_cell_info.cell, trial_cell_info.cell));
+                        if let Some(pairs) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex)
+                        {
+                            cell_pairs[pair_indices[&(test_cell_type, trial_cell_type, pairs)]]
+                                .push((test_cell_info.cell, trial_cell_info.cell));
+                        }
                     }
                 }
             }
@@ -935,13 +934,15 @@ pub trait BatchedAssembler: Sync + Sized {
             for test_cell_info in grid.vertex_to_cells(vertex) {
                 let test_cell = grid.cell_from_index(test_cell_info.cell);
                 let test_cell_type = test_cell.topology().cell_type();
-                for trial_cell_info in grid.vertex_to_cells(vertex) {
-                    let trial_cell = grid.cell_from_index(trial_cell_info.cell);
-                    let trial_cell_type = trial_cell.topology().cell_type();
+                if test_cell.ownership() == Ownership::Owned {
+                    for trial_cell_info in grid.vertex_to_cells(vertex) {
+                        let trial_cell = grid.cell_from_index(trial_cell_info.cell);
+                        let trial_cell_type = trial_cell.topology().cell_type();
 
-                    if get_pairs_if_smallest(&test_cell, &trial_cell, vertex).is_some() {
-                        cell_pairs[cell_type_indices[&(test_cell_type, trial_cell_type)]]
-                            .push((test_cell_info.cell, trial_cell_info.cell));
+                        if get_pairs_if_smallest(&test_cell, &trial_cell, vertex).is_some() {
+                            cell_pairs[cell_type_indices[&(test_cell_type, trial_cell_type)]]
+                                .push((test_cell_info.cell, trial_cell_info.cell));
+                        }
                     }
                 }
             }

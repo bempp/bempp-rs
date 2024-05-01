@@ -168,6 +168,7 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
                 });
             }
         }
+
         // receive ghost info
         let mut ownership = vec![Ownership::Owned; dofmap_size];
         for p in 0..size {

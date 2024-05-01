@@ -280,7 +280,8 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
     let rank = comm.rank();
     let size = comm.size();
 
-    let grid = example_flat_triangle_grid(comm, 10);
+    let n = 10;
+    let grid = example_flat_triangle_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
@@ -334,7 +335,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
         .unwrap();
 
         // Compare to matrix assembled on just this process
-        let serial_grid = example_flat_triangle_grid_serial(10);
+        let serial_grid = example_flat_triangle_grid_serial(n);
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
 
@@ -371,7 +372,8 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let rank = comm.rank();
     let size = comm.size();
 
-    let grid = example_single_element_grid(comm, 10);
+    let n = 10;
+    let grid = example_single_element_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
@@ -425,7 +427,7 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
         .unwrap();
 
         // Compare to matrix assembled on just this process
-        let serial_grid = example_single_element_grid_serial(10);
+        let serial_grid = example_single_element_grid_serial(n);
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
 
@@ -458,7 +460,8 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
     let rank = comm.rank();
     let size = comm.size();
 
-    let grid = example_mixed_grid(comm, 10);
+    let n = 10;
+    let grid = example_mixed_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
@@ -512,7 +515,7 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
         .unwrap();
 
         // Compare to matrix assembled on just this process
-        let serial_grid = example_mixed_grid_serial(10);
+        let serial_grid = example_mixed_grid_serial(n);
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
 
@@ -545,22 +548,39 @@ fn main() {
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let rank = world.rank();
+
     if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");
     }
     test_parallel_flat_triangle_grid(&world);
-    if rank == 0 {
-        println!("Testing assembly with DP0 using FlatTriangleGrid in parallel.");
+    for degree in 0..4 {
+        if rank == 0 {
+            println!("Testing assembly with DP{degree} using FlatTriangleGrid in parallel.");
+        }
+        test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Discontinuous);
+        if rank == 0 {
+            println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
+        }
+        test_parallel_assembly_single_element_grid(&world, degree, Continuity::Discontinuous);
+        if rank == 0 {
+            println!("Testing assembly with DP{degree} using MixedGrid in parallel.");
+        }
+        test_parallel_assembly_mixed_grid(&world, degree, Continuity::Discontinuous);
     }
-    test_parallel_assembly_flat_triangle_grid(&world, 0, Continuity::Discontinuous);
-    if rank == 0 {
-        println!("Testing assembly with DP0 using SingleElementGrid in parallel.");
+    for degree in 1..4 {
+        if rank == 0 {
+            println!("Testing assembly with P{degree} using FlatTriangleGrid in parallel.");
+        }
+        test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Continuous);
+        if rank == 0 {
+            println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
+        }
+        test_parallel_assembly_single_element_grid(&world, degree, Continuity::Continuous);
+        if rank == 0 {
+            println!("Testing assembly with P{degree} using MixedGrid in parallel.");
+        }
+        test_parallel_assembly_mixed_grid(&world, degree, Continuity::Continuous);
     }
-    test_parallel_assembly_single_element_grid(&world, 0, Continuity::Discontinuous);
-    if rank == 0 {
-        println!("Testing assembly with DP0 using MixedGrid in parallel.");
-    }
-    test_parallel_assembly_mixed_grid(&world, 0, Continuity::Discontinuous);
 }
 #[cfg(not(feature = "mpi"))]
 fn main() {}
