@@ -49,11 +49,11 @@ fn create_flat_triangle_grid_data(b: &mut FlatTriangleGridBuilder<f64>, n: usize
     for i in 0..n - 1 {
         for j in 0..n - 1 {
             b.add_cell(
-                2 * i * (n - 1) + j,
+                2 * i * (n - 1) + 2 * j,
                 [j * n + i, j * n + i + 1, j * n + i + n + 1],
             );
             b.add_cell(
-                2 * i * (n - 1) + j + 1,
+                2 * i * (n - 1) + 2 * j + 1,
                 [j * n + i, j * n + i + n + 1, j * n + i + n],
             );
         }
