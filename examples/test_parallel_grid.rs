@@ -339,16 +339,6 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
 
-        /*
-        println!("== full_matrix == ");
-        println!("{:?}", full_matrix.indptr());
-        println!("{:?}", full_matrix.indices());
-        println!("{:?}", full_matrix.data());
-        println!("== serial_matrix == ");
-        println!("{:?}", serial_matrix.indptr());
-        println!("{:?}", serial_matrix.indices());
-        println!("{:?}", serial_matrix.data());
-        */
         for (i, j) in full_matrix.indices().iter().zip(serial_matrix.indices()) {
             assert_eq!(i, j);
         }
@@ -558,10 +548,6 @@ fn main() {
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let rank = world.rank();
-
-    //test_parallel_assembly_flat_triangle_grid(&world, 2, Continuity::Continuous);
-
-    //return;
 
     if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");

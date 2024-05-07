@@ -87,7 +87,6 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                         for (dof_i, _d) in e_dofs.iter().enumerate() {
                             entity_dofs[1][e].push(size);
                             if let Ownership::Ghost(process, index) = grid.edge_from_index(e).ownership() {
-                                println!("{e} {process} {index}");
                                 owner_data.push((process, 1, index, dof_i));
                             } else {
                                 owner_data.push((rank, 1, e, dof_i));

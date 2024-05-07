@@ -105,15 +105,6 @@ where
             }
         }
 
-        println!("points = {:?}", self.points);
-        println!("edge_owners = {edge_owners:?}");
-        println!("points_per_proc = {points_per_proc:?}");
-        println!("edge_owners_per_proc = {edge_owners_per_proc:?}");
-        println!("edge_local_indices_per_proc = {edge_local_indices_per_proc:?}");
-        println!("edge_vertices0_per_proc = {edge_vertices0_per_proc:?}");
-        println!("edge_vertices1_per_proc = {edge_vertices1_per_proc:?}");
-        println!();
-
         for index in 0..ncells {
             for p in 0..size {
                 for v in &self.cells[3 * index..3 * (index + 1)] {
@@ -180,13 +171,6 @@ where
                 );
             }
         }
-
-        println!("edge_owners = {edge_owners:?}");
-        println!("points_per_proc = {points_per_proc:?}");
-        println!("edge_owners_per_proc = {edge_owners_per_proc:?}");
-        println!("edge_local_indices_per_proc = {edge_local_indices_per_proc:?}");
-        println!("edge_vertices0_per_proc = {edge_vertices0_per_proc:?}");
-        println!("edge_vertices1_per_proc = {edge_vertices1_per_proc:?}");
 
         mpi::request::scope(|scope| {
             for p in 1..size {
@@ -357,8 +341,6 @@ where
                 Ownership::Ghost(*i, *j)
             }).collect::<Vec<_>>();
         let edges = edge_vertices0.iter().zip(edge_vertices1).map(|(i, j)| [*i, *j]).collect::<Vec<_>>();
-
-        println!("[{rank}] edge_ownership = {edge_ownership:?}");
 
         let serial_grid = FlatTriangleGrid::new(
             coordinates,
