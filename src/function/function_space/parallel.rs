@@ -141,11 +141,9 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
             if p != rank {
                 mpi::request::scope(|scope| {
                     let process = comm.process_at_rank(p);
+                    let _ = WaitGuard::from(process.immediate_send(scope, &ghost_dims[p as usize]));
                     let _ =
-                        WaitGuard::from(process.immediate_send(scope, &ghost_dims[p as usize]));
-                    let _ = WaitGuard::from(
-                        process.immediate_send(scope, &ghost_entities[p as usize]),
-                    );
+                        WaitGuard::from(process.immediate_send(scope, &ghost_entities[p as usize]));
                     let _ = WaitGuard::from(
                         process.immediate_send(scope, &ghost_entity_dofs[p as usize]),
                     );

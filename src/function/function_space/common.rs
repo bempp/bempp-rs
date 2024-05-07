@@ -3,7 +3,7 @@
 use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
     element::{ElementFamily, FiniteElement},
-    grid::{CellType, GridType, TopologyType, PointType, EdgeType},
+    grid::{CellType, EdgeType, GridType, PointType, TopologyType},
     types::Ownership,
 };
 use rlst::RlstScalar;
@@ -64,7 +64,9 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                 if entity_dofs[0][e].is_empty() {
                     for (dof_i, _d) in e_dofs.iter().enumerate() {
                         entity_dofs[0][e].push(size);
-                        if let Ownership::Ghost(process, index) = grid.vertex_from_index(e).ownership() {
+                        if let Ownership::Ghost(process, index) =
+                            grid.vertex_from_index(e).ownership()
+                        {
                             owner_data.push((process, 0, index, dof_i));
                         } else {
                             owner_data.push((rank, 0, e, dof_i));
@@ -86,7 +88,9 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
                     if entity_dofs[1][e].is_empty() {
                         for (dof_i, _d) in e_dofs.iter().enumerate() {
                             entity_dofs[1][e].push(size);
-                            if let Ownership::Ghost(process, index) = grid.edge_from_index(e).ownership() {
+                            if let Ownership::Ghost(process, index) =
+                                grid.edge_from_index(e).ownership()
+                            {
                                 owner_data.push((process, 1, index, dof_i));
                             } else {
                                 owner_data.push((rank, 1, e, dof_i));

@@ -4,7 +4,7 @@ use crate::element::reference_cell;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::FiniteElement;
 use crate::traits::grid::{
-    CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType, EdgeType,
+    CellType, EdgeType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 #[cfg(feature = "mpi")]
@@ -124,9 +124,7 @@ impl<'a, T: Float + RlstScalar<Real = T>, G: Geometry<T = T>, Top: Topology> Poi
     }
 }
 
-impl<'a, Top: Topology> EdgeType
-    for Edge<'a, Top>
-{
+impl<'a, Top: Topology> EdgeType for Edge<'a, Top> {
     fn index(&self) -> usize {
         self.index
     }

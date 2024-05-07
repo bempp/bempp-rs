@@ -1,6 +1,6 @@
 //! Definition of a grid
 
-use super::{EdgeType, CellType, PointType, ReferenceMapType};
+use super::{CellType, EdgeType, PointType, ReferenceMapType};
 use crate::traits::types::{CellIterator, CellLocalIndexPair, PointIterator, ReferenceCellType};
 use rlst::RlstScalar;
 

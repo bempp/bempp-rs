@@ -79,20 +79,22 @@ where
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
             let owner = cell_owners[&id];
             for e in [[1, 2], [0, 2], [0, 1]] {
-                let v0 = self.cells[3*index + e[0]];
-                let v1 = self.cells[3*index + e[1]];
-                let edge = if v0 < v1 {
-                    [v0, v1]
+                let v0 = self.cells[3 * index + e[0]];
+                let v1 = self.cells[3 * index + e[1]];
+                let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
+                let local_v0 = vertex_indices_per_proc[owner]
+                    .iter()
+                    .position(|&r| r == v0)
+                    .unwrap();
+                let local_v1 = vertex_indices_per_proc[owner]
+                    .iter()
+                    .position(|&r| r == v1)
+                    .unwrap();
+                let local_edge = if local_v0 < local_v1 {
+                    [local_v0, local_v1]
                 } else {
-                    [v1, v0]
+                    [local_v1, local_v0]
                 };
-                    let local_v0 = vertex_indices_per_proc[owner].iter().position(|&r| r == v0).unwrap();
-                    let local_v1 = vertex_indices_per_proc[owner].iter().position(|&r| r == v1).unwrap();
-                    let local_edge = if local_v0 < local_v1 {
-                        [local_v0, local_v1]
-                    } else {
-                        [local_v1, local_v0]
-                    };
                 if edge_owners.get_mut(&edge) == None {
                     edge_owners.insert(edge, (owner, edge_counts[owner]));
                     edges_per_proc[owner].push(edge);
@@ -138,15 +140,17 @@ where
                 }
 
                 for e in [[1, 2], [0, 2], [0, 1]] {
-                    let v0 = self.cells[3*index + e[0]];
-                    let v1 = self.cells[3*index + e[1]];
-                    let edge = if v0 < v1 {
-                        [v0, v1]
-                    } else {
-                        [v1, v0]
-                    };
-                    let local_v0 = vertex_indices_per_proc[p].iter().position(|&r| r == v0).unwrap();
-                    let local_v1 = vertex_indices_per_proc[p].iter().position(|&r| r == v1).unwrap();
+                    let v0 = self.cells[3 * index + e[0]];
+                    let v1 = self.cells[3 * index + e[1]];
+                    let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
+                    let local_v0 = vertex_indices_per_proc[p]
+                        .iter()
+                        .position(|&r| r == v0)
+                        .unwrap();
+                    let local_v1 = vertex_indices_per_proc[p]
+                        .iter()
+                        .position(|&r| r == v1)
+                        .unwrap();
                     let local_edge = if local_v0 < local_v1 {
                         [local_v0, local_v1]
                     } else {
@@ -335,12 +339,22 @@ where
             });
         }
 
-        let edge_ownership = edge_owners.iter().zip(edge_local_indices).map(|(i, j)| if *i == rank {
-                Ownership::Owned
-            } else {
-                Ownership::Ghost(*i, *j)
-            }).collect::<Vec<_>>();
-        let edges = edge_vertices0.iter().zip(edge_vertices1).map(|(i, j)| [*i, *j]).collect::<Vec<_>>();
+        let edge_ownership = edge_owners
+            .iter()
+            .zip(edge_local_indices)
+            .map(|(i, j)| {
+                if *i == rank {
+                    Ownership::Owned
+                } else {
+                    Ownership::Ghost(*i, *j)
+                }
+            })
+            .collect::<Vec<_>>();
+        let edges = edge_vertices0
+            .iter()
+            .zip(edge_vertices1)
+            .map(|(i, j)| [*i, *j])
+            .collect::<Vec<_>>();
 
         let serial_grid = FlatTriangleGrid::new(
             coordinates,
