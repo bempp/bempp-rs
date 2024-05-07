@@ -3,14 +3,14 @@
 use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
     element::{ElementFamily, FiniteElement},
-    grid::{CellType, GridType, TopologyType},
+    grid::{CellType, GridType, TopologyType, PointType, EdgeType},
     types::Ownership,
 };
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
 type DofList = Vec<Vec<usize>>;
-type OwnerData = Vec<(usize, usize, usize)>;
+type OwnerData = Vec<(usize, usize, usize, usize)>;
 
 pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
     rank: usize,
@@ -56,70 +56,70 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
         cell_dofs[cell.index()] = vec![0; element_dims[&cell.topology().cell_type()]];
         let element = &elements[&cell.topology().cell_type()];
         let topology = cell.topology();
+
+        // Assign DOFs to vertices
         for (i, e) in topology.vertex_indices().enumerate() {
             let e_dofs = element.entity_dofs(0, i).unwrap();
             if !e_dofs.is_empty() {
                 if entity_dofs[0][e].is_empty() {
-                    for _d in e_dofs {
+                    for (dof_i, _d) in e_dofs.iter().enumerate() {
                         entity_dofs[0][e].push(size);
-                        owner_data.push((max_rank + 1, 0, 0));
+                        if let Ownership::Ghost(process, index) = grid.vertex_from_index(e).ownership() {
+                            owner_data.push((process, 0, index, dof_i));
+                        } else {
+                            owner_data.push((rank, 0, e, dof_i));
+                        }
                         size += 1;
                     }
                 }
-                for (j, k) in e_dofs.iter().enumerate() {
-                    cell_dofs[cell.index()][*k] = entity_dofs[0][e][j];
-                    if let Ownership::Ghost(process, index) = cell.ownership() {
-                        if process < owner_data[entity_dofs[0][e][j]].0 {
-                            owner_data[entity_dofs[0][e][j]] = (process, index, *k);
-                        }
-                    } else if rank < owner_data[entity_dofs[0][e][j]].0 {
-                        owner_data[entity_dofs[0][e][j]] = (rank, cell.index(), *k);
-                    }
+                for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[0][e]) {
+                    cell_dofs[cell.index()][*local_dof] = *dof;
                 }
             }
         }
+
+        // Assign DOFs to edges
         if tdim >= 1 {
             for (i, e) in topology.edge_indices().enumerate() {
                 let e_dofs = element.entity_dofs(1, i).unwrap();
                 if !e_dofs.is_empty() {
                     if entity_dofs[1][e].is_empty() {
-                        for _d in e_dofs {
+                        for (dof_i, _d) in e_dofs.iter().enumerate() {
                             entity_dofs[1][e].push(size);
-                            owner_data.push((max_rank + 1, 0, 0));
+                            if let Ownership::Ghost(process, index) = grid.edge_from_index(e).ownership() {
+                                println!("{e} {process} {index}");
+                                owner_data.push((process, 1, index, dof_i));
+                            } else {
+                                owner_data.push((rank, 1, e, dof_i));
+                            }
                             size += 1;
                         }
                     }
-                    for (j, k) in e_dofs.iter().enumerate() {
-                        cell_dofs[cell.index()][*k] = entity_dofs[1][e][j];
-                        if let Ownership::Ghost(process, index) = cell.ownership() {
-                            if process < owner_data[entity_dofs[1][e][j]].0 {
-                                owner_data[entity_dofs[1][e][j]] = (process, index, *k);
-                            }
-                        } else if rank < owner_data[entity_dofs[1][e][j]].0 {
-                            owner_data[entity_dofs[1][e][j]] = (rank, cell.index(), *k);
-                        }
+                    for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[1][e]) {
+                        cell_dofs[cell.index()][*local_dof] = *dof;
                     }
                 }
             }
         }
+
+        // Assign DOFs to faces
         if tdim >= 2 {
             for (i, e) in topology.face_indices().enumerate() {
                 let e_dofs = element.entity_dofs(2, i).unwrap();
                 if !e_dofs.is_empty() {
                     if entity_dofs[2][e].is_empty() {
-                        for _d in e_dofs {
+                        for (dof_i, _d) in e_dofs.iter().enumerate() {
                             entity_dofs[2][e].push(size);
-                            owner_data.push((max_rank + 1, 0, 0));
+                            if let Ownership::Ghost(process, index) = cell.ownership() {
+                                owner_data.push((process, 2, index, dof_i));
+                            } else {
+                                owner_data.push((rank, 2, e, dof_i));
+                            }
                             size += 1;
                         }
                     }
-                    for (j, k) in e_dofs.iter().enumerate() {
-                        cell_dofs[cell.index()][*k] = entity_dofs[2][e][j];
-                        if let Ownership::Ghost(process, index) = cell.ownership() {
-                            owner_data[entity_dofs[2][e][j]] = (process, index, *k);
-                        } else if rank < owner_data[entity_dofs[2][e][j]].0 {
-                            owner_data[entity_dofs[2][e][j]] = (rank, cell.index(), *k);
-                        }
+                    for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[2][e]) {
+                        cell_dofs[cell.index()][*local_dof] = *dof;
                     }
                 }
             }

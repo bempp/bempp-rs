@@ -4,7 +4,7 @@ use crate::element::reference_cell;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::FiniteElement;
 use crate::traits::grid::{
-    CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
+    CellType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType, EdgeType,
 };
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 #[cfg(feature = "mpi")]
@@ -30,6 +30,12 @@ pub struct Vertex<'a, T: Float + RlstScalar<Real = T>, G: Geometry, Top: Topolog
     gindex: usize,
     tindex: Top::IndexType,
     _t: PhantomData<T>,
+}
+/// An edge
+pub struct Edge<'a, Top: Topology> {
+    topology: &'a Top,
+    index: usize,
+    tindex: Top::IndexType,
 }
 /// A cell
 pub struct Cell<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
@@ -115,6 +121,17 @@ impl<'a, T: Float + RlstScalar<Real = T>, G: Geometry<T = T>, Top: Topology> Poi
     }
     fn ownership(&self) -> Ownership {
         self.topology.vertex_ownership(self.tindex)
+    }
+}
+
+impl<'a, Top: Topology> EdgeType
+    for Edge<'a, Top>
+{
+    fn index(&self) -> usize {
+        self.index
+    }
+    fn ownership(&self) -> Ownership {
+        self.topology.edge_ownership(self.tindex)
     }
 }
 
@@ -299,6 +316,7 @@ where
 
     type Point<'a> = Point<'a, T, GridImpl::Geometry> where Self: 'a;
     type Vertex<'a> = Vertex<'a, T, GridImpl::Geometry, GridImpl::Topology> where Self: 'a;
+    type Edge<'a> = Edge<'a, GridImpl::Topology> where Self: 'a;
     type Cell<'a> = Cell<'a, T, GridImpl> where Self: 'a;
 
     fn number_of_points(&self) -> usize {
@@ -353,6 +371,14 @@ where
             gindex: self.point_index_from_id(self.vertex_id_from_index(index)),
             tindex: self.topology().vertex_flat_index_to_index(index),
             _t: PhantomData,
+        }
+    }
+
+    fn edge_from_index(&self, index: usize) -> Self::Edge<'_> {
+        Self::Edge {
+            topology: self.topology(),
+            index,
+            tindex: self.topology().edge_flat_index_to_index(index),
         }
     }
 

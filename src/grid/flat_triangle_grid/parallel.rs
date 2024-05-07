@@ -39,6 +39,9 @@ where
         let mut vertex_counts = vec![0; size];
         let mut cell_indices_per_proc = vec![vec![]; size];
         let mut vertex_indices_per_proc = vec![vec![]; size];
+        let mut edge_owners = HashMap::new();
+        let mut edge_counts = vec![0; size];
+        let mut edges_per_proc = vec![vec![]; size];
 
         // data to send to other processes
         let mut points_per_proc = vec![vec![]; size];
@@ -47,6 +50,10 @@ where
         let mut cell_ids_per_proc = vec![vec![]; size];
         let mut vertex_owners_per_proc = vec![vec![]; size];
         let mut vertex_local_indices_per_proc = vec![vec![]; size];
+        let mut edge_vertices0_per_proc = vec![vec![]; size];
+        let mut edge_vertices1_per_proc = vec![vec![]; size];
+        let mut edge_owners_per_proc = vec![vec![]; size];
+        let mut edge_local_indices_per_proc = vec![vec![]; size];
         let mut cell_owners_per_proc = vec![vec![]; size];
         let mut cell_local_indices_per_proc = vec![vec![]; size];
 
@@ -55,7 +62,6 @@ where
             for v in &self.cells[3 * index..3 * (index + 1)] {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
-                    vertex_counts[owner] += 1;
                 }
                 if !vertex_indices_per_proc[owner].contains(v) {
                     vertex_indices_per_proc[owner].push(*v);
@@ -64,10 +70,49 @@ where
                     for i in 0..3 {
                         points_per_proc[owner].push(self.points[v * 3 + i])
                     }
-                    point_ids_per_proc[owner].push(self.point_indices_to_ids[*v])
+                    point_ids_per_proc[owner].push(self.point_indices_to_ids[*v]);
+                    vertex_counts[owner] += 1;
                 }
             }
         }
+
+        for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
+            let owner = cell_owners[&id];
+            for e in [[1, 2], [0, 2], [0, 1]] {
+                let v0 = self.cells[3*index + e[0]];
+                let v1 = self.cells[3*index + e[1]];
+                let edge = if v0 < v1 {
+                    [v0, v1]
+                } else {
+                    [v1, v0]
+                };
+                    let local_v0 = vertex_indices_per_proc[owner].iter().position(|&r| r == v0).unwrap();
+                    let local_v1 = vertex_indices_per_proc[owner].iter().position(|&r| r == v1).unwrap();
+                    let local_edge = if local_v0 < local_v1 {
+                        [local_v0, local_v1]
+                    } else {
+                        [local_v1, local_v0]
+                    };
+                if edge_owners.get_mut(&edge) == None {
+                    edge_owners.insert(edge, (owner, edge_counts[owner]));
+                    edges_per_proc[owner].push(edge);
+                    edge_vertices0_per_proc[owner].push(local_edge[0]);
+                    edge_vertices1_per_proc[owner].push(local_edge[1]);
+                    edge_owners_per_proc[owner].push(edge_owners[&edge].0);
+                    edge_local_indices_per_proc[owner].push(edge_owners[&edge].1);
+                    edge_counts[owner] += 1;
+                }
+            }
+        }
+
+        println!("points = {:?}", self.points);
+        println!("edge_owners = {edge_owners:?}");
+        println!("points_per_proc = {points_per_proc:?}");
+        println!("edge_owners_per_proc = {edge_owners_per_proc:?}");
+        println!("edge_local_indices_per_proc = {edge_local_indices_per_proc:?}");
+        println!("edge_vertices0_per_proc = {edge_vertices0_per_proc:?}");
+        println!("edge_vertices1_per_proc = {edge_vertices1_per_proc:?}");
+        println!();
 
         for index in 0..ncells {
             for p in 0..size {
@@ -100,6 +145,31 @@ where
                             .unwrap(),
                     );
                 }
+
+                for e in [[1, 2], [0, 2], [0, 1]] {
+                    let v0 = self.cells[3*index + e[0]];
+                    let v1 = self.cells[3*index + e[1]];
+                    let edge = if v0 < v1 {
+                        [v0, v1]
+                    } else {
+                        [v1, v0]
+                    };
+                    let local_v0 = vertex_indices_per_proc[p].iter().position(|&r| r == v0).unwrap();
+                    let local_v1 = vertex_indices_per_proc[p].iter().position(|&r| r == v1).unwrap();
+                    let local_edge = if local_v0 < local_v1 {
+                        [local_v0, local_v1]
+                    } else {
+                        [local_v1, local_v0]
+                    };
+                    if !edges_per_proc[p].contains(&edge) {
+                        edges_per_proc[p].push(edge);
+                        edge_vertices0_per_proc[p].push(local_edge[0]);
+                        edge_vertices1_per_proc[p].push(local_edge[1]);
+                        edge_owners_per_proc[p].push(edge_owners[&edge].0);
+                        edge_local_indices_per_proc[p].push(edge_owners[&edge].1);
+                    }
+                }
+
                 cell_ids_per_proc[p].push(id);
                 cell_owners_per_proc[p].push(cell_owners[&id]);
                 cell_local_indices_per_proc[p].push(
@@ -110,6 +180,13 @@ where
                 );
             }
         }
+
+        println!("edge_owners = {edge_owners:?}");
+        println!("points_per_proc = {points_per_proc:?}");
+        println!("edge_owners_per_proc = {edge_owners_per_proc:?}");
+        println!("edge_local_indices_per_proc = {edge_local_indices_per_proc:?}");
+        println!("edge_vertices0_per_proc = {edge_vertices0_per_proc:?}");
+        println!("edge_vertices1_per_proc = {edge_vertices1_per_proc:?}");
 
         mpi::request::scope(|scope| {
             for p in 1..size {
@@ -145,6 +222,22 @@ where
                     comm.process_at_rank(p as i32)
                         .immediate_send(scope, &cell_local_indices_per_proc[p]),
                 );
+                let _ = WaitGuard::from(
+                    comm.process_at_rank(p as i32)
+                        .immediate_send(scope, &edge_owners_per_proc[p]),
+                );
+                let _ = WaitGuard::from(
+                    comm.process_at_rank(p as i32)
+                        .immediate_send(scope, &edge_local_indices_per_proc[p]),
+                );
+                let _ = WaitGuard::from(
+                    comm.process_at_rank(p as i32)
+                        .immediate_send(scope, &edge_vertices0_per_proc[p]),
+                );
+                let _ = WaitGuard::from(
+                    comm.process_at_rank(p as i32)
+                        .immediate_send(scope, &edge_vertices1_per_proc[p]),
+                );
             }
         });
         self.create_internal(
@@ -157,6 +250,10 @@ where
             &cell_ids_per_proc[rank],
             &cell_owners_per_proc[rank],
             &cell_local_indices_per_proc[rank],
+            &edge_owners_per_proc[rank],
+            &edge_local_indices_per_proc[rank],
+            &edge_vertices0_per_proc[rank],
+            &edge_vertices1_per_proc[rank],
         )
     }
     fn receive_parallel_grid<C: Communicator>(
@@ -174,6 +271,10 @@ where
         let (cell_ids, _status) = root_process.receive_vec::<usize>();
         let (cell_owners, _status) = root_process.receive_vec::<usize>();
         let (cell_local_indices, _status) = root_process.receive_vec::<usize>();
+        let (edge_owners, _status) = root_process.receive_vec::<usize>();
+        let (edge_local_indices, _status) = root_process.receive_vec::<usize>();
+        let (edge_vertices0, _status) = root_process.receive_vec::<usize>();
+        let (edge_vertices1, _status) = root_process.receive_vec::<usize>();
         self.create_internal(
             comm,
             &points,
@@ -184,6 +285,10 @@ where
             &cell_ids,
             &cell_owners,
             &cell_local_indices,
+            &edge_owners,
+            &edge_local_indices,
+            &edge_vertices0,
+            &edge_vertices1,
         )
     }
 }
@@ -204,6 +309,10 @@ where
         cell_ids: &[usize],
         cell_owners: &[usize],
         cell_local_indices: &[usize],
+        edge_owners: &[usize],
+        edge_local_indices: &[usize],
+        edge_vertices0: &[usize],
+        edge_vertices1: &[usize],
     ) -> ParallelGrid<'a, C, FlatTriangleGrid<T>> {
         let rank = comm.rank() as usize;
         let npts = point_ids.len();
@@ -242,6 +351,15 @@ where
             });
         }
 
+        let edge_ownership = edge_owners.iter().zip(edge_local_indices).map(|(i, j)| if *i == rank {
+                Ownership::Owned
+            } else {
+                Ownership::Ghost(*i, *j)
+            }).collect::<Vec<_>>();
+        let edges = edge_vertices0.iter().zip(edge_vertices1).map(|(i, j)| [*i, *j]).collect::<Vec<_>>();
+
+        println!("[{rank}] edge_ownership = {edge_ownership:?}");
+
         let serial_grid = FlatTriangleGrid::new(
             coordinates,
             cells,
@@ -250,6 +368,8 @@ where
             cell_ids.to_vec(),
             cell_ids_to_indices,
             Some(cell_ownership),
+            Some(edges),
+            Some(edge_ownership),
             Some(vertex_ownership),
         );
 

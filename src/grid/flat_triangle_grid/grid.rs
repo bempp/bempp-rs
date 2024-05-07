@@ -45,6 +45,7 @@ pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
 
     // Ownership
     pub(crate) cell_ownership: Option<Vec<Ownership>>,
+    pub(crate) edge_ownership: Option<Vec<Ownership>>,
     pub(crate) vertex_ownership: Option<Vec<Ownership>>,
 }
 
@@ -62,6 +63,8 @@ where
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
         cell_ownership: Option<Vec<Ownership>>,
+        edges: Option<Vec<[usize; 2]>>,
+        edge_ownership: Option<Vec<Ownership>>,
         vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         assert_eq!(coordinates.shape()[1], 3);
@@ -150,7 +153,13 @@ where
             cells_to_entities[0][cell_i].extend_from_slice(cell);
             cells_to_entities[2][cell_i] = vec![cell_i];
         }
-
+        if let Some(e) = edges {
+            for (i, j) in e.iter().enumerate() {
+                edge_indices.insert((j[0], j[1]), i);
+                entities_to_vertices[1].push(vec![j[0], j[1]]);
+                entities_to_cells[1].push(vec![]);
+            }
+        }
         let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
         for cell_i in 0..ncells {
             let cell = &cells[3 * cell_i..3 * (cell_i + 1)];
@@ -172,7 +181,6 @@ where
                 }
             }
         }
-
         Self {
             index_map,
             coordinates,
@@ -192,6 +200,7 @@ where
             cell_indices_to_ids,
             cell_ids_to_indices,
             cell_ownership,
+            edge_ownership,
             vertex_ownership,
         }
     }
@@ -416,6 +425,13 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
             Ownership::Owned
         }
     }
+    fn edge_ownership(&self, index: usize) -> Ownership {
+        if let Some(vo) = &self.edge_ownership {
+            vo[index]
+        } else {
+            Ownership::Owned
+        }
+    }
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
         if dim <= 2 && index < self.cells_to_entities[dim].len() {
             Some(&self.cells_to_entities[dim][index])
@@ -518,6 +534,8 @@ mod test {
             HashMap::from([(0, 0), (1, 1)]),
             None,
             None,
+            None,
+            None,
         )
     }
 
@@ -544,6 +562,8 @@ mod test {
             HashMap::from([(0, 0), (1, 1), (2, 2), (3, 3)]),
             vec![0, 1],
             HashMap::from([(0, 0), (1, 1)]),
+            None,
+            None,
             None,
             None,
         )

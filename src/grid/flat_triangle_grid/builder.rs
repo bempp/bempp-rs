@@ -86,6 +86,8 @@ where
             self.cell_ids_to_indices,
             None,
             None,
+            None,
+            None,
         )
     }
 }

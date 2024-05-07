@@ -2,6 +2,7 @@
 
 mod builder;
 mod cell;
+mod edge;
 mod grid_type;
 mod io;
 #[cfg(feature = "mpi")]
@@ -11,6 +12,7 @@ mod reference_map;
 
 pub use builder::*;
 pub use cell::*;
+pub use edge::*;
 pub use grid_type::*;
 pub use io::*;
 #[cfg(feature = "mpi")]

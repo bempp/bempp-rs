@@ -205,6 +205,9 @@ impl Topology for SingleElementTopology {
             Ownership::Owned
         }
     }
+    fn edge_ownership(&self, index: usize) -> Ownership {
+        Ownership::Owned // TODO
+    }
 
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
         if dim <= self.dim && index < self.cells_to_entities[dim].len() {

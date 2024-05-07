@@ -63,6 +63,9 @@ pub trait Topology {
     /// Get the ownership of a vertex
     fn vertex_ownership(&self, index: Self::IndexType) -> Ownership;
 
+    /// Get the ownership of an edge
+    fn edge_ownership(&self, index: Self::IndexType) -> Ownership;
+
     /// Get the id of a vertex from its index
     fn vertex_index_to_id(&self, index: Self::IndexType) -> usize;
 
