@@ -95,7 +95,7 @@ where
                 } else {
                     [local_v1, local_v0]
                 };
-                if edge_owners.get_mut(&edge) == None {
+                if edge_owners.get_mut(&edge).is_none() {
                     edge_owners.insert(edge, (owner, edge_counts[owner]));
                     edges_per_proc[owner].push(edge);
                     edge_vertices0_per_proc[owner].push(local_edge[0]);

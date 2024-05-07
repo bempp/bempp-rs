@@ -1,8 +1,6 @@
 //! Definition of an edge.
 
-use super::GridType;
-use crate::traits::types::{Ownership, ReferenceCellType};
-use rlst::RlstScalar;
+use crate::traits::types::Ownership;
 
 pub trait EdgeType {
     //! An edge

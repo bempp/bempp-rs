@@ -558,7 +558,6 @@ fn main() {
             println!("Testing assembly with DP{degree} using FlatTriangleGrid in parallel.");
         }
         test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Discontinuous);
-        /*
         if rank == 0 {
             println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
         }
@@ -567,14 +566,12 @@ fn main() {
             println!("Testing assembly with DP{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Discontinuous);
-        */
     }
     for degree in 1..4 {
         if rank == 0 {
             println!("Testing assembly with P{degree} using FlatTriangleGrid in parallel.");
         }
         test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Continuous);
-        /*
         if rank == 0 {
             println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
         }
@@ -583,7 +580,6 @@ fn main() {
             println!("Testing assembly with P{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Continuous);
-        */
     }
 }
 #[cfg(not(feature = "mpi"))]
