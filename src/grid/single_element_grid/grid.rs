@@ -39,6 +39,8 @@ where
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
         cell_ownership: Option<Vec<Ownership>>,
+        edges: Option<Vec<[usize; 2]>>,
+        edge_ownership: Option<Vec<Ownership>>,
         vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         if cell_type == ReferenceCellType::Triangle && cell_degree == 1 {
@@ -62,6 +64,8 @@ where
             &point_indices_to_ids,
             &cell_indices_to_ids,
             cell_ownership,
+            edges,
+            edge_ownership,
             vertex_ownership,
         );
         let geometry = SingleElementGeometry::<T>::new(

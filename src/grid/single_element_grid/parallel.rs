@@ -55,7 +55,6 @@ where
             for v in &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)] {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
-                    vertex_counts[owner] += 1;
                 }
                 if !vertex_indices_per_proc[owner].contains(v) {
                     vertex_indices_per_proc[owner].push(*v);
@@ -64,7 +63,8 @@ where
                     for i in 0..GDIM {
                         points_per_proc[owner].push(self.points[v * GDIM + i])
                     }
-                    point_ids_per_proc[owner].push(self.point_indices_to_ids[*v])
+                    point_ids_per_proc[owner].push(self.point_indices_to_ids[*v]);
+                    vertex_counts[owner] += 1;
                 }
             }
         }
@@ -114,6 +114,8 @@ where
                 );
             }
         }
+
+        println!("cells_per_proc = {cells_per_proc:?}");
 
         mpi::request::scope(|scope| {
             for p in 1..size {
@@ -246,6 +248,17 @@ where
             });
         }
 
+        let mut edge_ownership = vec![];
+        let mut edges = vec![];
+
+        println!("[{rank}] point_ids = {point_ids:?}");
+        println!("[{rank}] vertex_local_indices = {vertex_local_indices:?}");
+
+
+        println!("[{rank}] vertex_ownership = {vertex_ownership:?}");
+        println!("[{rank}] cells = {cells:?}");
+        println!("[{rank}] cell_ownership = {cell_ownership:?}");
+
         let serial_grid = SingleElementGrid::new(
             coordinates,
             cells,
@@ -256,6 +269,8 @@ where
             cell_ids.to_vec(),
             cell_ids_to_indices,
             Some(cell_ownership),
+            Some(edges),
+            Some(edge_ownership),
             Some(vertex_ownership),
         );
 

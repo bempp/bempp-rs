@@ -1,9 +1,10 @@
 //! Parallel grid builder
 
+use crate::element::reference_cell;
 use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
 use crate::grid::parallel_grid::ParallelGrid;
 use crate::traits::grid::ParallelBuilder;
-use crate::traits::types::Ownership;
+use crate::traits::types::{Ownership, ReferenceCellType};
 use mpi::{
     request::WaitGuard,
     topology::Communicator,
@@ -76,11 +77,14 @@ where
             }
         }
 
+        let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
+        
+
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
             let owner = cell_owners[&id];
-            for e in [[1, 2], [0, 2], [0, 1]] {
-                let v0 = self.cells[3 * index + e[0]];
-                let v1 = self.cells[3 * index + e[1]];
+            for e in ref_conn {
+                let v0 = self.cells[3 * index + e[0][0]];
+                let v1 = self.cells[3 * index + e[0][1]];
                 let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
                 let local_v0 = vertex_indices_per_proc[owner]
                     .iter()
@@ -139,9 +143,9 @@ where
                     );
                 }
 
-                for e in [[1, 2], [0, 2], [0, 1]] {
-                    let v0 = self.cells[3 * index + e[0]];
-                    let v1 = self.cells[3 * index + e[1]];
+                for e in ref_conn {
+                    let v0 = self.cells[3 * index + e[0][0]];
+                    let v1 = self.cells[3 * index + e[0][1]];
                     let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
                     let local_v0 = vertex_indices_per_proc[p]
                         .iter()

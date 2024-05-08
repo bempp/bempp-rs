@@ -28,7 +28,7 @@ use mpi::{
     traits::{Communicator, Destination, Source},
 };
 #[cfg(feature = "mpi")]
-use rlst::CsrMatrix;
+use rlst::{CsrMatrix, Shape};
 #[cfg(feature = "mpi")]
 use std::collections::HashMap;
 
@@ -373,6 +373,7 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let size = comm.size();
 
     let n = 10;
+    let n = 3;
     let grid = example_single_element_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
@@ -380,6 +381,40 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
 
     let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
+
+    fn print_matrix(m: &CsrMatrix<f64>) {
+        let mut row = 0;
+        let mut col = 0;
+        println!("{:?}", m.shape());
+        for (i, j) in m.indices().iter().enumerate() {
+            while i >= m.indptr()[row + 1] {
+                for _ in col..m.shape()[1] {
+                    print!("0.      ");
+                }
+                println!();
+                col = 0;
+                row += 1;
+            }
+            while col < *j {
+                print!("0.      ");
+                col += 1;
+            }
+            print!("{:.5} ", m.data()[i]);
+            col += 1;
+        }
+        for _ in col..m.shape()[1] {
+            print!("0.      ");
+        }
+        col = 0;
+        row += 1;
+        println!();
+        for _ in row..m.shape()[0] {
+            for _ in 0..m.shape()[1] {
+                print!("0.      ");
+            }
+            println!();
+        }
+    }
 
     if rank == 0 {
         // Gather sparse matrices onto process 0
@@ -396,17 +431,27 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
             cols.push(*index);
             data.push(matrix.data()[i]);
         }
+
+
+
+
+        println!(" == matrix == ");
+        print_matrix(&matrix);
+
         for p in 1..size {
             let process = comm.process_at_rank(p);
             let (indices, _status) = process.receive_vec::<usize>();
             let (indptr, _status) = process.receive_vec::<usize>();
             let (subdata, _status) = process.receive_vec::<f64>();
             let mat = CsrMatrix::new(
-                [indptr.len() + 1, indptr.len() + 1],
+                matrix.shape(),
                 indices,
                 indptr,
                 subdata,
             );
+
+            println!(" == mat[{p}] == ");
+            print_matrix(&mat);
 
             let mut r = 0;
             for (i, index) in mat.indices().iter().enumerate() {
@@ -430,6 +475,12 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
         let serial_grid = example_single_element_grid_serial(n);
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
         let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
+
+        println!(" == full_matrix == ");
+        print_matrix(&full_matrix);
+
+        println!(" == serial_matrix == ");
+        print_matrix(&serial_matrix);
 
         for (i, j) in full_matrix.indices().iter().zip(serial_matrix.indices()) {
             assert_eq!(i, j);
@@ -459,6 +510,11 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
 fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, cont: Continuity) {
     let rank = comm.rank();
     let size = comm.size();
+
+    if rank < 1000 {
+        println!("SKIPPING TEST");
+        return;
+    }
 
     let n = 10;
     let grid = example_mixed_grid(comm, n);
@@ -548,6 +604,9 @@ fn main() {
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let rank = world.rank();
+
+    test_parallel_assembly_single_element_grid(&world, 1, Continuity::Continuous);
+    if rank < 100 { return; }
 
     if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");

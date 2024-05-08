@@ -36,6 +36,7 @@ pub struct SingleElementTopology {
     cell_ids_to_indices: HashMap<usize, usize>,
     cell_types: [ReferenceCellType; 1],
     cell_ownership: Option<Vec<Ownership>>,
+    edge_ownership: Option<Vec<Ownership>>,
     vertex_ownership: Option<Vec<Ownership>>,
 }
 
@@ -49,6 +50,8 @@ impl SingleElementTopology {
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
         cell_ownership: Option<Vec<Ownership>>,
+        edges: Option<Vec<[usize; 2]>>,
+        edge_ownership: Option<Vec<Ownership>>,
         vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         let size = reference_cell::entity_counts(cell_type)[0];
@@ -103,9 +106,14 @@ impl SingleElementTopology {
             start += size;
         }
 
-        for i in 0..vertices.len() {
-            entities_to_vertices[0].push(vec![i]);
+        entities_to_vertices[0] = (0..vertices.len()).map(|i| vec![i]).collect::<Vec<_>>();
+
+        if let Some(e) = edges {
+            for i in &e {
+                entities_to_vertices[1].push(vec![i[0], i[1]]);
+            }
         }
+
         for d in 1..dim {
             let mut c_to_e = vec![];
             let ref_conn = &reference_cell::connectivity(cell_type)[d];
@@ -148,6 +156,7 @@ impl SingleElementTopology {
             cell_ids_to_indices,
             cell_types: [cell_type],
             cell_ownership,
+            edge_ownership,
             vertex_ownership,
         }
     }
@@ -206,7 +215,11 @@ impl Topology for SingleElementTopology {
         }
     }
     fn edge_ownership(&self, index: usize) -> Ownership {
-        Ownership::Owned // TODO
+        if let Some(eo) = &self.edge_ownership {
+            eo[index]
+        } else {
+            Ownership::Owned
+        }
     }
 
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
@@ -295,6 +308,8 @@ mod test {
             ReferenceCellType::Triangle,
             &[0, 1, 2, 3],
             &[0, 1],
+            None,
+            None,
             None,
             None,
         )
