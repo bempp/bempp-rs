@@ -18,7 +18,8 @@ use bempp::{
         element::Continuity,
         function::FunctionSpace,
         grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
-        types::{Ownership, ReferenceCellType},
+        types::Ownership,
+        // types::{Ownership, ReferenceCellType},
     },
 };
 #[cfg(feature = "mpi")]
@@ -28,7 +29,8 @@ use mpi::{
     traits::{Communicator, Destination, Source},
 };
 #[cfg(feature = "mpi")]
-use rlst::{CsrMatrix, Shape};
+use rlst::CsrMatrix;
+// use rlst::{CsrMatrix, Shape};
 #[cfg(feature = "mpi")]
 use std::collections::HashMap;
 
