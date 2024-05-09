@@ -1,4 +1,4 @@
-    //? mpirun -n {{NPROCESSES}} --features "mpi"
+//? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
 use approx::assert_relative_eq;
