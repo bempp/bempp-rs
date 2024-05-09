@@ -43,6 +43,10 @@ jobs:
         run: cargo test --examples --release ${{ matrix.feature-flags }}
       - name: Test benchmarks build
         run: cargo bench --no-run --features "mpi,strict"
+
+      - name: look for blis so file
+        run: find target | grep libblis
+
       - name: Run examples
         run: |
           python3 find_examples.py
