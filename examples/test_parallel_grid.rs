@@ -100,7 +100,7 @@ fn example_flat_triangle_grid_serial(n: usize) -> FlatTriangleGrid<f64> {
     create_flat_triangle_grid_data(&mut b, n);
     b.create_grid()
 }
-
+/*
 #[cfg(feature = "mpi")]
 fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<3, f64>, n: usize) {
     for y in 0..n {
@@ -162,7 +162,7 @@ fn example_single_element_grid_serial(n: usize) -> SingleElementGrid<f64> {
     create_single_element_grid_data(&mut b, n);
     b.create_grid()
 }
-/*
+
 #[cfg(feature = "mpi")]
 fn create_mixed_grid_data(b: &mut MixedGridBuilder<3, f64>, n: usize) {
     for y in 0..n {
