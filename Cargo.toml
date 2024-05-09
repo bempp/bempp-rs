@@ -40,6 +40,7 @@ criterion = { version = "0.5.*", features = ["html_reports"]}
 kifmm = { git = "https://github.com/bempp/kifmm.git" }
 blas-src = { version = "0.10", features = ["blis"]}
 lapack-src = { version = "0.10", features = ["netlib"]}
+blis-src = { version = "0.2.*" }
 
 [[bench]]
 name = "assembly_benchmark"
@@ -54,4 +55,3 @@ wildcard_imports = "forbid"
 [target.aarch64-apple-darwin.dev-dependencies]
 blas-src = { version = "0.10", features = ["accelerate"]}
 lapack-src = { version = "0.10", features = ["accelerate"]}
-
