@@ -585,11 +585,6 @@ fn main() {
     let world = universe.world();
     let rank = world.rank();
 
-    test_parallel_assembly_single_element_grid(&world, 1, Continuity::Continuous);
-    if rank < 100 {
-        return;
-    }
-
     if rank == 0 {
         println!("Testing FlatTriangleGrid in parallel.");
     }
