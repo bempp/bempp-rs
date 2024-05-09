@@ -27,9 +27,9 @@ jobs:
         with:
           mpi: mpich
       - uses: actions/checkout@v3
-      - name: Install LAPACK & OpenBLAS
+      - name: Install LAPACK, OpenBLAS, Blis
         run:
-          sudo apt-get install libopenblas-dev liblapack-dev
+          sudo apt-get install -y libopenblas-dev liblapack-dev libblis-dev
 
       - name: Style checks
         run: |

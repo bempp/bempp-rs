@@ -25,9 +25,9 @@ jobs:
       - name: Install cargo-mpirun
         run: cargo install cargo-mpirun
       - uses: actions/checkout@v3
-      - name: Install LAPACK & OpenBLAS
+      - name: Install LAPACK, OpenBLAS, Blis
         run:
-          sudo apt-get install libopenblas-dev liblapack-dev
+          sudo apt-get install -y libopenblas-dev liblapack-dev libblis-dev
 
       - name: Build rust library
         run: cargo build --features "strict"
