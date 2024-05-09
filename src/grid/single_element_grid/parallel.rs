@@ -1,8 +1,8 @@
 //! Parallel grid builder
 
 use crate::element::reference_cell;
-use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
 use crate::grid::parallel_grid::ParallelGrid;
+use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
 use crate::traits::grid::ParallelBuilder;
 use crate::traits::types::{Ownership, ReferenceCellType};
 use mpi::{
@@ -112,7 +112,9 @@ where
 
         for index in 0..ncells {
             for p in 0..size {
-                for v in &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)] {
+                for v in
+                    &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
+                {
                     if vertex_indices_per_proc[p].contains(v) {
                         cell_indices_per_proc[p].push(index);
                         break;
@@ -124,7 +126,9 @@ where
         for p in 0..size {
             for index in &cell_indices_per_proc[p] {
                 let id = self.cell_indices_to_ids[*index];
-                for v in &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)] {
+                for v in
+                    &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
+                {
                     if !vertex_indices_per_proc[p].contains(v) {
                         vertex_indices_per_proc[p].push(*v);
                         vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);

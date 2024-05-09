@@ -190,14 +190,6 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
             }
         }
 
-        println!("[{rank}] cell_dofs = {cell_dofs:?}");
-        println!("[{rank}] entity_dofs = {entity_dofs:?}");
-        println!("[{rank}] dofmap_size = {dofmap_size:?}");
-        println!("[{rank}] owner_data = {owner_data:?}");
-        println!("[{rank}] global_dof_numbers = {global_dof_numbers:?}");
-
-        
-
         let serial_space = SerialFunctionSpace {
             grid: grid.local_grid(),
             elements,

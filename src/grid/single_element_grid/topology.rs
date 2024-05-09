@@ -44,6 +44,7 @@ unsafe impl Sync for SingleElementTopology {}
 
 impl SingleElementTopology {
     /// Create a topology
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         cells_input: &[usize],
         cell_type: ReferenceCellType,
@@ -106,11 +107,8 @@ impl SingleElementTopology {
             start += size;
         }
 
-        println!("{vertices:?}");
-
         entities_to_vertices[0] = (0..vertices.len()).map(|i| vec![i]).collect::<Vec<_>>();
 
-        println!("{edges:?}");
         if let Some(e) = edges {
             for i in &e {
                 entities_to_vertices[1].push(vec![i[0], i[1]]);

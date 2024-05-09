@@ -78,7 +78,6 @@ where
         }
 
         let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
-        
 
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
             let owner = cell_owners[&id];

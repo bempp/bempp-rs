@@ -179,18 +179,8 @@ fn assemble_batch_singular<
             k.data_mut(),
         );
 
-        use crate::traits::grid::PointType;
-
         let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
         let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
-        print!("cell vertices = {{ ");
-        for v in grid.cell_from_index(*test_cell).topology().vertex_indices() {
-            print!("{} ", grid.vertex_from_index(v).id());
-        }
-        println!("}}");
-        println!("test_cell = {test_cell}");
-        println!("test_dofs = {test_dofs:?}");
-        println!();
         for (test_i, test_dof) in test_dofs.iter().enumerate() {
             for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
                 let mut sum = num::cast::<f64, T>(0.0).unwrap();
