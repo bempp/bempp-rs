@@ -49,10 +49,11 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 [lints.clippy]
 wildcard_imports = "forbid"
 
+[dev-dependencies]
+blas-src = { version = "0.10", features = ["blis"]}
+lapack-src = { version = "0.10", features = ["netlib"]}
+
 [target.aarch64-apple-darwin.dev-dependencies]
 blas-src = { version = "0.10", features = ["accelerate"]}
 lapack-src = { version = "0.10", features = ["accelerate"]}
 
-[target.x86_64-unknown-linux-gnu.dev-dependencies]
-blas-src = { version = "0.10", features = ["blis"]}
-lapack-src = { version = "0.10", features = ["netlib"]}
