@@ -50,9 +50,9 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 wildcard_imports = "forbid"
 
 [target.aarch64-apple-darwin.dev-dependencies]
-blas-src = { version = "0.10", features = ["accelerate"]}
+blas-src = { version = "0.9", features = ["accelerate"]}
 lapack-src = { version = "0.10", features = ["accelerate"]}
 
 [target.x86_64-unknown-linux-gnu.dev-dependencies]
-blas-src = { version = "0.10", features = ["blis"]}
+blas-src = { version = "0.9", features = ["blis"]}
 lapack-src = { version = "0.10", features = ["netlib"]}
