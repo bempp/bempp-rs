@@ -23,7 +23,7 @@ crate-type = ["lib", "cdylib"]
 approx = "0.5"
 cauchy = "0.4.*"
 itertools = "0.12.*"
-mpi = { version = "0.8.*", optional = true }
+mpi = { version = "0.7.*", optional = true }
 num = "0.4"
 paste = "1.*"
 lazy_static = "1.4"
