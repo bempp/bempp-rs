@@ -5,8 +5,6 @@
 mod builder;
 mod grid;
 mod io;
-#[cfg(feature = "mpi")]
-mod parallel;
 
 pub use self::builder::FlatTriangleGridBuilder;
 pub use self::grid::FlatTriangleGrid;

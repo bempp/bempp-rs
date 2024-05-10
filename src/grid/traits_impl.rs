@@ -7,10 +7,6 @@ use crate::traits::grid::{
     CellType, EdgeType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
-#[cfg(feature = "mpi")]
-use crate::{grid::parallel_grid::ParallelGrid, traits::grid::ParallelGridType};
-#[cfg(feature = "mpi")]
-use mpi::traits::Communicator;
 use num::Float;
 use rlst::RlstScalar;
 use std::iter::Copied;
@@ -430,21 +426,5 @@ where
 
     fn cell_types(&self) -> &[ReferenceCellType] {
         self.topology().cell_types()
-    }
-}
-
-#[cfg(feature = "mpi")]
-impl<'comm, T: RlstScalar<Real = T> + Float, C: Communicator, G: Grid<T = T> + GridType<T = T>>
-    ParallelGridType for ParallelGrid<'comm, C, G>
-{
-    type Comm = C;
-    type LocalGridType = G;
-
-    fn comm(&self) -> &C {
-        self.comm
-    }
-
-    fn local_grid(&self) -> &G {
-        &self.serial_grid
     }
 }

@@ -6,8 +6,6 @@ mod builder;
 mod geometry;
 mod grid;
 mod io;
-//#[cfg(feature = "mpi")]
-//mod parallel;
 mod topology;
 
 pub use self::builder::MixedGridBuilder;
