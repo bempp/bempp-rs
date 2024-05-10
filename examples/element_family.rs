@@ -4,7 +4,6 @@ use bempp::traits::{
     types::ReferenceCellType,
 };
 
-extern crate blas_src;
 extern crate lapack_src;
 
 fn main() {

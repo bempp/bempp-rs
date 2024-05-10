@@ -5,7 +5,6 @@ use bempp::grid::shapes::regular_sphere;
 use bempp::traits::{element::Continuity, function::FunctionSpace, types::ReferenceCellType};
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
-extern crate blas_src;
 extern crate lapack_src;
 
 fn main() {

@@ -5,7 +5,6 @@ use bempp::traits::{
 };
 use rlst::{rlst_dynamic_array2, rlst_dynamic_array4, RawAccess};
 
-extern crate blas_src;
 extern crate lapack_src;
 
 fn main() {

@@ -8,7 +8,6 @@ use bempp::traits::function::FunctionSpace;
 use cauchy::c64;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
-extern crate blas_src;
 extern crate lapack_src;
 
 #[test]

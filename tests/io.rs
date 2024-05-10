@@ -5,7 +5,6 @@ use bempp::grid::single_element_grid::SingleElementGridBuilder;
 use bempp::traits::grid::{Builder, GmshIO};
 use bempp::traits::types::ReferenceCellType;
 
-extern crate blas_src;
 extern crate lapack_src;
 
 #[test]

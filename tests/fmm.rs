@@ -20,7 +20,6 @@ use rlst::{
     RawAccess, RawAccessMut,
 };
 
-extern crate blas_src;
 extern crate lapack_src;
 
 fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64> + Sync>(

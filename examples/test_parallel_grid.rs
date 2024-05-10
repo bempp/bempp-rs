@@ -32,7 +32,6 @@ use rlst::CsrMatrix;
 #[cfg(feature = "mpi")]
 use std::collections::HashMap;
 
-extern crate blas_src;
 extern crate lapack_src;
 
 #[cfg(feature = "mpi")]
