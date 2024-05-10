@@ -32,8 +32,8 @@ use rlst::CsrMatrix;
 #[cfg(feature = "mpi")]
 use std::collections::HashMap;
 
-extern crate blas_src;
 extern crate lapack_src;
+// extern crate blas_src;
 
 #[cfg(feature = "mpi")]
 fn create_flat_triangle_grid_data(b: &mut FlatTriangleGridBuilder<f64>, n: usize) {

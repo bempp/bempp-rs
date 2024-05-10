@@ -51,7 +51,7 @@ where
         let mut cell_local_indices_per_proc = vec![vec![]; size];
 
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
-            let owner = cell_owners[&id];
+            let owner = cell_owners[id];
             for v in &self.cells[3 * index..3 * (index + 1)] {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
