@@ -63,7 +63,7 @@ where
         }
 
         for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
-            let owner = cell_owners[&id];
+            let owner = cell_owners[id];
             for v in &self.cells[cell_starts[index]..cell_ends[index]] {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
