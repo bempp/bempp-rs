@@ -6,6 +6,7 @@ use bempp::traits::grid::{Builder, GmshIO};
 use bempp::traits::types::ReferenceCellType;
 
 extern crate lapack_src;
+extern crate blas_src;
 
 #[test]
 fn test_regular_sphere_gmsh_io() {

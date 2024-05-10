@@ -5,6 +5,7 @@ use bempp::traits::{
 };
 
 extern crate lapack_src;
+extern crate blas_src;
 
 /// Creating a mixed grid
 ///

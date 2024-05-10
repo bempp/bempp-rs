@@ -2,6 +2,7 @@ use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
 use bempp::traits::grid::{Builder, CellType, GeometryType, GridType, PointType};
 
 extern crate lapack_src;
+extern crate blas_src;
 
 /// Creating a flat triangle grid
 ///

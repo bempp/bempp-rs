@@ -5,6 +5,7 @@ use bempp::traits::grid::{Builder, CellType, GeometryType, GridType, PointType, 
 use bempp::traits::types::ReferenceCellType;
 
 extern crate lapack_src;
+extern crate blas_src;
 
 #[test]
 fn test_grid_mixed_cell_type() {
