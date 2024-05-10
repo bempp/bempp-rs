@@ -136,6 +136,9 @@ impl<'comm, C: Communicator, G: Grid> Topology for ParallelGrid<'comm, C, G> {
     fn vertex_ownership(&self, index: Self::IndexType) -> Ownership {
         self.serial_grid.topology().vertex_ownership(index)
     }
+    fn edge_ownership(&self, index: Self::IndexType) -> Ownership {
+        self.serial_grid.topology().edge_ownership(index)
+    }
     fn vertex_index_to_id(&self, index: Self::IndexType) -> usize {
         self.serial_grid.topology().vertex_index_to_id(index)
     }

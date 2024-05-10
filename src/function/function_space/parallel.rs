@@ -94,8 +94,9 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         // Assign global DOF numbers
         let mut global_dof_numbers = vec![0; dofmap_size];
         let mut ghost_indices = vec![vec![]; size as usize];
-        let mut ghost_cells = vec![vec![]; size as usize];
-        let mut ghost_cell_dofs = vec![vec![]; size as usize];
+        let mut ghost_dims = vec![vec![]; size as usize];
+        let mut ghost_entities = vec![vec![]; size as usize];
+        let mut ghost_entity_dofs = vec![vec![]; size as usize];
 
         let local_offset = if rank == 0 {
             0
@@ -110,8 +111,9 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
                 dof_n += 1;
             } else {
                 ghost_indices[ownership.0].push(i);
-                ghost_cells[ownership.0].push(ownership.1);
-                ghost_cell_dofs[ownership.0].push(ownership.2);
+                ghost_dims[ownership.0].push(ownership.1);
+                ghost_entities[ownership.0].push(ownership.2);
+                ghost_entity_dofs[ownership.0].push(ownership.3);
             }
         }
         if rank < size - 1 {
@@ -139,10 +141,11 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
             if p != rank {
                 mpi::request::scope(|scope| {
                     let process = comm.process_at_rank(p);
+                    let _ = WaitGuard::from(process.immediate_send(scope, &ghost_dims[p as usize]));
                     let _ =
-                        WaitGuard::from(process.immediate_send(scope, &ghost_cells[p as usize]));
+                        WaitGuard::from(process.immediate_send(scope, &ghost_entities[p as usize]));
                     let _ = WaitGuard::from(
-                        process.immediate_send(scope, &ghost_cell_dofs[p as usize]),
+                        process.immediate_send(scope, &ghost_entity_dofs[p as usize]),
                     );
                 });
             }
@@ -151,12 +154,13 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
         for p in 0..size {
             if p != rank {
                 let process = comm.process_at_rank(p);
-                let (gcells, _status) = process.receive_vec::<usize>();
-                let (gdofs, _status) = process.receive_vec::<usize>();
-                let local_ghost_dofs = gcells
+                let (gdims, _status) = process.receive_vec::<usize>();
+                let (gentities, _status) = process.receive_vec::<usize>();
+                let (gentity_dofs, _status) = process.receive_vec::<usize>();
+                let local_ghost_dofs = gdims
                     .iter()
-                    .zip(&gdofs)
-                    .map(|(c, d)| cell_dofs[*c][*d])
+                    .zip(gentities.iter().zip(&gentity_dofs))
+                    .map(|(c, (e, d))| entity_dofs[*c][*e][*d])
                     .collect::<Vec<_>>();
                 let global_ghost_dofs = local_ghost_dofs
                     .iter()

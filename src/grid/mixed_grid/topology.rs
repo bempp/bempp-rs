@@ -320,6 +320,9 @@ impl Topology for MixedTopology {
             Ownership::Owned
         }
     }
+    fn edge_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
+        Ownership::Owned // TODO
+    }
 
     fn entity_to_cells(
         &self,

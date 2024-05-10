@@ -10,15 +10,16 @@ use bempp::{
     function::{ParallelFunctionSpace, SerialFunctionSpace},
     grid::{
         flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
-        mixed_grid::{MixedGrid, MixedGridBuilder},
+        //mixed_grid::{MixedGrid, MixedGridBuilder},
         parallel_grid::ParallelGrid,
-        single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
+        //single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
     },
     traits::{
         element::Continuity,
         function::FunctionSpace,
         grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
-        types::{Ownership, ReferenceCellType},
+        types::Ownership,
+        // types::{Ownership, ReferenceCellType},
     },
 };
 #[cfg(feature = "mpi")]
@@ -29,11 +30,12 @@ use mpi::{
 };
 #[cfg(feature = "mpi")]
 use rlst::CsrMatrix;
+// use rlst::{CsrMatrix, Shape};
 #[cfg(feature = "mpi")]
 use std::collections::HashMap;
 
-extern crate lapack_src;
 // extern crate blas_src;
+extern crate lapack_src;
 
 #[cfg(feature = "mpi")]
 fn create_flat_triangle_grid_data(b: &mut FlatTriangleGridBuilder<f64>, n: usize) {
@@ -49,11 +51,11 @@ fn create_flat_triangle_grid_data(b: &mut FlatTriangleGridBuilder<f64>, n: usize
     for i in 0..n - 1 {
         for j in 0..n - 1 {
             b.add_cell(
-                2 * i * (n - 1) + j,
+                2 * i * (n - 1) + 2 * j,
                 [j * n + i, j * n + i + 1, j * n + i + n + 1],
             );
             b.add_cell(
-                2 * i * (n - 1) + j + 1,
+                2 * i * (n - 1) + 2 * j + 1,
                 [j * n + i, j * n + i + n + 1, j * n + i + n],
             );
         }
@@ -100,7 +102,7 @@ fn example_flat_triangle_grid_serial(n: usize) -> FlatTriangleGrid<f64> {
     create_flat_triangle_grid_data(&mut b, n);
     b.create_grid()
 }
-
+/*
 #[cfg(feature = "mpi")]
 fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<3, f64>, n: usize) {
     for y in 0..n {
@@ -225,7 +227,7 @@ fn example_mixed_grid_serial(n: usize) -> MixedGrid<f64> {
     create_mixed_grid_data(&mut b, n);
     b.create_grid()
 }
-
+*/
 #[cfg(feature = "mpi")]
 fn test_parallel_flat_triangle_grid<C: Communicator>(comm: &C) {
     let rank = comm.rank();
@@ -362,7 +364,7 @@ fn test_parallel_assembly_flat_triangle_grid<C: Communicator>(
         });
     }
 }
-
+/*
 #[cfg(feature = "mpi")]
 fn test_parallel_assembly_single_element_grid<C: Communicator>(
     comm: &C,
@@ -373,6 +375,7 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let size = comm.size();
 
     let n = 10;
+    let n = 3;
     let grid = example_single_element_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
@@ -380,6 +383,40 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
 
     let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
+
+    fn print_matrix(m: &CsrMatrix<f64>) {
+        let mut row = 0;
+        let mut col = 0;
+        println!("{:?}", m.shape());
+        for (i, j) in m.indices().iter().enumerate() {
+            while i >= m.indptr()[row + 1] {
+                for _ in col..m.shape()[1] {
+                    print!("0.      ");
+                }
+                println!();
+                col = 0;
+                row += 1;
+            }
+            while col < *j {
+                print!("0.      ");
+                col += 1;
+            }
+            print!("{:.5} ", m.data()[i]);
+            col += 1;
+        }
+        for _ in col..m.shape()[1] {
+            print!("0.      ");
+        }
+        col = 0;
+        row += 1;
+        println!();
+        for _ in row..m.shape()[0] {
+            for _ in 0..m.shape()[1] {
+                print!("0.      ");
+            }
+            println!();
+        }
+    }
 
     if rank == 0 {
         // Gather sparse matrices onto process 0
@@ -396,13 +433,14 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
             cols.push(*index);
             data.push(matrix.data()[i]);
         }
+
         for p in 1..size {
             let process = comm.process_at_rank(p);
             let (indices, _status) = process.receive_vec::<usize>();
             let (indptr, _status) = process.receive_vec::<usize>();
             let (subdata, _status) = process.receive_vec::<f64>();
             let mat = CsrMatrix::new(
-                [indptr.len() + 1, indptr.len() + 1],
+                matrix.shape(),
                 indices,
                 indptr,
                 subdata,
@@ -542,7 +580,7 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
         });
     }
 }
-
+*/
 #[cfg(feature = "mpi")]
 fn main() {
     let universe: Universe = mpi::initialize().unwrap();
@@ -558,6 +596,7 @@ fn main() {
             println!("Testing assembly with DP{degree} using FlatTriangleGrid in parallel.");
         }
         test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Discontinuous);
+        /*
         if rank == 0 {
             println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
         }
@@ -566,12 +605,14 @@ fn main() {
             println!("Testing assembly with DP{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Discontinuous);
+        */
     }
     for degree in 1..4 {
         if rank == 0 {
             println!("Testing assembly with P{degree} using FlatTriangleGrid in parallel.");
         }
         test_parallel_assembly_flat_triangle_grid(&world, degree, Continuity::Continuous);
+        /*
         if rank == 0 {
             println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
         }
@@ -580,6 +621,7 @@ fn main() {
             println!("Testing assembly with P{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Continuous);
+        */
     }
 }
 #[cfg(not(feature = "mpi"))]

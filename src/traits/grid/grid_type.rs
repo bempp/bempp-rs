@@ -1,6 +1,6 @@
 //! Definition of a grid
 
-use super::{CellType, PointType, ReferenceMapType};
+use super::{CellType, EdgeType, PointType, ReferenceMapType};
 use crate::traits::types::{CellIterator, CellLocalIndexPair, PointIterator, ReferenceCellType};
 use rlst::RlstScalar;
 
@@ -17,6 +17,12 @@ pub trait GridType: std::marker::Sized {
     ///
     /// Vertices are the points that are at the vertex of a cell in the grid
     type Vertex<'a>: PointType
+    where
+        Self: 'a;
+    /// The type used for an edge
+    ///
+    /// Vertices are the points that are at the vertex of a cell in the grid
+    type Edge<'a>: EdgeType
     where
         Self: 'a;
     /// The type used for a cell
@@ -74,6 +80,9 @@ pub trait GridType: std::marker::Sized {
 
     /// Get a vertex from its index
     fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_>;
+
+    /// Get a vertex from its index
+    fn edge_from_index(&self, index: usize) -> Self::Edge<'_>;
 
     /// Get a cell from its index
     fn cell_from_index(&self, index: usize) -> Self::Cell<'_>;
