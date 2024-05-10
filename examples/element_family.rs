@@ -4,8 +4,8 @@ use bempp::traits::{
     types::ReferenceCellType,
 };
 
-extern crate lapack_src;
 extern crate blas_src;
+extern crate lapack_src;
 
 fn main() {
     // Create the degree 2 Lagrange element family. A family is a set of finite elements with the

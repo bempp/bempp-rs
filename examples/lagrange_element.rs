@@ -5,8 +5,8 @@ use bempp::traits::{
 };
 use rlst::{rlst_dynamic_array2, rlst_dynamic_array4, RawAccess};
 
-extern crate lapack_src;
 extern crate blas_src;
+extern crate lapack_src;
 
 fn main() {
     // Create a P2 element on a triangle

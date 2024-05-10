@@ -14,8 +14,8 @@ use cauchy::c64;
 use paste::paste;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
-extern crate lapack_src;
 extern crate blas_src;
+extern crate lapack_src;
 
 fn mixed_grid() -> MixedGrid<f64> {
     let mut b = MixedGridBuilder::<3, f64>::new(());
