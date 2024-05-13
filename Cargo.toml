@@ -31,13 +31,13 @@ libc = "0.2"
 log = "0.4"
 rayon = "1.9"
 rand = "0.8.5"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-green-kernels = { git = "https://github.com/bempp/green-kernels.git" }
+rlst = { version = "0.1" }
+green-kernels = { version = "0.1" }
 thiserror="1.*"
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}
-kifmm = { git = "https://github.com/bempp/kifmm.git" }
+kifmm = { version = "0.1" }
 blas-src = { version = "0.10", features = ["blis"]}
 lapack-src = { version = "0.10", features = ["netlib"]}
 
