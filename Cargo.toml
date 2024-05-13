@@ -4,7 +4,7 @@ strict = []
 
 [package]
 name = "bempp"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2021"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Srinath Kailasa <srinathkailasa@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 description = "Boundary element method library."
