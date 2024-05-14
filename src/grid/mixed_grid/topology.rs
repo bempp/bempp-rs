@@ -305,6 +305,12 @@ impl Topology for MixedTopology {
             panic!("Vertex with id {} not found", id);
         }
     }
+    fn edge_id_to_index(&self, id: usize) -> usize {
+        id
+    }
+    fn edge_index_to_id(&self, id: usize) -> usize {
+        id
+    }
     fn cell_id_to_index(&self, id: usize) -> IndexType {
         self.cell_ids_to_indices[&id]
     }

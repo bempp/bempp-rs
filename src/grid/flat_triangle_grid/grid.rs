@@ -451,6 +451,12 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
     fn vertex_id_to_index(&self, id: usize) -> usize {
         self.point_ids_to_indices[&id]
     }
+    fn edge_id_to_index(&self, id: usize) -> usize {
+        id
+    }
+    fn edge_index_to_id(&self, id: usize) -> usize {
+        id
+    }
     fn cell_id_to_index(&self, id: usize) -> usize {
         self.cell_ids_to_indices[&id]
     }

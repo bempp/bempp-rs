@@ -61,6 +61,7 @@ impl<G: Grid> Topology for LocalGrid<G> {
         self.cell_ownership[&index]
     }
     fn vertex_ownership(&self, index: usize) -> Ownership {
+        println!("{index}");
         self.vertex_ownership[&index]
     }
     fn edge_ownership(&self, index: usize) -> Ownership {
@@ -69,11 +70,17 @@ impl<G: Grid> Topology for LocalGrid<G> {
     fn vertex_index_to_id(&self, index: usize) -> usize {
         self.serial_grid.topology().vertex_index_to_id(index)
     }
+    fn edge_index_to_id(&self, index: usize) -> usize {
+        self.serial_grid.topology().edge_index_to_id(index)
+    }
     fn cell_index_to_id(&self, index: Self::IndexType) -> usize {
         self.serial_grid.topology().cell_index_to_id(index)
     }
     fn vertex_id_to_index(&self, id: usize) -> usize {
         self.serial_grid.topology().vertex_id_to_index(id)
+    }
+    fn edge_id_to_index(&self, id: usize) -> usize {
+        self.serial_grid.topology().edge_id_to_index(id)
     }
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType {
         self.serial_grid.topology().cell_id_to_index(id)
@@ -193,11 +200,17 @@ impl<'comm, C: Communicator, G: Grid> Topology for ParallelGrid<'comm, C, G> {
     fn vertex_index_to_id(&self, index: usize) -> usize {
         self.local_grid.topology().vertex_index_to_id(index)
     }
+    fn edge_index_to_id(&self, index: usize) -> usize {
+        self.local_grid.topology().edge_index_to_id(index)
+    }
     fn cell_index_to_id(&self, index: Self::IndexType) -> usize {
         self.local_grid.topology().cell_index_to_id(index)
     }
     fn vertex_id_to_index(&self, id: usize) -> usize {
         self.local_grid.topology().vertex_id_to_index(id)
+    }
+    fn edge_id_to_index(&self, id: usize) -> usize {
+        self.local_grid.topology().edge_id_to_index(id)
     }
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType {
         self.local_grid.topology().cell_id_to_index(id)
