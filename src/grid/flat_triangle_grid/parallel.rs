@@ -325,39 +325,46 @@ where
             cell_ids_to_indices.insert(*id, index);
         }
 
-        let mut cell_ownership = vec![];
+        let mut cell_ownership = HashMap::new();
         for index in 0..ncells {
-            cell_ownership.push(if cell_owners[index] == rank {
-                Ownership::Owned
-            } else {
-                Ownership::Ghost(cell_owners[index], cell_local_indices[index])
-            });
-        }
-        let mut vertex_ownership = vec![];
-        for index in 0..npts {
-            vertex_ownership.push(if vertex_owners[index] == rank {
-                Ownership::Owned
-            } else {
-                Ownership::Ghost(vertex_owners[index], vertex_local_indices[index])
-            });
-        }
-
-        let edge_ownership = edge_owners
-            .iter()
-            .zip(edge_local_indices)
-            .map(|(i, j)| {
-                if *i == rank {
+            cell_ownership.insert(
+                index,
+                if cell_owners[index] == rank {
                     Ownership::Owned
                 } else {
-                    Ownership::Ghost(*i, *j)
-                }
-            })
-            .collect::<Vec<_>>();
-        let edges = edge_vertices0
-            .iter()
-            .zip(edge_vertices1)
-            .map(|(i, j)| [*i, *j])
-            .collect::<Vec<_>>();
+                    Ownership::Ghost(cell_owners[index], cell_local_indices[index])
+                },
+            );
+        }
+        let mut vertex_ownership = HashMap::new();
+        for index in 0..npts {
+            vertex_ownership.insert(
+                index,
+                if vertex_owners[index] == rank {
+                    Ownership::Owned
+                } else {
+                    Ownership::Ghost(vertex_owners[index], vertex_local_indices[index])
+                },
+            );
+        }
+
+        let nedges = edge_owners.len();
+        let mut edge_ownership = HashMap::new();
+        for index in 0..nedges {
+            edge_ownership.insert(
+                index,
+                if edge_owners[index] == rank {
+                    Ownership::Owned
+                } else {
+                    Ownership::Ghost(edge_owners[index], edge_local_indices[index])
+                },
+            );
+        }
+
+        let mut edge_ids = HashMap::new();
+        for (n, (i, j)) in edge_vertices0.iter().zip(edge_vertices1).enumerate() {
+            edge_ids.insert([*i, *j], n);
+        }
 
         let serial_grid = FlatTriangleGrid::new(
             coordinates,
@@ -366,12 +373,15 @@ where
             point_ids_to_indices,
             cell_ids.to_vec(),
             cell_ids_to_indices,
-            Some(cell_ownership),
-            Some(edges),
-            Some(edge_ownership),
-            Some(vertex_ownership),
+            Some(edge_ids),
         );
 
-        ParallelGrid::new(comm, serial_grid)
+        ParallelGrid::new(
+            comm,
+            serial_grid,
+            vertex_ownership,
+            edge_ownership,
+            cell_ownership,
+        )
     }
 }

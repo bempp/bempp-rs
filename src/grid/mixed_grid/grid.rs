@@ -5,7 +5,7 @@ use crate::element::reference_cell;
 use crate::grid::mixed_grid::{geometry::MixedGeometry, topology::MixedTopology};
 use crate::grid::traits::Grid;
 use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::{Ownership, ReferenceCellType};
+use crate::traits::types::ReferenceCellType;
 use log::warn;
 use num::Float;
 use rlst::RlstScalar;
@@ -35,8 +35,6 @@ where
         point_indices_to_ids: Vec<usize>,
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
-        cell_ownership: Option<Vec<Ownership>>,
-        vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         let mut element_info = vec![];
         let mut element_numbers = vec![];
@@ -73,8 +71,6 @@ where
             cell_types,
             &point_indices_to_ids,
             &cell_indices_to_ids,
-            cell_ownership,
-            vertex_ownership,
         );
         let geometry = MixedGeometry::<T>::new(
             points,

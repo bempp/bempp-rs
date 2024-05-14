@@ -42,11 +42,6 @@ pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     point_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
-
-    // Ownership
-    pub(crate) cell_ownership: Option<Vec<Ownership>>,
-    pub(crate) edge_ownership: Option<Vec<Ownership>>,
-    pub(crate) vertex_ownership: Option<Vec<Ownership>>,
 }
 
 impl<T: Float + RlstScalar<Real = T>> FlatTriangleGrid<T>
@@ -62,10 +57,7 @@ where
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
-        cell_ownership: Option<Vec<Ownership>>,
-        edges: Option<Vec<[usize; 2]>>,
-        edge_ownership: Option<Vec<Ownership>>,
-        vertex_ownership: Option<Vec<Ownership>>,
+        edge_ids: Option<HashMap<[usize; 2], usize>>,
     ) -> Self {
         assert_eq!(coordinates.shape()[1], 3);
         let ncells = cells.len() / 3;
@@ -153,10 +145,10 @@ where
             cells_to_entities[0][cell_i].extend_from_slice(cell);
             cells_to_entities[2][cell_i] = vec![cell_i];
         }
-        if let Some(e) = edges {
-            for (i, j) in e.iter().enumerate() {
-                edge_indices.insert((j[0], j[1]), i);
-                entities_to_vertices[1].push(vec![j[0], j[1]]);
+        if let Some(e) = edge_ids {
+            for (i, j) in e.into_iter() {
+                edge_indices.insert((i[0], i[1]), j);
+                entities_to_vertices[1].push(vec![i[0], i[1]]);
                 entities_to_cells[1].push(vec![]);
             }
         }
@@ -199,9 +191,6 @@ where
             point_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
-            cell_ownership,
-            edge_ownership,
-            vertex_ownership,
         }
     }
 }
@@ -411,26 +400,14 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn cell_ownership(&self, index: usize) -> Ownership {
-        if let Some(co) = &self.cell_ownership {
-            co[index]
-        } else {
-            Ownership::Owned
-        }
+    fn cell_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
     }
-    fn vertex_ownership(&self, index: usize) -> Ownership {
-        if let Some(vo) = &self.vertex_ownership {
-            vo[index]
-        } else {
-            Ownership::Owned
-        }
+    fn vertex_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
     }
-    fn edge_ownership(&self, index: usize) -> Ownership {
-        if let Some(vo) = &self.edge_ownership {
-            vo[index]
-        } else {
-            Ownership::Owned
-        }
+    fn edge_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
     }
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
         if dim <= 2 && index < self.cells_to_entities[dim].len() {
@@ -518,9 +495,6 @@ mod test {
             vec![0, 1],
             HashMap::from([(0, 0), (1, 1)]),
             None,
-            None,
-            None,
-            None,
         )
     }
 
@@ -547,9 +521,6 @@ mod test {
             HashMap::from([(0, 0), (1, 1), (2, 2), (3, 3)]),
             vec![0, 1],
             HashMap::from([(0, 0), (1, 1)]),
-            None,
-            None,
-            None,
             None,
         )
     }

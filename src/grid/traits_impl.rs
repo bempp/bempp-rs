@@ -8,7 +8,10 @@ use crate::traits::grid::{
 };
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 #[cfg(feature = "mpi")]
-use crate::{grid::parallel_grid::ParallelGrid, traits::grid::ParallelGridType};
+use crate::{
+    grid::parallel_grid::{LocalGrid, ParallelGrid},
+    traits::grid::ParallelGridType,
+};
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use num::Float;
@@ -438,13 +441,13 @@ impl<'comm, T: RlstScalar<Real = T> + Float, C: Communicator, G: Grid<T = T> + G
     ParallelGridType for ParallelGrid<'comm, C, G>
 {
     type Comm = C;
-    type LocalGridType = G;
+    type LocalGridType = LocalGrid<G>;
 
     fn comm(&self) -> &C {
         self.comm
     }
 
-    fn local_grid(&self) -> &G {
-        &self.serial_grid
+    fn local_grid(&self) -> &LocalGrid<G> {
+        &self.local_grid
     }
 }

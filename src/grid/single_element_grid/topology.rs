@@ -35,9 +35,6 @@ pub struct SingleElementTopology {
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
     cell_types: [ReferenceCellType; 1],
-    cell_ownership: Option<Vec<Ownership>>,
-    edge_ownership: Option<Vec<Ownership>>,
-    vertex_ownership: Option<Vec<Ownership>>,
 }
 
 unsafe impl Sync for SingleElementTopology {}
@@ -50,10 +47,6 @@ impl SingleElementTopology {
         cell_type: ReferenceCellType,
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
-        cell_ownership: Option<Vec<Ownership>>,
-        edges: Option<Vec<[usize; 2]>>,
-        edge_ownership: Option<Vec<Ownership>>,
-        vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         let size = reference_cell::entity_counts(cell_type)[0];
         let ncells = cells_input.len() / size;
@@ -109,13 +102,6 @@ impl SingleElementTopology {
 
         entities_to_vertices[0] = (0..vertices.len()).map(|i| vec![i]).collect::<Vec<_>>();
 
-        if let Some(e) = edges {
-            for i in &e {
-                entities_to_vertices[1].push(vec![i[0], i[1]]);
-                entities_to_cells[1].push(vec![]);
-            }
-        }
-
         for d in 1..dim {
             let mut c_to_e = vec![];
             let ref_conn = &reference_cell::connectivity(cell_type)[d];
@@ -157,9 +143,6 @@ impl SingleElementTopology {
             cell_indices_to_ids,
             cell_ids_to_indices,
             cell_types: [cell_type],
-            cell_ownership,
-            edge_ownership,
-            vertex_ownership,
         }
     }
 }
@@ -202,26 +185,14 @@ impl Topology for SingleElementTopology {
         &self.entity_types[dim..dim + 1]
     }
 
-    fn cell_ownership(&self, index: usize) -> Ownership {
-        if let Some(co) = &self.cell_ownership {
-            co[index]
-        } else {
-            Ownership::Owned
-        }
+    fn cell_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
     }
-    fn vertex_ownership(&self, index: usize) -> Ownership {
-        if let Some(vo) = &self.vertex_ownership {
-            vo[index]
-        } else {
-            Ownership::Owned
-        }
+    fn vertex_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
     }
-    fn edge_ownership(&self, index: usize) -> Ownership {
-        if let Some(eo) = &self.edge_ownership {
-            eo[index]
-        } else {
-            Ownership::Owned
-        }
+    fn edge_ownership(&self, _index: usize) -> Ownership {
+        Ownership::Owned
     }
 
     fn cell_to_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
@@ -295,10 +266,6 @@ mod test {
             ReferenceCellType::Triangle,
             &[0, 1, 2, 3],
             &[0, 1],
-            None,
-            None,
-            None,
-            None,
         )
     }
 

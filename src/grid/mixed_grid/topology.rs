@@ -40,8 +40,6 @@ pub struct MixedTopology {
     vertex_ids_to_indices: HashMap<usize, IndexType>,
     cell_indices_to_ids: HashMap<IndexType, usize>,
     cell_ids_to_indices: HashMap<usize, IndexType>,
-    cell_ownership: Option<HashMap<(ReferenceCellType, usize), Ownership>>,
-    vertex_ownership: Option<HashMap<(ReferenceCellType, usize), Ownership>>,
 }
 
 unsafe impl Sync for MixedTopology {}
@@ -53,16 +51,11 @@ impl MixedTopology {
         cell_types: &[ReferenceCellType],
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
-        cell_ownership_list: Option<Vec<Ownership>>,
-        vertex_ownership_list: Option<Vec<Ownership>>,
     ) -> Self {
         let mut index_map = vec![(ReferenceCellType::Point, 0); cell_types.len()];
         let mut reverse_index_map = HashMap::new();
         let mut vertices = vec![];
         let dim = reference_cell::dim(cell_types[0]);
-
-        let mut cell_ownership = HashMap::new();
-        let mut vertex_ownership = HashMap::new();
 
         let mut vertex_indices_to_ids = HashMap::new();
         let mut vertex_ids_to_indices = HashMap::new();
@@ -116,10 +109,6 @@ impl MixedTopology {
                     cell_indices_to_ids.insert(cell_i, grid_cell_indices_to_ids[i]);
                     cell_ids_to_indices.insert(grid_cell_indices_to_ids[i], cell_i);
 
-                    if let Some(co) = &cell_ownership_list {
-                        cell_ownership.insert(cell_i, co[i]);
-                    }
-
                     let mut row = vec![];
                     for v in cell {
                         if !vertices.contains(v) {
@@ -132,10 +121,6 @@ impl MixedTopology {
                                 .insert((ReferenceCellType::Point, *v), point_indices_to_ids[*v]);
                             vertex_ids_to_indices
                                 .insert(point_indices_to_ids[*v], (ReferenceCellType::Point, *v));
-
-                            if let Some(vo) = &vertex_ownership_list {
-                                vertex_ownership.insert((ReferenceCellType::Point, *v), vo[*v]);
-                            }
                         }
                         row.push(vertices.iter().position(|&r| r == *v).unwrap());
                     }
@@ -236,16 +221,6 @@ impl MixedTopology {
             vertex_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
-            cell_ownership: if cell_ownership_list.is_none() {
-                None
-            } else {
-                Some(cell_ownership)
-            },
-            vertex_ownership: if vertex_ownership_list.is_none() {
-                None
-            } else {
-                Some(vertex_ownership)
-            },
         }
     }
 }
@@ -297,22 +272,14 @@ impl Topology for MixedTopology {
         &self.entity_types[dim]
     }
 
-    fn cell_ownership(&self, index: (ReferenceCellType, usize)) -> Ownership {
-        if let Some(co) = &self.cell_ownership {
-            co[&index]
-        } else {
-            Ownership::Owned
-        }
+    fn cell_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
+        Ownership::Owned
     }
-    fn vertex_ownership(&self, index: (ReferenceCellType, usize)) -> Ownership {
-        if let Some(vo) = &self.vertex_ownership {
-            vo[&index]
-        } else {
-            Ownership::Owned
-        }
+    fn vertex_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
+        Ownership::Owned
     }
     fn edge_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
-        Ownership::Owned // TODO
+        Ownership::Owned
     }
 
     fn entity_to_cells(
@@ -429,8 +396,6 @@ mod test {
             &[ReferenceCellType::Triangle; 2],
             &[0, 1, 2, 3],
             &[0, 1],
-            None,
-            None,
         )
     }
 
@@ -444,8 +409,6 @@ mod test {
             ],
             &[0, 1, 2, 3, 4],
             &[0, 1],
-            None,
-            None,
         )
     }
 

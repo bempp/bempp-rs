@@ -7,7 +7,7 @@ use crate::grid::single_element_grid::{
 };
 use crate::grid::traits::Grid;
 use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::{Ownership, ReferenceCellType};
+use crate::traits::types::ReferenceCellType;
 use log::warn;
 use num::Float;
 use rlst::RlstScalar;
@@ -38,10 +38,6 @@ where
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
-        cell_ownership: Option<Vec<Ownership>>,
-        edges: Option<Vec<[usize; 2]>>,
-        edge_ownership: Option<Vec<Ownership>>,
-        vertex_ownership: Option<Vec<Ownership>>,
     ) -> Self {
         if cell_type == ReferenceCellType::Triangle && cell_degree == 1 {
             warn!("Creating a single element grid with a P1 triangle. Using a FlatTriangleGrid would be faster.");
@@ -63,10 +59,6 @@ where
             cell_type,
             &point_indices_to_ids,
             &cell_indices_to_ids,
-            cell_ownership,
-            edges,
-            edge_ownership,
-            vertex_ownership,
         );
         let geometry = SingleElementGeometry::<T>::new(
             points,
