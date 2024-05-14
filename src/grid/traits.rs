@@ -26,7 +26,7 @@ pub trait Topology {
     fn entity_count_by_dim(&self, dim: usize) -> usize;
 
     /// The indices of the vertices of the cell with topological index `index`
-    fn cell(&self, index: Self::IndexType) -> Option<&[Self::IndexType]>;
+    fn cell(&self, index: Self::IndexType) -> Option<&[usize]>;
 
     /// The cell type of the cell with topological index `index`
     fn cell_type(&self, index: Self::IndexType) -> Option<ReferenceCellType>;
@@ -35,16 +35,13 @@ pub trait Topology {
     fn entity_types(&self, dim: usize) -> &[ReferenceCellType];
 
     /// Get the indices of entities of dimension `dim` that are connected to the cell with index `index`
-    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[Self::IndexType]>;
-
-    /// Get the flat indices of entities of dimension `dim` that are connected to the cell with index `index`
-    fn cell_to_flat_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]>;
+    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]>;
 
     /// Get the indices of cells that are connected to the entity with dimension `dim` and index `index`
     fn entity_to_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<Self::IndexType>]>;
 
     /// Get the flat indices of cells that are connected to the entity with dimension `dim` and index `index`
@@ -55,43 +52,31 @@ pub trait Topology {
     ) -> Option<&[CellLocalIndexPair<usize>]>;
 
     /// Get the indices of the vertices that are connect to theentity with dimension `dim` and index `index`
-    fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]>;
+    fn entity_vertices(&self, dim: usize, index: usize) -> Option<&[usize]>;
 
     /// Get the ownership of a cell
     fn cell_ownership(&self, index: Self::IndexType) -> Ownership;
 
     /// Get the ownership of a vertex
-    fn vertex_ownership(&self, index: Self::IndexType) -> Ownership;
+    fn vertex_ownership(&self, index: usize) -> Ownership;
 
     /// Get the ownership of an edge
-    fn edge_ownership(&self, index: Self::IndexType) -> Ownership;
+    fn edge_ownership(&self, index: usize) -> Ownership;
 
     /// Get the id of a vertex from its index
-    fn vertex_index_to_id(&self, index: Self::IndexType) -> usize;
+    fn vertex_index_to_id(&self, index: usize) -> usize;
 
     /// Get the id of a cell from its index
     fn cell_index_to_id(&self, index: Self::IndexType) -> usize;
 
     /// Get the index of a vertex from its id
-    fn vertex_id_to_index(&self, id: usize) -> Self::IndexType;
+    fn vertex_id_to_index(&self, id: usize) -> usize;
 
     /// Get the index of a cell from its id
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType;
 
-    /// Get the flat index from the index of a vertex
-    fn vertex_index_to_flat_index(&self, index: Self::IndexType) -> usize;
-
-    /// Get the flat index from the index of an edge
-    fn edge_index_to_flat_index(&self, index: Self::IndexType) -> usize;
-
     /// Get the flat index from the index of a face
     fn face_index_to_flat_index(&self, index: Self::IndexType) -> usize;
-
-    /// Get the index from the flat index of a vertex
-    fn vertex_flat_index_to_index(&self, index: usize) -> Self::IndexType;
-
-    /// Get the index from the flat index of an edge
-    fn edge_flat_index_to_index(&self, index: usize) -> Self::IndexType;
 
     /// Get the index from the flat index of a face
     fn face_flat_index_to_index(&self, index: usize) -> Self::IndexType;

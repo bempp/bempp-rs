@@ -439,9 +439,6 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
             None
         }
     }
-    fn cell_to_flat_entities(&self, index: usize, dim: usize) -> Option<&[usize]> {
-        self.cell_to_entities(index, dim)
-    }
     fn entity_to_cells(&self, dim: usize, index: usize) -> Option<&[CellLocalIndexPair<usize>]> {
         if dim <= 2 && index < self.entities_to_cells[dim].len() {
             Some(&self.entities_to_cells[dim][index])
@@ -480,19 +477,7 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
     fn cell_id_to_index(&self, id: usize) -> usize {
         self.cell_ids_to_indices[&id]
     }
-    fn vertex_index_to_flat_index(&self, index: usize) -> usize {
-        index
-    }
-    fn edge_index_to_flat_index(&self, index: usize) -> usize {
-        index
-    }
     fn face_index_to_flat_index(&self, index: usize) -> usize {
-        index
-    }
-    fn vertex_flat_index_to_index(&self, index: usize) -> usize {
-        index
-    }
-    fn edge_flat_index_to_index(&self, index: usize) -> usize {
         index
     }
     fn face_flat_index_to_index(&self, index: usize) -> usize {

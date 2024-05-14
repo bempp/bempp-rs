@@ -33,7 +33,7 @@ pub struct MixedTopology {
     entities_to_vertices: Vec<HashMap<ReferenceCellType, Vec<Vec<IndexType>>>>,
     cells_to_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<IndexType>>>>,
     cells_to_flat_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<usize>>>>,
-    entities_to_cells: Vec<HashMap<ReferenceCellType, Vec<Vec<CellLocalIndexPair<IndexType>>>>>,
+    entities_to_cells: Vec<Vec<Vec<CellLocalIndexPair<IndexType>>>>,
     entities_to_flat_cells: Vec<HashMap<ReferenceCellType, Vec<Vec<CellLocalIndexPair<usize>>>>>,
     entity_types: Vec<Vec<ReferenceCellType>>,
     vertex_indices_to_ids: HashMap<IndexType, usize>,
@@ -74,7 +74,7 @@ impl MixedTopology {
         let mut entities_to_vertices = vec![HashMap::new(); dim];
         let mut cells_to_entities = vec![HashMap::new(); dim + 1];
         let mut cells_to_flat_entities = vec![HashMap::new(); dim + 1];
-        let mut entities_to_cells = vec![HashMap::new(); dim + 1];
+        let mut entities_to_cells = vec![vec![]; dim];
         let mut entities_to_flat_cells = vec![HashMap::new(); dim + 1];
 
         for c in cell_types {
@@ -86,7 +86,6 @@ impl MixedTopology {
                     if !entity_types[dim0].contains(e) {
                         entity_types[dim0].push(*e);
 
-                        entities_to_cells[dim0].insert(*e, vec![]);
                         entities_to_flat_cells[dim0].insert(*e, vec![]);
                         if dim0 == dim {
                             for ce in cells_to_entities.iter_mut() {
@@ -124,9 +123,7 @@ impl MixedTopology {
                     let mut row = vec![];
                     for v in cell {
                         if !vertices.contains(v) {
-                            for (_, ec) in entities_to_cells[0].iter_mut() {
-                                ec.push(vec![]);
-                            }
+                            entities_to_cells[0].push(vec![]);
                             for (_, ec) in entities_to_flat_cells[0].iter_mut() {
                                 ec.push(vec![]);
                             }
@@ -140,23 +137,16 @@ impl MixedTopology {
                                 vertex_ownership.insert((ReferenceCellType::Point, *v), vo[*v]);
                             }
                         }
-                        row.push((
-                            ReferenceCellType::Point,
-                            vertices.iter().position(|&r| r == *v).unwrap(),
-                        ));
+                        row.push(vertices.iter().position(|&r| r == *v).unwrap());
                     }
 
                     for (local_index, v) in row.iter().enumerate() {
-                        entities_to_cells[0].get_mut(&v.0).unwrap()[v.1]
+                        entities_to_cells[0][v]
                             .push(CellLocalIndexPair::new(cell_i, local_index));
                         entities_to_flat_cells[0].get_mut(&v.0).unwrap()[v.1].push(
                             CellLocalIndexPair::new(reverse_index_map[&cell_i], local_index),
                         );
                     }
-                    entities_to_cells[dim]
-                        .get_mut(c)
-                        .unwrap()
-                        .push(vec![CellLocalIndexPair::new(cell_i, 0)]);
 
                     cells_to_flat_entities[0]
                         .get_mut(c)
@@ -199,9 +189,9 @@ impl MixedTopology {
                                 entities_to_vertices[d][etype].iter().enumerate()
                             {
                                 if all_equal(entity, &vertices) {
-                                    entity_ids.push((*etype, entity_index));
+                                    entity_ids.push(entity_index);
                                     entity_ids_flat.push(entity_index);
-                                    entities_to_cells[d].get_mut(etype).unwrap()[entity_index]
+                                    entities_to_cells[d][entity_index]
                                         .push(CellLocalIndexPair::new(
                                             (*cell_type, cell_i),
                                             local_index,
@@ -214,7 +204,7 @@ impl MixedTopology {
                             if !found {
                                 entity_ids.push((*etype, entities_to_vertices[d][etype].len()));
                                 entity_ids_flat.push(entities_to_vertices[d][etype].len());
-                                entities_to_cells[d].get_mut(etype).unwrap().push(vec![
+                                entities_to_cells[d].push(vec![
                                     CellLocalIndexPair::new((*cell_type, cell_i), local_index),
                                 ]);
                                 entities_to_vertices[d]
@@ -271,8 +261,9 @@ impl Topology for MixedTopology {
     }
     fn entity_count(&self, etype: ReferenceCellType) -> usize {
         let dim = reference_cell::dim(etype);
-        if self.entity_types[dim].contains(&etype) {
-            self.entities_to_cells[dim][&etype].len()
+        if dim == 2 {
+        } else {
+            self.entities_to_cells[dim].len()
         } else {
             0
         }
