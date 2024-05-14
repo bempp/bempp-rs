@@ -107,27 +107,21 @@ impl MixedTopology {
                             entities_to_cells[0].push(vec![]);
                             entities_to_flat_cells[0].push(vec![]);
                             vertices.push(*v);
-                            vertex_indices_to_ids
-                                .insert(*v, point_indices_to_ids[*v]);
-                            vertex_ids_to_indices
-                                .insert(point_indices_to_ids[*v], *v);
+                            vertex_indices_to_ids.insert(*v, point_indices_to_ids[*v]);
+                            vertex_ids_to_indices.insert(point_indices_to_ids[*v], *v);
                         }
                         row.push(vertices.iter().position(|&r| r == *v).unwrap());
                     }
 
                     for (local_index, v) in row.iter().enumerate() {
-                        entities_to_cells[0][v]
-                            .push(CellLocalIndexPair::new(cell_i, local_index));
-                        entities_to_flat_cells[0][v].push(
-                            CellLocalIndexPair::new(reverse_index_map[&cell_i], local_index),
-                        );
+                        entities_to_cells[0][*v].push(CellLocalIndexPair::new(cell_i, local_index));
+                        entities_to_flat_cells[0][*v].push(CellLocalIndexPair::new(
+                            reverse_index_map[&cell_i],
+                            local_index,
+                        ));
                     }
 
                     cells_to_entities[0].get_mut(c).unwrap().push(row);
-                    cells_to_entities[dim]
-                        .get_mut(c)
-                        .unwrap()
-                        .push(vec![cell_i]);
                 }
                 start += reference_cell::entity_counts(*ct)[0];
             }
@@ -136,49 +130,45 @@ impl MixedTopology {
             entities_to_vertices[0].push(vec![i]);
         }
 
-        for (d, etypes0) in entity_types.iter().enumerate().take(dim).skip(1) {
-            for etype in etypes0 {
-                for cell_type in &entity_types[dim] {
-                    let mut c_to_e = vec![];
-                    let mut c_to_e_flat = vec![];
-                    let ref_conn = &reference_cell::connectivity(*cell_type)[d];
-                    for (cell_i, cell) in cells_to_entities[0][cell_type].iter().enumerate() {
-                        let mut entity_ids = vec![];
-                        let mut entity_ids_flat = vec![];
+        for d in 1..dim {
+            for cell_type in &entity_types[dim] {
+                let mut c_to_e = vec![];
+                let mut c_to_e_flat = vec![];
+                let ref_conn = &reference_cell::connectivity(*cell_type)[d];
+                for (cell_i, cell) in cells_to_entities[0][cell_type].iter().enumerate() {
+                    let mut entity_ids = vec![];
+                    let mut entity_ids_flat = vec![];
 
-                        for (local_index, rc) in ref_conn.iter().enumerate() {
-                            let vertices = rc[0].iter().map(|x| cell[*x]).collect::<Vec<_>>();
-                            let mut found = false;
-                            for (entity_index, entity) in
-                                entities_to_vertices[d].iter().enumerate()
-                            {
-                                if all_equal(entity, &vertices) {
-                                    entity_ids.push(entity_index);
-                                    entity_ids_flat.push(entity_index);
-                                    entities_to_cells[d][entity_index]
-                                        .push(CellLocalIndexPair::new(
-                                            (*cell_type, cell_i),
-                                            local_index,
-                                        ));
+                    for (local_index, rc) in ref_conn.iter().enumerate() {
+                        let vertices = rc[0].iter().map(|x| cell[*x]).collect::<Vec<_>>();
+                        let mut found = false;
+                        for (entity_index, entity) in entities_to_vertices[d].iter().enumerate() {
+                            if all_equal(entity, &vertices) {
+                                entity_ids.push(entity_index);
+                                entity_ids_flat.push(entity_index);
+                                entities_to_cells[d][entity_index].push(CellLocalIndexPair::new(
+                                    (*cell_type, cell_i),
+                                    local_index,
+                                ));
 
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if !found {
-                                entity_ids.push((*etype, entities_to_vertices[d].len()));
-                                entity_ids_flat.push(entities_to_vertices[d].len());
-                                entities_to_cells[d].push(vec![
-                                    CellLocalIndexPair::new((*cell_type, cell_i), local_index),
-                                ]);
-                                entities_to_vertices[d].push(vertices);
+                                found = true;
+                                break;
                             }
                         }
-                        c_to_e.push(entity_ids);
-                        c_to_e_flat.push(entity_ids_flat);
+                        if !found {
+                            entity_ids.push(entities_to_vertices[d].len());
+                            entity_ids_flat.push(entities_to_vertices[d].len());
+                            entities_to_cells[d].push(vec![CellLocalIndexPair::new(
+                                (*cell_type, cell_i),
+                                local_index,
+                            )]);
+                            entities_to_vertices[d].push(vertices);
+                        }
                     }
-                    *cells_to_entities[d].get_mut(cell_type).unwrap() = c_to_e;
+                    c_to_e.push(entity_ids);
+                    c_to_e_flat.push(entity_ids_flat);
                 }
+                *cells_to_entities[d].get_mut(cell_type).unwrap() = c_to_e;
             }
         }
 
@@ -211,7 +201,11 @@ impl Topology for MixedTopology {
     fn entity_count(&self, etype: ReferenceCellType) -> usize {
         let dim = reference_cell::dim(etype);
         if dim == 2 {
-            unimplemented!();
+            if self.cells_to_entities[0].contains_key(&etype) {
+                self.cells_to_entities[0][&etype].len()
+            } else {
+                0
+            }
         } else {
             self.entities_to_cells[dim].len()
         }
@@ -222,7 +216,7 @@ impl Topology for MixedTopology {
             .map(|e| self.entity_count(*e))
             .sum()
     }
-    fn cell(&self, index: IndexType) -> Option<&[IndexType]> {
+    fn cell(&self, index: IndexType) -> Option<&[usize]> {
         if self.cells_to_entities[0].contains_key(&index.0)
             && index.1 < self.cells_to_entities[0][&index.0].len()
         {
@@ -248,23 +242,20 @@ impl Topology for MixedTopology {
     fn cell_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
         Ownership::Owned
     }
-    fn vertex_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
+    fn vertex_ownership(&self, _index: usize) -> Ownership {
         Ownership::Owned
     }
-    fn edge_ownership(&self, _index: (ReferenceCellType, usize)) -> Ownership {
+    fn edge_ownership(&self, _index: usize) -> Ownership {
         Ownership::Owned
     }
 
     fn entity_to_cells(
         &self,
         dim: usize,
-        index: IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<IndexType>]> {
-        if dim <= self.dim
-            && self.entities_to_cells[dim].contains_key(&index.0)
-            && index.1 < self.entities_to_cells[dim][&index.0].len()
-        {
-            Some(&self.entities_to_cells[dim][&index.0][index.1])
+        if dim < self.dim && index < self.entities_to_cells[dim].len() {
+            Some(&self.entities_to_cells[dim][index])
         } else {
             None
         }
@@ -273,20 +264,17 @@ impl Topology for MixedTopology {
     fn entity_to_flat_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<usize>]> {
-        if dim <= self.dim
-            && self.entities_to_flat_cells[dim].contains_key(&index.0)
-            && index.1 < self.entities_to_flat_cells[dim][&index.0].len()
-        {
-            Some(&self.entities_to_flat_cells[dim][&index.0][index.1])
+        if dim < self.dim && index < self.entities_to_flat_cells[dim].len() {
+            Some(&self.entities_to_flat_cells[dim][index])
         } else {
             None
         }
     }
 
-    fn cell_to_entities(&self, index: IndexType, dim: usize) -> Option<&[IndexType]> {
-        if dim <= self.dim
+    fn cell_to_entities(&self, index: IndexType, dim: usize) -> Option<&[usize]> {
+        if dim < self.dim
             && self.cells_to_entities[dim].contains_key(&index.0)
             && index.1 < self.cells_to_entities[dim][&index.0].len()
         {
@@ -297,21 +285,20 @@ impl Topology for MixedTopology {
     }
 
     fn entity_vertices(&self, dim: usize, index: usize) -> Option<&[usize]> {
-        if index < self.entities_to_vertices[dim].len()
-        {
+        if index < self.entities_to_vertices[dim].len() {
             Some(&self.entities_to_vertices[dim][index])
         } else {
             None
         }
     }
 
-    fn vertex_index_to_id(&self, index: IndexType) -> usize {
+    fn vertex_index_to_id(&self, index: usize) -> usize {
         self.vertex_indices_to_ids[&index]
     }
     fn cell_index_to_id(&self, index: IndexType) -> usize {
         self.cell_indices_to_ids[&index]
     }
-    fn vertex_id_to_index(&self, id: usize) -> IndexType {
+    fn vertex_id_to_index(&self, id: usize) -> usize {
         if self.vertex_ids_to_indices.contains_key(&id) {
             self.vertex_ids_to_indices[&id]
         } else {

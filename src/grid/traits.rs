@@ -48,7 +48,7 @@ pub trait Topology {
     fn entity_to_flat_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<usize>]>;
 
     /// Get the indices of the vertices that are connect to theentity with dimension `dim` and index `index`

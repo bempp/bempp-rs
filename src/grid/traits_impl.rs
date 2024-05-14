@@ -49,6 +49,7 @@ pub struct Cell<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
 pub struct CellTopology<'a, GridImpl: Grid> {
     topology: &'a <GridImpl as Grid>::Topology,
     index: <<GridImpl as Grid>::Topology as Topology>::IndexType,
+    face_indices: Vec<usize>,
 }
 /// The geometry of a cell
 pub struct CellGeometry<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
@@ -156,6 +157,7 @@ where
         CellTopology::<'_, GridImpl> {
             topology: self.grid.topology(),
             index: self.grid.topology().index_map()[self.index],
+            face_indices: vec![self.index],
         }
     }
 
@@ -196,7 +198,7 @@ where
 
     fn vertex_indices(&self) -> Self::VertexIndexIter<'_> {
         self.topology
-            .cell_to_flat_entities(self.index, 0)
+            .cell_to_entities(self.index, 0)
             .unwrap()
             .iter()
             .copied()
@@ -204,18 +206,14 @@ where
 
     fn edge_indices(&self) -> Self::EdgeIndexIter<'_> {
         self.topology
-            .cell_to_flat_entities(self.index, 1)
+            .cell_to_entities(self.index, 1)
             .unwrap()
             .iter()
             .copied()
     }
 
     fn face_indices(&self) -> Self::FaceIndexIter<'_> {
-        self.topology
-            .cell_to_flat_entities(self.index, 2)
-            .unwrap()
-            .iter()
-            .copied()
+        self.face_indices.iter().copied()
     }
 
     fn cell_type(&self) -> ReferenceCellType {
@@ -343,8 +341,7 @@ where
         self.topology().vertex_id_to_index(id)
     }
     fn vertex_id_from_index(&self, index: usize) -> usize {
-        self.topology()
-            .vertex_index_to_id(index)
+        self.topology().vertex_index_to_id(index)
     }
 
     fn cell_index_from_id(&self, id: usize) -> usize {
@@ -405,12 +402,10 @@ where
     }
 
     fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>] {
-        self.topology()
-            .entity_to_flat_cells(1, edge_index)
-            .unwrap()
+        self.topology().entity_to_flat_cells(1, edge_index).unwrap()
     }
 
-    fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>] {
+    fn face_to_cells(&self, _face_index: usize) -> &[CellLocalIndexPair<usize>] {
         unimplemented!();
     }
 
