@@ -31,14 +31,13 @@ pub struct Vertex<'a, T: Float + RlstScalar<Real = T>, G: Geometry, Top: Topolog
     topology: &'a Top,
     index: usize,
     gindex: usize,
-    tindex: Top::IndexType,
+    tindex: usize,
     _t: PhantomData<T>,
 }
 /// An edge
 pub struct Edge<'a, Top: Topology> {
     topology: &'a Top,
     index: usize,
-    tindex: Top::IndexType,
 }
 /// A cell
 pub struct Cell<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid> {
@@ -132,7 +131,7 @@ impl<'a, Top: Topology> EdgeType for Edge<'a, Top> {
         self.index
     }
     fn ownership(&self) -> Ownership {
-        self.topology.edge_ownership(self.tindex)
+        self.topology.edge_ownership(self.index)
     }
 }
 
@@ -341,12 +340,11 @@ where
     }
 
     fn vertex_index_from_id(&self, id: usize) -> usize {
-        self.topology()
-            .vertex_index_to_flat_index(self.topology().vertex_id_to_index(id))
+        self.topology().vertex_id_to_index(id)
     }
     fn vertex_id_from_index(&self, index: usize) -> usize {
         self.topology()
-            .vertex_index_to_id(self.topology().vertex_flat_index_to_index(index))
+            .vertex_index_to_id(index)
     }
 
     fn cell_index_from_id(&self, id: usize) -> usize {
@@ -370,7 +368,7 @@ where
             topology: self.topology(),
             index,
             gindex: self.point_index_from_id(self.vertex_id_from_index(index)),
-            tindex: self.topology().vertex_flat_index_to_index(index),
+            tindex: index,
             _t: PhantomData,
         }
     }
@@ -379,7 +377,6 @@ where
         Self::Edge {
             topology: self.topology(),
             index,
-            tindex: self.topology().edge_flat_index_to_index(index),
         }
     }
 
@@ -403,20 +400,18 @@ where
 
     fn vertex_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>] {
         self.topology()
-            .entity_to_flat_cells(0, self.topology().vertex_flat_index_to_index(vertex_index))
+            .entity_to_flat_cells(0, vertex_index)
             .unwrap()
     }
 
     fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>] {
         self.topology()
-            .entity_to_flat_cells(1, self.topology().edge_flat_index_to_index(edge_index))
+            .entity_to_flat_cells(1, edge_index)
             .unwrap()
     }
 
     fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>] {
-        self.topology()
-            .entity_to_flat_cells(2, self.topology().face_flat_index_to_index(face_index))
-            .unwrap()
+        unimplemented!();
     }
 
     fn is_serial(&self) -> bool {

@@ -30,14 +30,13 @@ pub struct MixedTopology {
     dim: usize,
     index_map: Vec<IndexType>,
     reverse_index_map: HashMap<IndexType, usize>,
-    entities_to_vertices: Vec<HashMap<ReferenceCellType, Vec<Vec<IndexType>>>>,
-    cells_to_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<IndexType>>>>,
-    cells_to_flat_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<usize>>>>,
+    entities_to_vertices: Vec<Vec<Vec<usize>>>,
+    cells_to_entities: Vec<HashMap<ReferenceCellType, Vec<Vec<usize>>>>,
     entities_to_cells: Vec<Vec<Vec<CellLocalIndexPair<IndexType>>>>,
-    entities_to_flat_cells: Vec<HashMap<ReferenceCellType, Vec<Vec<CellLocalIndexPair<usize>>>>>,
+    entities_to_flat_cells: Vec<Vec<Vec<CellLocalIndexPair<usize>>>>,
     entity_types: Vec<Vec<ReferenceCellType>>,
-    vertex_indices_to_ids: HashMap<IndexType, usize>,
-    vertex_ids_to_indices: HashMap<usize, IndexType>,
+    vertex_indices_to_ids: HashMap<usize, usize>,
+    vertex_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: HashMap<IndexType, usize>,
     cell_ids_to_indices: HashMap<usize, IndexType>,
 }
@@ -64,11 +63,10 @@ impl MixedTopology {
 
         let mut entity_types = vec![vec![]; 4];
 
-        let mut entities_to_vertices = vec![HashMap::new(); dim];
+        let mut entities_to_vertices = vec![vec![]; dim];
         let mut cells_to_entities = vec![HashMap::new(); dim + 1];
-        let mut cells_to_flat_entities = vec![HashMap::new(); dim + 1];
         let mut entities_to_cells = vec![vec![]; dim];
-        let mut entities_to_flat_cells = vec![HashMap::new(); dim + 1];
+        let mut entities_to_flat_cells = vec![vec![]; dim + 1];
 
         for c in cell_types {
             if dim != reference_cell::dim(*c) {
@@ -79,16 +77,10 @@ impl MixedTopology {
                     if !entity_types[dim0].contains(e) {
                         entity_types[dim0].push(*e);
 
-                        entities_to_flat_cells[dim0].insert(*e, vec![]);
                         if dim0 == dim {
                             for ce in cells_to_entities.iter_mut() {
                                 ce.insert(*e, vec![]);
                             }
-                            for ce in cells_to_flat_entities.iter_mut() {
-                                ce.insert(*e, vec![]);
-                            }
-                        } else {
-                            entities_to_vertices[dim0].insert(*e, vec![]);
                         }
                     }
                 }
@@ -113,14 +105,12 @@ impl MixedTopology {
                     for v in cell {
                         if !vertices.contains(v) {
                             entities_to_cells[0].push(vec![]);
-                            for (_, ec) in entities_to_flat_cells[0].iter_mut() {
-                                ec.push(vec![]);
-                            }
+                            entities_to_flat_cells[0].push(vec![]);
                             vertices.push(*v);
                             vertex_indices_to_ids
-                                .insert((ReferenceCellType::Point, *v), point_indices_to_ids[*v]);
+                                .insert(*v, point_indices_to_ids[*v]);
                             vertex_ids_to_indices
-                                .insert(point_indices_to_ids[*v], (ReferenceCellType::Point, *v));
+                                .insert(point_indices_to_ids[*v], *v);
                         }
                         row.push(vertices.iter().position(|&r| r == *v).unwrap());
                     }
@@ -128,19 +118,11 @@ impl MixedTopology {
                     for (local_index, v) in row.iter().enumerate() {
                         entities_to_cells[0][v]
                             .push(CellLocalIndexPair::new(cell_i, local_index));
-                        entities_to_flat_cells[0].get_mut(&v.0).unwrap()[v.1].push(
+                        entities_to_flat_cells[0][v].push(
                             CellLocalIndexPair::new(reverse_index_map[&cell_i], local_index),
                         );
                     }
 
-                    cells_to_flat_entities[0]
-                        .get_mut(c)
-                        .unwrap()
-                        .push(row.iter().map(|i| i.1).collect::<Vec<_>>());
-                    cells_to_flat_entities[dim]
-                        .get_mut(c)
-                        .unwrap()
-                        .push(vec![i]);
                     cells_to_entities[0].get_mut(c).unwrap().push(row);
                     cells_to_entities[dim]
                         .get_mut(c)
@@ -151,10 +133,7 @@ impl MixedTopology {
             }
         }
         for i in 0..vertices.len() {
-            entities_to_vertices[0]
-                .get_mut(&ReferenceCellType::Point)
-                .unwrap()
-                .push(vec![(ReferenceCellType::Point, i)]);
+            entities_to_vertices[0].push(vec![i]);
         }
 
         for (d, etypes0) in entity_types.iter().enumerate().take(dim).skip(1) {
@@ -171,7 +150,7 @@ impl MixedTopology {
                             let vertices = rc[0].iter().map(|x| cell[*x]).collect::<Vec<_>>();
                             let mut found = false;
                             for (entity_index, entity) in
-                                entities_to_vertices[d][etype].iter().enumerate()
+                                entities_to_vertices[d].iter().enumerate()
                             {
                                 if all_equal(entity, &vertices) {
                                     entity_ids.push(entity_index);
@@ -187,21 +166,17 @@ impl MixedTopology {
                                 }
                             }
                             if !found {
-                                entity_ids.push((*etype, entities_to_vertices[d][etype].len()));
-                                entity_ids_flat.push(entities_to_vertices[d][etype].len());
+                                entity_ids.push((*etype, entities_to_vertices[d].len()));
+                                entity_ids_flat.push(entities_to_vertices[d].len());
                                 entities_to_cells[d].push(vec![
                                     CellLocalIndexPair::new((*cell_type, cell_i), local_index),
                                 ]);
-                                entities_to_vertices[d]
-                                    .get_mut(etype)
-                                    .unwrap()
-                                    .push(vertices);
+                                entities_to_vertices[d].push(vertices);
                             }
                         }
                         c_to_e.push(entity_ids);
                         c_to_e_flat.push(entity_ids_flat);
                     }
-                    *cells_to_flat_entities[d].get_mut(cell_type).unwrap() = c_to_e_flat;
                     *cells_to_entities[d].get_mut(cell_type).unwrap() = c_to_e;
                 }
             }
@@ -213,7 +188,6 @@ impl MixedTopology {
             reverse_index_map,
             entities_to_vertices,
             cells_to_entities,
-            cells_to_flat_entities,
             entities_to_cells,
             entities_to_flat_cells,
             entity_types,
@@ -237,10 +211,9 @@ impl Topology for MixedTopology {
     fn entity_count(&self, etype: ReferenceCellType) -> usize {
         let dim = reference_cell::dim(etype);
         if dim == 2 {
+            unimplemented!();
         } else {
             self.entities_to_cells[dim].len()
-        } else {
-            0
         }
     }
     fn entity_count_by_dim(&self, dim: usize) -> usize {
@@ -322,25 +295,11 @@ impl Topology for MixedTopology {
             None
         }
     }
-    fn cell_to_flat_entities(&self, index: IndexType, dim: usize) -> Option<&[usize]> {
-        if dim <= self.dim
-            && self.cells_to_flat_entities[dim].contains_key(&index.0)
-            && index.1 < self.cells_to_flat_entities[dim][&index.0].len()
-        {
-            Some(&self.cells_to_flat_entities[dim][&index.0][index.1])
-        } else {
-            None
-        }
-    }
 
-    fn entity_vertices(&self, dim: usize, index: IndexType) -> Option<&[IndexType]> {
-        if dim == self.dim {
-            self.cell_to_entities(index, 0)
-        } else if dim < self.dim
-            && self.entities_to_vertices[dim].contains_key(&index.0)
-            && index.1 < self.entities_to_vertices[dim][&index.0].len()
+    fn entity_vertices(&self, dim: usize, index: usize) -> Option<&[usize]> {
+        if index < self.entities_to_vertices[dim].len()
         {
-            Some(&self.entities_to_vertices[dim][&index.0][index.1])
+            Some(&self.entities_to_vertices[dim][index])
         } else {
             None
         }
@@ -362,20 +321,8 @@ impl Topology for MixedTopology {
     fn cell_id_to_index(&self, id: usize) -> IndexType {
         self.cell_ids_to_indices[&id]
     }
-    fn vertex_index_to_flat_index(&self, index: IndexType) -> usize {
-        index.1
-    }
-    fn edge_index_to_flat_index(&self, index: IndexType) -> usize {
-        index.1
-    }
     fn face_index_to_flat_index(&self, index: IndexType) -> usize {
         self.reverse_index_map[&index]
-    }
-    fn vertex_flat_index_to_index(&self, index: usize) -> IndexType {
-        (ReferenceCellType::Point, index)
-    }
-    fn edge_flat_index_to_index(&self, index: usize) -> IndexType {
-        (ReferenceCellType::Interval, index)
     }
     fn face_flat_index_to_index(&self, index: usize) -> IndexType {
         self.index_map[index]
@@ -431,12 +378,9 @@ mod test {
                 .cell_to_entities((ReferenceCellType::Triangle, i), 0)
                 .unwrap();
             assert_eq!(c.len(), 3);
-            for i in c {
-                assert_eq!(i.0, ReferenceCellType::Point);
-            }
-            assert_eq!(c[0].1, vertices[0]);
-            assert_eq!(c[1].1, vertices[1]);
-            assert_eq!(c[2].1, vertices[2]);
+            assert_eq!(c[0], vertices[0]);
+            assert_eq!(c[1], vertices[1]);
+            assert_eq!(c[2], vertices[2]);
         }
     }
     #[test]
@@ -448,25 +392,9 @@ mod test {
                 .cell_to_entities((ReferenceCellType::Triangle, i), 1)
                 .unwrap();
             assert_eq!(c.len(), 3);
-            for i in c {
-                assert_eq!(i.0, ReferenceCellType::Interval);
-            }
-            assert_eq!(c[0].1, edges[0]);
-            assert_eq!(c[1].1, edges[1]);
-            assert_eq!(c[2].1, edges[2]);
-        }
-    }
-    #[test]
-    fn test_cell_to_entities_cells() {
-        //! Test cells
-        let t = example_topology();
-        for i in 0..2 {
-            let c = t
-                .cell_to_entities((ReferenceCellType::Triangle, i), 2)
-                .unwrap();
-            assert_eq!(c.len(), 1);
-            assert_eq!(c[0].0, ReferenceCellType::Triangle);
-            assert_eq!(c[0].1, i);
+            assert_eq!(c[0], edges[0]);
+            assert_eq!(c[1], edges[1]);
+            assert_eq!(c[2], edges[2]);
         }
     }
 
@@ -489,23 +417,20 @@ mod test {
             .cell_to_entities((ReferenceCellType::Quadrilateral, 0), 0)
             .unwrap();
         assert_eq!(c.len(), 4);
-        for i in c {
-            assert_eq!(i.0, ReferenceCellType::Point);
-        }
         // cell 0
-        assert_eq!(c[0].1, 0);
-        assert_eq!(c[1].1, 1);
-        assert_eq!(c[2].1, 2);
-        assert_eq!(c[3].1, 3);
+        assert_eq!(c[0], 0);
+        assert_eq!(c[1], 1);
+        assert_eq!(c[2], 2);
+        assert_eq!(c[3], 3);
 
         let c = t
             .cell_to_entities((ReferenceCellType::Triangle, 0), 0)
             .unwrap();
         assert_eq!(c.len(), 3);
         // cell 1
-        assert_eq!(c[0].1, 1);
-        assert_eq!(c[1].1, 4);
-        assert_eq!(c[2].1, 3);
+        assert_eq!(c[0], 1);
+        assert_eq!(c[1], 4);
+        assert_eq!(c[2], 3);
     }
 
     #[test]
@@ -517,42 +442,19 @@ mod test {
             .unwrap();
 
         assert_eq!(c.len(), 4);
-        for i in c {
-            assert_eq!(i.0, ReferenceCellType::Interval);
-        }
         // cell 0
-        assert_eq!(c[0].1, 0);
-        assert_eq!(c[1].1, 1);
-        assert_eq!(c[2].1, 2);
-        assert_eq!(c[3].1, 3);
+        assert_eq!(c[0], 0);
+        assert_eq!(c[1], 1);
+        assert_eq!(c[2], 2);
+        assert_eq!(c[3], 3);
 
         let c = t
             .cell_to_entities((ReferenceCellType::Triangle, 0), 1)
             .unwrap();
         assert_eq!(c.len(), 3);
         // cell 1
-        assert_eq!(c[0].1, 4);
-        assert_eq!(c[1].1, 2);
-        assert_eq!(c[2].1, 5);
-    }
-    #[test]
-    fn test_mixed_cell_entities_cells() {
-        //! Test cells
-        let t = example_topology_mixed();
-        let c = t
-            .cell_to_entities((ReferenceCellType::Quadrilateral, 0), 2)
-            .unwrap();
-        assert_eq!(c.len(), 1);
-        // cell 0
-        assert_eq!(c[0].0, ReferenceCellType::Quadrilateral);
-        assert_eq!(c[0].1, 0);
-
-        let c = t
-            .cell_to_entities((ReferenceCellType::Triangle, 0), 2)
-            .unwrap();
-        assert_eq!(c.len(), 1);
-        // cell 1
-        assert_eq!(c[0].0, ReferenceCellType::Triangle);
-        assert_eq!(c[0].1, 0);
+        assert_eq!(c[0], 4);
+        assert_eq!(c[1], 2);
+        assert_eq!(c[2], 5);
     }
 }
