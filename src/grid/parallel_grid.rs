@@ -8,8 +8,8 @@ use std::collections::HashMap;
 pub struct LocalGrid<G: Grid> {
     rank: usize,
     serial_grid: G,
-    vertex_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
-    edge_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
+    vertex_ownership: HashMap<usize, Ownership>,
+    edge_ownership: HashMap<usize, Ownership>,
     cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
 }
 
@@ -28,7 +28,7 @@ impl<G: Grid> Topology for LocalGrid<G> {
     fn entity_count_by_dim(&self, dim: usize) -> usize {
         self.serial_grid.topology().entity_count_by_dim(dim)
     }
-    fn cell(&self, index: Self::IndexType) -> Option<&[Self::IndexType]> {
+    fn cell(&self, index: Self::IndexType) -> Option<&[usize]> {
         self.serial_grid.topology().cell(index)
     }
     fn cell_type(&self, index: Self::IndexType) -> Option<ReferenceCellType> {
@@ -37,70 +37,49 @@ impl<G: Grid> Topology for LocalGrid<G> {
     fn entity_types(&self, dim: usize) -> &[ReferenceCellType] {
         self.serial_grid.topology().entity_types(dim)
     }
-    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[Self::IndexType]> {
+    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]> {
         self.serial_grid.topology().cell_to_entities(index, dim)
-    }
-    fn cell_to_flat_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]> {
-        self.serial_grid
-            .topology()
-            .cell_to_flat_entities(index, dim)
     }
     fn entity_to_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<Self::IndexType>]> {
         self.serial_grid.topology().entity_to_cells(dim, index)
     }
     fn entity_to_flat_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<usize>]> {
         self.serial_grid.topology().entity_to_flat_cells(dim, index)
     }
-    fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]> {
+    fn entity_vertices(&self, dim: usize, index: usize) -> Option<&[usize]> {
         self.serial_grid.topology().entity_vertices(dim, index)
     }
     fn cell_ownership(&self, index: Self::IndexType) -> Ownership {
         self.cell_ownership[&index]
     }
-    fn vertex_ownership(&self, index: Self::IndexType) -> Ownership {
+    fn vertex_ownership(&self, index: usize) -> Ownership {
         self.vertex_ownership[&index]
     }
-    fn edge_ownership(&self, index: Self::IndexType) -> Ownership {
+    fn edge_ownership(&self, index: usize) -> Ownership {
         self.edge_ownership[&index]
     }
-    fn vertex_index_to_id(&self, index: Self::IndexType) -> usize {
+    fn vertex_index_to_id(&self, index: usize) -> usize {
         self.serial_grid.topology().vertex_index_to_id(index)
     }
     fn cell_index_to_id(&self, index: Self::IndexType) -> usize {
         self.serial_grid.topology().cell_index_to_id(index)
     }
-    fn vertex_id_to_index(&self, id: usize) -> Self::IndexType {
+    fn vertex_id_to_index(&self, id: usize) -> usize {
         self.serial_grid.topology().vertex_id_to_index(id)
     }
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType {
         self.serial_grid.topology().cell_id_to_index(id)
     }
-    fn vertex_index_to_flat_index(&self, index: Self::IndexType) -> usize {
-        self.serial_grid
-            .topology()
-            .vertex_index_to_flat_index(index)
-    }
-    fn edge_index_to_flat_index(&self, index: Self::IndexType) -> usize {
-        self.serial_grid.topology().edge_index_to_flat_index(index)
-    }
     fn face_index_to_flat_index(&self, index: Self::IndexType) -> usize {
         self.serial_grid.topology().face_index_to_flat_index(index)
-    }
-    fn vertex_flat_index_to_index(&self, index: usize) -> Self::IndexType {
-        self.serial_grid
-            .topology()
-            .vertex_flat_index_to_index(index)
-    }
-    fn edge_flat_index_to_index(&self, index: usize) -> Self::IndexType {
-        self.serial_grid.topology().edge_flat_index_to_index(index)
     }
     fn face_flat_index_to_index(&self, index: usize) -> Self::IndexType {
         self.serial_grid.topology().face_flat_index_to_index(index)
@@ -143,8 +122,8 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
     pub fn new(
         comm: &'comm C,
         serial_grid: G,
-        vertex_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
-        edge_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
+        vertex_ownership: HashMap<usize, Ownership>,
+        edge_ownership: HashMap<usize, Ownership>,
         cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
     ) -> Self {
         let local_grid = LocalGrid {
@@ -173,7 +152,7 @@ impl<'comm, C: Communicator, G: Grid> Topology for ParallelGrid<'comm, C, G> {
     fn entity_count_by_dim(&self, dim: usize) -> usize {
         self.local_grid.topology().entity_count_by_dim(dim)
     }
-    fn cell(&self, index: Self::IndexType) -> Option<&[Self::IndexType]> {
+    fn cell(&self, index: Self::IndexType) -> Option<&[usize]> {
         self.local_grid.topology().cell(index)
     }
     fn cell_type(&self, index: Self::IndexType) -> Option<ReferenceCellType> {
@@ -182,64 +161,49 @@ impl<'comm, C: Communicator, G: Grid> Topology for ParallelGrid<'comm, C, G> {
     fn entity_types(&self, dim: usize) -> &[ReferenceCellType] {
         self.local_grid.topology().entity_types(dim)
     }
-    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[Self::IndexType]> {
+    fn cell_to_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]> {
         self.local_grid.topology().cell_to_entities(index, dim)
-    }
-    fn cell_to_flat_entities(&self, index: Self::IndexType, dim: usize) -> Option<&[usize]> {
-        self.local_grid.topology().cell_to_flat_entities(index, dim)
     }
     fn entity_to_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<Self::IndexType>]> {
         self.local_grid.topology().entity_to_cells(dim, index)
     }
     fn entity_to_flat_cells(
         &self,
         dim: usize,
-        index: Self::IndexType,
+        index: usize,
     ) -> Option<&[CellLocalIndexPair<usize>]> {
         self.local_grid.topology().entity_to_flat_cells(dim, index)
     }
-    fn entity_vertices(&self, dim: usize, index: Self::IndexType) -> Option<&[Self::IndexType]> {
+    fn entity_vertices(&self, dim: usize, index: usize) -> Option<&[usize]> {
         self.local_grid.topology().entity_vertices(dim, index)
     }
     fn cell_ownership(&self, index: Self::IndexType) -> Ownership {
         self.local_grid.topology().cell_ownership(index)
     }
-    fn vertex_ownership(&self, index: Self::IndexType) -> Ownership {
+    fn vertex_ownership(&self, index: usize) -> Ownership {
         self.local_grid.topology().vertex_ownership(index)
     }
-    fn edge_ownership(&self, index: Self::IndexType) -> Ownership {
+    fn edge_ownership(&self, index: usize) -> Ownership {
         self.local_grid.topology().edge_ownership(index)
     }
-    fn vertex_index_to_id(&self, index: Self::IndexType) -> usize {
+    fn vertex_index_to_id(&self, index: usize) -> usize {
         self.local_grid.topology().vertex_index_to_id(index)
     }
     fn cell_index_to_id(&self, index: Self::IndexType) -> usize {
         self.local_grid.topology().cell_index_to_id(index)
     }
-    fn vertex_id_to_index(&self, id: usize) -> Self::IndexType {
+    fn vertex_id_to_index(&self, id: usize) -> usize {
         self.local_grid.topology().vertex_id_to_index(id)
     }
     fn cell_id_to_index(&self, id: usize) -> Self::IndexType {
         self.local_grid.topology().cell_id_to_index(id)
     }
-    fn vertex_index_to_flat_index(&self, index: Self::IndexType) -> usize {
-        self.local_grid.topology().vertex_index_to_flat_index(index)
-    }
-    fn edge_index_to_flat_index(&self, index: Self::IndexType) -> usize {
-        self.local_grid.topology().edge_index_to_flat_index(index)
-    }
     fn face_index_to_flat_index(&self, index: Self::IndexType) -> usize {
         self.local_grid.topology().face_index_to_flat_index(index)
-    }
-    fn vertex_flat_index_to_index(&self, index: usize) -> Self::IndexType {
-        self.local_grid.topology().vertex_flat_index_to_index(index)
-    }
-    fn edge_flat_index_to_index(&self, index: usize) -> Self::IndexType {
-        self.local_grid.topology().edge_flat_index_to_index(index)
     }
     fn face_flat_index_to_index(&self, index: usize) -> Self::IndexType {
         self.local_grid.topology().face_flat_index_to_index(index)
