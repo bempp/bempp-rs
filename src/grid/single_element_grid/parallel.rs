@@ -1,315 +1,64 @@
 //! Parallel grid builder
 
-use crate::element::reference_cell;
-use crate::grid::parallel_grid::ParallelGrid;
+use crate::grid::parallel_grid::ParallelGridBuilder;
 use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
-use crate::traits::grid::ParallelBuilder;
+use crate::traits::types::ReferenceCellType;
 use mpi::{
-    request::WaitGuard,
-    topology::Communicator,
-    traits::{Buffer, Destination, Equivalence, Source},
+    traits::{Buffer, Equivalence},
 };
 use num::Float;
 use rlst::{
-    dense::array::views::ArrayViewMut, rlst_dynamic_array2, Array, BaseArray, MatrixInverse,
-    RandomAccessMut, RlstScalar, VectorContainer,
+    dense::array::views::ArrayViewMut, Array, BaseArray, MatrixInverse,
+    RlstScalar, VectorContainer,
 };
 use std::collections::HashMap;
 
-impl<const GDIM: usize, T: Float + RlstScalar<Real = T> + Equivalence> ParallelBuilder<GDIM>
-    for SingleElementGridBuilder<GDIM, T>
+impl<T: Float + RlstScalar<Real = T> + Equivalence> ParallelGridBuilder
+    for SingleElementGridBuilder<3, T>
 where
     for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
     [T]: Buffer,
 {
-    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, SingleElementGrid<T>>;
-    fn create_parallel_grid<'a, C: Communicator>(
-        self,
-        comm: &'a C,
-        cell_owners: &HashMap<usize, usize>,
-    ) -> ParallelGrid<'a, C, SingleElementGrid<T>> {
-        let rank = comm.rank() as usize;
-        let size = comm.size() as usize;
-
-        let npts = self.point_indices_to_ids.len();
-        let ncells = self.cell_indices_to_ids.len();
-
-        // data used in computation
-        let mut vertex_owners = vec![(-1, 0); npts];
-        let mut vertex_counts = vec![0; size];
-        let mut cell_indices_per_proc = vec![vec![]; size];
-        let mut vertex_indices_per_proc = vec![vec![]; size];
-        let mut edge_owners = HashMap::new();
-        let mut edge_ids = HashMap::new();
-        let mut edge_counts = vec![0; size];
-        let mut edges_included_per_proc = vec![vec![]; size];
-        let mut edge_id = 0;
-
-        // data to send to other processes
-        let mut points_per_proc = vec![vec![]; size];
-        let mut point_ids_per_proc = vec![vec![]; size];
-        let mut cells_per_proc = vec![vec![]; size];
-        let mut cell_owners_per_proc = vec![vec![]; size];
-        let mut cell_ids_per_proc = vec![vec![]; size];
-        let mut vertex_owners_per_proc = vec![vec![]; size];
-        let mut edges_per_proc = vec![vec![]; size];
-        let mut edge_owners_per_proc = vec![vec![]; size];
-        let mut edge_ids_per_proc = vec![vec![]; size];
-
-        for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
-            let owner = cell_owners[id];
-            // TODO: only assign owners to the first 3 or 4 vertices
-            for v in &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)] {
-                if vertex_owners[*v].0 == -1 {
-                    vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
-                }
-                if !vertex_indices_per_proc[owner].contains(v) {
-                    vertex_indices_per_proc[owner].push(*v);
-                    vertex_owners_per_proc[owner].push(vertex_owners[*v].0 as usize);
-                    for i in 0..GDIM {
-                        points_per_proc[owner].push(self.points[v * GDIM + i])
-                    }
-                    point_ids_per_proc[owner].push(self.point_indices_to_ids[*v]);
-                    vertex_counts[owner] += 1;
-                }
-            }
-        }
-
-        let ref_conn = &reference_cell::connectivity(self.element_data.0)[1];
-
-        for (index, id) in self.cell_indices_to_ids.iter().enumerate() {
-            let owner = cell_owners[id];
-            for e in ref_conn {
-                let v0 = self.cells[self.points_per_cell * index + e[0][0]];
-                let v1 = self.cells[self.points_per_cell * index + e[0][1]];
-                let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
-                if edge_owners.get_mut(&edge).is_none() {
-                    edge_owners.insert(edge, (owner, edge_counts[owner]));
-                    edge_ids.insert(edge, edge_id);
-                    edge_id += 1;
-                    edges_included_per_proc[owner].push(edge);
-                    edges_per_proc[owner].push(edge[0]);
-                    edges_per_proc[owner].push(edge[1]);
-                    edge_owners_per_proc[owner].push(edge_owners[&edge].0);
-                    edge_ids_per_proc[owner].push(edge_ids[&edge]);
-                    edge_counts[owner] += 1;
-                }
-            }
-        }
-
-        for index in 0..ncells {
-            for p in 0..size {
-                for v in
-                    &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
-                {
-                    if vertex_indices_per_proc[p].contains(v) {
-                        cell_indices_per_proc[p].push(index);
-                        break;
-                    }
-                }
-            }
-        }
-
-        for p in 0..size {
-            for index in &cell_indices_per_proc[p] {
-                let id = self.cell_indices_to_ids[*index];
-                // TODO: only assign owners to the first 3 or 4 vertices
-                for v in
-                    &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
-                {
-                    if !vertex_indices_per_proc[p].contains(v) {
-                        vertex_indices_per_proc[p].push(*v);
-                        vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
-                        for i in 0..GDIM {
-                            points_per_proc[p].push(self.points[v * GDIM + i])
-                        }
-                        point_ids_per_proc[p].push(self.point_indices_to_ids[*v])
-                    }
-                    cells_per_proc[p].push(
-                        vertex_indices_per_proc[p]
-                            .iter()
-                            .position(|&r| r == *v)
-                            .unwrap(),
-                    );
-                }
-
-                for e in ref_conn {
-                    let v0 = self.cells[self.points_per_cell * index + e[0][0]];
-                    let v1 = self.cells[self.points_per_cell * index + e[0][1]];
-                    let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
-                    if !edges_included_per_proc[p].contains(&edge) {
-                        edges_included_per_proc[p].push(edge);
-                        edges_per_proc[p].push(edge[0]);
-                        edges_per_proc[p].push(edge[1]);
-                        edge_owners_per_proc[p].push(edge_owners[&edge].0);
-                        edge_ids_per_proc[p].push(edge_ids[&edge]);
-                    }
-                }
-
-                cell_ids_per_proc[p].push(id);
-                cell_owners_per_proc[p].push(cell_owners[&id]);
-            }
-        }
-
-        mpi::request::scope(|scope| {
-            for p in 1..size {
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &points_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &point_ids_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cells_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_owners_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_ids_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &vertex_owners_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &edges_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &edge_owners_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &edge_ids_per_proc[p]),
-                );
-            }
-        });
-        self.create_internal(
-            comm,
-            &points_per_proc[rank],
-            &point_ids_per_proc[rank],
-            &cells_per_proc[rank],
-            &cell_owners_per_proc[rank],
-            &cell_ids_per_proc[rank],
-            &vertex_owners_per_proc[rank],
-            &point_ids_per_proc[rank],
-            &edges_per_proc[rank],
-            &edge_owners_per_proc[rank],
-            &edge_ids_per_proc[rank],
-        )
+    type G = SingleElementGrid<T>;
+    fn point_indices_to_ids(&self) -> &[usize] {
+        &self.point_indices_to_ids
     }
-    fn receive_parallel_grid<C: Communicator>(
-        self,
-        comm: &C,
-        root_rank: usize,
-    ) -> ParallelGrid<'_, C, SingleElementGrid<T>> {
-        let root_process = comm.process_at_rank(root_rank as i32);
-
-        let (points, _status) = root_process.receive_vec::<T>();
-        let (point_ids, _status) = root_process.receive_vec::<usize>();
-        let (cells, _status) = root_process.receive_vec::<usize>();
-        let (cell_owners, _status) = root_process.receive_vec::<usize>();
-        let (cell_ids, _status) = root_process.receive_vec::<usize>();
-        let (vertex_owners, _status) = root_process.receive_vec::<usize>();
-        let (edges, _status) = root_process.receive_vec::<usize>();
-        let (edge_owners, _status) = root_process.receive_vec::<usize>();
-        let (edge_ids, _status) = root_process.receive_vec::<usize>();
-        self.create_internal(
-            comm,
-            &points,
-            &point_ids,
-            &cells,
-            &cell_owners,
-            &cell_ids,
-            &vertex_owners,
-            &point_ids,
-            &edges,
-            &edge_owners,
-            &edge_ids,
-        )
+    fn points(&self) -> &[T] {
+        &self.points
     }
-}
-
-impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> SingleElementGridBuilder<GDIM, T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
-    #[allow(clippy::too_many_arguments)]
-    fn create_internal<'a, C: Communicator>(
-        self,
-        comm: &'a C,
-        points: &[T],
-        point_ids: &[usize],
+    fn cell_indices_to_ids(&self) -> &[usize] {
+        &self.cell_indices_to_ids
+    }
+    fn cell_points(&self, index: usize) -> &[usize] {
+        &self.cells[self.points_per_cell * index..self.points_per_cell * (index + 1)]
+    }
+    fn cell_vertices(&self, index: usize) -> &[usize] {
+        &self.cells
+            [self.points_per_cell * index..self.points_per_cell * index + self.vertices_per_cell]
+    }
+    fn cell_type(&self, _index: usize) -> ReferenceCellType {
+        self.element_data.0
+    }
+    fn create_serial_grid(
+        &self,
+        points: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         cells: &[usize],
-        cell_owners: &[usize],
-        cell_ids: &[usize],
-        vertex_owners: &[usize],
-        vertex_ids: &[usize],
-        edges: &[usize],
-        edge_owners: &[usize],
-        edge_ids: &[usize],
-    ) -> ParallelGrid<'a, C, SingleElementGrid<T>> {
-        let npts = point_ids.len();
-
-        let mut coordinates = rlst_dynamic_array2!(T, [npts, 3]);
-        for i in 0..npts {
-            for j in 0..3 {
-                *coordinates.get_mut([i, j]).unwrap() = points[i * 3 + j];
-            }
-        }
-
-        let mut point_ids_to_indices = HashMap::new();
-        for (index, id) in point_ids.iter().enumerate() {
-            point_ids_to_indices.insert(*id, index);
-        }
-        let mut cell_ids_to_indices = HashMap::new();
-        for (index, id) in cell_ids.iter().enumerate() {
-            cell_ids_to_indices.insert(*id, index);
-        }
-
-        let mut edge_id_map = HashMap::new();
-        for (n, id) in edge_ids.iter().enumerate() {
-            edge_id_map.insert([edges[2 * n], edges[2 * n + 1]], *id);
-        }
-
-        let serial_grid = SingleElementGrid::new(
-            coordinates,
+        point_indices_to_ids: Vec<usize>,
+        point_ids_to_indices: HashMap<usize, usize>,
+        cell_indices_to_ids: Vec<usize>,
+        cell_ids_to_indices: HashMap<usize, usize>,
+        edge_ids: HashMap<[usize; 2], usize>,
+    ) -> Self::G {
+        SingleElementGrid::new(
+            points,
             cells,
             self.element_data.0,
             self.element_data.1,
-            point_ids.to_vec(),
+            point_indices_to_ids,
             point_ids_to_indices,
-            cell_ids.to_vec(),
+            cell_indices_to_ids,
             cell_ids_to_indices,
-            Some(edge_id_map),
-        );
-
-        let mut vertex_owner_map = HashMap::new();
-        for (id, owner) in vertex_ids.iter().zip(vertex_owners) {
-            vertex_owner_map.insert(*id, *owner);
-        }
-        let mut edge_owner_map = HashMap::new();
-        for (id, owner) in edge_ids.iter().zip(edge_owners) {
-            edge_owner_map.insert(*id, *owner);
-        }
-        let mut cell_owner_map = HashMap::new();
-        for (id, owner) in cell_ids.iter().zip(cell_owners) {
-            cell_owner_map.insert(*id, *owner);
-        }
-
-        ParallelGrid::new(
-            comm,
-            serial_grid,
-            vertex_owner_map,
-            edge_owner_map,
-            cell_owner_map,
+            Some(edge_ids),
         )
     }
 }
