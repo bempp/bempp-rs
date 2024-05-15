@@ -128,17 +128,13 @@ pub struct ParallelGrid<'comm, C: Communicator, G: Grid> {
 }
 
 impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
-    #[allow(clippy::too_many_arguments)]
     /// Create new parallel grid
     pub fn new(
         comm: &'comm C,
         serial_grid: G,
-        vertex_ids: &[usize],
-        vertex_owners: &[usize],
-        edge_ids: &[usize],
-        edge_owners: &[usize],
-        cell_ids: &[usize],
-        cell_owners: &[usize],
+        vertex_owners: HashMap<usize, usize>,
+        edge_owners: HashMap<usize, usize>,
+        cell_owners: HashMap<usize, usize>,
     ) -> Self {
         let rank = comm.rank() as usize;
         let size = comm.size() as usize;
@@ -147,7 +143,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         let mut cell_ownership = HashMap::new();
         let mut cells_to_query = vec![vec![]; size];
 
-        for (id, owner) in cell_ids.iter().zip(cell_owners) {
+        for (id, owner) in cell_owners.iter() {
             if *owner != rank {
                 cells_to_query[*owner].push(*id);
             }
@@ -189,7 +185,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         }
 
         let mut indices = vec![0; size];
-        for (id, owner) in cell_ids.iter().zip(cell_owners) {
+        for (id, owner) in cell_owners.iter() {
             cell_ownership.insert(
                 Topology::cell_id_to_index(serial_grid.topology(), *id),
                 if *owner == rank {
@@ -205,7 +201,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         let mut vertex_ownership = HashMap::new();
         let mut vertices_to_query = vec![vec![]; size];
 
-        for (id, owner) in vertex_ids.iter().zip(vertex_owners) {
+        for (id, owner) in vertex_owners.iter() {
             if *owner != rank {
                 vertices_to_query[*owner].push(*id);
             }
@@ -242,7 +238,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         }
 
         let mut indices = vec![0; size];
-        for (id, owner) in vertex_ids.iter().zip(vertex_owners) {
+        for (id, owner) in vertex_owners.iter() {
             vertex_ownership.insert(
                 Topology::vertex_id_to_index(serial_grid.topology(), *id),
                 if *owner == rank {
@@ -258,7 +254,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         let mut edge_ownership = HashMap::new();
         let mut edges_to_query = vec![vec![]; size];
 
-        for (id, owner) in edge_ids.iter().zip(edge_owners) {
+        for (id, owner) in edge_owners.iter() {
             if *owner != rank {
                 edges_to_query[*owner].push(*id);
             }
@@ -295,7 +291,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         }
 
         let mut indices = vec![0; size];
-        for (id, owner) in edge_ids.iter().zip(edge_owners) {
+        for (id, owner) in edge_owners.iter() {
             edge_ownership.insert(
                 Topology::edge_id_to_index(serial_grid.topology(), *id),
                 if *owner == rank {

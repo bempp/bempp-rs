@@ -281,15 +281,25 @@ where
             Some(edge_id_map),
         );
 
+        let mut vertex_owner_map = HashMap::new();
+        for (id, owner) in point_ids.iter().zip(vertex_owners) {
+            vertex_owner_map.insert(*id, *owner);
+        }
+        let mut edge_owner_map = HashMap::new();
+        for (id, owner) in edge_ids.iter().zip(edge_owners) {
+            edge_owner_map.insert(*id, *owner);
+        }
+        let mut cell_owner_map = HashMap::new();
+        for (id, owner) in cell_ids.iter().zip(cell_owners) {
+            cell_owner_map.insert(*id, *owner);
+        }
+
         ParallelGrid::new(
             comm,
             serial_grid,
-            point_ids,
-            vertex_owners,
-            edge_ids,
-            edge_owners,
-            cell_ids,
-            cell_owners,
+            vertex_owner_map,
+            edge_owner_map,
+            cell_owner_map,
         )
     }
 }
