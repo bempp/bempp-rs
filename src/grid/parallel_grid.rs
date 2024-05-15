@@ -61,7 +61,6 @@ impl<G: Grid> Topology for LocalGrid<G> {
         self.cell_ownership[&index]
     }
     fn vertex_ownership(&self, index: usize) -> Ownership {
-        println!("{index}");
         self.vertex_ownership[&index]
     }
     fn edge_ownership(&self, index: usize) -> Ownership {

@@ -3,7 +3,7 @@
 use crate::element::reference_cell;
 use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
 use crate::grid::parallel_grid::ParallelGrid;
-use crate::grid::traits::{Geometry, Grid, Topology};
+use crate::grid::traits::{Grid, Topology};
 use crate::traits::grid::ParallelBuilder;
 use crate::traits::types::{Ownership, ReferenceCellType};
 use mpi::{
@@ -42,8 +42,10 @@ where
         let mut cell_indices_per_proc = vec![vec![]; size];
         let mut vertex_indices_per_proc = vec![vec![]; size];
         let mut edge_owners = HashMap::new();
+        let mut edge_ids = HashMap::new();
         let mut edge_counts = vec![0; size];
         let mut edges_included_per_proc = vec![vec![]; size];
+        let mut edge_id = 0;
 
         // data to send to other processes
         let mut points_per_proc = vec![vec![]; size];
@@ -52,7 +54,6 @@ where
         let mut cell_owners_per_proc = vec![vec![]; size];
         let mut cell_ids_per_proc = vec![vec![]; size];
         let mut vertex_owners_per_proc = vec![vec![]; size];
-        let mut vertex_ids_per_proc = vec![vec![]; size];
         let mut edges_per_proc = vec![vec![]; size];
         let mut edge_owners_per_proc = vec![vec![]; size];
         let mut edge_ids_per_proc = vec![vec![]; size];
@@ -65,7 +66,6 @@ where
                 }
                 if !vertex_indices_per_proc[owner].contains(v) {
                     vertex_indices_per_proc[owner].push(*v);
-                    vertex_ids_per_proc[owner].push(self.point_indices_to_ids[*v]);
                     vertex_owners_per_proc[owner].push(vertex_owners[*v].0 as usize);
                     for i in 0..3 {
                         points_per_proc[owner].push(self.points[v * 3 + i])
@@ -84,25 +84,15 @@ where
                 let v0 = self.cells[3 * index + e[0][0]];
                 let v1 = self.cells[3 * index + e[0][1]];
                 let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
-                let local_v0 = vertex_indices_per_proc[owner]
-                    .iter()
-                    .position(|&r| r == v0)
-                    .unwrap();
-                let local_v1 = vertex_indices_per_proc[owner]
-                    .iter()
-                    .position(|&r| r == v1)
-                    .unwrap();
-                let local_edge = if local_v0 < local_v1 {
-                    [local_v0, local_v1]
-                } else {
-                    [local_v1, local_v0]
-                };
                 if edge_owners.get_mut(&edge).is_none() {
                     edge_owners.insert(edge, (owner, edge_counts[owner]));
+                    edge_ids.insert(edge, edge_id);
+                    edge_id += 1;
                     edges_included_per_proc[owner].push(edge);
                     edges_per_proc[owner].push(edge[0]);
                     edges_per_proc[owner].push(edge[1]);
                     edge_owners_per_proc[owner].push(edge_owners[&edge].0);
+                    edge_ids_per_proc[owner].push(edge_ids[&edge]);
                     edge_counts[owner] += 1;
                 }
             }
@@ -143,24 +133,12 @@ where
                     let v0 = self.cells[3 * index + e[0][0]];
                     let v1 = self.cells[3 * index + e[0][1]];
                     let edge = if v0 < v1 { [v0, v1] } else { [v1, v0] };
-                    let local_v0 = vertex_indices_per_proc[p]
-                        .iter()
-                        .position(|&r| r == v0)
-                        .unwrap();
-                    let local_v1 = vertex_indices_per_proc[p]
-                        .iter()
-                        .position(|&r| r == v1)
-                        .unwrap();
-                    let local_edge = if local_v0 < local_v1 {
-                        [local_v0, local_v1]
-                    } else {
-                        [local_v1, local_v0]
-                    };
                     if !edges_included_per_proc[p].contains(&edge) {
                         edges_included_per_proc[p].push(edge);
                         edges_per_proc[p].push(edge[0]);
                         edges_per_proc[p].push(edge[1]);
                         edge_owners_per_proc[p].push(edge_owners[&edge].0);
+                        edge_ids_per_proc[p].push(edge_ids[&edge]);
                     }
                 }
 
@@ -197,10 +175,6 @@ where
                 );
                 let _ = WaitGuard::from(
                     comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &vertex_ids_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
                         .immediate_send(scope, &edges_per_proc[p]),
                 );
                 let _ = WaitGuard::from(
@@ -221,7 +195,7 @@ where
             &cell_owners_per_proc[rank],
             &cell_ids_per_proc[rank],
             &vertex_owners_per_proc[rank],
-            &vertex_ids_per_proc[rank],
+            &point_ids_per_proc[rank],
             &edges_per_proc[rank],
             &edge_owners_per_proc[rank],
             &edge_ids_per_proc[rank],
@@ -240,7 +214,6 @@ where
         let (cell_owners, _status) = root_process.receive_vec::<usize>();
         let (cell_ids, _status) = root_process.receive_vec::<usize>();
         let (vertex_owners, _status) = root_process.receive_vec::<usize>();
-        let (vertex_ids, _status) = root_process.receive_vec::<usize>();
         let (edges, _status) = root_process.receive_vec::<usize>();
         let (edge_owners, _status) = root_process.receive_vec::<usize>();
         let (edge_ids, _status) = root_process.receive_vec::<usize>();
@@ -252,7 +225,7 @@ where
             &cell_owners,
             &cell_ids,
             &vertex_owners,
-            &vertex_ids,
+            &point_ids,
             &edges,
             &edge_owners,
             &edge_ids,
@@ -282,7 +255,6 @@ where
         let rank = comm.rank() as usize;
         let size = comm.size() as usize;
         let npts = point_ids.len();
-        let ncells = cell_ids.len();
 
         let mut coordinates = rlst_dynamic_array2!(T, [npts, 3]);
         for i in 0..npts {
@@ -300,7 +272,6 @@ where
             cell_ids_to_indices.insert(*id, index);
         }
 
-        let nedges = edge_owners.len();
         let mut edge_id_map = HashMap::new();
         for (n, id) in edge_ids.iter().enumerate() {
             edge_id_map.insert([edges[2 * n], edges[2 * n + 1]], *id);
@@ -485,8 +456,6 @@ where
                 },
             );
         }
-
-        println!("[{rank}] {:?}", vertex_ownership);
 
         ParallelGrid::new(
             comm,

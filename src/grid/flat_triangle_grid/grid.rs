@@ -37,9 +37,11 @@ pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     entities_to_cells: Vec<Vec<Vec<CellLocalIndexPair<usize>>>>,
     entity_types: Vec<ReferenceCellType>,
 
-    // Point and cell ids
+    // Point, edge and cell ids
     point_indices_to_ids: Vec<usize>,
     point_ids_to_indices: HashMap<usize, usize>,
+    edge_indices_to_ids: Vec<usize>,
+    edge_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
 }
@@ -145,10 +147,21 @@ where
             cells_to_entities[0][cell_i].extend_from_slice(cell);
             cells_to_entities[2][cell_i] = vec![cell_i];
         }
-        if let Some(e) = edge_ids {
-            for (i, j) in e.into_iter() {
-                edge_indices.insert((i[0], i[1]), j);
-                entities_to_vertices[1].push(vec![i[0], i[1]]);
+
+        let mut edge_indices_to_ids = vec![];
+        let mut edge_ids_to_indices = HashMap::new();
+        if let Some(e) = &edge_ids {
+            for (edge_i, (i, j)) in e.iter().enumerate() {
+                let mut v0 = point_ids_to_indices[&i[0]];
+                let mut v1 = point_ids_to_indices[&i[1]];
+                if v0 > v1 {
+                    std::mem::swap(&mut v0, &mut v1);
+                }
+
+                edge_indices.insert((v0, v1), edge_i);
+                edge_indices_to_ids.push(*j);
+                edge_ids_to_indices.insert(*j, edge_i);
+                entities_to_vertices[1].push(vec![v0, v1]);
                 entities_to_cells[1].push(vec![]);
             }
         }
@@ -166,7 +179,13 @@ where
                     entities_to_cells[1][*edge_index]
                         .push(CellLocalIndexPair::new(cell_i, local_index));
                 } else {
-                    edge_indices.insert((first, second), entities_to_vertices[1].len());
+                    if edge_ids.is_some() {
+                        panic!("Missing id for edge");
+                    }
+                    let id = entities_to_vertices[1].len();
+                    edge_indices.insert((first, second), id);
+                    edge_indices_to_ids.push(id);
+                    edge_ids_to_indices.insert(id, id);
                     cells_to_entities[1][cell_i].push(entities_to_vertices[1].len());
                     entities_to_cells[1].push(vec![CellLocalIndexPair::new(cell_i, local_index)]);
                     entities_to_vertices[1].push(vec![first, second]);
@@ -189,6 +208,8 @@ where
             entity_types,
             point_indices_to_ids,
             point_ids_to_indices,
+            edge_indices_to_ids,
+            edge_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
         }
@@ -452,10 +473,10 @@ impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
         self.point_ids_to_indices[&id]
     }
     fn edge_id_to_index(&self, id: usize) -> usize {
-        id
+        self.edge_ids_to_indices[&id]
     }
-    fn edge_index_to_id(&self, id: usize) -> usize {
-        id
+    fn edge_index_to_id(&self, index: usize) -> usize {
+        self.edge_indices_to_ids[index]
     }
     fn cell_id_to_index(&self, id: usize) -> usize {
         self.cell_ids_to_indices[&id]
