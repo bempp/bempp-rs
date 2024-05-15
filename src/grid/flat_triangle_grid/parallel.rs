@@ -194,7 +194,6 @@ where
             &cell_owners_per_proc[rank],
             &cell_ids_per_proc[rank],
             &vertex_owners_per_proc[rank],
-            &point_ids_per_proc[rank],
             &edges_per_proc[rank],
             &edge_owners_per_proc[rank],
             &edge_ids_per_proc[rank],
@@ -224,7 +223,6 @@ where
             &cell_owners,
             &cell_ids,
             &vertex_owners,
-            &point_ids,
             &edges,
             &edge_owners,
             &edge_ids,
@@ -246,7 +244,6 @@ where
         cell_owners: &[usize],
         cell_ids: &[usize],
         vertex_owners: &[usize],
-        vertex_ids: &[usize],
         edges: &[usize],
         edge_owners: &[usize],
         edge_ids: &[usize],
@@ -287,15 +284,12 @@ where
         ParallelGrid::new(
             comm,
             serial_grid,
-            vertex_ids,
+            point_ids,
             vertex_owners,
             edge_ids,
             edge_owners,
             cell_ids,
             cell_owners,
-            //vertex_ownership,
-            //edge_ownership,
-            //cell_ownership,
         )
     }
 }

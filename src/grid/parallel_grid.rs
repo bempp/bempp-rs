@@ -138,9 +138,6 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         edge_owners: &[usize],
         cell_ids: &[usize],
         cell_owners: &[usize],
-        //vertex_ownership: HashMap<usize, Ownership>,
-        //edge_ownership: HashMap<usize, Ownership>,
-        //cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
     ) -> Self {
         let rank = comm.rank() as usize;
         let size = comm.size() as usize;
