@@ -128,6 +128,7 @@ pub struct ParallelGrid<'comm, C: Communicator, G: Grid> {
 }
 
 impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
+    #[allow(clippy::too_many_arguments)]
     /// Create new parallel grid
     pub fn new(
         comm: &'comm C,
@@ -152,12 +153,10 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             }
         }
         mpi::request::scope(|scope| {
-            for p in 0..size {
+            for (p, cq) in cells_to_query.iter().enumerate() {
                 if p != rank {
-                    let _ = WaitGuard::from(
-                        comm.process_at_rank(p as i32)
-                            .immediate_send(scope, &cells_to_query[p]),
-                    );
+                    let _ =
+                        WaitGuard::from(comm.process_at_rank(p as i32).immediate_send(scope, cq));
                 }
             }
         });
@@ -183,9 +182,9 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             }
         }
         let mut cell_info = vec![vec![]; size];
-        for p in 0..size {
+        for (p, ci) in cell_info.iter_mut().enumerate() {
             if p != rank {
-                (cell_info[p], _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
+                (*ci, _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
             }
         }
 
@@ -212,12 +211,10 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             }
         }
         mpi::request::scope(|scope| {
-            for p in 0..size {
+            for (p, vq) in vertices_to_query.iter().enumerate() {
                 if p != rank {
-                    let _ = WaitGuard::from(
-                        comm.process_at_rank(p as i32)
-                            .immediate_send(scope, &vertices_to_query[p]),
-                    );
+                    let _ =
+                        WaitGuard::from(comm.process_at_rank(p as i32).immediate_send(scope, vq));
                 }
             }
         });
@@ -238,9 +235,9 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             }
         }
         let mut vertex_info = vec![vec![]; size];
-        for p in 0..size {
+        for (p, vi) in vertex_info.iter_mut().enumerate() {
             if p != rank {
-                (vertex_info[p], _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
+                (*vi, _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
             }
         }
 
@@ -267,12 +264,10 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             }
         }
         mpi::request::scope(|scope| {
-            for p in 0..size {
+            for (p, eq) in edges_to_query.iter().enumerate() {
                 if p != rank {
-                    let _ = WaitGuard::from(
-                        comm.process_at_rank(p as i32)
-                            .immediate_send(scope, &edges_to_query[p]),
-                    );
+                    let _ =
+                        WaitGuard::from(comm.process_at_rank(p as i32).immediate_send(scope, eq));
                 }
             }
         });
@@ -293,9 +288,9 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
             }
         }
         let mut edge_info = vec![vec![]; size];
-        for p in 0..size {
+        for (p, ei) in edge_info.iter_mut().enumerate() {
             if p != rank {
-                (edge_info[p], _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
+                (*ei, _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
             }
         }
 

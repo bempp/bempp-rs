@@ -131,8 +131,6 @@ where
         let mut entities_to_cells = vec![vec![]; 3];
         let mut entities_to_vertices = vec![vec![]; 2];
 
-        let mut edge_indices = HashMap::new();
-
         entities_to_cells[2] = vec![vec![]; ncells];
         entities_to_vertices[0] = (0..nvertices).map(|i| vec![i]).collect::<Vec<_>>();
         entities_to_cells[0] = vec![vec![]; nvertices];
@@ -148,6 +146,7 @@ where
             cells_to_entities[2][cell_i] = vec![cell_i];
         }
 
+        let mut edge_indices = HashMap::new();
         let mut edge_indices_to_ids = vec![];
         let mut edge_ids_to_indices = HashMap::new();
         if let Some(e) = &edge_ids {

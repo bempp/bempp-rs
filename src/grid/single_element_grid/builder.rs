@@ -100,6 +100,7 @@ where
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
             self.cell_ids_to_indices,
+            None,
         )
     }
 }
