@@ -111,6 +111,7 @@ where
             self.point_indices_to_ids,
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
+            None,
         )
     }
 }

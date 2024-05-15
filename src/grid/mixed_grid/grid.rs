@@ -35,6 +35,7 @@ where
         point_indices_to_ids: Vec<usize>,
         point_ids_to_indices: HashMap<usize, usize>,
         cell_indices_to_ids: Vec<usize>,
+        edge_ids: Option<HashMap<[usize; 2], usize>>,
     ) -> Self {
         let mut element_info = vec![];
         let mut element_numbers = vec![];
@@ -71,6 +72,7 @@ where
             cell_types,
             &point_indices_to_ids,
             &cell_indices_to_ids,
+            edge_ids,
         );
         let geometry = MixedGeometry::<T>::new(
             points,

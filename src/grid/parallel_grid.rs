@@ -435,17 +435,17 @@ pub trait ParallelGridBuilder {
     /// TODO
     fn push_extra_cell_info(&self, _extra_cell_info: &mut Self::ExtraCellInfo, _cell_id: usize) {}
     /// TODO
-    fn send_extra_cell_info(
+    fn send_extra_cell_info<'a>(
         &self,
-        _scope: &LocalScope,
+        _scope: &LocalScope<'a>,
         _process: &Process,
-        _extra_cell_info: &Self::ExtraCellInfo,
+        _extra_cell_info: &'a Self::ExtraCellInfo,
     ) {
     }
     /// TODO
     fn receive_extra_cell_info(
         &self,
-        _process: &Process,
+        _root_process: &Process,
         _extra_cell_info: &mut Self::ExtraCellInfo,
     ) {
     }

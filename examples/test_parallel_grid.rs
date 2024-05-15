@@ -10,7 +10,7 @@ use bempp::{
     function::{ParallelFunctionSpace, SerialFunctionSpace},
     grid::{
         flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
-        //mixed_grid::{MixedGrid, MixedGridBuilder},
+        mixed_grid::{MixedGrid, MixedGridBuilder},
         parallel_grid::ParallelGrid,
         single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
     },
@@ -161,7 +161,7 @@ fn example_single_element_grid_serial(n: usize) -> SingleElementGrid<f64> {
     create_single_element_grid_data(&mut b, n);
     b.create_grid()
 }
-/*
+
 #[cfg(feature = "mpi")]
 fn create_mixed_grid_data(b: &mut MixedGridBuilder<3, f64>, n: usize) {
     for y in 0..n {
@@ -224,7 +224,7 @@ fn example_mixed_grid_serial(n: usize) -> MixedGrid<f64> {
     create_mixed_grid_data(&mut b, n);
     b.create_grid()
 }
-*/
+
 #[cfg(feature = "mpi")]
 fn test_parallel_flat_triangle_grid<C: Communicator>(comm: &C) {
     let rank = comm.rank();
@@ -448,7 +448,6 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
         });
     }
 }
-/*
 
 #[cfg(feature = "mpi")]
 fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, cont: Continuity) {
@@ -537,7 +536,7 @@ fn test_parallel_assembly_mixed_grid<C: Communicator>(comm: &C, degree: usize, c
         });
     }
 }
-*/
+
 #[cfg(feature = "mpi")]
 fn main() {
     let universe: Universe = mpi::initialize().unwrap();
@@ -557,12 +556,10 @@ fn main() {
             println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
         }
         test_parallel_assembly_single_element_grid(&world, degree, Continuity::Discontinuous);
-        /*
         if rank == 0 {
             println!("Testing assembly with DP{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Discontinuous);
-        */
     }
     for degree in 1..4 {
         if rank == 0 {
@@ -573,12 +570,10 @@ fn main() {
             println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
         }
         test_parallel_assembly_single_element_grid(&world, degree, Continuity::Continuous);
-        /*
         if rank == 0 {
             println!("Testing assembly with P{degree} using MixedGrid in parallel.");
         }
         test_parallel_assembly_mixed_grid(&world, degree, Continuity::Continuous);
-        */
     }
 }
 #[cfg(not(feature = "mpi"))]
