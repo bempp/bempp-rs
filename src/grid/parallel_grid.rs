@@ -1,7 +1,11 @@
 //! A parallel implementation of a grid
 use crate::grid::traits::{Grid, Topology};
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
-use mpi::topology::Communicator;
+use mpi::{
+    request::WaitGuard,
+    topology::Communicator,
+    traits::{Destination, Source},
+};
 use std::collections::HashMap;
 
 /// Grid local to a process
@@ -128,10 +132,189 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
     pub fn new(
         comm: &'comm C,
         serial_grid: G,
-        vertex_ownership: HashMap<usize, Ownership>,
-        edge_ownership: HashMap<usize, Ownership>,
-        cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
+        vertex_ids: &[usize],
+        vertex_owners: &[usize],
+        edge_ids: &[usize],
+        edge_owners: &[usize],
+        cell_ids: &[usize],
+        cell_owners: &[usize],
+        //vertex_ownership: HashMap<usize, Ownership>,
+        //edge_ownership: HashMap<usize, Ownership>,
+        //cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
     ) -> Self {
+        let rank = comm.rank() as usize;
+        let size = comm.size() as usize;
+
+        // Create cell ownership
+        let mut cell_ownership = HashMap::new();
+        let mut cells_to_query = vec![vec![]; size];
+
+        for (id, owner) in cell_ids.iter().zip(cell_owners) {
+            if *owner != rank {
+                cells_to_query[*owner].push(*id);
+            }
+        }
+        mpi::request::scope(|scope| {
+            for p in 0..size {
+                if p != rank {
+                    let _ = WaitGuard::from(
+                        comm.process_at_rank(p as i32)
+                            .immediate_send(scope, &cells_to_query[p]),
+                    );
+                }
+            }
+        });
+        for p in 0..size {
+            if p != rank {
+                let (cells_queried, _status) =
+                    comm.process_at_rank(p as i32).receive_vec::<usize>();
+                let send_back =
+                    cells_queried
+                        .iter()
+                        .map(|id| {
+                            serial_grid.topology().face_index_to_flat_index(
+                                Topology::cell_id_to_index(serial_grid.topology(), *id),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                mpi::request::scope(|scope| {
+                    let _ = WaitGuard::from(
+                        comm.process_at_rank(p as i32)
+                            .immediate_send(scope, &send_back),
+                    );
+                });
+            }
+        }
+        let mut cell_info = vec![vec![]; size];
+        for p in 0..size {
+            if p != rank {
+                (cell_info[p], _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
+            }
+        }
+
+        let mut indices = vec![0; size];
+        for (id, owner) in cell_ids.iter().zip(cell_owners) {
+            cell_ownership.insert(
+                Topology::cell_id_to_index(serial_grid.topology(), *id),
+                if *owner == rank {
+                    Ownership::Owned
+                } else {
+                    indices[*owner] += 1;
+                    Ownership::Ghost(*owner, cell_info[*owner][indices[*owner] - 1])
+                },
+            );
+        }
+
+        // Create vertex ownership
+        let mut vertex_ownership = HashMap::new();
+        let mut vertices_to_query = vec![vec![]; size];
+
+        for (id, owner) in vertex_ids.iter().zip(vertex_owners) {
+            if *owner != rank {
+                vertices_to_query[*owner].push(*id);
+            }
+        }
+        mpi::request::scope(|scope| {
+            for p in 0..size {
+                if p != rank {
+                    let _ = WaitGuard::from(
+                        comm.process_at_rank(p as i32)
+                            .immediate_send(scope, &vertices_to_query[p]),
+                    );
+                }
+            }
+        });
+        for p in 0..size {
+            if p != rank {
+                let (vertices_queried, _status) =
+                    comm.process_at_rank(p as i32).receive_vec::<usize>();
+                let send_back = vertices_queried
+                    .iter()
+                    .map(|id| Topology::vertex_id_to_index(serial_grid.topology(), *id))
+                    .collect::<Vec<_>>();
+                mpi::request::scope(|scope| {
+                    let _ = WaitGuard::from(
+                        comm.process_at_rank(p as i32)
+                            .immediate_send(scope, &send_back),
+                    );
+                });
+            }
+        }
+        let mut vertex_info = vec![vec![]; size];
+        for p in 0..size {
+            if p != rank {
+                (vertex_info[p], _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
+            }
+        }
+
+        let mut indices = vec![0; size];
+        for (id, owner) in vertex_ids.iter().zip(vertex_owners) {
+            vertex_ownership.insert(
+                Topology::vertex_id_to_index(serial_grid.topology(), *id),
+                if *owner == rank {
+                    Ownership::Owned
+                } else {
+                    indices[*owner] += 1;
+                    Ownership::Ghost(*owner, vertex_info[*owner][indices[*owner] - 1])
+                },
+            );
+        }
+
+        // Create edge ownership
+        let mut edge_ownership = HashMap::new();
+        let mut edges_to_query = vec![vec![]; size];
+
+        for (id, owner) in edge_ids.iter().zip(edge_owners) {
+            if *owner != rank {
+                edges_to_query[*owner].push(*id);
+            }
+        }
+        mpi::request::scope(|scope| {
+            for p in 0..size {
+                if p != rank {
+                    let _ = WaitGuard::from(
+                        comm.process_at_rank(p as i32)
+                            .immediate_send(scope, &edges_to_query[p]),
+                    );
+                }
+            }
+        });
+        for p in 0..size {
+            if p != rank {
+                let (edges_queried, _status) =
+                    comm.process_at_rank(p as i32).receive_vec::<usize>();
+                let send_back = edges_queried
+                    .iter()
+                    .map(|id| Topology::edge_id_to_index(serial_grid.topology(), *id))
+                    .collect::<Vec<_>>();
+                mpi::request::scope(|scope| {
+                    let _ = WaitGuard::from(
+                        comm.process_at_rank(p as i32)
+                            .immediate_send(scope, &send_back),
+                    );
+                });
+            }
+        }
+        let mut edge_info = vec![vec![]; size];
+        for p in 0..size {
+            if p != rank {
+                (edge_info[p], _) = comm.process_at_rank(p as i32).receive_vec::<usize>();
+            }
+        }
+
+        let mut indices = vec![0; size];
+        for (id, owner) in edge_ids.iter().zip(edge_owners) {
+            edge_ownership.insert(
+                Topology::edge_id_to_index(serial_grid.topology(), *id),
+                if *owner == rank {
+                    Ownership::Owned
+                } else {
+                    indices[*owner] += 1;
+                    Ownership::Ghost(*owner, edge_info[*owner][indices[*owner] - 1])
+                },
+            );
+        }
+
         let local_grid = LocalGrid {
             rank: comm.rank() as usize,
             serial_grid,
