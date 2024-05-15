@@ -1,15 +1,12 @@
 //! Parallel grid builder
 
-use crate::grid::parallel_grid::ParallelGridBuilder;
 use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
+use crate::grid::parallel_grid::ParallelGridBuilder;
 use crate::traits::types::ReferenceCellType;
-use mpi::{
-    traits::{Buffer, Equivalence},
-};
+use mpi::traits::{Buffer, Equivalence};
 use num::Float;
 use rlst::{
-    dense::array::views::ArrayViewMut, Array, BaseArray, MatrixInverse,
-    RlstScalar, VectorContainer,
+    dense::array::views::ArrayViewMut, Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer,
 };
 use std::collections::HashMap;
 
@@ -20,6 +17,10 @@ where
     [T]: Buffer,
 {
     type G = FlatTriangleGrid<T>;
+    type ExtraCellInfo = ();
+
+    fn new_extra_cell_info(&self) {}
+
     fn point_indices_to_ids(&self) -> &[usize] {
         &self.point_indices_to_ids
     }
@@ -47,6 +48,7 @@ where
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
         edge_ids: HashMap<[usize; 2], usize>,
+        _extra_cell_info: &(),
     ) -> Self::G {
         FlatTriangleGrid::new(
             points,

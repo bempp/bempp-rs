@@ -1,17 +1,14 @@
 //! A parallel implementation of a grid
 use crate::element::reference_cell;
 use crate::grid::traits::{Grid, Topology};
-use crate::traits::grid::{Builder, ParallelBuilder, GridType};
+use crate::traits::grid::{Builder, GridType, ParallelBuilder};
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use mpi::{
-    request::WaitGuard,
-    topology::Communicator,
-    traits::{Destination, Equivalence, Source, Buffer},
+    request::{LocalScope, WaitGuard},
+    topology::{Communicator, Process},
+    traits::{Buffer, Destination, Equivalence, Source},
 };
-use rlst::{
-    rlst_dynamic_array2, Array, BaseArray,
-    RandomAccessMut, VectorContainer,
-};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RandomAccessMut, VectorContainer};
 use std::collections::HashMap;
 
 type RlstMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -428,10 +425,32 @@ impl<'a, C: Communicator, G: Grid> Grid for ParallelGrid<'a, C, G> {
 
 // TODO: pub(crate)
 /// Internal trait for building parallel grids
-pub trait ParallelGridBuilder
-{
+pub trait ParallelGridBuilder {
     /// The serial grid type used on each process
     type G: Grid;
+
+    /// Extra cell info
+    type ExtraCellInfo: Clone;
+
+    /// TODO
+    fn push_extra_cell_info(&self, _extra_cell_info: &mut Self::ExtraCellInfo, _cell_id: usize) {}
+    /// TODO
+    fn send_extra_cell_info(
+        &self,
+        _scope: &LocalScope,
+        _process: &Process,
+        _extra_cell_info: &Self::ExtraCellInfo,
+    ) {
+    }
+    /// TODO
+    fn receive_extra_cell_info(
+        &self,
+        _process: &Process,
+        _extra_cell_info: &mut Self::ExtraCellInfo,
+    ) {
+    }
+    /// TODO
+    fn new_extra_cell_info(&self) -> Self::ExtraCellInfo;
 
     /// The id of each point
     fn point_indices_to_ids(&self) -> &[usize];
@@ -462,6 +481,7 @@ pub trait ParallelGridBuilder
         cell_indices_to_ids: Vec<usize>,
         cell_ids_to_indices: HashMap<usize, usize>,
         edge_ids: HashMap<[usize; 2], usize>,
+        extra_cell_info: &Self::ExtraCellInfo,
     ) -> Self::G;
 
     #[allow(clippy::too_many_arguments)]
@@ -479,10 +499,12 @@ pub trait ParallelGridBuilder
         edges: &[usize],
         edge_owners: &[usize],
         edge_ids: &[usize],
+        extra_cell_info: &Self::ExtraCellInfo,
     ) -> ParallelGrid<'a, C, Self::G> {
         let npts = point_ids.len();
 
-        let mut coordinates = rlst_dynamic_array2!(<<Self as ParallelGridBuilder>::G as GridType>::T, [npts, 3]);
+        let mut coordinates =
+            rlst_dynamic_array2!(<<Self as ParallelGridBuilder>::G as GridType>::T, [npts, 3]);
         for i in 0..npts {
             for j in 0..3 {
                 *coordinates.get_mut([i, j]).unwrap() = points[i * 3 + j];
@@ -511,6 +533,7 @@ pub trait ParallelGridBuilder
             cell_ids.to_vec(),
             cell_ids_to_indices,
             edge_id_map,
+            extra_cell_info,
         );
 
         let mut vertex_owner_map = HashMap::new();
@@ -536,12 +559,10 @@ pub trait ParallelGridBuilder
     }
 }
 
-impl<
-        const GDIM: usize,
-        B: ParallelGridBuilder + Builder<GDIM>,
-    > ParallelBuilder<GDIM> for B
-where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
-    <<B as ParallelGridBuilder>::G as GridType>::T: Equivalence
+impl<const GDIM: usize, B: ParallelGridBuilder + Builder<GDIM>> ParallelBuilder<GDIM> for B
+where
+    Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
+    <<B as ParallelGridBuilder>::G as GridType>::T: Equivalence,
 {
     type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, B::G>;
 
@@ -577,6 +598,7 @@ where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
         let mut edges_per_proc = vec![vec![]; size];
         let mut edge_owners_per_proc = vec![vec![]; size];
         let mut edge_ids_per_proc = vec![vec![]; size];
+        let mut extra_cell_info_per_proc = vec![self.new_extra_cell_info(); size];
 
         for (index, id) in self.cell_indices_to_ids().iter().enumerate() {
             let owner = cell_owners[id];
@@ -672,49 +694,26 @@ where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
 
                 cell_ids_per_proc[p].push(id);
                 cell_owners_per_proc[p].push(cell_owners[&id]);
+                self.push_extra_cell_info(&mut extra_cell_info_per_proc[p], id);
             }
         }
 
         mpi::request::scope(|scope| {
             for p in 1..size {
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &points_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &point_ids_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cells_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_owners_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &cell_ids_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &vertex_owners_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &edges_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &edge_owners_per_proc[p]),
-                );
-                let _ = WaitGuard::from(
-                    comm.process_at_rank(p as i32)
-                        .immediate_send(scope, &edge_ids_per_proc[p]),
-                );
+                let process = comm.process_at_rank(p as i32);
+                let _ = WaitGuard::from(process.immediate_send(scope, &points_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &point_ids_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &cells_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &cell_owners_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &cell_ids_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &vertex_owners_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &edges_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &edge_owners_per_proc[p]));
+                let _ = WaitGuard::from(process.immediate_send(scope, &edge_ids_per_proc[p]));
+                self.send_extra_cell_info(scope, &process, &extra_cell_info_per_proc[rank]);
             }
         });
+
         self.create_internal(
             comm,
             &points_per_proc[rank],
@@ -727,6 +726,7 @@ where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
             &edges_per_proc[rank],
             &edge_owners_per_proc[rank],
             &edge_ids_per_proc[rank],
+            &extra_cell_info_per_proc[rank],
         )
     }
 
@@ -737,7 +737,8 @@ where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
     ) -> ParallelGrid<'_, C, B::G> {
         let root_process = comm.process_at_rank(root_rank as i32);
 
-        let (points, _status) = root_process.receive_vec::<<<Self as ParallelGridBuilder>::G as GridType>::T>();
+        let (points, _status) =
+            root_process.receive_vec::<<<Self as ParallelGridBuilder>::G as GridType>::T>();
         let (point_ids, _status) = root_process.receive_vec::<usize>();
         let (cells, _status) = root_process.receive_vec::<usize>();
         let (cell_owners, _status) = root_process.receive_vec::<usize>();
@@ -746,6 +747,9 @@ where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
         let (edges, _status) = root_process.receive_vec::<usize>();
         let (edge_owners, _status) = root_process.receive_vec::<usize>();
         let (edge_ids, _status) = root_process.receive_vec::<usize>();
+        let mut extra_cell_info = self.new_extra_cell_info();
+        self.receive_extra_cell_info(&root_process, &mut extra_cell_info);
+
         self.create_internal(
             comm,
             &points,
@@ -758,6 +762,7 @@ where Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
             &edges,
             &edge_owners,
             &edge_ids,
+            &extra_cell_info,
         )
     }
 }
