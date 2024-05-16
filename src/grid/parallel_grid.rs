@@ -423,9 +423,8 @@ impl<'a, C: Communicator, G: Grid> Grid for ParallelGrid<'a, C, G> {
     }
 }
 
-// TODO: pub(crate)
 /// Internal trait for building parallel grids
-pub trait ParallelGridBuilder {
+pub(crate) trait ParallelGridBuilder {
     /// The serial grid type used on each process
     type G: Grid;
 
@@ -559,12 +558,12 @@ pub trait ParallelGridBuilder {
     }
 }
 
-impl<const GDIM: usize, B: ParallelGridBuilder + Builder<GDIM>> ParallelBuilder<GDIM> for B
+impl<const GDIM: usize, G: Grid, B: ParallelGridBuilder<G=G> + Builder<GDIM>> ParallelBuilder<GDIM> for B
 where
-    Vec<<<B as ParallelGridBuilder>::G as GridType>::T>: Buffer,
-    <<B as ParallelGridBuilder>::G as GridType>::T: Equivalence,
+    Vec<<G as GridType>::T>: Buffer,
+    <G as GridType>::T: Equivalence,
 {
-    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, B::G>;
+    type ParallelGridType<'a, C: Communicator + 'a> = ParallelGrid<'a, C, G>;
 
     fn create_parallel_grid<'a, C: Communicator>(
         self,
@@ -734,7 +733,7 @@ where
         self,
         comm: &C,
         root_rank: usize,
-    ) -> ParallelGrid<'_, C, B::G> {
+    ) -> ParallelGrid<'_, C, G> {
         let root_process = comm.process_at_rank(root_rank as i32);
 
         let (points, _status) =
