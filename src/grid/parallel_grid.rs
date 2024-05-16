@@ -430,11 +430,11 @@ pub trait ParallelGridBuilder {
     type G: Grid;
 
     /// Extra cell info
-    type ExtraCellInfo: Clone;
+    type ExtraCellInfo: Clone + std::fmt::Debug;
 
-    /// TODO
+    /// Push information from a cell to extra cell info
     fn push_extra_cell_info(&self, _extra_cell_info: &mut Self::ExtraCellInfo, _cell_id: usize) {}
-    /// TODO
+    /// Send extra cell info from root process to another process
     fn send_extra_cell_info<'a>(
         &self,
         _scope: &LocalScope<'a>,
@@ -442,14 +442,14 @@ pub trait ParallelGridBuilder {
         _extra_cell_info: &'a Self::ExtraCellInfo,
     ) {
     }
-    /// TODO
+    /// Receive extra cell info from root process
     fn receive_extra_cell_info(
         &self,
         _root_process: &Process,
         _extra_cell_info: &mut Self::ExtraCellInfo,
     ) {
     }
-    /// TODO
+    /// Create new empty extra cell info
     fn new_extra_cell_info(&self) -> Self::ExtraCellInfo;
 
     /// The id of each point
@@ -710,7 +710,7 @@ where
                 let _ = WaitGuard::from(process.immediate_send(scope, &edges_per_proc[p]));
                 let _ = WaitGuard::from(process.immediate_send(scope, &edge_owners_per_proc[p]));
                 let _ = WaitGuard::from(process.immediate_send(scope, &edge_ids_per_proc[p]));
-                self.send_extra_cell_info(scope, &process, &extra_cell_info_per_proc[rank]);
+                self.send_extra_cell_info(scope, &process, &extra_cell_info_per_proc[p]);
             }
         });
 

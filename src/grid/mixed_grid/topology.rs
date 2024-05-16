@@ -35,7 +35,7 @@ pub struct MixedTopology {
     entities_to_cells: Vec<Vec<Vec<CellLocalIndexPair<IndexType>>>>,
     entities_to_flat_cells: Vec<Vec<Vec<CellLocalIndexPair<usize>>>>,
     entity_types: Vec<Vec<ReferenceCellType>>,
-    vertex_indices_to_ids: HashMap<usize, usize>,
+    vertex_indices_to_ids: Vec<usize>,
     vertex_ids_to_indices: HashMap<usize, usize>,
     edge_indices_to_ids: Vec<usize>,
     edge_ids_to_indices: HashMap<usize, usize>,
@@ -59,7 +59,7 @@ impl MixedTopology {
         let mut vertices = vec![];
         let dim = reference_cell::dim(cell_types[0]);
 
-        let mut vertex_indices_to_ids = HashMap::new();
+        let mut vertex_indices_to_ids = vec![];
         let mut vertex_ids_to_indices = HashMap::new();
         let mut edge_indices_to_ids = vec![];
         let mut edge_ids_to_indices = HashMap::new();
@@ -111,9 +111,9 @@ impl MixedTopology {
                         if !vertices.contains(v) {
                             entities_to_cells[0].push(vec![]);
                             entities_to_flat_cells[0].push(vec![]);
+                            vertex_indices_to_ids.push(point_indices_to_ids[*v]);
+                            vertex_ids_to_indices.insert(point_indices_to_ids[*v], vertices.len());
                             vertices.push(*v);
-                            vertex_indices_to_ids.insert(*v, point_indices_to_ids[*v]);
-                            vertex_ids_to_indices.insert(point_indices_to_ids[*v], *v);
                         }
                         row.push(vertices.iter().position(|&r| r == *v).unwrap());
                     }
@@ -135,8 +135,6 @@ impl MixedTopology {
             entities_to_vertices[0].push(vec![i]);
         }
 
-        println!("{vertex_ids_to_indices:?}");
-
         let mut edge_indices = HashMap::new();
         if let Some(e) = &edge_ids {
             for (edge_i, (i, j)) in e.iter().enumerate() {
@@ -156,7 +154,11 @@ impl MixedTopology {
             let ref_conn = &reference_cell::connectivity(*cell_type)[1];
             let ncells = cells_to_entities[0][cell_type].len();
             for cell_i in 0..ncells {
-                let cell_index = index_map[cell_i];
+                cells_to_entities[1]
+                    .get_mut(cell_type)
+                    .unwrap()
+                    .push(vec![]);
+                let cell_index = (*cell_type, cell_i);
                 for (local_index, rc) in ref_conn.iter().enumerate() {
                     let cell = &cells_to_entities[0][cell_type][cell_i];
                     let mut first = cell[rc[0][0]];
@@ -351,7 +353,7 @@ impl Topology for MixedTopology {
     }
 
     fn vertex_index_to_id(&self, index: usize) -> usize {
-        self.vertex_indices_to_ids[&index]
+        self.vertex_indices_to_ids[index]
     }
     fn cell_index_to_id(&self, index: IndexType) -> usize {
         self.cell_indices_to_ids[&index]

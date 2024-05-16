@@ -17,6 +17,8 @@ use std::collections::HashMap;
 pub struct SingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
     pub(crate) element_data: (ReferenceCellType, usize),
     pub(crate) points_per_cell: usize,
+    // Dead code allowed here, as vertices_per_cell is only used if the mpi feature is activated
+    #[allow(dead_code)]
     pub(crate) vertices_per_cell: usize,
     pub(crate) points: Vec<T>,
     pub(crate) cells: Vec<usize>,
