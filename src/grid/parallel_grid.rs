@@ -558,7 +558,8 @@ pub(crate) trait ParallelGridBuilder {
     }
 }
 
-impl<const GDIM: usize, G: Grid, B: ParallelGridBuilder<G=G> + Builder<GDIM>> ParallelBuilder<GDIM> for B
+impl<const GDIM: usize, G: Grid, B: ParallelGridBuilder<G = G> + Builder<GDIM>>
+    ParallelBuilder<GDIM> for B
 where
     Vec<<G as GridType>::T>: Buffer,
     <G as GridType>::T: Equivalence,
