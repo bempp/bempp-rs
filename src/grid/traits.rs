@@ -66,6 +66,12 @@ pub trait Topology {
     /// Get the id of a vertex from its index
     fn vertex_index_to_id(&self, index: usize) -> usize;
 
+    /// Get the id of a vertex from its index
+    fn edge_index_to_id(&self, index: usize) -> usize;
+
+    /// Get the index of a vertex from its id
+    fn edge_id_to_index(&self, index: usize) -> usize;
+
     /// Get the id of a cell from its index
     fn cell_index_to_id(&self, index: Self::IndexType) -> usize;
 

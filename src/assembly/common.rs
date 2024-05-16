@@ -2,11 +2,11 @@
 use rlst::RlstScalar;
 
 /// Raw 2D data
-pub struct RawData2D<T: RlstScalar> {
+pub(crate) struct RawData2D<T: RlstScalar> {
     /// Array containting data
-    pub data: *mut T,
+    pub(crate) data: *mut T,
     /// Shape of data
-    pub shape: [usize; 2],
+    pub(crate) shape: [usize; 2],
 }
 
 unsafe impl<T: RlstScalar> Sync for RawData2D<T> {}

@@ -32,6 +32,8 @@ pub struct SingleElementTopology {
     entity_types: Vec<ReferenceCellType>,
     vertex_indices_to_ids: Vec<usize>,
     vertex_ids_to_indices: HashMap<usize, usize>,
+    edge_indices_to_ids: Vec<usize>,
+    edge_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
     cell_types: [ReferenceCellType; 1],
@@ -47,6 +49,7 @@ impl SingleElementTopology {
         cell_type: ReferenceCellType,
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
+        edge_ids: Option<HashMap<[usize; 2], usize>>,
     ) -> Self {
         let size = reference_cell::entity_counts(cell_type)[0];
         let ncells = cells_input.len() / size;
@@ -82,9 +85,9 @@ impl SingleElementTopology {
             for v in cell {
                 if !vertices.contains(v) {
                     entities_to_cells[0].push(vec![]);
-                    vertices.push(*v);
                     vertex_indices_to_ids.push(point_indices_to_ids[*v]);
-                    vertex_ids_to_indices.insert(point_indices_to_ids[*v], *v);
+                    vertex_ids_to_indices.insert(point_indices_to_ids[*v], vertices.len());
+                    vertices.push(*v);
                 }
                 row.push(vertices.iter().position(|&r| r == *v).unwrap());
             }
@@ -102,7 +105,52 @@ impl SingleElementTopology {
 
         entities_to_vertices[0] = (0..vertices.len()).map(|i| vec![i]).collect::<Vec<_>>();
 
-        for d in 1..dim {
+        let mut edge_indices = HashMap::new();
+        let mut edge_indices_to_ids = vec![];
+        let mut edge_ids_to_indices = HashMap::new();
+        if let Some(e) = &edge_ids {
+            for (edge_i, (i, j)) in e.iter().enumerate() {
+                let mut v0 = vertex_ids_to_indices[&i[0]];
+                let mut v1 = vertex_ids_to_indices[&i[1]];
+                if v0 > v1 {
+                    std::mem::swap(&mut v0, &mut v1);
+                }
+                edge_indices.insert((v0, v1), edge_i);
+                edge_indices_to_ids.push(*j);
+                edge_ids_to_indices.insert(*j, edge_i);
+                entities_to_vertices[1].push(vec![v0, v1]);
+                entities_to_cells[1].push(vec![]);
+            }
+        }
+        let ref_conn = &reference_cell::connectivity(cell_type)[1];
+        for cell_i in 0..ncells {
+            for (local_index, rc) in ref_conn.iter().enumerate() {
+                let cell = &cells_to_entities[0][cell_i];
+                let mut first = cell[rc[0][0]];
+                let mut second = cell[rc[0][1]];
+                if first > second {
+                    std::mem::swap(&mut first, &mut second);
+                }
+                if let Some(edge_index) = edge_indices.get(&(first, second)) {
+                    cells_to_entities[1][cell_i].push(*edge_index);
+                    entities_to_cells[1][*edge_index]
+                        .push(CellLocalIndexPair::new(cell_i, local_index));
+                } else {
+                    if edge_ids.is_some() {
+                        panic!("Missing id for edge");
+                    }
+                    let id = entities_to_vertices[1].len();
+                    edge_indices.insert((first, second), id);
+                    edge_indices_to_ids.push(id);
+                    edge_ids_to_indices.insert(id, id);
+                    cells_to_entities[1][cell_i].push(entities_to_vertices[1].len());
+                    entities_to_cells[1].push(vec![CellLocalIndexPair::new(cell_i, local_index)]);
+                    entities_to_vertices[1].push(vec![first, second]);
+                }
+            }
+        }
+
+        for d in 2..dim {
             let mut c_to_e = vec![];
             let ref_conn = &reference_cell::connectivity(cell_type)[d];
             for (cell_i, cell) in cells_to_entities[0].iter().enumerate() {
@@ -139,6 +187,8 @@ impl SingleElementTopology {
             entities_to_cells,
             entity_types,
             vertex_indices_to_ids,
+            edge_ids_to_indices,
+            edge_indices_to_ids,
             vertex_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
@@ -241,6 +291,12 @@ impl Topology for SingleElementTopology {
             panic!("Vertex with id {} not found", id);
         }
     }
+    fn edge_id_to_index(&self, id: usize) -> usize {
+        self.edge_ids_to_indices[&id]
+    }
+    fn edge_index_to_id(&self, index: usize) -> usize {
+        self.edge_indices_to_ids[index]
+    }
     fn cell_id_to_index(&self, id: usize) -> usize {
         self.cell_ids_to_indices[&id]
     }
@@ -266,6 +322,7 @@ mod test {
             ReferenceCellType::Triangle,
             &[0, 1, 2, 3],
             &[0, 1],
+            None,
         )
     }
 

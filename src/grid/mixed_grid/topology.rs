@@ -35,8 +35,10 @@ pub struct MixedTopology {
     entities_to_cells: Vec<Vec<Vec<CellLocalIndexPair<IndexType>>>>,
     entities_to_flat_cells: Vec<Vec<Vec<CellLocalIndexPair<usize>>>>,
     entity_types: Vec<Vec<ReferenceCellType>>,
-    vertex_indices_to_ids: HashMap<usize, usize>,
+    vertex_indices_to_ids: Vec<usize>,
     vertex_ids_to_indices: HashMap<usize, usize>,
+    edge_indices_to_ids: Vec<usize>,
+    edge_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: HashMap<IndexType, usize>,
     cell_ids_to_indices: HashMap<usize, IndexType>,
 }
@@ -50,14 +52,17 @@ impl MixedTopology {
         cell_types: &[ReferenceCellType],
         point_indices_to_ids: &[usize],
         grid_cell_indices_to_ids: &[usize],
+        edge_ids: Option<HashMap<[usize; 2], usize>>,
     ) -> Self {
         let mut index_map = vec![(ReferenceCellType::Point, 0); cell_types.len()];
         let mut reverse_index_map = HashMap::new();
         let mut vertices = vec![];
         let dim = reference_cell::dim(cell_types[0]);
 
-        let mut vertex_indices_to_ids = HashMap::new();
+        let mut vertex_indices_to_ids = vec![];
         let mut vertex_ids_to_indices = HashMap::new();
+        let mut edge_indices_to_ids = vec![];
+        let mut edge_ids_to_indices = HashMap::new();
         let mut cell_indices_to_ids = HashMap::new();
         let mut cell_ids_to_indices = HashMap::new();
 
@@ -106,9 +111,9 @@ impl MixedTopology {
                         if !vertices.contains(v) {
                             entities_to_cells[0].push(vec![]);
                             entities_to_flat_cells[0].push(vec![]);
+                            vertex_indices_to_ids.push(point_indices_to_ids[*v]);
+                            vertex_ids_to_indices.insert(point_indices_to_ids[*v], vertices.len());
                             vertices.push(*v);
-                            vertex_indices_to_ids.insert(*v, point_indices_to_ids[*v]);
-                            vertex_ids_to_indices.insert(point_indices_to_ids[*v], *v);
                         }
                         row.push(vertices.iter().position(|&r| r == *v).unwrap());
                     }
@@ -130,7 +135,60 @@ impl MixedTopology {
             entities_to_vertices[0].push(vec![i]);
         }
 
-        for d in 1..dim {
+        let mut edge_indices = HashMap::new();
+        if let Some(e) = &edge_ids {
+            for (edge_i, (i, j)) in e.iter().enumerate() {
+                let mut v0 = vertex_ids_to_indices[&i[0]];
+                let mut v1 = vertex_ids_to_indices[&i[1]];
+                if v0 > v1 {
+                    std::mem::swap(&mut v0, &mut v1);
+                }
+                edge_indices.insert((v0, v1), edge_i);
+                edge_indices_to_ids.push(*j);
+                edge_ids_to_indices.insert(*j, edge_i);
+                entities_to_vertices[1].push(vec![v0, v1]);
+                entities_to_cells[1].push(vec![]);
+            }
+        }
+        for cell_type in &entity_types[dim] {
+            let ref_conn = &reference_cell::connectivity(*cell_type)[1];
+            let ncells = cells_to_entities[0][cell_type].len();
+            for cell_i in 0..ncells {
+                cells_to_entities[1]
+                    .get_mut(cell_type)
+                    .unwrap()
+                    .push(vec![]);
+                let cell_index = (*cell_type, cell_i);
+                for (local_index, rc) in ref_conn.iter().enumerate() {
+                    let cell = &cells_to_entities[0][cell_type][cell_i];
+                    let mut first = cell[rc[0][0]];
+                    let mut second = cell[rc[0][1]];
+                    if first > second {
+                        std::mem::swap(&mut first, &mut second);
+                    }
+                    if let Some(edge_index) = edge_indices.get(&(first, second)) {
+                        cells_to_entities[1].get_mut(cell_type).unwrap()[cell_i].push(*edge_index);
+                        entities_to_cells[1][*edge_index]
+                            .push(CellLocalIndexPair::new(cell_index, local_index));
+                    } else {
+                        if edge_ids.is_some() {
+                            panic!("Missing id for edge");
+                        }
+                        let id = entities_to_vertices[1].len();
+                        edge_indices.insert((first, second), id);
+                        edge_indices_to_ids.push(id);
+                        edge_ids_to_indices.insert(id, id);
+                        cells_to_entities[1].get_mut(cell_type).unwrap()[cell_i]
+                            .push(entities_to_vertices[1].len());
+                        entities_to_cells[1]
+                            .push(vec![CellLocalIndexPair::new(cell_index, local_index)]);
+                        entities_to_vertices[1].push(vec![first, second]);
+                    }
+                }
+            }
+        }
+
+        for d in 2..dim {
             for cell_type in &entity_types[dim] {
                 let mut c_to_e = vec![];
                 let mut c_to_e_flat = vec![];
@@ -183,6 +241,8 @@ impl MixedTopology {
             entity_types,
             vertex_indices_to_ids,
             vertex_ids_to_indices,
+            edge_indices_to_ids,
+            edge_ids_to_indices,
             cell_indices_to_ids,
             cell_ids_to_indices,
         }
@@ -293,7 +353,7 @@ impl Topology for MixedTopology {
     }
 
     fn vertex_index_to_id(&self, index: usize) -> usize {
-        self.vertex_indices_to_ids[&index]
+        self.vertex_indices_to_ids[index]
     }
     fn cell_index_to_id(&self, index: IndexType) -> usize {
         self.cell_indices_to_ids[&index]
@@ -304,6 +364,12 @@ impl Topology for MixedTopology {
         } else {
             panic!("Vertex with id {} not found", id);
         }
+    }
+    fn edge_id_to_index(&self, id: usize) -> usize {
+        self.edge_ids_to_indices[&id]
+    }
+    fn edge_index_to_id(&self, index: usize) -> usize {
+        self.edge_indices_to_ids[index]
     }
     fn cell_id_to_index(&self, id: usize) -> IndexType {
         self.cell_ids_to_indices[&id]
@@ -330,6 +396,7 @@ mod test {
             &[ReferenceCellType::Triangle; 2],
             &[0, 1, 2, 3],
             &[0, 1],
+            None,
         )
     }
 
@@ -343,6 +410,7 @@ mod test {
             ],
             &[0, 1, 2, 3, 4],
             &[0, 1],
+            None,
         )
     }
 

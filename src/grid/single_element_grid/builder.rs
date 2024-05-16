@@ -1,6 +1,6 @@
 //! Grid builder
 
-use crate::element::ciarlet::lagrange;
+use crate::element::{ciarlet::lagrange, reference_cell};
 use crate::grid::single_element_grid::grid::SingleElementGrid;
 use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::grid::Builder;
@@ -17,6 +17,9 @@ use std::collections::HashMap;
 pub struct SingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
     pub(crate) element_data: (ReferenceCellType, usize),
     pub(crate) points_per_cell: usize,
+    // Dead code allowed here, as vertices_per_cell is only used if the mpi feature is activated
+    #[allow(dead_code)]
+    pub(crate) vertices_per_cell: usize,
     pub(crate) points: Vec<T>,
     pub(crate) cells: Vec<usize>,
     pub(crate) point_indices_to_ids: Vec<usize>,
@@ -37,9 +40,12 @@ where
 
     fn new(data: (ReferenceCellType, usize)) -> Self {
         let points_per_cell = lagrange::create::<T>(data.0, data.1, Continuity::Continuous).dim();
+        let vertices_per_cell = reference_cell::entity_counts(data.0)[0];
+
         Self {
             element_data: data,
             points_per_cell,
+            vertices_per_cell,
             points: vec![],
             cells: vec![],
             point_indices_to_ids: vec![],
@@ -51,9 +57,11 @@ where
 
     fn new_with_capacity(npoints: usize, ncells: usize, data: (ReferenceCellType, usize)) -> Self {
         let points_per_cell = lagrange::create::<T>(data.0, data.1, Continuity::Continuous).dim();
+        let vertices_per_cell = reference_cell::entity_counts(data.0)[0];
         Self {
             element_data: data,
             points_per_cell,
+            vertices_per_cell,
             points: Vec::with_capacity(npoints * Self::GDIM),
             cells: Vec::with_capacity(ncells * points_per_cell),
             point_indices_to_ids: Vec::with_capacity(npoints),
@@ -100,6 +108,7 @@ where
             self.point_ids_to_indices,
             self.cell_indices_to_ids,
             self.cell_ids_to_indices,
+            None,
         )
     }
 }
