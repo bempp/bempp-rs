@@ -15,7 +15,6 @@ type RlstMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Grid local to a process
 pub struct LocalGrid<G: Grid> {
-    rank: usize,
     serial_grid: G,
     vertex_ownership: HashMap<usize, Ownership>,
     edge_ownership: HashMap<usize, Ownership>,
@@ -108,10 +107,6 @@ impl<G: Grid> Grid for LocalGrid<G> {
     type T = G::T;
     type Topology = Self;
     type Geometry = <G as Grid>::Geometry;
-
-    fn mpi_rank(&self) -> usize {
-        self.rank
-    }
 
     fn topology(&self) -> &Self::Topology {
         self
@@ -309,7 +304,6 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         }
 
         let local_grid = LocalGrid {
-            rank: comm.rank() as usize,
             serial_grid,
             vertex_ownership,
             edge_ownership,
@@ -405,10 +399,6 @@ impl<'a, C: Communicator, G: Grid> Grid for ParallelGrid<'a, C, G> {
     type T = G::T;
     type Topology = Self;
     type Geometry = <G as Grid>::Geometry;
-
-    fn mpi_rank(&self) -> usize {
-        self.comm.rank() as usize
-    }
 
     fn topology(&self) -> &Self::Topology {
         self
