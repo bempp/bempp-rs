@@ -1,5 +1,13 @@
 //! Common utility functions
+use crate::traits::grid::GridType;
 use rlst::RlstScalar;
+
+pub(crate) fn equal_grids<TestGrid: GridType, TrialGrid: GridType>(
+    test_grid: &TestGrid,
+    trial_grid: &TrialGrid,
+) -> bool {
+    std::ptr::addr_of!(*test_grid) as usize == std::ptr::addr_of!(*trial_grid) as usize
+}
 
 /// Raw 2D data
 pub(crate) struct RawData2D<T: RlstScalar> {

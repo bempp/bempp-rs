@@ -1,7 +1,6 @@
 //! Hypersingular assemblers
-use super::{
-    equal_grids, BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData,
-};
+use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData};
+use crate::assembly::common::equal_grids;
 use crate::traits::{
     element::FiniteElement, function::FunctionSpace, grid::GridType, types::ReferenceCellType,
 };
