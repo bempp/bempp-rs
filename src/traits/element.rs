@@ -73,14 +73,11 @@ pub trait FiniteElement {
     fn value_size(&self) -> usize;
 
     /// Tabulate the values of the basis functions and their derivatives at a set of points
-    fn tabulate<
-        Array2: RandomAccessByRef<2, Item = <Self::T as RlstScalar>::Real> + Shape<2>,
-        Array4Mut: RandomAccessMut<4, Item = Self::T>,
-    >(
+    fn tabulate<Array2: RandomAccessByRef<2, Item = <Self::T as RlstScalar>::Real> + Shape<2>>(
         &self,
         points: &Array2,
         nderivs: usize,
-        data: &mut Array4Mut,
+        data: &mut impl RandomAccessMut<4, Item = Self::T>,
     );
 
     /// The DOFs that are associated with a subentity of the reference cell
