@@ -568,6 +568,7 @@ where
         let mut vertex_counts = vec![0; size];
         let mut cell_indices_per_proc = vec![vec![]; size];
         let mut vertex_indices_per_proc = vec![vec![]; size];
+        let mut point_indices_per_proc = vec![vec![]; size];
         let mut edge_owners = HashMap::new();
         let mut edge_ids = HashMap::new();
         let mut edge_counts = vec![0; size];
@@ -588,18 +589,22 @@ where
 
         for (index, id) in self.cell_indices_to_ids().iter().enumerate() {
             let owner = cell_owners[id];
-            // TODO: only assign owners to the first 3 or 4 vertices
-            for v in self.cell_points(index) {
+            for pt in self.cell_points(index) {
+                if !point_indices_per_proc[owner].contains(pt) {
+                    point_indices_per_proc[owner].push(*pt);
+                    for i in 0..GDIM {
+                        points_per_proc[owner].push(self.points()[pt * GDIM + i])
+                    }
+                    point_ids_per_proc[owner].push(self.point_indices_to_ids()[*pt]);
+                }
+            }
+            for v in self.cell_vertices(index) {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
                 }
                 if !vertex_indices_per_proc[owner].contains(v) {
                     vertex_indices_per_proc[owner].push(*v);
                     vertex_owners_per_proc[owner].push(vertex_owners[*v].0 as usize);
-                    for i in 0..GDIM {
-                        points_per_proc[owner].push(self.points()[v * GDIM + i])
-                    }
-                    point_ids_per_proc[owner].push(self.point_indices_to_ids()[*v]);
                     vertex_counts[owner] += 1;
                 }
             }
@@ -643,15 +648,19 @@ where
         for p in 0..size {
             for index in &cell_indices_per_proc[p] {
                 let id = self.cell_indices_to_ids()[*index];
-                // TODO: only assign owners to the first 3 or 4 vertices
+                for pt in self.cell_points(*index) {
+                    if !point_indices_per_proc[p].contains(pt) {
+                        point_indices_per_proc[p].push(*pt);
+                        for i in 0..GDIM {
+                            points_per_proc[p].push(self.points()[pt * GDIM + i]);
+                        }
+                        point_ids_per_proc[p].push(self.point_indices_to_ids()[*pt]);
+                    }
+                }
                 for v in self.cell_points(*index) {
                     if !vertex_indices_per_proc[p].contains(v) {
                         vertex_indices_per_proc[p].push(*v);
                         vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
-                        for i in 0..GDIM {
-                            points_per_proc[p].push(self.points()[v * GDIM + i]);
-                        }
-                        point_ids_per_proc[p].push(self.point_indices_to_ids()[*v]);
                     }
                     cells_per_proc[p].push(
                         vertex_indices_per_proc[p]
