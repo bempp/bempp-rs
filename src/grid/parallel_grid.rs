@@ -16,8 +16,8 @@ type RlstMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// Grid local to a process
 pub struct LocalGrid<G: Grid> {
     serial_grid: G,
-    vertex_ownership: HashMap<usize, Ownership>,
-    edge_ownership: HashMap<usize, Ownership>,
+    vertex_ownership: Vec<Ownership>,
+    edge_ownership: Vec<Ownership>,
     cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
 }
 
@@ -69,10 +69,10 @@ impl<G: Grid> Topology for LocalGrid<G> {
         self.cell_ownership[&index]
     }
     fn vertex_ownership(&self, index: usize) -> Ownership {
-        self.vertex_ownership[&index]
+        self.vertex_ownership[index]
     }
     fn edge_ownership(&self, index: usize) -> Ownership {
-        self.edge_ownership[&index]
+        self.edge_ownership[index]
     }
     fn vertex_index_to_id(&self, index: usize) -> usize {
         self.serial_grid.topology().vertex_index_to_id(index)
@@ -198,7 +198,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         }
 
         // Create vertex ownership
-        let mut vertex_ownership = HashMap::new();
+        let mut vertex_ownership = vec![Ownership::Owned; vertex_owners.len()];
         let mut vertices_to_query = vec![vec![]; size];
 
         for (id, owner) in vertex_owners.iter() {
@@ -239,19 +239,17 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
 
         let mut indices = vec![0; size];
         for (id, owner) in vertex_owners.iter() {
-            vertex_ownership.insert(
-                Topology::vertex_id_to_index(serial_grid.topology(), *id),
+            vertex_ownership[Topology::vertex_id_to_index(serial_grid.topology(), *id)] =
                 if *owner == rank {
                     Ownership::Owned
                 } else {
                     indices[*owner] += 1;
                     Ownership::Ghost(*owner, vertex_info[*owner][indices[*owner] - 1])
-                },
-            );
+                };
         }
 
         // Create edge ownership
-        let mut edge_ownership = HashMap::new();
+        let mut edge_ownership = vec![Ownership::Owned; edge_owners.len()];
         let mut edges_to_query = vec![vec![]; size];
 
         for (id, owner) in edge_owners.iter() {
@@ -292,15 +290,13 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
 
         let mut indices = vec![0; size];
         for (id, owner) in edge_owners.iter() {
-            edge_ownership.insert(
-                Topology::edge_id_to_index(serial_grid.topology(), *id),
+            edge_ownership[Topology::edge_id_to_index(serial_grid.topology(), *id)] =
                 if *owner == rank {
                     Ownership::Owned
                 } else {
                     indices[*owner] += 1;
                     Ownership::Ghost(*owner, edge_info[*owner][indices[*owner] - 1])
-                },
-            );
+                };
         }
 
         let local_grid = LocalGrid {
@@ -572,6 +568,7 @@ where
         let mut vertex_counts = vec![0; size];
         let mut cell_indices_per_proc = vec![vec![]; size];
         let mut vertex_indices_per_proc = vec![vec![]; size];
+        let mut point_indices_per_proc = vec![vec![]; size];
         let mut edge_owners = HashMap::new();
         let mut edge_ids = HashMap::new();
         let mut edge_counts = vec![0; size];
@@ -592,18 +589,22 @@ where
 
         for (index, id) in self.cell_indices_to_ids().iter().enumerate() {
             let owner = cell_owners[id];
-            // TODO: only assign owners to the first 3 or 4 vertices
-            for v in self.cell_points(index) {
+            for pt in self.cell_points(index) {
+                if !point_indices_per_proc[owner].contains(pt) {
+                    point_indices_per_proc[owner].push(*pt);
+                    for i in 0..GDIM {
+                        points_per_proc[owner].push(self.points()[pt * GDIM + i])
+                    }
+                    point_ids_per_proc[owner].push(self.point_indices_to_ids()[*pt]);
+                }
+            }
+            for v in self.cell_vertices(index) {
                 if vertex_owners[*v].0 == -1 {
                     vertex_owners[*v] = (owner as i32, vertex_counts[owner]);
                 }
                 if !vertex_indices_per_proc[owner].contains(v) {
                     vertex_indices_per_proc[owner].push(*v);
                     vertex_owners_per_proc[owner].push(vertex_owners[*v].0 as usize);
-                    for i in 0..GDIM {
-                        points_per_proc[owner].push(self.points()[v * GDIM + i])
-                    }
-                    point_ids_per_proc[owner].push(self.point_indices_to_ids()[*v]);
                     vertex_counts[owner] += 1;
                 }
             }
@@ -647,15 +648,19 @@ where
         for p in 0..size {
             for index in &cell_indices_per_proc[p] {
                 let id = self.cell_indices_to_ids()[*index];
-                // TODO: only assign owners to the first 3 or 4 vertices
+                for pt in self.cell_points(*index) {
+                    if !point_indices_per_proc[p].contains(pt) {
+                        point_indices_per_proc[p].push(*pt);
+                        for i in 0..GDIM {
+                            points_per_proc[p].push(self.points()[pt * GDIM + i]);
+                        }
+                        point_ids_per_proc[p].push(self.point_indices_to_ids()[*pt]);
+                    }
+                }
                 for v in self.cell_points(*index) {
                     if !vertex_indices_per_proc[p].contains(v) {
                         vertex_indices_per_proc[p].push(*v);
                         vertex_owners_per_proc[p].push(vertex_owners[*v].0 as usize);
-                        for i in 0..GDIM {
-                            points_per_proc[p].push(self.points()[v * GDIM + i]);
-                        }
-                        point_ids_per_proc[p].push(self.point_indices_to_ids()[*v]);
                     }
                     cells_per_proc[p].push(
                         vertex_indices_per_proc[p]
