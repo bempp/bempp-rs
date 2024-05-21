@@ -255,14 +255,11 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
     fn dim(&self) -> usize {
         self.dim
     }
-    fn tabulate<
-        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
-        Array4Mut: RandomAccessMut<4, Item = T>,
-    >(
+    fn tabulate<Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>>(
         &self,
         points: &Array2,
         nderivs: usize,
-        data: &mut Array4Mut,
+        data: &mut impl RandomAccessMut<4, Item = T>,
     ) {
         let mut table = rlst_dynamic_array3!(
             T,
