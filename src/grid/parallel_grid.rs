@@ -109,10 +109,6 @@ impl<G: Grid> Grid for LocalGrid<G> {
     type Topology = Self;
     type Geometry = <G as Grid>::Geometry;
 
-    fn mpi_rank(&self) -> usize {
-        self.rank
-    }
-
     fn topology(&self) -> &Self::Topology {
         self
     }
@@ -405,10 +401,6 @@ impl<'a, C: Communicator, G: Grid> Grid for ParallelGrid<'a, C, G> {
     type T = G::T;
     type Topology = Self;
     type Geometry = <G as Grid>::Geometry;
-
-    fn mpi_rank(&self) -> usize {
-        self.comm.rank() as usize
-    }
 
     fn topology(&self) -> &Self::Topology {
         self
