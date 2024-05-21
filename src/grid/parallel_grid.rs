@@ -16,7 +16,7 @@ type RlstMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// Grid local to a process
 pub struct LocalGrid<G: Grid> {
     serial_grid: G,
-    vertex_ownership: HashMap<usize, Ownership>,
+    vertex_ownership: Vec<Ownership>,
     edge_ownership: HashMap<usize, Ownership>,
     cell_ownership: HashMap<<<G as Grid>::Topology as Topology>::IndexType, Ownership>,
 }
@@ -69,7 +69,7 @@ impl<G: Grid> Topology for LocalGrid<G> {
         self.cell_ownership[&index]
     }
     fn vertex_ownership(&self, index: usize) -> Ownership {
-        self.vertex_ownership[&index]
+        self.vertex_ownership[index]
     }
     fn edge_ownership(&self, index: usize) -> Ownership {
         self.edge_ownership[&index]
@@ -198,7 +198,7 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
         }
 
         // Create vertex ownership
-        let mut vertex_ownership = HashMap::new();
+        let mut vertex_ownership = vec![Ownership::Owned; vertex_owners.len()];
         let mut vertices_to_query = vec![vec![]; size];
 
         for (id, owner) in vertex_owners.iter() {
@@ -239,15 +239,13 @@ impl<'comm, C: Communicator, G: Grid> ParallelGrid<'comm, C, G> {
 
         let mut indices = vec![0; size];
         for (id, owner) in vertex_owners.iter() {
-            vertex_ownership.insert(
-                Topology::vertex_id_to_index(serial_grid.topology(), *id),
+            vertex_ownership[Topology::vertex_id_to_index(serial_grid.topology(), *id)] =
                 if *owner == rank {
                     Ownership::Owned
                 } else {
                     indices[*owner] += 1;
                     Ownership::Ghost(*owner, vertex_info[*owner][indices[*owner] - 1])
-                },
-            );
+                };
         }
 
         // Create edge ownership
