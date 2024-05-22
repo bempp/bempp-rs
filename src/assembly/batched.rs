@@ -19,7 +19,11 @@ pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssemble
 pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
 pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
+mod double_layer_potential;
 mod single_layer_potential;
+pub use double_layer_potential::{
+    HelmholtzDoubleLayerPotentialAssembler, LaplaceDoubleLayerPotentialAssembler,
+};
 pub use single_layer_potential::{
     HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler,
 };

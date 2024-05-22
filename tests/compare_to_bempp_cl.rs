@@ -280,3 +280,59 @@ fn test_helmholtz_single_layer_potential_dp0() {
         }
     }
 }
+
+#[test]
+fn test_laplace_double_layer_potential_dp0() {
+    let grid = regular_sphere(0);
+    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
+    let space = SerialFunctionSpace::new(&grid, &element);
+
+    let ndofs = space.global_size();
+
+    let mut matrix = rlst_dynamic_array2!(f64, [3, ndofs]);
+
+    let mut points = rlst_dynamic_array2!(f64, [3, 3]);
+    *points.get_mut([0, 0]).unwrap() = 2.0;
+    *points.get_mut([1, 1]).unwrap() = 2.0;
+    *points.get_mut([2, 2]).unwrap() = 2.0;
+
+    let a = batched::LaplaceDoubleLayerPotentialAssembler::<f64>::default();
+    a.assemble_into_dense(&mut matrix, &space, &points);
+
+    // Compare to result from bempp-cl
+    #[rustfmt::skip]
+    let from_cl = [[0.0088687364674846, 0.008868736467484609, 0.008868736467484612], [-0.008860928325637398, 0.008868736467484602, 0.008868736467484612], [-0.0088609283256374, -0.008860928325637398, 0.008868736467484612], [0.008868736467484609, -0.008860928325637398, 0.008868736467484612], [0.0088687364674846, 0.008868736467484612, -0.008860928325637398], [-0.008860928325637396, 0.0088687364674846, -0.008860928325637398], [-0.0088609283256374, -0.008860928325637398, -0.008860928325637398], [0.008868736467484612, -0.0088609283256374, -0.008860928325637398]];
+    for (i, row) in from_cl.iter().enumerate() {
+        for (j, entry) in row.iter().enumerate() {
+            assert_relative_eq!(*matrix.get([j, i]).unwrap(), entry, epsilon = 1e-3);
+        }
+    }
+}
+
+#[test]
+fn test_helmholtz_double_layer_potential_dp0() {
+    let grid = regular_sphere(0);
+    let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
+    let space = SerialFunctionSpace::new(&grid, &element);
+
+    let ndofs = space.global_size();
+
+    let mut matrix = rlst_dynamic_array2!(c64, [3, ndofs]);
+
+    let mut points = rlst_dynamic_array2!(f64, [3, 3]);
+    *points.get_mut([0, 0]).unwrap() = 2.0;
+    *points.get_mut([1, 1]).unwrap() = 2.0;
+    *points.get_mut([2, 2]).unwrap() = 2.0;
+
+    let a = batched::HelmholtzDoubleLayerPotentialAssembler::<c64>::new(3.0);
+    a.assemble_into_dense(&mut matrix, &space, &points);
+
+    // Compare to result from bempp-cl
+    #[rustfmt::skip]
+    let from_cl = [[c64::new(-0.025921206675194482, -0.01265280207508083), c64::new(-0.025921206675194475, -0.012652802075080833), c64::new(-0.025921206675194496, -0.0126528020750808)], [c64::new(-0.045480226003470216, 0.03114053667616141), c64::new(-0.025921206675194486, -0.01265280207508083), c64::new(-0.025921206675194493, -0.0126528020750808)], [c64::new(-0.045480226003470216, 0.03114053667616141), c64::new(-0.04548022600347021, 0.031140536676161422), c64::new(-0.025921206675194496, -0.0126528020750808)], [c64::new(-0.025921206675194475, -0.012652802075080835), c64::new(-0.04548022600347021, 0.03114053667616141), c64::new(-0.025921206675194493, -0.0126528020750808)], [c64::new(-0.025921206675194482, -0.01265280207508083), c64::new(-0.025921206675194493, -0.0126528020750808), c64::new(-0.04548022600347021, 0.031140536676161415)], [c64::new(-0.04548022600347023, 0.031140536676161377), c64::new(-0.025921206675194482, -0.01265280207508083), c64::new(-0.04548022600347021, 0.031140536676161422)], [c64::new(-0.045480226003470216, 0.03114053667616141), c64::new(-0.04548022600347021, 0.031140536676161415), c64::new(-0.04548022600347021, 0.031140536676161415)], [c64::new(-0.025921206675194493, -0.0126528020750808), c64::new(-0.045480226003470195, 0.03114053667616144), c64::new(-0.04548022600347021, 0.031140536676161422)]];
+    for (i, row) in from_cl.iter().enumerate() {
+        for (j, entry) in row.iter().enumerate() {
+            assert_relative_eq!(*matrix.get([j, i]).unwrap(), entry, epsilon = 1e-3);
+        }
+    }
+}
