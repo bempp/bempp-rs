@@ -4,8 +4,6 @@ use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::element::FiniteElement;
 use crate::traits::function::FunctionSpace;
-#[cfg(feature = "mpi")]
-use crate::traits::function::FunctionSpaceInParallel;
 use crate::traits::grid::{GridType, ReferenceMapType};
 use crate::traits::types::ReferenceCellType;
 use rayon::prelude::*;
