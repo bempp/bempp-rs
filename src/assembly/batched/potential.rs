@@ -112,8 +112,6 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
     type T: RlstScalar;
     /// Number of derivatives
     const DERIV_SIZE: usize;
-    /// Number of derivatives needed in basis function tables
-    const TABLE_DERIVS: usize;
 
     /// Get assembler options
     fn options(&self) -> &BatchedPotentialAssemblerOptions;
@@ -198,9 +196,9 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
             let element = space.element(*cell_type);
             let mut table = rlst_dynamic_array4!(
                 Self::T,
-                element.tabulate_array_shape(Self::TABLE_DERIVS, npts)
+                element.tabulate_array_shape(0, npts)
             );
-            element.tabulate(&qpoints, Self::TABLE_DERIVS, &mut table);
+            element.tabulate(&qpoints, 0, &mut table);
 
             let output_raw = RawData2D {
                 data: output.data_mut().as_mut_ptr(),

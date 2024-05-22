@@ -19,8 +19,6 @@ impl<T: RlstScalar> Default for LaplaceDoubleLayerPotentialAssembler<T> {
 
 impl<T: RlstScalar> BatchedPotentialAssembler for LaplaceDoubleLayerPotentialAssembler<T> {
     const DERIV_SIZE: usize = 4;
-    // TODO: remove TABLE_DERIVS, always 0
-    const TABLE_DERIVS: usize = 0;
     type T = T;
 
     fn options(&self) -> &BatchedPotentialAssemblerOptions {
@@ -75,7 +73,6 @@ impl<T: RlstScalar<Complex = T>> BatchedPotentialAssembler
     for HelmholtzDoubleLayerPotentialAssembler<T>
 {
     const DERIV_SIZE: usize = 4;
-    const TABLE_DERIVS: usize = 0;
     type T = T;
 
     fn options(&self) -> &BatchedPotentialAssemblerOptions {
