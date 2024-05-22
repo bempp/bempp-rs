@@ -1,6 +1,6 @@
 //! Boundary operator assembly
 pub mod batched;
-pub mod common;
+pub(crate) mod common;
 pub mod fmm_tools;
 
 #[cfg(test)]
