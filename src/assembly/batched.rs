@@ -5,6 +5,8 @@ use rlst::{Array, BaseArray, VectorContainer};
 
 mod boundary;
 pub use boundary::{BatchedAssembler, BatchedAssemblerOptions};
+mod potential;
+pub use potential::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions};
 
 mod adjoint_double_layer;
 mod double_layer;
@@ -17,6 +19,11 @@ pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssemble
 pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
 pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
+mod single_layer_potential;
+pub use single_layer_potential::{
+    HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler,
+};
+
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
 
 #[cfg(test)]
@@ -25,8 +32,9 @@ mod test {
     use crate::element::ciarlet::LagrangeElementFamily;
     use crate::function::SerialFunctionSpace;
     use crate::grid::shapes::regular_sphere;
-    use crate::traits::element::Continuity;
+    use crate::traits::{element::Continuity, function::FunctionSpace};
     use approx::*;
+    use rlst::rlst_dynamic_array2;
     use rlst::RandomAccessByRef;
 
     #[test]
