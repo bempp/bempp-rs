@@ -1,4 +1,4 @@
-//! Batched dense assembly of boundary operators
+//! Batched dense assembly of potential operators
 use crate::assembly::common::RawData2D;
 use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::simplex_rules::simplex_rule;
@@ -41,8 +41,6 @@ fn assemble_batch<
     assert_eq!(grid.physical_dimension(), 3);
     assert_eq!(grid.domain_dimension(), 2);
 
-    // TODO: is this correct or do we want:
-    // let mut k = rlst_dynamic_array3!(T, [nevalpts, deriv_size, npts]);
     let mut k = rlst_dynamic_array3!(T, [npts, deriv_size, nevalpts]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut jdet = vec![zero; npts];
