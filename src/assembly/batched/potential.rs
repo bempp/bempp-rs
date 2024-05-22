@@ -194,10 +194,7 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
                 .collect::<Vec<_>>();
 
             let element = space.element(*cell_type);
-            let mut table = rlst_dynamic_array4!(
-                Self::T,
-                element.tabulate_array_shape(0, npts)
-            );
+            let mut table = rlst_dynamic_array4!(Self::T, element.tabulate_array_shape(0, npts));
             element.tabulate(&qpoints, 0, &mut table);
 
             let output_raw = RawData2D {
