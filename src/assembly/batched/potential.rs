@@ -8,12 +8,22 @@ use crate::traits::grid::{GridType, ReferenceMapType};
 use crate::traits::types::ReferenceCellType;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, RandomAccessMut, RawAccess,
-    RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, RandomAccessByRef,
+    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
 use super::RlstArray;
+
+fn copy_and_transpose<T: RlstScalar>(mat: &RlstArray<T, 2>) -> RlstArray<T, 2> {
+    let mut mat_t = rlst_dynamic_array2!(T, [mat.shape()[1], mat.shape()[0]]);
+    for i in 0..mat.shape()[0] {
+        for j in 0..mat.shape()[1] {
+            *mat_t.get_mut([j, i]).unwrap() = *mat.get([i, j]).unwrap();
+        }
+    }
+    mat_t
+}
 
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]
@@ -52,13 +62,21 @@ fn assemble_batch<
 
     let mut sum: T;
 
+    let evaluation_points_t = copy_and_transpose(evaluation_points);
+
     for cell in cells {
         evaluator.jacobian(*cell, jacobians.data_mut());
         compute_dets23(jacobians.data(), &mut jdet);
         compute_normals_from_jacobians23(jacobians.data(), normals.data_mut());
         evaluator.reference_to_physical(*cell, mapped_pts.data_mut());
 
-        assembler.kernel_assemble_st(mapped_pts.data(), evaluation_points.data(), k.data_mut());
+        let mapped_pts_t = copy_and_transpose(&mapped_pts);
+
+        assembler.kernel_assemble_st(
+            mapped_pts_t.data(),
+            evaluation_points_t.data(),
+            k.data_mut(),
+        );
 
         let dofs = space.cell_dofs(*cell).unwrap();
 

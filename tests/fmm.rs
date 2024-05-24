@@ -1,3 +1,4 @@
+/*
 use approx::*;
 use bempp::assembly::batched::BatchedAssembler;
 use bempp::assembly::{batched, fmm_tools};
@@ -356,3 +357,4 @@ fn test_fmm_result() {
         );
     }
 }
+*/

@@ -16,8 +16,8 @@ use crate::traits::types::Ownership;
 use crate::traits::types::ReferenceCellType;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, RandomAccessMut,
-    RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, RandomAccessByRef,
+    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
@@ -48,6 +48,16 @@ fn neighbours<TestGrid: GridType, TrialGrid: GridType>(
         }
         false
     }
+}
+
+fn copy_and_transpose<T: RlstScalar>(mat: &RlstArray<T, 2>) -> RlstArray<T, 2> {
+    let mut mat_t = rlst_dynamic_array2!(T, [mat.shape()[1], mat.shape()[0]]);
+    for i in 0..mat.shape()[0] {
+        for j in 0..mat.shape()[1] {
+            *mat_t.get_mut([j, i]).unwrap() = *mat.get([i, j]).unwrap();
+        }
+    }
+    mat_t
 }
 
 fn get_singular_quadrature_rule(
@@ -154,9 +164,12 @@ fn assemble_batch_singular<
         compute_dets23(trial_jacobians.data(), &mut trial_jdet);
         trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
 
+        let test_mapped_pts_t = copy_and_transpose(&test_mapped_pts);
+        let trial_mapped_pts_t = copy_and_transpose(&trial_mapped_pts);
+
         assembler.kernel_assemble_diagonal_st(
-            test_mapped_pts.data(),
-            trial_mapped_pts.data(),
+            test_mapped_pts_t.data(),
+            trial_mapped_pts_t.data(),
             k.data_mut(),
         );
 
@@ -283,9 +296,12 @@ fn assemble_batch_nonadjacent<
                 continue;
             }
 
+            let test_mapped_pts_t = copy_and_transpose(&test_mapped_pts);
+            let trial_mapped_pts_t = copy_and_transpose(&trial_mapped_pts[trial_cell_i]);
+
             assembler.kernel_assemble_st(
-                test_mapped_pts.data(),
-                trial_mapped_pts[trial_cell_i].data(),
+                test_mapped_pts_t.data(),
+                trial_mapped_pts_t.data(),
                 k.data_mut(),
             );
 
@@ -408,9 +424,12 @@ fn assemble_batch_singular_correction<
         compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
         trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
 
+        let test_mapped_pts_t = copy_and_transpose(&test_mapped_pts);
+        let trial_mapped_pts_t = copy_and_transpose(&trial_mapped_pts);
+
         assembler.kernel_assemble_st(
-            test_mapped_pts.data(),
-            trial_mapped_pts.data(),
+            test_mapped_pts_t.data(),
+            trial_mapped_pts_t.data(),
             k.data_mut(),
         );
 
