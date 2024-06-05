@@ -4,23 +4,16 @@ use crate::element::ciarlet::{reference_cell, CiarletElement};
 use crate::element::polynomials::polynomial_count;
 use crate::traits::element::{Continuity, ElementFamily, MapType};
 use crate::traits::types::ReferenceCellType;
-use rlst::MatrixInverse;
-use rlst::RlstScalar;
-use rlst::{
-    dense::array::views::ArrayViewMut, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray,
-    RandomAccessMut, VectorContainer,
-};
+use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut};
+use rlst::{LinAlg, RlstScalar};
 use std::marker::PhantomData;
 
 /// Create a Raviart-Thomas element
-pub fn create<T: RlstScalar>(
+pub fn create<T: LinAlg + RlstScalar>(
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,
-) -> CiarletElement<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+) -> CiarletElement<T> {
     if cell_type != ReferenceCellType::Triangle && cell_type != ReferenceCellType::Quadrilateral {
         panic!("Unsupported cell type");
     }
@@ -98,19 +91,13 @@ where
 }
 
 /// Raviart-Thomas element family
-pub struct RaviartThomasElementFamily<T: RlstScalar>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+pub struct RaviartThomasElementFamily<T: LinAlg + RlstScalar> {
     degree: usize,
     continuity: Continuity,
     _t: PhantomData<T>,
 }
 
-impl<T: RlstScalar> RaviartThomasElementFamily<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + RlstScalar> RaviartThomasElementFamily<T> {
     /// Create new family
     pub fn new(degree: usize, continuity: Continuity) -> Self {
         Self {
@@ -121,10 +108,7 @@ where
     }
 }
 
-impl<T: RlstScalar> ElementFamily for RaviartThomasElementFamily<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + RlstScalar> ElementFamily for RaviartThomasElementFamily<T> {
     type T = T;
     type FiniteElement = CiarletElement<T>;
     fn element(&self, cell_type: ReferenceCellType) -> CiarletElement<T> {

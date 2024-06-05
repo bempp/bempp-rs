@@ -20,16 +20,10 @@ mod test {
     use cauchy::{c32, c64};
     use num::Float;
     use paste::paste;
-    use rlst::{
-        dense::array::views::ArrayViewMut, rlst_dynamic_array2, Array, BaseArray, MatrixInverse,
-        RlstScalar, VectorContainer,
-    };
+    use rlst::LinAlg;
+    use rlst::{rlst_dynamic_array2, RlstScalar};
 
-    fn quadrilateral_grid<T: Float + RlstScalar<Real = T>>() -> SingleElementGrid<T>
-    where
-        for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
-            MatrixInverse,
-    {
+    fn quadrilateral_grid<T: LinAlg + Float + RlstScalar<Real = T>>() -> SingleElementGrid<T> {
         let mut b = SingleElementGridBuilder::<3, T>::new((ReferenceCellType::Quadrilateral, 1));
         for j in 0..4 {
             for i in 0..4 {
@@ -54,11 +48,7 @@ mod test {
         b.create_grid()
     }
 
-    fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> MixedGrid<T>
-    where
-        for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
-            MatrixInverse,
-    {
+    fn mixed_grid<T: LinAlg + Float + RlstScalar<Real = T>>() -> MixedGrid<T> {
         let mut b = MixedGridBuilder::<3, T>::new(());
         for j in 0..4 {
             for i in 0..4 {

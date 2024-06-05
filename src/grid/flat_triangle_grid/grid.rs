@@ -7,18 +7,18 @@ use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use num::Float;
-use rlst::rlst_static_array;
 use rlst::rlst_static_type;
 use rlst::RlstScalar;
 use rlst::{
-    dense::array::{views::ArrayViewMut, Array, SliceArray},
-    rlst_array_from_slice2, BaseArray, DefaultIterator, DefaultIteratorMut, MatrixInverse,
-    RandomAccessByRef, RawAccess, Shape, UnsafeRandomAccessByRef, VectorContainer,
+    dense::array::{Array, SliceArray},
+    rlst_array_from_slice2, BaseArray, DefaultIterator, DefaultIteratorMut, RandomAccessByRef,
+    RawAccess, Shape, UnsafeRandomAccessByRef, VectorContainer,
 };
+use rlst::{rlst_static_array, LinAlg};
 use std::collections::HashMap;
 
 /// A flat triangle grid
-pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
+pub struct FlatTriangleGrid<T: LinAlg + Float + RlstScalar<Real = T>> {
     index_map: Vec<usize>,
 
     // Geometry information
@@ -46,10 +46,7 @@ pub struct FlatTriangleGrid<T: Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> FlatTriangleGrid<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
     /// Create a flat triangle grid
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -215,7 +212,7 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Grid for FlatTriangleGrid<T> {
+impl<T: LinAlg + Float + RlstScalar<Real = T>> Grid for FlatTriangleGrid<T> {
     type T = T;
     type Topology = Self;
     type Geometry = Self;
@@ -233,7 +230,7 @@ impl<T: Float + RlstScalar<Real = T>> Grid for FlatTriangleGrid<T> {
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Geometry for FlatTriangleGrid<T> {
+impl<T: LinAlg + Float + RlstScalar<Real = T>> Geometry for FlatTriangleGrid<T> {
     type IndexType = usize;
     type T = T;
     type Element = CiarletElement<T>;
@@ -323,12 +320,12 @@ impl<T: Float + RlstScalar<Real = T>> Geometry for FlatTriangleGrid<T> {
 }
 
 /// Geometry evaluator for a flat triangle grid
-pub struct GeometryEvaluatorFlatTriangle<'a, T: Float + RlstScalar<Real = T>> {
+pub struct GeometryEvaluatorFlatTriangle<'a, T: LinAlg + Float + RlstScalar<Real = T>> {
     grid: &'a FlatTriangleGrid<T>,
     points: SliceArray<'a, T, 2>,
 }
 
-impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
+impl<'a, T: LinAlg + Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
     /// Create a geometry evaluator
     fn new(grid: &'a FlatTriangleGrid<T>, points: &'a [T]) -> Self {
         let tdim = reference_cell::dim(grid.element.cell_type());
@@ -341,7 +338,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle<'a, T> {
     }
 }
 
-impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
+impl<'a, T: LinAlg + Float + RlstScalar<Real = T>> GeometryEvaluator
     for GeometryEvaluatorFlatTriangle<'a, T>
 {
     type T = T;
@@ -382,7 +379,7 @@ impl<'a, T: Float + RlstScalar<Real = T>> GeometryEvaluator
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
+impl<T: LinAlg + Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> {
     type IndexType = usize;
 
     fn dim(&self) -> usize {

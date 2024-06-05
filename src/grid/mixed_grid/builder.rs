@@ -6,15 +6,12 @@ use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::grid::Builder;
 use crate::traits::types::ReferenceCellType;
 use num::Float;
-use rlst::RlstScalar;
-use rlst::{
-    dense::array::{views::ArrayViewMut, Array},
-    rlst_array_from_slice2, rlst_dynamic_array2, BaseArray, MatrixInverse, VectorContainer,
-};
+use rlst::{rlst_array_from_slice2, rlst_dynamic_array2};
+use rlst::{LinAlg, RlstScalar};
 use std::collections::HashMap;
 
 /// Grid builder for a mixed grid
-pub struct MixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
+pub struct MixedGridBuilder<const GDIM: usize, T: LinAlg + Float + RlstScalar<Real = T>> {
     pub(crate) elements_to_npoints: HashMap<(ReferenceCellType, usize), usize>,
     pub(crate) points: Vec<T>,
     pub(crate) cells: Vec<usize>,
@@ -26,9 +23,9 @@ pub struct MixedGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> 
     pub(crate) cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM> for MixedGridBuilder<GDIM, T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
+impl<const GDIM: usize, T: LinAlg + Float + RlstScalar<Real = T>> Builder<GDIM>
+    for MixedGridBuilder<GDIM, T>
+// for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     type GridType = MixedGrid<T>;
     type T = T;

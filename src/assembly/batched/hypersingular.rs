@@ -111,7 +111,7 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -196,7 +196,7 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularCurl
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -301,7 +301,7 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel

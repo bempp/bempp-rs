@@ -5,18 +5,14 @@ use crate::grid::mixed_grid::{MixedGrid, MixedGridBuilder};
 use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
 use crate::traits::{grid::Builder, types::ReferenceCellType};
 use num::Float;
-use rlst::{
-    dense::array::{views::ArrayViewMut, Array},
-    BaseArray, MatrixInverse, RlstScalar, VectorContainer,
-};
+use rlst::{LinAlg, RlstScalar};
 /// Create a square grid with triangle cells
 ///
 /// Create a grid of the square \[0,1\]^2 with triangle cells. The input ncells is the number of cells
 /// along each side of the square.
-pub fn screen_triangles<T: Float + RlstScalar<Real = T>>(ncells: usize) -> FlatTriangleGrid<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+pub fn screen_triangles<T: LinAlg + Float + RlstScalar<Real = T>>(
+    ncells: usize,
+) -> FlatTriangleGrid<T> {
     if ncells == 0 {
         panic!("Cannot create a grid with 0 cells");
     }
@@ -64,10 +60,9 @@ where
 ///
 /// Create a grid of the square \[0,1\]^2 with quadrilateral cells. The input ncells is the number of
 /// cells along each side of the square.
-pub fn screen_quadrilaterals<T: Float + RlstScalar<Real = T>>(ncells: usize) -> SingleElementGrid<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+pub fn screen_quadrilaterals<T: LinAlg + Float + RlstScalar<Real = T>>(
+    ncells: usize,
+) -> SingleElementGrid<T> {
     if ncells == 0 {
         panic!("Cannot create a grid with 0 cells");
     }
@@ -109,10 +104,7 @@ where
 /// Create a grid of the square \[0,2\]x\[0,1\] with triangle cells on the left half and quadrilateral
 /// cells on the right half. The input ncells is the number of cells along each side of the unit
 /// square.
-pub fn screen_mixed<T: Float + RlstScalar<Real = T>>(ncells: usize) -> MixedGrid<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+pub fn screen_mixed<T: LinAlg + Float + RlstScalar<Real = T>>(ncells: usize) -> MixedGrid<T> {
     if ncells == 0 {
         panic!("Cannot create a grid with 0 cells");
     }

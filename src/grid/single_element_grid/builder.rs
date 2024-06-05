@@ -6,15 +6,12 @@ use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::grid::Builder;
 use crate::traits::types::ReferenceCellType;
 use num::Float;
-use rlst::RlstScalar;
-use rlst::{
-    dense::array::{views::ArrayViewMut, Array},
-    rlst_array_from_slice2, rlst_dynamic_array2, BaseArray, MatrixInverse, VectorContainer,
-};
+use rlst::{rlst_array_from_slice2, rlst_dynamic_array2};
+use rlst::{LinAlg, RlstScalar};
 use std::collections::HashMap;
 
 /// Grid builder for a single element grid
-pub struct SingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Real = T>> {
+pub struct SingleElementGridBuilder<const GDIM: usize, T: LinAlg + Float + RlstScalar<Real = T>> {
     pub(crate) element_data: (ReferenceCellType, usize),
     pub(crate) points_per_cell: usize,
     // Dead code allowed here, as vertices_per_cell is only used if the mpi feature is activated
@@ -28,10 +25,8 @@ pub struct SingleElementGridBuilder<const GDIM: usize, T: Float + RlstScalar<Rea
     pub(crate) cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<const GDIM: usize, T: Float + RlstScalar<Real = T>> Builder<GDIM>
+impl<const GDIM: usize, T: LinAlg + Float + RlstScalar<Real = T>> Builder<GDIM>
     for SingleElementGridBuilder<GDIM, T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
 {
     type GridType = SingleElementGrid<T>;
     type T = T;

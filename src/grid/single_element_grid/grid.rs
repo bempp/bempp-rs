@@ -10,11 +10,8 @@ use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::types::ReferenceCellType;
 use log::warn;
 use num::Float;
-use rlst::RlstScalar;
-use rlst::{
-    dense::array::{views::ArrayViewMut, Array},
-    BaseArray, MatrixInverse, VectorContainer,
-};
+use rlst::{dense::array::Array, BaseArray, VectorContainer};
+use rlst::{LinAlg, RlstScalar};
 use std::collections::HashMap;
 
 /// A single element grid
@@ -23,10 +20,7 @@ pub struct SingleElementGrid<T: Float + RlstScalar<Real = T>> {
     pub(crate) geometry: SingleElementGeometry<T>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> SingleElementGrid<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + Float + RlstScalar<Real = T>> SingleElementGrid<T> {
     /// Create a single element grid
     #[allow(clippy::too_many_arguments)]
     pub fn new(

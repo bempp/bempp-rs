@@ -62,7 +62,7 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceDoubleLayerAssembler<T> {
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+            .assemble_pairwise_st(EvalType::ValueDeriv, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -130,7 +130,7 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzDoubleLayerAssemb
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+            .assemble_pairwise_st(EvalType::ValueDeriv, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel

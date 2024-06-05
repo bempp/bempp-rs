@@ -8,23 +8,17 @@ use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::types::ReferenceCellType;
 use log::warn;
 use num::Float;
-use rlst::RlstScalar;
-use rlst::{
-    dense::array::{views::ArrayViewMut, Array},
-    BaseArray, MatrixInverse, VectorContainer,
-};
+use rlst::{dense::array::Array, BaseArray, VectorContainer};
+use rlst::{LinAlg, RlstScalar};
 use std::collections::HashMap;
 
 /// A mixed grid
-pub struct MixedGrid<T: Float + RlstScalar<Real = T>> {
+pub struct MixedGrid<T: LinAlg + Float + RlstScalar<Real = T>> {
     topology: MixedTopology,
     pub(crate) geometry: MixedGeometry<T>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> MixedGrid<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + Float + RlstScalar<Real = T>> MixedGrid<T> {
     #[allow(clippy::too_many_arguments)]
     /// Create a mixed grid
     pub fn new(
@@ -88,7 +82,7 @@ where
     }
 }
 
-impl<T: Float + RlstScalar<Real = T>> Grid for MixedGrid<T> {
+impl<T: LinAlg + Float + RlstScalar<Real = T>> Grid for MixedGrid<T> {
     type T = T;
     type Topology = MixedTopology;
     type Geometry = MixedGeometry<T>;

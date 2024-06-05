@@ -31,15 +31,13 @@ libc = "0.2"
 log = "0.4"
 rayon = "1.9"
 rand = "0.8.5"
-rlst = "0.1.*"
-green-kernels = "0.1.*"
+rlst = {path = "../rlst"}
+green-kernels = {path = "../green-kernels"}
 thiserror="1.*"
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}
 kifmm = { git="https://github.com/bempp/kifmm.git" }
-blas-src = { version = "0.10", features = ["blis"]}
-lapack-src = { version = "0.10", features = ["netlib"]}
 
 [[bench]]
 name = "assembly_benchmark"
@@ -50,6 +48,10 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints.clippy]
 wildcard_imports = "forbid"
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.10", features = ["blis"]}
+lapack-src = { version = "0.10", features = ["netlib"]}
 
 [target.aarch64-apple-darwin.dev-dependencies]
 blas-src = { version = "0.10", features = ["accelerate"]}

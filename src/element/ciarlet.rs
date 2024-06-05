@@ -6,10 +6,10 @@ use crate::element::polynomials::{
 use crate::element::reference_cell;
 use crate::traits::element::{Continuity, FiniteElement, MapType};
 use crate::traits::types::ReferenceCellType;
+use rlst::LinAlg;
 use rlst::{
-    dense::array::views::ArrayViewMut, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray,
-    MatrixInverse, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape, UnsafeRandomAccessMut,
-    VectorContainer,
+    rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
+    RlstScalar, Shape, UnsafeRandomAccessMut, VectorContainer,
 };
 
 pub mod lagrange;
@@ -38,7 +38,7 @@ pub struct CiarletElement<T: RlstScalar> {
 
 impl<T: RlstScalar> CiarletElement<T>
 where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
+    T: LinAlg,
 {
     /// Create a Ciarlet element
     #[allow(clippy::too_many_arguments)]

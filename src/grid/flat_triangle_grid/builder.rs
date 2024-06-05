@@ -3,15 +3,12 @@
 use crate::grid::flat_triangle_grid::grid::FlatTriangleGrid;
 use crate::traits::grid::Builder;
 use num::Float;
-use rlst::{
-    dense::array::views::ArrayViewMut, rlst_array_from_slice2, rlst_dynamic_array2, Array,
-    BaseArray, MatrixInverse, RlstScalar, VectorContainer,
-};
+use rlst::prelude::*;
 use std::collections::HashMap;
 
 /// Grid builder for a flat triangle grid
-pub struct FlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
-    pub(crate) points: Vec<T>,
+pub struct FlatTriangleGridBuilder<T: LinAlg + Float + RlstScalar<Real = T>> {
+    pub(crate) points: Vec<[T; 3]>,
     pub(crate) cells: Vec<usize>,
     pub(crate) point_indices_to_ids: Vec<usize>,
     point_ids_to_indices: HashMap<usize, usize>,
@@ -19,10 +16,7 @@ pub struct FlatTriangleGridBuilder<T: Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBuilder<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBuilder<T> {
     type GridType = FlatTriangleGrid<T>;
     type T = T;
     type CellData = [usize; 3];
@@ -30,8 +24,8 @@ where
 
     fn new(_data: ()) -> Self {
         Self {
-            points: vec![],
-            cells: vec![],
+            points: Vec::default(),
+            cells: Vec::default(),
             point_indices_to_ids: vec![],
             point_ids_to_indices: HashMap::new(),
             cell_indices_to_ids: vec![],
@@ -41,8 +35,8 @@ where
 
     fn new_with_capacity(npoints: usize, ncells: usize, _data: ()) -> Self {
         Self {
-            points: Vec::with_capacity(npoints * Self::GDIM),
-            cells: Vec::with_capacity(ncells * 3),
+            points: Vec::with_capacity(npoints),
+            cells: Vec::with_capacity(3 * ncells),
             point_indices_to_ids: Vec::with_capacity(npoints),
             point_ids_to_indices: HashMap::new(),
             cell_indices_to_ids: Vec::with_capacity(ncells),
@@ -57,7 +51,7 @@ where
         self.point_ids_to_indices
             .insert(id, self.point_indices_to_ids.len());
         self.point_indices_to_ids.push(id);
-        self.points.extend_from_slice(&data);
+        self.points.push(data);
     }
 
     fn add_cell(&mut self, id: usize, cell_data: [usize; 3]) {
@@ -75,10 +69,12 @@ where
     fn create_grid(self) -> Self::GridType {
         // TODO: remove this transposing
         let npts = self.point_indices_to_ids.len();
-        let mut points = rlst_dynamic_array2!(T, [npts, 3]);
-        points.fill_from(rlst_array_from_slice2!(&self.points, [npts, 3], [3, 1]));
+        let mut points_arr = rlst_dynamic_array2!(T, [3, npts]);
+        for (mut col, point) in itertools::izip!(points_arr.col_iter_mut(), self.points) {
+            col.data_mut().copy_from_slice(&point);
+        }
         FlatTriangleGrid::new(
-            points,
+            points_arr,
             &self.cells,
             self.point_indices_to_ids,
             self.point_ids_to_indices,

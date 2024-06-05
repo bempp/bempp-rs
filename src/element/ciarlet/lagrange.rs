@@ -4,23 +4,16 @@ use crate::element::ciarlet::{reference_cell, CiarletElement};
 use crate::element::polynomials::polynomial_count;
 use crate::traits::element::{Continuity, ElementFamily, MapType};
 use crate::traits::types::ReferenceCellType;
-use rlst::MatrixInverse;
-use rlst::RlstScalar;
-use rlst::{
-    dense::array::views::ArrayViewMut, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray,
-    RandomAccessMut, VectorContainer,
-};
+use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut};
+use rlst::{LinAlg, RlstScalar};
 use std::marker::PhantomData;
 
 /// Create a Lagrange element
-pub fn create<T: RlstScalar>(
+pub fn create<T: RlstScalar + LinAlg>(
     cell_type: ReferenceCellType,
     degree: usize,
     continuity: Continuity,
-) -> CiarletElement<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+) -> CiarletElement<T> {
     let dim = polynomial_count(cell_type, degree);
     let tdim = reference_cell::dim(cell_type);
     let mut wcoeffs = rlst_dynamic_array3!(T, [dim, 1, dim]);
@@ -179,19 +172,13 @@ where
 }
 
 /// Lagrange element family
-pub struct LagrangeElementFamily<T: RlstScalar>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+pub struct LagrangeElementFamily<T: LinAlg + RlstScalar> {
     degree: usize,
     continuity: Continuity,
     _t: PhantomData<T>,
 }
 
-impl<T: RlstScalar> LagrangeElementFamily<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + RlstScalar> LagrangeElementFamily<T> {
     /// Create new family
     pub fn new(degree: usize, continuity: Continuity) -> Self {
         Self {
@@ -202,10 +189,7 @@ where
     }
 }
 
-impl<T: RlstScalar> ElementFamily for LagrangeElementFamily<T>
-where
-    for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>: MatrixInverse,
-{
+impl<T: LinAlg + RlstScalar> ElementFamily for LagrangeElementFamily<T> {
     type T = T;
     type FiniteElement = CiarletElement<T>;
     fn element(&self, cell_type: ReferenceCellType) -> CiarletElement<T> {
