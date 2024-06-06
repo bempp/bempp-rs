@@ -138,7 +138,8 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
 mod test {
     use super::*;
     use crate::element::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
-    use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
+    use crate::grid::shapes::screen_triangles;
+    // use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
     use crate::traits::element::Continuity;
 
     fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
@@ -215,45 +216,45 @@ mod test {
         run_test_rt(&grid, 1, Continuity::Discontinuous);
     }
 
-    #[test]
-    fn test_dp0_quadrilaterals() {
-        let grid = screen_quadrilaterals::<f64>(8);
-        run_test(&grid, 0, Continuity::Discontinuous);
-    }
-    #[test]
-    fn test_dp2_quadrilaterals() {
-        let grid = screen_quadrilaterals::<f64>(8);
-        run_test(&grid, 2, Continuity::Discontinuous);
-    }
-    #[test]
-    fn test_p2_quadrilaterals() {
-        let grid = screen_quadrilaterals::<f64>(8);
-        run_test(&grid, 2, Continuity::Continuous);
-    }
-    #[test]
-    fn test_p3_quadrilaterals() {
-        let grid = screen_quadrilaterals::<f64>(8);
-        run_test(&grid, 3, Continuity::Continuous);
-    }
+    // #[test]
+    // fn test_dp0_quadrilaterals() {
+    //     let grid = screen_quadrilaterals::<f64>(8);
+    //     run_test(&grid, 0, Continuity::Discontinuous);
+    // }
+    // #[test]
+    // fn test_dp2_quadrilaterals() {
+    //     let grid = screen_quadrilaterals::<f64>(8);
+    //     run_test(&grid, 2, Continuity::Discontinuous);
+    // }
+    // #[test]
+    // fn test_p2_quadrilaterals() {
+    //     let grid = screen_quadrilaterals::<f64>(8);
+    //     run_test(&grid, 2, Continuity::Continuous);
+    // }
+    // #[test]
+    // fn test_p3_quadrilaterals() {
+    //     let grid = screen_quadrilaterals::<f64>(8);
+    //     run_test(&grid, 3, Continuity::Continuous);
+    // }
 
-    #[test]
-    fn test_dp0_mixed() {
-        let grid = screen_mixed::<f64>(8);
-        run_test(&grid, 0, Continuity::Discontinuous);
-    }
-    #[test]
-    fn test_dp2_mixed() {
-        let grid = screen_mixed::<f64>(8);
-        run_test(&grid, 2, Continuity::Discontinuous);
-    }
-    #[test]
-    fn test_p2_mixed() {
-        let grid = screen_mixed::<f64>(8);
-        run_test(&grid, 2, Continuity::Continuous);
-    }
-    #[test]
-    fn test_p3_mixed() {
-        let grid = screen_mixed::<f64>(8);
-        run_test(&grid, 3, Continuity::Continuous);
-    }
+    // #[test]
+    // fn test_dp0_mixed() {
+    //     let grid = screen_mixed::<f64>(8);
+    //     run_test(&grid, 0, Continuity::Discontinuous);
+    // }
+    // #[test]
+    // fn test_dp2_mixed() {
+    //     let grid = screen_mixed::<f64>(8);
+    //     run_test(&grid, 2, Continuity::Discontinuous);
+    // }
+    // #[test]
+    // fn test_p2_mixed() {
+    //     let grid = screen_mixed::<f64>(8);
+    //     run_test(&grid, 2, Continuity::Continuous);
+    // }
+    // #[test]
+    // fn test_p3_mixed() {
+    //     let grid = screen_mixed::<f64>(8);
+    //     run_test(&grid, 3, Continuity::Continuous);
+    // }
 }

@@ -7,7 +7,6 @@ use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use num::Float;
-use rlst::rlst_static_type;
 use rlst::RlstScalar;
 use rlst::{
     dense::array::{Array, SliceArray},
@@ -15,6 +14,7 @@ use rlst::{
     RawAccess, Shape, UnsafeRandomAccessByRef, VectorContainer,
 };
 use rlst::{rlst_static_array, LinAlg};
+use rlst::{rlst_static_type, DynamicArray};
 use std::collections::HashMap;
 
 /// A flat triangle grid
@@ -22,7 +22,7 @@ pub struct FlatTriangleGrid<T: LinAlg + Float + RlstScalar<Real = T>> {
     index_map: Vec<usize>,
 
     // Geometry information
-    pub(crate) coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+    pub(crate) coordinates: DynamicArray<T, 2>,
     pub(crate) element: CiarletElement<T>,
     midpoints: Vec<rlst_static_type!(T, 3)>,
     diameters: Vec<T>,
@@ -50,7 +50,7 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
     /// Create a flat triangle grid
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        coordinates: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        coordinates: DynamicArray<T, 2>,
         cells: &[usize],
         point_indices_to_ids: Vec<usize>,
         point_ids_to_indices: HashMap<usize, usize>,
@@ -58,9 +58,9 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
         cell_ids_to_indices: HashMap<usize, usize>,
         edge_ids: Option<HashMap<[usize; 2], usize>>,
     ) -> Self {
-        assert_eq!(coordinates.shape()[1], 3);
+        assert_eq!(coordinates.shape()[0], 3);
         let ncells = cells.len() / 3;
-        let nvertices = coordinates.shape()[0];
+        let nvertices = coordinates.shape()[1];
 
         // Compute geometry
         let mut index_map = vec![0; ncells];
@@ -85,15 +85,19 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
             normals.push(rlst_static_array!(T, 3));
             jacobians.push(rlst_static_array!(T, 3, 2));
 
-            for (i, c) in v0.iter_mut().enumerate() {
-                *c = unsafe { *coordinates.get_unchecked([cells[3 * cell_i], i]) };
-            }
-            for (i, c) in v1.iter_mut().enumerate() {
-                *c = unsafe { *coordinates.get_unchecked([cells[3 * cell_i + 1], i]) };
-            }
-            for (i, c) in v2.iter_mut().enumerate() {
-                *c = unsafe { *coordinates.get_unchecked([cells[3 * cell_i + 2], i]) };
-            }
+            v0.fill_from(coordinates.view().slice(1, cells[3 * cell_i]));
+            v1.fill_from(coordinates.view().slice(1, cells[3 * cell_i + 1]));
+            v2.fill_from(coordinates.view().slice(1, cells[3 * cell_i + 2]));
+
+            // for (i, c) in v0.iter_mut().enumerate() {
+            //     *c = unsafe { *coordinates.get_unchecked([cells[3 * cell_i], i]) };
+            // }
+            // for (i, c) in v1.iter_mut().enumerate() {
+            //     *c = unsafe { *coordinates.get_unchecked([cells[3 * cell_i + 1], i]) };
+            // }
+            // for (i, c) in v2.iter_mut().enumerate() {
+            //     *c = unsafe { *coordinates.get_unchecked([cells[3 * cell_i + 2], i]) };
+            // }
 
             midpoints[cell_i].fill_from(
                 (v0.view() + v1.view() + v2.view()).scalar_mul(T::from(1.0 / 3.0).unwrap()),
@@ -115,7 +119,7 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
         }
 
         let element = lagrange::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
-        let cell_indices = (0..ncells).collect::<Vec<_>>();
+        let cell_indices: Vec<usize> = (0..ncells).collect();
 
         // Compute topology
         let entity_types = vec![
@@ -133,10 +137,10 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
         entities_to_cells[0] = vec![vec![]; nvertices];
 
         for (cell_i, i) in index_map.iter_mut().enumerate() {
-            let cell = &cells[3 * cell_i..3 * (cell_i + 1)];
+            let cell = &cells[3 * cell_i..3 * cell_i + 3];
             *i = cell_i;
-            for (local_index, v) in cell.iter().enumerate() {
-                entities_to_cells[0][*v].push(CellLocalIndexPair::new(cell_i, local_index));
+            for (local_index, &v) in cell.iter().enumerate() {
+                entities_to_cells[0][v].push(CellLocalIndexPair::new(cell_i, local_index));
             }
             entities_to_cells[2][cell_i] = vec![CellLocalIndexPair::new(cell_i, 0)];
             cells_to_entities[0][cell_i].extend_from_slice(cell);
@@ -245,16 +249,16 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> Geometry for FlatTriangleGrid<T> 
     }
 
     fn coordinate(&self, point_index: usize, coord_index: usize) -> Option<&Self::T> {
-        self.coordinates.get([point_index, coord_index])
+        self.coordinates.get([coord_index, point_index])
     }
 
     fn point_count(&self) -> usize {
-        self.coordinates.shape()[0]
+        self.coordinates.shape()[1]
     }
 
     fn cell_points(&self, index: usize) -> Option<&[usize]> {
-        if index < self.cells_to_entities[0].len() {
-            Some(&self.cells_to_entities[0][index])
+        if let Some(c) = self.cells_to_entities[0].get(index) {
+            Some(&c)
         } else {
             None
         }
@@ -333,7 +337,7 @@ impl<'a, T: LinAlg + Float + RlstScalar<Real = T>> GeometryEvaluatorFlatTriangle
         let npoints = points.len() / tdim;
         Self {
             grid,
-            points: rlst_array_from_slice2!(points, [npoints, tdim]),
+            points: rlst_array_from_slice2!(points, [tdim, npoints]),
         }
     }
 }
@@ -350,31 +354,38 @@ impl<'a, T: LinAlg + Float + RlstScalar<Real = T>> GeometryEvaluator
     fn compute_points(&self, cell_index: usize, points: &mut [T]) {
         let jacobian = &self.grid.jacobians[cell_index];
         let npts = self.points.shape()[0];
-        for d in 0..3 {
-            for point_index in 0..npts {
-                points[d * npts + point_index] = self.grid.coordinates
-                    [[self.grid.cells_to_entities[0][cell_index][0], d]]
-                    + jacobian[[d, 0]] * self.points[[point_index, 0]]
-                    + jacobian[[d, 1]] * self.points[[point_index, 1]];
-            }
+        let mut point = rlst_static_array!(T, 3);
+        for point_index in 0..npts {
+            point.fill_from(
+                self.grid
+                    .coordinates
+                    .view()
+                    .slice(1, self.grid.cells_to_entities[0][cell_index][0])
+                    + jacobian
+                        .view()
+                        .slice(1, 0)
+                        .scalar_mul(self.points[[0, point_index]])
+                    + jacobian
+                        .view()
+                        .slice(1, 1)
+                        .scalar_mul(self.points[[1, point_index]]),
+            );
+            points[3 * point_index..3 * point_index + 3].copy_from_slice(point.data());
         }
     }
 
     fn compute_jacobians(&self, cell_index: usize, jacobians: &mut [T]) {
         let npts = self.points.shape()[0];
-        for (i, j) in self.grid.jacobians[cell_index].iter().enumerate() {
-            for point_index in 0..npts {
-                jacobians[i * npts + point_index] = j;
-            }
+        for index in 0..npts {
+            jacobians[6 * index..6 * index + 6]
+                .copy_from_slice(self.grid.jacobians[cell_index].data());
         }
     }
 
     fn compute_normals(&self, cell_index: usize, normals: &mut [T]) {
         let npts = self.points.shape()[0];
-        for (i, j) in self.grid.normals[cell_index].iter().enumerate() {
-            for point_index in 0..npts {
-                normals[i * npts + point_index] = j;
-            }
+        for index in 0..npts {
+            normals[3 * index..3 * index + 3].copy_from_slice(self.grid.normals[cell_index].data());
         }
     }
 }
@@ -492,23 +503,26 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> Topology for FlatTriangleGrid<T> 
 mod test {
     use super::*;
     use approx::*;
-    use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut, RawAccessMut};
+    use rlst::{
+        assert_array_relative_eq, rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut,
+        RawAccessMut,
+    };
 
     fn example_grid_flat() -> FlatTriangleGrid<f64> {
         //! Create a flat test grid
-        let mut points = rlst_dynamic_array2!(f64, [4, 3]);
+        let mut points = rlst_dynamic_array2!(f64, [3, 4]);
         points[[0, 0]] = 0.0;
-        points[[0, 1]] = 0.0;
-        points[[0, 2]] = 0.0;
-        points[[1, 0]] = 1.0;
+        points[[1, 0]] = 0.0;
+        points[[2, 0]] = 0.0;
+        points[[0, 1]] = 1.0;
         points[[1, 1]] = 0.0;
-        points[[1, 2]] = 0.0;
-        points[[2, 0]] = 1.0;
-        points[[2, 1]] = 1.0;
+        points[[2, 1]] = 0.0;
+        points[[0, 2]] = 1.0;
+        points[[1, 2]] = 1.0;
         points[[2, 2]] = 0.0;
-        points[[3, 0]] = 0.0;
-        points[[3, 1]] = 1.0;
-        points[[3, 2]] = 0.0;
+        points[[0, 3]] = 0.0;
+        points[[1, 3]] = 1.0;
+        points[[2, 3]] = 0.0;
         let cells = vec![0, 1, 2, 0, 2, 3];
         FlatTriangleGrid::new(
             points,
@@ -523,19 +537,19 @@ mod test {
 
     fn example_grid_3d() -> FlatTriangleGrid<f64> {
         //! Create a non-flat test grid
-        let mut points = rlst_dynamic_array2!(f64, [4, 3]);
+        let mut points = rlst_dynamic_array2!(f64, [3, 4]);
         points[[0, 0]] = 0.0;
-        points[[0, 1]] = 0.0;
-        points[[0, 2]] = 0.0;
-        points[[1, 0]] = 1.0;
+        points[[1, 0]] = 0.0;
+        points[[2, 0]] = 0.0;
+        points[[0, 1]] = 1.0;
         points[[1, 1]] = 0.0;
-        points[[1, 2]] = 1.0;
-        points[[2, 0]] = 1.0;
         points[[2, 1]] = 1.0;
+        points[[0, 2]] = 1.0;
+        points[[1, 2]] = 1.0;
         points[[2, 2]] = 0.0;
-        points[[3, 0]] = 0.0;
-        points[[3, 1]] = 1.0;
-        points[[3, 2]] = 0.0;
+        points[[0, 3]] = 0.0;
+        points[[1, 3]] = 1.0;
+        points[[2, 3]] = 0.0;
         let cells = vec![0, 1, 2, 0, 2, 3];
         FlatTriangleGrid::new(
             points,
@@ -549,11 +563,11 @@ mod test {
     }
 
     fn triangle_points() -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
-        //! Create a set of points inside the reference triangle
+        //! Create a set of points ins1de the re1erence triangle
         let mut points = rlst_dynamic_array2!(f64, [2, 2]);
         *points.get_mut([0, 0]).unwrap() = 0.2;
-        *points.get_mut([0, 1]).unwrap() = 0.5;
-        *points.get_mut([1, 0]).unwrap() = 0.6;
+        *points.get_mut([1, 0]).unwrap() = 0.5;
+        *points.get_mut([0, 1]).unwrap() = 0.6;
         *points.get_mut([1, 1]).unwrap() = 0.1;
         points
     }
@@ -597,7 +611,7 @@ mod test {
         let points = triangle_points();
 
         let evaluator = g.get_evaluator(points.data());
-        let mut mapped_points = rlst_dynamic_array2!(f64, [points.shape()[0], 3]);
+        let mut mapped_points = rlst_dynamic_array2!(f64, [3, points.shape()[1]]);
         for (cell_i, pts) in [
             vec![vec![0.7, 0.5, 0.0], vec![0.7, 0.1, 0.0]],
             vec![vec![0.2, 0.7, 0.0], vec![0.6, 0.7, 0.0]],
@@ -608,7 +622,7 @@ mod test {
             evaluator.compute_points(cell_i, mapped_points.data_mut());
             for (point_i, point) in pts.iter().enumerate() {
                 for (i, j) in point.iter().enumerate() {
-                    assert_relative_eq!(mapped_points[[point_i, i]], *j, epsilon = 1e-12);
+                    assert_relative_eq!(mapped_points[[i, point_i]], *j, epsilon = 1e-12);
                 }
             }
         }
@@ -621,7 +635,7 @@ mod test {
         let points = triangle_points();
         let evaluator = g.get_evaluator(points.data());
 
-        let mut mapped_points = rlst_dynamic_array2!(f64, [points.shape()[0], 3]);
+        let mut mapped_points = rlst_dynamic_array2!(f64, [3, points.shape()[1]]);
         for (cell_i, pts) in [
             vec![vec![0.7, 0.5, 0.2], vec![0.7, 0.1, 0.6]],
             vec![vec![0.2, 0.7, 0.0], vec![0.6, 0.7, 0.0]],
@@ -632,7 +646,7 @@ mod test {
             evaluator.compute_points(cell_i, mapped_points.data_mut());
             for (point_i, point) in pts.iter().enumerate() {
                 for (i, j) in point.iter().enumerate() {
-                    assert_relative_eq!(mapped_points[[point_i, i]], *j, epsilon = 1e-12);
+                    assert_relative_eq!(mapped_points[[i, point_i]], *j, epsilon = 1e-12);
                 }
             }
         }
@@ -645,28 +659,42 @@ mod test {
         let points = triangle_points();
         let evaluator = g.get_evaluator(points.data());
 
-        let mut computed_jacobians = rlst_dynamic_array3!(f64, [points.shape()[0], 3, 2]);
-        for (cell_i, jacobian) in [
-            vec![vec![1.0, 1.0], vec![0.0, 1.0], vec![1.0, 0.0]],
-            vec![vec![1.0, 0.0], vec![1.0, 1.0], vec![0.0, 0.0]],
-        ]
-        .iter()
-        .enumerate()
-        {
+        let mut computed_jacobians = rlst_dynamic_array3!(f64, [3, 2, points.shape()[1]]);
+        let mut expected = rlst_dynamic_array3!(f64, [3, 2, 2]);
+
+        // First cell, first col
+
+        expected[[0, 0, 0]] = 1.0;
+        expected[[1, 0, 0]] = 0.0;
+        expected[[2, 0, 0]] = 1.0;
+
+        // First cell, second col
+
+        expected[[0, 1, 0]] = 1.0;
+        expected[[1, 1, 0]] = 1.0;
+        expected[[2, 1, 0]] = 0.0;
+
+        // Second cell, first col,
+
+        expected[[0, 0, 1]] = 1.0;
+        expected[[1, 0, 1]] = 1.0;
+        expected[[2, 0, 1]] = 0.0;
+
+        // Second point, second col
+
+        expected[[0, 1, 1]] = 0.0;
+        expected[[1, 1, 1]] = 1.0;
+        expected[[2, 1, 1]] = 0.0;
+
+        for cell_i in 0..2 {
             evaluator.compute_jacobians(cell_i, computed_jacobians.data_mut());
-            for point_i in 0..points.shape()[0] {
-                for (i, row) in jacobian.iter().enumerate() {
-                    for (j, entry) in row.iter().enumerate() {
-                        assert_relative_eq!(
-                            *entry,
-                            *computed_jacobians.get([point_i, i, j]).unwrap(),
-                            epsilon = 1e-12
-                        );
-                    }
-                }
+            for point_i in 0..points.shape()[1] {
+                let jac = computed_jacobians.view().slice(2, point_i);
+                assert_array_relative_eq!(jac, expected.view().slice(2, cell_i), 1E-12);
             }
         }
     }
+
     #[test]
     fn test_compute_normal_3d() {
         //! Test the compute_normal function of an evaluator
@@ -674,30 +702,30 @@ mod test {
         let points = triangle_points();
         let evaluator = g.get_evaluator(points.data());
 
-        let mut computed_normals = rlst_dynamic_array2!(f64, [points.shape()[0], 3]);
-        for (cell_i, normal) in [
-            vec![
-                -1.0 / f64::sqrt(3.0),
-                1.0 / f64::sqrt(3.0),
-                1.0 / f64::sqrt(3.0),
-            ],
-            vec![0.0, 0.0, 1.0],
-        ]
-        .iter()
-        .enumerate()
-        {
+        let mut computed_normals = rlst_dynamic_array2!(f64, [3, points.shape()[1]]);
+        let mut expected = rlst_dynamic_array2!(f64, [3, 2]);
+
+        expected[[0, 0]] = -1.0;
+        expected[[1, 0]] = 1.0;
+        expected[[2, 0]] = 1.0;
+
+        expected[[0, 1]] = 0.0;
+        expected[[1, 1]] = 0.0;
+        expected[[2, 1]] = 1.0;
+
+        expected
+            .view_mut()
+            .slice(1, 0)
+            .scale_inplace(1.0 / f64::sqrt(3.0));
+
+        for cell_i in 0..2 {
             evaluator.compute_normals(cell_i, computed_normals.data_mut());
-            for point_i in 0..points.shape()[0] {
-                assert_relative_eq!(
-                    computed_normals[[point_i, 0]] * computed_normals[[point_i, 0]]
-                        + computed_normals[[point_i, 1]] * computed_normals[[point_i, 1]]
-                        + computed_normals[[point_i, 2]] * computed_normals[[point_i, 2]],
-                    1.0,
-                    epsilon = 1e-12
+            for point_i in 0..points.shape()[1] {
+                assert_array_relative_eq!(
+                    computed_normals.view().slice(1, point_i),
+                    expected.view().slice(1, cell_i),
+                    1E-12
                 );
-                for (i, j) in normal.iter().enumerate() {
-                    assert_relative_eq!(computed_normals[[point_i, i]], *j, epsilon = 1e-12);
-                }
             }
         }
     }

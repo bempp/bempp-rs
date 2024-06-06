@@ -47,9 +47,12 @@ pub fn regular_sphere<T: LinAlg + Float + RlstScalar<Real = T>>(
         let mut new_cells = Vec::with_capacity(8 * usize::pow(6, level));
         for c in &cells {
             for i in 0..3 {
-                for j in 0..3 {
-                    v[i][j] = b.points[3 * c[i] + j];
-                }
+                v[i] = b.points[c[i]];
+
+                //  for j in 0..3 {
+
+                // v[i][j] = b.points[3 * c[i] + j];
+                // }
             }
             let edges = [[1, 2], [0, 2], [0, 1]]
                 .iter()
