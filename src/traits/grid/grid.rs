@@ -1,36 +1,36 @@
 //! Definition of a grid
 
-use super::{CellType, EdgeType, PointType, ReferenceMapType};
+use super::{Cell, Edge, Point, ReferenceMap};
 use crate::traits::types::{CellIterator, CellLocalIndexPair, PointIterator, ReferenceCellType};
 use rlst::RlstScalar;
 
-pub trait GridType: std::marker::Sized {
+pub trait Grid: std::marker::Sized {
     //! A grid
 
     /// The floating point type used for coordinates
     type T: RlstScalar;
     /// The type used for a point
-    type Point<'a>: PointType
+    type Point<'a>: Point
     where
         Self: 'a;
     /// The type used for a vertex
     ///
     /// Vertices are the points that are at the vertex of a cell in the grid
-    type Vertex<'a>: PointType
+    type Vertex<'a>: Point
     where
         Self: 'a;
     /// The type used for an edge
     ///
     /// Vertices are the points that are at the vertex of a cell in the grid
-    type Edge<'a>: EdgeType
+    type Edge<'a>: Edge
     where
         Self: 'a;
     /// The type used for a cell
-    type Cell<'a>: CellType<Grid = Self>
+    type Cell<'a>: Cell<Grid = Self>
     where
         Self: 'a;
     /// The type of a reference map
-    type ReferenceMap<'a>: ReferenceMapType<Grid = Self>
+    type ReferenceMap<'a>: ReferenceMap<Grid = Self>
     where
         Self: 'a;
 
@@ -70,9 +70,6 @@ pub trait GridType: std::marker::Sized {
 
     /// Get a point from its index
     fn point_from_index(&self, index: usize) -> Self::Point<'_>;
-
-    /// Get a vertex from its index
-    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_>;
 
     /// Get a vertex from its index
     fn edge_from_index(&self, index: usize) -> Self::Edge<'_>;

@@ -1,7 +1,6 @@
 //! Regular sphere grid
 
 use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
-use crate::traits::grid::Builder;
 use num::Float;
 use rlst::LinAlg;
 use rlst::RlstScalar;
@@ -99,7 +98,7 @@ pub fn regular_sphere<T: LinAlg + Float + RlstScalar<Real = T>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::grid::{GridType, ReferenceMapType};
+    use crate::traits::grid::{Grid, ReferenceMap};
 
     #[test]
     fn test_regular_sphere_0() {

@@ -1,21 +1,21 @@
 //! Iterator over cells
 
-use crate::traits::grid::GridType;
+use crate::traits::grid::Grid;
 
 /// A cell iterator
-pub struct CellIterator<'a, Grid: GridType, Iter: std::iter::Iterator<Item = usize>> {
+pub struct CellIterator<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> {
     iter: Iter,
     grid: &'a Grid,
 }
 
-impl<'a, Grid: GridType, Iter: std::iter::Iterator<Item = usize>> CellIterator<'a, Grid, Iter> {
+impl<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> CellIterator<'a, Grid, Iter> {
     /// Create a cell iterator
     pub fn new(iter: Iter, grid: &'a Grid) -> Self {
         CellIterator { iter, grid }
     }
 }
 
-impl<'a, Grid: GridType, Iter: std::iter::Iterator<Item = usize>> std::iter::Iterator
+impl<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> std::iter::Iterator
     for CellIterator<'a, Grid, Iter>
 {
     type Item = Grid::Cell<'a>;

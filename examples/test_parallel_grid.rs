@@ -17,7 +17,7 @@ use bempp::{
     traits::{
         element::Continuity,
         function::FunctionSpace,
-        grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
+        grid::{Builder, Cell, Geometry, Grid, ParallelBuilder, Point},
         types::{Ownership, ReferenceCellType},
     },
 };

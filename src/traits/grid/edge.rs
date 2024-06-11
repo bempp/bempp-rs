@@ -2,7 +2,7 @@
 
 use crate::traits::types::Ownership;
 
-pub trait EdgeType {
+pub trait Edge {
     //! An edge
 
     /// The index of the edge

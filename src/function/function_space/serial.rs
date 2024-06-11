@@ -5,14 +5,14 @@ use crate::function::function_space::assign_dofs;
 use crate::traits::{
     element::{ElementFamily, FiniteElement},
     function::FunctionSpace,
-    grid::{CellType, GridType, TopologyType},
+    grid::{CellType, Grid, TopologyType},
     types::{Ownership, ReferenceCellType},
 };
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
 /// A serial function space
-pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
+pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: Grid<T = T::Real>> {
     pub(crate) grid: &'a GridImpl,
     pub(crate) elements: HashMap<ReferenceCellType, CiarletElement<T>>,
     pub(crate) entity_dofs: [Vec<Vec<usize>>; 4],
@@ -20,7 +20,7 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real
     pub(crate) size: usize,
 }
 
-impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
+impl<'a, T: RlstScalar, GridImpl: Grid<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
     /// Create new function space
     pub fn new(
         grid: &'a GridImpl,
@@ -43,7 +43,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
     }
 }
 
-impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
+impl<'a, T: RlstScalar, GridImpl: Grid<T = T::Real>> FunctionSpace
     for SerialFunctionSpace<'a, T, GridImpl>
 {
     type Grid = GridImpl;

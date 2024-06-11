@@ -1,7 +1,6 @@
 //! Grid builder
 
 use crate::grid::flat_triangle_grid::grid::FlatTriangleGrid;
-use crate::traits::grid::Builder;
 use num::Float;
 use rlst::prelude::*;
 use std::collections::HashMap;
@@ -16,13 +15,8 @@ pub struct FlatTriangleGridBuilder<T: LinAlg + Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: LinAlg + Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBuilder<T> {
-    type GridType = FlatTriangleGrid<T>;
-    type T = T;
-    type CellData = [usize; 3];
-    type GridMetadata = ();
-
-    fn new(_data: ()) -> Self {
+impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGridBuilder<T> {
+    pub fn new() -> Self {
         Self {
             points: Vec::default(),
             cells: Vec::default(),
@@ -32,8 +26,7 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBu
             cell_ids_to_indices: HashMap::new(),
         }
     }
-
-    fn new_with_capacity(npoints: usize, ncells: usize, _data: ()) -> Self {
+    pub fn new_with_capacity(npoints: usize, ncells: usize, _data: ()) -> Self {
         Self {
             points: Vec::with_capacity(npoints),
             cells: Vec::with_capacity(3 * ncells),
@@ -43,8 +36,7 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBu
             cell_ids_to_indices: HashMap::new(),
         }
     }
-
-    fn add_point(&mut self, id: usize, data: [T; 3]) {
+    pub fn add_point(&mut self, id: usize, data: [T; 3]) {
         if self.point_indices_to_ids.contains(&id) {
             panic!("Cannot add point with duplicate id.");
         }
@@ -54,7 +46,7 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBu
         self.points.push(data);
     }
 
-    fn add_cell(&mut self, id: usize, cell_data: [usize; 3]) {
+    pub fn add_cell(&mut self, id: usize, cell_data: [usize; 3]) {
         if self.cell_indices_to_ids.contains(&id) {
             panic!("Cannot add cell with duplicate id.");
         }
@@ -66,7 +58,7 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> Builder<3> for FlatTriangleGridBu
         }
     }
 
-    fn create_grid(self) -> Self::GridType {
+    pub fn create_grid(self) -> FlatTriangleGrid<T> {
         // TODO: remove this transposing
         let npts = self.point_indices_to_ids.len();
         let mut points_arr = rlst_dynamic_array2!(T, [3, npts]);
@@ -92,7 +84,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_duplicate_point_id() {
-        let mut b = FlatTriangleGridBuilder::<f64>::new(());
+        let mut b = FlatTriangleGridBuilder::<f64>::new();
 
         b.add_point(2, [0.0, 0.0, 0.0]);
         b.add_point(0, [1.0, 0.0, 0.0]);
@@ -103,7 +95,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_duplicate_cell_id() {
-        let mut b = FlatTriangleGridBuilder::<f64>::new(());
+        let mut b = FlatTriangleGridBuilder::<f64>::new();
 
         b.add_point(0, [0.0, 0.0, 0.0]);
         b.add_point(1, [1.0, 0.0, 0.0]);

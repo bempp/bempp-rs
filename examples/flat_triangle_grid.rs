@@ -1,5 +1,5 @@
 use bempp::grid::flat_triangle_grid::FlatTriangleGridBuilder;
-use bempp::traits::grid::{Builder, CellType, GeometryType, GridType, PointType};
+use bempp::traits::grid::{Builder, Cell, Geometry, Grid, Point};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -9,7 +9,7 @@ extern crate lapack_src;
 /// In a flat triangle grid, all the cells are flat triangles in 3D space.
 fn main() {
     // The grid will be created using the grid builder
-    let mut b = FlatTriangleGridBuilder::<f64>::new(());
+    let mut b = FlatTriangleGridBuilder::<f64>::new();
     // Add four points, giving them the ids 1 to 4
     b.add_point(1, [0.0, 0.0, 0.0]);
     b.add_point(2, [1.0, 0.0, 1.0]);

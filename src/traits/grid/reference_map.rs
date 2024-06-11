@@ -1,13 +1,13 @@
 //! Map from reference to physical space.
 
-use crate::traits::grid::GridType;
+use crate::traits::grid::Grid;
 use rlst::RlstScalar;
 
-pub trait ReferenceMapType {
+pub trait ReferenceMap {
     //! Reference to physical map
 
     /// The type of the grid that this map maps
-    type Grid: GridType;
+    type Grid: Grid;
 
     /// The topoloical/domain dimension
     fn domain_dimension(&self) -> usize;
@@ -24,7 +24,7 @@ pub trait ReferenceMapType {
     fn reference_to_physical(
         &self,
         cell_index: usize,
-        value: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real],
+        value: &mut [<<Self::Grid as Grid>::T as RlstScalar>::Real],
     );
 
     /// Write the jacobians at the physical points for the cell with index `cell_index` into `value`
@@ -33,15 +33,15 @@ pub trait ReferenceMapType {
     fn jacobian(
         &self,
         cell_index: usize,
-        value: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real],
+        value: &mut [<<Self::Grid as Grid>::T as RlstScalar>::Real],
     );
 
     /// Write the normals at the physical points for the cell with index `cell_index` into `value`
     ///
-    /// `value` should have shape [npts, physical_dimension] and use column-major ordering
+    /// `value` should have shape [physical_dimension, npts] and use column-major ordering
     fn normal(
         &self,
         cell_index: usize,
-        value: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real],
+        value: &mut [<<Self::Grid as Grid>::T as RlstScalar>::Real],
     );
 }

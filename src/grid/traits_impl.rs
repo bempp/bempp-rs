@@ -1,10 +1,10 @@
 //! Implementing the grid traits from the topology and geometry traits used to store the grid data
 
 use crate::element::reference_cell;
-use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
+// use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::element::FiniteElement;
 use crate::traits::grid::{
-    CellType, EdgeType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
+    CellType, EdgeType, GeometryType, Grid, PointType, ReferenceMapType, TopologyType,
 };
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 #[cfg(feature = "mpi")]
@@ -289,7 +289,7 @@ impl<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> ReferenceMapTyp
         self.evaluator.point_count()
     }
 
-    fn reference_to_physical(&self, cell_index: usize, value: &mut [<Self::Grid as GridType>::T]) {
+    fn reference_to_physical(&self, cell_index: usize, value: &mut [<Self::Grid as Grid>::T]) {
         self.evaluator.compute_points(cell_index, value);
     }
 
@@ -302,7 +302,7 @@ impl<'a, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> ReferenceMapTyp
     }
 }
 
-impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> GridType for GridImpl
+impl<'grid, T: Float + RlstScalar<Real = T>, GridImpl: Grid<T = T>> Grid for GridImpl
 where
     GridImpl: 'grid,
 {
@@ -427,7 +427,7 @@ where
 }
 
 #[cfg(feature = "mpi")]
-impl<'comm, T: RlstScalar<Real = T> + Float, C: Communicator, G: Grid<T = T> + GridType<T = T>>
+impl<'comm, T: RlstScalar<Real = T> + Float, C: Communicator, G: Grid<T = T> + Grid<T = T>>
     ParallelGridType for ParallelGrid<'comm, C, G>
 {
     type Comm = C;

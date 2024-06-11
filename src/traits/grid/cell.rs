@@ -1,20 +1,20 @@
 //! Definition of a cell.
 
-use super::GridType;
+use super::Grid;
 use crate::traits::types::{Ownership, ReferenceCellType};
 use rlst::RlstScalar;
 
-pub trait CellType {
+pub trait Cell {
     //! A cell
 
     /// The type of the grid that the cell is part of
-    type Grid: GridType;
+    type Grid: Grid;
     /// The type of the cell topology
-    type Topology<'a>: TopologyType
+    type Topology<'a>: Topology
     where
         Self: 'a;
     /// The type of the cell geometry
-    type Geometry<'a>: GeometryType
+    type Geometry<'a>: Geometry
     where
         Self: 'a;
 
@@ -37,11 +37,11 @@ pub trait CellType {
     fn ownership(&self) -> Ownership;
 }
 
-pub trait TopologyType {
+pub trait Topology {
     //! Cell topology
 
     /// The type of the grid that the cell is part of
-    type Grid: GridType;
+    type Grid: Grid;
     /// The type of the iterator over vertices
     type VertexIndexIter<'a>: std::iter::Iterator<Item = usize>
     where
@@ -68,17 +68,17 @@ pub trait TopologyType {
     fn cell_type(&self) -> ReferenceCellType;
 }
 
-pub trait GeometryType {
+pub trait Geometry {
     //! Cell geometry
 
     /// The type of the grid that the cell is part of
-    type Grid: GridType;
+    type Grid: Grid;
     /// Type of iterator over vertices
-    type VertexIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as GridType>::Point<'iter>>
+    type VertexIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as Grid>::Point<'iter>>
     where
         Self: 'iter;
     /// Type of iterator over points
-    type PointIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as GridType>::Point<'iter>>
+    type PointIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as Grid>::Point<'iter>>
     where
         Self: 'iter;
 
@@ -86,13 +86,13 @@ pub trait GeometryType {
     fn physical_dimension(&self) -> usize;
 
     /// The midpoint of the cell
-    fn midpoint(&self, point: &mut [<<Self::Grid as GridType>::T as RlstScalar>::Real]);
+    fn midpoint(&self, point: &mut [<<Self::Grid as Grid>::T as RlstScalar>::Real]);
 
     /// The diameter of the cell
-    fn diameter(&self) -> <<Self::Grid as GridType>::T as RlstScalar>::Real;
+    fn diameter(&self) -> <<Self::Grid as Grid>::T as RlstScalar>::Real;
 
     /// The volume of the cell
-    fn volume(&self) -> <<Self::Grid as GridType>::T as RlstScalar>::Real;
+    fn volume(&self) -> <<Self::Grid as Grid>::T as RlstScalar>::Real;
 
     /// The vertices of the cell
     ///

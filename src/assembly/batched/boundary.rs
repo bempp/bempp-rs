@@ -1,7 +1,7 @@
 //! Batched dense assembly of boundary operators
 use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData};
 use crate::element::reference_cell;
-use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
+use crate::grid::common::{compute_integration_element, compute_normals_from_jacobians23};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
@@ -251,9 +251,9 @@ fn assemble_batch_nonadjacent<
     let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut test_jdet = vec![zero; npts_test];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_jacobians = rlst_dynamic_array3!(T::Real, [3, 2, npts_test]);
 
     let test_evaluator = test_grid.reference_to_physical_map(test_points.data());
     let trial_evaluator = trial_grid.reference_to_physical_map(trial_points.data());
@@ -263,17 +263,18 @@ fn assemble_batch_nonadjacent<
     let mut trial_normals = vec![];
     let mut trial_jacobians = vec![];
     for _i in 0..trial_cells.len() {
-        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
-        trial_normals.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
-        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [npts_trial, 6]));
+        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
+        trial_normals.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
+        trial_jacobians.push(rlst_dynamic_array3!(T::Real, [3, 2, npts_trial]));
     }
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
         trial_evaluator.jacobian(*trial_cell, trial_jacobians[trial_cell_i].data_mut());
-        compute_dets23(
+        compute_integration_element(
             trial_jacobians[trial_cell_i].data(),
             &mut trial_jdet[trial_cell_i],
         );
+
         compute_normals_from_jacobians23(
             trial_jacobians[trial_cell_i].data(),
             trial_normals[trial_cell_i].data_mut(),
@@ -1176,49 +1177,44 @@ pub trait BatchedAssembler: Sync + Sized {
 
         for test_cell_type in test_space.grid().cell_types() {
             let npts_test = self.options().quadrature_degrees[test_cell_type];
+
+            let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
+            let mut qpoints_test =
+                rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
+            for (out_elem, &in_elem) in
+                itertools::izip!(qpoints_test.data_mut(), qrule_test.points.iter())
+            {
+                *out_elem = num::cast::<f64, <Self::T as RlstScalar>::Real>(in_elem).unwrap();
+            }
+            let qweights_test: Vec<<Self::T as RlstScalar>::Real> = qrule_test
+                .weights
+                .iter()
+                .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                .collect();
+
+            let test_element = test_space.element(*test_cell_type);
+            let mut test_table = rlst_dynamic_array4!(
+                Self::T,
+                test_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
+            );
+            test_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
+
             for trial_cell_type in trial_space.grid().cell_types() {
                 let npts_trial = self.options().quadrature_degrees[trial_cell_type];
-                let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
-                let mut qpoints_test =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
-                for i in 0..npts_test {
-                    for j in 0..2 {
-                        *qpoints_test.get_mut([i, j]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
-                                qrule_test.points[2 * i + j],
-                            )
-                            .unwrap();
-                    }
-                }
-                let qweights_test = qrule_test
-                    .weights
-                    .iter()
-                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
-                    .collect::<Vec<_>>();
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut qpoints_trial =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
-                for i in 0..npts_trial {
-                    for j in 0..2 {
-                        *qpoints_trial.get_mut([i, j]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
-                                qrule_trial.points[2 * i + j],
-                            )
-                            .unwrap();
-                    }
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
+                for (out_elem, &in_elem) in
+                    itertools::izip!(qpoints_trial.data_mut(), qrule_trial.points.iter())
+                {
+                    *out_elem = num::cast::<f64, <Self::T as RlstScalar>::Real>(in_elem).unwrap();
                 }
+
                 let qweights_trial = qrule_trial
                     .weights
                     .iter()
                     .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
                     .collect::<Vec<_>>();
-
-                let test_element = test_space.element(*test_cell_type);
-                let mut test_table = rlst_dynamic_array4!(
-                    Self::T,
-                    test_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
-                );
-                test_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
 
                 let trial_element = trial_space.element(*trial_cell_type);
                 let mut trial_table = rlst_dynamic_array4!(

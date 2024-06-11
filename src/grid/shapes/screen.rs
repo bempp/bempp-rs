@@ -3,7 +3,7 @@
 use crate::grid::flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder};
 // use crate::grid::mixed_grid::{MixedGrid, MixedGridBuilder};
 // use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
-use crate::traits::{grid::Builder, types::ReferenceCellType};
+use crate::traits::types::ReferenceCellType;
 use num::Float;
 use rlst::{LinAlg, RlstScalar};
 /// Create a square grid with triangle cells
@@ -171,7 +171,7 @@ pub fn screen_triangles<T: LinAlg + Float + RlstScalar<Real = T>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::grid::{GridType, ReferenceMapType};
+    use crate::traits::grid::{Grid, ReferenceMap};
 
     #[test]
     fn test_screen_triangles() {

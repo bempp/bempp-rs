@@ -1,21 +1,21 @@
 //! Iterator over points
 
-use crate::traits::grid::GridType;
+use crate::traits::grid::Grid;
 
 /// An iterator over points
-pub struct PointIterator<'a, Grid: GridType, Iter: std::iter::Iterator<Item = usize>> {
+pub struct PointIterator<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> {
     iter: Iter,
     grid: &'a Grid,
 }
 
-impl<'a, Grid: GridType, Iter: std::iter::Iterator<Item = usize>> PointIterator<'a, Grid, Iter> {
+impl<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> PointIterator<'a, Grid, Iter> {
     /// Create an iterator over points
     pub fn new(iter: Iter, grid: &'a Grid) -> Self {
         Self { iter, grid }
     }
 }
 
-impl<'a, Grid: GridType, Iter: std::iter::Iterator<Item = usize>> std::iter::Iterator
+impl<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> std::iter::Iterator
     for PointIterator<'a, Grid, Iter>
 {
     type Item = Grid::Point<'a>;

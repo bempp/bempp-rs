@@ -3,7 +3,7 @@
 use crate::element::ciarlet::CiarletElement;
 use crate::traits::{
     element::{ElementFamily, FiniteElement},
-    grid::{CellType, EdgeType, GridType, PointType, TopologyType},
+    grid::{Cell, Edge, Grid, Point, Topology},
     types::Ownership,
 };
 use rlst::RlstScalar;
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 type DofList = Vec<Vec<usize>>;
 type OwnerData = Vec<(usize, usize, usize, usize)>;
 
-pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
+pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: Grid<T = T::Real>>(
     rank: usize,
     grid: &GridImpl,
     e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
@@ -142,7 +142,7 @@ mod test {
     // use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
     use crate::traits::element::Continuity;
 
-    fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
+    fn run_test(grid: &impl Grid<T = f64>, degree: usize, continuity: Continuity) {
         let family = LagrangeElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 
@@ -166,7 +166,7 @@ mod test {
         }
     }
 
-    fn run_test_rt(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
+    fn run_test_rt(grid: &impl Grid<T = f64>, degree: usize, continuity: Continuity) {
         let family = RaviartThomasElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 
