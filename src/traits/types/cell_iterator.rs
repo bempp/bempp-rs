@@ -3,22 +3,22 @@
 use crate::traits::grid::Grid;
 
 /// A cell iterator
-pub struct CellIterator<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> {
+pub struct CellIterator<'a, G: Grid, Iter: std::iter::Iterator<Item = usize>> {
     iter: Iter,
-    grid: &'a Grid,
+    grid: &'a G,
 }
 
-impl<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> CellIterator<'a, Grid, Iter> {
+impl<'a, G: Grid, Iter: std::iter::Iterator<Item = usize>> CellIterator<'a, G, Iter> {
     /// Create a cell iterator
-    pub fn new(iter: Iter, grid: &'a Grid) -> Self {
+    pub fn new(iter: Iter, grid: &'a G) -> Self {
         CellIterator { iter, grid }
     }
 }
 
-impl<'a, Grid: Grid, Iter: std::iter::Iterator<Item = usize>> std::iter::Iterator
-    for CellIterator<'a, Grid, Iter>
+impl<'a, G: Grid, Iter: std::iter::Iterator<Item = usize>> std::iter::Iterator
+    for CellIterator<'a, G, Iter>
 {
-    type Item = Grid::Cell<'a>;
+    type Item = G::Cell<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(index) = self.iter.next() {

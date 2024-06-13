@@ -1,34 +1,30 @@
 //! Definition of a grid
 
-use super::{Cell, Edge, Point, ReferenceMap};
-use crate::traits::types::{CellIterator, CellLocalIndexPair, PointIterator, ReferenceCellType};
+use super::{Cell, Edge, ReferenceMap};
+use crate::traits::types::{CellIterator, CellLocalIndexPair, ReferenceCellType, VertexIterator};
 use rlst::RlstScalar;
 
 pub trait Grid: std::marker::Sized {
     //! A grid
 
     /// The floating point type used for coordinates
-    type T: RlstScalar;
+    type T: num::Float + RlstScalar<Real = Self::T>;
+
     /// The type used for a point
-    type Point<'a>: Point
+    type Vertex<'a>: super::Vertex
     where
         Self: 'a;
-    /// The type used for a vertex
-    ///
-    /// Vertices are the points that are at the vertex of a cell in the grid
-    type Vertex<'a>: Point
-    where
-        Self: 'a;
-    /// The type used for an edge
-    ///
-    /// Vertices are the points that are at the vertex of a cell in the grid
+
+    /// The edge type.    
     type Edge<'a>: Edge
     where
         Self: 'a;
+
     /// The type used for a cell
     type Cell<'a>: Cell<Grid = Self>
     where
         Self: 'a;
+
     /// The type of a reference map
     type ReferenceMap<'a>: ReferenceMap<Grid = Self>
     where
@@ -39,22 +35,16 @@ pub trait Grid: std::marker::Sized {
     /// The vertices are the points at the corners of the cell
     fn number_of_vertices(&self) -> usize;
 
-    /// The number of points in the grid
-    ///
-    /// The points are all points used to define the cell. For curved cells, this includes points on the edges and interior
-    fn number_of_points(&self) -> usize;
+    fn number_of_corner_vertices(&self) -> usize;
+
+    /// Get coordinates of a point.
+    fn coordinates_from_vertex_index(&self, index: usize) -> [Self::T; 3];
 
     /// The number of edges in the grid
     fn number_of_edges(&self) -> usize;
 
     /// The number of cells in the grid
     fn number_of_cells(&self) -> usize;
-
-    /// Get the index of a point from its id
-    fn point_index_from_id(&self, id: usize) -> usize;
-
-    /// Get the id of a point from its index
-    fn point_id_from_index(&self, index: usize) -> usize;
 
     /// Get the index of a vertex from its id
     fn vertex_index_from_id(&self, id: usize) -> usize;
@@ -69,7 +59,7 @@ pub trait Grid: std::marker::Sized {
     fn cell_id_from_index(&self, index: usize) -> usize;
 
     /// Get a point from its index
-    fn point_from_index(&self, index: usize) -> Self::Point<'_>;
+    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_>;
 
     /// Get a vertex from its index
     fn edge_from_index(&self, index: usize) -> Self::Edge<'_>;
@@ -78,16 +68,16 @@ pub trait Grid: std::marker::Sized {
     fn cell_from_index(&self, index: usize) -> Self::Cell<'_>;
 
     /// Get an iterator for a subset of points in the grid
-    fn iter_points<Iter: std::iter::Iterator<Item = usize>>(
+    fn iter_vertices<Iter: std::iter::Iterator<Item = usize>>(
         &self,
         index_iter: Iter,
-    ) -> PointIterator<'_, Self, Iter> {
-        PointIterator::new(index_iter, self)
+    ) -> VertexIterator<'_, Self, Iter> {
+        VertexIterator::new(index_iter, self)
     }
 
     /// Get an iterator for all points in the grid
-    fn iter_all_points(&self) -> PointIterator<'_, Self, std::ops::Range<usize>> {
-        self.iter_points(0..self.number_of_points())
+    fn iter_all_vertices(&self) -> VertexIterator<'_, Self, std::ops::Range<usize>> {
+        self.iter_vertices(0..self.number_of_vertices())
     }
 
     /// Get an iterator for a subset of cells in the grid

@@ -1,13 +1,15 @@
 //! Definition of an edge.
 
-use crate::traits::types::Ownership;
-
 pub trait Edge {
     //! An edge
 
-    /// The index of the edge
+    type Iter<'a>: std::iter::Iterator<Item = usize>
+    where
+        Self: 'a;
+
+    /// The index of the edge.
     fn index(&self) -> usize;
 
-    /// Get the point's ownership
-    fn ownership(&self) -> Ownership;
+    /// The points associated with the edge.
+    fn vertices(&self) -> Self::Iter<'_>;
 }

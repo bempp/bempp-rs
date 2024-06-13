@@ -33,7 +33,7 @@ pub trait Cell {
     /// Get the cell's geometry
     fn geometry(&self) -> Self::Geometry<'_>;
 
-    /// Get the point's ownership
+    /// Get the cell's ownership
     fn ownership(&self) -> Ownership;
 }
 
@@ -50,19 +50,12 @@ pub trait Topology {
     type EdgeIndexIter<'a>: std::iter::Iterator<Item = usize>
     where
         Self: 'a;
-    /// The type of the iterator over faces
-    type FaceIndexIter<'a>: std::iter::Iterator<Item = usize>
-    where
-        Self: 'a;
 
     /// Get an iterator over the vertices of the cell
     fn vertex_indices(&self) -> Self::VertexIndexIter<'_>;
 
     /// Get an iterator over the edges of the cell
     fn edge_indices(&self) -> Self::EdgeIndexIter<'_>;
-
-    /// Get an iterator over the faces of the cell
-    fn face_indices(&self) -> Self::FaceIndexIter<'_>;
 
     /// The cell type
     fn cell_type(&self) -> ReferenceCellType;
@@ -74,11 +67,7 @@ pub trait Geometry {
     /// The type of the grid that the cell is part of
     type Grid: Grid;
     /// Type of iterator over vertices
-    type VertexIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as Grid>::Point<'iter>>
-    where
-        Self: 'iter;
-    /// Type of iterator over points
-    type PointIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as Grid>::Point<'iter>>
+    type VertexIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as Grid>::Vertex<'iter>>
     where
         Self: 'iter;
 
@@ -94,13 +83,11 @@ pub trait Geometry {
     /// The volume of the cell
     fn volume(&self) -> <<Self::Grid as Grid>::T as RlstScalar>::Real;
 
+    /// The corner vertices of the cell
+    ///
+    fn corner_vertices(&self) -> Self::VertexIterator<'_>;
+
     /// The vertices of the cell
     ///
-    /// The vertices are the points at the corners of the cell
     fn vertices(&self) -> Self::VertexIterator<'_>;
-
-    /// The points of the cell
-    ///
-    /// The points are all points used to define the cell. For curved cells, this includes points on the edges and interior
-    fn points(&self) -> Self::PointIterator<'_>;
 }

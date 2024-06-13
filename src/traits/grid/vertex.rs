@@ -1,9 +1,8 @@
 //! Definition of a vertex
 
-use crate::traits::types::Ownership;
 use rlst::RlstScalar;
 
-pub trait Point {
+pub trait Vertex {
     //! A point
 
     /// The floating point type used for coordinates

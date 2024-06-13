@@ -11,3 +11,4 @@ pub mod element;
 pub mod grid;
 pub mod quadrature;
 pub mod traits;
+pub mod types;

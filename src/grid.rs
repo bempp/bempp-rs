@@ -1,7 +1,6 @@
 //! Grid creation and storage
 
 // pub mod common;
-pub mod entities;
 pub mod flat_triangle_grid;
 // pub mod io;
 //pub mod mixed_grid;

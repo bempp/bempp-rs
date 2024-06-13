@@ -1,11 +1,13 @@
 //! General type definitions
 mod cell;
 mod cell_iterator;
-mod point_iterator;
+mod edge_iterator;
+mod vertex_iterator;
 
 pub use cell::*;
 pub use cell_iterator::*;
-pub use point_iterator::*;
+pub use edge_iterator::*;
+pub use vertex_iterator::*;
 
 /// Ownership
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
