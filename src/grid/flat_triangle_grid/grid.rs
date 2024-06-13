@@ -5,6 +5,7 @@ use crate::element::reference_cell;
 // use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::grid::Grid;
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
+use crate::types::{IntegerArray2, RealScalar};
 use itertools::Itertools;
 use num::Float;
 use rlst::prelude::*;
@@ -15,10 +16,10 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 /// A flat triangle grid
-pub struct FlatTriangleGrid<T: LinAlg + Float + RlstScalar<Real = T>> {
+pub struct FlatTriangleGrid<T: RealScalar> {
     // Geometry information
     vertices: DynamicArray<T, 2>,
-    cells: Vec<usize>,
+    cells: IntegerArray2,
     midpoints: Vec<rlst_static_type!(T, 3)>,
     diameters: Vec<T>,
     volumes: Vec<T>,
@@ -26,9 +27,10 @@ pub struct FlatTriangleGrid<T: LinAlg + Float + RlstScalar<Real = T>> {
     jacobians: Vec<rlst_static_type!(T, 3, 2)>,
 
     // Topological information
-    cell_vertices: DynamicArray<T, 2>,
-    cell_edges: DynamicArray<T, 2>,
-    edge_vertices: DynamicArray<T, 2>,
+    cell_edges: IntegerArray2,
+    edge_to_vertices: IntegerArray2,
+    edge_to_cells: HashMap<usize, Vec<(usize, usize)>>,
+    vertex_to_cells: HashMap<usize, Vec<(usize, usize)>>,
     entity_types: Vec<ReferenceCellType>,
 
     // Point, edge and cell ids
@@ -38,31 +40,32 @@ pub struct FlatTriangleGrid<T: LinAlg + Float + RlstScalar<Real = T>> {
     cell_ids_to_indices: HashMap<usize, usize>,
 }
 
-impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
+impl<T: RealScalar> FlatTriangleGrid<T> {
     /// Create a flat triangle grid
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        vertices: DynamicArray<T, 2>,
+        vertices: &[T],
         cells: &[usize],
-        point_indices_to_ids: Vec<usize>,
-        point_ids_to_indices: HashMap<usize, usize>,
-        cell_indices_to_ids: Vec<usize>,
-        cell_ids_to_indices: HashMap<usize, usize>,
+        vertex_ids: &Vec<usize>,
+        cell_ids: &Vec<usize>,
     ) -> Self {
-        assert_eq!(vertices.shape()[0], 3);
+        assert_eq!(vertices.len() % 3, 0);
         assert_eq!(cells.len() % 3, 0);
-
-        let cells = cells.to_vec();
+        let nvertices = vertices.len() / 3;
         let ncells = cells.len() / 3;
 
-        let nvertices = vertices.shape()[1];
-
+        let vertices = {
+            let tmp = rlst_dynamic_array2!(T, [3, nvertices]);
+            tmp.data_mut().clone_from_slice(vertices);
+            tmp
+        };
+        let cells = IntegerArray2::new_from_slice(cells, [3, ncells]);
         // Compute geometry
 
         let mut midpoints = rlst_dynamic_array2!(T, [3, ncells]);
         let mut diameters = rlst_dynamic_array1!(T, [ncells]);
         let mut volumes = rlst_dynamic_array1!(T, [ncells]);
-        let mut normals = rlst_dynamic_array2!(T, [3, 2 * ncells]);
+        let mut normals = rlst_dynamic_array2!(T, [3, ncells]);
         let mut jacobians = rlst_dynamic_array2!(T, [3, 2 * ncells]);
 
         let mut a = rlst_static_array!(T, 3);
@@ -77,12 +80,96 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
             midpoints.col_iter_mut(),
             diameters.iter_mut(),
             volumes.iter_mut(),
-            normals.col_iter_mut().chunks(2),
-            jacobians.col_iter_mut().chunks(2),
-            cells.as_slice().iter().chunks(3),
+            normals.col_iter_mut(),
+            jacobians.col_iter_mut().tuples::<(_, _)>(),
+            cells.col_iter(),
         ) {
-            // let cell: [usize; 3] = ;
+            let cell: [usize; 3] = cell.try_into().unwrap();
+
+            v0.fill_from(vertices.view().slice(1, cell[0]));
+            v1.fill_from(vertices.view().slice(1, cell[1]));
+            v2.fill_from(vertices.view().slice(1, cell[2]));
+
+            midpoint.fill_from(
+                (v0.view() + v1.view() + v2.view()).scalar_mul(T::from(1.0 / 3.0).unwrap()),
+            );
+
+            a.fill_from(v1.view() - v0.view());
+            b.fill_from(v2.view() - v0.view());
+            c.fill_from(v2.view() - v1.view());
+            jacobian.0.fill_from(a.view());
+            jacobian.1.fill_from(b.view());
+
+            a.cross(b.view(), normal.view_mut());
+
+            let normal_length = normal.view().norm_2();
+            normals.scale_inplace(T::one() / normal_length);
+
+            *volume = normal_length / T::from(2.0).unwrap();
+            *diameter = compute_diameter_triangle(v0.view(), v1.view(), v2.view());
         }
+
+        // Compute topology
+        let entity_types = vec![
+            ReferenceCellType::Point,
+            ReferenceCellType::Interval,
+            ReferenceCellType::Triangle,
+        ];
+
+        let mut edge_indices = HashMap::<(usize, usize), usize>::new();
+
+        let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
+        let edge_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>> = HashMap::new();
+        let edge_to_vertices = Vec::<usize>::new();
+        let vertex_to_cells = HashMap::<usize, Vec<CellLocalIndexPair<usize>>>::new();
+
+        for (cell_index, cell) in cells.col_iter().enumerate() {
+            // Associate cell to adjacent vertices
+
+            for (vertex_local_index, vertex) in cell.iter().enumerate() {
+                if let Some(vertex_pair_list) = vertex_to_cells.get(vertex) {
+                    vertex_pair_list.push(CellLocalIndexPair::new(cell_index, vertex_local_index));
+                } else {
+                    vertex_to_cells.insert(
+                        *vertex,
+                        vec![CellLocalIndexPair::new(cell_index, vertex_local_index)],
+                    );
+                }
+            }
+
+            for (local_index, rc) in ref_conn.iter().enumerate() {
+                let first = cell[rc[0][0]];
+                let second = cell[rc[0][1]];
+                if first > second {
+                    std::mem::swap(&mut first, &mut second);
+                }
+                if let Some(edge_index) = edge_indices.get((first, second)) {
+                    edge_to_cells[edge_index]
+                        .push(CellLocalIndexPair::new(cell_index, local_index));
+                } else {
+                    let edge_index = edge_indices.len();
+                    edge_indices.insert((first, second), edge_index);
+                    edge_to_cells.insert(
+                        edge_index,
+                        vec![CellLocalIndexPair::new(cell_index, local_index)],
+                    );
+                    edge_to_vertices.push(first);
+                    edge_to_vertices.push(second);
+                }
+            }
+        }
+
+        let edge_to_vertices = IntegerArray2::new_from_slice(
+            edge_to_vertices.as_slice(),
+            [2, edge_to_vertices.len() / 2],
+        );
+
+        // // Topological information
+        // cell_edges: IntegerArray2,
+        // edge_to_vertices: IntegerArray2,
+        // edge_to_cells: HashMap<usize, Vec<(usize, usize)>>,
+        // vertex_to_cells: HashMap<usize, Vec<(usize, usize)>>,
+        // entity_types: Vec<ReferenceCellType>,
 
         // for cell_i in 0..ncells {
 
@@ -90,9 +177,9 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
         //     v1.fill_from(coordinates.view().slice(1, cells[3 * cell_i + 1]));
         //     v2.fill_from(coordinates.view().slice(1, cells[3 * cell_i + 2]));
 
-        //     midpoints[cell_i].fill_from(
-        //         (v0.view() + v1.view() + v2.view()).scalar_mul(T::from(1.0 / 3.0).unwrap()),
-        //     );
+        // midpoints[cell_i].fill_from(
+        //     (v0.view() + v1.view() + v2.view()).scalar_mul(T::from(1.0 / 3.0).unwrap()),
+        // );
 
         //     a.fill_from(v1.view() - v0.view());
         //     b.fill_from(v2.view() - v0.view());
@@ -463,20 +550,20 @@ impl<T: LinAlg + Float + RlstScalar<Real = T>> FlatTriangleGrid<T> {
 //     }
 // }
 
-// /// Compute the diameter of a triangle
-// fn compute_diameter_triangle<
-//     T: Float + Float + RlstScalar<Real = T>,
-//     ArrayImpl: UnsafeRandomAccessByValue<1, Item = T> + Shape<1>,
-// >(
-//     v0: Array<T, ArrayImpl, 1>,
-//     v1: Array<T, ArrayImpl, 1>,
-//     v2: Array<T, ArrayImpl, 1>,
-// ) -> T {
-//     let a = (v0.view() - v1.view()).norm_2();
-//     let b = (v0 - v2.view()).norm_2();
-//     let c = (v1 - v2).norm_2();
-//     RlstScalar::sqrt((b + c - a) * (a + c - b) * (a + b - c) / (a + b + c))
-// }
+/// Compute the diameter of a triangle
+fn compute_diameter_triangle<
+    T: Float + Float + RlstScalar<Real = T>,
+    ArrayImpl: UnsafeRandomAccessByValue<1, Item = T> + Shape<1>,
+>(
+    v0: Array<T, ArrayImpl, 1>,
+    v1: Array<T, ArrayImpl, 1>,
+    v2: Array<T, ArrayImpl, 1>,
+) -> T {
+    let a = (v0.view() - v1.view()).norm_2();
+    let b = (v0 - v2.view()).norm_2();
+    let c = (v1 - v2).norm_2();
+    RlstScalar::sqrt((b + c - a) * (a + c - b) * (a + b - c) / (a + b + c))
+}
 
 // #[cfg(test)]
 // mod test {

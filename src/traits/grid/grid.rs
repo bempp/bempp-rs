@@ -1,14 +1,17 @@
 //! Definition of a grid
 
 use super::{Cell, Edge, ReferenceMap};
-use crate::traits::types::{CellIterator, CellLocalIndexPair, ReferenceCellType, VertexIterator};
+use crate::{
+    traits::types::{CellIterator, CellLocalIndexPair, ReferenceCellType, VertexIterator},
+    types::RealScalar,
+};
 use rlst::RlstScalar;
 
 pub trait Grid: std::marker::Sized {
     //! A grid
 
     /// The floating point type used for coordinates
-    type T: num::Float + RlstScalar<Real = Self::T>;
+    type T: RealScalar;
 
     /// The type used for a point
     type Vertex<'a>: super::Vertex
