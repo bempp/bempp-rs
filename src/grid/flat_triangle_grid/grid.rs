@@ -20,22 +20,22 @@ pub struct FlatTriangleGrid<T: RealScalar> {
     // Geometry information
     vertices: DynamicArray<T, 2>,
     cells: IntegerArray2,
-    midpoints: Vec<rlst_static_type!(T, 3)>,
-    diameters: Vec<T>,
-    volumes: Vec<T>,
-    normals: Vec<rlst_static_type!(T, 3)>,
-    jacobians: Vec<rlst_static_type!(T, 3, 2)>,
+    midpoints: DynamicArray<T, 2>,
+    diameters: DynamicArray<T, 1>,
+    volumes: DynamicArray<T, 1>,
+    normals: DynamicArray<T, 2>,
+    jacobians: DynamicArray<T, 2>,
 
     // Topological information
-    cell_edges: IntegerArray2,
+    cells_to_edges: IntegerArray2,
     edge_to_vertices: IntegerArray2,
-    edge_to_cells: HashMap<usize, Vec<(usize, usize)>>,
-    vertex_to_cells: HashMap<usize, Vec<(usize, usize)>>,
+    edge_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>>,
+    vertex_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>>,
     entity_types: Vec<ReferenceCellType>,
 
     // Point, edge and cell ids
-    point_indices_to_ids: Vec<usize>,
-    point_ids_to_indices: HashMap<usize, usize>,
+    vertex_indices_to_ids: Vec<usize>,
+    vertex_ids_to_indices: HashMap<usize, usize>,
     cell_indices_to_ids: Vec<usize>,
     cell_ids_to_indices: HashMap<usize, usize>,
 }
@@ -43,19 +43,14 @@ pub struct FlatTriangleGrid<T: RealScalar> {
 impl<T: RealScalar> FlatTriangleGrid<T> {
     /// Create a flat triangle grid
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        vertices: &[T],
-        cells: &[usize],
-        vertex_ids: &Vec<usize>,
-        cell_ids: &Vec<usize>,
-    ) -> Self {
+    pub fn new(vertices: &[T], cells: &[usize], vertex_ids: &[usize], cell_ids: &[usize]) -> Self {
         assert_eq!(vertices.len() % 3, 0);
         assert_eq!(cells.len() % 3, 0);
         let nvertices = vertices.len() / 3;
         let ncells = cells.len() / 3;
 
         let vertices = {
-            let tmp = rlst_dynamic_array2!(T, [3, nvertices]);
+            let mut tmp = rlst_dynamic_array2!(T, [3, nvertices]);
             tmp.data_mut().clone_from_slice(vertices);
             tmp
         };
@@ -76,7 +71,7 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
         let mut v1 = rlst_static_array!(T, 3);
         let mut v2 = rlst_static_array!(T, 3);
 
-        for (midpoint, diameter, volume, normal, jacobian, cell) in itertools::izip!(
+        for (mut midpoint, diameter, volume, mut normal, mut jacobian, cell) in itertools::izip!(
             midpoints.col_iter_mut(),
             diameters.iter_mut(),
             volumes.iter_mut(),
@@ -103,7 +98,7 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
             a.cross(b.view(), normal.view_mut());
 
             let normal_length = normal.view().norm_2();
-            normals.scale_inplace(T::one() / normal_length);
+            normal.scale_inplace(T::one() / normal_length);
 
             *volume = normal_length / T::from(2.0).unwrap();
             *diameter = compute_diameter_triangle(v0.view(), v1.view(), v2.view());
@@ -119,15 +114,15 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
         let mut edge_indices = HashMap::<(usize, usize), usize>::new();
 
         let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
-        let edge_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>> = HashMap::new();
-        let edge_to_vertices = Vec::<usize>::new();
-        let vertex_to_cells = HashMap::<usize, Vec<CellLocalIndexPair<usize>>>::new();
+        let mut edge_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>> = HashMap::new();
+        let mut edge_to_vertices = Vec::<usize>::new();
+        let mut vertex_to_cells = HashMap::<usize, Vec<CellLocalIndexPair<usize>>>::new();
+        let mut cells_to_edges = IntegerArray2::new([3, ncells]);
 
         for (cell_index, cell) in cells.col_iter().enumerate() {
-            // Associate cell to adjacent vertices
-
+            // Associate cell to adjacent vertices.
             for (vertex_local_index, vertex) in cell.iter().enumerate() {
-                if let Some(vertex_pair_list) = vertex_to_cells.get(vertex) {
+                if let Some(vertex_pair_list) = vertex_to_cells.get_mut(vertex) {
                     vertex_pair_list.push(CellLocalIndexPair::new(cell_index, vertex_local_index));
                 } else {
                     vertex_to_cells.insert(
@@ -137,15 +132,19 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
                 }
             }
 
+            // Associate the edges.
             for (local_index, rc) in ref_conn.iter().enumerate() {
-                let first = cell[rc[0][0]];
-                let second = cell[rc[0][1]];
+                let mut first = cell[rc[0][0]];
+                let mut second = cell[rc[0][1]];
                 if first > second {
                     std::mem::swap(&mut first, &mut second);
                 }
-                if let Some(edge_index) = edge_indices.get((first, second)) {
-                    edge_to_cells[edge_index]
+                if let Some(edge_index) = edge_indices.get_mut(&(first, second)) {
+                    edge_to_cells
+                        .get_mut(edge_index)
+                        .unwrap()
                         .push(CellLocalIndexPair::new(cell_index, local_index));
+                    cells_to_edges[[local_index, cell_index]] = *edge_index;
                 } else {
                     let edge_index = edge_indices.len();
                     edge_indices.insert((first, second), edge_index);
@@ -164,106 +163,139 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
             [2, edge_to_vertices.len() / 2],
         );
 
-        // // Topological information
-        // cell_edges: IntegerArray2,
-        // edge_to_vertices: IntegerArray2,
-        // edge_to_cells: HashMap<usize, Vec<(usize, usize)>>,
-        // vertex_to_cells: HashMap<usize, Vec<(usize, usize)>>,
-        // entity_types: Vec<ReferenceCellType>,
+        // Finally compute the map from indices to ids
+        let mut vertex_ids_to_indices = HashMap::<usize, usize>::new();
+        let mut cell_ids_to_indices = HashMap::<usize, usize>::new();
 
-        // for cell_i in 0..ncells {
+        for (vertex_index, vertex_id) in vertex_ids.iter().enumerate() {
+            vertex_ids_to_indices.insert(*vertex_id, vertex_index);
+        }
 
-        //     v0.fill_from(coordinates.view().slice(1, cells[3 * cell_i]));
-        //     v1.fill_from(coordinates.view().slice(1, cells[3 * cell_i + 1]));
-        //     v2.fill_from(coordinates.view().slice(1, cells[3 * cell_i + 2]));
+        for (cell_index, cell_id) in cell_ids.iter().enumerate() {
+            cell_ids_to_indices.insert(*cell_id, cell_index);
+        }
 
-        // midpoints[cell_i].fill_from(
-        //     (v0.view() + v1.view() + v2.view()).scalar_mul(T::from(1.0 / 3.0).unwrap()),
-        // );
+        Self {
+            vertices,
+            cells,
+            midpoints,
+            diameters,
+            volumes,
+            normals,
+            jacobians,
+            cells_to_edges,
+            edge_to_vertices,
+            edge_to_cells,
+            vertex_to_cells,
+            entity_types,
+            vertex_indices_to_ids: vertex_ids.to_vec(),
+            vertex_ids_to_indices,
+            cell_indices_to_ids: cell_ids.to_vec(),
+            cell_ids_to_indices,
+        }
+    }
+}
 
-        //     a.fill_from(v1.view() - v0.view());
-        //     b.fill_from(v2.view() - v0.view());
-        //     c.fill_from(v2.view() - v1.view());
-        //     jacobians[cell_i].view_mut().slice(1, 0).fill_from(a.view());
-        //     jacobians[cell_i].view_mut().slice(1, 1).fill_from(b.view());
+impl<T: RealScalar> Grid for FlatTriangleGrid<T> {
+    type T = T;
 
-        //     a.cross(b.view(), normals[cell_i].view_mut());
+    type Vertex<'a> = super::entities::Vertex<T> 
+    where
+        Self: 'a;
 
-        //     let normal_length = normals[cell_i].view().norm_2();
-        //     normals[cell_i].scale_inplace(T::one() / normal_length);
+    type Edge<'a> = super::entities::Edge<'a, T>
+    where
+        Self: 'a;
 
-        //     volumes.push(normal_length / T::from(2.0).unwrap());
-        //     diameters.push(compute_diameter_triangle(v0.view(), v1.view(), v2.view()));
-        // }
+    type Cell<'a> = super::entities::Cell<'a, T>
+    where
+        Self: 'a;
 
-        // // Compute topology
-        // let entity_types = vec![
-        //     ReferenceCellType::Point,
-        //     ReferenceCellType::Interval,
-        //     ReferenceCellType::Triangle,
-        // ];
+    type ReferenceMap<'a>
+    where
+        Self: 'a;
 
-        // let mut cells_to_entities = vec![vec![vec![]; ncells]; 3];
-        // let mut entities_to_cells = vec![vec![]; 3];
-        // let mut entities_to_vertices = vec![vec![]; 2];
+    fn number_of_vertices(&self) -> usize {
+        todo!()
+    }
 
-        // entities_to_cells[2] = vec![vec![]; ncells];
-        // entities_to_vertices[0] = (0..nvertices).map(|i| vec![i]).collect::<Vec<_>>();
-        // entities_to_cells[0] = vec![vec![]; nvertices];
+    fn number_of_corner_vertices(&self) -> usize {
+        todo!()
+    }
 
-        // for (cell_i, i) in index_map.iter_mut().enumerate() {
-        //     let cell = &cells[3 * cell_i..3 * cell_i + 3];
-        //     *i = cell_i;
-        //     for (local_index, &v) in cell.iter().enumerate() {
-        //         entities_to_cells[0][v].push(CellLocalIndexPair::new(cell_i, local_index));
-        //     }
-        //     entities_to_cells[2][cell_i] = vec![CellLocalIndexPair::new(cell_i, 0)];
-        //     cells_to_entities[0][cell_i].extend_from_slice(cell);
-        //     cells_to_entities[2][cell_i] = vec![cell_i];
-        // }
+    fn coordinates_from_vertex_index(&self, index: usize) -> [Self::T; 3] {
+        todo!()
+    }
 
-        // let mut edge_indices = HashMap::new();
-        // let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
-        // for cell_i in 0..ncells {
-        //     let cell = &cells[3 * cell_i..3 * (cell_i + 1)];
-        //     for (local_index, rc) in ref_conn.iter().enumerate() {
-        //         let mut first = cell[rc[0][0]];
-        //         let mut second = cell[rc[0][1]];
-        //         if first > second {
-        //             std::mem::swap(&mut first, &mut second);
-        //         }
-        //         if let Some(edge_index) = edge_indices.get(&(first, second)) {
-        //             cells_to_entities[1][cell_i].push(*edge_index);
-        //             entities_to_cells[1][*edge_index]
-        //                 .push(CellLocalIndexPair::new(cell_i, local_index));
-        //         } else {
-        //             let edge_index = entities_to_vertices[1].len();
-        //             edge_indices.insert((first, second), edge_index);
-        //             cells_to_entities[1][cell_i].push(entities_to_vertices[1].len());
-        //             entities_to_cells[1].push(vec![CellLocalIndexPair::new(cell_i, local_index)]);
-        //             entities_to_vertices[1].push(vec![first, second]);
-        //         }
-        //     }
-        // }
-        // Self {
-        //     index_map,
-        //     coordinates,
-        //     element,
-        //     midpoints,
-        //     diameters,
-        //     volumes,
-        //     normals,
-        //     jacobians,
-        //     cell_indices,
-        //     entities_to_vertices,
-        //     cells_to_entities,
-        //     entities_to_cells,
-        //     entity_types,
-        //     point_indices_to_ids,
-        //     point_ids_to_indices,
-        //     cell_indices_to_ids,
-        //     cell_ids_to_indices,
-        // }
+    fn number_of_edges(&self) -> usize {
+        todo!()
+    }
+
+    fn number_of_cells(&self) -> usize {
+        todo!()
+    }
+
+    fn vertex_index_from_id(&self, id: usize) -> usize {
+        todo!()
+    }
+
+    fn vertex_id_from_index(&self, index: usize) -> usize {
+        todo!()
+    }
+
+    fn cell_index_from_id(&self, id: usize) -> usize {
+        todo!()
+    }
+
+    fn cell_id_from_index(&self, index: usize) -> usize {
+        todo!()
+    }
+
+    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_> {
+        todo!()
+    }
+
+    fn edge_from_index(&self, index: usize) -> Self::Edge<'_> {
+        todo!()
+    }
+
+    fn cell_from_index(&self, index: usize) -> Self::Cell<'_> {
+        todo!()
+    }
+
+    fn reference_to_physical_map<'a>(
+        &'a self,
+        reference_points: &'a [<Self::T as RlstScalar>::Real],
+    ) -> Self::ReferenceMap<'a> {
+        todo!()
+    }
+
+    fn vertex_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>] {
+        todo!()
+    }
+
+    fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>] {
+        todo!()
+    }
+
+    fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>] {
+        todo!()
+    }
+
+    fn is_serial(&self) -> bool {
+        todo!()
+    }
+
+    fn domain_dimension(&self) -> usize {
+        todo!()
+    }
+
+    fn physical_dimension(&self) -> usize {
+        todo!()
+    }
+
+    fn cell_types(&self) -> &[ReferenceCellType] {
+        todo!()
     }
 }
 

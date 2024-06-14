@@ -1,100 +1,107 @@
-// //! Default definitions of entities.
+//! Default definitions of entities.
 
-// use std::iter::Copied;
+use std::iter::Copied;
 
-// use num::Float;
-// use rlst::{LinAlg, RlstScalar};
+use num::Float;
+use rlst::{LinAlg, RlstScalar};
 
-// use crate::{traits::grid::Grid, types::RealScalar};
+use crate::{
+    traits::{grid::Grid, types::ReferenceCellType},
+    types::RealScalar,
+};
 
-// use super::FlatTriangleGrid;
+use super::FlatTriangleGrid;
 
-// /// A point
-// pub struct Vertex<T: RealScalar> {
-//     index: usize,
-//     coordinates: [T; 3],
-// }
+/// A point
+pub struct Vertex<T: RealScalar> {
+    index: usize,
+    coordinates: [T; 3],
+}
 
-// impl<T: RealScalar> Vertex<T> {
-//     pub fn new(index: usize, coordinates: [T; 3]) -> Self {
-//         Self { index, coordinates }
-//     }
-// }
+impl<T: RealScalar> Vertex<T> {
+    pub fn new(index: usize, coordinates: [T; 3]) -> Self {
+        Self { index, coordinates }
+    }
+}
 
-// impl<T: RealScalar> crate::traits::grid::Vertex for Vertex<T> {
-//     type T = T;
+impl<T: RealScalar> crate::traits::grid::Vertex for Vertex<T> {
+    type T = T;
 
-//     fn coords(&self) -> [Self::T; 3] {
-//         self.coordinates
-//     }
+    fn coords(&self) -> [Self::T; 3] {
+        self.coordinates
+    }
 
-//     fn index(&self) -> usize {
-//         self.index
-//     }
-// }
+    fn index(&self) -> usize {
+        self.index
+    }
+}
 
-// /// An edge
-// pub struct Edge<'a, T: RealScalar> {
-//     index: usize,
-//     vertices: [usize; 2],
-//     grid: &'a FlatTriangleGrid<T>,
-// }
+/// An edge
+pub struct Edge<'a, T: RealScalar> {
+    index: usize,
+    vertices: [usize; 2],
+    grid: &'a FlatTriangleGrid<T>,
+}
 
-// impl<'a, T: RealScalar> Edge<'a, T> {
-//     pub fn new(index: usize, vertices: [usize; 2], grid: &'a FlatTriangleGrid<T>) -> Self {
-//         Self {
-//             index,
-//             vertices,
-//             grid,
-//         }
-//     }
-// }
+impl<'a, T: RealScalar> Edge<'a, T> {
+    pub fn new(index: usize, vertices: [usize; 2], grid: &'a FlatTriangleGrid<T>) -> Self {
+        Self {
+            index,
+            vertices,
+            grid,
+        }
+    }
+}
 
-// impl<'a, T: RealScalar> crate::traits::grid::Edge for Edge<'a, T> {
-//     type Iter<'b> = crate::traits::types::VertexIterator<'b, FlatTriangleGrid<T>, Copied<std::slice::Iter<'b, usize>>>
-//     where
-//         Self: 'b;
+impl<'a, T: RealScalar> crate::traits::grid::Edge for Edge<'a, T> {
+    type Grid = FlatTriangleGrid<T>;
 
-//     fn index(&self) -> usize {
-//         self.index
-//     }
+    type Iter<'b> = crate::traits::types::VertexIterator<'b, FlatTriangleGrid<T>, Copied<std::slice::Iter<'b, usize>>>
+    where
+        Self: 'b;
 
-//     fn vertices(&self) -> Self::Iter<'_> {
-//         Self::Iter::<'_>::new(self.vertices.as_slice(), self.grid)
-//     }
-// }
+    fn index(&self) -> usize {
+        self.index
+    }
 
-// pub struct Cell<'a, T: RealScalar> {
-//     index: usize,
-//     vertices: [usize; 3],
-//     grid: &'a FlatTriangleGrid<T>,
-// }
+    fn vertices(&self) -> Self::Iter<'_> {
+        Self::Iter::<'_>::new(self.vertices.as_slice().iter().copied(), self.grid)
+    }
+}
 
-// pub struct Topology<'a, T: RealScalar> {
-//     index: usize,
-//     grid: &'a FlatTriangleGrid<T>,
-// }
+pub struct Cell<'a, T: RealScalar> {
+    index: usize,
+    vertices: [usize; 3],
+    grid: &'a FlatTriangleGrid<T>,
+}
 
-// impl<'a, T: RealScalar> crate::traits::grid::Topology for Topology<'a, T> {
-//     type Grid = FlatTriangleGrid<T>;
+pub struct Topology<T: RealScalar> {
+    vertex_indices: [usize; 3],
+    edge_indices: [usize; 3],
+    cell_type: ReferenceCellType,
+    index: usize,
+}
 
-//     type VertexIndexIter<'b> = crate::traits::types::VertexIterator<'b, FlatTriangleGrid<T>, Copied<std::slice::Iter<'b, usize>>>
-//     where
-//         Self: 'b;
+impl<T: RealScalar> crate::traits::grid::Topology for Topology<T> {
+    type Grid = FlatTriangleGrid<T>;
 
-//     type EdgeIndexIter<'b> = crate::traits::types::EdgeIterator<'b, FlatTriangleGrid<T>, Copied<std::slice::Iter<'b, usize>>>
-//     where
-//         Self: 'b;
+    type VertexIndexIter<'b> = Copied<std::slice::Iter<'b, usize>>
+    where
+        Self: 'b;
 
-//     fn vertex_indices(&self) -> Self::VertexIndexIter<'_> {
-//         self
-//     }
+    type EdgeIndexIter<'b> = Copied<std::slice::Iter<'b, usize>>
+    where
+        Self: 'b;
 
-//     fn edge_indices(&self) -> Self::EdgeIndexIter<'_> {
-//         todo!()
-//     }
+    fn vertex_indices(&self) -> Self::VertexIndexIter<'_> {
+        self.vertex_indices.iter().copied()
+    }
 
-//     fn cell_type(&self) -> crate::traits::types::ReferenceCellType {
-//         todo!()
-//     }
-// }
+    fn edge_indices(&self) -> Self::EdgeIndexIter<'_> {
+        self.edge_indices.iter().copied()
+    }
+
+    fn cell_type(&self) -> crate::traits::types::ReferenceCellType {
+        todo!()
+    }
+}

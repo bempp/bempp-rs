@@ -64,7 +64,7 @@ impl std::ops::IndexMut<[usize; 2]> for IntegerArray2 {
     }
 }
 
-struct ColIter<'a> {
+pub struct ColIter<'a> {
     arr: &'a IntegerArray2,
     index: usize,
 }
@@ -84,7 +84,7 @@ impl<'a> std::iter::Iterator for ColIter<'a> {
     }
 }
 
-struct ColIterMut<'a> {
+pub struct ColIterMut<'a> {
     arr: &'a mut IntegerArray2,
     index: usize,
 }
