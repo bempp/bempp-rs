@@ -7,7 +7,7 @@ use crate::quadrature::{
         TestTrialNumericalQuadratureDefinition,
     },
 };
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 
 fn identical_quadrilaterals(
     interval_rule: &NumericalQuadratureDefinition,
@@ -328,7 +328,7 @@ pub fn quadrilateral_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
 ) -> Result<TestTrialNumericalQuadratureDefinition, QuadratureError> {
-    let rule = simplex_rule(ReferenceCellType::Interval, npoints)?;
+    let rule = simplex_rule(ReferenceCell::Interval, npoints)?;
 
     match connectivity.connectivity_dimension {
         // Identical triangles

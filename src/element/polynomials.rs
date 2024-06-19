@@ -1,6 +1,6 @@
 //! Orthonormal polynomials
 
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use rlst::RlstScalar;
 use rlst::{RandomAccessByRef, RandomAccessMut, Shape};
 /// Tabulate orthonormal polynomials on a interval
@@ -432,11 +432,11 @@ fn tabulate_legendre_polynomials_triangle<
 }
 
 /// The number of polynomials
-pub fn polynomial_count(cell_type: ReferenceCellType, degree: usize) -> usize {
+pub fn polynomial_count(cell_type: ReferenceCell, degree: usize) -> usize {
     match cell_type {
-        ReferenceCellType::Interval => degree + 1,
-        ReferenceCellType::Triangle => (degree + 1) * (degree + 2) / 2,
-        ReferenceCellType::Quadrilateral => (degree + 1) * (degree + 1),
+        ReferenceCell::Interval => degree + 1,
+        ReferenceCell::Triangle => (degree + 1) * (degree + 2) / 2,
+        ReferenceCell::Quadrilateral => (degree + 1) * (degree + 1),
         _ => {
             panic!("Unsupported cell type");
         }
@@ -444,11 +444,11 @@ pub fn polynomial_count(cell_type: ReferenceCellType, degree: usize) -> usize {
 }
 
 /// The total number of partial derivatives up to a give degree
-pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usize {
+pub fn derivative_count(cell_type: ReferenceCell, derivatives: usize) -> usize {
     match cell_type {
-        ReferenceCellType::Interval => derivatives + 1,
-        ReferenceCellType::Triangle => (derivatives + 1) * (derivatives + 2) / 2,
-        ReferenceCellType::Quadrilateral => (derivatives + 1) * (derivatives + 2) / 2,
+        ReferenceCell::Interval => derivatives + 1,
+        ReferenceCell::Triangle => (derivatives + 1) * (derivatives + 2) / 2,
+        ReferenceCell::Quadrilateral => (derivatives + 1) * (derivatives + 2) / 2,
         _ => {
             panic!("Unsupported cell type");
         }
@@ -457,7 +457,7 @@ pub fn derivative_count(cell_type: ReferenceCellType, derivatives: usize) -> usi
 
 /// The shape of a table containing the values of Legendre polynomials
 pub fn legendre_shape<T, Array2: RandomAccessByRef<2, Item = T> + Shape<2>>(
-    cell_type: ReferenceCellType,
+    cell_type: ReferenceCell,
     points: &Array2,
     degree: usize,
     derivatives: usize,
@@ -475,20 +475,20 @@ pub fn tabulate_legendre_polynomials<
     Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2>,
     Array3Mut: RandomAccessMut<3, Item = T> + RandomAccessByRef<3, Item = T> + Shape<3>,
 >(
-    cell_type: ReferenceCellType,
+    cell_type: ReferenceCell,
     points: &Array2,
     degree: usize,
     derivatives: usize,
     data: &mut Array3Mut,
 ) {
     match cell_type {
-        ReferenceCellType::Interval => {
+        ReferenceCell::Interval => {
             tabulate_legendre_polynomials_interval(points, degree, derivatives, data)
         }
-        ReferenceCellType::Triangle => {
+        ReferenceCell::Triangle => {
             tabulate_legendre_polynomials_triangle(points, degree, derivatives, data)
         }
-        ReferenceCellType::Quadrilateral => {
+        ReferenceCell::Quadrilateral => {
             tabulate_legendre_polynomials_quadrilateral(points, degree, derivatives, data)
         }
         _ => {
@@ -508,7 +508,7 @@ mod test {
     fn test_legendre_interval() {
         let degree = 6;
 
-        let rule = simplex_rule(ReferenceCellType::Interval, degree + 1).unwrap();
+        let rule = simplex_rule(ReferenceCell::Interval, degree + 1).unwrap();
 
         let mut points = rlst_dynamic_array2!(f64, [rule.npoints, 1]);
         for (i, j) in rule.points.iter().enumerate() {
@@ -517,9 +517,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Interval, &points, degree, 0,)
+            legendre_shape(ReferenceCell::Interval, &points, degree, 0,)
         );
-        tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 0, &mut data);
+        tabulate_legendre_polynomials(ReferenceCell::Interval, &points, degree, 0, &mut data);
 
         for i in 0..degree + 1 {
             for j in 0..degree + 1 {
@@ -542,7 +542,7 @@ mod test {
     fn test_legendre_triangle() {
         let degree = 5;
 
-        let rule = simplex_rule(ReferenceCellType::Triangle, 79).unwrap();
+        let rule = simplex_rule(ReferenceCell::Triangle, 79).unwrap();
         let mut points = rlst_dynamic_array2!(f64, [rule.npoints, 2]);
         for i in 0..rule.npoints {
             for j in 0..2 {
@@ -552,9 +552,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Triangle, &points, degree, 0,)
+            legendre_shape(ReferenceCell::Triangle, &points, degree, 0,)
         );
-        tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 0, &mut data);
+        tabulate_legendre_polynomials(ReferenceCell::Triangle, &points, degree, 0, &mut data);
 
         for i in 0..data.shape()[1] {
             for j in 0..data.shape()[1] {
@@ -577,7 +577,7 @@ mod test {
     fn test_legendre_quadrilateral() {
         let degree = 5;
 
-        let rule = simplex_rule(ReferenceCellType::Quadrilateral, 85).unwrap();
+        let rule = simplex_rule(ReferenceCell::Quadrilateral, 85).unwrap();
         let mut points = rlst_dynamic_array2!(f64, [rule.npoints, 2]);
         for i in 0..rule.npoints {
             for j in 0..2 {
@@ -587,15 +587,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Quadrilateral, &points, degree, 0,)
+            legendre_shape(ReferenceCell::Quadrilateral, &points, degree, 0,)
         );
-        tabulate_legendre_polynomials(
-            ReferenceCellType::Quadrilateral,
-            &points,
-            degree,
-            0,
-            &mut data,
-        );
+        tabulate_legendre_polynomials(ReferenceCell::Quadrilateral, &points, degree, 0, &mut data);
 
         for i in 0..data.shape()[1] {
             for j in 0..data.shape()[1] {
@@ -627,9 +621,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Interval, &points, degree, 1,)
+            legendre_shape(ReferenceCell::Interval, &points, degree, 1,)
         );
-        tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 1, &mut data);
+        tabulate_legendre_polynomials(ReferenceCell::Interval, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
             for k in 0..points.shape()[0] / 2 {
@@ -666,9 +660,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Triangle, &points, degree, 1,)
+            legendre_shape(ReferenceCell::Triangle, &points, degree, 1,)
         );
-        tabulate_legendre_polynomials(ReferenceCellType::Triangle, &points, degree, 1, &mut data);
+        tabulate_legendre_polynomials(ReferenceCell::Triangle, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
             for k in 0..points.shape()[0] / 3 {
@@ -710,15 +704,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Quadrilateral, &points, degree, 1,)
+            legendre_shape(ReferenceCell::Quadrilateral, &points, degree, 1,)
         );
-        tabulate_legendre_polynomials(
-            ReferenceCellType::Quadrilateral,
-            &points,
-            degree,
-            1,
-            &mut data,
-        );
+        tabulate_legendre_polynomials(ReferenceCell::Quadrilateral, &points, degree, 1, &mut data);
 
         for i in 0..degree + 1 {
             for k in 0..points.shape()[0] / 3 {
@@ -749,9 +737,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Interval, &points, degree, 3,)
+            legendre_shape(ReferenceCell::Interval, &points, degree, 3,)
         );
-        tabulate_legendre_polynomials(ReferenceCellType::Interval, &points, degree, 3, &mut data);
+        tabulate_legendre_polynomials(ReferenceCell::Interval, &points, degree, 3, &mut data);
 
         for k in 0..points.shape()[0] {
             let x = *points.get([k, 0]).unwrap();
@@ -832,15 +820,9 @@ mod test {
 
         let mut data = rlst_dynamic_array3!(
             f64,
-            legendre_shape(ReferenceCellType::Quadrilateral, &points, degree, 1,)
+            legendre_shape(ReferenceCell::Quadrilateral, &points, degree, 1,)
         );
-        tabulate_legendre_polynomials(
-            ReferenceCellType::Quadrilateral,
-            &points,
-            degree,
-            1,
-            &mut data,
-        );
+        tabulate_legendre_polynomials(ReferenceCell::Quadrilateral, &points, degree, 1, &mut data);
 
         for k in 0..points.shape()[0] {
             let x = *points.get([k, 0]).unwrap();

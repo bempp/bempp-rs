@@ -1,7 +1,9 @@
 //! Definition of a cell.
 
+use std::iter::Copied;
+
 use super::Grid;
-use crate::traits::types::{Ownership, ReferenceCellType};
+use crate::traits::types::{EdgeIterator, Ownership, PointIterator, ReferenceCell};
 use rlst::RlstScalar;
 
 pub trait Cell {
@@ -21,8 +23,11 @@ pub trait Cell {
     /// The id of the cell
     fn id(&self) -> usize;
 
-    /// The index of the cell
-    fn index(&self) -> usize;
+    /// The local index of the cell
+    fn local_index(&self) -> usize;
+
+    /// The global index of the cell
+    fn global_index(&self) -> usize;
 
     /// Get the cell's topology
     fn topology(&self) -> Self::Topology<'_>;
@@ -33,61 +38,45 @@ pub trait Cell {
     /// Get the cell's geometry
     fn geometry(&self) -> Self::Geometry<'_>;
 
-    /// Get the cell's ownership
+    /// Get the ownership of the cell
     fn ownership(&self) -> Ownership;
 }
 
+/// Cell Topology.
 pub trait Topology {
-    //! Cell topology
-
     /// The type of the grid that the cell is part of
-    type Grid: Grid;
-    /// The type of the iterator over vertices
-    type VertexIndexIter<'a>: std::iter::Iterator<Item = usize>
-    where
-        Self: 'a;
-    /// The type of the iterator over edges
-    type EdgeIndexIter<'a>: std::iter::Iterator<Item = usize>
-    where
-        Self: 'a;
+    type G: Grid;
 
     /// Get an iterator over the vertices of the cell
-    fn vertex_indices(&self) -> Self::VertexIndexIter<'_>;
+    fn points(&self) -> PointIterator<'_, Self::G, Copied<std::slice::Iter<'_, usize>>>;
+
+    /// Get an iterator over corner indices.
+    fn corner_points(&self) -> PointIterator<'_, Self::G, Copied<std::slice::Iter<'_, usize>>>;
 
     /// Get an iterator over the edges of the cell
-    fn edge_indices(&self) -> Self::EdgeIndexIter<'_>;
+    fn edges(&self) -> EdgeIterator<'_, Self::G, Copied<std::slice::Iter<'_, usize>>>;
 
     /// The cell type
-    fn cell_type(&self) -> ReferenceCellType;
+    fn cell_type(&self) -> ReferenceCell;
 }
 
 pub trait Geometry {
     //! Cell geometry
 
     /// The type of the grid that the cell is part of
-    type Grid: Grid;
-    /// Type of iterator over vertices
-    type VertexIterator<'iter>: std::iter::Iterator<Item = <Self::Grid as Grid>::Vertex<'iter>>
-    where
-        Self: 'iter;
+    type G: Grid;
 
     /// The physical/geometric dimension of the cell
     fn physical_dimension(&self) -> usize;
 
     /// The midpoint of the cell
-    fn midpoint(&self, point: &mut [<<Self::Grid as Grid>::T as RlstScalar>::Real]);
+    fn midpoint(&self, point: &mut [<<Self::G as Grid>::T as RlstScalar>::Real]);
 
     /// The diameter of the cell
-    fn diameter(&self) -> <<Self::Grid as Grid>::T as RlstScalar>::Real;
+    fn diameter(&self) -> <<Self::G as Grid>::T as RlstScalar>::Real;
 
     /// The volume of the cell
-    fn volume(&self) -> <<Self::Grid as Grid>::T as RlstScalar>::Real;
+    fn volume(&self) -> <<Self::G as Grid>::T as RlstScalar>::Real;
 
-    /// The corner vertices of the cell
-    ///
-    fn corner_vertices(&self) -> Self::VertexIterator<'_>;
-
-    /// The vertices of the cell
-    ///
-    fn vertices(&self) -> Self::VertexIterator<'_>;
+    fn integration_element(&self) -> <Self::G as Grid>::T;
 }

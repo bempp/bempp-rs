@@ -3,14 +3,14 @@
 use crate::element::ciarlet::{reference_cell, CiarletElement};
 use crate::element::polynomials::polynomial_count;
 use crate::traits::element::{Continuity, ElementFamily, MapType};
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut};
 use rlst::{LinAlg, RlstScalar};
 use std::marker::PhantomData;
 
 /// Create a Lagrange element
 pub fn create<T: RlstScalar + LinAlg>(
-    cell_type: ReferenceCellType,
+    cell_type: ReferenceCell,
     degree: usize,
     continuity: Continuity,
 ) -> CiarletElement<T> {
@@ -87,14 +87,14 @@ pub fn create<T: RlstScalar + LinAlg>(
             .enumerate()
         {
             let npts = match face_type {
-                ReferenceCellType::Triangle => {
+                ReferenceCell::Triangle => {
                     if degree > 2 {
                         (degree - 1) * (degree - 2) / 2
                     } else {
                         0
                     }
                 }
-                ReferenceCellType::Quadrilateral => (degree - 1).pow(2),
+                ReferenceCell::Quadrilateral => (degree - 1).pow(2),
                 _ => {
                     panic!("Unsupported face type");
                 }
@@ -109,7 +109,7 @@ pub fn create<T: RlstScalar + LinAlg>(
             let v2 = &vertices[vn2];
 
             match face_type {
-                ReferenceCellType::Triangle => {
+                ReferenceCell::Triangle => {
                     let mut n = 0;
                     for i0 in 1..degree {
                         for i1 in 1..degree - i0 {
@@ -127,7 +127,7 @@ pub fn create<T: RlstScalar + LinAlg>(
                         }
                     }
                 }
-                ReferenceCellType::Quadrilateral => {
+                ReferenceCell::Quadrilateral => {
                     let mut n = 0;
                     for i0 in 1..degree {
                         for i1 in 1..degree {
@@ -192,7 +192,7 @@ impl<T: LinAlg + RlstScalar> LagrangeElementFamily<T> {
 impl<T: LinAlg + RlstScalar> ElementFamily for LagrangeElementFamily<T> {
     type T = T;
     type FiniteElement = CiarletElement<T>;
-    fn element(&self, cell_type: ReferenceCellType) -> CiarletElement<T> {
+    fn element(&self, cell_type: ReferenceCell) -> CiarletElement<T> {
         create::<T>(cell_type, self.degree, self.continuity)
     }
 }

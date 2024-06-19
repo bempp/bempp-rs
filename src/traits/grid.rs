@@ -7,8 +7,8 @@ mod grid;
 mod io;
 // #[cfg(feature = "mpi")]
 // mod parallel;
+mod point;
 mod reference_map;
-mod vertex;
 
 // pub use builder::*;
 pub use cell::*;
@@ -17,5 +17,5 @@ pub use grid::*;
 pub use io::*;
 // #[cfg(feature = "mpi")]
 // pub use parallel::*;
+pub use point::*;
 pub use reference_map::*;
-pub use vertex::*;

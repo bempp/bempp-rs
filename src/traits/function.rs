@@ -4,7 +4,7 @@ use crate::traits::grid::Grid;
 #[cfg(feature = "mpi")]
 use crate::traits::grid::ParallelGridType;
 use crate::traits::types::Ownership;
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use std::collections::HashMap;
 
 /// A function space
@@ -18,7 +18,7 @@ pub trait FunctionSpace {
     fn grid(&self) -> &Self::Grid;
 
     /// Get the finite element used to define this function space
-    fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement;
+    fn element(&self, cell_type: ReferenceCell) -> &Self::FiniteElement;
 
     /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool {
@@ -38,7 +38,7 @@ pub trait FunctionSpace {
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]>;
 
     /// Compute a colouring of the cells so that no two cells that share an entity with DOFs associated with it are assigned the same colour
-    fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>>;
+    fn cell_colouring(&self) -> HashMap<ReferenceCell, Vec<Vec<usize>>>;
 
     /// Get the global DOF indes associated with a local DOF indec
     fn global_dof_index(&self, local_dof_index: usize) -> usize;

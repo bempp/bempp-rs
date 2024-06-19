@@ -10,7 +10,7 @@ use crate::quadrature::{
         TestTrialNumericalQuadratureDefinition,
     },
 };
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 
 fn tri_quad_edge_points(
     interval_rule: &NumericalQuadratureDefinition,
@@ -312,7 +312,7 @@ pub fn triangle_quadrilateral_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
 ) -> Result<TestTrialNumericalQuadratureDefinition, QuadratureError> {
-    let rule = simplex_rule(ReferenceCellType::Interval, npoints)?;
+    let rule = simplex_rule(ReferenceCell::Interval, npoints)?;
 
     match connectivity.connectivity_dimension {
         0 => {
@@ -354,7 +354,7 @@ pub fn quadrilateral_triangle_duffy(
     connectivity: &CellToCellConnectivity,
     npoints: usize,
 ) -> Result<TestTrialNumericalQuadratureDefinition, QuadratureError> {
-    let rule = simplex_rule(ReferenceCellType::Interval, npoints)?;
+    let rule = simplex_rule(ReferenceCell::Interval, npoints)?;
 
     match connectivity.connectivity_dimension {
         0 => {

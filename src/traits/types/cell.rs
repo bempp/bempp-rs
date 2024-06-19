@@ -3,7 +3,7 @@
 /// The type of a reference cell
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(u8)]
-pub enum ReferenceCellType {
+pub enum ReferenceCell {
     /// A point
     Point = 0,
     /// A line interval
@@ -22,18 +22,18 @@ pub enum ReferenceCellType {
     Pyramid = 7,
 }
 
-impl ReferenceCellType {
+impl ReferenceCell {
     /// Create a reference cell type from a u8
-    pub fn from(i: u8) -> Option<ReferenceCellType> {
+    pub fn from(i: u8) -> Option<ReferenceCell> {
         match i {
-            0 => Some(ReferenceCellType::Point),
-            1 => Some(ReferenceCellType::Interval),
-            2 => Some(ReferenceCellType::Triangle),
-            3 => Some(ReferenceCellType::Quadrilateral),
-            4 => Some(ReferenceCellType::Tetrahedron),
-            5 => Some(ReferenceCellType::Hexahedron),
-            6 => Some(ReferenceCellType::Prism),
-            7 => Some(ReferenceCellType::Pyramid),
+            0 => Some(ReferenceCell::Point),
+            1 => Some(ReferenceCell::Interval),
+            2 => Some(ReferenceCell::Triangle),
+            3 => Some(ReferenceCell::Quadrilateral),
+            4 => Some(ReferenceCell::Tetrahedron),
+            5 => Some(ReferenceCell::Hexahedron),
+            6 => Some(ReferenceCell::Prism),
+            7 => Some(ReferenceCell::Pyramid),
             _ => None,
         }
     }
@@ -63,36 +63,36 @@ mod test {
     #[test]
     fn test_reference_cell_type() {
         assert_eq!(
-            ReferenceCellType::Point,
-            ReferenceCellType::from(ReferenceCellType::Point as u8).unwrap()
+            ReferenceCell::Point,
+            ReferenceCell::from(ReferenceCell::Point as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Interval,
-            ReferenceCellType::from(ReferenceCellType::Interval as u8).unwrap()
+            ReferenceCell::Interval,
+            ReferenceCell::from(ReferenceCell::Interval as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Triangle,
-            ReferenceCellType::from(ReferenceCellType::Triangle as u8).unwrap()
+            ReferenceCell::Triangle,
+            ReferenceCell::from(ReferenceCell::Triangle as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Quadrilateral,
-            ReferenceCellType::from(ReferenceCellType::Quadrilateral as u8).unwrap()
+            ReferenceCell::Quadrilateral,
+            ReferenceCell::from(ReferenceCell::Quadrilateral as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Tetrahedron,
-            ReferenceCellType::from(ReferenceCellType::Tetrahedron as u8).unwrap()
+            ReferenceCell::Tetrahedron,
+            ReferenceCell::from(ReferenceCell::Tetrahedron as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Hexahedron,
-            ReferenceCellType::from(ReferenceCellType::Hexahedron as u8).unwrap()
+            ReferenceCell::Hexahedron,
+            ReferenceCell::from(ReferenceCell::Hexahedron as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Prism,
-            ReferenceCellType::from(ReferenceCellType::Prism as u8).unwrap()
+            ReferenceCell::Prism,
+            ReferenceCell::from(ReferenceCell::Prism as u8).unwrap()
         );
         assert_eq!(
-            ReferenceCellType::Pyramid,
-            ReferenceCellType::from(ReferenceCellType::Pyramid as u8).unwrap()
+            ReferenceCell::Pyramid,
+            ReferenceCell::from(ReferenceCell::Pyramid as u8).unwrap()
         );
     }
 }

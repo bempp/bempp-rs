@@ -1,7 +1,7 @@
 use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::traits::{
     element::{Continuity, ElementFamily, FiniteElement},
-    types::ReferenceCellType,
+    types::ReferenceCell,
 };
 
 extern crate blas_src;
@@ -13,10 +13,10 @@ fn main() {
     let family = LagrangeElementFamily::<f64>::new(2, Continuity::Continuous);
 
     // Get the element in the family on a triangle
-    let element = family.element(ReferenceCellType::Triangle);
+    let element = family.element(ReferenceCell::Triangle);
     println!("Cell: {:?}", element.cell_type());
 
     // Get the element in the family on a triangle
-    let element = family.element(ReferenceCellType::Quadrilateral);
+    let element = family.element(ReferenceCell::Quadrilateral);
     println!("Cell: {:?}", element.cell_type());
 }

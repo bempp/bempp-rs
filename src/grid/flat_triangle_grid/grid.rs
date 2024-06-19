@@ -4,7 +4,7 @@ use crate::element::ciarlet::{lagrange, CiarletElement};
 use crate::element::reference_cell;
 // use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
 use crate::traits::grid::Grid;
-use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCell};
 use crate::types::{IntegerArray2, RealScalar};
 use itertools::Itertools;
 use num::Float;
@@ -31,7 +31,7 @@ pub struct FlatTriangleGrid<T: RealScalar> {
     edge_to_vertices: IntegerArray2,
     edge_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>>,
     vertex_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>>,
-    entity_types: Vec<ReferenceCellType>,
+    entity_types: Vec<ReferenceCell>,
 
     // Point, edge and cell ids
     vertex_indices_to_ids: Vec<usize>,
@@ -106,14 +106,14 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
 
         // Compute topology
         let entity_types = vec![
-            ReferenceCellType::Point,
-            ReferenceCellType::Interval,
-            ReferenceCellType::Triangle,
+            ReferenceCell::Point,
+            ReferenceCell::Interval,
+            ReferenceCell::Triangle,
         ];
 
         let mut edge_indices = HashMap::<(usize, usize), usize>::new();
 
-        let ref_conn = &reference_cell::connectivity(ReferenceCellType::Triangle)[1];
+        let ref_conn = &reference_cell::connectivity(ReferenceCell::Triangle)[1];
         let mut edge_to_cells: HashMap<usize, Vec<CellLocalIndexPair<usize>>> = HashMap::new();
         let mut edge_to_vertices = Vec::<usize>::new();
         let mut vertex_to_cells = HashMap::<usize, Vec<CellLocalIndexPair<usize>>>::new();
@@ -193,109 +193,6 @@ impl<T: RealScalar> FlatTriangleGrid<T> {
             cell_indices_to_ids: cell_ids.to_vec(),
             cell_ids_to_indices,
         }
-    }
-}
-
-impl<T: RealScalar> Grid for FlatTriangleGrid<T> {
-    type T = T;
-
-    type Vertex<'a> = super::entities::Vertex<T> 
-    where
-        Self: 'a;
-
-    type Edge<'a> = super::entities::Edge<'a, T>
-    where
-        Self: 'a;
-
-    type Cell<'a> = super::entities::Cell<'a, T>
-    where
-        Self: 'a;
-
-    type ReferenceMap<'a>
-    where
-        Self: 'a;
-
-    fn number_of_vertices(&self) -> usize {
-        todo!()
-    }
-
-    fn number_of_corner_vertices(&self) -> usize {
-        todo!()
-    }
-
-    fn coordinates_from_vertex_index(&self, index: usize) -> [Self::T; 3] {
-        todo!()
-    }
-
-    fn number_of_edges(&self) -> usize {
-        todo!()
-    }
-
-    fn number_of_cells(&self) -> usize {
-        todo!()
-    }
-
-    fn vertex_index_from_id(&self, id: usize) -> usize {
-        todo!()
-    }
-
-    fn vertex_id_from_index(&self, index: usize) -> usize {
-        todo!()
-    }
-
-    fn cell_index_from_id(&self, id: usize) -> usize {
-        todo!()
-    }
-
-    fn cell_id_from_index(&self, index: usize) -> usize {
-        todo!()
-    }
-
-    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_> {
-        todo!()
-    }
-
-    fn edge_from_index(&self, index: usize) -> Self::Edge<'_> {
-        todo!()
-    }
-
-    fn cell_from_index(&self, index: usize) -> Self::Cell<'_> {
-        todo!()
-    }
-
-    fn reference_to_physical_map<'a>(
-        &'a self,
-        reference_points: &'a [<Self::T as RlstScalar>::Real],
-    ) -> Self::ReferenceMap<'a> {
-        todo!()
-    }
-
-    fn vertex_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>] {
-        todo!()
-    }
-
-    fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>] {
-        todo!()
-    }
-
-    fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>] {
-        todo!()
-    }
-
-    fn is_serial(&self) -> bool {
-        todo!()
-    }
-
-    fn domain_dimension(&self) -> usize {
-        todo!()
-    }
-
-    fn physical_dimension(&self) -> usize {
-        todo!()
-    }
-
-    fn cell_types(&self) -> &[ReferenceCellType] {
-        todo!()
     }
 }
 

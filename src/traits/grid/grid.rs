@@ -2,7 +2,7 @@
 
 use super::{Cell, Edge, ReferenceMap};
 use crate::{
-    traits::types::{CellIterator, CellLocalIndexPair, ReferenceCellType, VertexIterator},
+    traits::types::{CellIterator, CellLocalIndexPair, Ownership, PointIterator, ReferenceCell},
     types::RealScalar,
 };
 use rlst::RlstScalar;
@@ -14,7 +14,7 @@ pub trait Grid: std::marker::Sized {
     type T: RealScalar;
 
     /// The type used for a point
-    type Vertex<'a>: super::Vertex
+    type Point<'a>: super::Point
     where
         Self: 'a;
 
@@ -33,27 +33,47 @@ pub trait Grid: std::marker::Sized {
     where
         Self: 'a;
 
-    /// The number of vertices in the grid
-    ///
-    /// The vertices are the points at the corners of the cell
-    fn number_of_vertices(&self) -> usize;
+    /// The number of global points in the grid.
+    fn number_of_global_points(&self) -> usize;
 
-    fn number_of_corner_vertices(&self) -> usize;
+    /// The number of global points in the grid.
+    fn number_of_local_points(&self) -> usize;
+
+    /// The number of global vertices (corner points) in the grid.
+    fn number_of_global_corner_vertices(&self) -> usize;
+
+    /// The number of local vertices (corner points) in the grid.
+    fn number_of_local_corner_vertices(&self) -> usize;
 
     /// Get coordinates of a point.
-    fn coordinates_from_vertex_index(&self, index: usize) -> [Self::T; 3];
+    fn coordinates_from_point_index(&self, index: usize) -> [Self::T; 3];
 
-    /// The number of edges in the grid
-    fn number_of_edges(&self) -> usize;
+    /// Get global index from a local point index.
+    fn global_point_index(&self, local_index: usize) -> usize;
 
-    /// The number of cells in the grid
-    fn number_of_cells(&self) -> usize;
+    /// Get global index from a local edge index.
+    fn global_edge_index(&self, local_index: usize) -> usize;
 
-    /// Get the index of a vertex from its id
-    fn vertex_index_from_id(&self, id: usize) -> usize;
+    /// Get global index from a local cell index.
+    fn global_cell_index(&self, local_index: usize) -> usize;
 
-    /// Get the id of a vertex from its index
-    fn vertex_id_from_index(&self, index: usize) -> usize;
+    /// The number of global edges in the grid
+    fn number_of_global_edges(&self) -> usize;
+
+    /// The number of global cells in the grid
+    fn number_of_global_cells(&self) -> usize;
+
+    /// The number of local edges in the grid
+    fn number_of_local_edges(&self) -> usize;
+
+    /// The number of local cells in the grid
+    fn number_of_local_cells(&self) -> usize;
+
+    /// Get the index of a point from its id
+    fn point_index_from_id(&self, id: usize) -> usize;
+
+    /// Get the id of a point from its index
+    fn point_id_from_index(&self, index: usize) -> usize;
 
     /// Get the index of a cell from its id
     fn cell_index_from_id(&self, id: usize) -> usize;
@@ -62,25 +82,25 @@ pub trait Grid: std::marker::Sized {
     fn cell_id_from_index(&self, index: usize) -> usize;
 
     /// Get a point from its index
-    fn vertex_from_index(&self, index: usize) -> Self::Vertex<'_>;
+    fn point_from_index(&self, index: usize) -> Self::Point<'_>;
 
-    /// Get a vertex from its index
+    /// Get an edge from its index
     fn edge_from_index(&self, index: usize) -> Self::Edge<'_>;
 
     /// Get a cell from its index
     fn cell_from_index(&self, index: usize) -> Self::Cell<'_>;
 
     /// Get an iterator for a subset of points in the grid
-    fn iter_vertices<Iter: std::iter::Iterator<Item = usize>>(
+    fn iter_points<Iter: std::iter::Iterator<Item = usize>>(
         &self,
         index_iter: Iter,
-    ) -> VertexIterator<'_, Self, Iter> {
-        VertexIterator::new(index_iter, self)
+    ) -> PointIterator<'_, Self, Iter> {
+        PointIterator::new(index_iter, self)
     }
 
     /// Get an iterator for all points in the grid
-    fn iter_all_vertices(&self) -> VertexIterator<'_, Self, std::ops::Range<usize>> {
-        self.iter_vertices(0..self.number_of_vertices())
+    fn iter_local_points(&self) -> PointIterator<'_, Self, std::ops::Range<usize>> {
+        self.iter_points(0..self.number_of_local_points())
     }
 
     /// Get an iterator for a subset of cells in the grid
@@ -92,8 +112,8 @@ pub trait Grid: std::marker::Sized {
     }
 
     /// Get an iterator for all cells in the grid
-    fn iter_all_cells(&self) -> CellIterator<'_, Self, std::ops::Range<usize>> {
-        self.iter_cells(0..self.number_of_cells())
+    fn iter_local_cells(&self) -> CellIterator<'_, Self, std::ops::Range<usize>> {
+        self.iter_cells(0..self.number_of_local_cells())
     }
 
     /// Get the reference to physical map for a set of reference points
@@ -103,13 +123,28 @@ pub trait Grid: std::marker::Sized {
     ) -> Self::ReferenceMap<'a>;
 
     /// Get the cells that are attached to a vertex
-    fn vertex_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>];
+    fn points_to_cells(&self, vertex_index: usize) -> &[CellLocalIndexPair<usize>];
+
+    /// Get the points associated with an edge
+    fn edge_to_points(&self, edge_index: usize) -> &[usize];
+
+    /// Get the end points associated with an edge
+    fn edge_to_end_points(&self, edge_index: usize) -> &[usize];
+
+    /// Get the points of a cell
+    fn cell_to_points(&self, cell_index: usize) -> &[usize];
+
+    /// Get the points of a cell
+    fn cell_to_corner_points(&self, cell_index: usize) -> &[usize];
+
+    /// Get the edges of a cell
+    fn cell_to_edges(&self, cell_index: usize) -> &[usize];
 
     /// Get the cells that are attached to an edge
-    fn edge_to_cells(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>];
+    fn edge_to_cell(&self, edge_index: usize) -> &[CellLocalIndexPair<usize>];
 
     /// Get the cells that are attached to a face
-    fn face_to_cells(&self, face_index: usize) -> &[CellLocalIndexPair<usize>];
+    fn face_to_cell(&self, face_index: usize) -> &[CellLocalIndexPair<usize>];
 
     /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool;
@@ -121,5 +156,17 @@ pub trait Grid: std::marker::Sized {
     fn physical_dimension(&self) -> usize;
 
     /// Get the cell types included in this grid
-    fn cell_types(&self) -> &[ReferenceCellType];
+    fn cell_types(&self) -> &[ReferenceCell];
+
+    /// Get the cell type of a cell
+    fn cell_type(&self, cell_index: usize) -> ReferenceCell;
+
+    /// Get the ownership of a point from its local index
+    fn point_ownership(&self, local_index: usize) -> Ownership;
+
+    /// Get the ownership of an edge  from its local index
+    fn edge_ownership(&self, local_index: usize) -> Ownership;
+
+    /// Get the ownership of a cell  from its local index
+    fn cell_ownership(&self, local_index: usize) -> Ownership;
 }

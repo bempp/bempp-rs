@@ -1,7 +1,7 @@
 use bempp::element::ciarlet::lagrange;
 use bempp::traits::{
     element::{Continuity, FiniteElement},
-    types::ReferenceCellType,
+    types::ReferenceCell,
 };
 use rlst::{rlst_dynamic_array2, rlst_dynamic_array4, RawAccess};
 
@@ -10,7 +10,7 @@ extern crate lapack_src;
 
 fn main() {
     // Create a P2 element on a triangle
-    let element = lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Continuous);
+    let element = lagrange::create::<f64>(ReferenceCell::Triangle, 2, Continuity::Continuous);
 
     println!("This element has {} basis functions.", element.dim());
 

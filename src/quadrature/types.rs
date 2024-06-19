@@ -1,5 +1,5 @@
 //! Type definitions.
-pub use crate::traits::types::ReferenceCellType;
+pub use crate::traits::types::ReferenceCell;
 use std::fmt;
 
 /// Invalid quadrature rule

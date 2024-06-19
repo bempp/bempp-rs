@@ -1,56 +1,56 @@
 //! Cell definitions
 
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use rlst::RlstScalar;
 
 /// The topological dimension of the cell
-pub fn dim(cell: ReferenceCellType) -> usize {
+pub fn dim(cell: ReferenceCell) -> usize {
     match cell {
-        ReferenceCellType::Point => 0,
-        ReferenceCellType::Interval => 1,
-        ReferenceCellType::Triangle => 2,
-        ReferenceCellType::Quadrilateral => 2,
-        ReferenceCellType::Tetrahedron => 3,
-        ReferenceCellType::Hexahedron => 3,
-        ReferenceCellType::Prism => 3,
-        ReferenceCellType::Pyramid => 3,
+        ReferenceCell::Point => 0,
+        ReferenceCell::Interval => 1,
+        ReferenceCell::Triangle => 2,
+        ReferenceCell::Quadrilateral => 2,
+        ReferenceCell::Tetrahedron => 3,
+        ReferenceCell::Hexahedron => 3,
+        ReferenceCell::Prism => 3,
+        ReferenceCell::Pyramid => 3,
     }
 }
 /// Is the cell a simplex?
-pub fn is_simplex(cell: ReferenceCellType) -> bool {
+pub fn is_simplex(cell: ReferenceCell) -> bool {
     match cell {
-        ReferenceCellType::Point => true,
-        ReferenceCellType::Interval => true,
-        ReferenceCellType::Triangle => true,
-        ReferenceCellType::Quadrilateral => false,
-        ReferenceCellType::Tetrahedron => true,
-        ReferenceCellType::Hexahedron => false,
-        ReferenceCellType::Prism => false,
-        ReferenceCellType::Pyramid => false,
+        ReferenceCell::Point => true,
+        ReferenceCell::Interval => true,
+        ReferenceCell::Triangle => true,
+        ReferenceCell::Quadrilateral => false,
+        ReferenceCell::Tetrahedron => true,
+        ReferenceCell::Hexahedron => false,
+        ReferenceCell::Prism => false,
+        ReferenceCell::Pyramid => false,
     }
 }
 
 /// The vertices of the reference cell
-pub fn vertices<T: RlstScalar<Real = T>>(cell: ReferenceCellType) -> Vec<Vec<T>> {
+pub fn vertices<T: RlstScalar<Real = T>>(cell: ReferenceCell) -> Vec<Vec<T>> {
     let zero = T::from(0.0).unwrap();
     let one = T::from(1.0).unwrap();
     match cell {
-        ReferenceCellType::Point => vec![],
-        ReferenceCellType::Interval => vec![vec![zero], vec![one]],
-        ReferenceCellType::Triangle => vec![vec![zero, zero], vec![one, zero], vec![zero, one]],
-        ReferenceCellType::Quadrilateral => vec![
+        ReferenceCell::Point => vec![],
+        ReferenceCell::Interval => vec![vec![zero], vec![one]],
+        ReferenceCell::Triangle => vec![vec![zero, zero], vec![one, zero], vec![zero, one]],
+        ReferenceCell::Quadrilateral => vec![
             vec![zero, zero],
             vec![one, zero],
             vec![zero, one],
             vec![one, one],
         ],
-        ReferenceCellType::Tetrahedron => vec![
+        ReferenceCell::Tetrahedron => vec![
             vec![zero, zero, zero],
             vec![one, zero, zero],
             vec![zero, one, zero],
             vec![zero, zero, one],
         ],
-        ReferenceCellType::Hexahedron => vec![
+        ReferenceCell::Hexahedron => vec![
             vec![zero, zero, zero],
             vec![one, zero, zero],
             vec![zero, one, zero],
@@ -60,7 +60,7 @@ pub fn vertices<T: RlstScalar<Real = T>>(cell: ReferenceCellType) -> Vec<Vec<T>>
             vec![zero, one, one],
             vec![one, one, one],
         ],
-        ReferenceCellType::Prism => vec![
+        ReferenceCell::Prism => vec![
             vec![zero, zero, zero],
             vec![one, zero, zero],
             vec![zero, one, zero],
@@ -68,7 +68,7 @@ pub fn vertices<T: RlstScalar<Real = T>>(cell: ReferenceCellType) -> Vec<Vec<T>>
             vec![one, zero, one],
             vec![zero, one, one],
         ],
-        ReferenceCellType::Pyramid => vec![
+        ReferenceCell::Pyramid => vec![
             vec![zero, zero, zero],
             vec![one, zero, zero],
             vec![zero, one, zero],
@@ -79,18 +79,18 @@ pub fn vertices<T: RlstScalar<Real = T>>(cell: ReferenceCellType) -> Vec<Vec<T>>
 }
 
 /// The midpoint of the cell
-pub fn midpoint<T: RlstScalar<Real = T>>(cell: ReferenceCellType) -> Vec<T> {
+pub fn midpoint<T: RlstScalar<Real = T>>(cell: ReferenceCell) -> Vec<T> {
     let half = T::from(0.5).unwrap();
     let third = T::from(1.0).unwrap() / T::from(3.0).unwrap();
     match cell {
-        ReferenceCellType::Point => vec![],
-        ReferenceCellType::Interval => vec![half],
-        ReferenceCellType::Triangle => vec![third; 2],
-        ReferenceCellType::Quadrilateral => vec![half; 2],
-        ReferenceCellType::Tetrahedron => vec![T::from(1.0).unwrap() / T::from(6.0).unwrap(); 3],
-        ReferenceCellType::Hexahedron => vec![half; 3],
-        ReferenceCellType::Prism => vec![third, third, half],
-        ReferenceCellType::Pyramid => vec![
+        ReferenceCell::Point => vec![],
+        ReferenceCell::Interval => vec![half],
+        ReferenceCell::Triangle => vec![third; 2],
+        ReferenceCell::Quadrilateral => vec![half; 2],
+        ReferenceCell::Tetrahedron => vec![T::from(1.0).unwrap() / T::from(6.0).unwrap(); 3],
+        ReferenceCell::Hexahedron => vec![half; 3],
+        ReferenceCell::Prism => vec![third, third, half],
+        ReferenceCell::Pyramid => vec![
             T::from(0.4).unwrap(),
             T::from(0.4).unwrap(),
             T::from(0.2).unwrap(),
@@ -99,13 +99,13 @@ pub fn midpoint<T: RlstScalar<Real = T>>(cell: ReferenceCellType) -> Vec<T> {
 }
 
 /// The edges of the reference cell
-pub fn edges(cell: ReferenceCellType) -> Vec<Vec<usize>> {
+pub fn edges(cell: ReferenceCell) -> Vec<Vec<usize>> {
     match cell {
-        ReferenceCellType::Point => vec![],
-        ReferenceCellType::Interval => vec![vec![0, 1]],
-        ReferenceCellType::Triangle => vec![vec![1, 2], vec![0, 2], vec![0, 1]],
-        ReferenceCellType::Quadrilateral => vec![vec![0, 1], vec![0, 2], vec![1, 3], vec![2, 3]],
-        ReferenceCellType::Tetrahedron => vec![
+        ReferenceCell::Point => vec![],
+        ReferenceCell::Interval => vec![vec![0, 1]],
+        ReferenceCell::Triangle => vec![vec![1, 2], vec![0, 2], vec![0, 1]],
+        ReferenceCell::Quadrilateral => vec![vec![0, 1], vec![0, 2], vec![1, 3], vec![2, 3]],
+        ReferenceCell::Tetrahedron => vec![
             vec![2, 3],
             vec![1, 3],
             vec![1, 2],
@@ -113,7 +113,7 @@ pub fn edges(cell: ReferenceCellType) -> Vec<Vec<usize>> {
             vec![0, 2],
             vec![0, 1],
         ],
-        ReferenceCellType::Hexahedron => vec![
+        ReferenceCell::Hexahedron => vec![
             vec![0, 1],
             vec![0, 2],
             vec![0, 4],
@@ -127,7 +127,7 @@ pub fn edges(cell: ReferenceCellType) -> Vec<Vec<usize>> {
             vec![5, 7],
             vec![6, 7],
         ],
-        ReferenceCellType::Prism => vec![
+        ReferenceCell::Prism => vec![
             vec![0, 1],
             vec![0, 2],
             vec![0, 3],
@@ -138,7 +138,7 @@ pub fn edges(cell: ReferenceCellType) -> Vec<Vec<usize>> {
             vec![3, 5],
             vec![4, 5],
         ],
-        ReferenceCellType::Pyramid => vec![
+        ReferenceCell::Pyramid => vec![
             vec![0, 1],
             vec![0, 2],
             vec![0, 4],
@@ -152,16 +152,16 @@ pub fn edges(cell: ReferenceCellType) -> Vec<Vec<usize>> {
 }
 
 /// The faces of the reference cell
-pub fn faces(cell: ReferenceCellType) -> Vec<Vec<usize>> {
+pub fn faces(cell: ReferenceCell) -> Vec<Vec<usize>> {
     match cell {
-        ReferenceCellType::Point => vec![],
-        ReferenceCellType::Interval => vec![],
-        ReferenceCellType::Triangle => vec![vec![0, 1, 2]],
-        ReferenceCellType::Quadrilateral => vec![vec![0, 1, 2, 3]],
-        ReferenceCellType::Tetrahedron => {
+        ReferenceCell::Point => vec![],
+        ReferenceCell::Interval => vec![],
+        ReferenceCell::Triangle => vec![vec![0, 1, 2]],
+        ReferenceCell::Quadrilateral => vec![vec![0, 1, 2, 3]],
+        ReferenceCell::Tetrahedron => {
             vec![vec![1, 2, 3], vec![0, 2, 3], vec![0, 1, 3], vec![0, 1, 2]]
         }
-        ReferenceCellType::Hexahedron => vec![
+        ReferenceCell::Hexahedron => vec![
             vec![0, 1, 2, 3],
             vec![0, 1, 4, 5],
             vec![0, 2, 4, 6],
@@ -169,14 +169,14 @@ pub fn faces(cell: ReferenceCellType) -> Vec<Vec<usize>> {
             vec![2, 3, 6, 7],
             vec![4, 5, 6, 7],
         ],
-        ReferenceCellType::Prism => vec![
+        ReferenceCell::Prism => vec![
             vec![0, 1, 2],
             vec![0, 1, 3, 4],
             vec![0, 2, 3, 5],
             vec![1, 2, 4, 5],
             vec![3, 4, 5],
         ],
-        ReferenceCellType::Pyramid => vec![
+        ReferenceCell::Pyramid => vec![
             vec![0, 1, 2, 3],
             vec![0, 1, 4],
             vec![0, 2, 4],
@@ -187,91 +187,91 @@ pub fn faces(cell: ReferenceCellType) -> Vec<Vec<usize>> {
 }
 
 /// The types of the subentities of the reference cell
-pub fn entity_types(cell: ReferenceCellType) -> Vec<Vec<ReferenceCellType>> {
+pub fn entity_types(cell: ReferenceCell) -> Vec<Vec<ReferenceCell>> {
     match cell {
-        ReferenceCellType::Point => vec![vec![ReferenceCellType::Point], vec![], vec![], vec![]],
-        ReferenceCellType::Interval => vec![
-            vec![ReferenceCellType::Point; 2],
-            vec![ReferenceCellType::Interval],
+        ReferenceCell::Point => vec![vec![ReferenceCell::Point], vec![], vec![], vec![]],
+        ReferenceCell::Interval => vec![
+            vec![ReferenceCell::Point; 2],
+            vec![ReferenceCell::Interval],
             vec![],
             vec![],
         ],
-        ReferenceCellType::Triangle => vec![
-            vec![ReferenceCellType::Point; 3],
-            vec![ReferenceCellType::Interval; 3],
-            vec![ReferenceCellType::Triangle],
+        ReferenceCell::Triangle => vec![
+            vec![ReferenceCell::Point; 3],
+            vec![ReferenceCell::Interval; 3],
+            vec![ReferenceCell::Triangle],
             vec![],
         ],
-        ReferenceCellType::Quadrilateral => vec![
-            vec![ReferenceCellType::Point; 4],
-            vec![ReferenceCellType::Interval; 4],
-            vec![ReferenceCellType::Quadrilateral],
+        ReferenceCell::Quadrilateral => vec![
+            vec![ReferenceCell::Point; 4],
+            vec![ReferenceCell::Interval; 4],
+            vec![ReferenceCell::Quadrilateral],
             vec![],
         ],
-        ReferenceCellType::Tetrahedron => vec![
-            vec![ReferenceCellType::Point; 4],
-            vec![ReferenceCellType::Interval; 6],
-            vec![ReferenceCellType::Triangle; 4],
-            vec![ReferenceCellType::Tetrahedron],
+        ReferenceCell::Tetrahedron => vec![
+            vec![ReferenceCell::Point; 4],
+            vec![ReferenceCell::Interval; 6],
+            vec![ReferenceCell::Triangle; 4],
+            vec![ReferenceCell::Tetrahedron],
         ],
-        ReferenceCellType::Hexahedron => vec![
-            vec![ReferenceCellType::Point; 8],
-            vec![ReferenceCellType::Interval; 12],
-            vec![ReferenceCellType::Quadrilateral; 6],
-            vec![ReferenceCellType::Hexahedron],
+        ReferenceCell::Hexahedron => vec![
+            vec![ReferenceCell::Point; 8],
+            vec![ReferenceCell::Interval; 12],
+            vec![ReferenceCell::Quadrilateral; 6],
+            vec![ReferenceCell::Hexahedron],
         ],
-        ReferenceCellType::Prism => vec![
-            vec![ReferenceCellType::Point; 6],
-            vec![ReferenceCellType::Interval; 9],
+        ReferenceCell::Prism => vec![
+            vec![ReferenceCell::Point; 6],
+            vec![ReferenceCell::Interval; 9],
             vec![
-                ReferenceCellType::Triangle,
-                ReferenceCellType::Quadrilateral,
-                ReferenceCellType::Quadrilateral,
-                ReferenceCellType::Quadrilateral,
-                ReferenceCellType::Triangle,
+                ReferenceCell::Triangle,
+                ReferenceCell::Quadrilateral,
+                ReferenceCell::Quadrilateral,
+                ReferenceCell::Quadrilateral,
+                ReferenceCell::Triangle,
             ],
-            vec![ReferenceCellType::Prism],
+            vec![ReferenceCell::Prism],
         ],
-        ReferenceCellType::Pyramid => vec![
-            vec![ReferenceCellType::Point; 5],
-            vec![ReferenceCellType::Interval; 8],
+        ReferenceCell::Pyramid => vec![
+            vec![ReferenceCell::Point; 5],
+            vec![ReferenceCell::Interval; 8],
             vec![
-                ReferenceCellType::Quadrilateral,
-                ReferenceCellType::Triangle,
-                ReferenceCellType::Triangle,
-                ReferenceCellType::Triangle,
-                ReferenceCellType::Triangle,
+                ReferenceCell::Quadrilateral,
+                ReferenceCell::Triangle,
+                ReferenceCell::Triangle,
+                ReferenceCell::Triangle,
+                ReferenceCell::Triangle,
             ],
-            vec![ReferenceCellType::Pyramid],
+            vec![ReferenceCell::Pyramid],
         ],
     }
 }
 
 /// The number of subentities of each dimension
-pub fn entity_counts(cell: ReferenceCellType) -> Vec<usize> {
+pub fn entity_counts(cell: ReferenceCell) -> Vec<usize> {
     match cell {
-        ReferenceCellType::Point => vec![1, 0, 0, 0],
-        ReferenceCellType::Interval => vec![2, 1, 0, 0],
-        ReferenceCellType::Triangle => vec![3, 3, 1, 0],
-        ReferenceCellType::Quadrilateral => vec![4, 4, 1, 0],
-        ReferenceCellType::Tetrahedron => vec![4, 6, 4, 1],
-        ReferenceCellType::Hexahedron => vec![8, 12, 6, 1],
-        ReferenceCellType::Prism => vec![6, 9, 5, 1],
-        ReferenceCellType::Pyramid => vec![5, 8, 5, 1],
+        ReferenceCell::Point => vec![1, 0, 0, 0],
+        ReferenceCell::Interval => vec![2, 1, 0, 0],
+        ReferenceCell::Triangle => vec![3, 3, 1, 0],
+        ReferenceCell::Quadrilateral => vec![4, 4, 1, 0],
+        ReferenceCell::Tetrahedron => vec![4, 6, 4, 1],
+        ReferenceCell::Hexahedron => vec![8, 12, 6, 1],
+        ReferenceCell::Prism => vec![6, 9, 5, 1],
+        ReferenceCell::Pyramid => vec![5, 8, 5, 1],
     }
 }
 
 /// The connectivity of the reference cell
 ///
 /// The indices of the result are \[i\]\[j\]\[k\]\[l\]
-pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
+pub fn connectivity(cell: ReferenceCell) -> Vec<Vec<Vec<Vec<usize>>>> {
     match cell {
-        ReferenceCellType::Point => vec![vec![vec![vec![0]]]],
-        ReferenceCellType::Interval => vec![
+        ReferenceCell::Point => vec![vec![vec![vec![0]]]],
+        ReferenceCell::Interval => vec![
             vec![vec![vec![0], vec![0]], vec![vec![1], vec![0]]],
             vec![vec![vec![0, 1], vec![0]]],
         ],
-        ReferenceCellType::Triangle => vec![
+        ReferenceCell::Triangle => vec![
             vec![
                 vec![vec![0], vec![1, 2], vec![0]],
                 vec![vec![1], vec![0, 2], vec![0]],
@@ -284,7 +284,7 @@ pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
             ],
             vec![vec![vec![0, 1, 2], vec![0, 1, 2], vec![0]]],
         ],
-        ReferenceCellType::Quadrilateral => vec![
+        ReferenceCell::Quadrilateral => vec![
             vec![
                 vec![vec![0], vec![0, 1], vec![0]],
                 vec![vec![1], vec![0, 2], vec![0]],
@@ -299,7 +299,7 @@ pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
             ],
             vec![vec![vec![0, 1, 2, 3], vec![0, 1, 2, 3], vec![0]]],
         ],
-        ReferenceCellType::Tetrahedron => vec![
+        ReferenceCell::Tetrahedron => vec![
             vec![
                 vec![vec![0], vec![3, 4, 5], vec![1, 2, 3], vec![0]],
                 vec![vec![1], vec![1, 2, 5], vec![0, 2, 3], vec![0]],
@@ -327,7 +327,7 @@ pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
                 vec![0],
             ]],
         ],
-        ReferenceCellType::Hexahedron => vec![
+        ReferenceCell::Hexahedron => vec![
             vec![
                 vec![vec![0], vec![0, 1, 2], vec![0, 1, 2], vec![0]],
                 vec![vec![1], vec![0, 3, 4], vec![0, 1, 3], vec![0]],
@@ -367,7 +367,7 @@ pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
                 vec![0],
             ]],
         ],
-        ReferenceCellType::Prism => vec![
+        ReferenceCell::Prism => vec![
             vec![
                 vec![vec![0], vec![0, 1, 2], vec![0, 1, 2], vec![0]],
                 vec![vec![1], vec![0, 3, 4], vec![0, 1, 3], vec![0]],
@@ -401,7 +401,7 @@ pub fn connectivity(cell: ReferenceCellType) -> Vec<Vec<Vec<Vec<usize>>>> {
                 vec![0],
             ]],
         ],
-        ReferenceCellType::Pyramid => vec![
+        ReferenceCell::Pyramid => vec![
             vec![
                 vec![vec![0], vec![0, 1, 2], vec![0, 1, 2], vec![0]],
                 vec![vec![1], vec![0, 3, 4], vec![0, 1, 3], vec![0]],

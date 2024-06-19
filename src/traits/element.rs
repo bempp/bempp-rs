@@ -1,5 +1,5 @@
 //! Finite element definitions
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use rlst::RlstScalar;
 use rlst::{RandomAccessByRef, RandomAccessMut, Shape};
 
@@ -36,16 +36,16 @@ pub enum MapType {
 }
 
 /// Compute the number of derivatives for a cell
-fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCellType) -> usize {
+fn compute_derivative_count(nderivs: usize, cell_type: ReferenceCell) -> usize {
     match cell_type {
-        ReferenceCellType::Point => 0,
-        ReferenceCellType::Interval => nderivs + 1,
-        ReferenceCellType::Triangle => (nderivs + 1) * (nderivs + 2) / 2,
-        ReferenceCellType::Quadrilateral => (nderivs + 1) * (nderivs + 2) / 2,
-        ReferenceCellType::Tetrahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
-        ReferenceCellType::Hexahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
-        ReferenceCellType::Prism => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
-        ReferenceCellType::Pyramid => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCell::Point => 0,
+        ReferenceCell::Interval => nderivs + 1,
+        ReferenceCell::Triangle => (nderivs + 1) * (nderivs + 2) / 2,
+        ReferenceCell::Quadrilateral => (nderivs + 1) * (nderivs + 2) / 2,
+        ReferenceCell::Tetrahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCell::Hexahedron => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCell::Prism => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
+        ReferenceCell::Pyramid => (nderivs + 1) * (nderivs + 2) * (nderivs + 3) / 6,
     }
 }
 
@@ -55,7 +55,7 @@ pub trait FiniteElement {
     type T: RlstScalar;
 
     /// The reference cell type
-    fn cell_type(&self) -> ReferenceCellType;
+    fn cell_type(&self) -> ReferenceCell;
 
     /// The highest degree polynomial in the element's polynomial set
     fn embedded_superdegree(&self) -> usize;
@@ -104,5 +104,5 @@ pub trait ElementFamily {
     type FiniteElement: FiniteElement<T = Self::T>;
 
     /// Get an elenent for a cell type
-    fn element(&self, cell_type: ReferenceCellType) -> Self::FiniteElement;
+    fn element(&self, cell_type: ReferenceCell) -> Self::FiniteElement;
 }

@@ -3,22 +3,22 @@
 use crate::element::ciarlet::{reference_cell, CiarletElement};
 use crate::element::polynomials::polynomial_count;
 use crate::traits::element::{Continuity, ElementFamily, MapType};
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use rlst::{rlst_dynamic_array2, rlst_dynamic_array3, RandomAccessMut};
 use rlst::{LinAlg, RlstScalar};
 use std::marker::PhantomData;
 
 /// Create a Raviart-Thomas element
 pub fn create<T: LinAlg + RlstScalar>(
-    cell_type: ReferenceCellType,
+    cell_type: ReferenceCell,
     degree: usize,
     continuity: Continuity,
 ) -> CiarletElement<T> {
-    if cell_type != ReferenceCellType::Triangle && cell_type != ReferenceCellType::Quadrilateral {
+    if cell_type != ReferenceCell::Triangle && cell_type != ReferenceCell::Quadrilateral {
         panic!("Unsupported cell type");
     }
 
-    if cell_type != ReferenceCellType::Triangle {
+    if cell_type != ReferenceCell::Triangle {
         panic!("RT elements on quadrilaterals not implemented yet");
     }
     if degree != 1 {
@@ -111,7 +111,7 @@ impl<T: LinAlg + RlstScalar> RaviartThomasElementFamily<T> {
 impl<T: LinAlg + RlstScalar> ElementFamily for RaviartThomasElementFamily<T> {
     type T = T;
     type FiniteElement = CiarletElement<T>;
-    fn element(&self, cell_type: ReferenceCellType) -> CiarletElement<T> {
+    fn element(&self, cell_type: ReferenceCell) -> CiarletElement<T> {
         create::<T>(cell_type, self.degree, self.continuity)
     }
 }

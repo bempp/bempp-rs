@@ -5,7 +5,7 @@ use crate::element::polynomials::{
 };
 use crate::element::reference_cell;
 use crate::traits::element::{Continuity, FiniteElement, MapType};
-use crate::traits::types::ReferenceCellType;
+use crate::traits::types::ReferenceCell;
 use rlst::LinAlg;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
@@ -22,7 +22,7 @@ type EntityWeights<T> = [Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>; 
 
 /// A Ciarlet element
 pub struct CiarletElement<T: RlstScalar> {
-    cell_type: ReferenceCellType,
+    cell_type: ReferenceCell,
     degree: usize,
     embedded_superdegree: usize,
     map_type: MapType,
@@ -43,7 +43,7 @@ where
     /// Create a Ciarlet element
     #[allow(clippy::too_many_arguments)]
     pub fn create(
-        cell_type: ReferenceCellType,
+        cell_type: ReferenceCell,
         degree: usize,
         value_shape: Vec<usize>,
         polynomial_coeffs: Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
@@ -243,7 +243,7 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
         self.map_type
     }
 
-    fn cell_type(&self) -> ReferenceCellType {
+    fn cell_type(&self) -> ReferenceCell {
         self.cell_type
     }
     fn embedded_superdegree(&self) -> usize {
@@ -306,14 +306,14 @@ mod test {
     fn check_dofs(e: impl FiniteElement) {
         let mut ndofs = 0;
         for (dim, entity_count) in match e.cell_type() {
-            ReferenceCellType::Point => vec![1],
-            ReferenceCellType::Interval => vec![2, 1],
-            ReferenceCellType::Triangle => vec![3, 3, 1],
-            ReferenceCellType::Quadrilateral => vec![4, 4, 1],
-            ReferenceCellType::Tetrahedron => vec![4, 6, 4, 1],
-            ReferenceCellType::Hexahedron => vec![8, 12, 6, 1],
-            ReferenceCellType::Prism => vec![6, 9, 5, 1],
-            ReferenceCellType::Pyramid => vec![5, 8, 5, 1],
+            ReferenceCell::Point => vec![1],
+            ReferenceCell::Interval => vec![2, 1],
+            ReferenceCell::Triangle => vec![3, 3, 1],
+            ReferenceCell::Quadrilateral => vec![4, 4, 1],
+            ReferenceCell::Tetrahedron => vec![4, 6, 4, 1],
+            ReferenceCell::Hexahedron => vec![8, 12, 6, 1],
+            ReferenceCell::Prism => vec![6, 9, 5, 1],
+            ReferenceCell::Pyramid => vec![5, 8, 5, 1],
         }
         .iter()
         .enumerate()
@@ -327,13 +327,13 @@ mod test {
 
     #[test]
     fn test_lagrange_1() {
-        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
     }
 
     #[test]
     fn test_lagrange_0_interval() {
-        let e = lagrange::create::<f64>(ReferenceCellType::Interval, 0, Continuity::Discontinuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Interval, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
         let mut points = rlst_dynamic_array2!(f64, [4, 1]);
@@ -351,7 +351,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_interval() {
-        let e = lagrange::create::<f64>(ReferenceCellType::Interval, 1, Continuity::Continuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Interval, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 4));
         let mut points = rlst_dynamic_array2!(f64, [4, 1]);
@@ -376,7 +376,7 @@ mod test {
 
     #[test]
     fn test_lagrange_0_triangle() {
-        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 0, Continuity::Discontinuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Triangle, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
 
@@ -404,7 +404,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_triangle() {
-        let e = lagrange::create::<f64>(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);
@@ -441,66 +441,46 @@ mod test {
 
     #[test]
     fn test_lagrange_higher_degree_triangle() {
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 3, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 4, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 5, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 2, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 3, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 4, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 5, Continuity::Continuous);
 
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 2, Continuity::Discontinuous);
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 3, Continuity::Discontinuous);
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 4, Continuity::Discontinuous);
-        lagrange::create::<f64>(ReferenceCellType::Triangle, 5, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 2, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 3, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 4, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Triangle, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_higher_degree_interval() {
-        lagrange::create::<f64>(ReferenceCellType::Interval, 2, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Interval, 3, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Interval, 4, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Interval, 5, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 2, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 3, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 4, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 5, Continuity::Continuous);
 
-        lagrange::create::<f64>(ReferenceCellType::Interval, 2, Continuity::Discontinuous);
-        lagrange::create::<f64>(ReferenceCellType::Interval, 3, Continuity::Discontinuous);
-        lagrange::create::<f64>(ReferenceCellType::Interval, 4, Continuity::Discontinuous);
-        lagrange::create::<f64>(ReferenceCellType::Interval, 5, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 2, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 3, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 4, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Interval, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_higher_degree_quadrilateral() {
-        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 3, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 4, Continuity::Continuous);
-        lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 5, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 2, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 3, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 4, Continuity::Continuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 5, Continuity::Continuous);
 
-        lagrange::create::<f64>(
-            ReferenceCellType::Quadrilateral,
-            2,
-            Continuity::Discontinuous,
-        );
-        lagrange::create::<f64>(
-            ReferenceCellType::Quadrilateral,
-            3,
-            Continuity::Discontinuous,
-        );
-        lagrange::create::<f64>(
-            ReferenceCellType::Quadrilateral,
-            4,
-            Continuity::Discontinuous,
-        );
-        lagrange::create::<f64>(
-            ReferenceCellType::Quadrilateral,
-            5,
-            Continuity::Discontinuous,
-        );
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 2, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 3, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 4, Continuity::Discontinuous);
+        lagrange::create::<f64>(ReferenceCell::Quadrilateral, 5, Continuity::Discontinuous);
     }
 
     #[test]
     fn test_lagrange_0_quadrilateral() {
-        let e = lagrange::create::<f64>(
-            ReferenceCellType::Quadrilateral,
-            0,
-            Continuity::Discontinuous,
-        );
+        let e = lagrange::create::<f64>(ReferenceCell::Quadrilateral, 0, Continuity::Discontinuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);
@@ -526,8 +506,7 @@ mod test {
 
     #[test]
     fn test_lagrange_1_quadrilateral() {
-        let e =
-            lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 1, Continuity::Continuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Quadrilateral, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);
@@ -569,8 +548,7 @@ mod test {
 
     #[test]
     fn test_lagrange_2_quadrilateral() {
-        let e =
-            lagrange::create::<f64>(ReferenceCellType::Quadrilateral, 2, Continuity::Continuous);
+        let e = lagrange::create::<f64>(ReferenceCell::Quadrilateral, 2, Continuity::Continuous);
         assert_eq!(e.value_size(), 1);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);
@@ -642,7 +620,7 @@ mod test {
 
     #[test]
     fn test_raviart_thomas_1_triangle() {
-        let e = raviart_thomas::create(ReferenceCellType::Triangle, 1, Continuity::Continuous);
+        let e = raviart_thomas::create(ReferenceCell::Triangle, 1, Continuity::Continuous);
         assert_eq!(e.value_size(), 2);
         let mut data = rlst_dynamic_array4!(f64, e.tabulate_array_shape(0, 6));
         let mut points = rlst_dynamic_array2!(f64, [6, 2]);

@@ -18,7 +18,7 @@ use bempp::{
         element::Continuity,
         function::FunctionSpace,
         grid::{Builder, Cell, Geometry, Grid, ParallelBuilder, Point},
-        types::{Ownership, ReferenceCellType},
+        types::{Ownership, ReferenceCell},
     },
 };
 #[cfg(feature = "mpi")]

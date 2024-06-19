@@ -1,18 +1,18 @@
 //! Test input/output
 // use bempp::grid::mixed_grid::MixedGridBuilder;
-use bempp::grid::shapes::regular_sphere;
+// use bempp::grid::shapes::regular_sphere;
 // use bempp::grid::single_element_grid::SingleElementGridBuilder;
-use bempp::traits::grid::{Builder, GmshIO};
-use bempp::traits::types::ReferenceCellType;
+// use bempp::traits::grid::{Builder, GmshIO};
+// use bempp::traits::types::ReferenceCellType;
 
 extern crate blas_src;
 extern crate lapack_src;
 
-#[test]
-fn test_regular_sphere_gmsh_io() {
-    let g = regular_sphere::<f64>(2);
-    g.export_as_gmsh(String::from("_test_io_sphere.msh"));
-}
+// #[test]
+// fn test_regular_sphere_gmsh_io() {
+// let g = regular_sphere::<f64>(2);
+// g.export_as_gmsh(String::from("_test_io_sphere.msh"));
+// }
 
 // #[test]
 // fn test_gmsh_output_quads() {

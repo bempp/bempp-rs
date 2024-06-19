@@ -1,6 +1,6 @@
 //! Get rules on simplices.
 
-pub use crate::traits::types::ReferenceCellType;
+pub use crate::traits::types::ReferenceCell;
 
 use crate::quadrature::simplex_rule_definitions::SIMPLEX_RULE_DEFINITIONS;
 use crate::quadrature::types::NumericalQuadratureDefinition;
@@ -10,18 +10,18 @@ use crate::quadrature::types::QuadratureError;
 ///
 /// If the rule does not exist `Err(())` is returned.
 pub fn simplex_rule(
-    cell_type: ReferenceCellType,
+    cell_type: ReferenceCell,
     npoints: usize,
 ) -> Result<NumericalQuadratureDefinition, QuadratureError> {
     let dim: usize = match cell_type {
-        ReferenceCellType::Point => 0,
-        ReferenceCellType::Interval => 1,
-        ReferenceCellType::Triangle => 2,
-        ReferenceCellType::Quadrilateral => 2,
-        ReferenceCellType::Tetrahedron => 3,
-        ReferenceCellType::Hexahedron => 3,
-        ReferenceCellType::Prism => 3,
-        ReferenceCellType::Pyramid => 3,
+        ReferenceCell::Point => 0,
+        ReferenceCell::Interval => 1,
+        ReferenceCell::Triangle => 2,
+        ReferenceCell::Quadrilateral => 2,
+        ReferenceCell::Tetrahedron => 3,
+        ReferenceCell::Hexahedron => 3,
+        ReferenceCell::Prism => 3,
+        ReferenceCell::Pyramid => 3,
     };
 
     if let Some((order, points, weights)) = SIMPLEX_RULE_DEFINITIONS
@@ -42,7 +42,7 @@ pub fn simplex_rule(
 }
 
 /// For a given cell type return a vector with the numbers of points for which simplex rules are available.
-pub fn available_rules(cell_type: ReferenceCellType) -> Vec<usize> {
+pub fn available_rules(cell_type: ReferenceCell) -> Vec<usize> {
     SIMPLEX_RULE_DEFINITIONS
         .get(&cell_type)
         .unwrap()
@@ -59,16 +59,16 @@ mod test {
 
     use approx::*;
 
-    fn get_volume(cell_type: ReferenceCellType) -> f64 {
+    fn get_volume(cell_type: ReferenceCell) -> f64 {
         match cell_type {
-            ReferenceCellType::Point => 0.0,
-            ReferenceCellType::Interval => 1.0,
-            ReferenceCellType::Triangle => 0.5,
-            ReferenceCellType::Quadrilateral => 1.0,
-            ReferenceCellType::Tetrahedron => 1.0 / 6.0,
-            ReferenceCellType::Hexahedron => 1.0,
-            ReferenceCellType::Prism => 0.5,
-            ReferenceCellType::Pyramid => 1.0 / 3.0,
+            ReferenceCell::Point => 0.0,
+            ReferenceCell::Interval => 1.0,
+            ReferenceCell::Triangle => 0.5,
+            ReferenceCell::Quadrilateral => 1.0,
+            ReferenceCell::Tetrahedron => 1.0 / 6.0,
+            ReferenceCell::Hexahedron => 1.0,
+            ReferenceCell::Prism => 0.5,
+            ReferenceCell::Pyramid => 1.0 / 3.0,
         }
     }
 
