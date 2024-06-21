@@ -8,8 +8,7 @@ use crate::traits::element::{Continuity, FiniteElement, MapType};
 use crate::traits::types::ReferenceCellType;
 use rlst::{
     dense::array::views::ArrayViewMut, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray,
-    MatrixInverse, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape, UnsafeRandomAccessMut,
-    VectorContainer,
+    MatrixInverse, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
 pub mod lagrange;
@@ -79,21 +78,21 @@ where
 
         let new_pts = if continuity == Continuity::Discontinuous {
             let mut new_pts: EntityPoints<T::Real> = [vec![], vec![], vec![], vec![]];
-            let mut pn = 0;
             let mut all_pts = rlst_dynamic_array2![T::Real, [npts, tdim]];
             for (i, pts_i) in interpolation_points.iter().take(tdim).enumerate() {
                 for _pts in pts_i {
                     new_pts[i].push(rlst_dynamic_array2![T::Real, [0, tdim]]);
                 }
             }
+            let mut row = 0;
             for pts_i in interpolation_points.iter() {
                 for pts in pts_i {
-                    for j in 0..pts.shape()[0] {
-                        for k in 0..tdim {
-                            *all_pts.get_mut([pn + j, k]).unwrap() = *pts.get([j, k]).unwrap();
-                        }
-                    }
-                    pn += pts.shape()[0];
+                    let nrows = pts.shape()[0];
+                    all_pts
+                        .view_mut()
+                        .into_subview([row, 0], [nrows, tdim])
+                        .fill_from(pts.view());
+                    row += nrows;
                 }
             }
             new_pts[tdim].push(all_pts);
@@ -113,16 +112,14 @@ where
             }
             for mi in interpolation_weights.iter() {
                 for mat in mi {
-                    for j in 0..mat.shape()[0] {
-                        for k in 0..value_size {
-                            for l in 0..mat.shape()[2] {
-                                *all_mat.get_mut([dn + j, k, pn + l]).unwrap() =
-                                    *mat.get([j, k, l]).unwrap();
-                            }
-                        }
-                    }
-                    dn += mat.shape()[0];
-                    pn += mat.shape()[2];
+                    let dim0 = mat.shape()[0];
+                    let dim2 = mat.shape()[2];
+                    all_mat
+                        .view_mut()
+                        .into_subview([dn, 0, pn], [dim0, value_size, dim2])
+                        .fill_from(mat.view());
+                    dn += dim0;
+                    pn += dim2;
                 }
             }
             new_wts[tdim].push(all_mat);
@@ -149,14 +146,14 @@ where
                     );
                     let mat = &new_wts[d][e];
                     for i in 0..mat.shape()[0] {
-                        for j in 0..value_size {
-                            for l in 0..pdim {
-                                let value = d_matrix.get_mut([j, l, dof + i]).unwrap();
-                                *value = T::from(0.0).unwrap();
-                                for k in 0..pts.shape()[0] {
-                                    *value += *mat.get([i, j, k]).unwrap()
-                                        * *table.get([0, l, k]).unwrap();
-                                }
+                        for l in 0..pdim {
+                            for j in 0..value_size {
+                                // d_matrix[j, l, dof + i] = inner(mat[i, j, :], table[0, l, :])
+                                *d_matrix.get_mut([j, l, dof + i]).unwrap() = mat
+                                    .view()
+                                    .slice(0, i)
+                                    .slice(0, j)
+                                    .inner(table.view().slice(0, 0).slice(0, l));
                             }
                         }
                     }
@@ -180,22 +177,17 @@ where
             }
         }
 
-        let mut ident = rlst::rlst_dynamic_array2!(T, [dim, dim]);
-        for i in 0..dim {
-            unsafe {
-                *ident.get_unchecked_mut([i, i]) = T::from(1.0).unwrap();
-            }
-        }
         inverse.view_mut().into_inverse_alloc().unwrap();
 
         let mut coefficients = rlst_dynamic_array3!(T, [dim, value_size, pdim]);
         for i in 0..dim {
-            for l in 0..pdim {
-                for j in 0..value_size {
-                    for k in 0..pdim {
-                        *coefficients.get_mut([i, j, k]).unwrap() += *inverse.get([i, l]).unwrap()
-                            * *polynomial_coeffs.get([l, j, k]).unwrap()
-                    }
+            for j in 0..value_size {
+                for k in 0..pdim {
+                    // coefficients[i, j, k] = inner(inverse[i, :], polynomial_coeffs[:, j, k])
+                    *coefficients.get_mut([i, j, k]).unwrap() = inverse
+                        .view()
+                        .slice(0, i)
+                        .inner(polynomial_coeffs.view().slice(1, j).slice(1, k));
                 }
             }
         }
@@ -277,12 +269,13 @@ impl<T: RlstScalar> FiniteElement for CiarletElement<T> {
             for p in 0..points.shape()[0] {
                 for j in 0..self.value_size {
                     for b in 0..self.dim {
-                        let value = data.get_mut([d, p, b, j]).unwrap();
-                        *value = T::from(0.0).unwrap();
-                        for i in 0..table.shape()[1] {
-                            *value += *self.coefficients.get([b, j, i]).unwrap()
-                                * *table.get_mut([d, i, p]).unwrap();
-                        }
+                        // data[d, p, b, j] = inner(self.coefficients[b, j, :], table[d, :, p])
+                        *data.get_mut([d, p, b, j]).unwrap() = self
+                            .coefficients
+                            .view()
+                            .slice(0, b)
+                            .slice(0, j)
+                            .inner(table.view().slice(0, d).slice(1, p));
                     }
                 }
             }
