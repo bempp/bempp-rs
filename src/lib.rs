@@ -6,7 +6,6 @@
 extern crate lazy_static;
 
 pub mod assembly;
-pub mod element;
 pub mod function;
 pub mod grid;
 pub mod quadrature;

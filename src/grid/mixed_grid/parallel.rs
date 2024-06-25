@@ -1,14 +1,14 @@
 //! Parallel grid builder
 
-use crate::element::reference_cell;
 use crate::grid::mixed_grid::{MixedGrid, MixedGridBuilder};
 use crate::grid::parallel_grid::ParallelGridBuilder;
-use crate::traits::types::ReferenceCellType;
 use mpi::{
     request::{LocalScope, WaitGuard},
     topology::Process,
     traits::{Buffer, Destination, Equivalence, Source},
 };
+use ndelement::reference_cell;
+use ndelement::types::ReferenceCellType;
 use num::Float;
 use rlst::{
     dense::array::views::ArrayViewMut, Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer,

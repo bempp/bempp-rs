@@ -1,18 +1,19 @@
 //! Parallel function space
 
-use crate::element::ciarlet::CiarletElement;
 use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
 use crate::traits::{
-    element::ElementFamily,
     function::{FunctionSpace, FunctionSpaceInParallel},
     grid::{GridType, ParallelGridType},
-    types::{Ownership, ReferenceCellType},
+    types::Ownership,
 };
 use mpi::{
     point_to_point::{Destination, Source},
     request::WaitGuard,
     topology::Communicator,
 };
+use ndelement::ciarlet::CiarletElement;
+use ndelement::traits::ElementFamily;
+use ndelement::types::ReferenceCellType;
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
@@ -76,7 +77,11 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
     /// Create new function space
     pub fn new(
         grid: &'a GridImpl,
-        e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
+        e_family: &impl ElementFamily<
+            T = T,
+            FiniteElement = CiarletElement<T>,
+            CellType = ReferenceCellType,
+        >,
     ) -> Self {
         let comm = grid.comm();
         let rank = comm.rank();

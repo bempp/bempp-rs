@@ -1,8 +1,9 @@
 use bempp::assembly::{batched, batched::BatchedAssembler};
-use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::function::SerialFunctionSpace;
 use bempp::grid::shapes::regular_sphere;
-use bempp::traits::{element::Continuity, function::FunctionSpace, types::ReferenceCellType};
+use bempp::traits::function::FunctionSpace;
+use ndelement::ciarlet::LagrangeElementFamily;
+use ndelement::types::{Continuity, ReferenceCellType};
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
 extern crate blas_src;

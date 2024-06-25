@@ -3,7 +3,7 @@ use bempp::grid::mixed_grid::MixedGridBuilder;
 use bempp::grid::shapes::regular_sphere;
 use bempp::grid::single_element_grid::SingleElementGridBuilder;
 use bempp::traits::grid::{Builder, GmshIO};
-use bempp::traits::types::ReferenceCellType;
+use ndelement::types::ReferenceCellType;
 
 extern crate blas_src;
 extern crate lapack_src;

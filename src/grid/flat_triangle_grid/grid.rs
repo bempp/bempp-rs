@@ -1,11 +1,13 @@
 //! Flat triangle grid
 
-use crate::element::ciarlet::{lagrange, CiarletElement};
-use crate::element::reference_cell;
 use crate::grid::common::compute_diameter_triangle;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
-use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, Ownership};
+use ndelement::ciarlet::{lagrange, CiarletElement};
+use ndelement::reference_cell;
+use ndelement::traits::FiniteElement;
+use ndelement::types::Continuity;
+use ndelement::types::ReferenceCellType;
 use num::Float;
 use rlst::rlst_static_array;
 use rlst::rlst_static_type;

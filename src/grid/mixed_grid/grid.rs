@@ -1,12 +1,13 @@
 //! Mixed grid
 
-use crate::element::ciarlet::lagrange;
-use crate::element::reference_cell;
 use crate::grid::mixed_grid::{geometry::MixedGeometry, topology::MixedTopology};
 use crate::grid::traits::Grid;
-use crate::traits::element::{Continuity, FiniteElement};
-use crate::traits::types::ReferenceCellType;
 use log::warn;
+use ndelement::ciarlet::lagrange;
+use ndelement::reference_cell;
+use ndelement::traits::FiniteElement;
+use ndelement::types::Continuity;
+use ndelement::types::ReferenceCellType;
 use num::Float;
 use rlst::RlstScalar;
 use rlst::{

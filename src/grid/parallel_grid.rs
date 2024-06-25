@@ -1,13 +1,14 @@
 //! A parallel implementation of a grid
-use crate::element::reference_cell;
 use crate::grid::traits::{Grid, Topology};
 use crate::traits::grid::{Builder, GridType, ParallelBuilder};
-use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, Ownership};
 use mpi::{
     request::{LocalScope, WaitGuard},
     topology::{Communicator, Process},
     traits::{Buffer, Destination, Equivalence, Source},
 };
+use ndelement::reference_cell;
+use ndelement::types::ReferenceCellType;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RandomAccessMut, VectorContainer};
 use std::collections::HashMap;
 

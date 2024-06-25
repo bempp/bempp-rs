@@ -10,7 +10,7 @@ use crate::quadrature::{
         TestTrialNumericalQuadratureDefinition,
     },
 };
-use crate::traits::types::ReferenceCellType;
+use ndelement::types::ReferenceCellType;
 
 fn tri_quad_edge_points(
     interval_rule: &NumericalQuadratureDefinition,

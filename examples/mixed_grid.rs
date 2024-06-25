@@ -1,8 +1,6 @@
 use bempp::grid::mixed_grid::MixedGridBuilder;
-use bempp::traits::{
-    grid::{Builder, CellType, GeometryType, GridType, PointType},
-    types::ReferenceCellType,
-};
+use bempp::traits::grid::{Builder, CellType, GeometryType, GridType, PointType};
+use ndelement::types::ReferenceCellType;
 
 extern crate blas_src;
 extern crate lapack_src;

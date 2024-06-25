@@ -1,10 +1,11 @@
 //! Grid builder
 
-use crate::element::{ciarlet::lagrange, reference_cell};
 use crate::grid::single_element_grid::grid::SingleElementGrid;
-use crate::traits::element::{Continuity, FiniteElement};
 use crate::traits::grid::Builder;
-use crate::traits::types::ReferenceCellType;
+use ndelement::traits::FiniteElement;
+use ndelement::types::Continuity;
+use ndelement::types::ReferenceCellType;
+use ndelement::{ciarlet::lagrange, reference_cell};
 use num::Float;
 use rlst::RlstScalar;
 use rlst::{

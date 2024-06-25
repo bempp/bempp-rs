@@ -1,10 +1,10 @@
 //! Functions and functions spaces
-use crate::traits::element::FiniteElement;
 use crate::traits::grid::GridType;
 #[cfg(feature = "mpi")]
 use crate::traits::grid::ParallelGridType;
 use crate::traits::types::Ownership;
-use crate::traits::types::ReferenceCellType;
+use ndelement::traits::FiniteElement;
+use ndelement::types::ReferenceCellType;
 use std::collections::HashMap;
 
 /// A function space
