@@ -1,8 +1,9 @@
 //! Grid builder
 
-use crate::element::ciarlet::lagrange;
+use ndelement::ciarlet::lagrange;
 use crate::grid::mixed_grid::grid::MixedGrid;
-use crate::traits::element::{Continuity, FiniteElement};
+use ndelement::traits::FiniteElement;
+use ndelement::types::Continuity;
 use crate::traits::grid::Builder;
 use crate::traits::types::ReferenceCellType;
 use num::Float;

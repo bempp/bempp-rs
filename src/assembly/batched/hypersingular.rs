@@ -1,8 +1,9 @@
 //! Hypersingular assemblers
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData};
 use crate::assembly::common::equal_grids;
+use ndelement::traits::FiniteElement;
 use crate::traits::{
-    element::FiniteElement, function::FunctionSpace, grid::GridType, types::ReferenceCellType,
+    function::FunctionSpace, grid::GridType, types::ReferenceCellType,
 };
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef};

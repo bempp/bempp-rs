@@ -1,8 +1,9 @@
 //! Grid builder
 
-use crate::element::{ciarlet::lagrange, reference_cell};
+use ndelement::{ciarlet::lagrange, reference_cell};
 use crate::grid::single_element_grid::grid::SingleElementGrid;
-use crate::traits::element::{Continuity, FiniteElement};
+use ndelement::traits::FiniteElement;
+use ndelement::types::Continuity;
 use crate::traits::grid::Builder;
 use crate::traits::types::ReferenceCellType;
 use num::Float;

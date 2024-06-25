@@ -1,9 +1,9 @@
 //! Serial function space
 
-use crate::element::ciarlet::CiarletElement;
+use ndelement::ciarlet::CiarletElement;
+use ndelement::traits::{ElementFamily, FiniteElement};
 use crate::function::function_space::assign_dofs;
 use crate::traits::{
-    element::{ElementFamily, FiniteElement},
     function::FunctionSpace,
     grid::{CellType, GridType, TopologyType},
     types::{Ownership, ReferenceCellType},
@@ -157,9 +157,9 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::element::ciarlet::LagrangeElementFamily;
+    use ndelement::ciarlet::LagrangeElementFamily;
     use crate::grid::shapes::regular_sphere;
-    use crate::traits::element::Continuity;
+    use ndelement::types::Continuity;
 
     #[test]
     fn test_dofmap_lagrange0() {

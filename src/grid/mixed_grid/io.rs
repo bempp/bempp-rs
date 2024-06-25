@@ -2,7 +2,8 @@
 use super::MixedGrid;
 use crate::grid::io::{get_gmsh_cell, get_permutation_to_gmsh};
 use crate::grid::traits::Geometry;
-use crate::traits::{element::FiniteElement, grid::GmshIO};
+use crate::traits::grid::GmshIO;
+use ndelement::traits::FiniteElement;
 use num::Float;
 use rlst::{RandomAccessByRef, RlstScalar, Shape};
 

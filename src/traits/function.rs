@@ -1,5 +1,5 @@
 //! Functions and functions spaces
-use crate::traits::element::FiniteElement;
+use ndelement::traits::FiniteElement;
 use crate::traits::grid::GridType;
 #[cfg(feature = "mpi")]
 use crate::traits::grid::ParallelGridType;

@@ -33,10 +33,11 @@ type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::element::ciarlet::LagrangeElementFamily;
+    use ndelement::ciarlet::LagrangeElementFamily;
     use crate::function::SerialFunctionSpace;
     use crate::grid::shapes::regular_sphere;
-    use crate::traits::{element::Continuity, function::FunctionSpace};
+    use ndelement::types::Continuity;
+    use crate::traits::function::FunctionSpace;
     use approx::*;
     use rlst::rlst_dynamic_array2;
     use rlst::RandomAccessByRef;

@@ -1,6 +1,6 @@
 //! Parallel grid builder
 
-use crate::element::reference_cell;
+use ndelement::reference_cell;
 use crate::grid::mixed_grid::{MixedGrid, MixedGridBuilder};
 use crate::grid::parallel_grid::ParallelGridBuilder;
 use crate::traits::types::ReferenceCellType;

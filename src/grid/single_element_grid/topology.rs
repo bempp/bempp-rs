@@ -1,6 +1,6 @@
 //! Implementation of grid topology
 
-use crate::element::reference_cell;
+use ndelement::reference_cell;
 use crate::grid::traits::Topology;
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use std::collections::HashMap;

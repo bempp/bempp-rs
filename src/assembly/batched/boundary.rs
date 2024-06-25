@@ -1,13 +1,13 @@
 //! Batched dense assembly of boundary operators
 use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData};
-use crate::element::reference_cell;
+use ndelement::reference_cell;
 use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use crate::traits::element::FiniteElement;
+use ndelement::traits::FiniteElement;
 use crate::traits::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::function::FunctionSpaceInParallel;

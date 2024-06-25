@@ -1,8 +1,8 @@
 //! Serial function space
 
-use crate::element::ciarlet::CiarletElement;
+use ndelement::ciarlet::CiarletElement;
+use ndelement::traits::{ElementFamily, FiniteElement};
 use crate::traits::{
-    element::{ElementFamily, FiniteElement},
     grid::{CellType, EdgeType, GridType, PointType, TopologyType},
     types::Ownership,
 };
@@ -137,9 +137,9 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::element::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
+    use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
     use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
-    use crate::traits::element::Continuity;
+    use ndelement::types::Continuity;
 
     fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
         let family = LagrangeElementFamily::<f64>::new(degree, continuity);

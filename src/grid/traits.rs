@@ -1,6 +1,6 @@
 //! Traits used in the implementation of a grid
 
-use crate::traits::element::FiniteElement;
+use ndelement::traits::FiniteElement;
 use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
 use num::Float;
 use rlst::RlstScalar;

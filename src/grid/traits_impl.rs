@@ -1,8 +1,8 @@
 //! Implementing the grid traits from the topology and geometry traits used to store the grid data
 
-use crate::element::reference_cell;
+use ndelement::reference_cell;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
-use crate::traits::element::FiniteElement;
+use ndelement::traits::FiniteElement;
 use crate::traits::grid::{
     CellType, EdgeType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
