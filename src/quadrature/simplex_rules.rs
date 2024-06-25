@@ -1,10 +1,9 @@
 //! Get rules on simplices.
 
-pub use crate::traits::types::ReferenceCellType;
-
 use crate::quadrature::simplex_rule_definitions::SIMPLEX_RULE_DEFINITIONS;
 use crate::quadrature::types::NumericalQuadratureDefinition;
 use crate::quadrature::types::QuadratureError;
+use ndelement::types::ReferenceCellType;
 
 /// Return a simplex rule for a given number of points.
 ///

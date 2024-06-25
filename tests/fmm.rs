@@ -1,12 +1,9 @@
 use approx::*;
 use bempp::assembly::batched::BatchedAssembler;
 use bempp::assembly::{batched, fmm_tools};
-use bempp::element::ciarlet::LagrangeElementFamily;
 use bempp::function::SerialFunctionSpace;
 use bempp::grid::shapes::regular_sphere;
-use bempp::traits::{
-    element::Continuity, function::FunctionSpace, grid::GridType, types::ReferenceCellType,
-};
+use bempp::traits::{function::FunctionSpace, grid::GridType};
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
 #[cfg(not(debug_assertions))]
@@ -14,6 +11,8 @@ use kifmm::traits::tree::Tree;
 use kifmm::traits::{fmm::Fmm, tree::FmmTree};
 use kifmm::FftFieldTranslation;
 use kifmm::SingleNodeBuilder;
+use ndelement::ciarlet::LagrangeElementFamily;
+use ndelement::types::{Continuity, ReferenceCellType};
 use rand::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RandomAccessMut,

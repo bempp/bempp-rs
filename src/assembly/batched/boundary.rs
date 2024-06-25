@@ -1,19 +1,19 @@
 //! Batched dense assembly of boundary operators
 use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData};
-use ndelement::reference_cell;
 use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use ndelement::traits::FiniteElement;
 use crate::traits::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::function::FunctionSpaceInParallel;
 use crate::traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
 use crate::traits::types::Ownership;
-use crate::traits::types::ReferenceCellType;
+use ndelement::reference_cell;
+use ndelement::traits::FiniteElement;
+use ndelement::types::ReferenceCellType;
 use rayon::prelude::*;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, RandomAccessMut,

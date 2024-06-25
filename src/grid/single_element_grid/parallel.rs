@@ -2,8 +2,8 @@
 
 use crate::grid::parallel_grid::ParallelGridBuilder;
 use crate::grid::single_element_grid::{SingleElementGrid, SingleElementGridBuilder};
-use crate::traits::types::ReferenceCellType;
 use mpi::traits::{Buffer, Equivalence};
+use ndelement::types::ReferenceCellType;
 use num::Float;
 use rlst::{
     dense::array::views::ArrayViewMut, Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer,

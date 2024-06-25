@@ -6,7 +6,6 @@ use approx::assert_relative_eq;
 use bempp::{
     assembly::batched,
     assembly::batched::BatchedAssembler,
-    element::ciarlet::LagrangeElementFamily,
     function::{ParallelFunctionSpace, SerialFunctionSpace},
     grid::{
         flat_triangle_grid::{FlatTriangleGrid, FlatTriangleGridBuilder},
@@ -15,10 +14,9 @@ use bempp::{
         single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
     },
     traits::{
-        element::Continuity,
         function::FunctionSpace,
         grid::{Builder, CellType, GeometryType, GridType, ParallelBuilder, PointType},
-        types::{Ownership, ReferenceCellType},
+        types::Ownership,
     },
 };
 #[cfg(feature = "mpi")]
@@ -26,6 +24,11 @@ use mpi::{
     environment::Universe,
     request::WaitGuard,
     traits::{Communicator, Destination, Source},
+};
+#[cfg(feature = "mpi")]
+use ndelement::{
+    ciarlet::LagrangeElementFamily,
+    types::{Continuity, ReferenceCellType},
 };
 #[cfg(feature = "mpi")]
 use rlst::{CsrMatrix, Shape};

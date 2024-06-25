@@ -1,13 +1,14 @@
 //! Serial function space
 
-use ndelement::ciarlet::CiarletElement;
-use ndelement::traits::{ElementFamily, FiniteElement};
 use crate::function::function_space::assign_dofs;
 use crate::traits::{
     function::FunctionSpace,
     grid::{CellType, GridType, TopologyType},
-    types::{Ownership, ReferenceCellType},
+    types::Ownership,
 };
+use ndelement::ciarlet::CiarletElement;
+use ndelement::traits::{ElementFamily, FiniteElement};
+use ndelement::types::ReferenceCellType;
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
@@ -24,7 +25,11 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
     /// Create new function space
     pub fn new(
         grid: &'a GridImpl,
-        e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
+        e_family: &impl ElementFamily<
+            T = T,
+            FiniteElement = CiarletElement<T>,
+            CellType = ReferenceCellType,
+        >,
     ) -> Self {
         let (cell_dofs, entity_dofs, size, _) = assign_dofs(0, grid, e_family);
 
@@ -157,8 +162,8 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndelement::ciarlet::LagrangeElementFamily;
     use crate::grid::shapes::regular_sphere;
+    use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;
 
     #[test]

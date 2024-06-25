@@ -1,12 +1,10 @@
 //! Implementing the grid traits from the topology and geometry traits used to store the grid data
 
-use ndelement::reference_cell;
 use crate::grid::traits::{Geometry, GeometryEvaluator, Grid, Topology};
-use ndelement::traits::FiniteElement;
 use crate::traits::grid::{
     CellType, EdgeType, GeometryType, GridType, PointType, ReferenceMapType, TopologyType,
 };
-use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
+use crate::traits::types::{CellLocalIndexPair, Ownership};
 #[cfg(feature = "mpi")]
 use crate::{
     grid::parallel_grid::{LocalGrid, ParallelGrid},
@@ -14,6 +12,9 @@ use crate::{
 };
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
+use ndelement::reference_cell;
+use ndelement::traits::FiniteElement;
+use ndelement::types::ReferenceCellType;
 use num::Float;
 use rlst::RlstScalar;
 use std::iter::Copied;

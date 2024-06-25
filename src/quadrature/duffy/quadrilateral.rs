@@ -7,7 +7,7 @@ use crate::quadrature::{
         TestTrialNumericalQuadratureDefinition,
     },
 };
-use crate::traits::types::ReferenceCellType;
+use ndelement::types::ReferenceCellType;
 
 fn identical_quadrilaterals(
     interval_rule: &NumericalQuadratureDefinition,

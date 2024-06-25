@@ -1,8 +1,6 @@
 use bempp::grid::single_element_grid::SingleElementGridBuilder;
-use bempp::traits::{
-    grid::{Builder, CellType, GeometryType, GridType, PointType},
-    types::ReferenceCellType,
-};
+use bempp::traits::grid::{Builder, CellType, GeometryType, GridType, PointType};
+use ndelement::types::ReferenceCellType;
 
 extern crate blas_src;
 extern crate lapack_src;

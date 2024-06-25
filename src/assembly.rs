@@ -7,18 +7,17 @@ pub mod fmm_tools;
 mod test {
     use super::batched::BatchedAssembler;
     use super::*;
-    use ndelement::ciarlet::LagrangeElementFamily;
     use crate::function::SerialFunctionSpace;
     use crate::grid::{
         mixed_grid::{MixedGrid, MixedGridBuilder},
         shapes::regular_sphere,
         single_element_grid::{SingleElementGrid, SingleElementGridBuilder},
     };
-    use ndelement::types::Continuity;
-    use crate::traits::{
-        function::FunctionSpace, grid::Builder, types::ReferenceCellType,
-    };
+    use crate::traits::{function::FunctionSpace, grid::Builder};
     use cauchy::{c32, c64};
+    use ndelement::ciarlet::LagrangeElementFamily;
+    use ndelement::types::Continuity;
+    use ndelement::types::ReferenceCellType;
     use num::Float;
     use paste::paste;
     use rlst::{

@@ -1,6 +1,6 @@
 //! Definition of simplex rules.
 
-use crate::traits::types::ReferenceCellType;
+use ndelement::types::ReferenceCellType;
 use std::collections::HashMap;
 
 type HM = HashMap<usize, (usize, Vec<f64>, Vec<f64>)>;

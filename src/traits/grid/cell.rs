@@ -1,7 +1,8 @@
 //! Definition of a cell.
 
 use super::GridType;
-use crate::traits::types::{Ownership, ReferenceCellType};
+use crate::traits::types::Ownership;
+use ndelement::types::ReferenceCellType;
 use rlst::RlstScalar;
 
 pub trait CellType {

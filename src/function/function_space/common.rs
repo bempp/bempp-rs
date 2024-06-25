@@ -1,11 +1,12 @@
 //! Serial function space
 
-use ndelement::ciarlet::CiarletElement;
-use ndelement::traits::{ElementFamily, FiniteElement};
 use crate::traits::{
     grid::{CellType, EdgeType, GridType, PointType, TopologyType},
     types::Ownership,
 };
+use ndelement::ciarlet::CiarletElement;
+use ndelement::traits::{ElementFamily, FiniteElement};
+use ndelement::types::ReferenceCellType;
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
@@ -15,7 +16,11 @@ type OwnerData = Vec<(usize, usize, usize, usize)>;
 pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
     rank: usize,
     grid: &GridImpl,
-    e_family: &impl ElementFamily<T = T, FiniteElement = CiarletElement<T>>,
+    e_family: &impl ElementFamily<
+        T = T,
+        FiniteElement = CiarletElement<T>,
+        CellType = ReferenceCellType,
+    >,
 ) -> (DofList, [DofList; 4], usize, OwnerData) {
     let mut size = 0;
     let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
@@ -137,8 +142,8 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
     use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
+    use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
     use ndelement::types::Continuity;
 
     fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {

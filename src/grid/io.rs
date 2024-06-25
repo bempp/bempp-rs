@@ -1,5 +1,5 @@
 //! I/O utility functions
-use crate::traits::types::ReferenceCellType;
+use ndelement::types::ReferenceCellType;
 
 pub(crate) fn get_permutation_to_gmsh(cell_type: ReferenceCellType, degree: usize) -> Vec<usize> {
     match cell_type {

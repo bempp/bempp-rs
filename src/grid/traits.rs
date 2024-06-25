@@ -1,7 +1,8 @@
 //! Traits used in the implementation of a grid
 
+use crate::traits::types::{CellLocalIndexPair, Ownership};
 use ndelement::traits::FiniteElement;
-use crate::traits::types::{CellLocalIndexPair, Ownership, ReferenceCellType};
+use ndelement::types::ReferenceCellType;
 use num::Float;
 use rlst::RlstScalar;
 use std::hash::Hash;
@@ -100,7 +101,7 @@ pub trait Geometry {
     /// Scalar type
     type T: Float + RlstScalar<Real = Self::T>;
     /// Element type
-    type Element: FiniteElement;
+    type Element: FiniteElement<CellType = ReferenceCellType>;
     /// Type of geometry evaluator
     type Evaluator<'a>: GeometryEvaluator<T = Self::T>
     where
