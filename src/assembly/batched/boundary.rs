@@ -28,10 +28,6 @@ fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
     test_cell: usize,
     trial_cell: usize,
 ) -> bool {
-    false
-    /*
-    TODO
-
     if !equal_grids(test_grid, trial_grid) {
         false
     } else {
@@ -51,7 +47,6 @@ fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
         }
         false
     }
-    */
 }
 
 fn get_singular_quadrature_rule(
