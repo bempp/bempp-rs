@@ -34,7 +34,7 @@ type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, 
 mod test {
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use crate::grid::shapes::regular_sphere;
+    use ndgrid::shapes::regular_sphere;
     use crate::traits::function::FunctionSpace;
     use approx::*;
     use ndelement::ciarlet::LagrangeElementFamily;
@@ -71,7 +71,7 @@ mod test {
     #[test]
     fn test_singular_p1() {
         let grid = regular_sphere::<f64>(0);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
         let space = SerialFunctionSpace::new(&grid, &element);
 
         let ndofs = space.global_size();
@@ -98,7 +98,7 @@ mod test {
     fn test_singular_dp0_p1() {
         let grid = regular_sphere::<f64>(0);
         let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-        let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+        let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
         let space0 = SerialFunctionSpace::new(&grid, &element0);
         let space1 = SerialFunctionSpace::new(&grid, &element1);
 

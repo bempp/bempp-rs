@@ -30,10 +30,11 @@ lazy_static = "1.4"
 libc = "0.2"
 log = "0.4"
 ndelement = { git = "https://github.com/bempp/ndelement.git" }
+ndgrid = { git = "https://github.com/bempp/ndgrid.git" }
 rayon = "1.9"
 rand = "0.8.5"
-rlst = { version = "0.1" }
-green-kernels = { version = "0.1" }
+rlst = { version = "0.2" }
+green-kernels = { git = "https://github.com/bempp/green-kernels.git" }
 thiserror="1.*"
 
 [dev-dependencies]

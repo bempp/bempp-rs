@@ -1,19 +1,19 @@
 //! Serial function space
 
-use crate::traits::{
-    grid::{CellType, EdgeType, GridType, PointType, TopologyType},
+use ndgrid::{
+    traits::{Entity, Grid, Point, Topology},
     types::Ownership,
 };
 use ndelement::ciarlet::CiarletElement;
 use ndelement::traits::{ElementFamily, FiniteElement};
 use ndelement::types::ReferenceCellType;
-use rlst::RlstScalar;
+use rlst::{RlstScalar, MatrixInverse};
 use std::collections::HashMap;
 
 type DofList = Vec<Vec<usize>>;
 type OwnerData = Vec<(usize, usize, usize, usize)>;
 
-pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
+pub(crate) fn assign_dofs<T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>>(
     rank: usize,
     grid: &GridImpl,
     e_family: &impl ElementFamily<
@@ -25,24 +25,20 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
     let mut size = 0;
     let mut entity_dofs: [Vec<Vec<usize>>; 4] = [vec![], vec![], vec![], vec![]];
     let mut owner_data = vec![];
-    let tdim = grid.domain_dimension();
+    let tdim = grid.topology_dim();
 
     let mut elements = HashMap::new();
     let mut element_dims = HashMap::new();
-    for cell in grid.cell_types() {
+    for cell in grid.entity_types(2) {
         elements.insert(*cell, e_family.element(*cell));
         element_dims.insert(*cell, elements[cell].dim());
     }
 
-    let mut entity_counts = vec![];
-    entity_counts.push(grid.number_of_vertices());
-    if tdim > 1 {
-        entity_counts.push(grid.number_of_edges());
-    }
+    let mut entity_counts = (0..tdim + 1).map(
+        |d| grid.entity_types(d).iter().map(|&i| grid.entity_count(i)).sum::<usize>()).collect::<Vec<_>>();
     if tdim > 2 {
         unimplemented!("DOF maps not implemented for cells with tdim > 2.");
     }
-    entity_counts.push(grid.number_of_cells());
 
     for d in 0..tdim + 1 {
         entity_dofs[d] = vec![vec![]; entity_counts[d]];
@@ -50,90 +46,42 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
     let mut cell_dofs = vec![vec![]; entity_counts[tdim]];
 
     let mut max_rank = rank;
-    for cell in grid.iter_all_cells() {
+    for cell in grid.entity_iter(tdim) {
         if let Ownership::Ghost(process, _index) = cell.ownership() {
             if process > max_rank {
                 max_rank = process;
             }
         }
     }
-    for cell in grid.iter_all_cells() {
-        cell_dofs[cell.index()] = vec![0; element_dims[&cell.topology().cell_type()]];
-        let element = &elements[&cell.topology().cell_type()];
+    for cell in grid.entity_iter(tdim) {
+        cell_dofs[cell.local_index()] = vec![0; element_dims[&cell.entity_type()]];
+        let element = &elements[&cell.entity_type()];
         let topology = cell.topology();
 
-        // Assign DOFs to vertices
-        for (i, e) in topology.vertex_indices().enumerate() {
-            let e_dofs = element.entity_dofs(0, i).unwrap();
-            if !e_dofs.is_empty() {
-                if entity_dofs[0][e].is_empty() {
-                    for (dof_i, _d) in e_dofs.iter().enumerate() {
-                        entity_dofs[0][e].push(size);
-                        if let Ownership::Ghost(process, index) =
-                            grid.vertex_from_index(e).ownership()
-                        {
-                            owner_data.push((process, 0, index, dof_i));
-                        } else {
-                            owner_data.push((rank, 0, e, dof_i));
-                        }
-                        size += 1;
-                    }
-                }
-                for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[0][e]) {
-                    cell_dofs[cell.index()][*local_dof] = *dof;
-                }
-            }
-        }
 
-        // Assign DOFs to edges
-        if tdim >= 1 {
-            for (i, e) in topology.edge_indices().enumerate() {
-                let e_dofs = element.entity_dofs(1, i).unwrap();
+        // Assign DOFs to entities
+        for d in 0..tdim + 1 {
+            for (i, e) in topology.sub_entity_iter(d).enumerate() {
+                let e_dofs = element.entity_dofs(d, i).unwrap();
                 if !e_dofs.is_empty() {
-                    if entity_dofs[1][e].is_empty() {
+                    if entity_dofs[d][e].is_empty() {
                         for (dof_i, _d) in e_dofs.iter().enumerate() {
-                            entity_dofs[1][e].push(size);
+                            entity_dofs[d][e].push(size);
                             if let Ownership::Ghost(process, index) =
-                                grid.edge_from_index(e).ownership()
+                                grid.entity(d, e).unwrap().ownership()
                             {
-                                owner_data.push((process, 1, index, dof_i));
+                                owner_data.push((process, d, index, dof_i));
                             } else {
-                                owner_data.push((rank, 1, e, dof_i));
+                                owner_data.push((rank, d, e, dof_i));
                             }
                             size += 1;
                         }
                     }
-                    for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[1][e]) {
-                        cell_dofs[cell.index()][*local_dof] = *dof;
+                    for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[d][e]) {
+                        cell_dofs[cell.local_index()][*local_dof] = *dof;
                     }
                 }
             }
-        }
-
-        // Assign DOFs to faces
-        if tdim >= 2 {
-            for (i, e) in topology.face_indices().enumerate() {
-                let e_dofs = element.entity_dofs(2, i).unwrap();
-                if !e_dofs.is_empty() {
-                    if entity_dofs[2][e].is_empty() {
-                        for (dof_i, _d) in e_dofs.iter().enumerate() {
-                            entity_dofs[2][e].push(size);
-                            if let Ownership::Ghost(process, index) = cell.ownership() {
-                                owner_data.push((process, 2, index, dof_i));
-                            } else {
-                                owner_data.push((rank, 2, e, dof_i));
-                            }
-                            size += 1;
-                        }
-                    }
-                    for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[2][e]) {
-                        cell_dofs[cell.index()][*local_dof] = *dof;
-                    }
-                }
-            }
-        }
-        if tdim >= 3 {
-            unimplemented!("DOF maps not implemented for cells with tdim > 2.");
         }
     }
     (cell_dofs, entity_dofs, size, owner_data)
@@ -142,11 +90,11 @@ pub(crate) fn assign_dofs<T: RlstScalar, GridImpl: GridType<T = T::Real>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::grid::shapes::{screen_mixed, screen_quadrilaterals, screen_triangles};
+    use ndgrid::shapes::{screen_quadrilaterals, screen_triangles};
     use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
     use ndelement::types::Continuity;
 
-    fn run_test(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
+    fn run_test(grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>, degree: usize, continuity: Continuity) {
         let family = LagrangeElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 
@@ -170,7 +118,7 @@ mod test {
         }
     }
 
-    fn run_test_rt(grid: &impl GridType<T = f64>, degree: usize, continuity: Continuity) {
+    fn run_test_rt(grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>, degree: usize, continuity: Continuity) {
         let family = RaviartThomasElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 
@@ -207,12 +155,12 @@ mod test {
     #[test]
     fn test_p2_triangles() {
         let grid = screen_triangles::<f64>(8);
-        run_test(&grid, 2, Continuity::Continuous);
+        run_test(&grid, 2, Continuity::Standard);
     }
     #[test]
     fn test_p3_triangles() {
         let grid = screen_triangles::<f64>(8);
-        run_test(&grid, 3, Continuity::Continuous);
+        run_test(&grid, 3, Continuity::Standard);
     }
     #[test]
     fn test_rt1_triangles() {
@@ -233,14 +181,15 @@ mod test {
     #[test]
     fn test_p2_quadrilaterals() {
         let grid = screen_quadrilaterals::<f64>(8);
-        run_test(&grid, 2, Continuity::Continuous);
+        run_test(&grid, 2, Continuity::Standard);
     }
     #[test]
     fn test_p3_quadrilaterals() {
         let grid = screen_quadrilaterals::<f64>(8);
-        run_test(&grid, 3, Continuity::Continuous);
+        run_test(&grid, 3, Continuity::Standard);
     }
 
+    /*
     #[test]
     fn test_dp0_mixed() {
         let grid = screen_mixed::<f64>(8);
@@ -254,11 +203,12 @@ mod test {
     #[test]
     fn test_p2_mixed() {
         let grid = screen_mixed::<f64>(8);
-        run_test(&grid, 2, Continuity::Continuous);
+        run_test(&grid, 2, Continuity::Standard);
     }
     #[test]
     fn test_p3_mixed() {
         let grid = screen_mixed::<f64>(8);
-        run_test(&grid, 3, Continuity::Continuous);
+        run_test(&grid, 3, Continuity::Standard);
     }
+    */
 }

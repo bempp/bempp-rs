@@ -1,14 +1,14 @@
 //! Single layer assemblers
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef};
+use rlst::{RlstScalar, UnsafeRandomAccessByRef, MatrixInverse};
 
 /// Assembler for a Laplace single layer operator
-pub struct LaplaceSingleLayerAssembler<T: RlstScalar> {
+pub struct LaplaceSingleLayerAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar> Default for LaplaceSingleLayerAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> Default for LaplaceSingleLayerAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -16,7 +16,7 @@ impl<T: RlstScalar> Default for LaplaceSingleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 0;
     type T = T;
@@ -45,14 +45,14 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
     ) -> T {
         *k.get_unchecked([test_index, 0, trial_index])
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -61,11 +61,11 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceSingleLayerAssembler<T> {
 }
 
 /// Assembler for a Helmholtz single layer boundary operator
-pub struct HelmholtzSingleLayerAssembler<T: RlstScalar<Complex = T>> {
+pub struct HelmholtzSingleLayerAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzSingleLayerAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -74,7 +74,7 @@ impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzSingleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler for HelmholtzSingleLayerAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 0;
     type T = T;
@@ -103,14 +103,14 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzSingleLayerAssemb
     ) -> T {
         *k.get_unchecked([test_index, 0, trial_index])
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
