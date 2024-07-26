@@ -1,6 +1,6 @@
 use bempp::assembly::{batched, batched::BatchedAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::grid::shapes::regular_sphere;
+use ndgrid::shapes::regular_sphere;
 use bempp::traits::function::FunctionSpace;
 use criterion::{criterion_group, criterion_main, Criterion};
 use ndelement::ciarlet::LagrangeElementFamily;
