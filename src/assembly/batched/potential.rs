@@ -44,9 +44,9 @@ fn assemble_batch<
     let mut k = rlst_dynamic_array3!(T, [npts, deriv_size, nevalpts]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut jdet = vec![zero; npts];
-    let mut mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
+    let mut mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut normals = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut jacobians = rlst_dynamic_array2!(T::Real, [6, npts]);
 
     let evaluator = grid.geometry_map(cell_type, points.data());
 
@@ -173,10 +173,10 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
         for cell_type in space.grid().entity_types(2) {
             let npts = self.options().quadrature_degrees[cell_type];
             let qrule = simplex_rule(*cell_type, npts).unwrap();
-            let mut qpoints = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+            let mut qpoints = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
             for i in 0..npts {
                 for j in 0..2 {
-                    *qpoints.get_mut([i, j]).unwrap() =
+                    *qpoints.get_mut([j, i]).unwrap() =
                         num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule.points[2 * i + j])
                             .unwrap();
                 }

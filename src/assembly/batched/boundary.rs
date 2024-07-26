@@ -130,14 +130,14 @@ fn assemble_batch_singular<
     let mut k = rlst_dynamic_array2!(T, [deriv_size, npts]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut test_jdet = vec![zero; npts];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts]);
 
     let mut trial_jdet = vec![zero; npts];
-    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
-    let mut trial_normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
+    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [6, npts]);
+    let mut trial_normals = rlst_dynamic_array2!(T::Real, [3, npts]);
 
     let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
     let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
@@ -235,9 +235,9 @@ fn assemble_batch_nonadjacent<
     let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut test_jdet = vec![zero; npts_test];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_test]);
 
     let test_evaluator = test_grid.geometry_map(test_cell_type, test_points.data());
     let trial_evaluator = trial_grid.geometry_map(trial_cell_type, trial_points.data());
@@ -247,9 +247,9 @@ fn assemble_batch_nonadjacent<
     let mut trial_normals = vec![];
     let mut trial_jacobians = vec![];
     for _i in 0..trial_cells.len() {
-        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
-        trial_normals.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
-        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [npts_trial, 6]));
+        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
+        trial_normals.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
+        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [6, npts_trial]));
     }
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
@@ -368,14 +368,14 @@ fn assemble_batch_singular_correction<
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
 
     let mut test_jdet = vec![zero; npts_test];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_test]);
 
     let mut trial_jdet = vec![zero; npts_trial];
-    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_trial, 3]);
-    let mut trial_normals = rlst_dynamic_array2!(T::Real, [npts_trial, 3]);
-    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [npts_trial, 6]);
+    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_trial]);
+    let mut trial_normals = rlst_dynamic_array2!(T::Real, [3, npts_trial]);
+    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_trial]);
 
     let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
     let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
