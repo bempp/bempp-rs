@@ -1,6 +1,6 @@
 //! Functions and functions spaces
-#[cfg(feature = "mpi")]
-use crate::traits::grid::ParallelGridType;
+//#[cfg(feature = "mpi")]
+//use crate::traits::grid::ParallelGridType;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
 use ndgrid::traits::Grid;
@@ -48,6 +48,7 @@ pub trait FunctionSpace {
     fn ownership(&self, local_dof_index: usize) -> Ownership;
 }
 
+/*
 #[cfg(feature = "mpi")]
 /// A function space in parallel
 pub trait FunctionSpaceInParallel {
@@ -59,3 +60,4 @@ pub trait FunctionSpaceInParallel {
     /// Get the local space on the process
     fn local_space(&self) -> &Self::SerialSpace;
 }
+*/

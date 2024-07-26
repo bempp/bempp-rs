@@ -6,8 +6,8 @@ use crate::quadrature::duffy::{
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use crate::traits::function::FunctionSpace;
-#[cfg(feature = "mpi")]
-use crate::traits::function::FunctionSpaceInParallel;
+//#[cfg(feature = "mpi")]
+//use crate::traits::function::FunctionSpaceInParallel;
 use ndelement::reference_cell;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
@@ -1031,22 +1031,23 @@ pub trait BatchedAssembler: Sync + Sized {
         .unwrap()
     }
 
-    #[cfg(feature = "mpi")]
-    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
-    fn parallel_assemble_singular_into_csr<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
-    >(
-        &self,
-        trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
-        test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
-    ) -> CsrMatrix<Self::T> {
-        self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
-    }
-
+    /*
+        #[cfg(feature = "mpi")]
+        /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+        fn parallel_assemble_singular_into_csr<
+            TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            Element: FiniteElement<T = Self::T> + Sync,
+            SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
+            SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
+        >(
+            &self,
+            trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
+            test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
+        ) -> CsrMatrix<Self::T> {
+            self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
+        }
+    */
     /// Assemble the singular correction into a dense matrix
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
@@ -1100,26 +1101,26 @@ pub trait BatchedAssembler: Sync + Sized {
         )
         .unwrap()
     }
-
-    #[cfg(feature = "mpi")]
-    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
-    fn parallel_assemble_singular_correction_into_csr<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
-    >(
-        &self,
-        trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
-        test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
-    ) -> CsrMatrix<Self::T> {
-        self.assemble_singular_correction_into_csr(
-            trial_space.local_space(),
-            test_space.local_space(),
-        )
-    }
-
+    /*
+        #[cfg(feature = "mpi")]
+        /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+        fn parallel_assemble_singular_correction_into_csr<
+            TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            Element: FiniteElement<T = Self::T> + Sync,
+            SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
+            SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
+        >(
+            &self,
+            trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
+            test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
+        ) -> CsrMatrix<Self::T> {
+            self.assemble_singular_correction_into_csr(
+                trial_space.local_space(),
+                test_space.local_space(),
+            )
+        }
+    */
     /// Assemble into a dense matrix
     fn assemble_into_dense<
         TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
