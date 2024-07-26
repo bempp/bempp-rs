@@ -1,19 +1,22 @@
 //! Serial function space
 
-use ndgrid::{
-    traits::{Entity, Grid, Point, Topology},
-    types::Ownership,
-};
 use ndelement::ciarlet::CiarletElement;
 use ndelement::traits::{ElementFamily, FiniteElement};
 use ndelement::types::ReferenceCellType;
-use rlst::{RlstScalar, MatrixInverse};
+use ndgrid::{
+    traits::{Entity, Grid, Topology},
+    types::Ownership,
+};
+use rlst::{MatrixInverse, RlstScalar};
 use std::collections::HashMap;
 
 type DofList = Vec<Vec<usize>>;
 type OwnerData = Vec<(usize, usize, usize, usize)>;
 
-pub(crate) fn assign_dofs<T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>>(
+pub(crate) fn assign_dofs<
+    T: RlstScalar + MatrixInverse,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+>(
     rank: usize,
     grid: &GridImpl,
     e_family: &impl ElementFamily<
@@ -34,8 +37,14 @@ pub(crate) fn assign_dofs<T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::R
         element_dims.insert(*cell, elements[cell].dim());
     }
 
-    let mut entity_counts = (0..tdim + 1).map(
-        |d| grid.entity_types(d).iter().map(|&i| grid.entity_count(i)).sum::<usize>()).collect::<Vec<_>>();
+    let entity_counts = (0..tdim + 1)
+        .map(|d| {
+            grid.entity_types(d)
+                .iter()
+                .map(|&i| grid.entity_count(i))
+                .sum::<usize>()
+        })
+        .collect::<Vec<_>>();
     if tdim > 2 {
         unimplemented!("DOF maps not implemented for cells with tdim > 2.");
     }
@@ -58,15 +67,14 @@ pub(crate) fn assign_dofs<T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::R
         let element = &elements[&cell.entity_type()];
         let topology = cell.topology();
 
-
         // Assign DOFs to entities
-        for d in 0..tdim + 1 {
+        for (d, edofs_d) in entity_dofs.iter_mut().enumerate() {
             for (i, e) in topology.sub_entity_iter(d).enumerate() {
                 let e_dofs = element.entity_dofs(d, i).unwrap();
                 if !e_dofs.is_empty() {
-                    if entity_dofs[d][e].is_empty() {
+                    if edofs_d[e].is_empty() {
                         for (dof_i, _d) in e_dofs.iter().enumerate() {
-                            entity_dofs[d][e].push(size);
+                            edofs_d[e].push(size);
                             if let Ownership::Ghost(process, index) =
                                 grid.entity(d, e).unwrap().ownership()
                             {
@@ -77,7 +85,7 @@ pub(crate) fn assign_dofs<T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::R
                             size += 1;
                         }
                     }
-                    for (local_dof, dof) in e_dofs.iter().zip(&entity_dofs[d][e]) {
+                    for (local_dof, dof) in e_dofs.iter().zip(&edofs_d[e]) {
                         cell_dofs[cell.local_index()][*local_dof] = *dof;
                     }
                 }
@@ -90,11 +98,15 @@ pub(crate) fn assign_dofs<T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::R
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndgrid::shapes::{screen_quadrilaterals, screen_triangles};
     use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
     use ndelement::types::Continuity;
+    use ndgrid::shapes::{screen_quadrilaterals, screen_triangles};
 
-    fn run_test(grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>, degree: usize, continuity: Continuity) {
+    fn run_test(
+        grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>,
+        degree: usize,
+        continuity: Continuity,
+    ) {
         let family = LagrangeElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 
@@ -118,7 +130,11 @@ mod test {
         }
     }
 
-    fn run_test_rt(grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>, degree: usize, continuity: Continuity) {
+    fn run_test_rt(
+        grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>,
+        degree: usize,
+        continuity: Continuity,
+    ) {
         let family = RaviartThomasElementFamily::<f64>::new(degree, continuity);
         let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
 

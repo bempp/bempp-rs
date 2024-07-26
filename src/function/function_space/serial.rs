@@ -2,18 +2,22 @@
 
 use crate::function::function_space::assign_dofs;
 use crate::traits::function::FunctionSpace;
+use ndelement::ciarlet::CiarletElement;
+use ndelement::traits::{ElementFamily, FiniteElement};
+use ndelement::types::ReferenceCellType;
 use ndgrid::{
     traits::{Entity, Grid, Topology},
     types::Ownership,
 };
-use ndelement::ciarlet::CiarletElement;
-use ndelement::traits::{ElementFamily, FiniteElement};
-use ndelement::types::ReferenceCellType;
-use rlst::{RlstScalar, MatrixInverse};
+use rlst::{MatrixInverse, RlstScalar};
 use std::collections::HashMap;
 
 /// A serial function space
-pub struct SerialFunctionSpace<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>> {
+pub struct SerialFunctionSpace<
+    'a,
+    T: RlstScalar + MatrixInverse,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+> {
     pub(crate) grid: &'a GridImpl,
     pub(crate) elements: HashMap<ReferenceCellType, CiarletElement<T>>,
     pub(crate) entity_dofs: [Vec<Vec<usize>>; 4],
@@ -21,7 +25,12 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid
     pub(crate) size: usize,
 }
 
-impl<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>> SerialFunctionSpace<'a, T, GridImpl> {
+impl<
+        'a,
+        T: RlstScalar + MatrixInverse,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > SerialFunctionSpace<'a, T, GridImpl>
+{
     /// Create new function space
     pub fn new(
         grid: &'a GridImpl,
@@ -48,8 +57,11 @@ impl<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescri
     }
 }
 
-impl<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>> FunctionSpace
-    for SerialFunctionSpace<'a, T, GridImpl>
+impl<
+        'a,
+        T: RlstScalar + MatrixInverse,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > FunctionSpace for SerialFunctionSpace<'a, T, GridImpl>
 {
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
@@ -98,7 +110,11 @@ impl<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescri
             } else if edim == 1 {
                 self.grid.entity_count(ReferenceCellType::Interval)
             } else if edim == 2 && self.grid.topology_dim() == 2 {
-                self.grid.entity_types(2).iter().map(|&i| self.grid.entity_count(i)).sum::<usize>()
+                self.grid
+                    .entity_types(2)
+                    .iter()
+                    .map(|&i| self.grid.entity_count(i))
+                    .sum::<usize>()
             } else {
                 unimplemented!();
             }
@@ -154,9 +170,9 @@ impl<'a, T: RlstScalar + MatrixInverse, GridImpl: Grid<T = T::Real, EntityDescri
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndgrid::shapes::regular_sphere;
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;
+    use ndgrid::shapes::regular_sphere;
 
     #[test]
     fn test_dofmap_lagrange0() {
@@ -164,7 +180,10 @@ mod test {
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(space.local_size(), grid.entity_count(ReferenceCellType::Triangle));
+        assert_eq!(
+            space.local_size(),
+            grid.entity_count(ReferenceCellType::Triangle)
+        );
     }
 
     #[test]
@@ -173,7 +192,10 @@ mod test {
         let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(space.local_size(), grid.entity_count(ReferenceCellType::Point));
+        assert_eq!(
+            space.local_size(),
+            grid.entity_count(ReferenceCellType::Point)
+        );
     }
 
     #[test]
@@ -184,7 +206,8 @@ mod test {
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(
             space.local_size(),
-            grid.entity_count(ReferenceCellType::Point) + grid.entity_count(ReferenceCellType::Interval)
+            grid.entity_count(ReferenceCellType::Point)
+                + grid.entity_count(ReferenceCellType::Interval)
         );
     }
 
@@ -277,8 +300,18 @@ mod test {
             for cell0 in ci {
                 for cell1 in ci {
                     if cell0 != cell1 {
-                        for e0 in grid.entity(2, *cell0).unwrap().topology().sub_entity_iter(1) {
-                            for e1 in grid.entity(2, *cell1).unwrap().topology().sub_entity_iter(1) {
+                        for e0 in grid
+                            .entity(2, *cell0)
+                            .unwrap()
+                            .topology()
+                            .sub_entity_iter(1)
+                        {
+                            for e1 in grid
+                                .entity(2, *cell1)
+                                .unwrap()
+                                .topology()
+                                .sub_entity_iter(1)
+                            {
                                 assert!(e0 != e1);
                             }
                         }

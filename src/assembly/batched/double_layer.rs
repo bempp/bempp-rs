@@ -1,7 +1,7 @@
 //! Double layer assemblers
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef, MatrixInverse};
+use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace double layer operator
 pub struct LaplaceDoubleLayerAssembler<T: RlstScalar + MatrixInverse> {
@@ -84,7 +84,9 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzDoubleLayerAssembler<T
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler for HelmholtzDoubleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzDoubleLayerAssembler<T>
+{
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
     type T = T;

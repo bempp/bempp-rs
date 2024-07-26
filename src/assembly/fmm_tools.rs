@@ -3,17 +3,20 @@ use crate::assembly::common::SparseMatrixData;
 use crate::function::SerialFunctionSpace;
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::function::FunctionSpace;
-use ndgrid::traits::{Grid, GeometryMap};
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::{GeometryMap, Grid};
 use rlst::CsrMatrix;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array4, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
-    RawAccess, RlstScalar, Shape, VectorContainer, MatrixInverse
+    rlst_dynamic_array2, rlst_dynamic_array4, Array, BaseArray, MatrixInverse, RandomAccessByRef,
+    RandomAccessMut, RawAccess, RlstScalar, Shape, VectorContainer,
 };
 
 /// Generate an array of all the quadrature points
-pub fn get_all_quadrature_points<T: RlstScalar<Real = T> + MatrixInverse, G: Grid<T = T, EntityDescriptor = ReferenceCellType>>(
+pub fn get_all_quadrature_points<
+    T: RlstScalar<Real = T> + MatrixInverse,
+    G: Grid<T = T, EntityDescriptor = ReferenceCellType>,
+>(
     npts: usize,
     grid: &G,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> {
@@ -31,7 +34,10 @@ pub fn get_all_quadrature_points<T: RlstScalar<Real = T> + MatrixInverse, G: Gri
 
     let mut all_points = rlst_dynamic_array2!(
         T,
-        [npts * grid.entity_count(ReferenceCellType::Triangle), grid.geometry_dim()]
+        [
+            npts * grid.entity_count(ReferenceCellType::Triangle),
+            grid.geometry_dim()
+        ]
     );
     let mut points = vec![num::cast::<f64, T>(0.0).unwrap(); npts * grid.geometry_dim()];
 
@@ -75,7 +81,11 @@ pub fn basis_to_quadrature_into_csr<
     space: &SerialFunctionSpace<'_, T, G>,
 ) -> CsrMatrix<T> {
     let grid = space.grid();
-    let ncells = grid.entity_types(2).iter().map(|&i| grid.entity_count(i)).sum::<usize>();
+    let ncells = grid
+        .entity_types(2)
+        .iter()
+        .map(|&i| grid.entity_count(i))
+        .sum::<usize>();
     let shape = [ncells * npts, space.global_size()];
     let sparse_matrix = basis_to_quadrature::<BLOCKSIZE, T, G>(shape, npts, space);
 
@@ -118,7 +128,11 @@ pub fn transpose_basis_to_quadrature_into_csr<
     space: &SerialFunctionSpace<'_, T, G>,
 ) -> CsrMatrix<T> {
     let grid = space.grid();
-    let ncells = grid.entity_types(2).iter().map(|&i| grid.entity_count(i)).sum::<usize>();
+    let ncells = grid
+        .entity_types(2)
+        .iter()
+        .map(|&i| grid.entity_count(i))
+        .sum::<usize>();
     let shape = [ncells * npts, space.global_size()];
     let sparse_matrix = basis_to_quadrature::<BLOCKSIZE, T, G>(shape, npts, space);
 
@@ -131,7 +145,11 @@ pub fn transpose_basis_to_quadrature_into_csr<
     .unwrap()
 }
 
-fn basis_to_quadrature<const BLOCKSIZE: usize, T: RlstScalar + MatrixInverse, G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>>(
+fn basis_to_quadrature<
+    const BLOCKSIZE: usize,
+    T: RlstScalar + MatrixInverse,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+>(
     shape: [usize; 2],
     npts: usize,
     space: &SerialFunctionSpace<'_, T, G>,
@@ -140,7 +158,11 @@ fn basis_to_quadrature<const BLOCKSIZE: usize, T: RlstScalar + MatrixInverse, G:
         panic!("Dense assembly can only be used for function spaces stored in serial");
     }
     let grid = space.grid();
-    let ncells = grid.entity_types(2).iter().map(|&i| grid.entity_count(i)).sum::<usize>();
+    let ncells = grid
+        .entity_types(2)
+        .iter()
+        .map(|&i| grid.entity_count(i))
+        .sum::<usize>();
     if shape[0] != ncells * npts || shape[1] != space.global_size() {
         panic!("Matrix has wrong shape");
     }
@@ -184,10 +206,7 @@ fn basis_to_quadrature<const BLOCKSIZE: usize, T: RlstScalar + MatrixInverse, G:
         grid.geometry_dim() * grid.topology_dim() * npts
     ];
     let mut jdets = vec![num::cast::<f64, T::Real>(0.0).unwrap(); npts];
-    let mut normals = vec![
-        num::cast::<f64, T::Real>(0.0).unwrap();
-        grid.geometry_dim() * npts
-    ];
+    let mut normals = vec![num::cast::<f64, T::Real>(0.0).unwrap(); grid.geometry_dim() * npts];
 
     // TODO: batch this?
     for cell in 0..ncells {

@@ -1,7 +1,7 @@
 //! Single layer assemblers
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef, MatrixInverse};
+use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace single layer operator
 pub struct LaplaceSingleLayerAssembler<T: RlstScalar + MatrixInverse> {
@@ -74,7 +74,9 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzSingleLayerAssembler<T
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler for HelmholtzSingleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzSingleLayerAssembler<T>
+{
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 0;
     type T = T;

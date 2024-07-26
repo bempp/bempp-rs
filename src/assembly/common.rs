@@ -1,6 +1,6 @@
 //! Common utility functions
 use ndgrid::traits::Grid;
-use rlst::{RlstScalar, MatrixInverse};
+use rlst::{MatrixInverse, RlstScalar};
 
 pub(crate) fn equal_grids<TestGrid: Grid, TrialGrid: Grid>(
     test_grid: &TestGrid,

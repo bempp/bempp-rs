@@ -34,11 +34,11 @@ type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, 
 mod test {
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use ndgrid::shapes::regular_sphere;
     use crate::traits::function::FunctionSpace;
     use approx::*;
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;
+    use ndgrid::shapes::regular_sphere;
     use rlst::rlst_dynamic_array2;
     use rlst::RandomAccessByRef;
 

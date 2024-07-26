@@ -2,10 +2,6 @@
 
 use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
 use crate::traits::function::{FunctionSpace, FunctionSpaceInParallel};
-use ndgrid::{
-    traits::Grid,
-    types::Ownership,
-};
 use mpi::{
     point_to_point::{Destination, Source},
     request::WaitGuard,
@@ -14,7 +10,8 @@ use mpi::{
 use ndelement::ciarlet::CiarletElement;
 use ndelement::traits::ElementFamily;
 use ndelement::types::ReferenceCellType;
-use rlst::{RlstScalar, MatrixInverse};
+use ndgrid::{traits::Grid, types::Ownership};
+use rlst::{MatrixInverse, RlstScalar};
 use std::collections::HashMap;
 
 /// The local function space on a process
@@ -213,8 +210,8 @@ impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T 
     }
 }
 
-impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>> FunctionSpaceInParallel
-    for ParallelFunctionSpace<'a, T, GridImpl>
+impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>>
+    FunctionSpaceInParallel for ParallelFunctionSpace<'a, T, GridImpl>
 {
     type ParallelGrid = GridImpl;
     type SerialSpace = LocalFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>;
@@ -227,8 +224,8 @@ impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T 
     }
 }
 
-impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>> FunctionSpace
-    for ParallelFunctionSpace<'a, T, GridImpl>
+impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>>
+    FunctionSpace for ParallelFunctionSpace<'a, T, GridImpl>
 {
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;

@@ -8,15 +8,15 @@ use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadrat
 use crate::traits::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::function::FunctionSpaceInParallel;
-use ndgrid::traits::{GeometryMap, Entity, Grid, Topology};
-use ndgrid::types::Ownership;
 use ndelement::reference_cell;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::{Entity, GeometryMap, Grid, Topology};
+use ndgrid::types::Ownership;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, RandomAccessMut,
-    RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef, MatrixInverse
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, MatrixInverse,
+    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
@@ -32,12 +32,14 @@ fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
         false
     } else {
         let test_vertices = trial_grid
-            .entity(2, test_cell).unwrap()
+            .entity(2, test_cell)
+            .unwrap()
             .topology()
             .sub_entity_iter(0)
             .collect::<Vec<_>>();
         for v in trial_grid
-            .entity(2, trial_cell).unwrap()
+            .entity(2, trial_cell)
+            .unwrap()
             .topology()
             .sub_entity_iter(0)
         {
@@ -144,10 +146,20 @@ fn assemble_batch_singular<
 
     for (test_cell, trial_cell) in cell_pairs {
         test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
-        test_evaluator.jacobians_dets_normals(*test_cell, test_jacobians.data_mut(), &mut test_jdet, test_normals.data_mut());
+        test_evaluator.jacobians_dets_normals(
+            *test_cell,
+            test_jacobians.data_mut(),
+            &mut test_jdet,
+            test_normals.data_mut(),
+        );
 
         trial_evaluator.points(*trial_cell, trial_mapped_pts.data_mut());
-        trial_evaluator.jacobians_dets_normals(*trial_cell, trial_jacobians.data_mut(), &mut trial_jdet, trial_normals.data_mut());
+        trial_evaluator.jacobians_dets_normals(
+            *trial_cell,
+            trial_jacobians.data_mut(),
+            &mut trial_jdet,
+            trial_normals.data_mut(),
+        );
 
         assembler.kernel_assemble_pairwise_st(
             test_mapped_pts.data(),
@@ -254,7 +266,12 @@ fn assemble_batch_nonadjacent<
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
         trial_evaluator.points(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
-        trial_evaluator.jacobians_dets_normals(*trial_cell, trial_jacobians[trial_cell_i].data_mut(), &mut trial_jdet[trial_cell_i], trial_normals[trial_cell_i].data_mut());
+        trial_evaluator.jacobians_dets_normals(
+            *trial_cell,
+            trial_jacobians[trial_cell_i].data_mut(),
+            &mut trial_jdet[trial_cell_i],
+            trial_normals[trial_cell_i].data_mut(),
+        );
     }
 
     let mut sum: T;
@@ -262,7 +279,12 @@ fn assemble_batch_nonadjacent<
 
     for test_cell in test_cells {
         test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
-        test_evaluator.jacobians_dets_normals(*test_cell, test_jacobians.data_mut(), &mut test_jdet, test_normals.data_mut());
+        test_evaluator.jacobians_dets_normals(
+            *test_cell,
+            test_jacobians.data_mut(),
+            &mut test_jdet,
+            test_normals.data_mut(),
+        );
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
             if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
@@ -385,10 +407,20 @@ fn assemble_batch_singular_correction<
 
     for (test_cell, trial_cell) in cell_pairs {
         test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
-        test_evaluator.jacobians_dets_normals(*test_cell, test_jacobians.data_mut(), &mut test_jdet, test_normals.data_mut());
+        test_evaluator.jacobians_dets_normals(
+            *test_cell,
+            test_jacobians.data_mut(),
+            &mut test_jdet,
+            test_normals.data_mut(),
+        );
 
         trial_evaluator.points(*trial_cell, trial_mapped_pts.data_mut());
-        trial_evaluator.jacobians_dets_normals(*trial_cell, trial_jacobians.data_mut(), &mut trial_jdet, trial_normals.data_mut());
+        trial_evaluator.jacobians_dets_normals(
+            *trial_cell,
+            trial_jacobians.data_mut(),
+            &mut trial_jdet,
+            trial_normals.data_mut(),
+        );
 
         assembler.kernel_assemble_st(
             test_mapped_pts.data(),
@@ -739,7 +771,9 @@ pub trait BatchedAssembler: Sync + Sized {
                     for trial_cell_index in vertex.topology().connected_entity_iter(2) {
                         let trial_cell = grid.entity(2, trial_cell_index).unwrap();
                         let trial_cell_type = trial_cell.entity_type();
-                        if let Some(pairs) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index()) {
+                        if let Some(pairs) =
+                            get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index())
+                        {
                             cell_pairs[pair_indices[&(test_cell_type, trial_cell_type, pairs)]]
                                 .push((test_cell_index, trial_cell_index));
                         }
@@ -747,7 +781,6 @@ pub trait BatchedAssembler: Sync + Sized {
                 }
             }
         }
-
 
         let batch_size = self.options().batch_size;
         for (i, cells) in cell_pairs.iter().enumerate() {
@@ -902,7 +935,9 @@ pub trait BatchedAssembler: Sync + Sized {
                         let trial_cell = grid.entity(2, trial_cell_index).unwrap();
                         let trial_cell_type = trial_cell.entity_type();
 
-                        if get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index()).is_some() {
+                        if get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index())
+                            .is_some()
+                        {
                             cell_pairs[cell_type_indices[&(test_cell_type, trial_cell_type)]]
                                 .push((test_cell_index, trial_cell_index));
                         }
@@ -1230,7 +1265,8 @@ pub trait BatchedAssembler: Sync + Sized {
                                     self,
                                     Self::DERIV_SIZE,
                                     &output_raw,
-                                    *test_cell_type, *trial_cell_type,
+                                    *test_cell_type,
+                                    *trial_cell_type,
                                     trial_space,
                                     trial_cells[t],
                                     test_space,

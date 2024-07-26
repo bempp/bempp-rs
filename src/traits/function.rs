@@ -1,10 +1,10 @@
 //! Functions and functions spaces
-use ndgrid::traits::Grid;
 #[cfg(feature = "mpi")]
 use crate::traits::grid::ParallelGridType;
-use ndgrid::types::Ownership;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::Grid;
+use ndgrid::types::Ownership;
 use std::collections::HashMap;
 
 /// A function space

@@ -2,13 +2,13 @@
 use crate::assembly::common::RawData2D;
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::function::FunctionSpace;
-use ndgrid::traits::{Grid, GeometryMap};
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::{GeometryMap, Grid};
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, RandomAccessMut, RawAccess,
-    RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef, MatrixInverse
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, MatrixInverse, RandomAccessMut,
+    RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
@@ -54,7 +54,12 @@ fn assemble_batch<
 
     for cell in cells {
         evaluator.points(*cell, mapped_pts.data_mut());
-        evaluator.jacobians_dets_normals(*cell, jacobians.data_mut(), &mut jdet, normals.data_mut());
+        evaluator.jacobians_dets_normals(
+            *cell,
+            jacobians.data_mut(),
+            &mut jdet,
+            normals.data_mut(),
+        );
 
         assembler.kernel_assemble_st(mapped_pts.data(), evaluation_points.data(), k.data_mut());
 

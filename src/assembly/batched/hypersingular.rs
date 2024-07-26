@@ -2,11 +2,11 @@
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData};
 use crate::assembly::common::equal_grids;
 use crate::traits::function::FunctionSpace;
-use ndgrid::traits::Grid;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
-use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef, MatrixInverse};
+use ndgrid::traits::Grid;
+use rlst::{MatrixInverse, RlstScalar, Shape, UnsafeRandomAccessByRef};
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
@@ -161,7 +161,9 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularCurlCurlA
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler for HelmholtzHypersingularCurlCurlAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzHypersingularCurlCurlAssembler<T>
+{
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
@@ -326,7 +328,9 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularAssembler
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler for HelmholtzHypersingularAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzHypersingularAssembler<T>
+{
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;

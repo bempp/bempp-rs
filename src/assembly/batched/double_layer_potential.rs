@@ -1,7 +1,7 @@
 //! Batched dense assembly of boundary operators
 use super::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef, MatrixInverse};
+use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace double layer potential operator
 pub struct LaplaceDoubleLayerPotentialAssembler<T: RlstScalar + MatrixInverse> {
@@ -17,7 +17,9 @@ impl<T: RlstScalar + MatrixInverse> Default for LaplaceDoubleLayerPotentialAssem
     }
 }
 
-impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler for LaplaceDoubleLayerPotentialAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
+    for LaplaceDoubleLayerPotentialAssembler<T>
+{
     const DERIV_SIZE: usize = 4;
     type T = T;
 
