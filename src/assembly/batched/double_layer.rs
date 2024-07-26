@@ -104,11 +104,11 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         index: usize,
     ) -> T {
         *k.get_unchecked([1, index])
-            * num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, index])).unwrap()
             + *k.get_unchecked([2, index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, index])).unwrap()
             + *k.get_unchecked([3, index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([2, index])).unwrap()
     }
     unsafe fn nonsingular_kernel_value(
         &self,
@@ -119,11 +119,11 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         trial_index: usize,
     ) -> T {
         *k.get_unchecked([test_index, 1, trial_index])
-            * num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, trial_index])).unwrap()
             + *k.get_unchecked([test_index, 2, trial_index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, trial_index])).unwrap()
             + *k.get_unchecked([test_index, 3, trial_index])
-                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*trial_normals.get_unchecked([2, trial_index])).unwrap()
     }
     fn kernel_assemble_pairwise_st(
         &self,

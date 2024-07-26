@@ -19,12 +19,8 @@ mod test {
         traits::Builder,
         types::RealScalar,
     };
-    use num::Float;
     use paste::paste;
-    use rlst::{
-        dense::array::views::ArrayViewMut, rlst_dynamic_array2, Array, BaseArray, MatrixInverse,
-        RlstScalar, VectorContainer,
-    };
+    use rlst::{rlst_dynamic_array2, MatrixInverse, RlstScalar};
 
     fn quadrilateral_grid<T: RealScalar + MatrixInverse>() -> SingleElementGrid<T, CiarletElement<T>>
     {

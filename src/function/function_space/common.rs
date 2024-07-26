@@ -68,7 +68,7 @@ pub(crate) fn assign_dofs<
         let topology = cell.topology();
 
         // Assign DOFs to entities
-        for (d, edofs_d) in entity_dofs.iter_mut().enumerate() {
+        for (d, edofs_d) in entity_dofs.iter_mut().take(tdim + 1).enumerate() {
             for (i, e) in topology.sub_entity_iter(d).enumerate() {
                 let e_dofs = element.entity_dofs(d, i).unwrap();
                 if !e_dofs.is_empty() {
