@@ -33,8 +33,8 @@ fn assemble_batch<
     table: &RlstArray<T, 4>,
 ) -> usize {
     let npts = weights.len();
-    let nevalpts = evaluation_points.shape()[0];
-    debug_assert!(points.shape()[0] == npts);
+    let nevalpts = evaluation_points.shape()[1];
+    debug_assert!(points.shape()[1] == npts);
 
     let grid = space.grid();
 
@@ -167,7 +167,7 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
         if !space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
-        if output.shape()[0] != points.shape()[0] || output.shape()[1] != space.global_size() {
+        if output.shape()[0] != points.shape()[1] || output.shape()[1] != space.global_size() {
             panic!("Matrix has wrong shape");
         }
 
