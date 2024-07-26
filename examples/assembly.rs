@@ -1,6 +1,6 @@
 use bempp::assembly::{batched, batched::BatchedAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::grid::shapes::regular_sphere;
+use ndgrid::shapes::regular_sphere;
 use bempp::traits::function::FunctionSpace;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
@@ -12,7 +12,7 @@ extern crate lapack_src;
 fn main() {
     // Create a grid, family of elements, and function space
     let grid = regular_sphere(0);
-    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     // Create an array to store the assembled discrete operator

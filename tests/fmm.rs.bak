@@ -2,8 +2,8 @@ use approx::*;
 use bempp::assembly::batched::BatchedAssembler;
 use bempp::assembly::{batched, fmm_tools};
 use bempp::function::SerialFunctionSpace;
-use bempp::grid::shapes::regular_sphere;
-use bempp::traits::{function::FunctionSpace, grid::GridType};
+use ndgrid::{shapes::regular_sphere, traits::Grid};
+use bempp::traits::function::FunctionSpace;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
 #[cfg(not(debug_assertions))]
@@ -22,7 +22,7 @@ use rlst::{
 extern crate blas_src;
 extern crate lapack_src;
 
-fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64> + Sync>(
+fn fmm_prototype<TestGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync, TrialGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync>(
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
@@ -38,7 +38,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
 
     let test_ndofs = test_space.global_size();
     let trial_ndofs = trial_space.global_size();
-    let nqpts = npts * grid.number_of_cells();
+    let nqpts = npts * grid.entity_types(2).iter().map(|&i| grid.entity_count(i)).sum::<usize>();
     let kernel = Laplace3dKernel::new();
 
     // Compute dense
@@ -98,7 +98,7 @@ fn fmm_prototype<TestGrid: GridType<T = f64> + Sync, TrialGrid: GridType<T = f64
 }
 
 #[cfg(not(debug_assertions))]
-fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> + Sync>(
+fn fmm_matvec<TrialGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync, TestGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync>(
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,
 ) {
@@ -114,7 +114,7 @@ fn fmm_matvec<TrialGrid: GridType<T = f64> + Sync, TestGrid: GridType<T = f64> +
 
     let test_ndofs = test_space.global_size();
     let trial_ndofs = trial_space.global_size();
-    let nqpts = npts * grid.number_of_cells();
+    let nqpts = npts * grid.entity_types(2).iter().map(|&i| grid.entity_count(i)).sum::<usize>();
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
@@ -239,7 +239,7 @@ fn test_fmm_prototype_p1_p1() {
     #[cfg(not(debug_assertions))]
     let grid = regular_sphere(2);
 
-    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_prototype(&space, &space);
@@ -251,7 +251,7 @@ fn test_fmm_prototype_dp0_p1() {
     let grid = regular_sphere(2);
 
     let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space0 = SerialFunctionSpace::new(&grid, &element0);
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 
@@ -274,7 +274,7 @@ fn test_fmm_dp0_dp0() {
 fn test_fmm_p1_p1() {
     let grid = regular_sphere(2);
 
-    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     fmm_matvec(&space, &space);
@@ -286,7 +286,7 @@ fn test_fmm_dp0_p1() {
     let grid = regular_sphere(2);
 
     let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space0 = SerialFunctionSpace::new(&grid, &element0);
     let space1 = SerialFunctionSpace::new(&grid, &element1);
 
@@ -299,7 +299,7 @@ fn test_fmm_result() {
 
     let npts = 1;
 
-    let nqpts = npts * grid.number_of_cells();
+    let nqpts = npts * grid.entity_types(2).iter().map(|&i| grid.entity_count(i)).sum::<usize>();
     let kernel = Laplace3dKernel::new();
 
     let all_points = fmm_tools::get_all_quadrature_points::<f64, _>(npts, &grid);

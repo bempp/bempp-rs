@@ -119,8 +119,8 @@ fn assemble_batch_singular<
     );
     let npts = weights.len();
     debug_assert!(weights.len() == npts);
-    debug_assert!(test_points.shape()[0] == npts);
-    debug_assert!(trial_points.shape()[0] == npts);
+    debug_assert!(test_points.shape()[1] == npts);
+    debug_assert!(trial_points.shape()[1] == npts);
 
     let grid = test_space.grid();
     assert_eq!(grid.geometry_dim(), 3);
@@ -221,8 +221,8 @@ fn assemble_batch_nonadjacent<
 ) -> usize {
     let npts_test = test_weights.len();
     let npts_trial = trial_weights.len();
-    debug_assert!(test_points.shape()[0] == npts_test);
-    debug_assert!(trial_points.shape()[0] == npts_trial);
+    debug_assert!(test_points.shape()[1] == npts_test);
+    debug_assert!(trial_points.shape()[1] == npts_trial);
 
     let test_grid = test_space.grid();
     let trial_grid = trial_space.grid();
@@ -356,8 +356,8 @@ fn assemble_batch_singular_correction<
     );
     let npts_test = test_weights.len();
     let npts_trial = trial_weights.len();
-    debug_assert!(test_points.shape()[0] == npts_test);
-    debug_assert!(trial_points.shape()[0] == npts_trial);
+    debug_assert!(test_points.shape()[1] == npts_test);
+    debug_assert!(trial_points.shape()[1] == npts_trial);
 
     let grid = test_space.grid();
     assert_eq!(grid.geometry_dim(), 3);
@@ -683,10 +683,10 @@ pub trait BatchedAssembler: Sync + Sized {
                     );
                     let npts = qrule.weights.len();
 
-                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
                     for i in 0..npts {
                         for j in 0..2 {
-                            *points.get_mut([i, j]).unwrap() =
+                            *points.get_mut([j, i]).unwrap() =
                                 num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                     qrule.trial_points[2 * i + j],
                                 )
@@ -696,16 +696,16 @@ pub trait BatchedAssembler: Sync + Sized {
                     let trial_element = trial_space.element(*trial_cell_type);
                     let mut table = rlst_dynamic_array4!(
                         Self::T,
-                        trial_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                        trial_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[1])
                     );
                     trial_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
                     trial_points.push(points);
                     trial_tables.push(table);
 
-                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
                     for i in 0..npts {
                         for j in 0..2 {
-                            *points.get_mut([i, j]).unwrap() =
+                            *points.get_mut([j, i]).unwrap() =
                                 num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                     qrule.test_points[2 * i + j],
                                 )
@@ -715,7 +715,7 @@ pub trait BatchedAssembler: Sync + Sized {
                     let test_element = test_space.element(*test_cell_type);
                     let mut table = rlst_dynamic_array4!(
                         Self::T,
-                        test_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                        test_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[1])
                     );
                     test_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
                     test_points.push(points);
@@ -836,10 +836,10 @@ pub trait BatchedAssembler: Sync + Sized {
 
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut test_pts =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
-                        *test_pts.get_mut([i, j]).unwrap() =
+                        *test_pts.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_test.points[2 * i + j],
                             )
@@ -864,10 +864,10 @@ pub trait BatchedAssembler: Sync + Sized {
 
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut trial_pts =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
-                        *trial_pts.get_mut([i, j]).unwrap() =
+                        *trial_pts.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_trial.points[2 * i + j],
                             )
@@ -1143,10 +1143,10 @@ pub trait BatchedAssembler: Sync + Sized {
                 let npts_trial = self.options().quadrature_degrees[trial_cell_type];
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut qpoints_test =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
-                        *qpoints_test.get_mut([i, j]).unwrap() =
+                        *qpoints_test.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_test.points[2 * i + j],
                             )
@@ -1160,10 +1160,10 @@ pub trait BatchedAssembler: Sync + Sized {
                     .collect::<Vec<_>>();
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut qpoints_trial =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
-                        *qpoints_trial.get_mut([i, j]).unwrap() =
+                        *qpoints_trial.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_trial.points[2 * i + j],
                             )

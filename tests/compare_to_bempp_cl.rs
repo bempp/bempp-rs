@@ -1,7 +1,7 @@
 use approx::*;
 use bempp::assembly::{batched, batched::BatchedAssembler, batched::BatchedPotentialAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::grid::shapes::regular_sphere;
+use ndgrid::shapes::regular_sphere;
 use bempp::traits::function::FunctionSpace;
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
@@ -103,7 +103,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
 #[test]
 fn test_laplace_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
@@ -199,7 +199,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
-    let element = LagrangeElementFamily::<c64>::new(1, Continuity::Continuous);
+    let element = LagrangeElementFamily::<c64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
     let ndofs = space.global_size();
