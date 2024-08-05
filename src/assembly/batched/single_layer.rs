@@ -1,5 +1,5 @@
 //! Single layer assemblers
-use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray};
+use super::{BatchedAssembler, BatchedAssemblerOptions, GreenKernelEvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
@@ -52,11 +52,11 @@ impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceSingleLayerAssem
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(GreenKernelEvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
-            .assemble_st(EvalType::Value, sources, targets, result);
+            .assemble_st(GreenKernelEvalType::Value, sources, targets, result);
     }
 }
 
@@ -112,10 +112,10 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(GreenKernelEvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
-            .assemble_st(EvalType::Value, sources, targets, result);
+            .assemble_st(GreenKernelEvalType::Value, sources, targets, result);
     }
 }

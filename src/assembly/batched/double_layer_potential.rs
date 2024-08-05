@@ -1,5 +1,7 @@
 //! Batched dense assembly of boundary operators
-use super::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions, EvalType, RlstArray};
+use super::{
+    BatchedPotentialAssembler, BatchedPotentialAssemblerOptions, GreenKernelEvalType, RlstArray,
+};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
@@ -52,7 +54,7 @@ impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
         result: &mut [Self::T],
     ) {
         self.kernel
-            .assemble_st(EvalType::ValueDeriv, sources, targets, result);
+            .assemble_st(GreenKernelEvalType::ValueDeriv, sources, targets, result);
     }
 }
 
@@ -106,6 +108,6 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedPotentialAssembler
         result: &mut [Self::T],
     ) {
         self.kernel
-            .assemble_st(EvalType::ValueDeriv, sources, targets, result);
+            .assemble_st(GreenKernelEvalType::ValueDeriv, sources, targets, result);
     }
 }
