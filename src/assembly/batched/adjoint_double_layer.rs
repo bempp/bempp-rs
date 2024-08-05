@@ -1,14 +1,14 @@
 //! Adjoint double layer assemblers
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef};
+use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace adjoint double layer operator
-pub struct LaplaceAdjointDoubleLayerAssembler<T: RlstScalar> {
+pub struct LaplaceAdjointDoubleLayerAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar> Default for LaplaceAdjointDoubleLayerAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> Default for LaplaceAdjointDoubleLayerAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -16,7 +16,7 @@ impl<T: RlstScalar> Default for LaplaceAdjointDoubleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
     type T = T;
@@ -34,11 +34,11 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
         index: usize,
     ) -> T {
         -*k.get_unchecked([1, index])
-            * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, index])).unwrap()
             - *k.get_unchecked([2, index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([1, index])).unwrap()
             - *k.get_unchecked([3, index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([2, index])).unwrap()
     }
     unsafe fn nonsingular_kernel_value(
         &self,
@@ -49,20 +49,20 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
         trial_index: usize,
     ) -> T {
         -*k.get_unchecked([test_index, 1, trial_index])
-            * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, test_index])).unwrap()
             - *k.get_unchecked([test_index, 2, trial_index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([1, test_index])).unwrap()
             - *k.get_unchecked([test_index, 3, trial_index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([2, test_index])).unwrap()
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+            .assemble_pairwise_st(EvalType::ValueDeriv, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -71,11 +71,11 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceAdjointDoubleLayerAssembler<T> {
 }
 
 /// Assembler for a Helmholtz adjoint double layer boundary operator
-pub struct HelmholtzAdjointDoubleLayerAssembler<T: RlstScalar<Complex = T>> {
+pub struct HelmholtzAdjointDoubleLayerAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzAdjointDoubleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzAdjointDoubleLayerAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -84,7 +84,9 @@ impl<T: RlstScalar<Complex = T>> HelmholtzAdjointDoubleLayerAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLayerAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzAdjointDoubleLayerAssembler<T>
+{
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
     type T = T;
@@ -102,11 +104,11 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLaye
         index: usize,
     ) -> T {
         -*k.get_unchecked([1, index])
-            * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, index])).unwrap()
             - *k.get_unchecked([2, index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([1, index])).unwrap()
             - *k.get_unchecked([3, index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([2, index])).unwrap()
     }
     unsafe fn nonsingular_kernel_value(
         &self,
@@ -116,21 +118,23 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzAdjointDoubleLaye
         test_index: usize,
         trial_index: usize,
     ) -> T {
+        use rlst::Shape;
+        println!("{:?} [{test_index}, 0]", test_normals.shape());
         -*k.get_unchecked([test_index, 1, trial_index])
-            * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, test_index])).unwrap()
             - *k.get_unchecked([test_index, 2, trial_index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([1, test_index])).unwrap()
             - *k.get_unchecked([test_index, 3, trial_index])
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([2, test_index])).unwrap()
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::ValueDeriv, sources, targets, result);
+            .assemble_pairwise_st(EvalType::ValueDeriv, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel

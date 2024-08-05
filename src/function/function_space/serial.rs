@@ -1,19 +1,23 @@
 //! Serial function space
 
 use crate::function::function_space::assign_dofs;
-use crate::traits::{
-    function::FunctionSpace,
-    grid::{CellType, GridType, TopologyType},
-    types::Ownership,
-};
+use crate::traits::function::FunctionSpace;
 use ndelement::ciarlet::CiarletElement;
 use ndelement::traits::{ElementFamily, FiniteElement};
 use ndelement::types::ReferenceCellType;
-use rlst::RlstScalar;
+use ndgrid::{
+    traits::{Entity, Grid, Topology},
+    types::Ownership,
+};
+use rlst::{MatrixInverse, RlstScalar};
 use std::collections::HashMap;
 
 /// A serial function space
-pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
+pub struct SerialFunctionSpace<
+    'a,
+    T: RlstScalar + MatrixInverse,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+> {
     pub(crate) grid: &'a GridImpl,
     pub(crate) elements: HashMap<ReferenceCellType, CiarletElement<T>>,
     pub(crate) entity_dofs: [Vec<Vec<usize>>; 4],
@@ -21,7 +25,12 @@ pub struct SerialFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real
     pub(crate) size: usize,
 }
 
-impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a, T, GridImpl> {
+impl<
+        'a,
+        T: RlstScalar + MatrixInverse,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > SerialFunctionSpace<'a, T, GridImpl>
+{
     /// Create new function space
     pub fn new(
         grid: &'a GridImpl,
@@ -34,7 +43,7 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
         let (cell_dofs, entity_dofs, size, _) = assign_dofs(0, grid, e_family);
 
         let mut elements = HashMap::new();
-        for cell in grid.cell_types() {
+        for cell in grid.entity_types(2) {
             elements.insert(*cell, e_family.element(*cell));
         }
 
@@ -48,8 +57,11 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> SerialFunctionSpace<'a,
     }
 }
 
-impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
-    for SerialFunctionSpace<'a, T, GridImpl>
+impl<
+        'a,
+        T: RlstScalar + MatrixInverse,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > FunctionSpace for SerialFunctionSpace<'a, T, GridImpl>
 {
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
@@ -79,11 +91,11 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
         let mut colouring = HashMap::new();
         //: HashMap<ReferenceCellType, Vec<Vec<usize>>>
-        for cell in self.grid.cell_types() {
+        for cell in self.grid.entity_types(2) {
             colouring.insert(*cell, vec![]);
         }
         let mut edim = 0;
-        while self.elements[&self.grid.cell_types()[0]]
+        while self.elements[&self.grid.entity_types(2)[0]]
             .entity_dofs(edim, 0)
             .unwrap()
             .is_empty()
@@ -94,27 +106,23 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
         let mut entity_colours = vec![
             vec![];
             if edim == 0 {
-                self.grid.number_of_vertices()
+                self.grid.entity_count(ReferenceCellType::Point)
             } else if edim == 1 {
-                self.grid.number_of_edges()
-            } else if edim == 2 && self.grid.domain_dimension() == 2 {
-                self.grid.number_of_cells()
+                self.grid.entity_count(ReferenceCellType::Interval)
+            } else if edim == 2 && self.grid.topology_dim() == 2 {
+                self.grid
+                    .entity_types(2)
+                    .iter()
+                    .map(|&i| self.grid.entity_count(i))
+                    .sum::<usize>()
             } else {
                 unimplemented!();
             }
         ];
 
-        for cell in self.grid.iter_all_cells() {
-            let cell_type = cell.topology().cell_type();
-            let indices = if edim == 0 {
-                cell.topology().vertex_indices().collect::<Vec<_>>()
-            } else if edim == 1 {
-                cell.topology().edge_indices().collect::<Vec<_>>()
-            } else if edim == 2 {
-                cell.topology().face_indices().collect::<Vec<_>>()
-            } else {
-                unimplemented!();
-            };
+        for cell in self.grid.entity_iter(2) {
+            let cell_type = cell.entity_type();
+            let indices = cell.topology().sub_entity_iter(edim).collect::<Vec<_>>();
 
             let c = {
                 let mut c = 0;
@@ -135,15 +143,15 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
                 c
             };
             if c == colouring[&cell_type].len() {
-                for ct in self.grid.cell_types() {
+                for ct in self.grid.entity_types(2) {
                     colouring.get_mut(ct).unwrap().push(if *ct == cell_type {
-                        vec![cell.index()]
+                        vec![cell.local_index()]
                     } else {
                         vec![]
                     });
                 }
             } else {
-                colouring.get_mut(&cell_type).unwrap()[c].push(cell.index());
+                colouring.get_mut(&cell_type).unwrap()[c].push(cell.local_index());
             }
             for v in &indices {
                 entity_colours[*v].push(c);
@@ -162,9 +170,9 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::grid::shapes::regular_sphere;
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;
+    use ndgrid::shapes::regular_sphere;
 
     #[test]
     fn test_dofmap_lagrange0() {
@@ -172,42 +180,49 @@ mod test {
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(space.local_size(), grid.number_of_cells());
+        assert_eq!(
+            space.local_size(),
+            grid.entity_count(ReferenceCellType::Triangle)
+        );
     }
 
     #[test]
     fn test_dofmap_lagrange1() {
         let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(space.local_size(), grid.number_of_vertices());
+        assert_eq!(
+            space.local_size(),
+            grid.entity_count(ReferenceCellType::Point)
+        );
     }
 
     #[test]
     fn test_dofmap_lagrange2() {
         let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(2, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(2, Continuity::Standard);
         let space = SerialFunctionSpace::new(&grid, &element);
         assert_eq!(space.local_size(), space.global_size());
         assert_eq!(
             space.local_size(),
-            grid.number_of_vertices() + grid.number_of_edges()
+            grid.entity_count(ReferenceCellType::Point)
+                + grid.entity_count(ReferenceCellType::Interval)
         );
     }
 
     #[test]
     fn test_colouring_p1() {
         let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
-        let cells = grid.iter_all_cells().collect::<Vec<_>>();
+        let cells = grid.entity_iter(2).collect::<Vec<_>>();
         let mut n = 0;
         for i in colouring {
             n += i.len()
         }
-        assert_eq!(n, grid.number_of_cells());
+        assert_eq!(n, grid.entity_count(ReferenceCellType::Triangle));
         for (i, ci) in colouring.iter().enumerate() {
             for (j, cj) in colouring.iter().enumerate() {
                 if i != j {
@@ -223,8 +238,8 @@ mod test {
             for cell0 in ci {
                 for cell1 in ci {
                     if cell0 != cell1 {
-                        for v0 in cells[*cell0].topology().vertex_indices() {
-                            for v1 in cells[*cell1].topology().vertex_indices() {
+                        for v0 in cells[*cell0].topology().sub_entity_iter(0) {
+                            for v1 in cells[*cell1].topology().sub_entity_iter(0) {
                                 assert!(v0 != v1);
                             }
                         }
@@ -244,7 +259,7 @@ mod test {
         for i in colouring {
             n += i.len()
         }
-        assert_eq!(n, grid.number_of_cells());
+        assert_eq!(n, grid.entity_count(ReferenceCellType::Triangle));
         for (i, ci) in colouring.iter().enumerate() {
             for (j, cj) in colouring.iter().enumerate() {
                 if i != j {
@@ -262,15 +277,14 @@ mod test {
     #[test]
     fn test_colouring_rt1() {
         let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Continuous);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
         let space = SerialFunctionSpace::new(&grid, &element);
         let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
-        let cells = grid.iter_all_cells().collect::<Vec<_>>();
         let mut n = 0;
         for i in colouring {
             n += i.len()
         }
-        assert_eq!(n, grid.number_of_cells());
+        assert_eq!(n, grid.entity_count(ReferenceCellType::Triangle));
         for (i, ci) in colouring.iter().enumerate() {
             for (j, cj) in colouring.iter().enumerate() {
                 if i != j {
@@ -286,8 +300,18 @@ mod test {
             for cell0 in ci {
                 for cell1 in ci {
                     if cell0 != cell1 {
-                        for e0 in cells[*cell0].topology().edge_indices() {
-                            for e1 in cells[*cell1].topology().edge_indices() {
+                        for e0 in grid
+                            .entity(2, *cell0)
+                            .unwrap()
+                            .topology()
+                            .sub_entity_iter(1)
+                        {
+                            for e1 in grid
+                                .entity(2, *cell1)
+                                .unwrap()
+                                .topology()
+                                .sub_entity_iter(1)
+                            {
                                 assert!(e0 != e1);
                             }
                         }

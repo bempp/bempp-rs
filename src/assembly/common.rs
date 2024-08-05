@@ -1,8 +1,8 @@
 //! Common utility functions
-use crate::traits::grid::GridType;
-use rlst::RlstScalar;
+use ndgrid::traits::Grid;
+use rlst::{MatrixInverse, RlstScalar};
 
-pub(crate) fn equal_grids<TestGrid: GridType, TrialGrid: GridType>(
+pub(crate) fn equal_grids<TestGrid: Grid, TrialGrid: Grid>(
     test_grid: &TestGrid,
     trial_grid: &TrialGrid,
 ) -> bool {
@@ -10,17 +10,17 @@ pub(crate) fn equal_grids<TestGrid: GridType, TrialGrid: GridType>(
 }
 
 /// Raw 2D data
-pub(crate) struct RawData2D<T: RlstScalar> {
+pub(crate) struct RawData2D<T: RlstScalar + MatrixInverse> {
     /// Array containting data
     pub(crate) data: *mut T,
     /// Shape of data
     pub(crate) shape: [usize; 2],
 }
 
-unsafe impl<T: RlstScalar> Sync for RawData2D<T> {}
+unsafe impl<T: RlstScalar + MatrixInverse> Sync for RawData2D<T> {}
 
 /// Data for a sparse matrix
-pub struct SparseMatrixData<T: RlstScalar> {
+pub struct SparseMatrixData<T: RlstScalar + MatrixInverse> {
     /// Data
     pub data: Vec<T>,
     /// Rows
@@ -31,7 +31,7 @@ pub struct SparseMatrixData<T: RlstScalar> {
     pub shape: [usize; 2],
 }
 
-impl<T: RlstScalar> SparseMatrixData<T> {
+impl<T: RlstScalar + MatrixInverse> SparseMatrixData<T> {
     /// Create new sparse matrix
     pub fn new(shape: [usize; 2]) -> Self {
         Self {
@@ -73,4 +73,4 @@ impl<T: RlstScalar> SparseMatrixData<T> {
     }
 }
 
-unsafe impl<T: RlstScalar> Sync for SparseMatrixData<T> {}
+unsafe impl<T: RlstScalar + MatrixInverse> Sync for SparseMatrixData<T> {}

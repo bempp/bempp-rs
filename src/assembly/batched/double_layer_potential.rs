@@ -1,14 +1,14 @@
 //! Batched dense assembly of boundary operators
 use super::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef};
+use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace double layer potential operator
-pub struct LaplaceDoubleLayerPotentialAssembler<T: RlstScalar> {
+pub struct LaplaceDoubleLayerPotentialAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
     options: BatchedPotentialAssemblerOptions,
 }
-impl<T: RlstScalar> Default for LaplaceDoubleLayerPotentialAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> Default for LaplaceDoubleLayerPotentialAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -17,7 +17,9 @@ impl<T: RlstScalar> Default for LaplaceDoubleLayerPotentialAssembler<T> {
     }
 }
 
-impl<T: RlstScalar> BatchedPotentialAssembler for LaplaceDoubleLayerPotentialAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
+    for LaplaceDoubleLayerPotentialAssembler<T>
+{
     const DERIV_SIZE: usize = 4;
     type T = T;
 
@@ -36,11 +38,11 @@ impl<T: RlstScalar> BatchedPotentialAssembler for LaplaceDoubleLayerPotentialAss
         point_index: usize,
     ) -> T {
         -*k.get_unchecked([index, 1, point_index])
-            * num::cast::<T::Real, T>(*normals.get_unchecked([index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*normals.get_unchecked([0, index])).unwrap()
             - *k.get_unchecked([index, 2, point_index])
-                * num::cast::<T::Real, T>(*normals.get_unchecked([index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*normals.get_unchecked([1, index])).unwrap()
             - *k.get_unchecked([index, 3, point_index])
-                * num::cast::<T::Real, T>(*normals.get_unchecked([index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*normals.get_unchecked([2, index])).unwrap()
     }
 
     fn kernel_assemble_st(
@@ -55,11 +57,11 @@ impl<T: RlstScalar> BatchedPotentialAssembler for LaplaceDoubleLayerPotentialAss
 }
 
 /// Assembler for a Helmholtz double layer potential operator
-pub struct HelmholtzDoubleLayerPotentialAssembler<T: RlstScalar<Complex = T>> {
+pub struct HelmholtzDoubleLayerPotentialAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedPotentialAssemblerOptions,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzDoubleLayerPotentialAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzDoubleLayerPotentialAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -69,7 +71,7 @@ impl<T: RlstScalar<Complex = T>> HelmholtzDoubleLayerPotentialAssembler<T> {
     }
 }
 
-impl<T: RlstScalar<Complex = T>> BatchedPotentialAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedPotentialAssembler
     for HelmholtzDoubleLayerPotentialAssembler<T>
 {
     const DERIV_SIZE: usize = 4;
@@ -90,11 +92,11 @@ impl<T: RlstScalar<Complex = T>> BatchedPotentialAssembler
         point_index: usize,
     ) -> T {
         -*k.get_unchecked([index, 1, point_index])
-            * num::cast::<T::Real, T>(*normals.get_unchecked([index, 0])).unwrap()
+            * num::cast::<T::Real, T>(*normals.get_unchecked([0, index])).unwrap()
             - *k.get_unchecked([index, 2, point_index])
-                * num::cast::<T::Real, T>(*normals.get_unchecked([index, 1])).unwrap()
+                * num::cast::<T::Real, T>(*normals.get_unchecked([1, index])).unwrap()
             - *k.get_unchecked([index, 3, point_index])
-                * num::cast::<T::Real, T>(*normals.get_unchecked([index, 2])).unwrap()
+                * num::cast::<T::Real, T>(*normals.get_unchecked([2, index])).unwrap()
     }
 
     fn kernel_assemble_st(

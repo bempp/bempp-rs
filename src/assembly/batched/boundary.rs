@@ -1,29 +1,28 @@
 //! Batched dense assembly of boundary operators
 use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData};
-use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use crate::traits::function::FunctionSpace;
-#[cfg(feature = "mpi")]
-use crate::traits::function::FunctionSpaceInParallel;
-use crate::traits::grid::{CellType, GridType, ReferenceMapType, TopologyType};
-use crate::traits::types::Ownership;
+//#[cfg(feature = "mpi")]
+//use crate::traits::function::FunctionSpaceInParallel;
 use ndelement::reference_cell;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::{Entity, GeometryMap, Grid, Topology};
+use ndgrid::types::Ownership;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, RandomAccessMut,
-    RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, MatrixInverse,
+    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
 use super::RlstArray;
 
-fn neighbours<TestGrid: GridType, TrialGrid: GridType>(
+fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
     test_grid: &TestGrid,
     trial_grid: &TrialGrid,
     test_cell: usize,
@@ -33,14 +32,16 @@ fn neighbours<TestGrid: GridType, TrialGrid: GridType>(
         false
     } else {
         let test_vertices = trial_grid
-            .cell_from_index(test_cell)
+            .entity(2, test_cell)
+            .unwrap()
             .topology()
-            .vertex_indices()
+            .sub_entity_iter(0)
             .collect::<Vec<_>>();
         for v in trial_grid
-            .cell_from_index(trial_cell)
+            .entity(2, trial_cell)
+            .unwrap()
             .topology()
-            .vertex_indices()
+            .sub_entity_iter(0)
         {
             if test_vertices.contains(&v) {
                 return true;
@@ -93,9 +94,9 @@ fn get_singular_quadrature_rule(
 /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
-    T: RlstScalar,
-    TestGrid: GridType<T = T::Real>,
-    TrialGrid: GridType<T = T::Real>,
+    T: RlstScalar + MatrixInverse,
+    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedAssembler<T = T>,
@@ -120,41 +121,47 @@ fn assemble_batch_singular<
     );
     let npts = weights.len();
     debug_assert!(weights.len() == npts);
-    debug_assert!(test_points.shape()[0] == npts);
-    debug_assert!(trial_points.shape()[0] == npts);
+    debug_assert!(test_points.shape()[1] == npts);
+    debug_assert!(trial_points.shape()[1] == npts);
 
     let grid = test_space.grid();
-    assert_eq!(grid.physical_dimension(), 3);
-    assert_eq!(grid.domain_dimension(), 2);
+    assert_eq!(grid.geometry_dim(), 3);
+    assert_eq!(grid.topology_dim(), 2);
 
     // Memory assignment to be moved elsewhere as passed into here mutable?
     let mut k = rlst_dynamic_array2!(T, [deriv_size, npts]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut test_jdet = vec![zero; npts];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts]);
 
     let mut trial_jdet = vec![zero; npts];
-    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
-    let mut trial_normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
+    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [6, npts]);
+    let mut trial_normals = rlst_dynamic_array2!(T::Real, [3, npts]);
 
-    let test_evaluator = grid.reference_to_physical_map(test_points.data());
-    let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
+    let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
+    let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
 
     for (test_cell, trial_cell) in cell_pairs {
-        test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
-        compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
-        compute_dets23(test_jacobians.data(), &mut test_jdet);
-        test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+        test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
+        test_evaluator.jacobians_dets_normals(
+            *test_cell,
+            test_jacobians.data_mut(),
+            &mut test_jdet,
+            test_normals.data_mut(),
+        );
 
-        trial_evaluator.jacobian(*trial_cell, trial_jacobians.data_mut());
-        compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
-        compute_dets23(trial_jacobians.data(), &mut trial_jdet);
-        trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
+        trial_evaluator.points(*trial_cell, trial_mapped_pts.data_mut());
+        trial_evaluator.jacobians_dets_normals(
+            *trial_cell,
+            trial_jacobians.data_mut(),
+            &mut trial_jdet,
+            trial_normals.data_mut(),
+        );
 
-        assembler.kernel_assemble_diagonal_st(
+        assembler.kernel_assemble_pairwise_st(
             test_mapped_pts.data(),
             trial_mapped_pts.data(),
             k.data_mut(),
@@ -203,14 +210,16 @@ fn assemble_batch_singular<
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<
-    T: RlstScalar,
-    TestGrid: GridType<T = T::Real>,
-    TrialGrid: GridType<T = T::Real>,
+    T: RlstScalar + MatrixInverse,
+    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedAssembler<T = T>,
     deriv_size: usize,
     output: &RawData2D<T>,
+    trial_cell_type: ReferenceCellType,
+    test_cell_type: ReferenceCellType,
     trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
     trial_cells: &[usize],
     test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
@@ -224,59 +233,58 @@ fn assemble_batch_nonadjacent<
 ) -> usize {
     let npts_test = test_weights.len();
     let npts_trial = trial_weights.len();
-    debug_assert!(test_points.shape()[0] == npts_test);
-    debug_assert!(trial_points.shape()[0] == npts_trial);
+    debug_assert!(test_points.shape()[1] == npts_test);
+    debug_assert!(trial_points.shape()[1] == npts_trial);
 
     let test_grid = test_space.grid();
     let trial_grid = trial_space.grid();
 
-    assert_eq!(test_grid.physical_dimension(), 3);
-    assert_eq!(test_grid.domain_dimension(), 2);
-    assert_eq!(trial_grid.physical_dimension(), 3);
-    assert_eq!(trial_grid.domain_dimension(), 2);
+    assert_eq!(test_grid.geometry_dim(), 3);
+    assert_eq!(test_grid.topology_dim(), 2);
+    assert_eq!(trial_grid.geometry_dim(), 3);
+    assert_eq!(trial_grid.topology_dim(), 2);
 
     let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut test_jdet = vec![zero; npts_test];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_test]);
 
-    let test_evaluator = test_grid.reference_to_physical_map(test_points.data());
-    let trial_evaluator = trial_grid.reference_to_physical_map(trial_points.data());
+    let test_evaluator = test_grid.geometry_map(test_cell_type, test_points.data());
+    let trial_evaluator = trial_grid.geometry_map(trial_cell_type, trial_points.data());
 
     let mut trial_jdet = vec![vec![zero; npts_trial]; trial_cells.len()];
     let mut trial_mapped_pts = vec![];
     let mut trial_normals = vec![];
     let mut trial_jacobians = vec![];
     for _i in 0..trial_cells.len() {
-        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
-        trial_normals.push(rlst_dynamic_array2!(T::Real, [npts_trial, 3]));
-        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [npts_trial, 6]));
+        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
+        trial_normals.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
+        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [6, npts_trial]));
     }
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
-        trial_evaluator.jacobian(*trial_cell, trial_jacobians[trial_cell_i].data_mut());
-        compute_dets23(
-            trial_jacobians[trial_cell_i].data(),
+        trial_evaluator.points(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
+        trial_evaluator.jacobians_dets_normals(
+            *trial_cell,
+            trial_jacobians[trial_cell_i].data_mut(),
             &mut trial_jdet[trial_cell_i],
-        );
-        compute_normals_from_jacobians23(
-            trial_jacobians[trial_cell_i].data(),
             trial_normals[trial_cell_i].data_mut(),
         );
-        trial_evaluator
-            .reference_to_physical(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
     }
 
     let mut sum: T;
     let mut trial_integrands = vec![num::cast::<f64, T>(0.0).unwrap(); npts_trial];
 
     for test_cell in test_cells {
-        test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
-        compute_dets23(test_jacobians.data(), &mut test_jdet);
-        compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
-        test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+        test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
+        test_evaluator.jacobians_dets_normals(
+            *test_cell,
+            test_jacobians.data_mut(),
+            &mut test_jdet,
+            test_normals.data_mut(),
+        );
 
         for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
             if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
@@ -342,9 +350,9 @@ fn assemble_batch_nonadjacent<
 /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells if an (incorrect) non-singular quadrature rule was used
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular_correction<
-    T: RlstScalar,
-    TestGrid: GridType<T = T::Real>,
-    TrialGrid: GridType<T = T::Real>,
+    T: RlstScalar + MatrixInverse,
+    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedAssembler<T = T>,
@@ -370,43 +378,49 @@ fn assemble_batch_singular_correction<
     );
     let npts_test = test_weights.len();
     let npts_trial = trial_weights.len();
-    debug_assert!(test_points.shape()[0] == npts_test);
-    debug_assert!(trial_points.shape()[0] == npts_trial);
+    debug_assert!(test_points.shape()[1] == npts_test);
+    debug_assert!(trial_points.shape()[1] == npts_trial);
 
     let grid = test_space.grid();
-    assert_eq!(grid.physical_dimension(), 3);
-    assert_eq!(grid.domain_dimension(), 2);
+    assert_eq!(grid.geometry_dim(), 3);
+    assert_eq!(grid.topology_dim(), 2);
 
     let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
 
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
 
     let mut test_jdet = vec![zero; npts_test];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [npts_test, 3]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [npts_test, 6]);
+    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts_test]);
+    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_test]);
 
     let mut trial_jdet = vec![zero; npts_trial];
-    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [npts_trial, 3]);
-    let mut trial_normals = rlst_dynamic_array2!(T::Real, [npts_trial, 3]);
-    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [npts_trial, 6]);
+    let mut trial_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_trial]);
+    let mut trial_normals = rlst_dynamic_array2!(T::Real, [3, npts_trial]);
+    let mut trial_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_trial]);
 
-    let test_evaluator = grid.reference_to_physical_map(test_points.data());
-    let trial_evaluator = grid.reference_to_physical_map(trial_points.data());
+    let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
+    let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
 
     let mut sum: T;
     let mut trial_integrands = vec![num::cast::<f64, T>(0.0).unwrap(); npts_trial];
 
     for (test_cell, trial_cell) in cell_pairs {
-        test_evaluator.jacobian(*test_cell, test_jacobians.data_mut());
-        compute_dets23(test_jacobians.data(), &mut test_jdet);
-        compute_normals_from_jacobians23(test_jacobians.data(), test_normals.data_mut());
-        test_evaluator.reference_to_physical(*test_cell, test_mapped_pts.data_mut());
+        test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
+        test_evaluator.jacobians_dets_normals(
+            *test_cell,
+            test_jacobians.data_mut(),
+            &mut test_jdet,
+            test_normals.data_mut(),
+        );
 
-        trial_evaluator.jacobian(*trial_cell, trial_jacobians.data_mut());
-        compute_dets23(trial_jacobians.data(), &mut trial_jdet);
-        compute_normals_from_jacobians23(trial_jacobians.data(), trial_normals.data_mut());
-        trial_evaluator.reference_to_physical(*trial_cell, trial_mapped_pts.data_mut());
+        trial_evaluator.points(*trial_cell, trial_mapped_pts.data_mut());
+        trial_evaluator.jacobians_dets_normals(
+            *trial_cell,
+            trial_jacobians.data_mut(),
+            &mut trial_jdet,
+            trial_normals.data_mut(),
+        );
 
         assembler.kernel_assemble_st(
             test_mapped_pts.data(),
@@ -461,13 +475,13 @@ fn assemble_batch_singular_correction<
 }
 
 fn get_pairs_if_smallest(
-    test_cell: &impl CellType,
-    trial_cell: &impl CellType,
+    test_cell: &impl Entity,
+    trial_cell: &impl Entity,
     vertex: usize,
 ) -> Option<Vec<(usize, usize)>> {
     let mut pairs = vec![];
-    for (trial_i, trial_v) in trial_cell.topology().vertex_indices().enumerate() {
-        for (test_i, test_v) in test_cell.topology().vertex_indices().enumerate() {
+    for (trial_i, trial_v) in trial_cell.topology().sub_entity_iter(0).enumerate() {
+        for (test_i, test_v) in test_cell.topology().sub_entity_iter(0).enumerate() {
             if test_v == trial_v {
                 if test_v < vertex {
                     return None;
@@ -511,7 +525,7 @@ pub trait BatchedAssembler: Sync + Sized {
     //! Assemble operators by processing batches of cells in parallel
 
     /// Scalar type
-    type T: RlstScalar;
+    type T: RlstScalar + MatrixInverse;
     /// Number of derivatives
     const DERIV_SIZE: usize;
     /// Number of derivatives needed in basis function tables
@@ -578,7 +592,7 @@ pub trait BatchedAssembler: Sync + Sized {
     /// Evaluate the kernel values for all source and target pairs
     ///
     /// For each source, the kernel is evaluated for exactly one target. This is equivalent to taking the diagonal of the matrix assembled by `kernel_assemble_st`
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
@@ -619,8 +633,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the singular contributions
     fn assemble_singular<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -654,8 +668,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let mut pair_indices = HashMap::new();
 
-        for test_cell_type in grid.cell_types() {
-            for trial_cell_type in grid.cell_types() {
+        for test_cell_type in grid.entity_types(2) {
+            for trial_cell_type in grid.entity_types(2) {
                 let qdegree = self.options().singular_quadrature_degrees
                     [&(*test_cell_type, *trial_cell_type)];
                 let offset = qweights.len();
@@ -701,10 +715,10 @@ pub trait BatchedAssembler: Sync + Sized {
                     );
                     let npts = qrule.weights.len();
 
-                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
                     for i in 0..npts {
                         for j in 0..2 {
-                            *points.get_mut([i, j]).unwrap() =
+                            *points.get_mut([j, i]).unwrap() =
                                 num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                     qrule.trial_points[2 * i + j],
                                 )
@@ -714,16 +728,16 @@ pub trait BatchedAssembler: Sync + Sized {
                     let trial_element = trial_space.element(*trial_cell_type);
                     let mut table = rlst_dynamic_array4!(
                         Self::T,
-                        trial_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                        trial_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[1])
                     );
                     trial_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
                     trial_points.push(points);
                     trial_tables.push(table);
 
-                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
                     for i in 0..npts {
                         for j in 0..2 {
-                            *points.get_mut([i, j]).unwrap() =
+                            *points.get_mut([j, i]).unwrap() =
                                 num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                     qrule.test_points[2 * i + j],
                                 )
@@ -733,7 +747,7 @@ pub trait BatchedAssembler: Sync + Sized {
                     let test_element = test_space.element(*test_cell_type);
                     let mut table = rlst_dynamic_array4!(
                         Self::T,
-                        test_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[0])
+                        test_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[1])
                     );
                     test_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
                     test_points.push(points);
@@ -749,24 +763,25 @@ pub trait BatchedAssembler: Sync + Sized {
             }
         }
         let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; pair_indices.len()];
-        for vertex in 0..grid.number_of_vertices() {
-            for test_cell_info in grid.vertex_to_cells(vertex) {
-                let test_cell = grid.cell_from_index(test_cell_info.cell);
+        for vertex in grid.entity_iter(0) {
+            for test_cell_index in vertex.topology().connected_entity_iter(2) {
+                let test_cell = grid.entity(2, test_cell_index).unwrap();
                 if test_cell.ownership() == Ownership::Owned {
-                    let test_cell_type = test_cell.topology().cell_type();
-                    for trial_cell_info in grid.vertex_to_cells(vertex) {
-                        let trial_cell = grid.cell_from_index(trial_cell_info.cell);
-                        let trial_cell_type = trial_cell.topology().cell_type();
-
-                        if let Some(pairs) = get_pairs_if_smallest(&test_cell, &trial_cell, vertex)
+                    let test_cell_type = test_cell.entity_type();
+                    for trial_cell_index in vertex.topology().connected_entity_iter(2) {
+                        let trial_cell = grid.entity(2, trial_cell_index).unwrap();
+                        let trial_cell_type = trial_cell.entity_type();
+                        if let Some(pairs) =
+                            get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index())
                         {
                             cell_pairs[pair_indices[&(test_cell_type, trial_cell_type, pairs)]]
-                                .push((test_cell_info.cell, trial_cell_info.cell));
+                                .push((test_cell_index, trial_cell_index));
                         }
                     }
                 }
             }
         }
+
         let batch_size = self.options().batch_size;
         for (i, cells) in cell_pairs.iter().enumerate() {
             let mut start = 0;
@@ -808,8 +823,8 @@ pub trait BatchedAssembler: Sync + Sized {
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -844,9 +859,9 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let mut cell_type_indices = HashMap::new();
 
-        for test_cell_type in grid.cell_types() {
+        for test_cell_type in grid.entity_types(2) {
             let npts_test = self.options().quadrature_degrees[test_cell_type];
-            for trial_cell_type in grid.cell_types() {
+            for trial_cell_type in grid.entity_types(2) {
                 let npts_trial = self.options().quadrature_degrees[trial_cell_type];
                 test_cell_types.push(*test_cell_type);
                 trial_cell_types.push(*trial_cell_type);
@@ -854,10 +869,10 @@ pub trait BatchedAssembler: Sync + Sized {
 
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut test_pts =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
-                        *test_pts.get_mut([i, j]).unwrap() =
+                        *test_pts.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_test.points[2 * i + j],
                             )
@@ -882,10 +897,10 @@ pub trait BatchedAssembler: Sync + Sized {
 
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut trial_pts =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
-                        *trial_pts.get_mut([i, j]).unwrap() =
+                        *trial_pts.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_trial.points[2 * i + j],
                             )
@@ -911,18 +926,20 @@ pub trait BatchedAssembler: Sync + Sized {
         }
         let mut cell_pairs: Vec<Vec<(usize, usize)>> = vec![vec![]; qweights_test.len()];
 
-        for vertex in 0..grid.number_of_vertices() {
-            for test_cell_info in grid.vertex_to_cells(vertex) {
-                let test_cell = grid.cell_from_index(test_cell_info.cell);
-                let test_cell_type = test_cell.topology().cell_type();
+        for vertex in grid.entity_iter(0) {
+            for test_cell_index in vertex.topology().connected_entity_iter(2) {
+                let test_cell = grid.entity(2, test_cell_index).unwrap();
+                let test_cell_type = test_cell.entity_type();
                 if test_cell.ownership() == Ownership::Owned {
-                    for trial_cell_info in grid.vertex_to_cells(vertex) {
-                        let trial_cell = grid.cell_from_index(trial_cell_info.cell);
-                        let trial_cell_type = trial_cell.topology().cell_type();
+                    for trial_cell_index in vertex.topology().connected_entity_iter(2) {
+                        let trial_cell = grid.entity(2, trial_cell_index).unwrap();
+                        let trial_cell_type = trial_cell.entity_type();
 
-                        if get_pairs_if_smallest(&test_cell, &trial_cell, vertex).is_some() {
+                        if get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index())
+                            .is_some()
+                        {
                             cell_pairs[cell_type_indices[&(test_cell_type, trial_cell_type)]]
-                                .push((test_cell_info.cell, trial_cell_info.cell));
+                                .push((test_cell_index, trial_cell_index));
                         }
                     }
                 }
@@ -969,8 +986,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the singular contributions into a dense matrix
     fn assemble_singular_into_dense<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -993,8 +1010,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the singular contributions into a CSR sparse matrix
     fn assemble_singular_into_csr<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -1014,28 +1031,29 @@ pub trait BatchedAssembler: Sync + Sized {
         .unwrap()
     }
 
-    #[cfg(feature = "mpi")]
-    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
-    fn parallel_assemble_singular_into_csr<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
-    >(
-        &self,
-        trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
-        test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
-    ) -> CsrMatrix<Self::T> {
-        self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
-    }
-
+    /*
+        #[cfg(feature = "mpi")]
+        /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+        fn parallel_assemble_singular_into_csr<
+            TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            Element: FiniteElement<T = Self::T> + Sync,
+            SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
+            SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
+        >(
+            &self,
+            trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
+            test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
+        ) -> CsrMatrix<Self::T> {
+            self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
+        }
+    */
     /// Assemble the singular correction into a dense matrix
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction_into_dense<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -1060,8 +1078,8 @@ pub trait BatchedAssembler: Sync + Sized {
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
     fn assemble_singular_correction_into_csr<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -1083,30 +1101,30 @@ pub trait BatchedAssembler: Sync + Sized {
         )
         .unwrap()
     }
-
-    #[cfg(feature = "mpi")]
-    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
-    fn parallel_assemble_singular_correction_into_csr<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
-    >(
-        &self,
-        trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
-        test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
-    ) -> CsrMatrix<Self::T> {
-        self.assemble_singular_correction_into_csr(
-            trial_space.local_space(),
-            test_space.local_space(),
-        )
-    }
-
+    /*
+        #[cfg(feature = "mpi")]
+        /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+        fn parallel_assemble_singular_correction_into_csr<
+            TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+            Element: FiniteElement<T = Self::T> + Sync,
+            SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync,
+            SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync,
+        >(
+            &self,
+            trial_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTrialSpace> + FunctionSpace),
+            test_space: &(impl FunctionSpaceInParallel<SerialSpace = SerialTestSpace> + FunctionSpace),
+        ) -> CsrMatrix<Self::T> {
+            self.assemble_singular_correction_into_csr(
+                trial_space.local_space(),
+                test_space.local_space(),
+            )
+        }
+    */
     /// Assemble into a dense matrix
     fn assemble_into_dense<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -1133,8 +1151,8 @@ pub trait BatchedAssembler: Sync + Sized {
 
     /// Assemble the non-singular contributions into a dense matrix
     fn assemble_nonsingular_into_dense<
-        TestGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
-        TrialGrid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
@@ -1155,16 +1173,16 @@ pub trait BatchedAssembler: Sync + Sized {
 
         let batch_size = self.options().batch_size;
 
-        for test_cell_type in test_space.grid().cell_types() {
+        for test_cell_type in test_space.grid().entity_types(2) {
             let npts_test = self.options().quadrature_degrees[test_cell_type];
-            for trial_cell_type in trial_space.grid().cell_types() {
+            for trial_cell_type in trial_space.grid().entity_types(2) {
                 let npts_trial = self.options().quadrature_degrees[trial_cell_type];
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut qpoints_test =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_test, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
-                        *qpoints_test.get_mut([i, j]).unwrap() =
+                        *qpoints_test.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_test.points[2 * i + j],
                             )
@@ -1178,10 +1196,10 @@ pub trait BatchedAssembler: Sync + Sized {
                     .collect::<Vec<_>>();
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut qpoints_trial =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts_trial, 2]);
+                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
-                        *qpoints_trial.get_mut([i, j]).unwrap() =
+                        *qpoints_trial.get_mut([j, i]).unwrap() =
                             num::cast::<f64, <Self::T as RlstScalar>::Real>(
                                 qrule_trial.points[2 * i + j],
                             )
@@ -1248,6 +1266,8 @@ pub trait BatchedAssembler: Sync + Sized {
                                     self,
                                     Self::DERIV_SIZE,
                                     &output_raw,
+                                    *test_cell_type,
+                                    *trial_cell_type,
                                     trial_space,
                                     trial_cells[t],
                                     test_space,

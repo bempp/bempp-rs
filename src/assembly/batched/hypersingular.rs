@@ -1,15 +1,16 @@
 //! Hypersingular assemblers
 use super::{BatchedAssembler, BatchedAssemblerOptions, EvalType, RlstArray, SparseMatrixData};
 use crate::assembly::common::equal_grids;
-use crate::traits::{function::FunctionSpace, grid::GridType};
+use crate::traits::function::FunctionSpace;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
-use rlst::{RlstScalar, Shape, UnsafeRandomAccessByRef};
+use ndgrid::traits::Grid;
+use rlst::{MatrixInverse, RlstScalar, Shape, UnsafeRandomAccessByRef};
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
-unsafe fn hyp_test_trial_product<T: RlstScalar>(
+unsafe fn hyp_test_trial_product<T: RlstScalar + MatrixInverse>(
     test_table: &RlstArray<T, 4>,
     trial_table: &RlstArray<T, 4>,
     test_jacobians: &RlstArray<T::Real, 2>,
@@ -26,36 +27,36 @@ unsafe fn hyp_test_trial_product<T: RlstScalar>(
     let trial0 = *trial_table.get_unchecked([1, trial_point_index, trial_basis_index, 0]);
     let trial1 = *trial_table.get_unchecked([2, trial_point_index, trial_basis_index, 0]);
 
-    ((num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 3])).unwrap()
+    ((num::cast::<T::Real, T>(*test_jacobians.get_unchecked([3, test_point_index])).unwrap()
         * test0
-        - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 0])).unwrap()
+        - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([0, test_point_index])).unwrap()
             * test1)
-        * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 3]))
+        * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([3, trial_point_index]))
             .unwrap()
             * trial0
-            - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 0]))
+            - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([0, trial_point_index]))
                 .unwrap()
                 * trial1)
-        + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 4])).unwrap()
+        + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([4, test_point_index])).unwrap()
             * test0
-            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 1]))
+            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([1, test_point_index]))
                 .unwrap()
                 * test1)
-            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 4]))
+            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([4, trial_point_index]))
                 .unwrap()
                 * trial0
-                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 1]))
+                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([1, trial_point_index]))
                     .unwrap()
                     * trial1)
-        + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 5])).unwrap()
+        + (num::cast::<T::Real, T>(*test_jacobians.get_unchecked([5, test_point_index])).unwrap()
             * test0
-            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([test_point_index, 2]))
+            - num::cast::<T::Real, T>(*test_jacobians.get_unchecked([2, test_point_index]))
                 .unwrap()
                 * test1)
-            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 5]))
+            * (num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([5, trial_point_index]))
                 .unwrap()
                 * trial0
-                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([trial_point_index, 2]))
+                - num::cast::<T::Real, T>(*trial_jacobians.get_unchecked([2, trial_point_index]))
                     .unwrap()
                     * trial1))
         / num::cast::<T::Real, T>(test_jdets[test_point_index] * trial_jdets[trial_point_index])
@@ -63,11 +64,11 @@ unsafe fn hyp_test_trial_product<T: RlstScalar>(
 }
 
 /// Assembler for a Laplace hypersingular operator
-pub struct LaplaceHypersingularAssembler<T: RlstScalar> {
+pub struct LaplaceHypersingularAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar> Default for LaplaceHypersingularAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> Default for LaplaceHypersingularAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -75,7 +76,7 @@ impl<T: RlstScalar> Default for LaplaceHypersingularAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceHypersingularAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
@@ -104,14 +105,14 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
     ) -> T {
         *k.get_unchecked([test_index, 0, trial_index])
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -147,11 +148,11 @@ impl<T: RlstScalar> BatchedAssembler for LaplaceHypersingularAssembler<T> {
 }
 
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
-struct HelmholtzHypersingularCurlCurlAssembler<T: RlstScalar<Complex = T>> {
+struct HelmholtzHypersingularCurlCurlAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularCurlCurlAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularCurlCurlAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -160,7 +161,9 @@ impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularCurlCurlAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularCurlCurlAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzHypersingularCurlCurlAssembler<T>
+{
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
@@ -189,14 +192,14 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularCurl
     ) -> T {
         *k.get_unchecked([test_index, 0, trial_index])
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -232,12 +235,12 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularCurl
 }
 
 /// Assembler for normal normal term of Helmholtz hypersingular boundary operator
-struct HelmholtzHypersingularNormalNormalAssembler<T: RlstScalar<Complex = T>> {
+struct HelmholtzHypersingularNormalNormalAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     wavenumber: T::Real,
     options: BatchedAssemblerOptions,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularNormalNormalAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularNormalNormalAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -247,7 +250,7 @@ impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularNormalNormalAssembler<T> 
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> BatchedAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
     for HelmholtzHypersingularNormalNormalAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
@@ -268,12 +271,12 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler
     ) -> T {
         -num::cast::<T::Real, T>(self.wavenumber.powi(2)).unwrap()
             * *k.get_unchecked([0, index])
-            * (num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 0])).unwrap()
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 0])).unwrap()
-                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 1])).unwrap()
-                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 1])).unwrap()
-                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([index, 2])).unwrap()
-                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([index, 2])).unwrap())
+            * (num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, index])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, index])).unwrap()
+                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, index])).unwrap()
+                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([1, index])).unwrap()
+                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([2, index])).unwrap()
+                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([2, index])).unwrap())
     }
     unsafe fn nonsingular_kernel_value(
         &self,
@@ -285,23 +288,23 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler
     ) -> T {
         -num::cast::<T::Real, T>(self.wavenumber.powi(2)).unwrap()
             * *k.get_unchecked([test_index, 0, trial_index])
-            * (num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 0])).unwrap()
-                * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 0])).unwrap()
-                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 1])).unwrap()
-                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 1]))
+            * (num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, trial_index])).unwrap()
+                * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, test_index])).unwrap()
+                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, trial_index])).unwrap()
+                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([1, test_index]))
                         .unwrap()
-                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([trial_index, 2])).unwrap()
-                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([test_index, 2]))
+                + num::cast::<T::Real, T>(*trial_normals.get_unchecked([2, trial_index])).unwrap()
+                    * num::cast::<T::Real, T>(*test_normals.get_unchecked([2, test_index]))
                         .unwrap())
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         sources: &[T::Real],
         targets: &[T::Real],
         result: &mut [T],
     ) {
         self.kernel
-            .assemble_diagonal_st(EvalType::Value, sources, targets, result);
+            .assemble_pairwise_st(EvalType::Value, sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
         self.kernel
@@ -310,11 +313,11 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler
 }
 
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
-pub struct HelmholtzHypersingularAssembler<T: RlstScalar<Complex = T>> {
+pub struct HelmholtzHypersingularAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     curl_curl_assembler: HelmholtzHypersingularCurlCurlAssembler<T>,
     normal_normal_assembler: HelmholtzHypersingularNormalNormalAssembler<T>,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -325,7 +328,9 @@ impl<T: RlstScalar<Complex = T>> HelmholtzHypersingularAssembler<T> {
         }
     }
 }
-impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+    for HelmholtzHypersingularAssembler<T>
+{
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
@@ -373,7 +378,7 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAsse
     ) -> T {
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
     }
-    fn kernel_assemble_diagonal_st(
+    fn kernel_assemble_pairwise_st(
         &self,
         _sources: &[T::Real],
         _targets: &[T::Real],
@@ -386,8 +391,8 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAsse
     }
 
     fn assemble_singular<
-        TestGrid: GridType<T = T::Real> + Sync,
-        TrialGrid: GridType<T = T::Real> + Sync,
+        TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = T> + Sync,
     >(
         &self,
@@ -406,8 +411,8 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAsse
     }
 
     fn assemble_singular_correction<
-        TestGrid: GridType<T = T::Real> + Sync,
-        TrialGrid: GridType<T = T::Real> + Sync,
+        TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = T> + Sync,
     >(
         &self,
@@ -440,8 +445,8 @@ impl<T: RlstScalar<Complex = T>> BatchedAssembler for HelmholtzHypersingularAsse
 
     #[allow(clippy::too_many_arguments)]
     fn assemble_nonsingular_into_dense<
-        TestGrid: GridType<T = T::Real> + Sync,
-        TrialGrid: GridType<T = T::Real> + Sync,
+        TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = T> + Sync,
     >(
         &self,

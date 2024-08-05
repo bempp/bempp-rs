@@ -1,14 +1,14 @@
 //! Batched dense assembly of boundary operators
 use super::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions, EvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef};
+use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace single layer potential operator
-pub struct LaplaceSingleLayerPotentialAssembler<T: RlstScalar> {
+pub struct LaplaceSingleLayerPotentialAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
     options: BatchedPotentialAssemblerOptions,
 }
-impl<T: RlstScalar> Default for LaplaceSingleLayerPotentialAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> Default for LaplaceSingleLayerPotentialAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
@@ -17,7 +17,9 @@ impl<T: RlstScalar> Default for LaplaceSingleLayerPotentialAssembler<T> {
     }
 }
 
-impl<T: RlstScalar> BatchedPotentialAssembler for LaplaceSingleLayerPotentialAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
+    for LaplaceSingleLayerPotentialAssembler<T>
+{
     const DERIV_SIZE: usize = 1;
     type T = T;
 
@@ -50,11 +52,11 @@ impl<T: RlstScalar> BatchedPotentialAssembler for LaplaceSingleLayerPotentialAss
 }
 
 /// Assembler for a Helmholtz single layer potential operator
-pub struct HelmholtzSingleLayerPotentialAssembler<T: RlstScalar<Complex = T>> {
+pub struct HelmholtzSingleLayerPotentialAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     options: BatchedPotentialAssemblerOptions,
 }
-impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerPotentialAssembler<T> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzSingleLayerPotentialAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
@@ -64,7 +66,7 @@ impl<T: RlstScalar<Complex = T>> HelmholtzSingleLayerPotentialAssembler<T> {
     }
 }
 
-impl<T: RlstScalar<Complex = T>> BatchedPotentialAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedPotentialAssembler
     for HelmholtzSingleLayerPotentialAssembler<T>
 {
     const DERIV_SIZE: usize = 1;

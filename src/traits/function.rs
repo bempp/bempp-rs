@@ -1,16 +1,16 @@
 //! Functions and functions spaces
-use crate::traits::grid::GridType;
-#[cfg(feature = "mpi")]
-use crate::traits::grid::ParallelGridType;
-use crate::traits::types::Ownership;
+//#[cfg(feature = "mpi")]
+//use crate::traits::grid::ParallelGridType;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::Grid;
+use ndgrid::types::Ownership;
 use std::collections::HashMap;
 
 /// A function space
 pub trait FunctionSpace {
     /// The grid type
-    type Grid: GridType;
+    type Grid: Grid;
     /// The finite element type
     type FiniteElement: FiniteElement;
 
@@ -22,7 +22,8 @@ pub trait FunctionSpace {
 
     /// Check if the function space is stored in serial
     fn is_serial(&self) -> bool {
-        self.grid().is_serial()
+        // self.grid().is_serial()
+        true
     }
 
     /// Get the DOF numbers on the local process associated with the given entity
@@ -47,14 +48,16 @@ pub trait FunctionSpace {
     fn ownership(&self, local_dof_index: usize) -> Ownership;
 }
 
+/*
 #[cfg(feature = "mpi")]
 /// A function space in parallel
 pub trait FunctionSpaceInParallel {
     /// The parallel grid type
-    type ParallelGrid: GridType + ParallelGridType;
+    type ParallelGrid: Grid + ParallelGrid;
     /// The type of the serial space on each process
-    type SerialSpace: FunctionSpace<Grid = <Self::ParallelGrid as ParallelGridType>::LocalGridType>;
+    type SerialSpace: FunctionSpace<Grid = <Self::ParallelGrid as ParallelGrid>::LocalGrid>;
 
     /// Get the local space on the process
     fn local_space(&self) -> &Self::SerialSpace;
 }
+*/

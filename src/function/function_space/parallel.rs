@@ -1,11 +1,7 @@
 //! Parallel function space
 
 use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
-use crate::traits::{
-    function::{FunctionSpace, FunctionSpaceInParallel},
-    grid::{GridType, ParallelGridType},
-    types::Ownership,
-};
+use crate::traits::function::{FunctionSpace, FunctionSpaceInParallel};
 use mpi::{
     point_to_point::{Destination, Source},
     request::WaitGuard,
@@ -14,18 +10,19 @@ use mpi::{
 use ndelement::ciarlet::CiarletElement;
 use ndelement::traits::ElementFamily;
 use ndelement::types::ReferenceCellType;
-use rlst::RlstScalar;
+use ndgrid::{traits::Grid, types::Ownership};
+use rlst::{MatrixInverse, RlstScalar};
 use std::collections::HashMap;
 
 /// The local function space on a process
-pub struct LocalFunctionSpace<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> {
+pub struct LocalFunctionSpace<'a, T: RlstScalar + MatrixInverse, GridImpl: GridType<T = T::Real>> {
     serial_space: SerialFunctionSpace<'a, T, GridImpl>,
     global_size: usize,
     global_dof_numbers: Vec<usize>,
     ownership: Vec<Ownership>,
 }
 
-impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
+impl<'a, T: RlstScalar + MatrixInverse, GridImpl: GridType<T = T::Real>> FunctionSpace
     for LocalFunctionSpace<'a, T, GridImpl>
 {
     type Grid = GridImpl;
@@ -64,14 +61,14 @@ impl<'a, T: RlstScalar, GridImpl: GridType<T = T::Real>> FunctionSpace
 /// A parallel function space
 pub struct ParallelFunctionSpace<
     'a,
-    T: RlstScalar,
+    T: RlstScalar + MatrixInverse,
     GridImpl: ParallelGridType + GridType<T = T::Real>,
 > {
     grid: &'a GridImpl,
     local_space: LocalFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>,
 }
 
-impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
+impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>>
     ParallelFunctionSpace<'a, T, GridImpl>
 {
     /// Create new function space
@@ -213,8 +210,8 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>>
     }
 }
 
-impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> FunctionSpaceInParallel
-    for ParallelFunctionSpace<'a, T, GridImpl>
+impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>>
+    FunctionSpaceInParallel for ParallelFunctionSpace<'a, T, GridImpl>
 {
     type ParallelGrid = GridImpl;
     type SerialSpace = LocalFunctionSpace<'a, T, <GridImpl as ParallelGridType>::LocalGridType>;
@@ -227,8 +224,8 @@ impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> Func
     }
 }
 
-impl<'a, T: RlstScalar, GridImpl: ParallelGridType + GridType<T = T::Real>> FunctionSpace
-    for ParallelFunctionSpace<'a, T, GridImpl>
+impl<'a, T: RlstScalar + MatrixInverse, GridImpl: ParallelGridType + GridType<T = T::Real>>
+    FunctionSpace for ParallelFunctionSpace<'a, T, GridImpl>
 {
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;

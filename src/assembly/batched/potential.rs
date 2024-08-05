@@ -1,15 +1,14 @@
 //! Batched dense assembly of potential operators
 use crate::assembly::common::RawData2D;
-use crate::grid::common::{compute_dets23, compute_normals_from_jacobians23};
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::function::FunctionSpace;
-use crate::traits::grid::{GridType, ReferenceMapType};
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
+use ndgrid::traits::{GeometryMap, Grid};
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, RandomAccessMut, RawAccess,
-    RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
+    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, MatrixInverse, RandomAccessMut,
+    RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
@@ -18,14 +17,15 @@ use super::RlstArray;
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch<
-    T: RlstScalar,
-    Grid: GridType<T = T::Real>,
+    T: RlstScalar + MatrixInverse,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
     assembler: &impl BatchedPotentialAssembler<T = T>,
     deriv_size: usize,
     output: &RawData2D<T>,
-    space: &impl FunctionSpace<Grid = Grid, FiniteElement = Element>,
+    cell_type: ReferenceCellType,
+    space: &impl FunctionSpace<Grid = G, FiniteElement = Element>,
     evaluation_points: &RlstArray<T::Real, 2>,
     cells: &[usize],
     points: &RlstArray<T::Real, 2>,
@@ -33,30 +33,33 @@ fn assemble_batch<
     table: &RlstArray<T, 4>,
 ) -> usize {
     let npts = weights.len();
-    let nevalpts = evaluation_points.shape()[0];
-    debug_assert!(points.shape()[0] == npts);
+    let nevalpts = evaluation_points.shape()[1];
+    debug_assert!(points.shape()[1] == npts);
 
     let grid = space.grid();
 
-    assert_eq!(grid.physical_dimension(), 3);
-    assert_eq!(grid.domain_dimension(), 2);
+    assert_eq!(grid.geometry_dim(), 3);
+    assert_eq!(grid.topology_dim(), 2);
 
     let mut k = rlst_dynamic_array3!(T, [npts, deriv_size, nevalpts]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut jdet = vec![zero; npts];
-    let mut mapped_pts = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut normals = rlst_dynamic_array2!(T::Real, [npts, 3]);
-    let mut jacobians = rlst_dynamic_array2!(T::Real, [npts, 6]);
+    let mut mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut normals = rlst_dynamic_array2!(T::Real, [3, npts]);
+    let mut jacobians = rlst_dynamic_array2!(T::Real, [6, npts]);
 
-    let evaluator = grid.reference_to_physical_map(points.data());
+    let evaluator = grid.geometry_map(cell_type, points.data());
 
     let mut sum: T;
 
     for cell in cells {
-        evaluator.jacobian(*cell, jacobians.data_mut());
-        compute_dets23(jacobians.data(), &mut jdet);
-        compute_normals_from_jacobians23(jacobians.data(), normals.data_mut());
-        evaluator.reference_to_physical(*cell, mapped_pts.data_mut());
+        evaluator.points(*cell, mapped_pts.data_mut());
+        evaluator.jacobians_dets_normals(
+            *cell,
+            jacobians.data_mut(),
+            &mut jdet,
+            normals.data_mut(),
+        );
 
         assembler.kernel_assemble_st(mapped_pts.data(), evaluation_points.data(), k.data_mut());
 
@@ -105,7 +108,7 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
     //! Assemble potential operators by processing batches of cells in parallel
 
     /// Scalar type
-    type T: RlstScalar;
+    type T: RlstScalar + MatrixInverse;
     /// Number of derivatives
     const DERIV_SIZE: usize;
 
@@ -153,18 +156,18 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
 
     /// Assemble into a dense matrix
     fn assemble_into_dense<
-        Grid: GridType<T = <Self::T as RlstScalar>::Real> + Sync,
+        G: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
         Element: FiniteElement<T = Self::T> + Sync,
     >(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        space: &(impl FunctionSpace<Grid = Grid, FiniteElement = Element> + Sync),
+        space: &(impl FunctionSpace<Grid = G, FiniteElement = Element> + Sync),
         points: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
     ) {
         if !space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
-        if output.shape()[0] != points.shape()[0] || output.shape()[1] != space.global_size() {
+        if output.shape()[0] != points.shape()[1] || output.shape()[1] != space.global_size() {
             panic!("Matrix has wrong shape");
         }
 
@@ -172,13 +175,13 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
 
         let batch_size = self.options().batch_size;
 
-        for cell_type in space.grid().cell_types() {
+        for cell_type in space.grid().entity_types(2) {
             let npts = self.options().quadrature_degrees[cell_type];
             let qrule = simplex_rule(*cell_type, npts).unwrap();
-            let mut qpoints = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [npts, 2]);
+            let mut qpoints = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
             for i in 0..npts {
                 for j in 0..2 {
-                    *qpoints.get_mut([i, j]).unwrap() =
+                    *qpoints.get_mut([j, i]).unwrap() =
                         num::cast::<f64, <Self::T as RlstScalar>::Real>(qrule.points[2 * i + j])
                             .unwrap();
                 }
@@ -217,10 +220,11 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
                 let r: usize = (0..numtasks)
                     .into_par_iter()
                     .map(&|t| {
-                        assemble_batch::<Self::T, Grid, Element>(
+                        assemble_batch::<Self::T, G, Element>(
                             self,
                             Self::DERIV_SIZE,
                             &output_raw,
+                            *cell_type,
                             space,
                             points,
                             cells[t],

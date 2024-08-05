@@ -1,10 +1,10 @@
 use bempp::assembly::{batched, batched::BatchedAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::grid::shapes::regular_sphere;
 use bempp::traits::function::FunctionSpace;
 use criterion::{criterion_group, criterion_main, Criterion};
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
+use ndgrid::shapes::regular_sphere;
 use rlst::rlst_dynamic_array2;
 
 extern crate blas_src;
