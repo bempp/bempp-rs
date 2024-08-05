@@ -35,7 +35,6 @@ fn test_laplace_single_layer_dp0_dp0() {
     }
 }
 
-/*
 #[test]
 fn test_laplace_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -64,7 +63,7 @@ fn test_laplace_double_layer_dp0_dp0() {
         }
     }
 }
-
+/*
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);

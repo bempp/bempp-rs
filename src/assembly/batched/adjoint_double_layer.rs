@@ -119,7 +119,6 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         trial_index: usize,
     ) -> T {
         use rlst::Shape;
-        println!("{:?} [{test_index}, 0]", test_normals.shape());
         -*k.get_unchecked([test_index, 1, trial_index])
             * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, test_index])).unwrap()
             - *k.get_unchecked([test_index, 2, trial_index])
