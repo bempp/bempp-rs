@@ -41,7 +41,7 @@ fn assemble_batch<
     assert_eq!(grid.geometry_dim(), 3);
     assert_eq!(grid.topology_dim(), 2);
 
-    let mut k = rlst_dynamic_array3!(T, [npts, deriv_size, nevalpts]);
+    let mut k = rlst_dynamic_array3!(T, [deriv_size, npts, nevalpts]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut jdet = vec![zero; npts];
     let mut mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts]);

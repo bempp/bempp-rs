@@ -48,11 +48,11 @@ impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceDoubleLayerAssem
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        *k.get_unchecked([test_index, 1, trial_index])
+        *k.get_unchecked([1, test_index, trial_index])
             * num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, trial_index])).unwrap()
-            + *k.get_unchecked([test_index, 2, trial_index])
+            + *k.get_unchecked([2, test_index, trial_index])
                 * num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, trial_index])).unwrap()
-            + *k.get_unchecked([test_index, 3, trial_index])
+            + *k.get_unchecked([3, test_index, trial_index])
                 * num::cast::<T::Real, T>(*trial_normals.get_unchecked([2, trial_index])).unwrap()
     }
     fn kernel_assemble_pairwise_st(
@@ -118,11 +118,11 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        *k.get_unchecked([test_index, 1, trial_index])
+        *k.get_unchecked([1, test_index, trial_index])
             * num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, trial_index])).unwrap()
-            + *k.get_unchecked([test_index, 2, trial_index])
+            + *k.get_unchecked([2, test_index, trial_index])
                 * num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, trial_index])).unwrap()
-            + *k.get_unchecked([test_index, 3, trial_index])
+            + *k.get_unchecked([3, test_index, trial_index])
                 * num::cast::<T::Real, T>(*trial_normals.get_unchecked([2, trial_index])).unwrap()
     }
     fn kernel_assemble_pairwise_st(

@@ -244,7 +244,7 @@ fn assemble_batch_nonadjacent<
     assert_eq!(trial_grid.geometry_dim(), 3);
     assert_eq!(trial_grid.topology_dim(), 2);
 
-    let mut k = rlst_dynamic_array3!(T, [npts_test, deriv_size, npts_trial]);
+    let mut k = rlst_dynamic_array3!(T, [deriv_size, npts_test, npts_trial]);
     let zero = num::cast::<f64, T::Real>(0.0).unwrap();
     let mut test_jdet = vec![zero; npts_test];
     let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);

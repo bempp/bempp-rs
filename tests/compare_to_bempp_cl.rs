@@ -53,17 +53,10 @@ fn test_laplace_double_layer_dp0_dp0() {
 
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
-            println!("{} {entry}", *matrix.get([i, j]).unwrap());
-        }
-        println!();
-    }
-    for (i, row) in from_cl.iter().enumerate() {
-        for (j, entry) in row.iter().enumerate() {
             assert_relative_eq!(*matrix.get([i, j]).unwrap(), entry, epsilon = 1e-4);
         }
     }
 }
-/*
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -86,7 +79,6 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
         }
     }
 }
-*/
 
 #[test]
 fn test_laplace_hypersingular_dp0_dp0() {
@@ -159,7 +151,6 @@ fn test_helmholtz_single_layer_dp0_dp0() {
     }
 }
 
-/*
 #[test]
 fn test_helmholtz_double_layer_dp0_dp0() {
     let grid = regular_sphere(0);
@@ -204,7 +195,6 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
         }
     }
 }
-*/
 
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
@@ -291,7 +281,6 @@ fn test_helmholtz_single_layer_potential_dp0() {
     }
 }
 
-/*
 #[test]
 fn test_laplace_double_layer_potential_dp0() {
     let grid = regular_sphere(0);
@@ -347,4 +336,3 @@ fn test_helmholtz_double_layer_potential_dp0() {
         }
     }
 }
-*/
