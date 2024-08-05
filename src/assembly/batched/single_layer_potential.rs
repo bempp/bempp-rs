@@ -39,7 +39,7 @@ impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
         index: usize,
         point_index: usize,
     ) -> T {
-        *k.get_unchecked([index, 0, point_index])
+        *k.get_unchecked([0, index, point_index])
     }
 
     fn kernel_assemble_st(
@@ -88,7 +88,7 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedPotentialAssembler
         index: usize,
         point_index: usize,
     ) -> T {
-        *k.get_unchecked([index, 0, point_index])
+        *k.get_unchecked([0, index, point_index])
     }
 
     fn kernel_assemble_st(

@@ -43,7 +43,7 @@ impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceSingleLayerAssem
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        *k.get_unchecked([test_index, 0, trial_index])
+        *k.get_unchecked([0, test_index, trial_index])
     }
     fn kernel_assemble_pairwise_st(
         &self,
@@ -103,7 +103,7 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        *k.get_unchecked([test_index, 0, trial_index])
+        *k.get_unchecked([0, test_index, trial_index])
     }
     fn kernel_assemble_pairwise_st(
         &self,

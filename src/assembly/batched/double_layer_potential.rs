@@ -39,11 +39,11 @@ impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
         index: usize,
         point_index: usize,
     ) -> T {
-        -*k.get_unchecked([index, 1, point_index])
+        -*k.get_unchecked([1, index, point_index])
             * num::cast::<T::Real, T>(*normals.get_unchecked([0, index])).unwrap()
-            - *k.get_unchecked([index, 2, point_index])
+            - *k.get_unchecked([2, index, point_index])
                 * num::cast::<T::Real, T>(*normals.get_unchecked([1, index])).unwrap()
-            - *k.get_unchecked([index, 3, point_index])
+            - *k.get_unchecked([3, index, point_index])
                 * num::cast::<T::Real, T>(*normals.get_unchecked([2, index])).unwrap()
     }
 
@@ -93,11 +93,11 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedPotentialAssembler
         index: usize,
         point_index: usize,
     ) -> T {
-        -*k.get_unchecked([index, 1, point_index])
+        -*k.get_unchecked([1, index, point_index])
             * num::cast::<T::Real, T>(*normals.get_unchecked([0, index])).unwrap()
-            - *k.get_unchecked([index, 2, point_index])
+            - *k.get_unchecked([2, index, point_index])
                 * num::cast::<T::Real, T>(*normals.get_unchecked([1, index])).unwrap()
-            - *k.get_unchecked([index, 3, point_index])
+            - *k.get_unchecked([3, index, point_index])
                 * num::cast::<T::Real, T>(*normals.get_unchecked([2, index])).unwrap()
     }
 

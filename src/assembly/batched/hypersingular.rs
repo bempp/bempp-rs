@@ -105,7 +105,7 @@ impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceHypersingularAss
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        *k.get_unchecked([test_index, 0, trial_index])
+        *k.get_unchecked([0, test_index, trial_index])
     }
     fn kernel_assemble_pairwise_st(
         &self,
@@ -192,7 +192,7 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        *k.get_unchecked([test_index, 0, trial_index])
+        *k.get_unchecked([0, test_index, trial_index])
     }
     fn kernel_assemble_pairwise_st(
         &self,
@@ -289,7 +289,7 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
         trial_index: usize,
     ) -> T {
         -num::cast::<T::Real, T>(self.wavenumber.powi(2)).unwrap()
-            * *k.get_unchecked([test_index, 0, trial_index])
+            * *k.get_unchecked([0, test_index, trial_index])
             * (num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, trial_index])).unwrap()
                 * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, test_index])).unwrap()
                 + num::cast::<T::Real, T>(*trial_normals.get_unchecked([1, trial_index])).unwrap()
