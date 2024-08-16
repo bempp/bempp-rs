@@ -19,9 +19,6 @@ use rlst::{
     RawAccess, RawAccessMut,
 };
 
-extern crate blas_src;
-extern crate lapack_src;
-
 fn fmm_prototype<TestGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync, TrialGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync>(
     trial_space: &SerialFunctionSpace<f64, TrialGrid>,
     test_space: &SerialFunctionSpace<f64, TestGrid>,

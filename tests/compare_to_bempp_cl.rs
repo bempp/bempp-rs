@@ -8,9 +8,6 @@ use ndelement::types::Continuity;
 use ndgrid::shapes::regular_sphere;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef, RandomAccessMut};
 
-extern crate blas_src;
-extern crate lapack_src;
-
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {
     let grid = regular_sphere(0);

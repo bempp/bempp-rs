@@ -6,9 +6,6 @@ use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
 
-extern crate blas_src;
-extern crate lapack_src;
-
 fn main() {
     // Create a grid, family of elements, and function space
     let grid = regular_sphere(0);

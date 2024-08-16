@@ -20,28 +20,22 @@ name = "bempp"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-approx = "0.5"
-cauchy = "0.4.*"
 itertools = "0.13.*"
 mpi = { version = "0.8.*", optional = true }
 num = "0.4"
-paste = "1.*"
 lazy_static = "1.4"
-libc = "0.2"
-log = "0.4"
 ndelement = { git = "https://github.com/bempp/ndelement.git" }
 ndgrid = { git = "https://github.com/bempp/ndgrid.git" }
 rayon = "1.9"
-rand = "0.8.5"
 rlst = { version = "0.2" }
 green-kernels = { git = "https://github.com/bempp/green-kernels.git" }
-thiserror="1.*"
 
 [dev-dependencies]
+approx = "0.5"
+paste = "1.*"
+cauchy = "0.4.*"
 criterion = { version = "0.5.*", features = ["html_reports"]}
-kifmm = { version = "1.0" }
-blas-src = { version = "0.10", features = ["blis"]}
-lapack-src = { version = "0.10", features = ["netlib"]}
+# kifmm = { version = "1.0" }
 
 [[bench]]
 name = "assembly_benchmark"
@@ -52,7 +46,3 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [lints.clippy]
 wildcard_imports = "forbid"
-
-[target.aarch64-apple-darwin.dev-dependencies]
-blas-src = { version = "0.10", features = ["accelerate"]}
-lapack-src = { version = "0.10", features = ["accelerate"]}
