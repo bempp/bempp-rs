@@ -3,7 +3,7 @@ use bempp::assembly::batched::BatchedAssembler;
 use bempp::assembly::{batched, fmm_tools};
 use bempp::function::SerialFunctionSpace;
 use ndgrid::{shapes::regular_sphere, traits::Grid};
-use bempp::traits::function::FunctionSpace;
+use bempp::traits::FunctionSpace;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::{traits::Kernel, types::EvalType};
 #[cfg(not(debug_assertions))]

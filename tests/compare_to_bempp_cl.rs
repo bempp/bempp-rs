@@ -1,7 +1,7 @@
 use approx::*;
 use bempp::assembly::{batched, batched::BatchedAssembler, batched::BatchedPotentialAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::function::FunctionSpace;
+use bempp::traits::FunctionSpace;
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
