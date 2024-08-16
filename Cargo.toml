@@ -1,5 +1,5 @@
 [features]
-mpi = ["dep:mpi"]
+mpi = ["dep:mpi", "ndelement/mpi", "ndgrid/mpi"]
 strict = []
 
 [package]
@@ -25,7 +25,8 @@ mpi = { version = "0.8.*", optional = true }
 num = "0.4"
 lazy_static = "1.4"
 ndelement = { git = "https://github.com/bempp/ndelement.git" }
-ndgrid = { git = "https://github.com/bempp/ndgrid.git" }
+# ndgrid = { git = "https://github.com/bempp/ndgrid.git" }
+ndgrid = { path="../ndgrid" }
 rayon = "1.9"
 rlst = { version = "0.2" }
 green-kernels = { git = "https://github.com/bempp/green-kernels.git" }

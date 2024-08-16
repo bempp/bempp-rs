@@ -1,10 +1,10 @@
 //! Functions and functions spaces
-//#[cfg(feature = "mpi")]
-//use crate::traits::grid::ParallelGridType;
-use ndelement::traits::FiniteElement;
-use ndelement::types::ReferenceCellType;
-use ndgrid::traits::Grid;
-use ndgrid::types::Ownership;
+#[cfg(feature = "mpi")]
+use mpi::traits::Communicator;
+use ndelement::{traits::FiniteElement, types::ReferenceCellType};
+#[cfg(feature = "mpi")]
+use ndgrid::traits::ParallelGrid;
+use ndgrid::{traits::Grid, types::Ownership};
 use std::collections::HashMap;
 
 /// A function space
@@ -48,16 +48,22 @@ pub trait FunctionSpace {
     fn ownership(&self, local_dof_index: usize) -> Ownership;
 }
 
-/*
 #[cfg(feature = "mpi")]
 /// A function space in parallel
-pub trait FunctionSpaceInParallel {
-    /// The parallel grid type
-    type ParallelGrid: Grid + ParallelGrid;
+pub trait ParallelFunctionSpace<C: Communicator> {
+    /// Parallel grid type
+    type ParallelGrid: ParallelGrid<C> + Grid;
     /// The type of the serial space on each process
-    type SerialSpace: FunctionSpace<Grid = <Self::ParallelGrid as ParallelGrid>::LocalGrid>;
+    type LocalSpace<'a>: FunctionSpace
+    where
+        Self: 'a;
+
+    /// MPI communicator
+    fn comm(&self) -> &C;
+
+    /// Get the grid
+    fn grid(&self) -> &Self::ParallelGrid;
 
     /// Get the local space on the process
-    fn local_space(&self) -> &Self::SerialSpace;
+    fn local_space(&self) -> &Self::LocalSpace<'_>;
 }
-*/
