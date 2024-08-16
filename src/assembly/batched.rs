@@ -27,7 +27,7 @@ type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, 
 mod test {
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use crate::traits::function::FunctionSpace;
+    use crate::traits::FunctionSpace;
     use approx::*;
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;

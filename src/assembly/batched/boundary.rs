@@ -10,9 +10,9 @@ use crate::quadrature::duffy::{
 };
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use crate::traits::function::FunctionSpace;
+use crate::traits::FunctionSpace;
 #[cfg(feature = "mpi")]
-use crate::traits::function::ParallelFunctionSpace;
+use crate::traits::ParallelFunctionSpace;
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use ndelement::reference_cell;

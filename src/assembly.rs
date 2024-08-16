@@ -8,7 +8,7 @@ mod test {
     use super::batched::BatchedAssembler;
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use crate::traits::function::FunctionSpace;
+    use crate::traits::FunctionSpace;
     use cauchy::{c32, c64};
     use ndelement::ciarlet::CiarletElement;
     use ndelement::ciarlet::LagrangeElementFamily;

@@ -1,7 +1,7 @@
 //! Parallel function space
 
 use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
-use crate::traits::function::{FunctionSpace, ParallelFunctionSpace as ParallelFunctionSpaceTrait};
+use crate::traits::{FunctionSpace, ParallelFunctionSpace as ParallelFunctionSpaceTrait};
 use mpi::{
     point_to_point::{Destination, Source},
     request::WaitGuard,

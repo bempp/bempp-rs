@@ -7,8 +7,10 @@ use bempp::{
     assembly::batched,
     assembly::batched::BatchedAssembler,
     function::{ParallelFunctionSpace, SerialFunctionSpace},
-    traits::function::FunctionSpace,
+    traits::FunctionSpace,
 };
+#[cfg(feature = "mpi")]
+use itertools::izip;
 #[cfg(feature = "mpi")]
 use mpi::{
     environment::Universe,
@@ -23,11 +25,13 @@ use ndelement::{
 #[cfg(feature = "mpi")]
 use ndgrid::{
     grid::parallel::ParallelGrid,
-    traits::{Builder, ParallelBuilder},
+    traits::{Builder, Entity, Grid, ParallelBuilder},
     SingleElementGrid, SingleElementGridBuilder,
 };
 #[cfg(feature = "mpi")]
 use rlst::{CsrMatrix, Shape};
+#[cfg(feature = "mpi")]
+use std::collections::HashMap;
 
 #[cfg(feature = "mpi")]
 fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<f64>, n: usize) {
@@ -83,7 +87,7 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let rank = comm.rank();
     let size = comm.size();
 
-    let n = 4;
+    let n = 10;
     let grid = example_single_element_grid(comm, n);
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
@@ -93,6 +97,60 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
 
     if rank == 0 {
+        // Compute the same matrix on a single process
+        let serial_grid = example_single_element_grid_serial(n);
+        let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
+        let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
+
+        // Dofs associated with each cell (by cell id)
+        let mut serial_dofmap = HashMap::new();
+        for cell in serial_grid.entity_iter(2) {
+            serial_dofmap.insert(
+                cell.id().unwrap(),
+                serial_space
+                    .cell_dofs(cell.local_index())
+                    .unwrap()
+                    .iter()
+                    .map(|i| serial_space.global_dof_index(*i))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        let mut parallel_dofmap = HashMap::new();
+        for cell in grid.entity_iter(2) {
+            parallel_dofmap.insert(
+                cell.id().unwrap(),
+                space
+                    .cell_dofs(cell.local_index())
+                    .unwrap()
+                    .iter()
+                    .map(|i| space.global_dof_index(*i))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        for p in 1..size {
+            let process = comm.process_at_rank(p);
+            let (cell_ids, _status) = process.receive_vec::<usize>();
+            let (dofs, _status) = process.receive_vec::<usize>();
+            let (dofs_len, _status) = process.receive_vec::<usize>();
+            let mut start = 0;
+            for (id, len) in izip!(cell_ids, dofs_len) {
+                if parallel_dofmap.contains_key(&id) {
+                    assert_eq!(parallel_dofmap[&id], dofs[start..start + len]);
+                } else {
+                    parallel_dofmap.insert(id, dofs[start..start + len].to_vec());
+                }
+                start += len;
+            }
+        }
+
+        let mut index_map = vec![0; serial_space.global_size()];
+
+        for (id, dofs) in parallel_dofmap {
+            for (i, j) in izip!(&serial_dofmap[&id], dofs) {
+                index_map[j] = *i;
+            }
+        }
+
         // Gather sparse matrices onto process 0
         let mut rows = vec![];
         let mut cols = vec![];
@@ -103,10 +161,9 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
             while i >= matrix.indptr()[r + 1] {
                 r += 1;
             }
-            rows.push(r);
-            cols.push(*index);
+            rows.push(index_map[r]);
+            cols.push(index_map[*index]);
             data.push(matrix.data()[i]);
-            println!("[0] {r} {index} {}", matrix.data()[i]);
         }
 
         for p in 1..size {
@@ -121,10 +178,9 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
                 while i >= mat.indptr()[r + 1] {
                     r += 1;
                 }
-                rows.push(r);
-                cols.push(*index);
+                rows.push(index_map[r]);
+                cols.push(index_map[*index]);
                 data.push(mat.data()[i]);
-                println!("[{p}] {r} {index} {}", mat.data()[i]);
             }
         }
         let full_matrix = CsrMatrix::from_aij(
@@ -136,18 +192,6 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
         .unwrap();
 
         // Compare to matrix assembled on just this process
-        let serial_grid = example_single_element_grid_serial(n);
-        let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
-        let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
-
-        println!("{:?}", serial_matrix.indices());
-        println!("{:?}", serial_matrix.indptr());
-        println!("{:?}", serial_matrix.data());
-
-        println!("{:?}", full_matrix.indices());
-        println!("{:?}", full_matrix.indptr());
-        println!("{:?}", full_matrix.data());
-
         for (i, j) in full_matrix.indices().iter().zip(serial_matrix.indices()) {
             assert_eq!(i, j);
         }
@@ -158,16 +202,30 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
             assert_relative_eq!(i, j, epsilon = 1e-10);
         }
     } else {
+        let mut cell_ids = vec![];
+        let mut dofs = vec![];
+        let mut dofs_len = vec![];
+        for cell in grid.entity_iter(2) {
+            cell_ids.push(cell.id().unwrap());
+            let cell_dofs = space
+                .cell_dofs(cell.local_index())
+                .unwrap()
+                .iter()
+                .map(|i| space.global_dof_index(*i))
+                .collect::<Vec<_>>();
+            dofs.extend_from_slice(&cell_dofs);
+            dofs_len.push(cell_dofs.len());
+        }
+
         mpi::request::scope(|scope| {
-            let _ = WaitGuard::from(
-                comm.process_at_rank(0)
-                    .immediate_send(scope, matrix.indices()),
-            );
-            let _ = WaitGuard::from(
-                comm.process_at_rank(0)
-                    .immediate_send(scope, matrix.indptr()),
-            );
-            let _ = WaitGuard::from(comm.process_at_rank(0).immediate_send(scope, matrix.data()));
+            let root = comm.process_at_rank(0);
+            // TODO: send this:
+            let _ = WaitGuard::from(root.immediate_send(scope, &cell_ids));
+            let _ = WaitGuard::from(root.immediate_send(scope, &dofs));
+            let _ = WaitGuard::from(root.immediate_send(scope, &dofs_len));
+            let _ = WaitGuard::from(root.immediate_send(scope, matrix.indices()));
+            let _ = WaitGuard::from(root.immediate_send(scope, matrix.indptr()));
+            let _ = WaitGuard::from(root.process_at_rank(0).immediate_send(scope, matrix.data()));
         });
     }
 }

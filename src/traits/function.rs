@@ -50,7 +50,7 @@ pub trait FunctionSpace {
 
 #[cfg(feature = "mpi")]
 /// A function space in parallel
-pub trait ParallelFunctionSpace<C: Communicator> {
+pub trait ParallelFunctionSpace<C: Communicator>: FunctionSpace {
     /// Parallel grid type
     type ParallelGrid: ParallelGrid<C> + Grid;
     /// The type of the serial space on each process

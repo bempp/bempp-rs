@@ -2,7 +2,7 @@
 use crate::assembly::common::SparseMatrixData;
 use crate::function::SerialFunctionSpace;
 use crate::quadrature::simplex_rules::simplex_rule;
-use crate::traits::function::FunctionSpace;
+use crate::traits::FunctionSpace;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
 use ndgrid::traits::{GeometryMap, Grid};

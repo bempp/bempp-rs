@@ -4,7 +4,7 @@ pub(crate) mod single_layer;
 
 use crate::assembly::common::RawData2D;
 use crate::quadrature::simplex_rules::simplex_rule;
-use crate::traits::function::FunctionSpace;
+use crate::traits::FunctionSpace;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
 use ndgrid::traits::{GeometryMap, Grid};
