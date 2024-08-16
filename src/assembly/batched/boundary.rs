@@ -1050,12 +1050,8 @@ pub trait BatchedAssembler: Sync + Sized {
         SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
     >(
         &self,
-        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace>
-                 + FunctionSpace
-                 + 'a),
-        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace>
-                 + FunctionSpace
-                 + 'a),
+        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
+        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
     ) -> CsrMatrix<Self::T> {
         self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
     }
@@ -1126,12 +1122,8 @@ pub trait BatchedAssembler: Sync + Sized {
         SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
     >(
         &self,
-        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace>
-                 + FunctionSpace
-                 + 'a),
-        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace>
-                 + FunctionSpace
-                 + 'a),
+        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
+        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
     ) -> CsrMatrix<Self::T> {
         self.assemble_singular_correction_into_csr(
             trial_space.local_space(),
