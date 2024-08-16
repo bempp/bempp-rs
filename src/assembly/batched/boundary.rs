@@ -1,4 +1,9 @@
 //! Batched dense assembly of boundary operators
+pub(crate) mod adjoint_double_layer;
+pub(crate) mod double_layer;
+pub(crate) mod hypersingular;
+pub(crate) mod single_layer;
+
 use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,

@@ -1,6 +1,7 @@
 //! Batched dense assembly of boundary operators
 use super::{
-    BatchedPotentialAssembler, BatchedPotentialAssemblerOptions, GreenKernelEvalType, RlstArray,
+    super::{GreenKernelEvalType, RlstArray},
+    BatchedPotentialAssembler, BatchedPotentialAssemblerOptions,
 };
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};

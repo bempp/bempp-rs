@@ -1,6 +1,7 @@
 //! Hypersingular assemblers
 use super::{
-    BatchedAssembler, BatchedAssemblerOptions, GreenKernelEvalType, RlstArray, SparseMatrixData,
+    super::{GreenKernelEvalType, RlstArray, SparseMatrixData},
+    BatchedAssembler, BatchedAssemblerOptions,
 };
 use crate::assembly::common::equal_grids;
 use crate::traits::function::FunctionSpace;

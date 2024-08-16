@@ -1,4 +1,7 @@
 //! Batched dense assembly of potential operators
+pub(crate) mod double_layer;
+pub(crate) mod single_layer;
+
 use crate::assembly::common::RawData2D;
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::function::FunctionSpace;
