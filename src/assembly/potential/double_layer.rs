@@ -4,74 +4,37 @@ use crate::assembly::common::{GreenKernelEvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
-/// Assembler for a Laplace double layer potential operator
-pub struct LaplaceDoubleLayerPotentialAssembler<T: RlstScalar + MatrixInverse> {
-    kernel: Laplace3dKernel<T>,
+/// Assembler for a double layer potential operator
+pub struct DoubleLayerPotentialAssembler<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> {
+    kernel: K,
     options: PotentialAssemblerOptions,
 }
-impl<T: RlstScalar + MatrixInverse> Default for LaplaceDoubleLayerPotentialAssembler<T> {
-    fn default() -> Self {
+impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> DoubleLayerPotentialAssembler<T, K> {
+    /// Create a new double layer potential assembler
+    pub fn new(kernel: K) -> Self {
         Self {
-            kernel: Laplace3dKernel::<T>::new(),
+            kernel,
             options: PotentialAssemblerOptions::default(),
         }
     }
 }
-
-impl<T: RlstScalar + MatrixInverse> PotentialAssembler for LaplaceDoubleLayerPotentialAssembler<T> {
-    const DERIV_SIZE: usize = 4;
-    type T = T;
-
-    fn options(&self) -> &PotentialAssemblerOptions {
-        &self.options
+impl<T: RlstScalar + MatrixInverse> DoubleLayerPotentialAssembler<T, Laplace3dKernel<T>> {
+    /// Create a new Laplace double layer potential assembler
+    pub fn new_laplace() -> Self {
+        Self::new(Laplace3dKernel::<T>::new())
     }
-    fn options_mut(&mut self) -> &mut PotentialAssemblerOptions {
-        &mut self.options
-    }
-
-    unsafe fn kernel_value(
-        &self,
-        k: &RlstArray<T, 3>,
-        normals: &RlstArray<T::Real, 2>,
-        index: usize,
-        point_index: usize,
-    ) -> T {
-        -*k.get_unchecked([1, index, point_index])
-            * num::cast::<T::Real, T>(*normals.get_unchecked([0, index])).unwrap()
-            - *k.get_unchecked([2, index, point_index])
-                * num::cast::<T::Real, T>(*normals.get_unchecked([1, index])).unwrap()
-            - *k.get_unchecked([3, index, point_index])
-                * num::cast::<T::Real, T>(*normals.get_unchecked([2, index])).unwrap()
-    }
-
-    fn kernel_assemble_st(
-        &self,
-        sources: &[<Self::T as RlstScalar>::Real],
-        targets: &[<Self::T as RlstScalar>::Real],
-        result: &mut [Self::T],
-    ) {
-        self.kernel
-            .assemble_st(GreenKernelEvalType::ValueDeriv, sources, targets, result);
+}
+impl<T: RlstScalar<Complex = T> + MatrixInverse>
+    DoubleLayerPotentialAssembler<T, Helmholtz3dKernel<T>>
+{
+    /// Create a new Helmholtz double layer potential assembler
+    pub fn new_helmholtz(wavenumber: T::Real) -> Self {
+        Self::new(Helmholtz3dKernel::<T>::new(wavenumber))
     }
 }
 
-/// Assembler for a Helmholtz double layer potential operator
-pub struct HelmholtzDoubleLayerPotentialAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
-    kernel: Helmholtz3dKernel<T>,
-    options: PotentialAssemblerOptions,
-}
-impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzDoubleLayerPotentialAssembler<T> {
-    /// Create a new assembler
-    pub fn new(wavenumber: T::Real) -> Self {
-        Self {
-            kernel: Helmholtz3dKernel::<T>::new(wavenumber),
-            options: PotentialAssemblerOptions::default(),
-        }
-    }
-}
-
-impl<T: RlstScalar<Complex = T> + MatrixInverse> PotentialAssembler
-    for HelmholtzDoubleLayerPotentialAssembler<T>
+impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> PotentialAssembler
+    for DoubleLayerPotentialAssembler<T, K>
 {
     const DERIV_SIZE: usize = 4;
     type T = T;

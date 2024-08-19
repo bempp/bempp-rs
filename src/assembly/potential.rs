@@ -2,12 +2,8 @@
 pub(crate) mod double_layer;
 pub(crate) mod single_layer;
 
-pub use double_layer::{
-    HelmholtzDoubleLayerPotentialAssembler, LaplaceDoubleLayerPotentialAssembler,
-};
-pub use single_layer::{
-    HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler,
-};
+pub use double_layer::DoubleLayerPotentialAssembler;
+pub use single_layer::SingleLayerPotentialAssembler;
 
 use crate::assembly::common::RawData2D;
 use crate::assembly::common::RlstArray;

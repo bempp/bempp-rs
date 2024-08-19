@@ -17,7 +17,7 @@ fn main() {
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
 
     // Create an assembler for the Laplace single layer operator
-    let mut a = boundary::LaplaceSingleLayerAssembler::<f64>::default();
+    let mut a = boundary::SingleLayerAssembler::<f64, _>::new_laplace();
 
     // Adjust the quadrature degree for non-singular integrals on a triangle.
     // This makes the integrals use a quadrature rule with 16 points

@@ -123,12 +123,12 @@ mod test {
     macro_rules! create_assembler {
         (Laplace, $operator:ident, $dtype:ident) => {
             paste! {
-                boundary::[<Laplace $operator Assembler>]::<[<$dtype>]>::default()
+                boundary::[<$operator Assembler>]::<[<$dtype>], _>::new_laplace()
             }
         };
         (Helmholtz, $operator:ident, $dtype:ident) => {
             paste! {
-                boundary::[<Helmholtz $operator Assembler>]::<[<$dtype>]>::new(3.0)
+                boundary::[<$operator Assembler>]::<[<$dtype>], _>::new_helmholtz(3.0)
             }
         };
     }

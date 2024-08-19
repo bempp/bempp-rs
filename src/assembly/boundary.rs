@@ -4,12 +4,10 @@ pub(crate) mod double_layer;
 pub(crate) mod hypersingular;
 pub(crate) mod single_layer;
 
-pub use adjoint_double_layer::{
-    HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
-};
-pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
-pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
-pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
+pub use adjoint_double_layer::AdjointDoubleLayerAssembler;
+pub use double_layer::DoubleLayerAssembler;
+pub use hypersingular::HypersingularAssembler;
+pub use single_layer::SingleLayerAssembler;
 
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::quadrature::duffy::{
@@ -1325,7 +1323,7 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = LaplaceSingleLayerAssembler::<f64>::default();
+        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -1351,7 +1349,7 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = LaplaceSingleLayerAssembler::<f64>::default();
+        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -1380,7 +1378,7 @@ mod test {
         let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
-        let assembler = LaplaceSingleLayerAssembler::<f64>::default();
+        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
         assembler.assemble_singular_into_dense(&mut matrix, &space0, &space1);
         let csr = assembler.assemble_singular_into_csr(&space0, &space1);
         let indptr = csr.indptr();
