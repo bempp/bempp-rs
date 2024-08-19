@@ -4,16 +4,14 @@ pub(crate) mod double_layer;
 pub(crate) mod hypersingular;
 pub(crate) mod single_layer;
 
-pub use adjoint_double_layer::{LaplaceAdjointDoubleLayerAssembler,
-HelmholtzAdjointDoubleLayerAssembler};
-pub use double_layer::{LaplaceDoubleLayerAssembler,
-HelmholtzDoubleLayerAssembler};
-pub use single_layer::{LaplaceSingleLayerAssembler,
-HelmholtzSingleLayerAssembler};
-pub use hypersingular::{LaplaceHypersingularAssembler,
-HelmholtzHypersingularAssembler};
+pub use adjoint_double_layer::{
+    HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
+};
+pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
+pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
+pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
 
-use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData, RlstArray};
+use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };

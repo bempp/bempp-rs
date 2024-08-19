@@ -1,8 +1,6 @@
 //! Hypersingular assemblers
-use super::{
-    BoundaryAssembler, BoundaryAssemblerOptions,
-};
-use crate::assembly::common::{GreenKernelEvalType, RlstArray, SparseMatrixData, equal_grids};
+use super::{BoundaryAssembler, BoundaryAssemblerOptions};
+use crate::assembly::common::{equal_grids, GreenKernelEvalType, RlstArray, SparseMatrixData};
 use crate::traits::FunctionSpace;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use ndelement::traits::FiniteElement;

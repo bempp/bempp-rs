@@ -1,13 +1,13 @@
 //! Boundary operator assembly
 pub mod boundary;
-pub mod potential;
 pub(crate) mod common;
 pub mod fmm_tools;
+pub mod potential;
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::boundary::BoundaryAssembler;
+    use super::*;
     use crate::function::SerialFunctionSpace;
     use crate::traits::FunctionSpace;
     use cauchy::{c32, c64};

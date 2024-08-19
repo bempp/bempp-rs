@@ -2,10 +2,15 @@
 pub(crate) mod double_layer;
 pub(crate) mod single_layer;
 
-pub use single_layer::{HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler};
-pub use double_layer::{HelmholtzDoubleLayerPotentialAssembler, LaplaceDoubleLayerPotentialAssembler};
+pub use double_layer::{
+    HelmholtzDoubleLayerPotentialAssembler, LaplaceDoubleLayerPotentialAssembler,
+};
+pub use single_layer::{
+    HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler,
+};
 
 use crate::assembly::common::RawData2D;
+use crate::assembly::common::RlstArray;
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::FunctionSpace;
 use ndelement::traits::FiniteElement;
@@ -17,7 +22,6 @@ use rlst::{
     RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
-use crate::assembly::common::RlstArray;
 
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]

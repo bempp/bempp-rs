@@ -1,7 +1,5 @@
 //! Double layer potential assemblers
-use super::{
-    PotentialAssembler, PotentialAssemblerOptions,
-};
+use super::{PotentialAssembler, PotentialAssemblerOptions};
 use crate::assembly::common::{GreenKernelEvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
@@ -20,9 +18,7 @@ impl<T: RlstScalar + MatrixInverse> Default for LaplaceSingleLayerPotentialAssem
     }
 }
 
-impl<T: RlstScalar + MatrixInverse> PotentialAssembler
-    for LaplaceSingleLayerPotentialAssembler<T>
-{
+impl<T: RlstScalar + MatrixInverse> PotentialAssembler for LaplaceSingleLayerPotentialAssembler<T> {
     const DERIV_SIZE: usize = 1;
     type T = T;
 
