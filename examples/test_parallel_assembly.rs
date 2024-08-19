@@ -31,7 +31,7 @@ use ndgrid::{
 #[cfg(feature = "mpi")]
 use rlst::{CsrMatrix, Shape};
 #[cfg(feature = "mpi")]
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 #[cfg(feature = "mpi")]
 fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<f64>, n: usize) {
@@ -134,10 +134,10 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
             let (dofs_len, _status) = process.receive_vec::<usize>();
             let mut start = 0;
             for (id, len) in izip!(cell_ids, dofs_len) {
-                if parallel_dofmap.contains_key(&id) {
-                    assert_eq!(parallel_dofmap[&id], dofs[start..start + len]);
+                if let Entry::Vacant(e) = parallel_dofmap.entry(id) {
+                    e.insert(dofs[start..start + len].to_vec());
                 } else {
-                    parallel_dofmap.insert(id, dofs[start..start + len].to_vec());
+                    assert_eq!(parallel_dofmap[&id], dofs[start..start + len]);
                 }
                 start += len;
             }
