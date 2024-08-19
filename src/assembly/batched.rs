@@ -4,29 +4,22 @@ use green_kernels::types::GreenKernelEvalType;
 use rlst::{Array, BaseArray, VectorContainer};
 
 mod boundary;
-pub use boundary::{BatchedAssembler, BatchedAssemblerOptions};
-mod potential;
-pub use potential::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions};
-
-mod adjoint_double_layer;
-mod double_layer;
-mod hypersingular;
-mod single_layer;
-pub use adjoint_double_layer::{
+pub use boundary::adjoint_double_layer::{
     HelmholtzAdjointDoubleLayerAssembler, LaplaceAdjointDoubleLayerAssembler,
 };
-pub use double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
-pub use hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
-pub use single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
+pub use boundary::double_layer::{HelmholtzDoubleLayerAssembler, LaplaceDoubleLayerAssembler};
+pub use boundary::hypersingular::{HelmholtzHypersingularAssembler, LaplaceHypersingularAssembler};
+pub use boundary::single_layer::{HelmholtzSingleLayerAssembler, LaplaceSingleLayerAssembler};
+pub use boundary::{BatchedAssembler, BatchedAssemblerOptions};
 
-mod double_layer_potential;
-mod single_layer_potential;
-pub use double_layer_potential::{
+mod potential;
+pub use potential::double_layer::{
     HelmholtzDoubleLayerPotentialAssembler, LaplaceDoubleLayerPotentialAssembler,
 };
-pub use single_layer_potential::{
+pub use potential::single_layer::{
     HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler,
 };
+pub use potential::{BatchedPotentialAssembler, BatchedPotentialAssemblerOptions};
 
 type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
 
@@ -34,7 +27,7 @@ type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, 
 mod test {
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use crate::traits::function::FunctionSpace;
+    use crate::traits::FunctionSpace;
     use approx::*;
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;

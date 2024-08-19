@@ -5,15 +5,12 @@ use ndgrid::{
     grid::{SingleElementGrid, SingleElementGridBuilder},
     traits::Builder,
 };
-use bempp::traits::function::FunctionSpace;
+use bempp::traits::FunctionSpace;
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use paste::paste;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef};
-
-extern crate blas_src;
-extern crate lapack_src;
 
 fn mixed_grid() -> MixedGrid<f64> {
     let mut b = MixedGridBuilder::<3, f64>::new(());

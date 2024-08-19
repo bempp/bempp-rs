@@ -1,5 +1,8 @@
 //! Adjoint double layer assemblers
-use super::{BatchedAssembler, BatchedAssemblerOptions, GreenKernelEvalType, RlstArray};
+use super::{
+    super::{GreenKernelEvalType, RlstArray},
+    BatchedAssembler, BatchedAssemblerOptions,
+};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 

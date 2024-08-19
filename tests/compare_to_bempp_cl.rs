@@ -1,15 +1,12 @@
 use approx::*;
 use bempp::assembly::{batched, batched::BatchedAssembler, batched::BatchedPotentialAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::function::FunctionSpace;
+use bempp::traits::FunctionSpace;
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
 use ndgrid::shapes::regular_sphere;
 use rlst::{rlst_dynamic_array2, RandomAccessByRef, RandomAccessMut};
-
-extern crate blas_src;
-extern crate lapack_src;
 
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {

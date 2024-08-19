@@ -1,7 +1,7 @@
 //! Serial function space
 
 use crate::function::function_space::assign_dofs;
-use crate::traits::function::FunctionSpace;
+use crate::traits::FunctionSpace;
 use ndelement::ciarlet::CiarletElement;
 use ndelement::traits::{ElementFamily, FiniteElement};
 use ndelement::types::ReferenceCellType;
