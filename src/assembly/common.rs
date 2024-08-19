@@ -1,6 +1,9 @@
 //! Common utility functions
 use ndgrid::traits::Grid;
-use rlst::{MatrixInverse, RlstScalar};
+use rlst::{MatrixInverse, RlstScalar, Array, BaseArray, VectorContainer};
+pub(crate) use green_kernels::types::EvalType as GreenKernelEvalType;
+
+pub(crate) type RlstArray<T, const DIM: usize> = Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
 
 pub(crate) fn equal_grids<TestGrid: Grid, TrialGrid: Grid>(
     test_grid: &TestGrid,

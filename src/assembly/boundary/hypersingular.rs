@@ -1,9 +1,8 @@
 //! Hypersingular assemblers
 use super::{
-    super::{GreenKernelEvalType, RlstArray, SparseMatrixData},
-    BatchedAssembler, BatchedAssemblerOptions,
+    BoundaryAssembler, BoundaryAssemblerOptions,
 };
-use crate::assembly::common::equal_grids;
+use crate::assembly::common::{GreenKernelEvalType, RlstArray, SparseMatrixData, equal_grids};
 use crate::traits::FunctionSpace;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use ndelement::traits::FiniteElement;
@@ -69,24 +68,24 @@ unsafe fn hyp_test_trial_product<T: RlstScalar + MatrixInverse>(
 /// Assembler for a Laplace hypersingular operator
 pub struct LaplaceHypersingularAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
-    options: BatchedAssemblerOptions,
+    options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar + MatrixInverse> Default for LaplaceHypersingularAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
-            options: BatchedAssemblerOptions::default(),
+            options: BoundaryAssemblerOptions::default(),
         }
     }
 }
-impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceHypersingularAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BoundaryAssembler for LaplaceHypersingularAssembler<T> {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
-    fn options(&self) -> &BatchedAssemblerOptions {
+    fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         &mut self.options
     }
     unsafe fn singular_kernel_value(
@@ -153,27 +152,27 @@ impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceHypersingularAss
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
 struct HelmholtzHypersingularCurlCurlAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
-    options: BatchedAssemblerOptions,
+    options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularCurlCurlAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
-            options: BatchedAssemblerOptions::default(),
+            options: BoundaryAssemblerOptions::default(),
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     for HelmholtzHypersingularCurlCurlAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
-    fn options(&self) -> &BatchedAssemblerOptions {
+    fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         &mut self.options
     }
     unsafe fn singular_kernel_value(
@@ -241,7 +240,7 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
 struct HelmholtzHypersingularNormalNormalAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
     wavenumber: T::Real,
-    options: BatchedAssemblerOptions,
+    options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularNormalNormalAssembler<T> {
     /// Create a new assembler
@@ -249,20 +248,20 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularNormalNor
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
             wavenumber,
-            options: BatchedAssemblerOptions::default(),
+            options: BoundaryAssemblerOptions::default(),
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     for HelmholtzHypersingularNormalNormalAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 0;
     type T = T;
-    fn options(&self) -> &BatchedAssemblerOptions {
+    fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         &mut self.options
     }
     unsafe fn singular_kernel_value(
@@ -331,16 +330,16 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzHypersingularAssembler
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     for HelmholtzHypersingularAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
-    fn options(&self) -> &BatchedAssemblerOptions {
+    fn options(&self) -> &BoundaryAssemblerOptions {
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
     }
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         panic!("Cannot directly use HelmholtzHypersingularAssembler");
     }
     fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {

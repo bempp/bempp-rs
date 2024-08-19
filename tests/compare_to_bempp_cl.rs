@@ -1,5 +1,5 @@
 use approx::*;
-use bempp::assembly::{batched, batched::BatchedAssembler, batched::BatchedPotentialAssembler};
+use bempp::assembly::{boundary, boundary::BoundaryAssembler, potential, potential::PotentialAssembler};
 use bempp::function::SerialFunctionSpace;
 use bempp::traits::FunctionSpace;
 use cauchy::c64;
@@ -18,7 +18,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
 
-    let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+    let a = boundary::LaplaceSingleLayerAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -41,7 +41,7 @@ fn test_laplace_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceDoubleLayerAssembler::<f64>::default();
+    let a = boundary::LaplaceDoubleLayerAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -63,7 +63,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceAdjointDoubleLayerAssembler::<f64>::default();
+    let a = boundary::LaplaceAdjointDoubleLayerAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -86,7 +86,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceHypersingularAssembler::<f64>::default();
+    let a = boundary::LaplaceHypersingularAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     for i in 0..ndofs {
@@ -105,7 +105,7 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = batched::LaplaceHypersingularAssembler::<f64>::default();
+    let a = boundary::LaplaceHypersingularAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -134,7 +134,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzSingleLayerAssembler::<c64>::new(3.0);
+    let a = boundary::HelmholtzSingleLayerAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -157,7 +157,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzDoubleLayerAssembler::<c64>::new(3.0);
+    let a = boundary::HelmholtzDoubleLayerAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -179,7 +179,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzAdjointDoubleLayerAssembler::<c64>::new(3.0);
+    let a = boundary::HelmholtzAdjointDoubleLayerAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -202,7 +202,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = batched::HelmholtzHypersingularAssembler::<c64>::new(3.0);
+    let a = boundary::HelmholtzHypersingularAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -237,7 +237,7 @@ fn test_laplace_single_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = batched::LaplaceSingleLayerPotentialAssembler::<f64>::default();
+    let a = potential::LaplaceSingleLayerPotentialAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
@@ -265,7 +265,7 @@ fn test_helmholtz_single_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = batched::HelmholtzSingleLayerPotentialAssembler::<c64>::new(3.0);
+    let a = potential::HelmholtzSingleLayerPotentialAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
@@ -293,7 +293,7 @@ fn test_laplace_double_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = batched::LaplaceDoubleLayerPotentialAssembler::<f64>::default();
+    let a = potential::LaplaceDoubleLayerPotentialAssembler::<f64>::default();
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
@@ -321,7 +321,7 @@ fn test_helmholtz_double_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = batched::HelmholtzDoubleLayerPotentialAssembler::<c64>::new(3.0);
+    let a = potential::HelmholtzDoubleLayerPotentialAssembler::<c64>::new(3.0);
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl

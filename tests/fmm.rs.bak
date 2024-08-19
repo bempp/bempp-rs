@@ -1,6 +1,6 @@
 use approx::*;
-use bempp::assembly::batched::BatchedAssembler;
-use bempp::assembly::{batched, fmm_tools};
+use bempp::assembly::boundary::BoundaryAssembler;
+use bempp::assembly::{boundary, fmm_tools};
 use bempp::function::SerialFunctionSpace;
 use ndgrid::{shapes::regular_sphere, traits::Grid};
 use bempp::traits::FunctionSpace;
@@ -40,7 +40,7 @@ fn fmm_prototype<TestGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> +
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+    let mut a = boundary::LaplaceSingleLayerAssembler::<f64>::default();
     a.quadrature_degree(ReferenceCellType::Triangle, npts);
     a.assemble_into_dense(&mut matrix, trial_space, test_space);
 
@@ -115,7 +115,7 @@ fn fmm_matvec<TrialGrid: Grid<T = f64, EntityDescriptor = ReferenceCellType> + S
 
     // Compute dense
     let mut matrix = rlst_dynamic_array2!(f64, [test_ndofs, trial_ndofs]);
-    let mut a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+    let mut a = boundary::LaplaceSingleLayerAssembler::<f64>::default();
     a.quadrature_degree(ReferenceCellType::Triangle, npts);
     a.assemble_into_dense(&mut matrix, trial_space, test_space);
 

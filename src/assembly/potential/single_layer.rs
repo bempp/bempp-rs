@@ -1,35 +1,35 @@
-//! Batched dense assembly of boundary operators
+//! Double layer potential assemblers
 use super::{
-    super::{GreenKernelEvalType, RlstArray},
-    BatchedPotentialAssembler, BatchedPotentialAssemblerOptions,
+    PotentialAssembler, PotentialAssemblerOptions,
 };
+use crate::assembly::common::{GreenKernelEvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace single layer potential operator
 pub struct LaplaceSingleLayerPotentialAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
-    options: BatchedPotentialAssemblerOptions,
+    options: PotentialAssemblerOptions,
 }
 impl<T: RlstScalar + MatrixInverse> Default for LaplaceSingleLayerPotentialAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
-            options: BatchedPotentialAssemblerOptions::default(),
+            options: PotentialAssemblerOptions::default(),
         }
     }
 }
 
-impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
+impl<T: RlstScalar + MatrixInverse> PotentialAssembler
     for LaplaceSingleLayerPotentialAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
     type T = T;
 
-    fn options(&self) -> &BatchedPotentialAssemblerOptions {
+    fn options(&self) -> &PotentialAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedPotentialAssemblerOptions {
+    fn options_mut(&mut self) -> &mut PotentialAssemblerOptions {
         &mut self.options
     }
 
@@ -57,28 +57,28 @@ impl<T: RlstScalar + MatrixInverse> BatchedPotentialAssembler
 /// Assembler for a Helmholtz single layer potential operator
 pub struct HelmholtzSingleLayerPotentialAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
-    options: BatchedPotentialAssemblerOptions,
+    options: PotentialAssemblerOptions,
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzSingleLayerPotentialAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
-            options: BatchedPotentialAssemblerOptions::default(),
+            options: PotentialAssemblerOptions::default(),
         }
     }
 }
 
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedPotentialAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> PotentialAssembler
     for HelmholtzSingleLayerPotentialAssembler<T>
 {
     const DERIV_SIZE: usize = 1;
     type T = T;
 
-    fn options(&self) -> &BatchedPotentialAssemblerOptions {
+    fn options(&self) -> &PotentialAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedPotentialAssemblerOptions {
+    fn options_mut(&mut self) -> &mut PotentialAssemblerOptions {
         &mut self.options
     }
 

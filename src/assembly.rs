@@ -1,12 +1,13 @@
 //! Boundary operator assembly
-pub mod batched;
+pub mod boundary;
+pub mod potential;
 pub(crate) mod common;
 pub mod fmm_tools;
 
 #[cfg(test)]
 mod test {
-    use super::batched::BatchedAssembler;
     use super::*;
+    use super::boundary::BoundaryAssembler;
     use crate::function::SerialFunctionSpace;
     use crate::traits::FunctionSpace;
     use cauchy::{c32, c64};
@@ -122,12 +123,12 @@ mod test {
     macro_rules! create_assembler {
         (Laplace, $operator:ident, $dtype:ident) => {
             paste! {
-                batched::[<Laplace $operator Assembler>]::<[<$dtype>]>::default()
+                boundary::[<Laplace $operator Assembler>]::<[<$dtype>]>::default()
             }
         };
         (Helmholtz, $operator:ident, $dtype:ident) => {
             paste! {
-                batched::[<Helmholtz $operator Assembler>]::<[<$dtype>]>::new(3.0)
+                boundary::[<Helmholtz $operator Assembler>]::<[<$dtype>]>::new(3.0)
             }
         };
     }

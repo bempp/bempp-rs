@@ -1,6 +1,9 @@
-//! Batched dense assembly of potential operators
+//! Assembly of potential operators
 pub(crate) mod double_layer;
 pub(crate) mod single_layer;
+
+pub use single_layer::{HelmholtzSingleLayerPotentialAssembler, LaplaceSingleLayerPotentialAssembler};
+pub use double_layer::{HelmholtzDoubleLayerPotentialAssembler, LaplaceDoubleLayerPotentialAssembler};
 
 use crate::assembly::common::RawData2D;
 use crate::quadrature::simplex_rules::simplex_rule;
@@ -14,8 +17,7 @@ use rlst::{
     RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
-
-use super::RlstArray;
+use crate::assembly::common::RlstArray;
 
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]
@@ -24,7 +26,7 @@ fn assemble_batch<
     G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
-    assembler: &impl BatchedPotentialAssembler<T = T>,
+    assembler: &impl PotentialAssembler<T = T>,
     deriv_size: usize,
     output: &RawData2D<T>,
     cell_type: ReferenceCellType,
@@ -87,15 +89,15 @@ fn assemble_batch<
     1
 }
 
-/// Options for a batched assembler
-pub struct BatchedPotentialAssemblerOptions {
+/// Options for a potential assembler
+pub struct PotentialAssemblerOptions {
     /// Number of points used in quadrature for non-singular integrals
     quadrature_degrees: HashMap<ReferenceCellType, usize>,
     /// Maximum size of each batch of cells to send to an assembly function
     batch_size: usize,
 }
 
-impl Default for BatchedPotentialAssemblerOptions {
+impl Default for PotentialAssemblerOptions {
     fn default() -> Self {
         use ReferenceCellType::{Quadrilateral, Triangle};
         Self {
@@ -105,8 +107,8 @@ impl Default for BatchedPotentialAssemblerOptions {
     }
 }
 
-pub trait BatchedPotentialAssembler: Sync + Sized {
-    //! Batched potential assembler
+pub trait PotentialAssembler: Sync + Sized {
+    //! Potential assembler
     //!
     //! Assemble potential operators by processing batches of cells in parallel
 
@@ -116,10 +118,10 @@ pub trait BatchedPotentialAssembler: Sync + Sized {
     const DERIV_SIZE: usize;
 
     /// Get assembler options
-    fn options(&self) -> &BatchedPotentialAssemblerOptions;
+    fn options(&self) -> &PotentialAssemblerOptions;
 
     /// Get mutable assembler options
-    fn options_mut(&mut self) -> &mut BatchedPotentialAssemblerOptions;
+    fn options_mut(&mut self) -> &mut PotentialAssemblerOptions;
 
     /// Set (non-singular) quadrature degree for a cell type
     fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {

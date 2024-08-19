@@ -1,32 +1,32 @@
 //! Double layer assemblers
 use super::{
-    super::{GreenKernelEvalType, RlstArray},
-    BatchedAssembler, BatchedAssemblerOptions,
+    BoundaryAssembler, BoundaryAssemblerOptions,
 };
+use crate::assembly::common::{GreenKernelEvalType, RlstArray};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a Laplace double layer operator
 pub struct LaplaceDoubleLayerAssembler<T: RlstScalar + MatrixInverse> {
     kernel: Laplace3dKernel<T>,
-    options: BatchedAssemblerOptions,
+    options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar + MatrixInverse> Default for LaplaceDoubleLayerAssembler<T> {
     fn default() -> Self {
         Self {
             kernel: Laplace3dKernel::<T>::new(),
-            options: BatchedAssemblerOptions::default(),
+            options: BoundaryAssemblerOptions::default(),
         }
     }
 }
-impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceDoubleLayerAssembler<T> {
+impl<T: RlstScalar + MatrixInverse> BoundaryAssembler for LaplaceDoubleLayerAssembler<T> {
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
     type T = T;
-    fn options(&self) -> &BatchedAssemblerOptions {
+    fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         &mut self.options
     }
     unsafe fn singular_kernel_value(
@@ -76,27 +76,27 @@ impl<T: RlstScalar + MatrixInverse> BatchedAssembler for LaplaceDoubleLayerAssem
 /// Assembler for a Helmholtz double layer boundary operator
 pub struct HelmholtzDoubleLayerAssembler<T: RlstScalar<Complex = T> + MatrixInverse> {
     kernel: Helmholtz3dKernel<T>,
-    options: BatchedAssemblerOptions,
+    options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse> HelmholtzDoubleLayerAssembler<T> {
     /// Create a new assembler
     pub fn new(wavenumber: T::Real) -> Self {
         Self {
             kernel: Helmholtz3dKernel::<T>::new(wavenumber),
-            options: BatchedAssemblerOptions::default(),
+            options: BoundaryAssemblerOptions::default(),
         }
     }
 }
-impl<T: RlstScalar<Complex = T> + MatrixInverse> BatchedAssembler
+impl<T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     for HelmholtzDoubleLayerAssembler<T>
 {
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
     type T = T;
-    fn options(&self) -> &BatchedAssemblerOptions {
+    fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions {
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         &mut self.options
     }
     unsafe fn singular_kernel_value(
