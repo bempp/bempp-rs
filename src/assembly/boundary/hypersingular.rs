@@ -183,7 +183,7 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     const TABLE_DERIVS: usize = 1;
     type T = T;
     fn options(&self) -> &BoundaryAssemblerOptions {
-        &self.options
+        self.options
     }
     fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         panic!("Cannot get mutable options")
@@ -269,7 +269,7 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     const TABLE_DERIVS: usize = 0;
     type T = T;
     fn options(&self) -> &BoundaryAssemblerOptions {
-        &self.options
+        self.options
     }
     fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         panic!("Cannot get mutable options")
