@@ -1,10 +1,15 @@
-//! Batched dense assembly of boundary operators
+//! Assembly of boundary operators
 pub(crate) mod adjoint_double_layer;
 pub(crate) mod double_layer;
 pub(crate) mod hypersingular;
 pub(crate) mod single_layer;
 
-use crate::assembly::common::{equal_grids, RawData2D, SparseMatrixData};
+pub use adjoint_double_layer::AdjointDoubleLayerAssembler;
+pub use double_layer::DoubleLayerAssembler;
+pub use hypersingular::HypersingularAssembler;
+pub use single_layer::SingleLayerAssembler;
+
+use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
@@ -26,8 +31,6 @@ use rlst::{
     RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
-
-use super::RlstArray;
 
 fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
     test_grid: &TestGrid,
@@ -106,7 +109,7 @@ fn assemble_batch_singular<
     TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
-    assembler: &impl BatchedAssembler<T = T>,
+    assembler: &impl BoundaryAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
@@ -222,7 +225,7 @@ fn assemble_batch_nonadjacent<
     TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
-    assembler: &impl BatchedAssembler<T = T>,
+    assembler: &impl BoundaryAssembler<T = T>,
     deriv_size: usize,
     output: &RawData2D<T>,
     trial_cell_type: ReferenceCellType,
@@ -362,7 +365,7 @@ fn assemble_batch_singular_correction<
     TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
 >(
-    assembler: &impl BatchedAssembler<T = T>,
+    assembler: &impl BoundaryAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
@@ -500,8 +503,8 @@ fn get_pairs_if_smallest(
     Some(pairs)
 }
 
-/// Options for a batched assembler
-pub struct BatchedAssemblerOptions {
+/// Options for a boundary assembler
+pub struct BoundaryAssemblerOptions {
     /// Number of points used in quadrature for non-singular integrals
     quadrature_degrees: HashMap<ReferenceCellType, usize>,
     /// Quadrature degrees to be used for singular integrals
@@ -510,7 +513,7 @@ pub struct BatchedAssemblerOptions {
     batch_size: usize,
 }
 
-impl Default for BatchedAssemblerOptions {
+impl Default for BoundaryAssemblerOptions {
     fn default() -> Self {
         use ReferenceCellType::{Quadrilateral, Triangle};
         Self {
@@ -526,8 +529,8 @@ impl Default for BatchedAssemblerOptions {
     }
 }
 
-pub trait BatchedAssembler: Sync + Sized {
-    //! Batched assembler
+pub trait BoundaryAssembler: Sync + Sized {
+    //! Boundary assembler
     //!
     //! Assemble operators by processing batches of cells in parallel
 
@@ -539,10 +542,10 @@ pub trait BatchedAssembler: Sync + Sized {
     const TABLE_DERIVS: usize;
 
     /// Get assembler options
-    fn options(&self) -> &BatchedAssemblerOptions;
+    fn options(&self) -> &BoundaryAssemblerOptions;
 
     /// Get mutable assembler options
-    fn options_mut(&mut self) -> &mut BatchedAssemblerOptions;
+    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions;
 
     /// Set (non-singular) quadrature degree for a cell type
     fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
@@ -1295,6 +1298,99 @@ pub trait BatchedAssembler: Sync + Sized {
                     }
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::function::SerialFunctionSpace;
+    use crate::traits::FunctionSpace;
+    use approx::*;
+    use ndelement::ciarlet::LagrangeElementFamily;
+    use ndelement::types::Continuity;
+    use ndgrid::shapes::regular_sphere;
+    use rlst::rlst_dynamic_array2;
+    use rlst::RandomAccessByRef;
+
+    #[test]
+    fn test_singular_dp0() {
+        let grid = regular_sphere::<f64>(0);
+        let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.global_size();
+
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
+        assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
+        let csr = assembler.assemble_singular_into_csr(&space, &space);
+
+        let indptr = csr.indptr();
+        let indices = csr.indices();
+        let data = csr.data();
+
+        let mut row = 0;
+        for (i, j) in indices.iter().enumerate() {
+            while i >= indptr[row + 1] {
+                row += 1;
+            }
+            assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
+        }
+    }
+
+    #[test]
+    fn test_singular_p1() {
+        let grid = regular_sphere::<f64>(0);
+        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
+        let space = SerialFunctionSpace::new(&grid, &element);
+
+        let ndofs = space.global_size();
+
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
+        assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
+        let csr = assembler.assemble_singular_into_csr(&space, &space);
+
+        let indptr = csr.indptr();
+        let indices = csr.indices();
+        let data = csr.data();
+
+        let mut row = 0;
+        for (i, j) in indices.iter().enumerate() {
+            while i >= indptr[row + 1] {
+                row += 1;
+            }
+            assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
+        }
+    }
+
+    #[test]
+    fn test_singular_dp0_p1() {
+        let grid = regular_sphere::<f64>(0);
+        let element0 = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
+        let element1 = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
+        let space0 = SerialFunctionSpace::new(&grid, &element0);
+        let space1 = SerialFunctionSpace::new(&grid, &element1);
+
+        let ndofs0 = space0.global_size();
+        let ndofs1 = space1.global_size();
+
+        let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
+        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
+        assembler.assemble_singular_into_dense(&mut matrix, &space0, &space1);
+        let csr = assembler.assemble_singular_into_csr(&space0, &space1);
+        let indptr = csr.indptr();
+        let indices = csr.indices();
+        let data = csr.data();
+
+        let mut row = 0;
+        for (i, j) in indices.iter().enumerate() {
+            while i >= indptr[row + 1] {
+                row += 1;
+            }
+            assert_relative_eq!(*matrix.get([row, *j]).unwrap(), data[i], epsilon = 1e-8);
         }
     }
 }

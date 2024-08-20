@@ -1,6 +1,6 @@
 //! Batched dense assembly
 use crate::assembly::common::SparseMatrixData;
-use green_kernels::types::GreenKernelEvalType;
+use green_kernels::types::EvalType as GreenKernelEvalType;
 use rlst::{Array, BaseArray, VectorContainer};
 
 mod boundary;

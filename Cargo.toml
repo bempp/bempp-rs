@@ -24,11 +24,11 @@ itertools = "0.13.*"
 mpi = { version = "0.8.*", optional = true }
 num = "0.4"
 lazy_static = "1.4"
-ndelement = { git = "https://github.com/bempp/ndelement.git" }
-ndgrid = { git = "https://github.com/bempp/ndgrid.git" }
+ndelement = "0.1.0"
+ndgrid = "0.1.0"
 rayon = "1.9"
-rlst = { version = "0.2" }
-green-kernels = { git = "https://github.com/bempp/green-kernels.git" }
+rlst = "0.2"
+green-kernels = "0.2.0"
 
 [dev-dependencies]
 approx = "0.5"

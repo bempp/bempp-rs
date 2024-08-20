@@ -4,8 +4,8 @@
 use approx::assert_relative_eq;
 #[cfg(feature = "mpi")]
 use bempp::{
-    assembly::batched,
-    assembly::batched::BatchedAssembler,
+    assembly::boundary,
+    assembly::boundary::BoundaryAssembler,
     function::{ParallelFunctionSpace, SerialFunctionSpace},
     traits::FunctionSpace,
 };
@@ -92,7 +92,7 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
-    let a = batched::LaplaceSingleLayerAssembler::<f64>::default();
+    let a = boundary::SingleLayerAssembler::<f64, _>::new_laplace();
 
     let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
 
