@@ -1,7 +1,12 @@
 //! Hypersingular assemblers
 use super::{BoundaryAssembler, BoundaryAssemblerOptions};
-use crate::assembly::common::{equal_grids, GreenKernelEvalType, RlstArray, SparseMatrixData};
+use crate::assembly::{
+    boundary::integrands::HypersingularBoundaryIntegrand,
+    common::{equal_grids, GreenKernelEvalType, RlstArray, SparseMatrixData},
+    kernels::KernelEvaluator,
+};
 use crate::traits::FunctionSpace;
+use crate::traits::KernelEvaluator as KernelEvaluatorTrait;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
@@ -65,12 +70,12 @@ unsafe fn hyp_test_trial_product<T: RlstScalar + MatrixInverse>(
 
 /// Assembler for a hypersingular operator
 pub struct HypersingularAssembler<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> {
-    kernel: K,
+    kernel: KernelEvaluator<T, K>,
     options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> HypersingularAssembler<T, K> {
     /// Create a new hypersingular assembler
-    pub fn new(kernel: K) -> Self {
+    pub fn new(kernel: KernelEvaluator<T, K>) -> Self {
         Self {
             kernel,
             options: BoundaryAssemblerOptions::default(),
@@ -80,13 +85,18 @@ impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> HypersingularAssembler<T, 
 impl<T: RlstScalar + MatrixInverse> HypersingularAssembler<T, Laplace3dKernel<T>> {
     /// Create a new Laplace hypersingular assembler
     pub fn new_laplace() -> Self {
-        Self::new(Laplace3dKernel::<T>::new())
+        Self::new(KernelEvaluator::new_laplace(
+            GreenKernelEvalType::ValueDeriv,
+        ))
     }
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse> HypersingularAssembler<T, Helmholtz3dKernel<T>> {
     /// Create a new Helmholtz hypersingular assembler
     pub fn new_helmholtz(wavenumber: T::Real) -> Self {
-        Self::new(Helmholtz3dKernel::<T>::new(wavenumber))
+        Self::new(KernelEvaluator::new_helmholtz(
+            wavenumber,
+            GreenKernelEvalType::ValueDeriv,
+        ))
     }
 }
 
@@ -96,6 +106,14 @@ impl<T: RlstScalar + MatrixInverse> BoundaryAssembler
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
+    type Integrand = HypersingularBoundaryIntegrand<T>;
+    type Kernel = KernelEvaluator<T, Laplace3dKernel<T>>;
+    fn integrand(&self) -> &HypersingularBoundaryIntegrand<T> {
+        panic!();
+    }
+    fn kernel(&self) -> &KernelEvaluator<T, Laplace3dKernel<T>> {
+        &self.kernel
+    }
     fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
@@ -127,12 +145,10 @@ impl<T: RlstScalar + MatrixInverse> BoundaryAssembler
         targets: &[T::Real],
         result: &mut [T],
     ) {
-        self.kernel
-            .assemble_pairwise_st(GreenKernelEvalType::Value, sources, targets, result);
+        self.kernel.assemble_pairwise_st(sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
-        self.kernel
-            .assemble_st(GreenKernelEvalType::Value, sources, targets, result);
+        self.kernel.assemble_st(sources, targets, result);
     }
     #[allow(clippy::too_many_arguments)]
     unsafe fn test_trial_product(
@@ -165,14 +181,17 @@ impl<T: RlstScalar + MatrixInverse> BoundaryAssembler
 
 /// Assembler for curl-curl term of Helmholtz hypersingular operator
 struct HelmholtzHypersingularCurlCurlAssembler<'a, T: RlstScalar<Complex = T> + MatrixInverse> {
-    kernel: &'a Helmholtz3dKernel<T>,
+    kernel: &'a KernelEvaluator<T, Helmholtz3dKernel<T>>,
     options: &'a BoundaryAssemblerOptions,
 }
 impl<'a, T: RlstScalar<Complex = T> + MatrixInverse>
     HelmholtzHypersingularCurlCurlAssembler<'a, T>
 {
     /// Create a new assembler
-    pub fn new(kernel: &'a Helmholtz3dKernel<T>, options: &'a BoundaryAssemblerOptions) -> Self {
+    pub fn new(
+        kernel: &'a KernelEvaluator<T, Helmholtz3dKernel<T>>,
+        options: &'a BoundaryAssemblerOptions,
+    ) -> Self {
         Self { kernel, options }
     }
 }
@@ -182,6 +201,14 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
+    type Integrand = HypersingularBoundaryIntegrand<T>;
+    type Kernel = KernelEvaluator<T, Helmholtz3dKernel<T>>;
+    fn integrand(&self) -> &HypersingularBoundaryIntegrand<T> {
+        panic!();
+    }
+    fn kernel(&self) -> &KernelEvaluator<T, Helmholtz3dKernel<T>> {
+        panic!();
+    }
     fn options(&self) -> &BoundaryAssemblerOptions {
         self.options
     }
@@ -213,12 +240,10 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
         targets: &[T::Real],
         result: &mut [T],
     ) {
-        self.kernel
-            .assemble_pairwise_st(GreenKernelEvalType::Value, sources, targets, result);
+        self.kernel.assemble_pairwise_st(sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
-        self.kernel
-            .assemble_st(GreenKernelEvalType::Value, sources, targets, result);
+        self.kernel.assemble_st(sources, targets, result);
     }
     #[allow(clippy::too_many_arguments)]
     unsafe fn test_trial_product(
@@ -251,14 +276,17 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
 
 /// Assembler for normal normal term of Helmholtz hypersingular boundary operator
 struct HelmholtzHypersingularNormalNormalAssembler<'a, T: RlstScalar<Complex = T> + MatrixInverse> {
-    kernel: &'a Helmholtz3dKernel<T>,
+    kernel: &'a KernelEvaluator<T, Helmholtz3dKernel<T>>,
     options: &'a BoundaryAssemblerOptions,
 }
 impl<'a, T: RlstScalar<Complex = T> + MatrixInverse>
     HelmholtzHypersingularNormalNormalAssembler<'a, T>
 {
     /// Create a new assembler
-    pub fn new(kernel: &'a Helmholtz3dKernel<T>, options: &'a BoundaryAssemblerOptions) -> Self {
+    pub fn new(
+        kernel: &'a KernelEvaluator<T, Helmholtz3dKernel<T>>,
+        options: &'a BoundaryAssemblerOptions,
+    ) -> Self {
         Self { kernel, options }
     }
 }
@@ -268,6 +296,14 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 0;
     type T = T;
+    type Integrand = HypersingularBoundaryIntegrand<T>;
+    type Kernel = KernelEvaluator<T, Helmholtz3dKernel<T>>;
+    fn integrand(&self) -> &HypersingularBoundaryIntegrand<T> {
+        panic!();
+    }
+    fn kernel(&self) -> &KernelEvaluator<T, Helmholtz3dKernel<T>> {
+        panic!();
+    }
     fn options(&self) -> &BoundaryAssemblerOptions {
         self.options
     }
@@ -283,7 +319,7 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     ) -> T {
         -*k.get_unchecked([0, index])
             * num::cast::<T::Real, T>(
-                self.kernel.wavenumber.powi(2)
+                self.kernel.kernel.wavenumber.powi(2)
                     * (*trial_normals.get_unchecked([0, index])
                         * *test_normals.get_unchecked([0, index])
                         + *trial_normals.get_unchecked([1, index])
@@ -301,7 +337,7 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
         test_index: usize,
         trial_index: usize,
     ) -> T {
-        -num::cast::<T::Real, T>(self.kernel.wavenumber.powi(2)).unwrap()
+        -num::cast::<T::Real, T>(self.kernel.kernel.wavenumber.powi(2)).unwrap()
             * *k.get_unchecked([0, test_index, trial_index])
             * (num::cast::<T::Real, T>(*trial_normals.get_unchecked([0, trial_index])).unwrap()
                 * num::cast::<T::Real, T>(*test_normals.get_unchecked([0, test_index])).unwrap()
@@ -318,12 +354,10 @@ impl<'a, T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
         targets: &[T::Real],
         result: &mut [T],
     ) {
-        self.kernel
-            .assemble_pairwise_st(GreenKernelEvalType::Value, sources, targets, result);
+        self.kernel.assemble_pairwise_st(sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
-        self.kernel
-            .assemble_st(GreenKernelEvalType::Value, sources, targets, result);
+        self.kernel.assemble_st(sources, targets, result);
     }
 }
 
@@ -333,6 +367,14 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse> BoundaryAssembler
     const DERIV_SIZE: usize = 1;
     const TABLE_DERIVS: usize = 1;
     type T = T;
+    type Integrand = HypersingularBoundaryIntegrand<T>;
+    type Kernel = KernelEvaluator<T, Helmholtz3dKernel<T>>;
+    fn integrand(&self) -> &HypersingularBoundaryIntegrand<T> {
+        panic!();
+    }
+    fn kernel(&self) -> &KernelEvaluator<T, Helmholtz3dKernel<T>> {
+        panic!();
+    }
     fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }

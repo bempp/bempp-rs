@@ -1,18 +1,25 @@
 //! Double layer assemblers
 use super::{BoundaryAssembler, BoundaryAssemblerOptions};
-use crate::assembly::common::{GreenKernelEvalType, RlstArray};
+use crate::assembly::{
+    boundary::integrands::DoubleLayerBoundaryIntegrand,
+    common::{GreenKernelEvalType, RlstArray},
+    kernels::KernelEvaluator,
+};
+use crate::traits::KernelEvaluator as KernelEvaluatorTrait;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
 
 /// Assembler for a double layer operator
 pub struct DoubleLayerAssembler<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> {
-    kernel: K,
+    integrand: DoubleLayerBoundaryIntegrand<T>,
+    kernel: KernelEvaluator<T, K>,
     options: BoundaryAssemblerOptions,
 }
 impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> DoubleLayerAssembler<T, K> {
     /// Create a new double layer assembler
-    pub fn new(kernel: K) -> Self {
+    pub fn new(kernel: KernelEvaluator<T, K>) -> Self {
         Self {
+            integrand: DoubleLayerBoundaryIntegrand::new(),
             kernel,
             options: BoundaryAssemblerOptions::default(),
         }
@@ -21,13 +28,18 @@ impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> DoubleLayerAssembler<T, K>
 impl<T: RlstScalar + MatrixInverse> DoubleLayerAssembler<T, Laplace3dKernel<T>> {
     /// Create a new Laplace double layer assembler
     pub fn new_laplace() -> Self {
-        Self::new(Laplace3dKernel::<T>::new())
+        Self::new(KernelEvaluator::new_laplace(
+            GreenKernelEvalType::ValueDeriv,
+        ))
     }
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse> DoubleLayerAssembler<T, Helmholtz3dKernel<T>> {
     /// Create a new Helmholtz double layer assembler
     pub fn new_helmholtz(wavenumber: T::Real) -> Self {
-        Self::new(Helmholtz3dKernel::<T>::new(wavenumber))
+        Self::new(KernelEvaluator::new_helmholtz(
+            wavenumber,
+            GreenKernelEvalType::ValueDeriv,
+        ))
     }
 }
 
@@ -37,6 +49,14 @@ impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> BoundaryAssembler
     const DERIV_SIZE: usize = 4;
     const TABLE_DERIVS: usize = 0;
     type T = T;
+    type Integrand = DoubleLayerBoundaryIntegrand<T>;
+    type Kernel = KernelEvaluator<T, K>;
+    fn integrand(&self) -> &DoubleLayerBoundaryIntegrand<T> {
+        &self.integrand
+    }
+    fn kernel(&self) -> &KernelEvaluator<T, K> {
+        &self.kernel
+    }
     fn options(&self) -> &BoundaryAssemblerOptions {
         &self.options
     }
@@ -78,11 +98,9 @@ impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> BoundaryAssembler
         targets: &[T::Real],
         result: &mut [T],
     ) {
-        self.kernel
-            .assemble_pairwise_st(GreenKernelEvalType::ValueDeriv, sources, targets, result);
+        self.kernel.assemble_pairwise_st(sources, targets, result);
     }
     fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
-        self.kernel
-            .assemble_st(GreenKernelEvalType::ValueDeriv, sources, targets, result);
+        self.kernel.assemble_st(sources, targets, result);
     }
 }

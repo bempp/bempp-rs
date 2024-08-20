@@ -1,4 +1,5 @@
 //! Common utility functions
+use crate::traits::CellGeometry;
 pub(crate) use green_kernels::types::EvalType as GreenKernelEvalType;
 use ndgrid::traits::Grid;
 use rlst::{Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer};
@@ -78,3 +79,42 @@ impl<T: RlstScalar + MatrixInverse> SparseMatrixData<T> {
 }
 
 unsafe impl<T: RlstScalar + MatrixInverse> Sync for SparseMatrixData<T> {}
+
+pub(crate) struct AssemblerGeometry<'a, T: RlstScalar<Real = T>> {
+    points: &'a RlstArray<T, 2>,
+    normals: &'a RlstArray<T, 2>,
+    jacobians: &'a RlstArray<T, 2>,
+    jdets: &'a [T],
+}
+
+impl<'a, T: RlstScalar<Real = T>> AssemblerGeometry<'a, T> {
+    pub(crate) fn new(
+        points: &'a RlstArray<T, 2>,
+        normals: &'a RlstArray<T, 2>,
+        jacobians: &'a RlstArray<T, 2>,
+        jdets: &'a [T],
+    ) -> Self {
+        Self {
+            points,
+            normals,
+            jacobians,
+            jdets,
+        }
+    }
+}
+
+impl<'a, T: RlstScalar<Real = T>> CellGeometry for AssemblerGeometry<'a, T> {
+    type T = T;
+    fn points(&self) -> &RlstArray<T, 2> {
+        self.points
+    }
+    fn normals(&self) -> &RlstArray<T, 2> {
+        self.normals
+    }
+    fn jacobians(&self) -> &RlstArray<T, 2> {
+        self.jacobians
+    }
+    fn jdets(&self) -> &[T] {
+        self.jdets
+    }
+}

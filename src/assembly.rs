@@ -2,6 +2,7 @@
 pub mod boundary;
 pub(crate) mod common;
 pub mod fmm_tools;
+pub mod kernels;
 pub mod potential;
 
 #[cfg(test)]
