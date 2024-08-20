@@ -1,7 +1,7 @@
 //! Hypersingular integrand
 use crate::assembly::common::RlstArray;
 use crate::traits::{BoundaryIntegrand, CellGeometry};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef};
+use rlst::RlstScalar;
 
 pub struct HypersingularBoundaryIntegrand<T: RlstScalar> {
     _t: std::marker::PhantomData<T>,

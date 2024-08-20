@@ -1,13 +1,11 @@
 //! Single layer assemblers
 use super::{BoundaryAssembler, BoundaryAssemblerOptions};
 use crate::assembly::{
-    boundary::integrands::SingleLayerBoundaryIntegrand,
-    common::{GreenKernelEvalType, RlstArray},
+    boundary::integrands::SingleLayerBoundaryIntegrand, common::GreenKernelEvalType,
     kernels::KernelEvaluator,
 };
-use crate::traits::KernelEvaluator as KernelEvaluatorTrait;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
-use rlst::{MatrixInverse, RlstScalar, UnsafeRandomAccessByRef};
+use rlst::{MatrixInverse, RlstScalar};
 
 /// Assembler for a single layer operator
 pub struct SingleLayerAssembler<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> {
@@ -60,35 +58,5 @@ impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>> BoundaryAssembler
     }
     fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
         &mut self.options
-    }
-    unsafe fn singular_kernel_value(
-        &self,
-        k: &RlstArray<T, 2>,
-        _test_normals: &RlstArray<T::Real, 2>,
-        _trial_normals: &RlstArray<T::Real, 2>,
-        index: usize,
-    ) -> T {
-        *k.get_unchecked([0, index])
-    }
-    unsafe fn nonsingular_kernel_value(
-        &self,
-        k: &RlstArray<T, 3>,
-        _test_normals: &RlstArray<T::Real, 2>,
-        _trial_normals: &RlstArray<T::Real, 2>,
-        test_index: usize,
-        trial_index: usize,
-    ) -> T {
-        *k.get_unchecked([0, test_index, trial_index])
-    }
-    fn kernel_assemble_pairwise_st(
-        &self,
-        sources: &[T::Real],
-        targets: &[T::Real],
-        result: &mut [T],
-    ) {
-        self.kernel.assemble_pairwise_st(sources, targets, result);
-    }
-    fn kernel_assemble_st(&self, sources: &[T::Real], targets: &[T::Real], result: &mut [T]) {
-        self.kernel.assemble_st(sources, targets, result);
     }
 }

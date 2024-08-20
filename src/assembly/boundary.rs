@@ -34,7 +34,6 @@ use rayon::prelude::*;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, DefaultIterator,
     DefaultIteratorMut, MatrixInverse, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
-    UnsafeRandomAccessByRef,
 };
 use std::collections::HashMap;
 
@@ -202,14 +201,11 @@ impl<
             self.trial_normals.data_mut(),
         );
 
-        // TODO:
-        /*
         self.kernel.assemble_pairwise_st(
             self.test_mapped_pts.data(),
             self.trial_mapped_pts.data(),
             self.k.data_mut(),
         );
-        */
 
         let test_geometry = AssemblerGeometry::new(
             &self.test_mapped_pts,
@@ -409,7 +405,7 @@ fn assemble_batch_nonadjacent<
                 continue;
             }
 
-            assembler.kernel_assemble_st(
+            assembler.kernel().assemble_st(
                 test_mapped_pts.data(),
                 trial_mapped_pts[trial_cell_i].data(),
                 k.data_mut(),
@@ -417,6 +413,19 @@ fn assemble_batch_nonadjacent<
 
             let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
             let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+
+            let test_geometry = AssemblerGeometry::new(
+                &test_mapped_pts,
+                &test_normals,
+                &test_jacobians,
+                &test_jdet,
+            );
+            let trial_geometry = AssemblerGeometry::new(
+                &trial_mapped_pts[trial_cell_i],
+                &trial_normals[trial_cell_i],
+                &trial_jacobians[trial_cell_i],
+                &trial_jdet[trial_cell_i],
+            );
 
             for (test_i, test_dof) in test_dofs.iter().enumerate() {
                 for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
@@ -432,26 +441,18 @@ fn assemble_batch_nonadjacent<
                             num::cast::<T::Real, T>(*test_wt * test_jdet[test_index]).unwrap();
                         for trial_index in 0..npts_trial {
                             sum += unsafe {
-                                assembler.nonsingular_kernel_value(
-                                    &k,
-                                    &test_normals,
-                                    &trial_normals[trial_cell_i],
+                                assembler.integrand().evaluate_nonsingular(
+                                    test_table,
+                                    trial_table,
                                     test_index,
                                     trial_index,
+                                    test_i,
+                                    trial_i,
+                                    &k,
+                                    &test_geometry,
+                                    &trial_geometry,
                                 ) * test_integrand
                                     * *trial_integrands.get_unchecked(trial_index)
-                                    * assembler.test_trial_product(
-                                        test_table,
-                                        trial_table,
-                                        &test_jacobians,
-                                        &trial_jacobians[trial_cell_i],
-                                        &test_jdet,
-                                        &trial_jdet[trial_cell_i],
-                                        test_index,
-                                        trial_index,
-                                        test_i,
-                                        trial_i,
-                                    )
                             };
                         }
                     }
@@ -540,10 +541,19 @@ fn assemble_batch_singular_correction<
             trial_normals.data_mut(),
         );
 
-        assembler.kernel_assemble_st(
+        assembler.kernel().assemble_st(
             test_mapped_pts.data(),
             trial_mapped_pts.data(),
             k.data_mut(),
+        );
+
+        let test_geometry =
+            AssemblerGeometry::new(&test_mapped_pts, &test_normals, &test_jacobians, &test_jdet);
+        let trial_geometry = AssemblerGeometry::new(
+            &trial_mapped_pts,
+            &trial_normals,
+            &trial_jacobians,
+            &trial_jdet,
         );
 
         let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
@@ -560,26 +570,18 @@ fn assemble_batch_singular_correction<
                         num::cast::<T::Real, T>(*test_wt * test_jdet[test_index]).unwrap();
                     for trial_index in 0..npts_trial {
                         sum += unsafe {
-                            assembler.nonsingular_kernel_value(
-                                &k,
-                                &test_normals,
-                                &trial_normals,
+                            assembler.integrand().evaluate_nonsingular(
+                                test_table,
+                                trial_table,
                                 test_index,
                                 trial_index,
+                                test_i,
+                                trial_i,
+                                &k,
+                                &test_geometry,
+                                &trial_geometry,
                             ) * test_integrand
                                 * *trial_integrands.get_unchecked(trial_index)
-                                * assembler.test_trial_product(
-                                    test_table,
-                                    trial_table,
-                                    &test_jacobians,
-                                    &trial_jacobians,
-                                    &test_jdet,
-                                    &trial_jdet,
-                                    test_index,
-                                    trial_index,
-                                    test_i,
-                                    trial_i,
-                                )
                         };
                     }
                 }
@@ -690,73 +692,6 @@ pub trait BoundaryAssembler: Sync + Sized {
     /// Set the maximum size of a batch of cells to send to an assembly function
     fn batch_size(&mut self, size: usize) {
         self.options_mut().batch_size = size;
-    }
-
-    /// Return the kernel value to use in the integrand when using a singular quadrature rule
-    ///
-    /// # Safety
-    /// This method is unsafe to allow `get_unchecked` to be used
-    unsafe fn singular_kernel_value(
-        &self,
-        k: &RlstArray<Self::T, 2>,
-        test_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
-        trial_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
-        index: usize,
-    ) -> Self::T;
-
-    /// Return the kernel value to use in the integrand when using a non-singular quadrature rule
-    ///
-    /// # Safety
-    /// This method is unsafe to allow `get_unchecked` to be used
-    unsafe fn nonsingular_kernel_value(
-        &self,
-        k: &RlstArray<Self::T, 3>,
-        test_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
-        trial_normals: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
-        test_index: usize,
-        trial_index: usize,
-    ) -> Self::T;
-
-    /// Evaluate the kernel values for all source and target pairs
-    ///
-    /// For each source, the kernel is evaluated for exactly one target. This is equivalent to taking the diagonal of the matrix assembled by `kernel_assemble_st`
-    fn kernel_assemble_pairwise_st(
-        &self,
-        sources: &[<Self::T as RlstScalar>::Real],
-        targets: &[<Self::T as RlstScalar>::Real],
-        result: &mut [Self::T],
-    );
-
-    /// Evaluate the kernel values for all sources and all targets
-    ///
-    /// For every source, the kernel is evaluated for every target.
-    fn kernel_assemble_st(
-        &self,
-        sources: &[<Self::T as RlstScalar>::Real],
-        targets: &[<Self::T as RlstScalar>::Real],
-        result: &mut [Self::T],
-    );
-
-    /// The product of a test and trial function
-    ///
-    /// # Safety
-    /// This method is unsafe to allow `get_unchecked` to be used
-    #[allow(clippy::too_many_arguments)]
-    unsafe fn test_trial_product(
-        &self,
-        test_table: &RlstArray<Self::T, 4>,
-        trial_table: &RlstArray<Self::T, 4>,
-        _test_jacobians: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
-        _trial_jacobians: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
-        _test_jdets: &[<Self::T as RlstScalar>::Real],
-        _trial_jdets: &[<Self::T as RlstScalar>::Real],
-        test_point_index: usize,
-        trial_point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-    ) -> Self::T {
-        *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
-            * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
     }
 
     /// Assemble the singular contributions
