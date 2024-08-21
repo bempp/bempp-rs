@@ -26,7 +26,7 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
+        let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -52,7 +52,7 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
+        let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -81,7 +81,7 @@ mod test {
         let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
-        let assembler = SingleLayerAssembler::<f64, _>::new_laplace();
+        let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
         assembler.assemble_singular_into_dense(&mut matrix, &space0, &space1);
         let csr = assembler.assemble_singular_into_csr(&space0, &space1);
         let indptr = csr.indptr();

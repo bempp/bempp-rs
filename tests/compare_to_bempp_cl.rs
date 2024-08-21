@@ -1,5 +1,5 @@
 use approx::*;
-use bempp::assembly::{boundary, potential, potential::PotentialAssembler};
+use bempp::assembly::{boundary::BoundaryAssembler, potential, potential::PotentialAssembler};
 use bempp::function::SerialFunctionSpace;
 use bempp::traits::{BoundaryAssembly, FunctionSpace};
 use cauchy::c64;
@@ -18,7 +18,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
 
-    let a = boundary::SingleLayerAssembler::<f64, _>::new_laplace();
+    let a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -41,7 +41,7 @@ fn test_laplace_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = boundary::DoubleLayerAssembler::<f64, _>::new_laplace();
+    let a = BoundaryAssembler::<f64, _, _>::new_laplace_double_layer();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -63,7 +63,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = boundary::AdjointDoubleLayerAssembler::<f64, _>::new_laplace();
+    let a = BoundaryAssembler::<f64, _, _>::new_laplace_adjoint_double_layer();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -86,7 +86,7 @@ fn test_laplace_hypersingular_dp0_dp0() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = boundary::HypersingularAssembler::<f64, _, _>::new_laplace();
+    let a = BoundaryAssembler::<f64, _, _>::new_laplace_hypersingular();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     for i in 0..ndofs {
@@ -105,7 +105,7 @@ fn test_laplace_hypersingular_p1_p1() {
     let ndofs = space.global_size();
 
     let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = boundary::HypersingularAssembler::<f64, _, _>::new_laplace();
+    let a = BoundaryAssembler::<f64, _, _>::new_laplace_hypersingular();
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -134,7 +134,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = boundary::SingleLayerAssembler::<c64, _>::new_helmholtz(3.0);
+    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_single_layer(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -157,7 +157,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = boundary::DoubleLayerAssembler::<c64, _>::new_helmholtz(3.0);
+    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_double_layer(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -179,7 +179,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = boundary::AdjointDoubleLayerAssembler::<c64, _>::new_helmholtz(3.0);
+    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_adjoint_double_layer(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl
@@ -202,7 +202,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let ndofs = space.global_size();
     let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
 
-    let a = boundary::HypersingularAssembler::<c64, _, _>::new_helmholtz(3.0);
+    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_hypersingular(3.0);
     a.assemble_into_dense(&mut matrix, &space, &space);
 
     // Compare to result from bempp-cl

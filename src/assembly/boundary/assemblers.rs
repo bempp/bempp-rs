@@ -149,18 +149,17 @@ where
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
     T: RlstScalar + MatrixInverse,
-    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    Element: FiniteElement<T = T> + Sync,
-    Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>
+    Space: FunctionSpace<T = T>,
+    Integrand: BoundaryIntegrand<T = T>,
+    Kernel: KernelEvaluator<T = T>,
 >(
     assembler: &BoundaryAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
-    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
+    trial_space: &Space,
+    test_space: &Space,
     cell_pairs: &[(usize, usize)],
     trial_points: &RlstArray<T::Real, 2>,
     test_points: &RlstArray<T::Real, 2>,
@@ -189,8 +188,8 @@ fn assemble_batch_singular<
     let mut a = SingularCellPairAssembler::new(
         npts,
         deriv_size,
-        assembler.integrand(),
-        assembler.kernel(),
+        &assembler.integrand,
+        &assembler.kernel,
         test_evaluator,
         trial_evaluator,
         test_table,
@@ -229,19 +228,18 @@ fn assemble_batch_singular<
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<
     T: RlstScalar + MatrixInverse,
-    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    Element: FiniteElement<T = T> + Sync,
-    Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>
+    Space: FunctionSpace<T = T>,
+    Integrand: BoundaryIntegrand<T = T>,
+    Kernel: KernelEvaluator<T = T>,
 >(
     assembler: &BoundaryAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     output: &RawData2D<T>,
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
+    trial_space: &Space,
     trial_cells: &[usize],
-    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
+    test_space: &Space,
     test_cells: &[usize],
     trial_points: &RlstArray<T::Real, 2>,
     trial_weights: &[T::Real],
@@ -270,8 +268,8 @@ fn assemble_batch_nonadjacent<
         npts_test,
         npts_trial,
         deriv_size,
-        assembler.integrand(),
-        assembler.kernel(),
+        &assembler.integrand,
+        &assembler.kernel,
         test_evaluator,
         trial_evaluator,
         test_table,
@@ -317,18 +315,17 @@ fn assemble_batch_nonadjacent<
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular_correction<
     T: RlstScalar + MatrixInverse,
-    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    Element: FiniteElement<T = T> + Sync,
-    Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>
+    Space: FunctionSpace<T = T>,
+    Integrand: BoundaryIntegrand<T = T>,
+    Kernel: KernelEvaluator<T = T>,
 >(
     assembler: &BoundaryAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
-    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
+    trial_space: &Space,
+    test_space: &Space,
     cell_pairs: &[(usize, usize)],
     trial_points: &RlstArray<T::Real, 2>,
     trial_weights: &[T::Real],
@@ -359,8 +356,8 @@ fn assemble_batch_singular_correction<
         npts_test,
         npts_trial,
         deriv_size,
-        assembler.integrand(),
-        assembler.kernel(),
+        &assembler.integrand,
+        &assembler.kernel,
         test_evaluator,
         trial_evaluator,
         test_table,
@@ -445,7 +442,11 @@ impl Default for BoundaryAssemblerOptions {
 /// Boundary assembler
 ///
 /// Assembles operators by processing batches of cells in parallel
-pub struct BoundaryAssembler<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>> {
+pub struct BoundaryAssembler<
+    T: RlstScalar + MatrixInverse,
+    Integrand: BoundaryIntegrand<T = T>,
+    Kernel: KernelEvaluator<T = T>,
+> {
     pub(crate) integrand: Integrand,
     pub(crate) kernel: Kernel,
     pub(crate) options: BoundaryAssemblerOptions,
@@ -453,29 +454,34 @@ pub struct BoundaryAssembler<T: RlstScalar + MatrixInverse, Integrand: BoundaryI
     pub(crate) table_derivs: usize,
 }
 
-unsafe impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>>
-    Sync for BoundaryAssembler<T, Integrand, Kernel> {}
+unsafe impl<
+        T: RlstScalar + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluator<T = T>,
+    > Sync for BoundaryAssembler<T, Integrand, Kernel>
+{
+}
 
-impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>>
-    BoundaryAssembler<T, Integrand, Kernel> {
-
+impl<
+        T: RlstScalar + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluator<T = T>,
+    > BoundaryAssembler<T, Integrand, Kernel>
+{
     /// Create new
-    fn new(integrand: Integrand,
- kernel: Kernel,
-deriv_size: usize,
-table_derivs: usize) -> Self {
+    fn new(integrand: Integrand, kernel: Kernel, deriv_size: usize, table_derivs: usize) -> Self {
         Self {
-            integrand, kernel, options: BoundaryAssemblerOptions::default(), deriv_size, table_derivs
+            integrand,
+            kernel,
+            options: BoundaryAssemblerOptions::default(),
+            deriv_size,
+            table_derivs,
         }
     }
 
     /// Set (non-singular) quadrature degree for a cell type
     pub fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
-        *self
-            .options
-            .quadrature_degrees
-            .get_mut(&cell)
-            .unwrap() = degree;
+        *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
     }
 
     /// Set singular quadrature degree for a pair of cell types
@@ -529,8 +535,8 @@ table_derivs: usize) -> Self {
 
         for test_cell_type in grid.entity_types(2) {
             for trial_cell_type in grid.entity_types(2) {
-                let qdegree = self.options().singular_quadrature_degrees
-                    [&(*test_cell_type, *trial_cell_type)];
+                let qdegree =
+                    self.options.singular_quadrature_degrees[&(*test_cell_type, *trial_cell_type)];
                 let offset = qweights.len();
 
                 let mut possible_pairs = vec![];
@@ -627,7 +633,7 @@ table_derivs: usize) -> Self {
             },
             pair_indices.len(),
             grid,
-            self.options().batch_size,
+            self.options.batch_size,
         );
 
         cell_blocks
@@ -635,7 +641,7 @@ table_derivs: usize) -> Self {
             .map(|(i, cell_block)| {
                 assemble_batch_singular(
                     self,
-                    Self::DERIV_SIZE,
+                    self.deriv_size,
                     shape,
                     trial_cell_types[i],
                     test_cell_types[i],
@@ -693,23 +699,20 @@ table_derivs: usize) -> Self {
         let mut cell_type_indices = HashMap::new();
 
         for test_cell_type in grid.entity_types(2) {
-            let npts_test = self.options().quadrature_degrees[test_cell_type];
+            let npts_test = self.options.quadrature_degrees[test_cell_type];
             for trial_cell_type in grid.entity_types(2) {
-                let npts_trial = self.options().quadrature_degrees[trial_cell_type];
+                let npts_trial = self.options.quadrature_degrees[trial_cell_type];
                 test_cell_types.push(*test_cell_type);
                 trial_cell_types.push(*trial_cell_type);
                 cell_type_indices.insert((*test_cell_type, *trial_cell_type), qweights_test.len());
 
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
-                let mut test_pts =
-                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
+                let mut test_pts = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
                         *test_pts.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <T as RlstScalar>::Real>(
-                                qrule_test.points[2 * i + j],
-                            )
-                            .unwrap();
+                            num::cast::<f64, <T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
+                                .unwrap();
                     }
                 }
                 qweights_test.push(
@@ -729,8 +732,7 @@ table_derivs: usize) -> Self {
                 qpoints_test.push(test_pts);
 
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
-                let mut trial_pts =
-                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_trial]);
+                let mut trial_pts = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
                         *trial_pts.get_mut([j, i]).unwrap() =
@@ -764,7 +766,7 @@ table_derivs: usize) -> Self {
             },
             qweights_test.len(),
             grid,
-            self.options().batch_size,
+            self.options.batch_size,
         );
 
         cell_blocks
@@ -772,7 +774,7 @@ table_derivs: usize) -> Self {
             .map(|(i, cell_block)| {
                 assemble_batch_singular_correction(
                     self,
-                    Self::DERIV_SIZE,
+                    self.deriv_size,
                     shape,
                     trial_cell_types[i],
                     test_cell_types[i],
@@ -813,22 +815,20 @@ table_derivs: usize) -> Self {
             panic!("Matrix has wrong shape");
         }
 
-        let batch_size = self.options().batch_size;
+        let batch_size = self.options.batch_size;
 
         for test_cell_type in test_space.grid().entity_types(2) {
-            let npts_test = self.options().quadrature_degrees[test_cell_type];
+            let npts_test = self.options.quadrature_degrees[test_cell_type];
             for trial_cell_type in trial_space.grid().entity_types(2) {
-                let npts_trial = self.options().quadrature_degrees[trial_cell_type];
+                let npts_trial = self.options.quadrature_degrees[trial_cell_type];
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut qpoints_test =
                     rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
                         *qpoints_test.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <T as RlstScalar>::Real>(
-                                qrule_test.points[2 * i + j],
-                            )
-                            .unwrap();
+                            num::cast::<f64, <T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
+                                .unwrap();
                     }
                 }
                 let qweights_test = qrule_test
@@ -901,7 +901,7 @@ table_derivs: usize) -> Self {
                             .map(&|t| {
                                 assemble_batch_nonadjacent(
                                     self,
-                                    Self::DERIV_SIZE,
+                                    self.deriv_size,
                                     output,
                                     *test_cell_type,
                                     *trial_cell_type,
@@ -926,9 +926,12 @@ table_derivs: usize) -> Self {
     }
 }
 
-impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>>
-BoundaryAssembly for
-    BoundaryAssembler<T, Integrand, Kernel> {
+impl<
+        T: RlstScalar + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluator<T = T>,
+    > BoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
+{
     type T = T;
     fn assemble_singular_into_dense<Space: FunctionSpace<T = T> + Sync>(
         &self,

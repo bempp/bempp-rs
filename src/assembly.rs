@@ -121,24 +121,14 @@ mod test {
            //};
     }
     macro_rules! create_assembler {
-        (Laplace, Hypersingular, $dtype:ident) => {
-            paste! {
-                boundary::HypersingularAssembler::<[<$dtype>], _, _>::new_laplace()
-            }
-        };
-        (Helmholtz, Hypersingular, $dtype:ident) => {
-            paste! {
-                boundary::HypersingularAssembler::<[<$dtype>], _, _>::new_helmholtz(3.0)
-            }
-        };
         (Laplace, $operator:ident, $dtype:ident) => {
             paste! {
-                boundary::[<$operator Assembler>]::<[<$dtype>], _>::new_laplace()
+                boundary::BoundaryAssembler::<[<$dtype>], _, _>::[<new_laplace_ $operator>]()
             }
         };
         (Helmholtz, $operator:ident, $dtype:ident) => {
             paste! {
-                boundary::[<$operator Assembler>]::<[<$dtype>], _>::new_helmholtz(3.0)
+                boundary::BoundaryAssembler::<[<$dtype>], _, _>::[<new_helmholtz_ $operator>](3.0)
             }
         };
     }
@@ -169,76 +159,76 @@ mod test {
     }
 
     test_assembly!(
-        (f64, Laplace, SingleLayer, Triangle),
-        (f32, Laplace, SingleLayer, Triangle),
-        //(c64, Laplace, SingleLayer, Triangle),
-        //(c32, Laplace, SingleLayer, Triangle),
-        (f64, Laplace, DoubleLayer, Triangle),
-        (f32, Laplace, DoubleLayer, Triangle),
-        //(c64, Laplace, DoubleLayer, Triangle),
-        //(c32, Laplace, DoubleLayer, Triangle),
-        (f64, Laplace, AdjointDoubleLayer, Triangle),
-        (f32, Laplace, AdjointDoubleLayer, Triangle),
-        //(c64, Laplace, AdjointDoubleLayer, Triangle),
-        //(c32, Laplace, AdjointDoubleLayer, Triangle),
-        (f64, Laplace, Hypersingular, Triangle),
-        (f32, Laplace, Hypersingular, Triangle),
-        //(c64, Laplace, Hypersingular, Triangle),
-        //(c32, Laplace, Hypersingular, Triangle),
-        (c64, Helmholtz, SingleLayer, Triangle),
-        (c32, Helmholtz, SingleLayer, Triangle),
-        (c64, Helmholtz, DoubleLayer, Triangle),
-        (c32, Helmholtz, DoubleLayer, Triangle),
-        (c64, Helmholtz, AdjointDoubleLayer, Triangle),
-        (c32, Helmholtz, AdjointDoubleLayer, Triangle),
-        (c64, Helmholtz, Hypersingular, Triangle),
-        (c32, Helmholtz, Hypersingular, Triangle),
-        (f64, Laplace, SingleLayer, Quadrilateral),
-        (f32, Laplace, SingleLayer, Quadrilateral),
-        //(c64, Laplace, SingleLayer, Quadrilateral),
-        //(c32, Laplace, SingleLayer, Quadrilateral),
-        (f64, Laplace, DoubleLayer, Quadrilateral),
-        (f32, Laplace, DoubleLayer, Quadrilateral),
-        //(c64, Laplace, DoubleLayer, Quadrilateral),
-        //(c32, Laplace, DoubleLayer, Quadrilateral),
-        (f64, Laplace, AdjointDoubleLayer, Quadrilateral),
-        (f32, Laplace, AdjointDoubleLayer, Quadrilateral),
-        //(c64, Laplace, AdjointDoubleLayer, Quadrilateral),
-        //(c32, Laplace, AdjointDoubleLayer, Quadrilateral),
-        (f64, Laplace, Hypersingular, Quadrilateral),
-        (f32, Laplace, Hypersingular, Quadrilateral),
-        //(c64, Laplace, Hypersingular, Quadrilateral),
-        //(c32, Laplace, Hypersingular, Quadrilateral),
-        (c64, Helmholtz, SingleLayer, Quadrilateral),
-        (c32, Helmholtz, SingleLayer, Quadrilateral),
-        (c64, Helmholtz, DoubleLayer, Quadrilateral),
-        (c32, Helmholtz, DoubleLayer, Quadrilateral),
-        (c64, Helmholtz, AdjointDoubleLayer, Quadrilateral),
-        (c32, Helmholtz, AdjointDoubleLayer, Quadrilateral),
-        (c64, Helmholtz, Hypersingular, Quadrilateral),
-        (c32, Helmholtz, Hypersingular, Quadrilateral) //(f64, Laplace, SingleLayer, Mixed),
-                                                       //(f32, Laplace, SingleLayer, Mixed),
-                                                       //(c64, Laplace, SingleLayer, Mixed),
-                                                       //(c32, Laplace, SingleLayer, Mixed),
-                                                       //(f64, Laplace, DoubleLayer, Mixed),
-                                                       //(f32, Laplace, DoubleLayer, Mixed),
-                                                       //(c64, Laplace, DoubleLayer, Mixed),
-                                                       //(c32, Laplace, DoubleLayer, Mixed),
-                                                       //(f64, Laplace, AdjointDoubleLayer, Mixed),
-                                                       //(f32, Laplace, AdjointDoubleLayer, Mixed),
-                                                       //(c64, Laplace, AdjointDoubleLayer, Mixed),
-                                                       //(c32, Laplace, AdjointDoubleLayer, Mixed),
-                                                       //(f64, Laplace, Hypersingular, Mixed),
-                                                       //(f32, Laplace, Hypersingular, Mixed),
-                                                       //(c64, Laplace, Hypersingular, Mixed),
-                                                       //(c32, Laplace, Hypersingular, Mixed),
-                                                       //(c64, Helmholtz, SingleLayer, Mixed),
-                                                       //(c32, Helmholtz, SingleLayer, Mixed),
-                                                       //(c64, Helmholtz, DoubleLayer, Mixed),
-                                                       //(c32, Helmholtz, DoubleLayer, Mixed),
-                                                       //(c64, Helmholtz, AdjointDoubleLayer, Mixed),
-                                                       //(c32, Helmholtz, AdjointDoubleLayer, Mixed),
-                                                       //(c64, Helmholtz, Hypersingular, Mixed),
-                                                       //(c32, Helmholtz, Hypersingular, Mixed)
+        (f64, Laplace, single_layer, Triangle),
+        (f32, Laplace, single_layer, Triangle),
+        //(c64, Laplace, single_layer, Triangle),
+        //(c32, Laplace, single_layer, Triangle),
+        (f64, Laplace, double_layer, Triangle),
+        (f32, Laplace, double_layer, Triangle),
+        //(c64, Laplace, double_layer, Triangle),
+        //(c32, Laplace, double_layer, Triangle),
+        (f64, Laplace, adjoint_double_layer, Triangle),
+        (f32, Laplace, adjoint_double_layer, Triangle),
+        //(c64, Laplace, adjoint_double_layer, Triangle),
+        //(c32, Laplace, adjoint_double_layer, Triangle),
+        (f64, Laplace, hypersingular, Triangle),
+        (f32, Laplace, hypersingular, Triangle),
+        //(c64, Laplace, hypersingular, Triangle),
+        //(c32, Laplace, hypersingular, Triangle),
+        (c64, Helmholtz, single_layer, Triangle),
+        (c32, Helmholtz, single_layer, Triangle),
+        (c64, Helmholtz, double_layer, Triangle),
+        (c32, Helmholtz, double_layer, Triangle),
+        (c64, Helmholtz, adjoint_double_layer, Triangle),
+        (c32, Helmholtz, adjoint_double_layer, Triangle),
+        (c64, Helmholtz, hypersingular, Triangle),
+        (c32, Helmholtz, hypersingular, Triangle),
+        (f64, Laplace, single_layer, Quadrilateral),
+        (f32, Laplace, single_layer, Quadrilateral),
+        //(c64, Laplace, single_layer, Quadrilateral),
+        //(c32, Laplace, single_layer, Quadrilateral),
+        (f64, Laplace, double_layer, Quadrilateral),
+        (f32, Laplace, double_layer, Quadrilateral),
+        //(c64, Laplace, double_layer, Quadrilateral),
+        //(c32, Laplace, double_layer, Quadrilateral),
+        (f64, Laplace, adjoint_double_layer, Quadrilateral),
+        (f32, Laplace, adjoint_double_layer, Quadrilateral),
+        //(c64, Laplace, adjoint_double_layer, Quadrilateral),
+        //(c32, Laplace, adjoint_double_layer, Quadrilateral),
+        (f64, Laplace, hypersingular, Quadrilateral),
+        (f32, Laplace, hypersingular, Quadrilateral),
+        //(c64, Laplace, hypersingular, Quadrilateral),
+        //(c32, Laplace, hypersingular, Quadrilateral),
+        (c64, Helmholtz, single_layer, Quadrilateral),
+        (c32, Helmholtz, single_layer, Quadrilateral),
+        (c64, Helmholtz, double_layer, Quadrilateral),
+        (c32, Helmholtz, double_layer, Quadrilateral),
+        (c64, Helmholtz, adjoint_double_layer, Quadrilateral),
+        (c32, Helmholtz, adjoint_double_layer, Quadrilateral),
+        (c64, Helmholtz, hypersingular, Quadrilateral),
+        (c32, Helmholtz, hypersingular, Quadrilateral) //(f64, Laplace, single_layer, Mixed),
+                                                       //(f32, Laplace, single_layer, Mixed),
+                                                       //(c64, Laplace, single_layer, Mixed),
+                                                       //(c32, Laplace, single_layer, Mixed),
+                                                       //(f64, Laplace, double_layer, Mixed),
+                                                       //(f32, Laplace, double_layer, Mixed),
+                                                       //(c64, Laplace, double_layer, Mixed),
+                                                       //(c32, Laplace, double_layer, Mixed),
+                                                       //(f64, Laplace, adjoint_double_layer, Mixed),
+                                                       //(f32, Laplace, adjoint_double_layer, Mixed),
+                                                       //(c64, Laplace, adjoint_double_layer, Mixed),
+                                                       //(c32, Laplace, adjoint_double_layer, Mixed),
+                                                       //(f64, Laplace, hypersingular, Mixed),
+                                                       //(f32, Laplace, hypersingular, Mixed),
+                                                       //(c64, Laplace, hypersingular, Mixed),
+                                                       //(c32, Laplace, hypersingular, Mixed),
+                                                       //(c64, Helmholtz, single_layer, Mixed),
+                                                       //(c32, Helmholtz, single_layer, Mixed),
+                                                       //(c64, Helmholtz, double_layer, Mixed),
+                                                       //(c32, Helmholtz, double_layer, Mixed),
+                                                       //(c64, Helmholtz, adjoint_double_layer, Mixed),
+                                                       //(c32, Helmholtz, adjoint_double_layer, Mixed),
+                                                       //(c64, Helmholtz, hypersingular, Mixed),
+                                                       //(c32, Helmholtz, hypersingular, Mixed)
     );
 }

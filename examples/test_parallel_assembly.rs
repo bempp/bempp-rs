@@ -91,7 +91,7 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
-    let a = boundary::SingleLayerAssembler::<f64, _>::new_laplace();
+    let a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
 
     let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
 

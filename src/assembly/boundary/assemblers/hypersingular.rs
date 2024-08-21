@@ -1,5 +1,5 @@
 //! Hypersingular assemblers
-use super::{BoundaryAssembler, BoundaryAssemblerOptions};
+use super::BoundaryAssembler;
 use crate::assembly::{
     boundary::integrands::{
         BoundaryIntegrandSum, HypersingularCurlCurlBoundaryIntegrand,
@@ -18,18 +18,21 @@ type HelmholtzIntegrand<T> = BoundaryIntegrandSum<
     HypersingularNormalNormalBoundaryIntegrand<T>,
 >;
 
-impl<T: RlstScalar, K: Kernel<T = T>, I: BoundaryIntegrand<T=T>> BoundaryAssembler<T, I, KernelEvaluator<T, K>> {
+impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>, I: BoundaryIntegrand<T = T>>
+    BoundaryAssembler<T, I, KernelEvaluator<T, K>>
+{
     /// Create a new adjoint double layer assembler
     pub fn new_hypersingular(integrand: I, kernel: KernelEvaluator<T, K>) -> Self {
-        Self::new(
-            integrand,
-            kernel,
-            4,
-            1
-        )
+        Self::new(integrand, kernel, 4, 1)
     }
 }
-impl<T: RlstScalar, K: Kernel<T = T>> BoundaryAssembler<T, HypersingularCurlCurlBoundaryIntegrand<T>, KernelEvaluator<T, Laplace3dKernel<T>>> {
+impl<T: RlstScalar + MatrixInverse>
+    BoundaryAssembler<
+        T,
+        HypersingularCurlCurlBoundaryIntegrand<T>,
+        KernelEvaluator<T, Laplace3dKernel<T>>,
+    >
+{
     /// Create a new Laplace adjoint double layer assembler
     pub fn new_laplace_hypersingular() -> Self {
         Self::new_hypersingular(
@@ -38,17 +41,17 @@ impl<T: RlstScalar, K: Kernel<T = T>> BoundaryAssembler<T, HypersingularCurlCurl
         )
     }
 }
-impl<T: RlstScalar<Complex=T>, K: Kernel<T = T>> BoundaryAssembler<T, HelmholtzIntegrand<T>, KernelEvaluator<T, Helmholtz3dKernel<T>>> {
+impl<T: RlstScalar<Complex = T> + MatrixInverse>
+    BoundaryAssembler<T, HelmholtzIntegrand<T>, KernelEvaluator<T, Helmholtz3dKernel<T>>>
+{
     /// Create a new Helmholtz adjoint double layer assembler
     pub fn new_helmholtz_hypersingular(wavenumber: T::Real) -> Self {
         Self::new_hypersingular(
-        BoundaryIntegrandSum::new(
+            BoundaryIntegrandSum::new(
                 HypersingularCurlCurlBoundaryIntegrand::new(),
                 HypersingularNormalNormalBoundaryIntegrand::new(wavenumber),
             ),
-KernelEvaluator::new_helmholtz(
-            wavenumber,
-            GreenKernelEvalType::ValueDeriv,
-        ))
+            KernelEvaluator::new_helmholtz(wavenumber, GreenKernelEvalType::ValueDeriv),
+        )
     }
 }

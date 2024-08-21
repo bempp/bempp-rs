@@ -19,7 +19,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.cell_colouring();
-        let mut a = boundary::SingleLayerAssembler::<f64, _>::new_laplace();
+        let mut a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
         a.quadrature_degree(ReferenceCellType::Triangle, 16);
         a.singular_quadrature_degree(
             (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
