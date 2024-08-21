@@ -4,9 +4,6 @@ pub(crate) mod cell_pair_assemblers;
 mod integrands;
 
 pub use assemblers::BoundaryAssembler;
-pub use assemblers::{
-    AdjointDoubleLayerAssembler, DoubleLayerAssembler, HypersingularAssembler, SingleLayerAssembler,
-};
 
 #[cfg(test)]
 mod test {

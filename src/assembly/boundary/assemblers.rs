@@ -3,10 +3,6 @@ pub mod adjoint_double_layer;
 pub mod double_layer;
 pub mod hypersingular;
 pub mod single_layer;
-pub use adjoint_double_layer::AdjointDoubleLayerAssembler;
-pub use double_layer::DoubleLayerAssembler;
-pub use hypersingular::HypersingularAssembler;
-pub use single_layer::SingleLayerAssembler;
 
 use super::cell_pair_assemblers::{NonsingularCellPairAssembler, SingularCellPairAssembler};
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
@@ -156,8 +152,9 @@ fn assemble_batch_singular<
     TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
+    Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>
 >(
-    assembler: &impl BoundaryAssembler<T = T>,
+    assembler: &BoundaryAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
@@ -235,8 +232,9 @@ fn assemble_batch_nonadjacent<
     TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
+    Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>
 >(
-    assembler: &impl BoundaryAssembler<T = T>,
+    assembler: &BoundaryAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     output: &RawData2D<T>,
     trial_cell_type: ReferenceCellType,
@@ -322,8 +320,9 @@ fn assemble_batch_singular_correction<
     TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     Element: FiniteElement<T = T> + Sync,
+    Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>
 >(
-    assembler: &impl BoundaryAssembler<T = T>,
+    assembler: &BoundaryAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
@@ -443,71 +442,67 @@ impl Default for BoundaryAssemblerOptions {
     }
 }
 
-// TODO: make this a struct, with HasBoundaryAssemblerOptions trait
-pub trait BoundaryAssembler: Sync + Sized {
-    //! Boundary assembler
-    //!
-    //! Assemble operators by processing batches of cells in parallel
+/// Boundary assembler
+///
+/// Assembles operators by processing batches of cells in parallel
+pub struct BoundaryAssembler<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>> {
+    pub(crate) integrand: Integrand,
+    pub(crate) kernel: Kernel,
+    pub(crate) options: BoundaryAssemblerOptions,
+    pub(crate) deriv_size: usize,
+    pub(crate) table_derivs: usize,
+}
 
-    /// Scalar type
-    type T: RlstScalar + MatrixInverse;
-    /// Integrand type
-    type Integrand: BoundaryIntegrand<T = Self::T>;
-    /// Kernel type
-    type Kernel: KernelEvaluator<T = Self::T>;
-    /// Number of derivatives
-    const DERIV_SIZE: usize;
-    /// Number of derivatives needed in basis function tables
-    const TABLE_DERIVS: usize;
+unsafe impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>>
+    Sync for BoundaryAssembler<T, Integrand, Kernel> {}
 
-    /// Get integrand
-    fn integrand(&self) -> &Self::Integrand;
+impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>>
+    BoundaryAssembler<T, Integrand, Kernel> {
 
-    /// Get integrand
-    fn kernel(&self) -> &Self::Kernel;
-
-    /// Get assembler options
-    fn options(&self) -> &BoundaryAssemblerOptions;
-
-    /// Get mutable assembler options
-    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions;
+    /// Create new
+    fn new(integrand: Integrand,
+ kernel: Kernel,
+deriv_size: usize,
+table_derivs: usize) -> Self {
+        Self {
+            integrand, kernel, options: BoundaryAssemblerOptions::default(), deriv_size, table_derivs
+        }
+    }
 
     /// Set (non-singular) quadrature degree for a cell type
-    fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+    pub fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
         *self
-            .options_mut()
+            .options
             .quadrature_degrees
             .get_mut(&cell)
             .unwrap() = degree;
     }
 
     /// Set singular quadrature degree for a pair of cell types
-    fn singular_quadrature_degree(
+    pub fn singular_quadrature_degree(
         &mut self,
         cells: (ReferenceCellType, ReferenceCellType),
         degree: usize,
     ) {
         *self
-            .options_mut()
+            .options
             .singular_quadrature_degrees
             .get_mut(&cells)
             .unwrap() = degree;
     }
 
     /// Set the maximum size of a batch of cells to send to an assembly function
-    fn batch_size(&mut self, size: usize) {
-        self.options_mut().batch_size = size;
+    pub fn batch_size(&mut self, size: usize) {
+        self.options.batch_size = size;
     }
-}
 
-trait InternalAssemblyFunctions: BoundaryAssembler {
     /// Assemble the singular contributions
-    fn assemble_singular<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
         test_space: &Space,
-    ) -> SparseMatrixData<Self::T> {
+    ) -> SparseMatrixData<T> {
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
             return SparseMatrixData::new(shape);
@@ -579,11 +574,11 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                     );
                     let npts = qrule.weights.len();
 
-                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
+                    let mut points = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts]);
                     for i in 0..npts {
                         for j in 0..2 {
                             *points.get_mut([j, i]).unwrap() =
-                                num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                num::cast::<f64, <T as RlstScalar>::Real>(
                                     qrule.trial_points[2 * i + j],
                                 )
                                 .unwrap();
@@ -591,18 +586,18 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                     }
                     let trial_element = trial_space.element(*trial_cell_type);
                     let mut table = rlst_dynamic_array4!(
-                        Self::T,
-                        trial_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[1])
+                        T,
+                        trial_element.tabulate_array_shape(self.table_derivs, points.shape()[1])
                     );
-                    trial_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
+                    trial_element.tabulate(&points, self.table_derivs, &mut table);
                     trial_points.push(points);
                     trial_tables.push(table);
 
-                    let mut points = rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts]);
+                    let mut points = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts]);
                     for i in 0..npts {
                         for j in 0..2 {
                             *points.get_mut([j, i]).unwrap() =
-                                num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                                num::cast::<f64, <T as RlstScalar>::Real>(
                                     qrule.test_points[2 * i + j],
                                 )
                                 .unwrap();
@@ -610,17 +605,17 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                     }
                     let test_element = test_space.element(*test_cell_type);
                     let mut table = rlst_dynamic_array4!(
-                        Self::T,
-                        test_element.tabulate_array_shape(Self::TABLE_DERIVS, points.shape()[1])
+                        T,
+                        test_element.tabulate_array_shape(self.table_derivs, points.shape()[1])
                     );
-                    test_element.tabulate(&points, Self::TABLE_DERIVS, &mut table);
+                    test_element.tabulate(&points, self.table_derivs, &mut table);
                     test_points.push(points);
                     test_tables.push(table);
                     qweights.push(
                         qrule
                             .weights
                             .iter()
-                            .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                            .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
                             .collect::<Vec<_>>(),
                     );
                 }
@@ -655,7 +650,7 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                 )
             })
             .reduce(
-                || SparseMatrixData::<Self::T>::new(shape),
+                || SparseMatrixData::<T>::new(shape),
                 |mut a, b| {
                     a.add(b);
                     a
@@ -666,12 +661,12 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
     /// Assemble the singular correction
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
-    fn assemble_singular_correction<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_singular_correction<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
         test_space: &Space,
-    ) -> SparseMatrixData<Self::T> {
+    ) -> SparseMatrixData<T> {
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
             return SparseMatrixData::new(shape);
@@ -707,11 +702,11 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
 
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut test_pts =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
+                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
                         *test_pts.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                            num::cast::<f64, <T as RlstScalar>::Real>(
                                 qrule_test.points[2 * i + j],
                             )
                             .unwrap();
@@ -721,25 +716,25 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                     qrule_test
                         .weights
                         .iter()
-                        .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                        .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
                         .collect::<Vec<_>>(),
                 );
                 let test_element = test_space.element(*test_cell_type);
                 let mut test_table = rlst_dynamic_array4!(
-                    Self::T,
-                    test_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
+                    T,
+                    test_element.tabulate_array_shape(self.table_derivs, npts_test)
                 );
-                test_element.tabulate(&test_pts, Self::TABLE_DERIVS, &mut test_table);
+                test_element.tabulate(&test_pts, self.table_derivs, &mut test_table);
                 test_tables.push(test_table);
                 qpoints_test.push(test_pts);
 
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut trial_pts =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
+                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
                         *trial_pts.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                            num::cast::<f64, <T as RlstScalar>::Real>(
                                 qrule_trial.points[2 * i + j],
                             )
                             .unwrap();
@@ -749,15 +744,15 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                     qrule_trial
                         .weights
                         .iter()
-                        .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                        .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
                         .collect::<Vec<_>>(),
                 );
                 let trial_element = trial_space.element(*trial_cell_type);
                 let mut trial_table = rlst_dynamic_array4!(
-                    Self::T,
-                    trial_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
+                    T,
+                    trial_element.tabulate_array_shape(self.table_derivs, npts_trial)
                 );
-                trial_element.tabulate(&trial_pts, Self::TABLE_DERIVS, &mut trial_table);
+                trial_element.tabulate(&trial_pts, self.table_derivs, &mut trial_table);
                 trial_tables.push(trial_table);
                 qpoints_trial.push(trial_pts);
             }
@@ -793,7 +788,7 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                 )
             })
             .reduce(
-                || SparseMatrixData::<Self::T>::new(shape),
+                || SparseMatrixData::<T>::new(shape),
                 |mut a, b| {
                     a.add(b);
                     a
@@ -801,9 +796,9 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
             )
     }
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
         &self,
-        output: &RawData2D<Self::T>,
+        output: &RawData2D<T>,
         trial_space: &Space,
         test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
@@ -826,11 +821,11 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                 let npts_trial = self.options().quadrature_degrees[trial_cell_type];
                 let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
                 let mut qpoints_test =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_test]);
+                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
                 for i in 0..npts_test {
                     for j in 0..2 {
                         *qpoints_test.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                            num::cast::<f64, <T as RlstScalar>::Real>(
                                 qrule_test.points[2 * i + j],
                             )
                             .unwrap();
@@ -839,15 +834,15 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                 let qweights_test = qrule_test
                     .weights
                     .iter()
-                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                    .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
                     .collect::<Vec<_>>();
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut qpoints_trial =
-                    rlst_dynamic_array2!(<Self::T as RlstScalar>::Real, [2, npts_trial]);
+                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_trial]);
                 for i in 0..npts_trial {
                     for j in 0..2 {
                         *qpoints_trial.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <Self::T as RlstScalar>::Real>(
+                            num::cast::<f64, <T as RlstScalar>::Real>(
                                 qrule_trial.points[2 * i + j],
                             )
                             .unwrap();
@@ -856,22 +851,22 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                 let qweights_trial = qrule_trial
                     .weights
                     .iter()
-                    .map(|w| num::cast::<f64, <Self::T as RlstScalar>::Real>(*w).unwrap())
+                    .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
                     .collect::<Vec<_>>();
 
                 let test_element = test_space.element(*test_cell_type);
                 let mut test_table = rlst_dynamic_array4!(
-                    Self::T,
-                    test_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_test)
+                    T,
+                    test_element.tabulate_array_shape(self.table_derivs, npts_test)
                 );
-                test_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut test_table);
+                test_element.tabulate(&qpoints_test, self.table_derivs, &mut test_table);
 
                 let trial_element = trial_space.element(*trial_cell_type);
                 let mut trial_table = rlst_dynamic_array4!(
-                    Self::T,
-                    trial_element.tabulate_array_shape(Self::TABLE_DERIVS, npts_trial)
+                    T,
+                    trial_element.tabulate_array_shape(self.table_derivs, npts_trial)
                 );
-                trial_element.tabulate(&qpoints_test, Self::TABLE_DERIVS, &mut trial_table);
+                trial_element.tabulate(&qpoints_test, self.table_derivs, &mut trial_table);
 
                 for test_c in &test_colouring[test_cell_type] {
                     for trial_c in &trial_colouring[trial_cell_type] {
@@ -931,12 +926,13 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
     }
 }
 
-impl<A: BoundaryAssembler> InternalAssemblyFunctions for A {}
-impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
-    type T = A::T;
-    fn assemble_singular_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
+impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, Kernel: KernelEvaluator<T = T>>
+BoundaryAssembly for
+    BoundaryAssembler<T, Integrand, Kernel> {
+    type T = T;
+    fn assemble_singular_into_dense<Space: FunctionSpace<T = T> + Sync>(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut RlstArray<T, 2>,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -949,15 +945,15 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         }
     }
 
-    fn assemble_singular_into_csr<Space: FunctionSpace<T = A::T> + Sync>(
+    fn assemble_singular_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
-    ) -> CsrMatrix<Self::T> {
+    ) -> CsrMatrix<T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular(shape, trial_space, test_space);
 
-        CsrMatrix::<Self::T>::from_aij(
+        CsrMatrix::<T>::from_aij(
             sparse_matrix.shape,
             &sparse_matrix.rows,
             &sparse_matrix.cols,
@@ -966,9 +962,9 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         .unwrap()
     }
 
-    fn assemble_singular_correction_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
+    fn assemble_singular_correction_into_dense<Space: FunctionSpace<T = T> + Sync>(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut RlstArray<T, 2>,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -982,15 +978,15 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         }
     }
 
-    fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = A::T> + Sync>(
+    fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
-    ) -> CsrMatrix<Self::T> {
+    ) -> CsrMatrix<T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular_correction(shape, trial_space, test_space);
 
-        CsrMatrix::<Self::T>::from_aij(
+        CsrMatrix::<T>::from_aij(
             sparse_matrix.shape,
             &sparse_matrix.rows,
             &sparse_matrix.cols,
@@ -999,9 +995,9 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         .unwrap()
     }
 
-    fn assemble_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
+    fn assemble_into_dense<Space: FunctionSpace<T = T> + Sync>(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut RlstArray<T, 2>,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -1018,9 +1014,9 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         self.assemble_singular_into_dense(output, trial_space, test_space);
     }
 
-    fn assemble_nonsingular_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
+    fn assemble_nonsingular_into_dense<Space: FunctionSpace<T = T> + Sync>(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut RlstArray<T, 2>,
         trial_space: &Space,
         test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
@@ -1053,23 +1049,23 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
 impl<A: BoundaryAssembler + InternalAssemblyFunctions> ParallelBoundaryAssembly for A {
     fn parallel_assemble_singular_into_csr<
         C: Communicator,
-        Space: ParallelFunctionSpace<C, T = A::T>,
+        Space: ParallelFunctionSpace<C, T = T>,
     >(
         &self,
         trial_space: &Space,
         test_space: &Space,
-    ) -> CsrMatrix<Self::T> {
+    ) -> CsrMatrix<T> {
         self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
     }
 
     fn parallel_assemble_singular_correction_into_csr<
         C: Communicator,
-        Space: ParallelFunctionSpace<C, T = A::T>,
+        Space: ParallelFunctionSpace<C, T = T>,
     >(
         &self,
         trial_space: &Space,
         test_space: &Space,
-    ) -> CsrMatrix<Self::T> {
+    ) -> CsrMatrix<T> {
         self.assemble_singular_correction_into_csr(
             trial_space.local_space(),
             test_space.local_space(),
