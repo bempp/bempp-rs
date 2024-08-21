@@ -121,6 +121,16 @@ mod test {
            //};
     }
     macro_rules! create_assembler {
+        (Laplace, Hypersingular, $dtype:ident) => {
+            paste! {
+                boundary::HypersingularAssembler::<[<$dtype>], _, _>::new_laplace()
+            }
+        };
+        (Helmholtz, Hypersingular, $dtype:ident) => {
+            paste! {
+                boundary::HypersingularAssembler::<[<$dtype>], _, _>::new_helmholtz(3.0)
+            }
+        };
         (Laplace, $operator:ident, $dtype:ident) => {
             paste! {
                 boundary::BoundaryAssembler::<[<$dtype>], _, _>::[<new_laplace_ $operator>]()
