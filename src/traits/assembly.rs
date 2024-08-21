@@ -1,10 +1,14 @@
 //! Assembly
 use crate::assembly::common::RlstArray;
 use crate::traits::FunctionSpace;
-use ndelement::{traits::FiniteElement, types::ReferenceCellType};
-use ndgrid::traits::Grid;
+use ndelement::types::ReferenceCellType;
 use rlst::{CsrMatrix, RlstScalar};
 use std::collections::HashMap;
+
+#[cfg(feature = "mpi")]
+use crate::traits::ParallelFunctionSpace;
+#[cfg(feature = "mpi")]
+use mpi::traits::Communicator;
 
 pub trait CellGeometry {
     //! Cell geometry
@@ -156,31 +160,21 @@ pub trait ParallelBoundaryAssembly: BoundaryAssembly {
 
     /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
     fn parallel_assemble_singular_into_csr<
-        'a,
         C: Communicator,
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync + 'a,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
+        Space: ParallelFunctionSpace<C, T = Self::T>,
     >(
         &self,
-        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
-        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> CsrMatrix<Self::T>;
 
     /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
     fn parallel_assemble_singular_correction_into_csr<
-        'a,
         C: Communicator,
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync + 'a,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
+        Space: ParallelFunctionSpace<C, T = Self::T>,
     >(
         &self,
-        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
-        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> CsrMatrix<Self::T>;
 }

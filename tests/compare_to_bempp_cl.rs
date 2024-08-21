@@ -1,7 +1,5 @@
 use approx::*;
-use bempp::assembly::{
-    boundary, boundary::BoundaryAssembler, potential, potential::PotentialAssembler,
-};
+use bempp::assembly::{boundary, potential, potential::PotentialAssembler};
 use bempp::function::SerialFunctionSpace;
 use bempp::traits::{BoundaryAssembly, FunctionSpace};
 use cauchy::c64;

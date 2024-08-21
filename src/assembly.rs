@@ -7,7 +7,6 @@ pub mod potential;
 
 #[cfg(test)]
 mod test {
-    use super::boundary::BoundaryAssembler;
     use super::*;
     use crate::function::SerialFunctionSpace;
     use crate::traits::{BoundaryAssembly, FunctionSpace};

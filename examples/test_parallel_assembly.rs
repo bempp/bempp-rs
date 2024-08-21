@@ -5,7 +5,6 @@ use approx::assert_relative_eq;
 #[cfg(feature = "mpi")]
 use bempp::{
     assembly::boundary,
-    assembly::boundary::BoundaryAssembler,
     function::{ParallelFunctionSpace, SerialFunctionSpace},
     traits::{BoundaryAssembly, FunctionSpace, ParallelBoundaryAssembly},
 };

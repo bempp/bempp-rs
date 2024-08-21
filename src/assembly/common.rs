@@ -63,19 +63,6 @@ impl<T: RlstScalar + MatrixInverse> SparseMatrixData<T> {
         self.cols.extend(&other.cols);
         self.data.extend(&other.data);
     }
-    /// Compute the sum of this sparse matrix and another sparse matrix
-    pub fn sum(&self, other: SparseMatrixData<T>) -> SparseMatrixData<T> {
-        debug_assert!(self.shape[0] == other.shape[0]);
-        debug_assert!(self.shape[1] == other.shape[1]);
-        let mut out = SparseMatrixData::<T>::new(self.shape);
-        out.rows.extend(&self.rows);
-        out.cols.extend(&self.cols);
-        out.data.extend(&self.data);
-        out.rows.extend(&other.rows);
-        out.cols.extend(&other.cols);
-        out.data.extend(&other.data);
-        out
-    }
 }
 
 unsafe impl<T: RlstScalar + MatrixInverse> Sync for SparseMatrixData<T> {}

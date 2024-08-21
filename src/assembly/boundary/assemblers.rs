@@ -15,6 +15,9 @@ use crate::quadrature::duffy::{
 };
 use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
+use crate::traits::BoundaryAssembly;
+#[cfg(feature = "mpi")]
+use crate::traits::ParallelBoundaryAssembly;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelFunctionSpace;
 use crate::traits::{BoundaryIntegrand, CellPairAssembler, FunctionSpace, KernelEvaluator};
@@ -761,7 +764,7 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
         }
 
         let cell_blocks = make_cell_blocks(
-            |test_cell_type, trial_cell_type, pairs| {
+            |test_cell_type, trial_cell_type, _pairs| {
                 cell_type_indices[&(test_cell_type, trial_cell_type)]
             },
             qweights_test.len(),
@@ -928,10 +931,6 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
     }
 }
 
-use crate::traits::BoundaryAssembly;
-#[cfg(feature = "mpi")]
-use crate::traits::ParallelBoundaryAssembly;
-
 impl<A: BoundaryAssembler> InternalAssemblyFunctions for A {}
 impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
     type T = A::T;
@@ -1053,33 +1052,23 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
 #[cfg(feature = "mpi")]
 impl<A: BoundaryAssembler + InternalAssemblyFunctions> ParallelBoundaryAssembly for A {
     fn parallel_assemble_singular_into_csr<
-        'a,
         C: Communicator,
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync + 'a,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
+        Space: ParallelFunctionSpace<C, T = A::T>,
     >(
         &self,
-        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
-        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> CsrMatrix<Self::T> {
         self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
     }
 
     fn parallel_assemble_singular_correction_into_csr<
-        'a,
         C: Communicator,
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync + 'a,
-        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
+        Space: ParallelFunctionSpace<C, T = A::T>,
     >(
         &self,
-        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
-        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> CsrMatrix<Self::T> {
         self.assemble_singular_correction_into_csr(
             trial_space.local_space(),

@@ -13,7 +13,7 @@ pub trait FunctionSpace {
     /// Scalar type
     type T: RlstScalar;
     /// The grid type
-    type Grid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync;
+    type Grid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
     /// The finite element type
     type FiniteElement: FiniteElement<T = Self::T> + Sync;
 
@@ -55,9 +55,10 @@ pub trait FunctionSpace {
 /// A function space in parallel
 pub trait ParallelFunctionSpace<C: Communicator>: FunctionSpace {
     /// Parallel grid type
-    type ParallelGrid: ParallelGrid<C> + Grid;
+    type ParallelGrid: ParallelGrid<C>
+        + Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
     /// The type of the serial space on each process
-    type LocalSpace<'a>: FunctionSpace
+    type LocalSpace<'a>: FunctionSpace<T = Self::T> + Sync
     where
         Self: 'a;
 

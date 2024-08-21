@@ -73,7 +73,7 @@ pub struct ParallelFunctionSpace<
     'a,
     C: Communicator,
     T: RlstScalar + MatrixInverse,
-    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
 > {
     grid: &'a GridImpl,
     local_space: LocalFunctionSpace<'a, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>>,
@@ -83,7 +83,7 @@ impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     > ParallelFunctionSpace<'a, C, T, GridImpl>
 {
     /// Create new function space
@@ -101,7 +101,7 @@ impl<
 
         // Create local space on current process
         let (cell_dofs, entity_dofs, dofmap_size, owner_data) =
-            assign_dofs(rank as usize, grid, e_family);
+            assign_dofs(rank as usize, grid.local_grid(), e_family);
 
         let mut elements = HashMap::new();
         for cell in grid.entity_types(grid.topology_dim()) {
@@ -229,7 +229,7 @@ impl<
         'g,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     > ParallelFunctionSpaceTrait<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
 {
     type ParallelGrid = GridImpl;
@@ -255,9 +255,10 @@ impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     > FunctionSpace for ParallelFunctionSpace<'a, C, T, GridImpl>
 {
+    type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
 

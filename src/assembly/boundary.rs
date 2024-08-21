@@ -4,8 +4,6 @@ pub(crate) mod cell_pair_assemblers;
 mod integrands;
 
 pub use assemblers::BoundaryAssembler;
-#[cfg(feature = "mpi")]
-pub use assemblers::ParallelBoundaryAssembler;
 pub use assemblers::{
     AdjointDoubleLayerAssembler, DoubleLayerAssembler, HypersingularAssembler, SingleLayerAssembler,
 };
