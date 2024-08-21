@@ -151,19 +151,14 @@ where
 
 /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
 #[allow(clippy::too_many_arguments)]
-fn assemble_batch_singular<
-    T: RlstScalar + MatrixInverse,
-    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    Element: FiniteElement<T = T> + Sync,
->(
+fn assemble_batch_singular<T: RlstScalar + MatrixInverse, Space: FunctionSpace<T = T>>(
     assembler: &impl BoundaryAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
-    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
+    trial_space: &Space,
+    test_space: &Space,
     cell_pairs: &[(usize, usize)],
     trial_points: &RlstArray<T::Real, 2>,
     test_points: &RlstArray<T::Real, 2>,
@@ -230,20 +225,15 @@ fn assemble_batch_singular<
 
 /// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
 #[allow(clippy::too_many_arguments)]
-fn assemble_batch_nonadjacent<
-    T: RlstScalar + MatrixInverse,
-    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    Element: FiniteElement<T = T> + Sync,
->(
+fn assemble_batch_nonadjacent<T: RlstScalar + MatrixInverse, Space: FunctionSpace<T = T>>(
     assembler: &impl BoundaryAssembler<T = T>,
     deriv_size: usize,
     output: &RawData2D<T>,
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
+    trial_space: &Space,
     trial_cells: &[usize],
-    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
+    test_space: &Space,
     test_cells: &[usize],
     trial_points: &RlstArray<T::Real, 2>,
     trial_weights: &[T::Real],
@@ -319,17 +309,15 @@ fn assemble_batch_nonadjacent<
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular_correction<
     T: RlstScalar + MatrixInverse,
-    TestGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    TrialGrid: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    Element: FiniteElement<T = T> + Sync,
+    Space: FunctionSpace<T = T>,
 >(
     assembler: &impl BoundaryAssembler<T = T>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
     test_cell_type: ReferenceCellType,
-    trial_space: &impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element>,
-    test_space: &impl FunctionSpace<Grid = TestGrid, FiniteElement = Element>,
+    trial_space: &Space,
+    test_space: &Space,
     cell_pairs: &[(usize, usize)],
     trial_points: &RlstArray<T::Real, 2>,
     trial_weights: &[T::Real],
