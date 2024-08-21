@@ -29,7 +29,11 @@ pub trait BoundaryIntegrand {
     /// Scalar type
     type T: RlstScalar;
 
+    #[allow(clippy::too_many_arguments)]
     /// Evaluate integrand for a singular quadrature rule
+    ///
+    /// # Safety
+    /// This method is unsafe to allow `get_unchecked` to be used
     unsafe fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<Self::T, 4>,
@@ -43,7 +47,11 @@ pub trait BoundaryIntegrand {
         trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
     ) -> Self::T;
 
+    #[allow(clippy::too_many_arguments)]
     /// Evaluate integrand for a non-singular quadrature rule
+    ///
+    /// # Safety
+    /// This method is unsafe to allow `get_unchecked` to be used
     unsafe fn evaluate_singular(
         &self,
         test_table: &RlstArray<Self::T, 4>,

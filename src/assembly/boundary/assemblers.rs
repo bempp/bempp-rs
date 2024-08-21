@@ -278,8 +278,8 @@ fn assemble_batch_nonadjacent<
         trial_evaluator,
         test_table,
         trial_table,
-        &test_weights,
-        &trial_weights,
+        test_weights,
+        trial_weights,
     );
 
     let mut local_mat = rlst_dynamic_array2!(
@@ -366,8 +366,8 @@ fn assemble_batch_singular_correction<
         trial_evaluator,
         test_table,
         trial_table,
-        &test_weights,
-        &trial_weights,
+        test_weights,
+        trial_weights,
     );
 
     let mut local_mat = rlst_dynamic_array2!(

@@ -69,6 +69,12 @@ impl<T: RlstScalar> HypersingularCurlCurlBoundaryIntegrand<T> {
     }
 }
 
+impl<T: RlstScalar> Default for HypersingularCurlCurlBoundaryIntegrand<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIntegrand<T> {
     type T = T;
 

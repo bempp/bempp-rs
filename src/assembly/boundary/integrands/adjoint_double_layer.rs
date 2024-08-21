@@ -73,3 +73,9 @@ impl<T: RlstScalar> BoundaryIntegrand for AdjointDoubleLayerBoundaryIntegrand<T>
             * *trial_table.get_unchecked([0, point_index, trial_basis_index, 0])
     }
 }
+
+impl<T: RlstScalar> Default for AdjointDoubleLayerBoundaryIntegrand<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

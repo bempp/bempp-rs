@@ -45,6 +45,7 @@ impl<
         K: KernelEvaluator<T = T>,
     > SingularCellPairAssembler<'a, T, I, G, K>
 {
+    #[allow(clippy::too_many_arguments)]
     /// Create new
     pub fn new(
         npts: usize,
@@ -195,6 +196,7 @@ impl<
         K: KernelEvaluator<T = T>,
     > NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
 {
+    #[allow(clippy::too_many_arguments)]
     /// Create new
     pub fn new(
         npts_test: usize,
