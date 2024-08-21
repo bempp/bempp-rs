@@ -3,7 +3,7 @@ use bempp::assembly::{
     boundary, boundary::BoundaryAssembler, potential, potential::PotentialAssembler,
 };
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::FunctionSpace;
+use bempp::traits::{BoundaryAssembly, FunctionSpace};
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;

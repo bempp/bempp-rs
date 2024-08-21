@@ -85,8 +85,9 @@ impl<
         I: BoundaryIntegrand<T = T>,
         G: GeometryMap<T = T::Real>,
         K: KernelEvaluator<T = T>,
-    > CellPairAssembler<T> for SingularCellPairAssembler<'a, T, I, G, K>
+    > CellPairAssembler for SingularCellPairAssembler<'a, T, I, G, K>
 {
+    type T = T;
     fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = test_cell;
         self.test_evaluator
@@ -239,8 +240,9 @@ impl<
         TestG: GeometryMap<T = T::Real>,
         TrialG: GeometryMap<T = T::Real>,
         K: KernelEvaluator<T = T>,
-    > CellPairAssembler<T> for NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
+    > CellPairAssembler for NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
 {
+    type T = T;
     fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = test_cell;
         self.test_evaluator

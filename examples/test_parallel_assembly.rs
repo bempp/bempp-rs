@@ -7,7 +7,7 @@ use bempp::{
     assembly::boundary,
     assembly::boundary::BoundaryAssembler,
     function::{ParallelFunctionSpace, SerialFunctionSpace},
-    traits::FunctionSpace,
+    traits::{BoundaryAssembly, FunctionSpace, ParallelBoundaryAssembly},
 };
 #[cfg(feature = "mpi")]
 use itertools::izip;

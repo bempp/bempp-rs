@@ -10,7 +10,7 @@ mod test {
     use super::boundary::BoundaryAssembler;
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use crate::traits::FunctionSpace;
+    use crate::traits::{BoundaryAssembly, FunctionSpace};
     use cauchy::{c32, c64};
     use ndelement::ciarlet::CiarletElement;
     use ndelement::ciarlet::LagrangeElementFamily;

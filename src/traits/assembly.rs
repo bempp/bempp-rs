@@ -1,6 +1,10 @@
 //! Assembly
 use crate::assembly::common::RlstArray;
-use rlst::RlstScalar;
+use crate::traits::FunctionSpace;
+use ndelement::{traits::FiniteElement, types::ReferenceCellType};
+use ndgrid::traits::Grid;
+use rlst::{CsrMatrix, RlstScalar};
+use std::collections::HashMap;
 
 pub trait CellGeometry {
     //! Cell geometry
@@ -75,12 +79,132 @@ pub trait KernelEvaluator {
     );
 }
 
-pub trait CellPairAssembler<T: RlstScalar> {
+pub trait CellPairAssembler {
     //! Assembler for the contributions from a pair of cells
+    /// Scalar type
+    type T: RlstScalar;
+
     /// Assemble contributions into `local_mat`
-    fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>);
+    fn assemble(&mut self, local_mat: &mut RlstArray<Self::T, 2>);
     /// Set the test cell
     fn set_test_cell(&mut self, test_cell: usize);
     /// Set the trial cell
     fn set_trial_cell(&mut self, trial_cell: usize);
+}
+
+pub trait BoundaryAssembly {
+    //! Functions for boundary assembly
+    /// Scalar type
+    type T: RlstScalar;
+
+    /// Assemble the singular contributions into a dense matrix
+    fn assemble_singular_into_dense<
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+    >(
+        &self,
+        output: &mut RlstArray<Self::T, 2>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+    );
+
+    /// Assemble the singular contributions into a CSR sparse matrix
+    fn assemble_singular_into_csr<
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+    >(
+        &self,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+    ) -> CsrMatrix<Self::T>;
+
+    /// Assemble the singular correction into a dense matrix
+    ///
+    /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
+    fn assemble_singular_correction_into_dense<
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+    >(
+        &self,
+        output: &mut RlstArray<Self::T, 2>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+    );
+
+    /// Assemble the singular correction into a CSR matrix
+    ///
+    /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
+    fn assemble_singular_correction_into_csr<
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+    >(
+        &self,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+    ) -> CsrMatrix<Self::T>;
+
+    /// Assemble into a dense matrix
+    fn assemble_into_dense<
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+    >(
+        &self,
+        output: &mut RlstArray<Self::T, 2>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+    );
+
+    /// Assemble the non-singular contributions into a dense matrix
+    fn assemble_nonsingular_into_dense<
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+    >(
+        &self,
+        output: &mut RlstArray<Self::T, 2>,
+        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
+        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
+        test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
+    );
+}
+
+#[cfg(feature = "mpi")]
+pub trait ParallelBoundaryAssembly: BoundaryAssembly {
+    //! Functions for parallel boundary assembly
+
+    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+    fn parallel_assemble_singular_into_csr<
+        'a,
+        C: Communicator,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync + 'a,
+        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
+    >(
+        &self,
+        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
+        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
+    ) -> CsrMatrix<Self::T>;
+
+    /// Assemble the singular contributions into a CSR sparse matrix, indexed by global DOF numbers
+    fn parallel_assemble_singular_correction_into_csr<
+        'a,
+        C: Communicator,
+        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
+        Element: FiniteElement<T = Self::T> + Sync,
+        SerialTestSpace: FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync + 'a,
+        SerialTrialSpace: FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync + 'a,
+    >(
+        &self,
+        trial_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTrialSpace> + 'a),
+        test_space: &'a (impl ParallelFunctionSpace<C, LocalSpace<'a> = SerialTestSpace> + 'a),
+    ) -> CsrMatrix<Self::T>;
 }

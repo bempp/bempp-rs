@@ -3,7 +3,11 @@
 mod assembly;
 mod function;
 
-pub use assembly::{BoundaryIntegrand, CellGeometry, CellPairAssembler, KernelEvaluator};
+#[cfg(feature = "mpi")]
+pub use assembly::ParallelBoundaryAssembly;
+pub use assembly::{
+    BoundaryAssembly, BoundaryIntegrand, CellGeometry, CellPairAssembler, KernelEvaluator,
+};
 pub use function::FunctionSpace;
 #[cfg(feature = "mpi")]
 pub use function::ParallelFunctionSpace;

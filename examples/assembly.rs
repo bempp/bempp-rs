@@ -1,6 +1,6 @@
 use bempp::assembly::{boundary, boundary::BoundaryAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::FunctionSpace;
+use bempp::traits::{BoundaryAssembly, FunctionSpace};
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;
