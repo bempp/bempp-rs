@@ -1,5 +1,6 @@
 //! Assembly of boundary operators
 pub(crate) mod adjoint_double_layer;
+mod cell_pair_assemblers;
 pub(crate) mod double_layer;
 pub(crate) mod hypersingular;
 mod integrands;
@@ -20,7 +21,8 @@ use crate::quadrature::simplex_rules::simplex_rule;
 use crate::quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelFunctionSpace;
-use crate::traits::{BoundaryIntegrand, FunctionSpace, KernelEvaluator};
+use crate::traits::{BoundaryIntegrand, CellPairAssembler, FunctionSpace, KernelEvaluator};
+use cell_pair_assemblers::{NonsingularCellPairAssembler, SingularCellPairAssembler};
 use itertools::izip;
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
@@ -29,11 +31,10 @@ use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
 use ndgrid::traits::{Entity, GeometryMap, Grid, Topology};
 use ndgrid::types::Ownership;
-use num::Zero;
 use rayon::prelude::*;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, CsrMatrix, DefaultIterator,
-    DefaultIteratorMut, MatrixInverse, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
+    MatrixInverse, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
 };
 use std::collections::HashMap;
 
@@ -106,145 +107,6 @@ fn get_singular_quadrature_rule(
     }
 }
 
-struct SingularCellPairAssembler<
-    'a,
-    T: RlstScalar,
-    I: BoundaryIntegrand<T = T>,
-    G: GeometryMap<T = T::Real>,
-    K: KernelEvaluator<T = T>,
-> {
-    integrand: &'a I,
-    kernel: &'a K,
-    test_evaluator: G,
-    trial_evaluator: G,
-    test_table: &'a RlstArray<T, 4>,
-    trial_table: &'a RlstArray<T, 4>,
-    k: RlstArray<T, 2>,
-    test_mapped_pts: RlstArray<T::Real, 2>,
-    trial_mapped_pts: RlstArray<T::Real, 2>,
-    test_normals: RlstArray<T::Real, 2>,
-    trial_normals: RlstArray<T::Real, 2>,
-    test_jacobians: RlstArray<T::Real, 2>,
-    trial_jacobians: RlstArray<T::Real, 2>,
-    test_jdet: Vec<T::Real>,
-    trial_jdet: Vec<T::Real>,
-}
-
-impl<
-        'a,
-        T: RlstScalar,
-        I: BoundaryIntegrand<T = T>,
-        G: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
-    > SingularCellPairAssembler<'a, T, I, G, K>
-{
-    pub fn new(
-        npts: usize,
-        deriv_size: usize,
-        integrand: &'a I,
-        kernel: &'a K,
-        test_evaluator: G,
-        trial_evaluator: G,
-        test_table: &'a RlstArray<T, 4>,
-        trial_table: &'a RlstArray<T, 4>,
-    ) -> Self {
-        Self {
-            integrand,
-            kernel,
-            test_evaluator,
-            trial_evaluator,
-            test_table,
-            trial_table,
-            k: rlst_dynamic_array2!(T, [deriv_size, npts]),
-            test_mapped_pts: rlst_dynamic_array2!(T::Real, [3, npts]),
-            trial_mapped_pts: rlst_dynamic_array2!(T::Real, [3, npts]),
-            test_normals: rlst_dynamic_array2!(T::Real, [3, npts]),
-            trial_normals: rlst_dynamic_array2!(T::Real, [3, npts]),
-            test_jacobians: rlst_dynamic_array2!(T::Real, [6, npts]),
-            trial_jacobians: rlst_dynamic_array2!(T::Real, [6, npts]),
-            test_jdet: vec![T::Real::zero(); npts],
-            trial_jdet: vec![T::Real::zero(); npts],
-        }
-    }
-}
-impl<
-        'a,
-        T: RlstScalar,
-        I: BoundaryIntegrand<T = T>,
-        G: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
-    > SingularCellPairAssembler<'a, T, I, G, K>
-{
-    // TODO make this a trait
-    fn assemble(
-        &mut self,
-        local_mat: &mut RlstArray<T, 2>,
-        weights: &[T::Real],
-        test_cell: usize,
-        trial_cell: usize,
-    ) {
-        self.test_evaluator
-            .points(test_cell, self.test_mapped_pts.data_mut());
-        self.test_evaluator.jacobians_dets_normals(
-            test_cell,
-            self.test_jacobians.data_mut(),
-            &mut self.test_jdet,
-            self.test_normals.data_mut(),
-        );
-
-        self.trial_evaluator
-            .points(trial_cell, self.trial_mapped_pts.data_mut());
-        self.trial_evaluator.jacobians_dets_normals(
-            trial_cell,
-            self.trial_jacobians.data_mut(),
-            &mut self.trial_jdet,
-            self.trial_normals.data_mut(),
-        );
-
-        self.kernel.assemble_pairwise_st(
-            self.test_mapped_pts.data(),
-            self.trial_mapped_pts.data(),
-            self.k.data_mut(),
-        );
-
-        let test_geometry = AssemblerGeometry::new(
-            &self.test_mapped_pts,
-            &self.test_normals,
-            &self.test_jacobians,
-            &self.test_jdet,
-        );
-        let trial_geometry = AssemblerGeometry::new(
-            &self.trial_mapped_pts,
-            &self.trial_normals,
-            &self.trial_jacobians,
-            &self.trial_jdet,
-        );
-
-        for (trial_i, mut col) in local_mat.col_iter_mut().enumerate() {
-            for (test_i, entry) in col.iter_mut().enumerate() {
-                *entry = T::zero();
-                for (index, wt) in weights.iter().enumerate() {
-                    unsafe {
-                        *entry += self.integrand.evaluate_singular(
-                            self.test_table,
-                            self.trial_table,
-                            index,
-                            test_i,
-                            trial_i,
-                            &self.k,
-                            &test_geometry,
-                            &trial_geometry,
-                        ) * num::cast::<T::Real, T>(
-                            *wt * *self.test_jdet.get_unchecked(index)
-                                * *self.trial_jdet.get_unchecked(index),
-                        )
-                        .unwrap();
-                    }
-                }
-            }
-        }
-    }
-}
 /// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
@@ -294,6 +156,7 @@ fn assemble_batch_singular<
         trial_evaluator,
         test_table,
         trial_table,
+        weights,
     );
 
     let mut local_mat = rlst_dynamic_array2!(
@@ -304,7 +167,9 @@ fn assemble_batch_singular<
         ]
     );
     for (test_cell, trial_cell) in cell_pairs {
-        a.assemble(&mut local_mat, weights, *test_cell, *trial_cell);
+        a.set_test_cell(*test_cell);
+        a.set_trial_cell(*trial_cell);
+        a.assemble(&mut local_mat);
 
         let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
         let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
@@ -358,106 +223,48 @@ fn assemble_batch_nonadjacent<
     assert_eq!(trial_grid.geometry_dim(), 3);
     assert_eq!(trial_grid.topology_dim(), 2);
 
-    let mut k = rlst_dynamic_array3!(T, [deriv_size, npts_test, npts_trial]);
-    let zero = num::cast::<f64, T::Real>(0.0).unwrap();
-    let mut test_jdet = vec![zero; npts_test];
-    let mut test_mapped_pts = rlst_dynamic_array2!(T::Real, [3, npts_test]);
-    let mut test_normals = rlst_dynamic_array2!(T::Real, [3, npts_test]);
-    let mut test_jacobians = rlst_dynamic_array2!(T::Real, [6, npts_test]);
-
     let test_evaluator = test_grid.geometry_map(test_cell_type, test_points.data());
     let trial_evaluator = trial_grid.geometry_map(trial_cell_type, trial_points.data());
 
-    let mut trial_jdet = vec![vec![zero; npts_trial]; trial_cells.len()];
-    let mut trial_mapped_pts = vec![];
-    let mut trial_normals = vec![];
-    let mut trial_jacobians = vec![];
-    for _i in 0..trial_cells.len() {
-        trial_mapped_pts.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
-        trial_normals.push(rlst_dynamic_array2!(T::Real, [3, npts_trial]));
-        trial_jacobians.push(rlst_dynamic_array2!(T::Real, [6, npts_trial]));
-    }
+    let mut a = NonsingularCellPairAssembler::new(
+        npts_test,
+        npts_trial,
+        deriv_size,
+        assembler.integrand(),
+        assembler.kernel(),
+        test_evaluator,
+        trial_evaluator,
+        test_table,
+        trial_table,
+        &test_weights,
+        &trial_weights,
+    );
+
+    let mut local_mat = rlst_dynamic_array2!(
+        T,
+        [
+            test_space.element(test_cell_type).dim(),
+            trial_space.element(trial_cell_type).dim()
+        ]
+    );
 
     for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
-        trial_evaluator.points(*trial_cell, trial_mapped_pts[trial_cell_i].data_mut());
-        trial_evaluator.jacobians_dets_normals(
-            *trial_cell,
-            trial_jacobians[trial_cell_i].data_mut(),
-            &mut trial_jdet[trial_cell_i],
-            trial_normals[trial_cell_i].data_mut(),
-        );
-    }
-
-    let mut sum: T;
-    let mut trial_integrands = vec![num::cast::<f64, T>(0.0).unwrap(); npts_trial];
-
-    for test_cell in test_cells {
-        test_evaluator.points(*test_cell, test_mapped_pts.data_mut());
-        test_evaluator.jacobians_dets_normals(
-            *test_cell,
-            test_jacobians.data_mut(),
-            &mut test_jdet,
-            test_normals.data_mut(),
-        );
-
-        for (trial_cell_i, trial_cell) in trial_cells.iter().enumerate() {
+        a.set_test_cell(*trial_cell);
+        let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+        for test_cell in test_cells {
             if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
                 continue;
             }
 
-            assembler.kernel().assemble_st(
-                test_mapped_pts.data(),
-                trial_mapped_pts[trial_cell_i].data(),
-                k.data_mut(),
-            );
+            a.set_test_cell(*test_cell);
+            a.assemble(&mut local_mat);
 
             let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
-            let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
 
-            let test_geometry = AssemblerGeometry::new(
-                &test_mapped_pts,
-                &test_normals,
-                &test_jacobians,
-                &test_jdet,
-            );
-            let trial_geometry = AssemblerGeometry::new(
-                &trial_mapped_pts[trial_cell_i],
-                &trial_normals[trial_cell_i],
-                &trial_jacobians[trial_cell_i],
-                &trial_jdet[trial_cell_i],
-            );
-
-            for (test_i, test_dof) in test_dofs.iter().enumerate() {
-                for (trial_i, trial_dof) in trial_dofs.iter().enumerate() {
-                    for (trial_index, trial_wt) in trial_weights.iter().enumerate() {
-                        trial_integrands[trial_index] = num::cast::<T::Real, T>(
-                            *trial_wt * trial_jdet[trial_cell_i][trial_index],
-                        )
-                        .unwrap();
-                    }
-                    sum = num::cast::<f64, T>(0.0).unwrap();
-                    for (test_index, test_wt) in test_weights.iter().enumerate() {
-                        let test_integrand =
-                            num::cast::<T::Real, T>(*test_wt * test_jdet[test_index]).unwrap();
-                        for trial_index in 0..npts_trial {
-                            sum += unsafe {
-                                assembler.integrand().evaluate_nonsingular(
-                                    test_table,
-                                    trial_table,
-                                    test_index,
-                                    trial_index,
-                                    test_i,
-                                    trial_i,
-                                    &k,
-                                    &test_geometry,
-                                    &trial_geometry,
-                                ) * test_integrand
-                                    * *trial_integrands.get_unchecked(trial_index)
-                            };
-                        }
-                    }
+            for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
+                for (test_dof, entry) in izip!(test_dofs, col.iter()) {
                     unsafe {
-                        *output.data.add(*test_dof + output.shape[0] * *trial_dof) += sum;
+                        *output.data.add(*test_dof + output.shape[0] * *trial_dof) += entry;
                     }
                 }
             }

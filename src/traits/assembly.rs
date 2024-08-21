@@ -74,3 +74,13 @@ pub trait KernelEvaluator {
         result: &mut [Self::T],
     );
 }
+
+pub trait CellPairAssembler<T: RlstScalar> {
+    //! Assembler for the contributions from a pair of cells
+    /// Assemble contributions into `local_mat`
+    fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>);
+    /// Set the test cell
+    fn set_test_cell(&mut self, test_cell: usize);
+    /// Set the trial cell
+    fn set_trial_cell(&mut self, trial_cell: usize);
+}
