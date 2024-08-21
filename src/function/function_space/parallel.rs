@@ -21,7 +21,7 @@ use std::collections::HashMap;
 pub struct LocalFunctionSpace<
     'a,
     T: RlstScalar + MatrixInverse,
-    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 > {
     serial_space: SerialFunctionSpace<'a, T, GridImpl>,
     global_size: usize,
@@ -32,9 +32,10 @@ pub struct LocalFunctionSpace<
 impl<
         'a,
         T: RlstScalar + MatrixInverse,
-        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > FunctionSpace for LocalFunctionSpace<'a, T, GridImpl>
 {
+    type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
 
@@ -72,7 +73,7 @@ pub struct ParallelFunctionSpace<
     'a,
     C: Communicator,
     T: RlstScalar + MatrixInverse,
-    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 > {
     grid: &'a GridImpl,
     local_space: LocalFunctionSpace<'a, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>>,
@@ -82,7 +83,7 @@ impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > ParallelFunctionSpace<'a, C, T, GridImpl>
 {
     /// Create new function space
@@ -228,7 +229,7 @@ impl<
         'g,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > ParallelFunctionSpaceTrait<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
 {
     type ParallelGrid = GridImpl;
@@ -254,7 +255,7 @@ impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > FunctionSpace for ParallelFunctionSpace<'a, C, T, GridImpl>
 {
     type Grid = GridImpl;

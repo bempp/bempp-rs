@@ -499,15 +499,11 @@ pub trait BoundaryAssembler: Sync + Sized {
 
 trait InternalAssemblyFunctions: BoundaryAssembler {
     /// Assemble the singular contributions
-    fn assemble_singular<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_singular<Space: FunctionSpace<T = Self::T> + Sync>(
         &self,
         shape: [usize; 2],
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> SparseMatrixData<Self::T> {
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
@@ -639,7 +635,7 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
         cell_blocks
             .into_par_iter()
             .map(|(i, cell_block)| {
-                assemble_batch_singular::<Self::T, TestGrid, TrialGrid, Element>(
+                assemble_batch_singular(
                     self,
                     Self::DERIV_SIZE,
                     shape,
@@ -667,15 +663,11 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
     /// Assemble the singular correction
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
-    fn assemble_singular_correction<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_singular_correction<Space: FunctionSpace<T = Self::T> + Sync>(
         &self,
         shape: [usize; 2],
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> SparseMatrixData<Self::T> {
         if !equal_grids(test_space.grid(), trial_space.grid()) {
             // If the test and trial grids are different, there are no neighbouring triangles
@@ -780,7 +772,7 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
         cell_blocks
             .into_par_iter()
             .map(|(i, cell_block)| {
-                assemble_batch_singular_correction::<Self::T, TestGrid, TrialGrid, Element>(
+                assemble_batch_singular_correction(
                     self,
                     Self::DERIV_SIZE,
                     shape,
@@ -806,15 +798,11 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
             )
     }
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_nonsingular<Space: FunctionSpace<T = Self::T> + Sync>(
         &self,
         output: &RawData2D<Self::T>,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
         test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
@@ -913,7 +901,7 @@ trait InternalAssemblyFunctions: BoundaryAssembler {
                         let r: usize = (0..numtasks)
                             .into_par_iter()
                             .map(&|t| {
-                                assemble_batch_nonadjacent::<Self::T, TestGrid, TrialGrid, Element>(
+                                assemble_batch_nonadjacent(
                                     self,
                                     Self::DERIV_SIZE,
                                     output,
@@ -947,21 +935,13 @@ use crate::traits::ParallelBoundaryAssembly;
 impl<A: BoundaryAssembler> InternalAssemblyFunctions for A {}
 impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
     type T = A::T;
-    fn assemble_singular_into_dense<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_singular_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
     ) {
-        let sparse_matrix = self.assemble_singular::<TestGrid, TrialGrid, Element>(
-            output.shape(),
-            trial_space,
-            test_space,
-        );
+        let sparse_matrix = self.assemble_singular(output.shape(), trial_space, test_space);
         let data = sparse_matrix.data;
         let rows = sparse_matrix.rows;
         let cols = sparse_matrix.cols;
@@ -970,43 +950,31 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         }
     }
 
-    fn assemble_singular_into_csr<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_singular_into_csr<Space: FunctionSpace<T = A::T> + Sync>(
         &self,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
+        let sparse_matrix = self.assemble_singular(shape, trial_space, test_space);
+
+        CsrMatrix::<Self::T>::from_aij(
+            sparse_matrix.shape,
+            &sparse_matrix.rows,
+            &sparse_matrix.cols,
+            &sparse_matrix.data,
+        )
+        .unwrap()
+    }
+
+    fn assemble_singular_correction_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
+        &self,
+        output: &mut RlstArray<Self::T, 2>,
+        trial_space: &Space,
+        test_space: &Space,
+    ) {
         let sparse_matrix =
-            self.assemble_singular::<TestGrid, TrialGrid, Element>(shape, trial_space, test_space);
-
-        CsrMatrix::<Self::T>::from_aij(
-            sparse_matrix.shape,
-            &sparse_matrix.rows,
-            &sparse_matrix.cols,
-            &sparse_matrix.data,
-        )
-        .unwrap()
-    }
-
-    fn assemble_singular_correction_into_dense<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
-        &self,
-        output: &mut RlstArray<Self::T, 2>,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
-    ) {
-        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid, Element>(
-            output.shape(),
-            trial_space,
-            test_space,
-        );
+            self.assemble_singular_correction(output.shape(), trial_space, test_space);
         let data = sparse_matrix.data;
         let rows = sparse_matrix.rows;
         let cols = sparse_matrix.cols;
@@ -1015,21 +983,13 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         }
     }
 
-    fn assemble_singular_correction_into_csr<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = A::T> + Sync>(
         &self,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
     ) -> CsrMatrix<Self::T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular_correction::<TestGrid, TrialGrid, Element>(
-            shape,
-            trial_space,
-            test_space,
-        );
+        let sparse_matrix = self.assemble_singular_correction(shape, trial_space, test_space);
 
         CsrMatrix::<Self::T>::from_aij(
             sparse_matrix.shape,
@@ -1040,42 +1000,30 @@ impl<A: BoundaryAssembler + InternalAssemblyFunctions> BoundaryAssembly for A {
         .unwrap()
     }
 
-    fn assemble_into_dense<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
     ) {
         let test_colouring = test_space.cell_colouring();
         let trial_colouring = trial_space.cell_colouring();
 
-        self.assemble_nonsingular_into_dense::<TestGrid, TrialGrid, Element>(
+        self.assemble_nonsingular_into_dense(
             output,
             trial_space,
             test_space,
             &trial_colouring,
             &test_colouring,
         );
-        self.assemble_singular_into_dense::<TestGrid, TrialGrid, Element>(
-            output,
-            trial_space,
-            test_space,
-        );
+        self.assemble_singular_into_dense(output, trial_space, test_space);
     }
 
-    fn assemble_nonsingular_into_dense<
-        TestGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        TrialGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType> + Sync,
-        Element: FiniteElement<T = Self::T> + Sync,
-    >(
+    fn assemble_nonsingular_into_dense<Space: FunctionSpace<T = A::T> + Sync>(
         &self,
         output: &mut RlstArray<Self::T, 2>,
-        trial_space: &(impl FunctionSpace<Grid = TrialGrid, FiniteElement = Element> + Sync),
-        test_space: &(impl FunctionSpace<Grid = TestGrid, FiniteElement = Element> + Sync),
+        trial_space: &Space,
+        test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
         test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
