@@ -1049,7 +1049,12 @@ impl<
     }
 }
 #[cfg(feature = "mpi")]
-impl<A: BoundaryAssembler + InternalAssemblyFunctions> ParallelBoundaryAssembly for A {
+impl<
+        T: RlstScalar + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluator<T = T>,
+    > ParallelBoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
+{
     fn parallel_assemble_singular_into_csr<
         C: Communicator,
         Space: ParallelFunctionSpace<C, T = T>,
