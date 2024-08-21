@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub struct SerialFunctionSpace<
     'a,
     T: RlstScalar + MatrixInverse,
-    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 > {
     pub(crate) grid: &'a GridImpl,
     pub(crate) elements: HashMap<ReferenceCellType, CiarletElement<T>>,
@@ -28,7 +28,7 @@ pub struct SerialFunctionSpace<
 impl<
         'a,
         T: RlstScalar + MatrixInverse,
-        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > SerialFunctionSpace<'a, T, GridImpl>
 {
     /// Create new function space
@@ -60,9 +60,10 @@ impl<
 impl<
         'a,
         T: RlstScalar + MatrixInverse,
-        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > FunctionSpace for SerialFunctionSpace<'a, T, GridImpl>
 {
+    type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
 

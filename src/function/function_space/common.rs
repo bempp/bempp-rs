@@ -15,7 +15,7 @@ type OwnerData = Vec<(usize, usize, usize, usize)>;
 
 pub(crate) fn assign_dofs<
     T: RlstScalar + MatrixInverse,
-    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     rank: usize,
     grid: &GridImpl,
@@ -103,7 +103,7 @@ mod test {
     use ndgrid::shapes::{screen_quadrilaterals, screen_triangles};
 
     fn run_test(
-        grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>,
+        grid: &(impl Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync),
         degree: usize,
         continuity: Continuity,
     ) {
@@ -131,7 +131,7 @@ mod test {
     }
 
     fn run_test_rt(
-        grid: &impl Grid<T = f64, EntityDescriptor = ReferenceCellType>,
+        grid: &(impl Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync),
         degree: usize,
         continuity: Continuity,
     ) {

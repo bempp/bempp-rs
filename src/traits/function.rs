@@ -5,14 +5,17 @@ use ndelement::{traits::FiniteElement, types::ReferenceCellType};
 #[cfg(feature = "mpi")]
 use ndgrid::traits::ParallelGrid;
 use ndgrid::{traits::Grid, types::Ownership};
+use rlst::RlstScalar;
 use std::collections::HashMap;
 
 /// A function space
 pub trait FunctionSpace {
+    /// Scalar type
+    type T: RlstScalar;
     /// The grid type
-    type Grid: Grid;
+    type Grid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
     /// The finite element type
-    type FiniteElement: FiniteElement;
+    type FiniteElement: FiniteElement<T = Self::T> + Sync;
 
     /// Get the grid that the element is defined on
     fn grid(&self) -> &Self::Grid;
@@ -52,9 +55,10 @@ pub trait FunctionSpace {
 /// A function space in parallel
 pub trait ParallelFunctionSpace<C: Communicator>: FunctionSpace {
     /// Parallel grid type
-    type ParallelGrid: ParallelGrid<C> + Grid;
+    type ParallelGrid: ParallelGrid<C>
+        + Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
     /// The type of the serial space on each process
-    type LocalSpace<'a>: FunctionSpace
+    type LocalSpace<'a>: FunctionSpace<T = Self::T> + Sync
     where
         Self: 'a;
 

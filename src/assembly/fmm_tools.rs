@@ -15,7 +15,7 @@ use rlst::{
 /// Generate an array of all the quadrature points
 pub fn get_all_quadrature_points<
     T: RlstScalar<Real = T> + MatrixInverse,
-    G: Grid<T = T, EntityDescriptor = ReferenceCellType>,
+    G: Grid<T = T, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     npts: usize,
     grid: &G,
@@ -56,7 +56,7 @@ pub fn get_all_quadrature_points<
 pub fn basis_to_quadrature_into_dense<
     const BLOCKSIZE: usize,
     T: RlstScalar + MatrixInverse,
-    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     output: &mut Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
     npts: usize,
@@ -75,7 +75,7 @@ pub fn basis_to_quadrature_into_dense<
 pub fn basis_to_quadrature_into_csr<
     const BLOCKSIZE: usize,
     T: RlstScalar + MatrixInverse,
-    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     npts: usize,
     space: &SerialFunctionSpace<'_, T, G>,
@@ -102,7 +102,7 @@ pub fn basis_to_quadrature_into_csr<
 pub fn transpose_basis_to_quadrature_into_dense<
     const BLOCKSIZE: usize,
     T: RlstScalar + MatrixInverse,
-    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     output: &mut Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
     npts: usize,
@@ -122,7 +122,7 @@ pub fn transpose_basis_to_quadrature_into_dense<
 pub fn transpose_basis_to_quadrature_into_csr<
     const BLOCKSIZE: usize,
     T: RlstScalar + MatrixInverse,
-    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     npts: usize,
     space: &SerialFunctionSpace<'_, T, G>,
@@ -148,7 +148,7 @@ pub fn transpose_basis_to_quadrature_into_csr<
 fn basis_to_quadrature<
     const BLOCKSIZE: usize,
     T: RlstScalar + MatrixInverse,
-    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     shape: [usize; 2],
     npts: usize,

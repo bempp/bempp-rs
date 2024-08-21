@@ -21,7 +21,7 @@ use std::collections::HashMap;
 pub struct LocalFunctionSpace<
     'a,
     T: RlstScalar + MatrixInverse,
-    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 > {
     serial_space: SerialFunctionSpace<'a, T, GridImpl>,
     global_size: usize,
@@ -32,9 +32,10 @@ pub struct LocalFunctionSpace<
 impl<
         'a,
         T: RlstScalar + MatrixInverse,
-        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > FunctionSpace for LocalFunctionSpace<'a, T, GridImpl>
 {
+    type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
 
@@ -100,7 +101,7 @@ impl<
 
         // Create local space on current process
         let (cell_dofs, entity_dofs, dofmap_size, owner_data) =
-            assign_dofs(rank as usize, grid, e_family);
+            assign_dofs(rank as usize, grid.local_grid(), e_family);
 
         let mut elements = HashMap::new();
         for cell in grid.entity_types(grid.topology_dim()) {
@@ -257,6 +258,7 @@ impl<
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
     > FunctionSpace for ParallelFunctionSpace<'a, C, T, GridImpl>
 {
+    type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
 

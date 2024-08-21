@@ -1,6 +1,6 @@
 use bempp::assembly::{boundary, boundary::BoundaryAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::FunctionSpace;
+use bempp::traits::{BoundaryAssembly, FunctionSpace};
 use criterion::{criterion_group, criterion_main, Criterion};
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};

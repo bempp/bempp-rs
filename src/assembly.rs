@@ -2,14 +2,14 @@
 pub mod boundary;
 pub(crate) mod common;
 pub mod fmm_tools;
+pub mod kernels;
 pub mod potential;
 
 #[cfg(test)]
 mod test {
-    use super::boundary::BoundaryAssembler;
     use super::*;
     use crate::function::SerialFunctionSpace;
-    use crate::traits::FunctionSpace;
+    use crate::traits::{BoundaryAssembly, FunctionSpace};
     use cauchy::{c32, c64};
     use ndelement::ciarlet::CiarletElement;
     use ndelement::ciarlet::LagrangeElementFamily;
@@ -121,6 +121,16 @@ mod test {
            //};
     }
     macro_rules! create_assembler {
+        (Laplace, Hypersingular, $dtype:ident) => {
+            paste! {
+                boundary::HypersingularAssembler::<[<$dtype>], _, _>::new_laplace()
+            }
+        };
+        (Helmholtz, Hypersingular, $dtype:ident) => {
+            paste! {
+                boundary::HypersingularAssembler::<[<$dtype>], _, _>::new_helmholtz(3.0)
+            }
+        };
         (Laplace, $operator:ident, $dtype:ident) => {
             paste! {
                 boundary::[<$operator Assembler>]::<[<$dtype>], _>::new_laplace()
