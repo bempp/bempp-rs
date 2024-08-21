@@ -291,7 +291,7 @@ fn assemble_batch_nonadjacent<
     );
 
     for trial_cell in trial_cells {
-        a.set_test_cell(*trial_cell);
+        a.set_trial_cell(*trial_cell);
         let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
         for test_cell in test_cells {
             if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
@@ -380,7 +380,7 @@ fn assemble_batch_singular_correction<
 
     for (test_cell, trial_cell) in cell_pairs {
         a.set_test_cell(*test_cell);
-        a.set_test_cell(*trial_cell);
+        a.set_trial_cell(*trial_cell);
 
         a.assemble(&mut local_mat);
 

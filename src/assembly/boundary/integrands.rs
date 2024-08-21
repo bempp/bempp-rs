@@ -63,7 +63,7 @@ impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>> 
             k,
             test_geometry,
             trial_geometry,
-        ) * self.integrand1.evaluate_nonsingular(
+        ) + self.integrand1.evaluate_nonsingular(
             test_table,
             trial_table,
             test_point_index,
@@ -96,7 +96,7 @@ impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>> 
             k,
             test_geometry,
             trial_geometry,
-        ) * self.integrand1.evaluate_singular(
+        ) + self.integrand1.evaluate_singular(
             test_table,
             trial_table,
             point_index,
