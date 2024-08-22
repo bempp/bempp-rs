@@ -27,13 +27,13 @@ impl<T: RlstScalar> PotentialIntegrand for DoubleLayerPotentialIntegrand<T> {
         k: &RlstArray<T, 3>,
         geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -(*k.get_unchecked([1, basis_index, eval_index])
-            * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([0, basis_index])).unwrap()
-            + *k.get_unchecked([2, basis_index, eval_index])
-                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([1, basis_index]))
+        -(*k.get_unchecked([1, point_index, eval_index])
+            * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([0, point_index])).unwrap()
+            + *k.get_unchecked([2, point_index, eval_index])
+                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([1, point_index]))
                     .unwrap()
-            + *k.get_unchecked([3, basis_index, eval_index])
-                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([2, basis_index]))
+            + *k.get_unchecked([3, point_index, eval_index])
+                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([2, point_index]))
                     .unwrap())
             * *table.get_unchecked([0, point_index, basis_index, 0])
     }

@@ -2,9 +2,7 @@
 use super::CellGeometry;
 use crate::assembly::common::RlstArray;
 use crate::traits::FunctionSpace;
-use ndelement::types::ReferenceCellType;
-use rlst::{CsrMatrix, RlstScalar};
-use std::collections::HashMap;
+use rlst::RlstScalar;
 
 pub trait PotentialIntegrand {
     //! Integrand

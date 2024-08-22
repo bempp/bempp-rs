@@ -11,11 +11,11 @@ use crate::traits::{
 use itertools::izip;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
-use ndgrid::traits::{GeometryMap, Grid};
+use ndgrid::traits::Grid;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, rlst_dynamic_array4, DefaultIterator, MatrixInverse,
-    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape, UnsafeRandomAccessByRef,
+    rlst_dynamic_array2, rlst_dynamic_array4, DefaultIterator, MatrixInverse, RandomAccessMut,
+    RawAccess, RawAccessMut, RlstScalar, Shape,
 };
 use std::collections::HashMap;
 
@@ -202,7 +202,7 @@ impl<
                         assemble_batch(
                             self,
                             self.deriv_size,
-                            &output,
+                            output,
                             *cell_type,
                             space,
                             points,

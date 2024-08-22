@@ -2,20 +2,12 @@
 mod boundary;
 mod potential;
 use crate::assembly::common::RlstArray;
-use crate::traits::FunctionSpace;
-use ndelement::types::ReferenceCellType;
-use rlst::{CsrMatrix, RlstScalar};
-use std::collections::HashMap;
+use rlst::RlstScalar;
 
 #[cfg(feature = "mpi")]
 pub use boundary::ParallelBoundaryAssembly;
 pub use boundary::{BoundaryAssembly, BoundaryIntegrand, CellPairAssembler};
 pub use potential::{CellAssembler, PotentialAssembly, PotentialIntegrand};
-
-#[cfg(feature = "mpi")]
-use crate::traits::ParallelFunctionSpace;
-#[cfg(feature = "mpi")]
-use mpi::traits::Communicator;
 
 pub trait CellGeometry {
     //! Cell geometry

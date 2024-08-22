@@ -27,7 +27,7 @@ impl<T: RlstScalar> PotentialIntegrand for SingleLayerPotentialIntegrand<T> {
         k: &RlstArray<T, 3>,
         _geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        *k.get_unchecked([0, basis_index, eval_index])
+        *k.get_unchecked([0, point_index, eval_index])
             * *table.get_unchecked([0, point_index, basis_index, 0])
     }
 }

@@ -38,6 +38,7 @@ impl<
         K: KernelEvaluator<T = T>,
     > PotentialCellAssembler<'a, T, I, G, K>
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         npts: usize,
         nevalpts: usize,

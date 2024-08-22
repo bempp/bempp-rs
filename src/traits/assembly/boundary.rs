@@ -2,6 +2,10 @@
 use super::CellGeometry;
 use crate::assembly::common::RlstArray;
 use crate::traits::FunctionSpace;
+#[cfg(feature = "mpi")]
+use crate::traits::ParallelFunctionSpace;
+#[cfg(feature = "mpi")]
+use mpi::traits::Communicator;
 use ndelement::types::ReferenceCellType;
 use rlst::{CsrMatrix, RlstScalar};
 use std::collections::HashMap;
