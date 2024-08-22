@@ -1,7 +1,7 @@
 use approx::*;
-use bempp::assembly::{boundary::BoundaryAssembler, potential, potential::PotentialAssembler};
+use bempp::assembly::{boundary::BoundaryAssembler, potential::PotentialAssembler};
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::{BoundaryAssembly, FunctionSpace};
+use bempp::traits::{BoundaryAssembly, FunctionSpace, PotentialAssembly};
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
@@ -237,7 +237,7 @@ fn test_laplace_single_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = potential::SingleLayerPotentialAssembler::<f64, _>::new_laplace();
+    let a = PotentialAssembler::<f64, _, _>::new_laplace_single_layer();
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
@@ -265,7 +265,7 @@ fn test_helmholtz_single_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = potential::SingleLayerPotentialAssembler::<c64, _>::new_helmholtz(3.0);
+    let a = PotentialAssembler::<c64, _, _>::new_helmholtz_single_layer(3.0);
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
@@ -293,12 +293,19 @@ fn test_laplace_double_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = potential::DoubleLayerPotentialAssembler::<f64, _>::new_laplace();
+    let a = PotentialAssembler::<f64, _, _>::new_laplace_double_layer();
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
     let from_cl = [[0.0088687364674846, 0.008868736467484609, 0.008868736467484612], [-0.008860928325637398, 0.008868736467484602, 0.008868736467484612], [-0.0088609283256374, -0.008860928325637398, 0.008868736467484612], [0.008868736467484609, -0.008860928325637398, 0.008868736467484612], [0.0088687364674846, 0.008868736467484612, -0.008860928325637398], [-0.008860928325637396, 0.0088687364674846, -0.008860928325637398], [-0.0088609283256374, -0.008860928325637398, -0.008860928325637398], [0.008868736467484612, -0.0088609283256374, -0.008860928325637398]];
+    for (i, row) in from_cl.iter().enumerate() {
+        for (j, entry) in row.iter().enumerate() {
+            println!("{} {}", matrix.get([j, i]).unwrap(), entry);
+        }
+        println!();
+    }
+
     for (i, row) in from_cl.iter().enumerate() {
         for (j, entry) in row.iter().enumerate() {
             assert_relative_eq!(*matrix.get([j, i]).unwrap(), entry, epsilon = 1e-3);
@@ -321,7 +328,7 @@ fn test_helmholtz_double_layer_potential_dp0() {
     *points.get_mut([1, 1]).unwrap() = 2.0;
     *points.get_mut([2, 2]).unwrap() = 2.0;
 
-    let a = potential::DoubleLayerPotentialAssembler::<c64, _>::new_helmholtz(3.0);
+    let a = PotentialAssembler::<c64, _, _>::new_helmholtz_double_layer(3.0);
     a.assemble_into_dense(&mut matrix, &space, &points);
 
     // Compare to result from bempp-cl
