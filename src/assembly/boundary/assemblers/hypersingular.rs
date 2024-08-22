@@ -1,5 +1,5 @@
 //! Hypersingular assemblers
-use super::{BoundaryAssembler, BoundaryAssemblerOptions};
+use super::BoundaryAssembler;
 use crate::assembly::{
     boundary::integrands::{
         BoundaryIntegrandSum, HypersingularCurlCurlBoundaryIntegrand,
@@ -18,73 +18,40 @@ type HelmholtzIntegrand<T> = BoundaryIntegrandSum<
     HypersingularNormalNormalBoundaryIntegrand<T>,
 >;
 
-/// Assembler for a hypersingular operator
-pub struct HypersingularAssembler<
-    T: RlstScalar + MatrixInverse,
-    K: Kernel<T = T>,
-    I: BoundaryIntegrand<T = T> + Sync,
-> {
-    kernel: KernelEvaluator<T, K>,
-    integrand: I,
-    options: BoundaryAssemblerOptions,
-}
-
-impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>, I: BoundaryIntegrand<T = T> + Sync>
-    HypersingularAssembler<T, K, I>
+impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>, I: BoundaryIntegrand<T = T>>
+    BoundaryAssembler<T, I, KernelEvaluator<T, K>>
 {
-    /// Create a new hypersingular assembler
-    pub fn new(kernel: KernelEvaluator<T, K>, integrand: I) -> Self {
-        Self {
-            kernel,
-            integrand,
-            options: BoundaryAssemblerOptions::default(),
-        }
+    /// Create a new adjoint double layer assembler
+    pub fn new_hypersingular(integrand: I, kernel: KernelEvaluator<T, K>) -> Self {
+        Self::new(integrand, kernel, 4, 1)
     }
 }
 impl<T: RlstScalar + MatrixInverse>
-    HypersingularAssembler<T, Laplace3dKernel<T>, HypersingularCurlCurlBoundaryIntegrand<T>>
+    BoundaryAssembler<
+        T,
+        HypersingularCurlCurlBoundaryIntegrand<T>,
+        KernelEvaluator<T, Laplace3dKernel<T>>,
+    >
 {
-    /// Create a new Laplace hypersingular assembler
-    pub fn new_laplace() -> Self {
-        Self::new(
-            KernelEvaluator::new_laplace(GreenKernelEvalType::ValueDeriv),
+    /// Create a new Laplace adjoint double layer assembler
+    pub fn new_laplace_hypersingular() -> Self {
+        Self::new_hypersingular(
             HypersingularCurlCurlBoundaryIntegrand::new(),
+            KernelEvaluator::new_laplace(GreenKernelEvalType::ValueDeriv),
         )
     }
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse>
-    HypersingularAssembler<T, Helmholtz3dKernel<T>, HelmholtzIntegrand<T>>
+    BoundaryAssembler<T, HelmholtzIntegrand<T>, KernelEvaluator<T, Helmholtz3dKernel<T>>>
 {
-    /// Create a new Helmholtz hypersingular assembler
-    pub fn new_helmholtz(wavenumber: T::Real) -> Self {
-        Self::new(
-            KernelEvaluator::new_helmholtz(wavenumber, GreenKernelEvalType::ValueDeriv),
+    /// Create a new Helmholtz adjoint double layer assembler
+    pub fn new_helmholtz_hypersingular(wavenumber: T::Real) -> Self {
+        Self::new_hypersingular(
             BoundaryIntegrandSum::new(
                 HypersingularCurlCurlBoundaryIntegrand::new(),
                 HypersingularNormalNormalBoundaryIntegrand::new(wavenumber),
             ),
+            KernelEvaluator::new_helmholtz(wavenumber, GreenKernelEvalType::ValueDeriv),
         )
-    }
-}
-
-impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>, I: BoundaryIntegrand<T = T> + Sync>
-    BoundaryAssembler for HypersingularAssembler<T, K, I>
-{
-    const DERIV_SIZE: usize = 4;
-    const TABLE_DERIVS: usize = 1;
-    type T = T;
-    type Integrand = I;
-    type Kernel = KernelEvaluator<T, K>;
-    fn integrand(&self) -> &I {
-        &self.integrand
-    }
-    fn kernel(&self) -> &KernelEvaluator<T, K> {
-        &self.kernel
-    }
-    fn options(&self) -> &BoundaryAssemblerOptions {
-        &self.options
-    }
-    fn options_mut(&mut self) -> &mut BoundaryAssemblerOptions {
-        &mut self.options
     }
 }
