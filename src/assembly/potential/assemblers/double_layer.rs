@@ -20,7 +20,9 @@ impl<T: RlstScalar + MatrixInverse>
 {
     /// Create a new Laplace Double layer assembler
     pub fn new_laplace_double_layer() -> Self {
-        Self::new_double_layer(KernelEvaluator::new_laplace(GreenKernelEvalType::ValueDeriv))
+        Self::new_double_layer(KernelEvaluator::new_laplace(
+            GreenKernelEvalType::ValueDeriv,
+        ))
     }
 }
 impl<T: RlstScalar<Complex = T> + MatrixInverse>
