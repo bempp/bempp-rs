@@ -108,3 +108,71 @@ impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>> 
         )
     }
 }
+
+/// An integrand multiplied by a scalar
+pub struct BoundaryIntegrandScalarProduct<T: RlstScalar, I: BoundaryIntegrand<T = T>> {
+    scalar: T,
+    integrand: I,
+}
+
+impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrandScalarProduct<T, I> {
+    pub fn new(scalar: T, integrand: I) -> Self {
+        Self { scalar, integrand }
+    }
+}
+
+impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
+    for BoundaryIntegrandScalarProduct<T, I>
+{
+    type T = T;
+
+    unsafe fn evaluate_nonsingular(
+        &self,
+        test_table: &RlstArray<T, 4>,
+        trial_table: &RlstArray<T, 4>,
+        test_point_index: usize,
+        trial_point_index: usize,
+        test_basis_index: usize,
+        trial_basis_index: usize,
+        k: &RlstArray<T, 3>,
+        test_geometry: &impl CellGeometry<T = T::Real>,
+        trial_geometry: &impl CellGeometry<T = T::Real>,
+    ) -> T {
+        self.scalar
+            * self.integrand.evaluate_nonsingular(
+                test_table,
+                trial_table,
+                test_point_index,
+                trial_point_index,
+                test_basis_index,
+                trial_basis_index,
+                k,
+                test_geometry,
+                trial_geometry,
+            )
+    }
+
+    unsafe fn evaluate_singular(
+        &self,
+        test_table: &RlstArray<T, 4>,
+        trial_table: &RlstArray<T, 4>,
+        point_index: usize,
+        test_basis_index: usize,
+        trial_basis_index: usize,
+        k: &RlstArray<Self::T, 2>,
+        test_geometry: &impl CellGeometry<T = T::Real>,
+        trial_geometry: &impl CellGeometry<T = T::Real>,
+    ) -> T {
+        self.scalar
+            * self.integrand.evaluate_singular(
+                test_table,
+                trial_table,
+                point_index,
+                test_basis_index,
+                trial_basis_index,
+                k,
+                test_geometry,
+                trial_geometry,
+            )
+    }
+}

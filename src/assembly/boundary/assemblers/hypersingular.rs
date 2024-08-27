@@ -2,8 +2,8 @@
 use super::BoundaryAssembler;
 use crate::assembly::{
     boundary::integrands::{
-        BoundaryIntegrandSum, HypersingularCurlCurlBoundaryIntegrand,
-        HypersingularNormalNormalBoundaryIntegrand,
+        BoundaryIntegrandScalarProduct, BoundaryIntegrandSum,
+        HypersingularCurlCurlBoundaryIntegrand, HypersingularNormalNormalBoundaryIntegrand,
     },
     common::GreenKernelEvalType,
     kernels::KernelEvaluator,
@@ -15,7 +15,7 @@ use rlst::{MatrixInverse, RlstScalar};
 type HelmholtzIntegrand<T> = BoundaryIntegrandSum<
     T,
     HypersingularCurlCurlBoundaryIntegrand<T>,
-    HypersingularNormalNormalBoundaryIntegrand<T>,
+    BoundaryIntegrandScalarProduct<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
 >;
 
 impl<T: RlstScalar + MatrixInverse, K: Kernel<T = T>, I: BoundaryIntegrand<T = T>>
@@ -49,7 +49,10 @@ impl<T: RlstScalar<Complex = T> + MatrixInverse>
         Self::new_hypersingular(
             BoundaryIntegrandSum::new(
                 HypersingularCurlCurlBoundaryIntegrand::new(),
-                HypersingularNormalNormalBoundaryIntegrand::new(wavenumber),
+                BoundaryIntegrandScalarProduct::new(
+                    num::cast::<T::Real, T>(-wavenumber.powi(2)).unwrap(),
+                    HypersingularNormalNormalBoundaryIntegrand::new(),
+                ),
             ),
             KernelEvaluator::new_helmholtz(wavenumber, GreenKernelEvalType::ValueDeriv),
         )
