@@ -142,6 +142,12 @@ impl<T: RlstScalar> HypersingularNormalNormalBoundaryIntegrand<T> {
     }
 }
 
+impl<T: RlstScalar> Default for HypersingularNormalNormalBoundaryIntegrand<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryIntegrand<T> {
     type T = T;
 
