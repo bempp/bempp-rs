@@ -157,7 +157,7 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryInteg
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -*k.get_unchecked([0, test_point_index, trial_point_index])
+        *k.get_unchecked([0, test_point_index, trial_point_index])
             * num::cast::<T::Real, T>(
                 *trial_geometry
                     .normals()
@@ -188,7 +188,7 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryInteg
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -*k.get_unchecked([0, point_index])
+        *k.get_unchecked([0, point_index])
             * num::cast::<T::Real, T>(
                 *trial_geometry.normals().get_unchecked([0, point_index])
                     * *test_geometry.normals().get_unchecked([0, point_index])
