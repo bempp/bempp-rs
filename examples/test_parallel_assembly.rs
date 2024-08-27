@@ -12,6 +12,7 @@ use bempp::{
 use itertools::izip;
 #[cfg(feature = "mpi")]
 use mpi::{
+    collective::CommunicatorCollectives,
     environment::Universe,
     request::WaitGuard,
     traits::{Communicator, Destination, Source},
@@ -240,12 +241,14 @@ fn main() {
             println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
         }
         test_parallel_assembly_single_element_grid(&world, degree, Continuity::Discontinuous);
+        world.barrier();
     }
     for degree in 1..4 {
         if rank == 0 {
             println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
         }
         test_parallel_assembly_single_element_grid(&world, degree, Continuity::Standard);
+        world.barrier();
     }
 }
 #[cfg(not(feature = "mpi"))]
