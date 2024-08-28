@@ -135,16 +135,20 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIn
 }
 
 pub struct HypersingularNormalNormalBoundaryIntegrand<T: RlstScalar> {
-    wavenumber: T::Real,
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> HypersingularNormalNormalBoundaryIntegrand<T> {
-    pub fn new(wavenumber: T::Real) -> Self {
+    pub fn new() -> Self {
         Self {
-            wavenumber,
             _t: std::marker::PhantomData,
         }
+    }
+}
+
+impl<T: RlstScalar> Default for HypersingularNormalNormalBoundaryIntegrand<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
