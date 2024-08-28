@@ -503,7 +503,7 @@ impl<
     }
 }
 
-/// Assembler for the contributions from pairs of non-neighbouring cells with trial geometry caching
+/// Assembler for the contributions from pairs of non-neighbouring cells with test geometry caching
 pub struct NonsingularCellPairAssemblerWithTestCaching<
     'a,
     T: RlstScalar,
