@@ -4,7 +4,10 @@ pub mod double_layer;
 pub mod hypersingular;
 pub mod single_layer;
 
-use super::cell_pair_assemblers::{NonsingularCellPairAssembler, SingularCellPairAssembler};
+use super::cell_pair_assemblers::{
+    NonsingularCellPairAssembler, NonsingularCellPairAssemblerWithTestCaching,
+    SingularCellPairAssembler,
+};
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
@@ -264,10 +267,11 @@ fn assemble_batch_nonadjacent<
     let test_evaluator = test_grid.geometry_map(test_cell_type, test_points.data());
     let trial_evaluator = trial_grid.geometry_map(trial_cell_type, trial_points.data());
 
-    let mut a = NonsingularCellPairAssembler::new(
+    let mut a = NonsingularCellPairAssemblerWithTestCaching::new(
         npts_test,
         npts_trial,
         deriv_size,
+        test_cells,
         &assembler.integrand,
         &assembler.kernel,
         test_evaluator,
