@@ -168,7 +168,7 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
         unsafe {
-            -*k.get_unchecked([0, test_point_index, trial_point_index])
+            *k.get_unchecked([0, test_point_index, trial_point_index])
                 * num::cast::<T::Real, T>(
                     *trial_geometry
                         .normals()
@@ -201,7 +201,7 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
         unsafe {
-            -*k.get_unchecked([0, point_index])
+            *k.get_unchecked([0, point_index])
                 * num::cast::<T::Real, T>(
                     *trial_geometry.normals().get_unchecked([0, point_index])
                         * *test_geometry.normals().get_unchecked([0, point_index])
