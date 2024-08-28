@@ -138,20 +138,18 @@ unsafe impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        unsafe {
-            self.scalar
-                * self.integrand.evaluate_nonsingular(
-                    test_table,
-                    trial_table,
-                    test_point_index,
-                    trial_point_index,
-                    test_basis_index,
-                    trial_basis_index,
-                    k,
-                    test_geometry,
-                    trial_geometry,
-                )
-        }
+        self.scalar
+            * self.integrand.evaluate_nonsingular(
+                test_table,
+                trial_table,
+                test_point_index,
+                trial_point_index,
+                test_basis_index,
+                trial_basis_index,
+                k,
+                test_geometry,
+                trial_geometry,
+            )
     }
 
     fn evaluate_singular(
@@ -165,18 +163,16 @@ unsafe impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        unsafe {
-            self.scalar
-                * self.integrand.evaluate_singular(
-                    test_table,
-                    trial_table,
-                    point_index,
-                    test_basis_index,
-                    trial_basis_index,
-                    k,
-                    test_geometry,
-                    trial_geometry,
-                )
-        }
+        self.scalar
+            * self.integrand.evaluate_singular(
+                test_table,
+                trial_table,
+                point_index,
+                test_basis_index,
+                trial_basis_index,
+                k,
+                test_geometry,
+                trial_geometry,
+            )
     }
 }
