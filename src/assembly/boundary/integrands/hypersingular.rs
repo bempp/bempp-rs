@@ -131,16 +131,20 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIntegrand
 }
 
 pub struct HypersingularNormalNormalBoundaryIntegrand<T: RlstScalar> {
-    wavenumber: T::Real,
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> HypersingularNormalNormalBoundaryIntegrand<T> {
-    pub fn new(wavenumber: T::Real) -> Self {
+    pub fn new() -> Self {
         Self {
-            wavenumber,
             _t: std::marker::PhantomData,
         }
+    }
+}
+
+impl<T: RlstScalar> Default for HypersingularNormalNormalBoundaryIntegrand<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -159,21 +163,20 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryInteg
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -*k.get_unchecked([0, test_point_index, trial_point_index])
+        *k.get_unchecked([0, test_point_index, trial_point_index])
             * num::cast::<T::Real, T>(
-                self.wavenumber.powi(2)
-                    * (*trial_geometry
+                *trial_geometry
+                    .normals()
+                    .get_unchecked([0, trial_point_index])
+                    * *test_geometry.normals().get_unchecked([0, test_point_index])
+                    + *trial_geometry
                         .normals()
-                        .get_unchecked([0, trial_point_index])
-                        * *test_geometry.normals().get_unchecked([0, test_point_index])
-                        + *trial_geometry
-                            .normals()
-                            .get_unchecked([1, trial_point_index])
-                            * *test_geometry.normals().get_unchecked([1, test_point_index])
-                        + *trial_geometry
-                            .normals()
-                            .get_unchecked([2, trial_point_index])
-                            * *test_geometry.normals().get_unchecked([2, test_point_index])),
+                        .get_unchecked([1, trial_point_index])
+                        * *test_geometry.normals().get_unchecked([1, test_point_index])
+                    + *trial_geometry
+                        .normals()
+                        .get_unchecked([2, trial_point_index])
+                        * *test_geometry.normals().get_unchecked([2, test_point_index]),
             )
             .unwrap()
             * *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
@@ -191,15 +194,14 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryInteg
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -*k.get_unchecked([0, point_index])
+        *k.get_unchecked([0, point_index])
             * num::cast::<T::Real, T>(
-                self.wavenumber.powi(2)
-                    * (*trial_geometry.normals().get_unchecked([0, point_index])
-                        * *test_geometry.normals().get_unchecked([0, point_index])
-                        + *trial_geometry.normals().get_unchecked([1, point_index])
-                            * *test_geometry.normals().get_unchecked([1, point_index])
-                        + *trial_geometry.normals().get_unchecked([2, point_index])
-                            * *test_geometry.normals().get_unchecked([2, point_index])),
+                *trial_geometry.normals().get_unchecked([0, point_index])
+                    * *test_geometry.normals().get_unchecked([0, point_index])
+                    + *trial_geometry.normals().get_unchecked([1, point_index])
+                        * *test_geometry.normals().get_unchecked([1, point_index])
+                    + *trial_geometry.normals().get_unchecked([2, point_index])
+                        * *test_geometry.normals().get_unchecked([2, point_index]),
             )
             .unwrap()
             * *test_table.get_unchecked([0, point_index, test_basis_index, 0])
