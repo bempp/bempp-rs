@@ -146,10 +146,9 @@ impl<
                         &self.k,
                         &test_geometry,
                         &trial_geometry,
-                    ) * num::cast::<T::Real, T>(unsafe {
-                        *wt * *self.test_jdet.get_unchecked(index)
-                            * *self.trial_jdet.get_unchecked(index)
-                    })
+                    ) * num::cast::<T::Real, T>(
+                        *wt * self.test_jdet[index] * self.trial_jdet[index],
+                    )
                     .unwrap();
                 }
             }
@@ -290,24 +289,23 @@ impl<
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
+                    let test_integrand =
+                        num::cast::<T::Real, T>(*test_wt * self.test_jdet[test_index]).unwrap();
                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
-                        *entry += self.integrand.evaluate_nonsingular(
-                            self.test_table,
-                            self.trial_table,
-                            test_index,
-                            trial_index,
-                            test_i,
-                            trial_i,
-                            &self.k,
-                            &test_geometry,
-                            &trial_geometry,
-                        ) * num::cast::<T::Real, T>(
-                            *test_wt
-                                * self.test_jdet[test_index]
-                                * *trial_wt
-                                * self.trial_jdet[trial_index],
-                        )
-                        .unwrap();
+                        *entry +=
+                            self.integrand.evaluate_nonsingular(
+                                self.test_table,
+                                self.trial_table,
+                                test_index,
+                                trial_index,
+                                test_i,
+                                trial_i,
+                                &self.k,
+                                &test_geometry,
+                                &trial_geometry,
+                            ) * num::cast::<T::Real, T>(*trial_wt * self.trial_jdet[trial_index])
+                                .unwrap()
+                                * test_integrand;
                     }
                 }
             }
@@ -470,26 +468,24 @@ impl<
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
+                    let test_integrand =
+                        num::cast::<T::Real, T>(*test_wt * self.test_jdet[test_index]).unwrap();
                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
-                        *entry += unsafe {
-                            self.integrand.evaluate_nonsingular(
-                                self.test_table,
-                                self.trial_table,
-                                test_index,
-                                trial_index,
-                                test_i,
-                                trial_i,
-                                &self.k,
-                                &test_geometry,
-                                &trial_geometry,
-                            ) * num::cast::<T::Real, T>(
-                                *test_wt
-                                    * self.test_jdet[test_index]
-                                    * *trial_wt
-                                    * self.trial_jdet[self.trial_cell][trial_index],
-                            )
-                            .unwrap()
-                        };
+                        *entry += self.integrand.evaluate_nonsingular(
+                            self.test_table,
+                            self.trial_table,
+                            test_index,
+                            trial_index,
+                            test_i,
+                            trial_i,
+                            &self.k,
+                            &test_geometry,
+                            &trial_geometry,
+                        ) * num::cast::<T::Real, T>(
+                            *trial_wt * self.trial_jdet[self.trial_cell][trial_index],
+                        )
+                        .unwrap()
+                            * test_integrand;
                     }
                 }
             }
@@ -650,8 +646,12 @@ impl<
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
+                    let test_integrand = num::cast::<T::Real, T>(
+                        *test_wt * self.test_jdet[self.test_cell][test_index],
+                    )
+                    .unwrap();
                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
-                        *entry += unsafe {
+                        *entry +=
                             self.integrand.evaluate_nonsingular(
                                 self.test_table,
                                 self.trial_table,
@@ -662,14 +662,9 @@ impl<
                                 &self.k,
                                 &test_geometry,
                                 &trial_geometry,
-                            ) * num::cast::<T::Real, T>(
-                                *test_wt
-                                    * self.test_jdet[self.test_cell][test_index]
-                                    * *trial_wt
-                                    * self.trial_jdet[trial_index],
-                            )
-                            .unwrap()
-                        };
+                            ) * num::cast::<T::Real, T>(*trial_wt * self.trial_jdet[trial_index])
+                                .unwrap()
+                                * test_integrand;
                     }
                 }
             }

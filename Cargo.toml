@@ -25,7 +25,8 @@ mpi = { version = "0.8.*", optional = true }
 num = "0.4"
 lazy_static = "1.4"
 ndelement = "0.1.0"
-ndgrid = "0.1.0"
+# ndgrid = "0.1.0"
+ndgrid = { git = "https://github.com/bempp/ndgrid.git" }
 rayon = "1.9"
 rlst = "0.2"
 green-kernels = "0.2.0"
