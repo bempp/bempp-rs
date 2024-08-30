@@ -75,10 +75,10 @@ impl<T: RlstScalar> Default for HypersingularCurlCurlBoundaryIntegrand<T> {
     }
 }
 
-impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIntegrand<T> {
+unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIntegrand<T> {
     type T = T;
 
-    unsafe fn evaluate_nonsingular(
+    fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -90,21 +90,23 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIntegrand
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        hyp_test_trial_product(
-            test_table,
-            trial_table,
-            test_geometry.jacobians(),
-            trial_geometry.jacobians(),
-            test_geometry.jdets(),
-            trial_geometry.jdets(),
-            test_point_index,
-            trial_point_index,
-            test_basis_index,
-            trial_basis_index,
-        ) * *k.get_unchecked([0, test_point_index, trial_point_index])
+        unsafe {
+            hyp_test_trial_product(
+                test_table,
+                trial_table,
+                test_geometry.jacobians(),
+                trial_geometry.jacobians(),
+                test_geometry.jdets(),
+                trial_geometry.jdets(),
+                test_point_index,
+                trial_point_index,
+                test_basis_index,
+                trial_basis_index,
+            ) * *k.get_unchecked([0, test_point_index, trial_point_index])
+        }
     }
 
-    unsafe fn evaluate_singular(
+    fn evaluate_singular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -115,18 +117,20 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIntegrand
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        hyp_test_trial_product(
-            test_table,
-            trial_table,
-            test_geometry.jacobians(),
-            trial_geometry.jacobians(),
-            test_geometry.jdets(),
-            trial_geometry.jdets(),
-            point_index,
-            point_index,
-            test_basis_index,
-            trial_basis_index,
-        ) * *k.get_unchecked([0, point_index])
+        unsafe {
+            hyp_test_trial_product(
+                test_table,
+                trial_table,
+                test_geometry.jacobians(),
+                trial_geometry.jacobians(),
+                test_geometry.jdets(),
+                trial_geometry.jdets(),
+                point_index,
+                point_index,
+                test_basis_index,
+                trial_basis_index,
+            ) * *k.get_unchecked([0, point_index])
+        }
     }
 }
 
@@ -148,10 +152,10 @@ impl<T: RlstScalar> Default for HypersingularNormalNormalBoundaryIntegrand<T> {
     }
 }
 
-impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryIntegrand<T> {
+unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryIntegrand<T> {
     type T = T;
 
-    unsafe fn evaluate_nonsingular(
+    fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -163,27 +167,29 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryInteg
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        *k.get_unchecked([0, test_point_index, trial_point_index])
-            * num::cast::<T::Real, T>(
-                *trial_geometry
-                    .normals()
-                    .get_unchecked([0, trial_point_index])
-                    * *test_geometry.normals().get_unchecked([0, test_point_index])
-                    + *trial_geometry
+        unsafe {
+            *k.get_unchecked([0, test_point_index, trial_point_index])
+                * num::cast::<T::Real, T>(
+                    *trial_geometry
                         .normals()
-                        .get_unchecked([1, trial_point_index])
-                        * *test_geometry.normals().get_unchecked([1, test_point_index])
-                    + *trial_geometry
-                        .normals()
-                        .get_unchecked([2, trial_point_index])
-                        * *test_geometry.normals().get_unchecked([2, test_point_index]),
-            )
-            .unwrap()
-            * *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
-            * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
+                        .get_unchecked([0, trial_point_index])
+                        * *test_geometry.normals().get_unchecked([0, test_point_index])
+                        + *trial_geometry
+                            .normals()
+                            .get_unchecked([1, trial_point_index])
+                            * *test_geometry.normals().get_unchecked([1, test_point_index])
+                        + *trial_geometry
+                            .normals()
+                            .get_unchecked([2, trial_point_index])
+                            * *test_geometry.normals().get_unchecked([2, test_point_index]),
+                )
+                .unwrap()
+                * *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
+                * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
+        }
     }
 
-    unsafe fn evaluate_singular(
+    fn evaluate_singular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -194,17 +200,19 @@ impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBoundaryInteg
         test_geometry: &impl CellGeometry<T = T::Real>,
         trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        *k.get_unchecked([0, point_index])
-            * num::cast::<T::Real, T>(
-                *trial_geometry.normals().get_unchecked([0, point_index])
-                    * *test_geometry.normals().get_unchecked([0, point_index])
-                    + *trial_geometry.normals().get_unchecked([1, point_index])
-                        * *test_geometry.normals().get_unchecked([1, point_index])
-                    + *trial_geometry.normals().get_unchecked([2, point_index])
-                        * *test_geometry.normals().get_unchecked([2, point_index]),
-            )
-            .unwrap()
-            * *test_table.get_unchecked([0, point_index, test_basis_index, 0])
-            * *trial_table.get_unchecked([0, point_index, trial_basis_index, 0])
+        unsafe {
+            *k.get_unchecked([0, point_index])
+                * num::cast::<T::Real, T>(
+                    *trial_geometry.normals().get_unchecked([0, point_index])
+                        * *test_geometry.normals().get_unchecked([0, point_index])
+                        + *trial_geometry.normals().get_unchecked([1, point_index])
+                            * *test_geometry.normals().get_unchecked([1, point_index])
+                        + *trial_geometry.normals().get_unchecked([2, point_index])
+                            * *test_geometry.normals().get_unchecked([2, point_index]),
+                )
+                .unwrap()
+                * *test_table.get_unchecked([0, point_index, test_basis_index, 0])
+                * *trial_table.get_unchecked([0, point_index, trial_basis_index, 0])
+        }
     }
 }

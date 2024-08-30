@@ -15,10 +15,10 @@ impl<T: RlstScalar> SingleLayerPotentialIntegrand<T> {
     }
 }
 
-impl<T: RlstScalar> PotentialIntegrand for SingleLayerPotentialIntegrand<T> {
+unsafe impl<T: RlstScalar> PotentialIntegrand for SingleLayerPotentialIntegrand<T> {
     type T = T;
 
-    unsafe fn evaluate(
+    fn evaluate(
         &self,
         table: &RlstArray<T, 4>,
         point_index: usize,
@@ -27,8 +27,10 @@ impl<T: RlstScalar> PotentialIntegrand for SingleLayerPotentialIntegrand<T> {
         k: &RlstArray<T, 3>,
         _geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        *k.get_unchecked([0, point_index, eval_index])
-            * *table.get_unchecked([0, point_index, basis_index, 0])
+        unsafe {
+            *k.get_unchecked([0, point_index, eval_index])
+                * *table.get_unchecked([0, point_index, basis_index, 0])
+        }
     }
 }
 

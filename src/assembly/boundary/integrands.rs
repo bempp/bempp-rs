@@ -36,12 +36,12 @@ impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>>
     }
 }
 
-impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>> BoundaryIntegrand
-    for BoundaryIntegrandSum<T, I0, I1>
+unsafe impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>>
+    BoundaryIntegrand for BoundaryIntegrandSum<T, I0, I1>
 {
     type T = T;
 
-    unsafe fn evaluate_nonsingular(
+    fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -76,7 +76,7 @@ impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>> 
         )
     }
 
-    unsafe fn evaluate_singular(
+    fn evaluate_singular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -121,12 +121,12 @@ impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrandScalarProduct<
     }
 }
 
-impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
+unsafe impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
     for BoundaryIntegrandScalarProduct<T, I>
 {
     type T = T;
 
-    unsafe fn evaluate_nonsingular(
+    fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -152,7 +152,7 @@ impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
             )
     }
 
-    unsafe fn evaluate_singular(
+    fn evaluate_singular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,

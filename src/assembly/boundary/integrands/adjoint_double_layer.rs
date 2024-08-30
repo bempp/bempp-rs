@@ -15,10 +15,10 @@ impl<T: RlstScalar> AdjointDoubleLayerBoundaryIntegrand<T> {
     }
 }
 
-impl<T: RlstScalar> BoundaryIntegrand for AdjointDoubleLayerBoundaryIntegrand<T> {
+unsafe impl<T: RlstScalar> BoundaryIntegrand for AdjointDoubleLayerBoundaryIntegrand<T> {
     type T = T;
 
-    unsafe fn evaluate_nonsingular(
+    fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -30,26 +30,28 @@ impl<T: RlstScalar> BoundaryIntegrand for AdjointDoubleLayerBoundaryIntegrand<T>
         test_geometry: &impl CellGeometry<T = T::Real>,
         _trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -(*k.get_unchecked([1, test_point_index, trial_point_index])
-            * num::cast::<T::Real, T>(
-                *test_geometry.normals().get_unchecked([0, test_point_index]),
-            )
-            .unwrap()
-            + *k.get_unchecked([2, test_point_index, trial_point_index])
+        unsafe {
+            -(*k.get_unchecked([1, test_point_index, trial_point_index])
                 * num::cast::<T::Real, T>(
-                    *test_geometry.normals().get_unchecked([1, test_point_index]),
+                    *test_geometry.normals().get_unchecked([0, test_point_index]),
                 )
                 .unwrap()
-            + *k.get_unchecked([3, test_point_index, trial_point_index])
-                * num::cast::<T::Real, T>(
-                    *test_geometry.normals().get_unchecked([2, test_point_index]),
-                )
-                .unwrap())
-            * *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
-            * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
+                + *k.get_unchecked([2, test_point_index, trial_point_index])
+                    * num::cast::<T::Real, T>(
+                        *test_geometry.normals().get_unchecked([1, test_point_index]),
+                    )
+                    .unwrap()
+                + *k.get_unchecked([3, test_point_index, trial_point_index])
+                    * num::cast::<T::Real, T>(
+                        *test_geometry.normals().get_unchecked([2, test_point_index]),
+                    )
+                    .unwrap())
+                * *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
+                * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
+        }
     }
 
-    unsafe fn evaluate_singular(
+    fn evaluate_singular(
         &self,
         test_table: &RlstArray<T, 4>,
         trial_table: &RlstArray<T, 4>,
@@ -60,17 +62,23 @@ impl<T: RlstScalar> BoundaryIntegrand for AdjointDoubleLayerBoundaryIntegrand<T>
         test_geometry: &impl CellGeometry<T = T::Real>,
         _trial_geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -(*k.get_unchecked([1, point_index])
-            * num::cast::<T::Real, T>(*test_geometry.normals().get_unchecked([0, point_index]))
-                .unwrap()
-            + *k.get_unchecked([2, point_index])
-                * num::cast::<T::Real, T>(*test_geometry.normals().get_unchecked([1, point_index]))
+        unsafe {
+            -(*k.get_unchecked([1, point_index])
+                * num::cast::<T::Real, T>(*test_geometry.normals().get_unchecked([0, point_index]))
                     .unwrap()
-            + *k.get_unchecked([3, point_index])
-                * num::cast::<T::Real, T>(*test_geometry.normals().get_unchecked([2, point_index]))
+                + *k.get_unchecked([2, point_index])
+                    * num::cast::<T::Real, T>(
+                        *test_geometry.normals().get_unchecked([1, point_index]),
+                    )
+                    .unwrap()
+                + *k.get_unchecked([3, point_index])
+                    * num::cast::<T::Real, T>(
+                        *test_geometry.normals().get_unchecked([2, point_index]),
+                    )
                     .unwrap())
-            * *test_table.get_unchecked([0, point_index, test_basis_index, 0])
-            * *trial_table.get_unchecked([0, point_index, trial_basis_index, 0])
+                * *test_table.get_unchecked([0, point_index, test_basis_index, 0])
+                * *trial_table.get_unchecked([0, point_index, trial_basis_index, 0])
+        }
     }
 }
 

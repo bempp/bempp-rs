@@ -10,17 +10,18 @@ use ndelement::types::ReferenceCellType;
 use rlst::{CsrMatrix, RlstScalar};
 use std::collections::HashMap;
 
-pub trait BoundaryIntegrand {
+pub unsafe trait BoundaryIntegrand {
     //! Integrand
+    //!
+    //! # Safety
+    //! This trait's methods use unsafe access
+
     /// Scalar type
     type T: RlstScalar;
 
     #[allow(clippy::too_many_arguments)]
     /// Evaluate integrand for a singular quadrature rule
-    ///
-    /// # Safety
-    /// This method is unsafe to allow `get_unchecked` to be used
-    unsafe fn evaluate_nonsingular(
+    fn evaluate_nonsingular(
         &self,
         test_table: &RlstArray<Self::T, 4>,
         trial_table: &RlstArray<Self::T, 4>,
@@ -35,10 +36,7 @@ pub trait BoundaryIntegrand {
 
     #[allow(clippy::too_many_arguments)]
     /// Evaluate integrand for a non-singular quadrature rule
-    ///
-    /// # Safety
-    /// This method is unsafe to allow `get_unchecked` to be used
-    unsafe fn evaluate_singular(
+    fn evaluate_singular(
         &self,
         test_table: &RlstArray<Self::T, 4>,
         trial_table: &RlstArray<Self::T, 4>,
