@@ -83,7 +83,7 @@ impl<
         self.size
     }
     unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
-        &self.cell_dofs.get_unchecked(cell)
+        self.cell_dofs.get_unchecked(cell)
     }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         if cell < self.cell_dofs.len() {
