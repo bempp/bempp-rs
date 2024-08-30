@@ -4,16 +4,17 @@ use crate::assembly::common::RlstArray;
 use crate::traits::FunctionSpace;
 use rlst::RlstScalar;
 
-pub trait PotentialIntegrand {
+pub unsafe trait PotentialIntegrand {
     //! Integrand
+    //!
+    //! # Safety
+    //! This trait's methods use unsafe access
+
     /// Scalar type
     type T: RlstScalar;
 
     /// Evaluate integrand
-    ///
-    /// # Safety
-    /// This method is unsafe to allow `get_unchecked` to be used
-    unsafe fn evaluate(
+    fn evaluate(
         &self,
         table: &RlstArray<Self::T, 4>,
         point_index: usize,
