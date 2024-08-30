@@ -212,8 +212,8 @@ fn assemble_batch_singular<
         a.set_trial_cell(*trial_cell);
         a.assemble(&mut local_mat);
 
-        let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
-        let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+        let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
+        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
 
         for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
             for (test_dof, entry) in izip!(test_dofs, col.iter()) {
@@ -292,7 +292,7 @@ fn assemble_batch_nonadjacent<
 
     for trial_cell in trial_cells {
         a.set_trial_cell(*trial_cell);
-        let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
         for test_cell in test_cells {
             if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
                 continue;
@@ -301,7 +301,7 @@ fn assemble_batch_nonadjacent<
             a.set_test_cell(*test_cell);
             a.assemble(&mut local_mat);
 
-            let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
+            let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
 
             for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
                 for (test_dof, entry) in izip!(test_dofs, col.iter()) {
@@ -384,8 +384,8 @@ fn assemble_batch_singular_correction<
 
         a.assemble(&mut local_mat);
 
-        let test_dofs = test_space.cell_dofs(*test_cell).unwrap();
-        let trial_dofs = trial_space.cell_dofs(*trial_cell).unwrap();
+        let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
+        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
 
         for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
             for (test_dof, entry) in izip!(test_dofs, col.iter()) {

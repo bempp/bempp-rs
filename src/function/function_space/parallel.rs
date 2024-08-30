@@ -55,6 +55,9 @@ impl<
     fn global_size(&self) -> usize {
         self.global_size
     }
+    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
+        self.serial_space.cell_dofs_unchecked(cell)
+    }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         self.serial_space.cell_dofs(cell)
     }
@@ -277,6 +280,9 @@ impl<
     }
     fn global_size(&self) -> usize {
         self.local_space.global_size()
+    }
+    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
+        self.local_space.cell_dofs_unchecked(cell)
     }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         self.local_space.cell_dofs(cell)
