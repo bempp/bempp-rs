@@ -15,10 +15,10 @@ impl<T: RlstScalar> DoubleLayerPotentialIntegrand<T> {
     }
 }
 
-impl<T: RlstScalar> PotentialIntegrand for DoubleLayerPotentialIntegrand<T> {
+unsafe impl<T: RlstScalar> PotentialIntegrand for DoubleLayerPotentialIntegrand<T> {
     type T = T;
 
-    unsafe fn evaluate(
+    fn evaluate(
         &self,
         table: &RlstArray<T, 4>,
         point_index: usize,
@@ -27,15 +27,18 @@ impl<T: RlstScalar> PotentialIntegrand for DoubleLayerPotentialIntegrand<T> {
         k: &RlstArray<T, 3>,
         geometry: &impl CellGeometry<T = T::Real>,
     ) -> T {
-        -(*k.get_unchecked([1, point_index, eval_index])
-            * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([0, point_index])).unwrap()
-            + *k.get_unchecked([2, point_index, eval_index])
-                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([1, point_index]))
+        unsafe {
+            -(*k.get_unchecked([1, point_index, eval_index])
+                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([0, point_index]))
                     .unwrap()
-            + *k.get_unchecked([3, point_index, eval_index])
-                * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([2, point_index]))
-                    .unwrap())
-            * *table.get_unchecked([0, point_index, basis_index, 0])
+                + *k.get_unchecked([2, point_index, eval_index])
+                    * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([1, point_index]))
+                        .unwrap()
+                + *k.get_unchecked([3, point_index, eval_index])
+                    * num::cast::<T::Real, T>(*geometry.normals().get_unchecked([2, point_index]))
+                        .unwrap())
+                * *table.get_unchecked([0, point_index, basis_index, 0])
+        }
     }
 }
 
