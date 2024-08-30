@@ -147,11 +147,12 @@ impl<
                             &self.k,
                             &test_geometry,
                             &trial_geometry,
+                        ) * num::cast::<T::Real, T>(
+                            *wt * *self.test_jdet.get_unchecked(index)
+                                * *self.trial_jdet.get_unchecked(index),
                         )
-                    } * num::cast::<T::Real, T>(
-                        *wt * self.test_jdet[index] * self.trial_jdet[index],
-                    )
-                    .unwrap();
+                        .unwrap()
+                    };
                 }
             }
         }
@@ -291,25 +292,29 @@ impl<
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
-                    let test_integrand =
-                        num::cast::<T::Real, T>(*test_wt * self.test_jdet[test_index]).unwrap();
+                    let test_integrand = unsafe {
+                        num::cast::<T::Real, T>(
+                            *test_wt * *self.test_jdet.get_unchecked(test_index),
+                        )
+                        .unwrap()
+                    };
                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
-                        *entry +=
-                            unsafe {
-                                self.integrand.evaluate_nonsingular(
-                                    self.test_table,
-                                    self.trial_table,
-                                    test_index,
-                                    trial_index,
-                                    test_i,
-                                    trial_i,
-                                    &self.k,
-                                    &test_geometry,
-                                    &trial_geometry,
-                                )
-                            } * num::cast::<T::Real, T>(*trial_wt * self.trial_jdet[trial_index])
-                                .unwrap()
-                                * test_integrand;
+                        *entry += unsafe {
+                            self.integrand.evaluate_nonsingular(
+                                self.test_table,
+                                self.trial_table,
+                                test_index,
+                                trial_index,
+                                test_i,
+                                trial_i,
+                                &self.k,
+                                &test_geometry,
+                                &trial_geometry,
+                            ) * num::cast::<T::Real, T>(
+                                *trial_wt * *self.trial_jdet.get_unchecked(trial_index),
+                            )
+                            .unwrap()
+                        } * test_integrand;
                     }
                 }
             }
@@ -451,7 +456,7 @@ impl<
     fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
         self.kernel.assemble_st(
             self.test_mapped_pts.data(),
-            self.trial_mapped_pts[self.trial_cell].data(),
+            unsafe { self.trial_mapped_pts.get_unchecked(self.trial_cell).data() },
             self.k.data_mut(),
         );
 
@@ -461,19 +466,25 @@ impl<
             &self.test_jacobians,
             &self.test_jdet,
         );
-        let trial_geometry = AssemblerGeometry::new(
-            &self.trial_mapped_pts[self.trial_cell],
-            &self.trial_normals[self.trial_cell],
-            &self.trial_jacobians[self.trial_cell],
-            &self.trial_jdet[self.trial_cell],
-        );
+        let trial_geometry = unsafe {
+            AssemblerGeometry::new(
+                self.trial_mapped_pts.get_unchecked(self.trial_cell),
+                self.trial_normals.get_unchecked(self.trial_cell),
+                self.trial_jacobians.get_unchecked(self.trial_cell),
+                self.trial_jdet.get_unchecked(self.trial_cell),
+            )
+        };
 
         for (trial_i, mut col) in local_mat.col_iter_mut().enumerate() {
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
-                    let test_integrand =
-                        num::cast::<T::Real, T>(*test_wt * self.test_jdet[test_index]).unwrap();
+                    let test_integrand = unsafe {
+                        num::cast::<T::Real, T>(
+                            *test_wt * *self.test_jdet.get_unchecked(test_index),
+                        )
+                        .unwrap()
+                    };
                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
                         *entry += unsafe {
                             self.integrand.evaluate_nonsingular(
@@ -486,12 +497,15 @@ impl<
                                 &self.k,
                                 &test_geometry,
                                 &trial_geometry,
+                            ) * num::cast::<T::Real, T>(
+                                *trial_wt
+                                    * *self
+                                        .trial_jdet
+                                        .get_unchecked(self.trial_cell)
+                                        .get_unchecked(trial_index),
                             )
-                        } * num::cast::<T::Real, T>(
-                            *trial_wt * self.trial_jdet[self.trial_cell][trial_index],
-                        )
-                        .unwrap()
-                            * test_integrand;
+                            .unwrap()
+                        } * test_integrand;
                     }
                 }
             }
@@ -630,17 +644,19 @@ impl<
     }
     fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
         self.kernel.assemble_st(
-            self.test_mapped_pts[self.test_cell].data(),
+            unsafe { self.test_mapped_pts.get_unchecked(self.test_cell).data() },
             self.trial_mapped_pts.data(),
             self.k.data_mut(),
         );
 
-        let test_geometry = AssemblerGeometry::new(
-            &self.test_mapped_pts[self.test_cell],
-            &self.test_normals[self.test_cell],
-            &self.test_jacobians[self.test_cell],
-            &self.test_jdet[self.test_cell],
-        );
+        let test_geometry = unsafe {
+            AssemblerGeometry::new(
+                self.test_mapped_pts.get_unchecked(self.test_cell),
+                self.test_normals.get_unchecked(self.test_cell),
+                self.test_jacobians.get_unchecked(self.test_cell),
+                self.test_jdet.get_unchecked(self.test_cell),
+            )
+        };
         let trial_geometry = AssemblerGeometry::new(
             &self.trial_mapped_pts,
             &self.trial_normals,
@@ -652,27 +668,33 @@ impl<
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
-                    let test_integrand = num::cast::<T::Real, T>(
-                        *test_wt * self.test_jdet[self.test_cell][test_index],
-                    )
+                    let test_integrand = unsafe {
+                        num::cast::<T::Real, T>(
+                            *test_wt
+                                * *self
+                                    .test_jdet
+                                    .get_unchecked(self.test_cell)
+                                    .get_unchecked(test_index),
+                        )
+                    }
                     .unwrap();
                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
-                        *entry +=
-                            unsafe {
-                                self.integrand.evaluate_nonsingular(
-                                    self.test_table,
-                                    self.trial_table,
-                                    test_index,
-                                    trial_index,
-                                    test_i,
-                                    trial_i,
-                                    &self.k,
-                                    &test_geometry,
-                                    &trial_geometry,
-                                )
-                            } * num::cast::<T::Real, T>(*trial_wt * self.trial_jdet[trial_index])
-                                .unwrap()
-                                * test_integrand;
+                        *entry += unsafe {
+                            self.integrand.evaluate_nonsingular(
+                                self.test_table,
+                                self.trial_table,
+                                test_index,
+                                trial_index,
+                                test_i,
+                                trial_i,
+                                &self.k,
+                                &test_geometry,
+                                &trial_geometry,
+                            ) * num::cast::<T::Real, T>(
+                                *trial_wt * *self.trial_jdet.get_unchecked(trial_index),
+                            )
+                            .unwrap()
+                        } * test_integrand;
                     }
                 }
             }
