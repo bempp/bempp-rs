@@ -100,11 +100,10 @@ impl<
             for (eval_index, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
                 for (index, wt) in self.weights.iter().enumerate() {
-                    *entry += unsafe {
-                        self.integrand
-                            .evaluate(self.table, index, eval_index, i, &self.k, &geometry)
-                            * num::cast::<T::Real, T>(*wt * self.jdet[index]).unwrap()
-                    };
+                    *entry += self
+                        .integrand
+                        .evaluate(self.table, index, eval_index, i, &self.k, &geometry)
+                        * num::cast::<T::Real, T>(*wt * self.jdet[index]).unwrap();
                 }
             }
         }
