@@ -82,9 +82,12 @@ impl<
     fn global_size(&self) -> usize {
         self.size
     }
+    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
+        self.cell_dofs.get_unchecked(cell)
+    }
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
         if cell < self.cell_dofs.len() {
-            Some(&self.cell_dofs[cell])
+            Some(unsafe { self.cell_dofs_unchecked(cell) })
         } else {
             None
         }

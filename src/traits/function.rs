@@ -41,6 +41,12 @@ pub trait FunctionSpace {
     /// Get the local DOF numbers associated with a cell
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]>;
 
+    /// Get the local DOF numbers associated with a cell
+    ///
+    /// # Safety
+    /// The function uses unchecked array access
+    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize];
+
     /// Compute a colouring of the cells so that no two cells that share an entity with DOFs associated with it are assigned the same colour
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>>;
 
