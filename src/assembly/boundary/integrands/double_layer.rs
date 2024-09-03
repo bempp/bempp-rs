@@ -1,7 +1,6 @@
 //! Double layer integrand
-use crate::assembly::common::RlstArray;
-use crate::traits::{BoundaryIntegrand, CellGeometry};
-use rlst::{RlstScalar, UnsafeRandomAccessByRef};
+use crate::traits::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
+use rlst::RlstScalar;
 
 pub struct DoubleLayerBoundaryIntegrand<T: RlstScalar> {
     _t: std::marker::PhantomData<T>,
@@ -18,74 +17,20 @@ impl<T: RlstScalar> DoubleLayerBoundaryIntegrand<T> {
 unsafe impl<T: RlstScalar> BoundaryIntegrand for DoubleLayerBoundaryIntegrand<T> {
     type T = T;
 
-    fn evaluate_nonsingular(
+    fn evaluate(
         &self,
-        test_table: &RlstArray<T, 4>,
-        trial_table: &RlstArray<T, 4>,
-        test_point_index: usize,
-        trial_point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<T, 3>,
-        _test_geometry: &impl CellGeometry<T = T::Real>,
-        trial_geometry: &impl CellGeometry<T = T::Real>,
+        k: &impl Access1D<T = T>,
+        test_table: &impl Access2D<T = T>,
+        trial_table: &impl Access2D<T = T>,
+        _test_geometry: &impl GeometryAccess<T = T>,
+        trial_geometry: &impl GeometryAccess<T = T>,
     ) -> T {
         unsafe {
-            (*k.get_unchecked([1, test_point_index, trial_point_index])
-                * num::cast::<T::Real, T>(
-                    *trial_geometry
-                        .normals()
-                        .get_unchecked([0, trial_point_index]),
-                )
-                .unwrap()
-                + *k.get_unchecked([2, test_point_index, trial_point_index])
-                    * num::cast::<T::Real, T>(
-                        *trial_geometry
-                            .normals()
-                            .get_unchecked([1, trial_point_index]),
-                    )
-                    .unwrap()
-                + *k.get_unchecked([3, test_point_index, trial_point_index])
-                    * num::cast::<T::Real, T>(
-                        *trial_geometry
-                            .normals()
-                            .get_unchecked([2, trial_point_index]),
-                    )
-                    .unwrap())
-                * *test_table.get_unchecked([0, test_point_index, test_basis_index, 0])
-                * *trial_table.get_unchecked([0, trial_point_index, trial_basis_index, 0])
-        }
-    }
-
-    fn evaluate_singular(
-        &self,
-        test_table: &RlstArray<T, 4>,
-        trial_table: &RlstArray<T, 4>,
-        point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<Self::T, 2>,
-        _test_geometry: &impl CellGeometry<T = T::Real>,
-        trial_geometry: &impl CellGeometry<T = T::Real>,
-    ) -> T {
-        unsafe {
-            (*k.get_unchecked([1, point_index])
-                * num::cast::<T::Real, T>(
-                    *trial_geometry.normals().get_unchecked([0, point_index]),
-                )
-                .unwrap()
-                + *k.get_unchecked([2, point_index])
-                    * num::cast::<T::Real, T>(
-                        *trial_geometry.normals().get_unchecked([1, point_index]),
-                    )
-                    .unwrap()
-                + *k.get_unchecked([3, point_index])
-                    * num::cast::<T::Real, T>(
-                        *trial_geometry.normals().get_unchecked([2, point_index]),
-                    )
-                    .unwrap())
-                * *test_table.get_unchecked([0, point_index, test_basis_index, 0])
-                * *trial_table.get_unchecked([0, point_index, trial_basis_index, 0])
+            (k.get(1) * trial_geometry.normal(0)
+                + k.get(2) * trial_geometry.normal(1)
+                + k.get(3) * trial_geometry.normal(2))
+                * test_table.get(0, 0)
+                * trial_table.get(0, 0)
         }
     }
 }

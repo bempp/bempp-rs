@@ -11,8 +11,7 @@ pub use hypersingular::{
 };
 pub use single_layer::SingleLayerBoundaryIntegrand;
 
-use crate::assembly::common::RlstArray;
-use crate::traits::{BoundaryIntegrand, CellGeometry};
+use crate::traits::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 use rlst::RlstScalar;
 
 /// The sum of two integrands
@@ -41,71 +40,19 @@ unsafe impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T
 {
     type T = T;
 
-    fn evaluate_nonsingular(
+    fn evaluate(
         &self,
-        test_table: &RlstArray<T, 4>,
-        trial_table: &RlstArray<T, 4>,
-        test_point_index: usize,
-        trial_point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<T, 3>,
-        test_geometry: &impl CellGeometry<T = T::Real>,
-        trial_geometry: &impl CellGeometry<T = T::Real>,
+        k: &impl Access1D<T = T>,
+        test_table: &impl Access2D<T = T>,
+        trial_table: &impl Access2D<T = T>,
+        test_geometry: &impl GeometryAccess<T = T>,
+        trial_geometry: &impl GeometryAccess<T = T>,
     ) -> T {
-        self.integrand0.evaluate_nonsingular(
-            test_table,
-            trial_table,
-            test_point_index,
-            trial_point_index,
-            test_basis_index,
-            trial_basis_index,
-            k,
-            test_geometry,
-            trial_geometry,
-        ) + self.integrand1.evaluate_nonsingular(
-            test_table,
-            trial_table,
-            test_point_index,
-            trial_point_index,
-            test_basis_index,
-            trial_basis_index,
-            k,
-            test_geometry,
-            trial_geometry,
-        )
-    }
-
-    fn evaluate_singular(
-        &self,
-        test_table: &RlstArray<T, 4>,
-        trial_table: &RlstArray<T, 4>,
-        point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<Self::T, 2>,
-        test_geometry: &impl CellGeometry<T = T::Real>,
-        trial_geometry: &impl CellGeometry<T = T::Real>,
-    ) -> T {
-        self.integrand0.evaluate_singular(
-            test_table,
-            trial_table,
-            point_index,
-            test_basis_index,
-            trial_basis_index,
-            k,
-            test_geometry,
-            trial_geometry,
-        ) + self.integrand1.evaluate_singular(
-            test_table,
-            trial_table,
-            point_index,
-            test_basis_index,
-            trial_basis_index,
-            k,
-            test_geometry,
-            trial_geometry,
-        )
+        self.integrand0
+            .evaluate(k, test_table, trial_table, test_geometry, trial_geometry)
+            + self
+                .integrand1
+                .evaluate(k, test_table, trial_table, test_geometry, trial_geometry)
     }
 }
 
@@ -126,53 +73,17 @@ unsafe impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrand
 {
     type T = T;
 
-    fn evaluate_nonsingular(
+    fn evaluate(
         &self,
-        test_table: &RlstArray<T, 4>,
-        trial_table: &RlstArray<T, 4>,
-        test_point_index: usize,
-        trial_point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<T, 3>,
-        test_geometry: &impl CellGeometry<T = T::Real>,
-        trial_geometry: &impl CellGeometry<T = T::Real>,
+        k: &impl Access1D<T = T>,
+        test_table: &impl Access2D<T = T>,
+        trial_table: &impl Access2D<T = T>,
+        test_geometry: &impl GeometryAccess<T = T>,
+        trial_geometry: &impl GeometryAccess<T = T>,
     ) -> T {
         self.scalar
-            * self.integrand.evaluate_nonsingular(
-                test_table,
-                trial_table,
-                test_point_index,
-                trial_point_index,
-                test_basis_index,
-                trial_basis_index,
-                k,
-                test_geometry,
-                trial_geometry,
-            )
-    }
-
-    fn evaluate_singular(
-        &self,
-        test_table: &RlstArray<T, 4>,
-        trial_table: &RlstArray<T, 4>,
-        point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<Self::T, 2>,
-        test_geometry: &impl CellGeometry<T = T::Real>,
-        trial_geometry: &impl CellGeometry<T = T::Real>,
-    ) -> T {
-        self.scalar
-            * self.integrand.evaluate_singular(
-                test_table,
-                trial_table,
-                point_index,
-                test_basis_index,
-                trial_basis_index,
-                k,
-                test_geometry,
-                trial_geometry,
-            )
+            * self
+                .integrand
+                .evaluate(k, test_table, trial_table, test_geometry, trial_geometry)
     }
 }

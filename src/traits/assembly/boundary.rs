@@ -1,4 +1,7 @@
 //! Traits for boundary assembly
+mod integrands;
+pub use integrands::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
+
 use super::CellGeometry;
 use crate::assembly::common::RlstArray;
 use crate::traits::FunctionSpace;
@@ -9,45 +12,6 @@ use mpi::traits::Communicator;
 use ndelement::types::ReferenceCellType;
 use rlst::{CsrMatrix, RlstScalar};
 use std::collections::HashMap;
-
-pub unsafe trait BoundaryIntegrand {
-    //! Integrand
-    //!
-    //! # Safety
-    //! This trait's methods use unsafe access
-
-    /// Scalar type
-    type T: RlstScalar;
-
-    #[allow(clippy::too_many_arguments)]
-    /// Evaluate integrand for a singular quadrature rule
-    fn evaluate_nonsingular(
-        &self,
-        test_table: &RlstArray<Self::T, 4>,
-        trial_table: &RlstArray<Self::T, 4>,
-        test_point_index: usize,
-        trial_point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<Self::T, 3>,
-        test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
-        trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
-    ) -> Self::T;
-
-    #[allow(clippy::too_many_arguments)]
-    /// Evaluate integrand for a non-singular quadrature rule
-    fn evaluate_singular(
-        &self,
-        test_table: &RlstArray<Self::T, 4>,
-        trial_table: &RlstArray<Self::T, 4>,
-        point_index: usize,
-        test_basis_index: usize,
-        trial_basis_index: usize,
-        k: &RlstArray<Self::T, 2>,
-        test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
-        trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
-    ) -> Self::T;
-}
 
 pub trait CellPairAssembler {
     //! Assembler for the contributions from a pair of cells

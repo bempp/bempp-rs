@@ -6,7 +6,9 @@ use rlst::RlstScalar;
 
 #[cfg(feature = "mpi")]
 pub use boundary::ParallelBoundaryAssembly;
-pub use boundary::{BoundaryAssembly, BoundaryIntegrand, CellPairAssembler};
+pub use boundary::{
+    Access1D, Access2D, BoundaryAssembly, BoundaryIntegrand, CellPairAssembler, GeometryAccess,
+};
 pub use potential::{CellAssembler, PotentialAssembly, PotentialIntegrand};
 
 pub trait CellGeometry {
