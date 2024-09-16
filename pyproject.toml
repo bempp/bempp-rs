@@ -1,0 +1,50 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "bempp-rs"
+version = "0.1.0-dev"
+description = "Boundary element method library"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [
+    {name = "Timo Betcke", email = "timo.betcke@gmail.com"},
+    {name = "Srinath Kailasa", email = "srinathkailasa@gmail.com"},
+    {name = "Matthew Scroggs", email = "rust@mscroggs.co.uk"}
+]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+    "maturin>=1.7",
+    "numpy",
+    "cffi",
+    'patchelf; platform_system == "Linux"',
+    "ndelement",
+    "ndgrid"
+]
+packages = ["bempp"]
+
+[project.urls]
+homepage = "https://github.com/bempp/bempp-rs"
+repository = "https://github.com/bempp/bempp-rs"
+
+[tool.maturin]
+python-source = "python"
+module-name = "bempp._bempprs"
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+ignore_missing_imports = true

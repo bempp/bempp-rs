@@ -15,9 +15,8 @@ and the "mpi" features turned on.
 import os
 import argparse
 
-parser = argparse.ArgumentParser(description='Parse inputs.')
-parser.add_argument('--features', default=None,
-                    help='feature flags to pass to the examples')
+parser = argparse.ArgumentParser(description="Parse inputs.")
+parser.add_argument("--features", default=None, help="feature flags to pass to the examples")
 
 raw_features = parser.parse_args().features
 
@@ -61,7 +60,7 @@ for file, example_name in files:
         if options is None:
             options = ""
         if "--features" in options:
-            a, b = options.split("--features \"")
+            a, b = options.split('--features "')
             options = f"{a}--features \"{','.join(features)},{b}"
         else:
             options += f" --features \"{','.join(features)}\""

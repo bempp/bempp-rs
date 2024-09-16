@@ -10,8 +10,8 @@ all_rule_files = []
 orders = []
 npoints = []
 
-for (dirpath, dirnames, filenames) in os.walk("."):
-        all_rule_files += [os.path.join(dirpath, file) for file in filenames if file.endswith(".txt")]
+for dirpath, dirnames, filenames in os.walk("."):
+    all_rule_files += [os.path.join(dirpath, file) for file in filenames if file.endswith(".txt")]
 
 for rule_file in all_rule_files:
     base = os.path.basename(rule_file)
@@ -19,7 +19,7 @@ for rule_file in all_rule_files:
     orders += [int(order_str)]
     npoints += [int(points_str)]
 
-with open("simplex_rule_definitions.rs", 'w') as f:
+with open("simplex_rule_definitions.rs", "w") as f:
     f.write("//! Definition of simplex rules.\n")
     f.write("\n")
     f.write("use std::collections::HashMap;\n")
@@ -38,10 +38,7 @@ with open("simplex_rule_definitions.rs", 'w') as f:
     f.write("m.insert(ReferenceCellType::Pyramid, HM::new());\n")
     f.write("m.insert(ReferenceCellType::Interval, HM::new());\n")
 
-
-
-    for (index, rule_file) in enumerate(all_rule_files):
-
+    for index, rule_file in enumerate(all_rule_files):
         arr = np.atleast_2d(np.loadtxt(rule_file))
         points = arr[:, :-1]
         weights = arr[:, -1]
@@ -74,7 +71,6 @@ with open("simplex_rule_definitions.rs", 'w') as f:
             points = 0.5 * (1.0 + points)
             weights = weights / 8.0
 
-
         elif rule_file.startswith("./tet"):
             identifier = "ReferenceCellType::Tetrahedron"
 
@@ -84,12 +80,11 @@ with open("simplex_rule_definitions.rs", 'w') as f:
         elif rule_file.startswith("./pyr"):
             identifier = "ReferenceCellType::Pyramid"
 
-            points = (1.0 + points) @ np.array([[0.5, 0, 0],
-                                                [0, 0.5, 0],
-                                                [-0.25, -0.25, 0.5]],dtype='float64')
+            points = (1.0 + points) @ np.array(
+                [[0.5, 0, 0], [0, 0.5, 0], [-0.25, -0.25, 0.5]], dtype="float64"
+            )
 
             weights = weights / 8.0
-
 
         else:
             raise ValueError("Unknown simplex type.")
@@ -131,11 +126,8 @@ with open("simplex_rule_definitions.rs", 'w') as f:
             f.write(f"{weight},")
         f.write("]));\n")
 
-
     f.write("m };\n}")
 
 os.system("rustfmt ./simplex_rule_definitions.rs")
 os.system("cp ./simplex_rule_definitions.rs ../")
 os.system("rm ./simplex_rule_definitions.rs")
-
-
