@@ -26,7 +26,7 @@ mod function {
         bindings as ndelement_b, ciarlet, ciarlet::CiarletElement, traits::ElementFamily,
         types::ReferenceCellType,
     };
-    use ndgrid::{bindings as ndgrid_b, traits::Grid, SingleElementGrid};
+    use ndgrid::{bindings as ndgrid_b, traits::Grid, types::Ownership, SingleElementGrid};
     use rlst::{c32, c64, MatrixInverse, RlstScalar};
     use std::ffi::c_void;
 
@@ -297,6 +297,259 @@ mod function {
                     >(space, entity_type),
                 },
             },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_get_local_dof_numbers_size(
+        space: *mut FunctionSpaceWrapper,
+        entity_dim: usize,
+        entity_number: usize,
+    ) -> usize {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                },
+            },
+        }
+        .len()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_get_local_dof_numbers(
+        space: *mut FunctionSpaceWrapper,
+        entity_dim: usize,
+        entity_number: usize,
+        dofs: *mut usize,
+    ) {
+        for (i, dof) in match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .get_local_dof_numbers(entity_dim, entity_number),
+                },
+            },
+        }
+        .iter()
+        .enumerate()
+        {
+            *dofs.add(i) = *dof;
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_has_cell_dofs(
+        space: *mut FunctionSpaceWrapper,
+        cell: usize,
+    ) -> bool {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                },
+            },
+        }
+        .is_some()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_cell_dofs_size(
+        space: *mut FunctionSpaceWrapper,
+        cell: usize,
+    ) -> usize {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                },
+            },
+        }
+        .unwrap()
+        .len()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_cell_dofs(
+        space: *mut FunctionSpaceWrapper,
+        cell: usize,
+        dofs: *mut usize,
+    ) {
+        for (i, dof) in match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .cell_dofs(cell),
+                },
+            },
+        }
+        .unwrap()
+        .iter()
+        .enumerate()
+        {
+            *dofs.add(i) = *dof;
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_global_dof_index(
+        space: *mut FunctionSpaceWrapper,
+        local_dof_index: usize,
+    ) -> usize {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .global_dof_index(local_dof_index),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .global_dof_index(local_dof_index),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .global_dof_index(local_dof_index),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .global_dof_index(local_dof_index),
+                },
+            },
+        }
+    }
+
+    unsafe fn space_ownership(
+        space: *mut FunctionSpaceWrapper,
+        local_dof_index: usize,
+    ) -> Ownership {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .ownership(local_dof_index),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .ownership(local_dof_index),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .ownership(local_dof_index),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .ownership(local_dof_index),
+                },
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_is_owned(
+        space: *mut FunctionSpaceWrapper,
+        local_dof_index: usize,
+    ) -> bool {
+        space_ownership(space, local_dof_index) == Ownership::Owned
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_ownership_process(
+        space: *mut FunctionSpaceWrapper,
+        local_dof_index: usize,
+    ) -> usize {
+        if let Ownership::Ghost(process, _index) = space_ownership(space, local_dof_index) {
+            process
+        } else {
+            panic!("Cannot get process of owned DOF");
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_ownership_index(
+        space: *mut FunctionSpaceWrapper,
+        local_dof_index: usize,
+    ) -> usize {
+        if let Ownership::Ghost(_process, index) = space_ownership(space, local_dof_index) {
+            index
+        } else {
+            panic!("Cannot get process of owned DOF");
         }
     }
 

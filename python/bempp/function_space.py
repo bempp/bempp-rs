@@ -1,10 +1,12 @@
 """Function space."""
 
+import typing
 import numpy as np
 from bempp._bempprs import lib as _lib, ffi as _ffi
 from ndelement._ndelementrs import ffi as _elementffi
 from ndgrid._ndgridrs import ffi as _gridffi
 from ndgrid.grid import Grid
+from ndgrid.ownership import Owned, Ghost
 from ndelement.ciarlet import ElementFamily, CiarletElement
 from ndelement.reference_cell import ReferenceCellType
 
@@ -37,6 +39,43 @@ class FunctionSpace(object):
             ),
             owned=False,
         )
+
+    # TODO: test
+    def get_local_dof_numbers(self, entity_dim: int, entity_index: int) -> typing.List[int]:
+        """Get the local DOF numbers associated with an entity."""
+        dofs = np.empty(
+            _lib.space_get_local_dof_numbers_size(self._rs_space, entity_dim, entity_index),
+            dtype=np.uintp,
+        )
+        _lib.space_get_local_dof_numbers(
+            self._rs_space, entity_dim, entity_index, _ffi.cast("uintptr_t*", dofs.ctypes.data)
+        )
+        return [int(i) for i in dofs]
+
+    # TODO: test
+    def cell_dofs(self, cell: int) -> typing.Optional[typing.List[int]]:
+        """Get the local DOF numbers associated with a cell."""
+        if not _lib.space_has_cell_dofs(self._rs_space, cell):
+            return None
+        dofs = np.empty(_lib.space_cell_dofs_size(self._rs_space, cell), dtype=np.uintp)
+        _lib.space_cell_dofs(self._rs_space, cell, _ffi.cast("uintptr_t*", dofs.ctypes.data))
+        return [int(i) for i in dofs]
+
+    # TODO: test
+    def global_dof_index(self, local_dof_index: int) -> typing.Optional[typing.List[int]]:
+        """Get the global DOF number for a local DOF."""
+        return _lib.space_global_dof_index(self._rs_space, local_dof_index)
+
+    # TODO: test
+    def ownership(self, local_dof_index) -> typing.Union[Owned, Ghost]:
+        """The ownership of a local DOF."""
+        if _lib.space_is_owned(self._rs_space, local_dof_index):
+            return Owned()
+        else:
+            return Ghost(
+                _lib.space_ownership_process(self._rs_space, local_dof_index),
+                _lib.space_ownership_index(self._rs_space, local_dof_index),
+            )
 
     @property
     def dtype(self):
