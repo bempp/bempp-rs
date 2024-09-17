@@ -50,7 +50,7 @@ pub trait FunctionSpace {
     /// Compute a colouring of the cells so that no two cells that share an entity with DOFs associated with it are assigned the same colour
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>>;
 
-    /// Get the global DOF indes associated with a local DOF indec
+    /// Get the global DOF index associated with a local DOF index
     fn global_dof_index(&self, local_dof_index: usize) -> usize;
 
     /// Get ownership of a local DOF
