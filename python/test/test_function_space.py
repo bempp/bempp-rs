@@ -53,3 +53,14 @@ def test_grid(level):
         ReferenceCellType.Quadrilateral,
     ]:
         assert space.grid.entity_count(e) == grid.entity_count(e)
+
+
+@pytest.mark.parametrize("level", range(4))
+def test_element(level):
+    grid = regular_sphere(level)
+    element = create_family(Family.Lagrange, 1)
+    space = function_space(grid, element)
+
+    e = ReferenceCellType.Triangle
+    assert space.element(e).dim == element.element(e).dim
+    assert space.element(e).entity_dofs(0, 0) == element.element(e).entity_dofs(0, 0)

@@ -246,6 +246,60 @@ mod function {
         }
     }
 
+    unsafe fn space_element_internal<
+        T: RlstScalar + MatrixInverse,
+        G: Grid<T = T::Real>,
+        S: FunctionSpace<T = T, Grid = G, FiniteElement = CiarletElement<T>>,
+    >(
+        space: *mut FunctionSpaceWrapper,
+        entity_type: u8,
+    ) -> *const c_void {
+        let element =
+            (*extract_space::<S>(space)).element(ReferenceCellType::from(entity_type).unwrap());
+        let dtype = match (*space).dtype {
+            DType::F32 => ndelement_b::ciarlet::DType::F32,
+            DType::F64 => ndelement_b::ciarlet::DType::F64,
+            DType::C32 => ndelement_b::ciarlet::DType::C32,
+            DType::C64 => ndelement_b::ciarlet::DType::C64,
+        };
+        Box::into_raw(Box::new(ndelement_b::ciarlet::CiarletElementWrapper {
+            element: (element as *const CiarletElement<T>) as *const c_void,
+            dtype,
+        })) as *const c_void
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn space_element(
+        space: *mut FunctionSpaceWrapper,
+        entity_type: u8,
+    ) -> *const c_void {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => space_element_internal::<
+                        f32,
+                        SingleElementGrid<f32, CiarletElement<f32>>,
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space, entity_type),
+                    DType::F64 => space_element_internal::<
+                        f64,
+                        SingleElementGrid<f64, CiarletElement<f64>>,
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space, entity_type),
+                    DType::C32 => space_element_internal::<
+                        c32,
+                        SingleElementGrid<f32, CiarletElement<f32>>,
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space, entity_type),
+                    DType::C64 => space_element_internal::<
+                        c64,
+                        SingleElementGrid<f64, CiarletElement<f64>>,
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space, entity_type),
+                },
+            },
+        }
+    }
+
     #[no_mangle]
     pub unsafe extern "C" fn space_dtype(space: *const FunctionSpaceWrapper) -> u8 {
         (*space).dtype as u8

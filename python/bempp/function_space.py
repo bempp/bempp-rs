@@ -2,9 +2,11 @@
 
 import numpy as np
 from bempp._bempprs import lib as _lib, ffi as _ffi
+from ndelement._ndelementrs import ffi as _elementffi
 from ndgrid._ndgridrs import ffi as _gridffi
 from ndgrid.grid import Grid
-from ndelement.ciarlet import ElementFamily
+from ndelement.ciarlet import ElementFamily, CiarletElement
+from ndelement.reference_cell import ReferenceCellType
 
 _dtypes = {
     0: np.float32,
@@ -26,6 +28,15 @@ class FunctionSpace(object):
     def __del__(self):
         """Delete."""
         _lib.free_space(self._rs_space)
+
+    def element(self, entity: ReferenceCellType) -> CiarletElement:
+        """Get the grid that this space is defined on."""
+        return CiarletElement(
+            _elementffi.cast(
+                "CiarletElementWrapper*", _lib.space_element(self._rs_space, entity.value)
+            ),
+            owned=False,
+        )
 
     @property
     def dtype(self):
@@ -56,7 +67,6 @@ class FunctionSpace(object):
     @property
     def grid(self) -> Grid:
         """Get the grid that this space is defined on."""
-        return Grid(_lib.space_grid(self._rs_space), owned=False)
         return Grid(_gridffi.cast("GridWrapper*", _lib.space_grid(self._rs_space)), owned=False)
 
 
