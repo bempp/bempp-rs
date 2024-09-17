@@ -32,7 +32,7 @@ jobs:
           components: rustfmt
 
       - name: Install OpenBLAS, LAPACK, OpenSSL (yum)
-        run: yum -y install openblas-devel lapack-devel openssl-devel sleef-devel
+        run: yum -y install openblas-devel lapack-devel openssl-devel sleef
         if: matrix.platform.package-manager == 'yum'
       - name: Install OpenBLAS, LAPACK, OpenSSL (apt)
         run: apt-get -y install libopenblas-dev liblapack-dev libsleef-dev
