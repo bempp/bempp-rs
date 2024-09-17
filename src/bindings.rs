@@ -167,6 +167,90 @@ mod function {
         }
     }
 
+    #[no_mangle]
+    pub unsafe extern "C" fn space_is_serial(space: *mut FunctionSpaceWrapper) -> bool {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => (*extract_space::<
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .is_serial(),
+                    DType::F64 => (*extract_space::<
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .is_serial(),
+                    DType::C32 => (*extract_space::<
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space))
+                    .is_serial(),
+                    DType::C64 => (*extract_space::<
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space))
+                    .is_serial(),
+                },
+            },
+        }
+    }
+
+    unsafe fn space_grid_internal<
+        T: RlstScalar,
+        G: Grid<T = T::Real>,
+        S: FunctionSpace<T = T, Grid = G>,
+    >(
+        space: *mut FunctionSpaceWrapper,
+    ) -> *const c_void {
+        let grid = (*extract_space::<S>(space)).grid();
+        let gtype = match (*space).gtype {
+            GridType::SerialSingleElementGrid => ndgrid_b::grid::GridType::SerialSingleElementGrid,
+        };
+        let dtype = match (*space).dtype {
+            DType::F32 => ndgrid_b::DType::F32,
+            DType::F64 => ndgrid_b::DType::F64,
+            DType::C32 => ndgrid_b::DType::F32,
+            DType::C64 => ndgrid_b::DType::F64,
+        };
+        Box::into_raw(Box::new(ndgrid_b::grid::GridWrapper {
+            grid: (grid as *const G) as *const c_void,
+            gtype,
+            dtype,
+        })) as *const c_void
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn space_grid(space: *mut FunctionSpaceWrapper) -> *const c_void {
+        match (*space).stype {
+            SpaceType::SerialFunctionSpace => match (*space).gtype {
+                GridType::SerialSingleElementGrid => match (*space).dtype {
+                    DType::F32 => space_grid_internal::<
+                        f32,
+                        SingleElementGrid<f32, CiarletElement<f32>>,
+                        SerialFunctionSpace<f32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space),
+                    DType::F64 => space_grid_internal::<
+                        f64,
+                        SingleElementGrid<f64, CiarletElement<f64>>,
+                        SerialFunctionSpace<f64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space),
+                    DType::C32 => space_grid_internal::<
+                        c32,
+                        SingleElementGrid<f32, CiarletElement<f32>>,
+                        SerialFunctionSpace<c32, SingleElementGrid<f32, CiarletElement<f32>>>,
+                    >(space),
+                    DType::C64 => space_grid_internal::<
+                        c64,
+                        SingleElementGrid<f64, CiarletElement<f64>>,
+                        SerialFunctionSpace<c64, SingleElementGrid<f64, CiarletElement<f64>>>,
+                    >(space),
+                },
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn space_dtype(space: *const FunctionSpaceWrapper) -> u8 {
+        (*space).dtype as u8
+    }
+
     pub unsafe extern "C" fn space_new_internal<
         T: RlstScalar + MatrixInverse,
         G: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
