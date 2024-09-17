@@ -1,0 +1,7 @@
+language = "C"
+
+[export]
+exclude = []
+
+[enum]
+prefix_with_name = true
