@@ -27,8 +27,8 @@ lazy_static = "1.4"
 ndelement = "0.1.1"
 ndgrid = "0.1.1"
 rayon = "1.9"
-rlst = { version = "0.2.0", default-features = false }
-green-kernels = { version = "0.2.0", default-features = false }
+rlst = "0.2.0"
+green-kernels = "0.2.0"
 
 [dev-dependencies]
 approx = "0.5"
