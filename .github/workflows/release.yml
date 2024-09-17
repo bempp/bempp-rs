@@ -5,7 +5,6 @@ name: 📦
 on:
   push:
     tags: ['*']
-    branches: ['mscroggs/pip']
   pull_request:
   workflow_dispatch:
 
