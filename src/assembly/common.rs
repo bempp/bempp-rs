@@ -1,6 +1,6 @@
 //! Common utility functions
 use crate::traits::CellGeometry;
-pub(crate) use green_kernels::types::EvalType as GreenKernelEvalType;
+pub(crate) use green_kernels::types::GreenKernelEvalType;
 use ndgrid::traits::Grid;
 use rlst::{Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer};
 

@@ -1,6 +1,8 @@
 [features]
 mpi = ["dep:mpi", "ndelement/mpi", "ndgrid/mpi"]
+sleef = ["rlst/sleef", "green-kernels/sleef"]
 strict = []
+default = ["sleef"]
 
 [package]
 name = "bempp"
@@ -28,7 +30,7 @@ ndelement = "0.1.1"
 ndgrid = "0.1.1"
 rayon = "1.9"
 rlst = { version = "0.2.0", default-features = false }
-green-kernels = "0.2.0"
+green-kernels = { version = "0.2.2", default-features = false }
 
 [dev-dependencies]
 approx = "0.5"
