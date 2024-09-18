@@ -18,8 +18,9 @@ jobs:
     strategy:
       matrix:
         platform:
-          - target: x86_64
+          - target: x86_64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_x86_64
+            wheel: wheels-linux-x86_64
             package-manager: yum
             python: /opt/python/cp38-cp38/bin/python
     container: ${{ matrix.platform.container }}
@@ -46,12 +47,12 @@ jobs:
           ${{ matrix.platform.python }} -m pip install cffi
 
       - name: Build wheel
-        run: ${{ matrix.platform.python }} -m maturin build --release --out dist -i ${{ matrix.platform.python }} --target ${{ matrix.platform.target }}-unknown-linux-gnu
+        run: ${{ matrix.platform.python }} -m maturin build --release --out dist -i ${{ matrix.platform.python }} --target ${{ matrix.platform.target }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.platform.target }}
+          name: ${{ matrix.platform.wheel }}
           path: dist
 
   macos:
