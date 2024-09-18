@@ -34,20 +34,8 @@ jobs:
       - name: Install OpenBLAS, LAPACK, OpenSSL (yum)
         run: yum -y install openblas-devel lapack-devel openssl-devel
         if: matrix.platform.package-manager == 'yum'
-      - name: Clone Sleef (yum)
-        uses: actions/checkout@v4
-        with:
-          path: ./sleef
-          repository: shibatch/sleef
-        if: matrix.platform.package-manager == 'yum'
       - name: Install Sleef (yum)
-        run: |
-          yum install -y mpfr
-          cd sleef
-          mkdir build
-          cmake -S . -B build
-          cmake --build build -j
-          cmake --install build
+        run: yum -y install https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/s/sleef-devel-3.5.1-3.el8.x86_64.rpm https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/s/sleef-3.5.1-3.el8.x86_64.rpm https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/s/sleef-3.5.1-3.el8.x86_64.rpm
         if: matrix.platform.package-manager == 'yum'
       - name: Install OpenBLAS, LAPACK, OpenSSL, Sleef (apt)
         run: apt-get -y install libopenblas-dev liblapack-dev libsleef-dev
