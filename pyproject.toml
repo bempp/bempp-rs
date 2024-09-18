@@ -35,6 +35,7 @@ repository = "https://github.com/bempp/bempp-rs"
 [tool.maturin]
 python-source = "python"
 module-name = "bempp._bempprs"
+no-default-features = true
 
 [tool.ruff]
 line-length = 100

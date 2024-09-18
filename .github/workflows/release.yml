@@ -18,9 +18,8 @@ jobs:
     strategy:
       matrix:
         platform:
-          - target: x86_64-unknown-linux-gnu
+          - target: x86_64
             container: quay.io/pypa/manylinux_2_28_x86_64
-            wheel: wheels-linux-x86_64
             package-manager: yum
             python: /opt/python/cp38-cp38/bin/python
     container: ${{ matrix.platform.container }}
@@ -34,11 +33,8 @@ jobs:
       - name: Install OpenBLAS, LAPACK, OpenSSL (yum)
         run: yum -y install openblas-devel lapack-devel openssl-devel
         if: matrix.platform.package-manager == 'yum'
-      - name: Install Sleef (yum)
-        run: yum -y install https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/s/sleef-devel-3.5.1-3.el8.x86_64.rpm https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/s/sleef-3.5.1-3.el8.x86_64.rpm https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/s/sleef-3.5.1-3.el8.x86_64.rpm
-        if: matrix.platform.package-manager == 'yum'
-      - name: Install OpenBLAS, LAPACK, OpenSSL, Sleef (apt)
-        run: apt-get -y install libopenblas-dev liblapack-dev libsleef-dev
+      - name: Install OpenBLAS, LAPACK, OpenSSL (apt)
+        run: apt-get -y install libopenblas-dev liblapack-dev
         if: matrix.platform.package-manager == 'apt'
 
       - uses: actions/checkout@v4
@@ -50,12 +46,12 @@ jobs:
           ${{ matrix.platform.python }} -m pip install cffi
 
       - name: Build wheel
-        run: ${{ matrix.platform.python }} -m maturin build --release --out dist -i ${{ matrix.platform.python }} --target ${{ matrix.platform.target }}
+        run: ${{ matrix.platform.python }} -m maturin build --release --out dist -i ${{ matrix.platform.python }} --target ${{ matrix.platform.target }}-unknown-linux-gnu
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform.wheel }}
+          name: wheels-linux-${{ matrix.platform.target }}
           path: dist
 
   macos:
