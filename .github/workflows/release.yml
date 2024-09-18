@@ -32,9 +32,24 @@ jobs:
           components: rustfmt
 
       - name: Install OpenBLAS, LAPACK, OpenSSL (yum)
-        run: yum -y install openblas-devel lapack-devel openssl-devel sleef
+        run: yum -y install openblas-devel lapack-devel openssl-devel
         if: matrix.platform.package-manager == 'yum'
-      - name: Install OpenBLAS, LAPACK, OpenSSL (apt)
+      - name: Clone Sleef (yum)
+        uses: actions/checkout@v4
+        with:
+          path: ./sleef
+          repository: shibatch/sleef
+        if: matrix.platform.package-manager == 'yum'
+      - name: Install Sleef (yum)
+        run: |
+          yum install -y mpfr
+          cd sleef
+          mkdir build
+          cmake -S . -B build
+          cmake --build build -j
+          cmake --install build
+        if: matrix.platform.package-manager == 'yum'
+      - name: Install OpenBLAS, LAPACK, OpenSSL, Sleef (apt)
         run: apt-get -y install libopenblas-dev liblapack-dev libsleef-dev
         if: matrix.platform.package-manager == 'apt'
 
