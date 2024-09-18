@@ -490,7 +490,7 @@ impl<
 
     /// Get (non-singular) quadrature degree for a cell type
     pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
-        self.options.quadrature_degrees.get(&cell).map(|i| *i)
+        self.options.quadrature_degrees.get(&cell).copied()
     }
 
     /// Set singular quadrature degree for a pair of cell types
@@ -514,7 +514,7 @@ impl<
         self.options
             .singular_quadrature_degrees
             .get(&cells)
-            .map(|i| *i)
+            .copied()
     }
 
     /// Set the maximum size of a batch of cells to send to an assembly function
