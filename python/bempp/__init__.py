@@ -1,3 +1,3 @@
 """Bempp."""
 
-from bempp import function_space
+from bempp import function_space, assembly

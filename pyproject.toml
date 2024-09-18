@@ -26,7 +26,7 @@ dependencies = [
     "ndelement",
     "ndgrid"
 ]
-packages = ["bempp"]
+packages = ["bempp", "bempp.assembly"]
 
 [project.urls]
 homepage = "https://github.com/bempp/bempp-rs"

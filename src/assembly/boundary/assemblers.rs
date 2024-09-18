@@ -484,12 +484,17 @@ impl<
     }
 
     /// Set (non-singular) quadrature degree for a cell type
-    pub fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+    pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
         *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
     }
 
+    /// Get (non-singular) quadrature degree for a cell type
+    pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
+        self.options.quadrature_degrees.get(&cell).map(|i| *i)
+    }
+
     /// Set singular quadrature degree for a pair of cell types
-    pub fn singular_quadrature_degree(
+    pub fn set_singular_quadrature_degree(
         &mut self,
         cells: (ReferenceCellType, ReferenceCellType),
         degree: usize,
@@ -501,9 +506,25 @@ impl<
             .unwrap() = degree;
     }
 
+    /// Get singular quadrature degree for a pair of cell types
+    pub fn singular_quadrature_degree(
+        &self,
+        cells: (ReferenceCellType, ReferenceCellType),
+    ) -> Option<usize> {
+        self.options
+            .singular_quadrature_degrees
+            .get(&cells)
+            .map(|i| *i)
+    }
+
     /// Set the maximum size of a batch of cells to send to an assembly function
-    pub fn batch_size(&mut self, size: usize) {
+    pub fn set_batch_size(&mut self, size: usize) {
         self.options.batch_size = size;
+    }
+
+    /// Get the maximum size of a batch of cells to send to an assembly function
+    pub fn batch_size(&self) -> usize {
+        self.options.batch_size
     }
 
     /// Assemble the singular contributions

@@ -12,11 +12,16 @@ pub enum DType {
     C64 = 3,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-#[repr(u8)]
-pub enum RealDType {
-    F32 = 0,
-    F64 = 1,
+impl DType {
+    fn from(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(DType::F32),
+            1 => Some(DType::F64),
+            2 => Some(DType::C32),
+            3 => Some(DType::C64),
+            _ => None,
+        }
+    }
 }
 
 mod function {
@@ -660,6 +665,1692 @@ mod function {
                     },
                 },
             },
+        }
+    }
+}
+
+mod assembly {
+    use super::DType;
+    use crate::{
+        assembly::boundary::integrands::{
+            AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandScalarProduct,
+            BoundaryIntegrandSum, DoubleLayerBoundaryIntegrand,
+            HypersingularCurlCurlBoundaryIntegrand, HypersingularNormalNormalBoundaryIntegrand,
+            SingleLayerBoundaryIntegrand,
+        },
+        assembly::boundary::BoundaryAssembler,
+        assembly::kernels::KernelEvaluator,
+        traits::{BoundaryIntegrand, KernelEvaluator as KernelEvaluatorTrait},
+    };
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
+    use ndelement::types::ReferenceCellType;
+    use rlst::{c32, c64, MatrixInverse, RlstScalar};
+    use std::ffi::c_void;
+
+    type LaplaceHypersingularBoundaryIntegrand<T> = HypersingularCurlCurlBoundaryIntegrand<T>;
+    type HelmholtzHypersingularBoundaryIntegrand<T> = BoundaryIntegrandSum<
+        T,
+        HypersingularCurlCurlBoundaryIntegrand<T>,
+        BoundaryIntegrandScalarProduct<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
+    >;
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    #[repr(u8)]
+    pub enum BoundaryOperator {
+        SingleLayer = 0,
+        DoubleLayer = 1,
+        AdjointDoubleLayer = 2,
+        Hypersingular = 3,
+        ElectricField = 4,
+        MagneticField = 5,
+    }
+
+    impl BoundaryOperator {
+        fn from(value: u8) -> Option<Self> {
+            match value {
+                0 => Some(BoundaryOperator::SingleLayer),
+                1 => Some(BoundaryOperator::DoubleLayer),
+                2 => Some(BoundaryOperator::AdjointDoubleLayer),
+                3 => Some(BoundaryOperator::Hypersingular),
+                4 => Some(BoundaryOperator::ElectricField),
+                5 => Some(BoundaryOperator::MagneticField),
+                _ => None,
+            }
+        }
+    }
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    #[repr(u8)]
+    pub enum KernelType {
+        Laplace = 0,
+        Helmholtz = 1,
+    }
+
+    #[repr(C)]
+    pub struct BoundaryAssemblerWrapper {
+        pub assembler: *const c_void,
+        pub itype: BoundaryOperator,
+        pub ktype: KernelType,
+        pub dtype: DType,
+    }
+    impl Drop for BoundaryAssemblerWrapper {
+        fn drop(&mut self) {
+            let Self {
+                assembler,
+                itype,
+                ktype,
+                dtype,
+            } = self;
+            match ktype {
+                KernelType::Laplace => match itype {
+                    BoundaryOperator::SingleLayer => match dtype {
+                        DType::F32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f32,
+                                        SingleLayerBoundaryIntegrand<f32>,
+                                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    >,
+                            )
+                        }),
+                        DType::F64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f64,
+                                        SingleLayerBoundaryIntegrand<f64>,
+                                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    BoundaryOperator::DoubleLayer => match dtype {
+                        DType::F32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f32,
+                                        DoubleLayerBoundaryIntegrand<f32>,
+                                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    >,
+                            )
+                        }),
+                        DType::F64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f64,
+                                        DoubleLayerBoundaryIntegrand<f64>,
+                                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    BoundaryOperator::AdjointDoubleLayer => match dtype {
+                        DType::F32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f32,
+                                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    >,
+                            )
+                        }),
+                        DType::F64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f64,
+                                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    BoundaryOperator::Hypersingular => match dtype {
+                        DType::F32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f32,
+                                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    >,
+                            )
+                        }),
+                        DType::F64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        f64,
+                                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    _ => {
+                        panic!("Invalid operator");
+                    }
+                },
+                KernelType::Helmholtz => match itype {
+                    BoundaryOperator::SingleLayer => match dtype {
+                        DType::C32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c32,
+                                        SingleLayerBoundaryIntegrand<c32>,
+                                        KernelEvaluator<c32, Laplace3dKernel<c32>>,
+                                    >,
+                            )
+                        }),
+                        DType::C64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c64,
+                                        SingleLayerBoundaryIntegrand<c64>,
+                                        KernelEvaluator<c64, Laplace3dKernel<c64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    BoundaryOperator::DoubleLayer => match dtype {
+                        DType::C32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c32,
+                                        DoubleLayerBoundaryIntegrand<c32>,
+                                        KernelEvaluator<c32, Laplace3dKernel<c32>>,
+                                    >,
+                            )
+                        }),
+                        DType::C64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c64,
+                                        DoubleLayerBoundaryIntegrand<c64>,
+                                        KernelEvaluator<c64, Laplace3dKernel<c64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    BoundaryOperator::AdjointDoubleLayer => match dtype {
+                        DType::C32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c32,
+                                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                                        KernelEvaluator<c32, Laplace3dKernel<c32>>,
+                                    >,
+                            )
+                        }),
+                        DType::C64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c64,
+                                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                                        KernelEvaluator<c64, Laplace3dKernel<c64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    BoundaryOperator::Hypersingular => match dtype {
+                        DType::C32 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c32,
+                                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                                        KernelEvaluator<c32, Laplace3dKernel<c32>>,
+                                    >,
+                            )
+                        }),
+                        DType::C64 => drop(unsafe {
+                            Box::from_raw(
+                                *assembler
+                                    as *mut BoundaryAssembler<
+                                        c64,
+                                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                                        KernelEvaluator<c64, Laplace3dKernel<c64>>,
+                                    >,
+                            )
+                        }),
+                        _ => {
+                            panic!("Invalid data type");
+                        }
+                    },
+                    _ => {
+                        panic!("Invalid operator");
+                    }
+                },
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn free_boundary_assembler(a: *mut BoundaryAssemblerWrapper) {
+        assert!(!a.is_null());
+        unsafe { drop(Box::from_raw(a)) }
+    }
+
+    pub(crate) unsafe fn extract_boundary_assembler<
+        T: RlstScalar + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluatorTrait<T = T>,
+    >(
+        assembler: *const BoundaryAssemblerWrapper,
+    ) -> *const BoundaryAssembler<T, Integrand, Kernel> {
+        (*assembler).assembler as *const BoundaryAssembler<T, Integrand, Kernel>
+    }
+
+    pub(crate) unsafe fn extract_boundary_assembler_mut<
+        T: RlstScalar + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluatorTrait<T = T>,
+    >(
+        assembler: *const BoundaryAssemblerWrapper,
+    ) -> *mut BoundaryAssembler<T, Integrand, Kernel> {
+        (*assembler).assembler as *mut BoundaryAssembler<T, Integrand, Kernel>
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_has_quadrature_degree(
+        assembler: *mut BoundaryAssemblerWrapper,
+        cell: u8,
+    ) -> bool {
+        let cell = ReferenceCellType::from(cell).unwrap();
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+        .is_some()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_set_quadrature_degree(
+        assembler: *mut BoundaryAssemblerWrapper,
+        cell: u8,
+        degree: usize,
+    ) {
+        let cell = ReferenceCellType::from(cell).unwrap();
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_quadrature_degree(cell, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_quadrature_degree(
+        assembler: *mut BoundaryAssemblerWrapper,
+        cell: u8,
+    ) -> usize {
+        let cell = ReferenceCellType::from(cell).unwrap();
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .quadrature_degree(cell),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+        .unwrap()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_has_singular_quadrature_degree(
+        assembler: *mut BoundaryAssemblerWrapper,
+        cell0: u8,
+        cell1: u8,
+    ) -> bool {
+        let cells = (
+            ReferenceCellType::from(cell0).unwrap(),
+            ReferenceCellType::from(cell1).unwrap(),
+        );
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+        .is_some()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_set_singular_quadrature_degree(
+        assembler: *mut BoundaryAssemblerWrapper,
+        cell0: u8,
+        cell1: u8,
+        degree: usize,
+    ) {
+        let cells = (
+            ReferenceCellType::from(cell0).unwrap(),
+            ReferenceCellType::from(cell1).unwrap(),
+        );
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_singular_quadrature_degree(cells, degree),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_singular_quadrature_degree(
+        assembler: *mut BoundaryAssemblerWrapper,
+        cell0: u8,
+        cell1: u8,
+    ) -> usize {
+        let cells = (
+            ReferenceCellType::from(cell0).unwrap(),
+            ReferenceCellType::from(cell1).unwrap(),
+        );
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .singular_quadrature_degree(cells),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+        .unwrap()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_set_batch_size(
+        assembler: *mut BoundaryAssemblerWrapper,
+        batch_size: usize,
+    ) {
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler_mut::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::F64 => (*extract_boundary_assembler_mut::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler_mut::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    DType::C64 => (*extract_boundary_assembler_mut::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .set_batch_size(batch_size),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_batch_size(
+        assembler: *mut BoundaryAssemblerWrapper,
+    ) -> usize {
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        SingleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        SingleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        DoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        DoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        AdjointDoubleLayerBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        AdjointDoubleLayerBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => (*extract_boundary_assembler::<
+                        f32,
+                        LaplaceHypersingularBoundaryIntegrand<f32>,
+                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::F64 => (*extract_boundary_assembler::<
+                        f64,
+                        LaplaceHypersingularBoundaryIntegrand<f64>,
+                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        SingleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        SingleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        DoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        DoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        AdjointDoubleLayerBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        AdjointDoubleLayerBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => (*extract_boundary_assembler::<
+                        c32,
+                        HelmholtzHypersingularBoundaryIntegrand<c32>,
+                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                    >(assembler))
+                    .batch_size(),
+                    DType::C64 => (*extract_boundary_assembler::<
+                        c64,
+                        HelmholtzHypersingularBoundaryIntegrand<c64>,
+                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                    >(assembler))
+                    .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_dtype(
+        assembler: *mut BoundaryAssemblerWrapper,
+    ) -> u8 {
+        (*assembler).dtype as u8
+    }
+
+    unsafe fn laplace_boundary_assembler_new_internal<T: RlstScalar + MatrixInverse>(
+        operator: BoundaryOperator,
+        dtype: DType,
+    ) -> *const BoundaryAssemblerWrapper {
+        Box::into_raw(Box::new(BoundaryAssemblerWrapper {
+            assembler: match operator {
+                BoundaryOperator::SingleLayer => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_laplace_single_layer(),
+                )) as *const c_void,
+                BoundaryOperator::DoubleLayer => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_laplace_double_layer(),
+                )) as *const c_void,
+                BoundaryOperator::AdjointDoubleLayer => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_laplace_adjoint_double_layer(),
+                )) as *const c_void,
+                BoundaryOperator::Hypersingular => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_laplace_hypersingular(),
+                )) as *const c_void,
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            itype: operator,
+            ktype: KernelType::Laplace,
+            dtype,
+        }))
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_boundary_assembler_new(
+        operator: u8,
+        dtype: u8,
+    ) -> *const BoundaryAssemblerWrapper {
+        let operator = BoundaryOperator::from(operator).unwrap();
+        let dtype = DType::from(dtype).unwrap();
+        match dtype {
+            DType::F32 => laplace_boundary_assembler_new_internal::<f32>(operator, dtype),
+            DType::F64 => laplace_boundary_assembler_new_internal::<f64>(operator, dtype),
+            // DType::C32 => laplace_boundary_assembler_new_internal::<c32>(operator, dtype),
+            // DType::C64 => laplace_boundary_assembler_new_internal::<c64>(operator, dtype),
+            _ => {
+                panic!("Invalid data type");
+            }
+        }
+    }
+
+    unsafe fn helmholtz_boundary_assembler_new_internal<
+        T: RlstScalar<Complex = T> + MatrixInverse,
+    >(
+        wavenumber: T::Real,
+        operator: BoundaryOperator,
+        dtype: DType,
+    ) -> *const BoundaryAssemblerWrapper {
+        Box::into_raw(Box::new(BoundaryAssemblerWrapper {
+            assembler: match operator {
+                BoundaryOperator::SingleLayer => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_helmholtz_single_layer(wavenumber),
+                )) as *const c_void,
+                BoundaryOperator::DoubleLayer => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_helmholtz_double_layer(wavenumber),
+                )) as *const c_void,
+                BoundaryOperator::AdjointDoubleLayer => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_helmholtz_adjoint_double_layer(wavenumber),
+                )) as *const c_void,
+                BoundaryOperator::Hypersingular => Box::into_raw(Box::new(
+                    BoundaryAssembler::<T, _, _>::new_helmholtz_hypersingular(wavenumber),
+                )) as *const c_void,
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            itype: operator,
+            ktype: KernelType::Helmholtz,
+            dtype,
+        }))
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_boundary_assembler_new(
+        wavenumber: *const c_void,
+        operator: u8,
+        dtype: u8,
+    ) -> *const BoundaryAssemblerWrapper {
+        let operator = BoundaryOperator::from(operator).unwrap();
+        let dtype = DType::from(dtype).unwrap();
+        match dtype {
+            DType::C32 => helmholtz_boundary_assembler_new_internal::<c32>(
+                *(wavenumber as *const f32),
+                operator,
+                dtype,
+            ),
+            DType::C64 => helmholtz_boundary_assembler_new_internal::<c64>(
+                *(wavenumber as *const f64),
+                operator,
+                dtype,
+            ),
+            _ => {
+                panic!("Invalid data type");
+            }
         }
     }
 }

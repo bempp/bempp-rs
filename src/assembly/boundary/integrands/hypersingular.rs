@@ -2,11 +2,13 @@
 use crate::traits::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 use rlst::RlstScalar;
 
+/// Integrand for the curl curl term of a hypersingular boundary operator
 pub struct HypersingularCurlCurlBoundaryIntegrand<T: RlstScalar> {
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> HypersingularCurlCurlBoundaryIntegrand<T> {
+    /// Create new
     pub fn new() -> Self {
         Self {
             _t: std::marker::PhantomData,
@@ -52,11 +54,13 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularCurlCurlBoundaryIn
     }
 }
 
+/// Integrand for the normal normal term of a hypersingular boundary operator
 pub struct HypersingularNormalNormalBoundaryIntegrand<T: RlstScalar> {
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> HypersingularNormalNormalBoundaryIntegrand<T> {
+    /// Create new
     pub fn new() -> Self {
         Self {
             _t: std::marker::PhantomData,
