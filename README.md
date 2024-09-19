@@ -3,6 +3,22 @@
 Bempp-rs is an open-source boundary element library written in Rust that can be used to assemble all the standard integral
 kernels for Laplace and Helmholtz problems.
 
+## Using bempp-rs
+### Rust
+You can use the latest release of bempp by adding the following to `[dependencies]` section of your Cargo.toml file:
+
+```toml
+bempp = "0.1.0"
+```
+
+### Python
+You can install the latest release of bempp by running:
+
+```bash
+pip3 install bempp-rs
+```
+
+
 ## Documentation
 The latest documentation of the main branch of this repo is available at [bempp.github.io/bempp-rs/](https://bempp.github.io/bempp-rs/).
 

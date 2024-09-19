@@ -2,7 +2,7 @@
 use super::CellGeometry;
 use crate::assembly::common::RlstArray;
 use crate::traits::FunctionSpace;
-use rlst::RlstScalar;
+use rlst::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape};
 
 pub unsafe trait PotentialIntegrand {
     //! Integrand
@@ -42,10 +42,17 @@ pub trait PotentialAssembly {
     type T: RlstScalar;
 
     /// Assemble into a dense matrix
-    fn assemble_into_dense<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_into_dense<
+        Space: FunctionSpace<T = Self::T> + Sync,
+        Array2Mut: RandomAccessMut<2, Item = Self::T> + Shape<2> + RawAccessMut<Item = Self::T>,
+        Array2: RandomAccessByRef<2, Item = <Self::T as RlstScalar>::Real>
+            + Shape<2>
+            + RawAccess<Item = <Self::T as RlstScalar>::Real>
+            + Sync,
+    >(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut Array2Mut,
         space: &Space,
-        points: &RlstArray<<Self::T as RlstScalar>::Real, 2>,
+        points: &Array2,
     );
 }

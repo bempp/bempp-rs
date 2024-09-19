@@ -14,8 +14,8 @@ use ndelement::types::ReferenceCellType;
 use ndgrid::traits::Grid;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array4, DefaultIterator, MatrixInverse, RandomAccessMut,
-    RawAccess, RawAccessMut, RlstScalar, Shape,
+    rlst_dynamic_array2, rlst_dynamic_array4, DefaultIterator, MatrixInverse, RandomAccessByRef,
+    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
 };
 use std::collections::HashMap;
 
@@ -26,13 +26,14 @@ fn assemble_batch<
     Space: FunctionSpace<T = T> + Sync,
     Integrand: PotentialIntegrand<T = T>,
     Kernel: KernelEvaluator<T = T>,
+    Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2> + RawAccess<Item = T::Real> + Sync,
 >(
     assembler: &PotentialAssembler<T, Integrand, Kernel>,
     deriv_size: usize,
     output: &RawData2D<T>,
     cell_type: ReferenceCellType,
     space: &Space,
-    evaluation_points: &RlstArray<T::Real, 2>,
+    evaluation_points: &Array2,
     cells: &[usize],
     points: &RlstArray<T::Real, 2>,
     weights: &[T::Real],
@@ -135,20 +136,33 @@ impl<
     }
 
     /// Set (non-singular) quadrature degree for a cell type
-    pub fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+    pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
         *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
     }
 
+    /// Get (non-singular) quadrature degree for a cell type
+    pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
+        self.options.quadrature_degrees.get(&cell).copied()
+    }
+
     /// Set the maximum size of a batch of cells to send to an assembly function
-    pub fn batch_size(&mut self, size: usize) {
+    pub fn set_batch_size(&mut self, size: usize) {
         self.options.batch_size = size;
     }
 
-    fn assemble<Space: FunctionSpace<T = T> + Sync>(
+    /// Get the maximum size of a batch of cells to send to an assembly function
+    pub fn batch_size(&self) -> usize {
+        self.options.batch_size
+    }
+
+    fn assemble<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2> + RawAccess<Item = T::Real> + Sync,
+    >(
         &self,
         output: &RawData2D<T>,
         space: &Space,
-        points: &RlstArray<T::Real, 2>,
+        points: &Array2,
         colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
         if !space.is_serial() {
@@ -227,11 +241,15 @@ impl<
 {
     type T = T;
 
-    fn assemble_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2Mut: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2> + RawAccess<Item = T::Real> + Sync,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2Mut,
         space: &Space,
-        points: &RlstArray<T::Real, 2>,
+        points: &Array2,
     ) {
         if !space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
