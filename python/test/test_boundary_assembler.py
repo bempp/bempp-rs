@@ -135,3 +135,138 @@ def test_single_layer_sphere0_dp0():
     )
 
     assert np.allclose(mat, from_cl, rtol=1e-4)
+
+
+@pytest.mark.parametrize(
+    "operator",
+    [
+        OperatorType.SingleLayer,
+        OperatorType.DoubleLayer,
+        OperatorType.AdjointDoubleLayer,
+        OperatorType.Hypersingular,
+    ],
+)
+@pytest.mark.parametrize("test_degree", range(3))
+@pytest.mark.parametrize("trial_degree", range(3))
+def test_assemble_singular(operator, test_degree, trial_degree):
+    grid = regular_sphere(0)
+    test_element = create_family(Family.Lagrange, test_degree, Continuity.Discontinuous)
+    test_space = function_space(grid, test_element)
+    trial_element = create_family(Family.Lagrange, trial_degree, Continuity.Discontinuous)
+    trial_space = function_space(grid, trial_element)
+
+    a = create_laplace_assembler(operator)
+    mat = a.assemble_singular(trial_space, test_space)
+
+    dense = a.assemble_into_dense(trial_space, test_space)
+    for i, j, value in zip(mat.row, mat.col, mat.data):
+        assert np.isclose(dense[i, j], value)
+
+
+@pytest.mark.parametrize(
+    "operator",
+    [
+        OperatorType.SingleLayer,
+        OperatorType.DoubleLayer,
+        OperatorType.AdjointDoubleLayer,
+        OperatorType.Hypersingular,
+    ],
+)
+@pytest.mark.parametrize(
+    "test_degree, test_continuity",
+    [
+        (0, Continuity.Discontinuous),
+        (1, Continuity.Discontinuous),
+        (1, Continuity.Standard),
+        (2, Continuity.Standard),
+    ],
+)
+@pytest.mark.parametrize(
+    "trial_degree, trial_continuity",
+    [
+        (0, Continuity.Discontinuous),
+        (1, Continuity.Discontinuous),
+        (1, Continuity.Standard),
+        (2, Continuity.Standard),
+    ],
+)
+def test_assemble_singular_sparse_vs_dense(
+    operator, test_degree, test_continuity, trial_degree, trial_continuity
+):
+    grid = regular_sphere(0)
+    test_element = create_family(Family.Lagrange, test_degree, test_continuity)
+    test_space = function_space(grid, test_element)
+    trial_element = create_family(Family.Lagrange, trial_degree, trial_continuity)
+    trial_space = function_space(grid, trial_element)
+
+    a = create_laplace_assembler(operator)
+    mat = a.assemble_singular(trial_space, test_space)
+
+    dense = a.assemble_singular_into_dense(trial_space, test_space)
+    assert np.allclose(dense, mat.todense())
+
+
+@pytest.mark.parametrize(
+    "operator",
+    [
+        OperatorType.SingleLayer,
+        OperatorType.DoubleLayer,
+        OperatorType.AdjointDoubleLayer,
+        OperatorType.Hypersingular,
+    ],
+)
+@pytest.mark.parametrize("test_degree", range(3))
+@pytest.mark.parametrize("trial_degree", range(3))
+def test_assemble_singular_correction(operator, test_degree, trial_degree):
+    grid = regular_sphere(0)
+    test_element = create_family(Family.Lagrange, test_degree, Continuity.Discontinuous)
+    test_space = function_space(grid, test_element)
+    trial_element = create_family(Family.Lagrange, trial_degree, Continuity.Discontinuous)
+    trial_space = function_space(grid, trial_element)
+
+    a = create_laplace_assembler(operator)
+    a.assemble_singular_correction(trial_space, test_space)
+
+
+@pytest.mark.parametrize(
+    "operator",
+    [
+        OperatorType.SingleLayer,
+        OperatorType.DoubleLayer,
+        OperatorType.AdjointDoubleLayer,
+        OperatorType.Hypersingular,
+    ],
+)
+@pytest.mark.parametrize(
+    "test_degree, test_continuity",
+    [
+        (0, Continuity.Discontinuous),
+        (1, Continuity.Discontinuous),
+        (1, Continuity.Standard),
+        (2, Continuity.Standard),
+    ],
+)
+@pytest.mark.parametrize(
+    "trial_degree, trial_continuity",
+    [
+        (0, Continuity.Discontinuous),
+        (1, Continuity.Discontinuous),
+        (1, Continuity.Standard),
+        (2, Continuity.Standard),
+    ],
+)
+def test_assemble_singular_and_nonsingular(
+    operator, test_degree, test_continuity, trial_degree, trial_continuity
+):
+    grid = regular_sphere(0)
+    test_element = create_family(Family.Lagrange, test_degree, test_continuity)
+    test_space = function_space(grid, test_element)
+    trial_element = create_family(Family.Lagrange, trial_degree, trial_continuity)
+    trial_space = function_space(grid, trial_element)
+
+    a = create_laplace_assembler(operator)
+    mat = a.assemble_singular_into_dense(trial_space, test_space)
+    mat += a.assemble_nonsingular_into_dense(trial_space, test_space)
+
+    mat2 = a.assemble_into_dense(trial_space, test_space)
+    assert np.allclose(mat, mat2)

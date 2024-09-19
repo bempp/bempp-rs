@@ -21,6 +21,7 @@ classifiers = [
 dependencies = [
     "maturin>=1.7",
     "numpy",
+    "scipy",
     "cffi",
     'patchelf; platform_system == "Linux"',
     "ndelement",

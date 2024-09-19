@@ -528,7 +528,7 @@ impl<
     }
 
     /// Assemble the singular contributions
-    fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -692,7 +692,7 @@ impl<
     /// Assemble the singular correction
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
-    fn assemble_singular_correction<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_singular_correction<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -823,7 +823,7 @@ impl<
             )
     }
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
         &self,
         output: &RawData2D<T>,
         trial_space: &Space,

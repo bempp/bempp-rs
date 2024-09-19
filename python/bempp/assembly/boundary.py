@@ -8,6 +8,7 @@ from bempp.function_space import FunctionSpace
 from ndelement.reference_cell import ReferenceCellType
 from enum import Enum
 from _cffi_backend import _CDataBase
+from scipy.sparse import coo_matrix
 
 _dtypes = {
     0: np.float32,
@@ -25,6 +26,20 @@ def _dtype_value(dtype):
         if j == dtype:
             return i
     raise TypeError("Invalid data type")
+
+
+def _convert_to_scipy(rs_sparse_mat: _CDataBase, dtype: typing.Type[np.floating]) -> coo_matrix:
+    """Convert a pointer to a sparse matrix in Rust to a SciPy COO matrix."""
+    shape = (_lib.sparse_shape0(rs_sparse_mat), _lib.sparse_shape1(rs_sparse_mat))
+    size = _lib.sparse_data_size(rs_sparse_mat)
+    data = np.empty(size, dtype=dtype)
+    rows = np.empty(size, dtype=np.uintp)
+    cols = np.empty(size, dtype=np.uintp)
+    _lib.sparse_data(rs_sparse_mat, _ffi.cast("void*", data.ctypes.data))
+    _lib.sparse_rows(rs_sparse_mat, _ffi.cast("uintptr_t*", rows.ctypes.data))
+    _lib.sparse_cols(rs_sparse_mat, _ffi.cast("uintptr_t*", cols.ctypes.data))
+    _lib.free_sparse_matrix(rs_sparse_mat)
+    return coo_matrix((data, (rows, cols)), shape=shape)
 
 
 class OperatorType(Enum):
@@ -54,6 +69,7 @@ class BoundaryAssembler(object):
     def assemble_into_dense(
         self, trial_space: FunctionSpace, test_space: FunctionSpace
     ) -> npt.NDArray[np.floating]:
+        """Assemble operator into a dense matrix."""
         assert trial_space.dtype == test_space.dtype == self.dtype
         output = np.zeros(
             (test_space.global_size, trial_space.global_size), dtype=self.dtype, order="F"
@@ -65,6 +81,66 @@ class BoundaryAssembler(object):
             test_space._rs_space,
         )
         return output
+
+    def assemble_singular_into_dense(
+        self, trial_space: FunctionSpace, test_space: FunctionSpace
+    ) -> npt.NDArray[np.floating]:
+        """Assemble the singular part of an operator into a dense matrix."""
+        assert trial_space.dtype == test_space.dtype == self.dtype
+        output = np.zeros(
+            (test_space.global_size, trial_space.global_size), dtype=self.dtype, order="F"
+        )
+        _lib.boundary_assembler_assemble_singular_into_dense(
+            self._rs_assembler,
+            _ffi.cast("void*", output.ctypes.data),
+            trial_space._rs_space,
+            test_space._rs_space,
+        )
+        return output
+
+    def assemble_nonsingular_into_dense(
+        self, trial_space: FunctionSpace, test_space: FunctionSpace
+    ) -> npt.NDArray[np.floating]:
+        """Assemble the non-singular part of an operator into a dense matrix."""
+        assert trial_space.dtype == test_space.dtype == self.dtype
+        output = np.zeros(
+            (test_space.global_size, trial_space.global_size), dtype=self.dtype, order="F"
+        )
+        _lib.boundary_assembler_assemble_nonsingular_into_dense(
+            self._rs_assembler,
+            _ffi.cast("void*", output.ctypes.data),
+            trial_space._rs_space,
+            test_space._rs_space,
+        )
+        return output
+
+    def assemble_singular(
+        self, trial_space: FunctionSpace, test_space: FunctionSpace
+    ) -> coo_matrix:
+        """Assemble the singular part of an operator into a CSR matrix."""
+        assert trial_space.dtype == test_space.dtype == self.dtype
+        return _convert_to_scipy(
+            _lib.boundary_assembler_assemble_singular(
+                self._rs_assembler,
+                trial_space._rs_space,
+                test_space._rs_space,
+            ),
+            self.dtype,
+        )
+
+    def assemble_singular_correction(
+        self, trial_space: FunctionSpace, test_space: FunctionSpace
+    ) -> coo_matrix:
+        """Assemble the singular correction of an operator into a CSR matrix."""
+        assert trial_space.dtype == test_space.dtype == self.dtype
+        return _convert_to_scipy(
+            _lib.boundary_assembler_assemble_singular_correction(
+                self._rs_assembler,
+                trial_space._rs_space,
+                test_space._rs_space,
+            ),
+            self.dtype,
+        )
 
     def set_quadrature_degree(self, cell: ReferenceCellType, degree: int):
         """Set the (non-singular) quadrature degree for a cell type."""
