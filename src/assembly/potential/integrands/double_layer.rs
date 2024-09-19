@@ -3,11 +3,13 @@ use crate::assembly::common::RlstArray;
 use crate::traits::{CellGeometry, PotentialIntegrand};
 use rlst::{RlstScalar, UnsafeRandomAccessByRef};
 
+/// Integrand for a double layer potential operator
 pub struct DoubleLayerPotentialIntegrand<T: RlstScalar> {
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> DoubleLayerPotentialIntegrand<T> {
+    /// Create new
     pub fn new() -> Self {
         Self {
             _t: std::marker::PhantomData,

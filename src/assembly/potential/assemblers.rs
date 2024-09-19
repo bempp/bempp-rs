@@ -135,13 +135,23 @@ impl<
     }
 
     /// Set (non-singular) quadrature degree for a cell type
-    pub fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+    pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
         *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
     }
 
+    /// Get (non-singular) quadrature degree for a cell type
+    pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
+        self.options.quadrature_degrees.get(&cell).copied()
+    }
+
     /// Set the maximum size of a batch of cells to send to an assembly function
-    pub fn batch_size(&mut self, size: usize) {
+    pub fn set_batch_size(&mut self, size: usize) {
         self.options.batch_size = size;
+    }
+
+    /// Get the maximum size of a batch of cells to send to an assembly function
+    pub fn batch_size(&self) -> usize {
+        self.options.batch_size
     }
 
     fn assemble<Space: FunctionSpace<T = T> + Sync>(
