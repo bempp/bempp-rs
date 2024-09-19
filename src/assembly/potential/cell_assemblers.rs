@@ -5,8 +5,8 @@ use crate::traits::{CellAssembler, KernelEvaluator, PotentialIntegrand};
 use ndgrid::traits::GeometryMap;
 use num::Zero;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, DefaultIteratorMut, RawAccess, RawAccessMut,
-    RlstScalar,
+    rlst_dynamic_array2, rlst_dynamic_array3, DefaultIteratorMut, RandomAccessByRef, RawAccess,
+    RawAccessMut, RlstScalar, Shape,
 };
 
 pub struct PotentialCellAssembler<
@@ -15,6 +15,7 @@ pub struct PotentialCellAssembler<
     I: PotentialIntegrand<T = T>,
     G: GeometryMap<T = T::Real>,
     K: KernelEvaluator<T = T>,
+    Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2> + RawAccess<Item = T::Real> + Sync,
 > {
     integrand: &'a I,
     kernel: &'a K,
@@ -25,7 +26,7 @@ pub struct PotentialCellAssembler<
     normals: RlstArray<T::Real, 2>,
     jacobians: RlstArray<T::Real, 2>,
     jdet: Vec<T::Real>,
-    evaluation_points: &'a RlstArray<T::Real, 2>,
+    evaluation_points: &'a Array2,
     weights: &'a [T::Real],
     cell: usize,
 }
@@ -36,7 +37,8 @@ impl<
         I: PotentialIntegrand<T = T>,
         G: GeometryMap<T = T::Real>,
         K: KernelEvaluator<T = T>,
-    > PotentialCellAssembler<'a, T, I, G, K>
+        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2> + RawAccess<Item = T::Real> + Sync,
+    > PotentialCellAssembler<'a, T, I, G, K, Array2>
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -47,7 +49,7 @@ impl<
         kernel: &'a K,
         evaluator: G,
         table: &'a RlstArray<T, 4>,
-        evaluation_points: &'a RlstArray<T::Real, 2>,
+        evaluation_points: &'a Array2,
         weights: &'a [T::Real],
     ) -> Self {
         Self {
@@ -72,7 +74,8 @@ impl<
         I: PotentialIntegrand<T = T>,
         G: GeometryMap<T = T::Real>,
         K: KernelEvaluator<T = T>,
-    > CellAssembler for PotentialCellAssembler<'a, T, I, G, K>
+        Array2: RandomAccessByRef<2, Item = T::Real> + Shape<2> + RawAccess<Item = T::Real> + Sync,
+    > CellAssembler for PotentialCellAssembler<'a, T, I, G, K, Array2>
 {
     type T = T;
     fn set_cell(&mut self, cell: usize) {

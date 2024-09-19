@@ -8,7 +8,6 @@ from bempp.function_space import FunctionSpace
 from ndelement.reference_cell import ReferenceCellType
 from enum import Enum
 from _cffi_backend import _CDataBase
-from scipy.sparse import coo_matrix
 
 _dtypes = {
     0: np.float32,
@@ -47,6 +46,23 @@ class PotentialAssembler(object):
         """Delete."""
         if self._owned:
             _lib.free_potential_assembler(self._rs_assembler)
+
+    def assemble_into_dense(
+        self,
+        space: FunctionSpace,
+        points: npt.NDArray[np.floating],
+    ) -> npt.NDArray[np.floating]:
+        """Assemble operator into a dense matrix."""
+        assert space.dtype == points.dtype == self.dtype
+        output = np.zeros((points.shape[0], space.global_size), dtype=self.dtype, order="F")
+        _lib.potential_assembler_assemble_into_dense(
+            self._rs_assembler,
+            _ffi.cast("void*", output.ctypes.data),
+            space._rs_space,
+            _ffi.cast("void*", points.ctypes.data),
+            points.shape[0],
+        )
+        return output
 
     def set_quadrature_degree(self, cell: ReferenceCellType, degree: int):
         """Set the (non-singular) quadrature degree for a cell type."""

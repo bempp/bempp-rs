@@ -30,3 +30,52 @@ def test_create_assembler(otype):
     assert a.batch_size == 4
 
     assert a.dtype == np.float64
+
+
+def test_single_layer_sphere0_dp0():
+    grid = regular_sphere(0)
+    element = create_family(Family.Lagrange, 0, Continuity.Discontinuous)
+    space = function_space(grid, element)
+
+    a = create_laplace_assembler(OperatorType.SingleLayer)
+
+    points = np.array([[2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 2.0]])
+
+    mat = a.assemble_into_dense(space, points)
+
+    from_cl = np.array(
+        [
+            [
+                0.04038047926587569,
+                0.02879904511649957,
+                0.02879904511649957,
+                0.0403804792658757,
+                0.04038047926587569,
+                0.028799045116499562,
+                0.02879904511649957,
+                0.04038047926587571,
+            ],
+            [
+                0.0403804792658757,
+                0.04038047926587569,
+                0.028799045116499573,
+                0.02879904511649957,
+                0.04038047926587571,
+                0.04038047926587569,
+                0.028799045116499573,
+                0.028799045116499573,
+            ],
+            [
+                0.04038047926587571,
+                0.04038047926587571,
+                0.04038047926587571,
+                0.04038047926587571,
+                0.028799045116499573,
+                0.028799045116499573,
+                0.028799045116499573,
+                0.028799045116499573,
+            ],
+        ]
+    )
+
+    assert np.allclose(mat, from_cl, rtol=1e-4)
