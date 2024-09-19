@@ -2,7 +2,9 @@
 
 import typing
 import numpy as np
-from bempp._bempprs import lib as _lib
+import numpy.typing as npt
+from bempp._bempprs import lib as _lib, ffi as _ffi
+from bempp.function_space import FunctionSpace
 from ndelement.reference_cell import ReferenceCellType
 from enum import Enum
 from _cffi_backend import _CDataBase
@@ -48,6 +50,21 @@ class BoundaryAssembler(object):
         """Delete."""
         if self._owned:
             _lib.free_boundary_assembler(self._rs_assembler)
+
+    def assemble_into_dense(
+        self, trial_space: FunctionSpace, test_space: FunctionSpace
+    ) -> npt.NDArray[np.floating]:
+        assert trial_space.dtype == test_space.dtype == self.dtype
+        output = np.zeros(
+            (test_space.global_size, trial_space.global_size), dtype=self.dtype, order="F"
+        )
+        _lib.boundary_assembler_assemble_into_dense(
+            self._rs_assembler,
+            _ffi.cast("void*", output.ctypes.data),
+            trial_space._rs_space,
+            test_space._rs_space,
+        )
+        return output
 
     def set_quadrature_degree(self, cell: ReferenceCellType, degree: int):
         """Set the (non-singular) quadrature degree for a cell type."""

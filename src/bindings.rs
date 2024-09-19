@@ -670,6 +670,7 @@ mod function {
 }
 
 mod assembly {
+    use super::function::{extract_space, FunctionSpaceWrapper, GridType, SpaceType};
     use super::DType;
     use crate::{
         assembly::boundary::integrands::{
@@ -680,12 +681,18 @@ mod assembly {
         },
         assembly::boundary::BoundaryAssembler,
         assembly::kernels::KernelEvaluator,
-        traits::{BoundaryIntegrand, KernelEvaluator as KernelEvaluatorTrait},
+        function::SerialFunctionSpace,
+        traits::{
+            BoundaryAssembly, BoundaryIntegrand, FunctionSpace,
+            KernelEvaluator as KernelEvaluatorTrait,
+        },
     };
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
-    use ndelement::types::ReferenceCellType;
-    use rlst::{c32, c64, MatrixInverse, RlstScalar};
+    use ndelement::{ciarlet::CiarletElement, types::ReferenceCellType};
+    use ndgrid::SingleElementGrid;
+    use rlst::{c32, c64, rlst_array_from_slice_mut2, MatrixInverse, RlstScalar};
     use std::ffi::c_void;
+    use std::slice::from_raw_parts_mut;
 
     type LaplaceHypersingularBoundaryIntegrand<T> = HypersingularCurlCurlBoundaryIntegrand<T>;
     type HelmholtzHypersingularBoundaryIntegrand<T> = BoundaryIntegrandSum<
@@ -2234,6 +2241,407 @@ mod assembly {
                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
                     >(assembler))
                     .batch_size(),
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+        }
+    }
+
+    unsafe fn boundary_assembler_assemble_into_dense_internal_real<
+        T: RlstScalar<Real = T> + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluatorTrait<T = T>,
+        Space: FunctionSpace<T = T> + Sync,
+    >(
+        assembler: *mut BoundaryAssemblerWrapper,
+        output: *mut c_void,
+        trial_space: *const FunctionSpaceWrapper,
+        test_space: *const FunctionSpaceWrapper,
+    ) {
+        let trial_dim = (*extract_space::<Space>(trial_space)).global_size();
+        let test_dim = (*extract_space::<Space>(test_space)).global_size();
+        let mut output = rlst_array_from_slice_mut2!(
+            from_raw_parts_mut(output as *mut T, trial_dim * test_dim),
+            [test_dim, trial_dim]
+        );
+
+        (*extract_boundary_assembler::<T, Integrand, Kernel>(assembler)).assemble_into_dense(
+            &mut output,
+            &*extract_space::<Space>(trial_space),
+            &*extract_space::<Space>(test_space),
+        )
+    }
+    unsafe fn boundary_assembler_assemble_into_dense_internal_complex<
+        T: RlstScalar<Complex = T> + MatrixInverse,
+        Integrand: BoundaryIntegrand<T = T>,
+        Kernel: KernelEvaluatorTrait<T = T>,
+        Space: FunctionSpace<T = T> + Sync,
+    >(
+        assembler: *mut BoundaryAssemblerWrapper,
+        output: *mut c_void,
+        trial_space: *const FunctionSpaceWrapper,
+        test_space: *const FunctionSpaceWrapper,
+    ) {
+        let trial_dim = (*extract_space::<Space>(trial_space)).global_size();
+        let test_dim = (*extract_space::<Space>(test_space)).global_size();
+        let mut output = rlst_array_from_slice_mut2!(
+            from_raw_parts_mut(output as *mut T, trial_dim * test_dim),
+            [test_dim, trial_dim]
+        );
+
+        (*extract_boundary_assembler::<T, Integrand, Kernel>(assembler)).assemble_into_dense(
+            &mut output,
+            &*extract_space::<Space>(trial_space),
+            &*extract_space::<Space>(test_space),
+        )
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn boundary_assembler_assemble_into_dense(
+        assembler: *mut BoundaryAssemblerWrapper,
+        output: *mut c_void,
+        trial_space: *const FunctionSpaceWrapper,
+        test_space: *const FunctionSpaceWrapper,
+    ) {
+        match (*assembler).dtype {
+            DType::F32 => {
+                assert_eq!((*trial_space).dtype, DType::F32);
+                assert_eq!((*test_space).dtype, DType::F32);
+            }
+            DType::F64 => {
+                assert_eq!((*trial_space).dtype, DType::F64);
+                assert_eq!((*test_space).dtype, DType::F64);
+            }
+            DType::C32 => {
+                assert_eq!((*trial_space).dtype, DType::F32);
+                assert_eq!((*test_space).dtype, DType::F32);
+            }
+            DType::C64 => {
+                assert_eq!((*trial_space).dtype, DType::F64);
+                assert_eq!((*test_space).dtype, DType::F64);
+            }
+        }
+        assert_eq!((*test_space).stype, (*trial_space).stype);
+        assert_eq!((*test_space).gtype, (*trial_space).gtype);
+        match (*assembler).ktype {
+            KernelType::Laplace => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::F32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f32,
+                                    SingleLayerBoundaryIntegrand<f32>,
+                                    KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    SerialFunctionSpace<
+                                        f32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::F64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f64,
+                                    SingleLayerBoundaryIntegrand<f64>,
+                                    KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    SerialFunctionSpace<
+                                        f64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::F32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f32,
+                                    DoubleLayerBoundaryIntegrand<f32>,
+                                    KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    SerialFunctionSpace<
+                                        f32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::F64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f64,
+                                    DoubleLayerBoundaryIntegrand<f64>,
+                                    KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    SerialFunctionSpace<
+                                        f64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::F32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f32,
+                                    AdjointDoubleLayerBoundaryIntegrand<f32>,
+                                    KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    SerialFunctionSpace<
+                                        f32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::F64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f64,
+                                    AdjointDoubleLayerBoundaryIntegrand<f64>,
+                                    KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    SerialFunctionSpace<
+                                        f64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::F32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f32,
+                                    LaplaceHypersingularBoundaryIntegrand<f32>,
+                                    KernelEvaluator<f32, Laplace3dKernel<f32>>,
+                                    SerialFunctionSpace<
+                                        f32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::F64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_real::<
+                                    f64,
+                                    LaplaceHypersingularBoundaryIntegrand<f64>,
+                                    KernelEvaluator<f64, Laplace3dKernel<f64>>,
+                                    SerialFunctionSpace<
+                                        f64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                _ => {
+                    panic!("Invalid operator");
+                }
+            },
+            KernelType::Helmholtz => match (*assembler).itype {
+                BoundaryOperator::SingleLayer => match (*assembler).dtype {
+                    DType::C32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c32,
+                                    SingleLayerBoundaryIntegrand<c32>,
+                                    KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                                    SerialFunctionSpace<
+                                        c32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::C64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c64,
+                                    SingleLayerBoundaryIntegrand<c64>,
+                                    KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                                    SerialFunctionSpace<
+                                        c64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::DoubleLayer => match (*assembler).dtype {
+                    DType::C32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c32,
+                                    DoubleLayerBoundaryIntegrand<c32>,
+                                    KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                                    SerialFunctionSpace<
+                                        c32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::C64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c64,
+                                    DoubleLayerBoundaryIntegrand<c64>,
+                                    KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                                    SerialFunctionSpace<
+                                        c64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::AdjointDoubleLayer => match (*assembler).dtype {
+                    DType::C32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c32,
+                                    AdjointDoubleLayerBoundaryIntegrand<c32>,
+                                    KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                                    SerialFunctionSpace<
+                                        c32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::C64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c64,
+                                    AdjointDoubleLayerBoundaryIntegrand<c64>,
+                                    KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                                    SerialFunctionSpace<
+                                        c64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    _ => {
+                        panic!("Invalid data type");
+                    }
+                },
+                BoundaryOperator::Hypersingular => match (*assembler).dtype {
+                    DType::C32 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c32,
+                                    HelmholtzHypersingularBoundaryIntegrand<c32>,
+                                    KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+                                    SerialFunctionSpace<
+                                        c32,
+                                        SingleElementGrid<f32, CiarletElement<f32>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
+                    DType::C64 => match (*trial_space).stype {
+                        SpaceType::SerialFunctionSpace => match (*trial_space).gtype {
+                            GridType::SerialSingleElementGrid => {
+                                boundary_assembler_assemble_into_dense_internal_complex::<
+                                    c64,
+                                    HelmholtzHypersingularBoundaryIntegrand<c64>,
+                                    KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+                                    SerialFunctionSpace<
+                                        c64,
+                                        SingleElementGrid<f64, CiarletElement<f64>>,
+                                    >,
+                                >(
+                                    assembler, output, trial_space, test_space
+                                );
+                            }
+                        },
+                    },
                     _ => {
                         panic!("Invalid data type");
                     }

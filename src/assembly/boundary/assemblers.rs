@@ -958,9 +958,12 @@ impl<
     > BoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
 {
     type T = T;
-    fn assemble_singular_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_singular_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -990,9 +993,12 @@ impl<
         .unwrap()
     }
 
-    fn assemble_singular_correction_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_singular_correction_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -1023,9 +1029,12 @@ impl<
         .unwrap()
     }
 
-    fn assemble_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -1042,9 +1051,12 @@ impl<
         self.assemble_singular_into_dense(output, trial_space, test_space);
     }
 
-    fn assemble_nonsingular_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_nonsingular_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
