@@ -8,7 +8,7 @@ kernels for Laplace and Helmholtz problems.
 You can use the latest release of bempp by adding the following to `[dependencies]` section of your Cargo.toml file:
 
 ```toml
-bempp = "0.1.0"
+bempp = "0.2.0"
 ```
 
 ### Python
