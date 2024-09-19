@@ -9,6 +9,7 @@ from ndgrid.grid import Grid
 from ndgrid.ownership import Owned, Ghost
 from ndelement.ciarlet import ElementFamily, CiarletElement
 from ndelement.reference_cell import ReferenceCellType
+from _cffi_backend import _CDataBase
 
 _dtypes = {
     0: np.float32,
@@ -23,13 +24,15 @@ _ctypes = {
 class FunctionSpace(object):
     """Function space."""
 
-    def __init__(self, rs_space):
+    def __init__(self, rs_space: _CDataBase, owned: bool = True):
         """Initialise."""
         self._rs_space = rs_space
+        self._owned = True
 
     def __del__(self):
         """Delete."""
-        _lib.free_space(self._rs_space)
+        if self._owned:
+            _lib.free_space(self._rs_space)
 
     def element(self, entity: ReferenceCellType) -> CiarletElement:
         """Get the grid that this space is defined on."""

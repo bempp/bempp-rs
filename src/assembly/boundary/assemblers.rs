@@ -484,12 +484,17 @@ impl<
     }
 
     /// Set (non-singular) quadrature degree for a cell type
-    pub fn quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+    pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
         *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
     }
 
+    /// Get (non-singular) quadrature degree for a cell type
+    pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
+        self.options.quadrature_degrees.get(&cell).copied()
+    }
+
     /// Set singular quadrature degree for a pair of cell types
-    pub fn singular_quadrature_degree(
+    pub fn set_singular_quadrature_degree(
         &mut self,
         cells: (ReferenceCellType, ReferenceCellType),
         degree: usize,
@@ -501,13 +506,29 @@ impl<
             .unwrap() = degree;
     }
 
+    /// Get singular quadrature degree for a pair of cell types
+    pub fn singular_quadrature_degree(
+        &self,
+        cells: (ReferenceCellType, ReferenceCellType),
+    ) -> Option<usize> {
+        self.options
+            .singular_quadrature_degrees
+            .get(&cells)
+            .copied()
+    }
+
     /// Set the maximum size of a batch of cells to send to an assembly function
-    pub fn batch_size(&mut self, size: usize) {
+    pub fn set_batch_size(&mut self, size: usize) {
         self.options.batch_size = size;
     }
 
+    /// Get the maximum size of a batch of cells to send to an assembly function
+    pub fn batch_size(&self) -> usize {
+        self.options.batch_size
+    }
+
     /// Assemble the singular contributions
-    fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -671,7 +692,7 @@ impl<
     /// Assemble the singular correction
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
-    fn assemble_singular_correction<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_singular_correction<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -802,7 +823,7 @@ impl<
             )
     }
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
         &self,
         output: &RawData2D<T>,
         trial_space: &Space,
@@ -937,9 +958,12 @@ impl<
     > BoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
 {
     type T = T;
-    fn assemble_singular_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_singular_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -969,9 +993,12 @@ impl<
         .unwrap()
     }
 
-    fn assemble_singular_correction_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_singular_correction_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -1002,9 +1029,12 @@ impl<
         .unwrap()
     }
 
-    fn assemble_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     ) {
@@ -1021,9 +1051,12 @@ impl<
         self.assemble_singular_into_dense(output, trial_space, test_space);
     }
 
-    fn assemble_nonsingular_into_dense<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_nonsingular_into_dense<
+        Space: FunctionSpace<T = T> + Sync,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
         &self,
-        output: &mut RlstArray<T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,

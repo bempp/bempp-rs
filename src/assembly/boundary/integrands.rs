@@ -27,6 +27,7 @@ pub struct BoundaryIntegrandSum<
 impl<T: RlstScalar, I0: BoundaryIntegrand<T = T>, I1: BoundaryIntegrand<T = T>>
     BoundaryIntegrandSum<T, I0, I1>
 {
+    /// Create new
     pub fn new(integrand0: I0, integrand1: I1) -> Self {
         Self {
             integrand0,
@@ -63,6 +64,7 @@ pub struct BoundaryIntegrandScalarProduct<T: RlstScalar, I: BoundaryIntegrand<T 
 }
 
 impl<T: RlstScalar, I: BoundaryIntegrand<T = T>> BoundaryIntegrandScalarProduct<T, I> {
+    /// Create new
     pub fn new(scalar: T, integrand: I) -> Self {
         Self { scalar, integrand }
     }

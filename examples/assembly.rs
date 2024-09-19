@@ -21,11 +21,11 @@ fn main() {
 
     // Adjust the quadrature degree for non-singular integrals on a triangle.
     // This makes the integrals use a quadrature rule with 16 points
-    a.quadrature_degree(ReferenceCellType::Triangle, 16);
+    a.set_quadrature_degree(ReferenceCellType::Triangle, 16);
 
     // Adjust the quadrature degree for singular integrals on a pair ortriangles.
     // This makes the integrals use a quadrature rule based on a rule on an interval with 4 points
-    a.singular_quadrature_degree(
+    a.set_singular_quadrature_degree(
         (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
         4,
     );

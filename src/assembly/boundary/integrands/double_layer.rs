@@ -2,11 +2,13 @@
 use crate::traits::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 use rlst::RlstScalar;
 
+/// Integrand for a double layer boundary operator
 pub struct DoubleLayerBoundaryIntegrand<T: RlstScalar> {
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T: RlstScalar> DoubleLayerBoundaryIntegrand<T> {
+    /// Create new
     pub fn new() -> Self {
         Self {
             _t: std::marker::PhantomData,

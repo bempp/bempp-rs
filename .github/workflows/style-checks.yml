@@ -37,3 +37,17 @@ jobs:
           cargo clippy ${{ matrix.feature-flags }} -- -D warnings
           cargo clippy --tests ${{ matrix.feature-flags }} -- -D warnings
           cargo clippy --examples ${{ matrix.feature-flags }} -- -D warnings
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - run: |
+          python3 -m pip install ruff
+          python3 -m ruff check python
+          python3 -m ruff format --check python
+        name: Run ruff checks
+      - run: |
+          python3 -m pip install mypy
+          python3 -m mypy python
+        name: Run mypy checks

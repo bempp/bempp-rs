@@ -10,7 +10,7 @@ use crate::traits::ParallelFunctionSpace;
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use ndelement::types::ReferenceCellType;
-use rlst::{CsrMatrix, RlstScalar};
+use rlst::{CsrMatrix, RandomAccessMut, RawAccessMut, RlstScalar, Shape};
 use std::collections::HashMap;
 
 pub trait CellPairAssembler {
@@ -32,9 +32,12 @@ pub trait BoundaryAssembly {
     type T: RlstScalar;
 
     /// Assemble the singular contributions into a dense matrix
-    fn assemble_singular_into_dense<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_singular_into_dense<
+        Space: FunctionSpace<T = Self::T> + Sync,
+        Array2: RandomAccessMut<2, Item = Self::T> + Shape<2> + RawAccessMut<Item = Self::T>,
+    >(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     );
@@ -49,9 +52,12 @@ pub trait BoundaryAssembly {
     /// Assemble the singular correction into a dense matrix
     ///
     /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
-    fn assemble_singular_correction_into_dense<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_singular_correction_into_dense<
+        Space: FunctionSpace<T = Self::T> + Sync,
+        Array2: RandomAccessMut<2, Item = Self::T> + Shape<2> + RawAccessMut<Item = Self::T>,
+    >(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     );
@@ -66,17 +72,23 @@ pub trait BoundaryAssembly {
     ) -> CsrMatrix<Self::T>;
 
     /// Assemble into a dense matrix
-    fn assemble_into_dense<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_into_dense<
+        Space: FunctionSpace<T = Self::T> + Sync,
+        Array2: RandomAccessMut<2, Item = Self::T> + Shape<2> + RawAccessMut<Item = Self::T>,
+    >(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
     );
 
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular_into_dense<Space: FunctionSpace<T = Self::T> + Sync>(
+    fn assemble_nonsingular_into_dense<
+        Space: FunctionSpace<T = Self::T> + Sync,
+        Array2: RandomAccessMut<2, Item = Self::T> + Shape<2> + RawAccessMut<Item = Self::T>,
+    >(
         &self,
-        output: &mut RlstArray<Self::T, 2>,
+        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,

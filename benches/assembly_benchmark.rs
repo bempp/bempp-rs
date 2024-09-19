@@ -20,12 +20,12 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
 
         let colouring = space.cell_colouring();
         let mut a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
-        a.quadrature_degree(ReferenceCellType::Triangle, 16);
-        a.singular_quadrature_degree(
+        a.set_quadrature_degree(ReferenceCellType::Triangle, 16);
+        a.set_singular_quadrature_degree(
             (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
             4,
         );
-        a.batch_size(128);
+        a.set_batch_size(128);
 
         group.bench_function(
             &format!(
