@@ -43,7 +43,6 @@ class FunctionSpace(object):
             owned=False,
         )
 
-    # TODO: test
     def get_local_dof_numbers(self, entity_dim: int, entity_index: int) -> typing.List[int]:
         """Get the local DOF numbers associated with an entity."""
         dofs = np.empty(
@@ -55,7 +54,6 @@ class FunctionSpace(object):
         )
         return [int(i) for i in dofs]
 
-    # TODO: test
     def cell_dofs(self, cell: int) -> typing.Optional[typing.List[int]]:
         """Get the local DOF numbers associated with a cell."""
         if not _lib.space_has_cell_dofs(self._rs_space, cell):
@@ -64,12 +62,10 @@ class FunctionSpace(object):
         _lib.space_cell_dofs(self._rs_space, cell, _ffi.cast("uintptr_t*", dofs.ctypes.data))
         return [int(i) for i in dofs]
 
-    # TODO: test
     def global_dof_index(self, local_dof_index: int) -> typing.Optional[typing.List[int]]:
         """Get the global DOF number for a local DOF."""
         return _lib.space_global_dof_index(self._rs_space, local_dof_index)
 
-    # TODO: test
     def ownership(self, local_dof_index) -> typing.Union[Owned, Ghost]:
         """The ownership of a local DOF."""
         if _lib.space_is_owned(self._rs_space, local_dof_index):
@@ -100,11 +96,10 @@ class FunctionSpace(object):
         """Number of DOFs on all processes."""
         return _lib.space_global_size(self._rs_space)
 
-    # TODO: test
     @property
     def is_serial(self) -> bool:
         """Indicates whether the function space is stored in serial."""
-        return _lib.space_serial(self._rs_space)
+        return _lib.space_is_serial(self._rs_space)
 
     @property
     def grid(self) -> Grid:
