@@ -43,7 +43,7 @@ jobs:
         # TODO: swap to `pip install maturin>=1.7.2` once there's a new release
       - name: Install maturin, CFFI
         run: |
-          ${{ matrix.platform.python }} -m pip install git+https://github.com/PyO3/maturin.git
+          ${{ matrix.platform.python }} -m pip install maturin>=1.7.2
           ${{ matrix.platform.python }} -m pip install cffi
 
       - name: Build wheel
