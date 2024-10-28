@@ -525,13 +525,12 @@ impl<
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        assembly::{
-            boundary::integrands::SingleLayerBoundaryIntegrand, common::GreenKernelEvalType,
-            kernels::KernelEvaluator,
-        },
-        quadrature::simplex_rules::simplex_rule,
+    use crate::assembly::{
+        boundary::integrands::SingleLayerBoundaryIntegrand, common::GreenKernelEvalType,
+        kernels::KernelEvaluator,
     };
+    use bempp_quadrature::simplex_rules::simplex_rule;
+
     use approx::*;
     use itertools::izip;
     use ndelement::{

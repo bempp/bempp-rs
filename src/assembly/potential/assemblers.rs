@@ -4,10 +4,10 @@ mod single_layer;
 
 use crate::assembly::common::{RawData2D, RlstArray};
 use crate::assembly::potential::cell_assemblers::PotentialCellAssembler;
-use crate::quadrature::simplex_rules::simplex_rule;
 use crate::traits::{
     CellAssembler, FunctionSpace, KernelEvaluator, PotentialAssembly, PotentialIntegrand,
 };
+use bempp_quadrature::simplex_rules::simplex_rule;
 use itertools::izip;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;
