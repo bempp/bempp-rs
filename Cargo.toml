@@ -29,7 +29,6 @@ crate-type = ["lib", "cdylib"]
 itertools = "0.13.*"
 mpi = { version = "0.8.*", optional = true }
 num = "0.4"
-lazy_static = "1.4"
 ndelement = { git = "https://github.com/bempp/ndelement", default-features = false }
 ndgrid = { git = "https://github.com/bempp/ndgrid.git", default-features = false }
 rayon = "1.9"
