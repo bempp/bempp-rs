@@ -104,6 +104,11 @@ fn get_singular_quadrature_rule(
     }
 }
 
+/// Generates blocks of singular interactions.
+///
+/// The output vector is a triple containing if an index denoting the type of singular quadrature rule to use and a vector
+/// of pairs of corresponding test and trial cells. The `batch_size` parameter describes the maximum number of pairs in each block.
+/// Hence, for a single quadrature rule there can be multiple blocks.
 fn make_cell_blocks<F>(
     f: F,
     size: usize,
@@ -398,6 +403,10 @@ fn assemble_batch_singular_correction<
     output
 }
 
+/// Returns the local element pairs of indices that are adjacent to `vertex` if `vertex` is the smallest index vertex for which the pairs are identical.
+///
+/// This ensures that if two triangles are connected by two or three vertices in the `make_cell_blocks` function only one connectivity vector is added
+/// for a triangle pair, namely the one where `vertex` is the smallest index in the chain of identical vertices.
 fn get_pairs_if_smallest(
     test_cell: &impl Entity,
     trial_cell: &impl Entity,
