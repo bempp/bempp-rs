@@ -2,7 +2,7 @@
 mpi = ["dep:mpi", "ndelement/mpi", "ndgrid/mpi"]
 sleef = ["rlst/sleef", "green-kernels/sleef", "ndelement/sleef", "ndgrid/sleef"]
 strict = []
-default = ["sleef", "mpi"]
+default = ["sleef"]
 
 [package]
 name = "bempp"
