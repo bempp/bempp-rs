@@ -18,3 +18,4 @@ _*.msh
 *.btr
 
 .vscode/
+.zed/
