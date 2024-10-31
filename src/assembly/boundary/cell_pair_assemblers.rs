@@ -136,7 +136,13 @@ impl<
         for (trial_i, mut col) in local_mat.col_iter_mut().enumerate() {
             for (test_i, entry) in col.iter_mut().enumerate() {
                 *entry = T::zero();
-                for (index, wt) in self.weights.iter().enumerate() {
+                for (index, (&wt, &test_det, &trial_det)) in izip!(
+                    self.weights.iter(),
+                    self.test_jdet.iter(),
+                    self.trial_jdet.iter()
+                )
+                .enumerate()
+                {
                     *entry += self.integrand.evaluate_singular(
                         self.test_table,
                         self.trial_table,
@@ -146,13 +152,7 @@ impl<
                         &self.k,
                         &test_geometry,
                         &trial_geometry,
-                    ) * num::cast::<T::Real, T>(
-                        *wt * unsafe {
-                            *self.test_jdet.get_unchecked(index)
-                                * *self.trial_jdet.get_unchecked(index)
-                        },
-                    )
-                    .unwrap();
+                    ) * num::cast::<T::Real, T>(wt * test_det * trial_det).unwrap();
                 }
             }
         }

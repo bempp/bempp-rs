@@ -20,7 +20,7 @@ use bempp_quadrature::duffy::{
 };
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
-use itertools::izip;
+use itertools::{izip, Itertools};
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use ndelement::reference_cell;
@@ -853,47 +853,36 @@ impl<
 
         for test_cell_type in test_space.grid().entity_types(2) {
             let npts_test = self.options.quadrature_degrees[test_cell_type];
+            let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
+            let mut qpoints_test = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
+            for (target, source) in izip!(qpoints_test.data_mut(), qrule_test.points.iter()) {
+                *target = num::cast::<f64, <T as RlstScalar>::Real>(*source).unwrap();
+            }
+            let qweights_test = qrule_test
+                .weights
+                .iter()
+                .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
+                .collect_vec();
+            let test_element = test_space.element(*test_cell_type);
+            let mut test_table = rlst_dynamic_array4!(
+                T,
+                test_element.tabulate_array_shape(self.table_derivs, npts_test)
+            );
+            test_element.tabulate(&qpoints_test, self.table_derivs, &mut test_table);
+
             for trial_cell_type in trial_space.grid().entity_types(2) {
                 let npts_trial = self.options.quadrature_degrees[trial_cell_type];
-                let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
-                let mut qpoints_test =
-                    rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
-                for i in 0..npts_test {
-                    for j in 0..2 {
-                        *qpoints_test.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
-                                .unwrap();
-                    }
-                }
-                let qweights_test = qrule_test
-                    .weights
-                    .iter()
-                    .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
-                    .collect::<Vec<_>>();
                 let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
                 let mut qpoints_trial =
                     rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_trial]);
-                for i in 0..npts_trial {
-                    for j in 0..2 {
-                        *qpoints_trial.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <T as RlstScalar>::Real>(
-                                qrule_trial.points[2 * i + j],
-                            )
-                            .unwrap();
-                    }
+                for (target, source) in izip!(qpoints_trial.data_mut(), qrule_trial.points.iter()) {
+                    *target = num::cast::<f64, <T as RlstScalar>::Real>(*source).unwrap();
                 }
                 let qweights_trial = qrule_trial
                     .weights
                     .iter()
                     .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
-                    .collect::<Vec<_>>();
-
-                let test_element = test_space.element(*test_cell_type);
-                let mut test_table = rlst_dynamic_array4!(
-                    T,
-                    test_element.tabulate_array_shape(self.table_derivs, npts_test)
-                );
-                test_element.tabulate(&qpoints_test, self.table_derivs, &mut test_table);
+                    .collect_vec();
 
                 let trial_element = trial_space.element(*trial_cell_type);
                 let mut trial_table = rlst_dynamic_array4!(
