@@ -33,7 +33,7 @@ impl<T: RlstScalar + MatrixInverse>
         KernelEvaluator<T, Laplace3dKernel<T>>,
     >
 {
-    /// Create a new Laplace adjoint double layer assembler
+    /// Create a new Laplace hypersingular assembler
     pub fn new_laplace_hypersingular() -> Self {
         Self::new_hypersingular(
             HypersingularCurlCurlBoundaryIntegrand::new(),
@@ -44,7 +44,7 @@ impl<T: RlstScalar + MatrixInverse>
 impl<T: RlstScalar<Complex = T> + MatrixInverse>
     BoundaryAssembler<T, HelmholtzIntegrand<T>, KernelEvaluator<T, Helmholtz3dKernel<T>>>
 {
-    /// Create a new Helmholtz adjoint double layer assembler
+    /// Create a new Helmholtz hypersingular assembler
     pub fn new_helmholtz_hypersingular(wavenumber: T::Real) -> Self {
         Self::new_hypersingular(
             BoundaryIntegrandSum::new(
