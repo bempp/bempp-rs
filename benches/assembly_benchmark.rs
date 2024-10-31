@@ -28,7 +28,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         a.set_batch_size(128);
 
         group.bench_function(
-            &format!(
+            format!(
                 "Assembly of singular terms of {}x{} matrix",
                 space.global_size(),
                 space.global_size()
@@ -36,7 +36,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             |b| b.iter(|| a.assemble_singular_into_dense(&mut matrix, &space, &space)),
         );
         group.bench_function(
-            &format!(
+            format!(
                 "Assembly of non-singular terms of {}x{} matrix",
                 space.global_size(),
                 space.global_size()
