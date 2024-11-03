@@ -8,8 +8,8 @@ pub mod assembler {
         assembly::{
             boundary::{
                 integrands::{
-                    AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandScalarProduct,
-                    BoundaryIntegrandSum, DoubleLayerBoundaryIntegrand,
+                    AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandSum,
+                    BoundaryIntegrandTimesScalar, DoubleLayerBoundaryIntegrand,
                     HypersingularCurlCurlBoundaryIntegrand,
                     HypersingularNormalNormalBoundaryIntegrand, SingleLayerBoundaryIntegrand,
                 },
@@ -131,7 +131,7 @@ pub mod assembler {
 
         let integrand = BoundaryIntegrandSum::new(
             HypersingularCurlCurlBoundaryIntegrand::new(),
-            BoundaryIntegrandScalarProduct::new(
+            BoundaryIntegrandTimesScalar::new(
                 num::cast::<T::Real, T>(-wavenumber.powi(2)).unwrap(),
                 HypersingularNormalNormalBoundaryIntegrand::new(),
             ),

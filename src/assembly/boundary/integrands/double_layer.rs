@@ -1,6 +1,7 @@
 //! Double layer integrand
-use crate::traits::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 use rlst::RlstScalar;
+
+use super::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 
 /// Integrand for a double layer boundary operator
 pub struct DoubleLayerBoundaryIntegrand<T: RlstScalar> {

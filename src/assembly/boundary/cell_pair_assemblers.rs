@@ -1,7 +1,10 @@
 //! Assemblers that assemble the contributions to the global matrix due to a single pair of cells
 
-use crate::assembly::common::{AssemblerGeometry, RlstArray};
-use crate::traits::{BoundaryIntegrand, KernelEvaluator};
+use crate::assembly::{
+    common::{AssemblerGeometry, RlstArray},
+    kernels::KernelEvaluator,
+};
+use green_kernels::traits::Kernel;
 use itertools::izip;
 use ndgrid::traits::GeometryMap;
 use num::Zero;
@@ -11,16 +14,18 @@ use rlst::{
 };
 use std::collections::HashMap;
 
+use super::integrands::BoundaryIntegrand;
+
 /// Assembler for the contributions from pairs of neighbouring cells
 pub struct SingularCellPairAssembler<
     'a,
     T: RlstScalar,
     I: BoundaryIntegrand<T = T>,
     G: GeometryMap<T = T::Real>,
-    K: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 > {
     integrand: &'a I,
-    kernel: &'a K,
+    kernel: &'a KernelEvaluator<T, K>,
     test_evaluator: G,
     trial_evaluator: G,
     test_table: &'a RlstArray<T, 4>,
@@ -44,7 +49,7 @@ impl<
         T: RlstScalar,
         I: BoundaryIntegrand<T = T>,
         G: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
+        K: Kernel<T = T>,
     > SingularCellPairAssembler<'a, T, I, G, K>
 {
     #[allow(clippy::too_many_arguments)]
@@ -53,7 +58,7 @@ impl<
         npts: usize,
         deriv_size: usize,
         integrand: &'a I,
-        kernel: &'a K,
+        kernel: &'a KernelEvaluator<T, K>,
         test_evaluator: G,
         trial_evaluator: G,
         test_table: &'a RlstArray<T, 4>,
@@ -157,10 +162,10 @@ pub struct NonsingularCellPairAssembler<
     I: BoundaryIntegrand<T = T>,
     TestG: GeometryMap<T = T::Real>,
     TrialG: GeometryMap<T = T::Real>,
-    K: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 > {
     integrand: &'a I,
-    kernel: &'a K,
+    kernel: &'a KernelEvaluator<T, K>,
     test_evaluator: TestG,
     trial_evaluator: TrialG,
     test_table: &'a RlstArray<T, 4>,
@@ -186,7 +191,7 @@ impl<
         I: BoundaryIntegrand<T = T>,
         TestG: GeometryMap<T = T::Real>,
         TrialG: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
+        K: Kernel<T = T>,
     > NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
 {
     #[allow(clippy::too_many_arguments)]
@@ -196,7 +201,7 @@ impl<
         npts_trial: usize,
         deriv_size: usize,
         integrand: &'a I,
-        kernel: &'a K,
+        kernel: &'a KernelEvaluator<T, K>,
         test_evaluator: TestG,
         trial_evaluator: TrialG,
         test_table: &'a RlstArray<T, 4>,
@@ -309,10 +314,10 @@ pub struct NonsingularCellPairAssemblerWithTestCaching<
     T: RlstScalar,
     I: BoundaryIntegrand<T = T>,
     TrialG: GeometryMap<T = T::Real>,
-    K: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 > {
     integrand: &'a I,
-    kernel: &'a K,
+    kernel: &'a KernelEvaluator<T, K>,
     trial_evaluator: TrialG,
     test_table: &'a RlstArray<T, 4>,
     trial_table: &'a RlstArray<T, 4>,
@@ -337,7 +342,7 @@ impl<
         T: RlstScalar,
         I: BoundaryIntegrand<T = T>,
         TrialG: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
+        K: Kernel<T = T>,
     > NonsingularCellPairAssemblerWithTestCaching<'a, T, I, TrialG, K>
 {
     #[allow(clippy::too_many_arguments)]
@@ -348,7 +353,7 @@ impl<
         deriv_size: usize,
         test_cells: &[usize],
         integrand: &'a I,
-        kernel: &'a K,
+        kernel: &'a KernelEvaluator<T, K>,
         test_evaluator: TestG,
         trial_evaluator: TrialG,
         test_table: &'a RlstArray<T, 4>,
@@ -409,12 +414,13 @@ impl<
         }
     }
 }
+
 impl<
         'a,
         T: RlstScalar,
         I: BoundaryIntegrand<T = T>,
         TrialG: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
+        K: Kernel<T = T>,
     > NonsingularCellPairAssemblerWithTestCaching<'a, T, I, TrialG, K>
 {
     // Set the test cell from the index in the test cell array
@@ -505,6 +511,7 @@ mod test {
     use bempp_quadrature::simplex_rules::simplex_rule;
 
     use approx::*;
+    use green_kernels::laplace_3d::Laplace3dKernel;
     use itertools::izip;
     use ndelement::{
         ciarlet::LagrangeElementFamily,
@@ -558,7 +565,7 @@ mod test {
         element.tabulate(&trial_points, 0, &mut trial_table);
 
         let integrand = SingleLayerBoundaryIntegrand::new();
-        let kernel = KernelEvaluator::new_laplace(GreenKernelEvalType::Value);
+        let kernel = KernelEvaluator::new(Laplace3dKernel::default(), GreenKernelEvalType::Value);
 
         let mut a0 = NonsingularCellPairAssembler::new(
             npts_test,

@@ -672,18 +672,19 @@ pub mod function {
 pub mod boundary_assembly {
     use super::function::{extract_space, FunctionSpaceWrapper, GridType, SpaceType};
     use super::DType;
+    use crate::assembly::boundary::integrands::BoundaryIntegrand;
     use crate::assembly::common::SparseMatrixData;
     use crate::{
         assembly::boundary::integrands::{
-            AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandScalarProduct,
-            BoundaryIntegrandSum, DoubleLayerBoundaryIntegrand,
+            AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandSum,
+            BoundaryIntegrandTimesScalar, DoubleLayerBoundaryIntegrand,
             HypersingularCurlCurlBoundaryIntegrand, HypersingularNormalNormalBoundaryIntegrand,
             SingleLayerBoundaryIntegrand,
         },
         assembly::boundary::BoundaryAssembler,
         assembly::kernels::KernelEvaluator,
         function::SerialFunctionSpace,
-        traits::{BoundaryIntegrand, FunctionSpace, KernelEvaluator as KernelEvaluatorTrait},
+        traits::{FunctionSpace, KernelEvaluator as KernelEvaluatorTrait},
     };
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
     use ndelement::{ciarlet::CiarletElement, types::ReferenceCellType};
@@ -696,7 +697,7 @@ pub mod boundary_assembly {
     type HelmholtzHypersingularBoundaryIntegrand<T> = BoundaryIntegrandSum<
         T,
         HypersingularCurlCurlBoundaryIntegrand<T>,
-        BoundaryIntegrandScalarProduct<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
+        BoundaryIntegrandTimesScalar<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
     >;
 
     #[derive(Debug, PartialEq, Clone, Copy)]

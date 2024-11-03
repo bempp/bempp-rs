@@ -3,7 +3,7 @@
 #![warn(missing_docs)]
 
 pub mod assembly;
-pub mod bindings;
+// pub mod bindings;
 pub mod function;
 pub mod helmholtz;
 pub mod laplace;

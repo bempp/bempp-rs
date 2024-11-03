@@ -4,17 +4,20 @@ use super::cell_pair_assemblers::{
     NonsingularCellPairAssembler, NonsingularCellPairAssemblerWithTestCaching,
     SingularCellPairAssembler,
 };
+use super::integrands::BoundaryIntegrand;
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
+use crate::assembly::kernels::KernelEvaluator;
+use crate::traits::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelBoundaryAssembly;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelFunctionSpace;
-use crate::traits::{BoundaryIntegrand, FunctionSpace, KernelEvaluator};
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
 use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
+use green_kernels::traits::Kernel;
 use itertools::izip;
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
@@ -149,9 +152,9 @@ fn assemble_batch_singular<
     T: RlstScalar + MatrixInverse,
     Space: FunctionSpace<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
-    Kernel: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 >(
-    assembler: &BoundaryAssembler<T, Integrand, Kernel>,
+    assembler: &BoundaryAssembler<T, Integrand, K>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
@@ -228,9 +231,9 @@ fn assemble_batch_nonadjacent<
     T: RlstScalar + MatrixInverse,
     Space: FunctionSpace<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
-    Kernel: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 >(
-    assembler: &BoundaryAssembler<T, Integrand, Kernel>,
+    assembler: &BoundaryAssembler<T, Integrand, K>,
     deriv_size: usize,
     output: &RawData2D<T>,
     trial_cell_type: ReferenceCellType,
@@ -316,9 +319,9 @@ fn assemble_batch_singular_correction<
     T: RlstScalar + MatrixInverse,
     Space: FunctionSpace<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
-    Kernel: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 >(
-    assembler: &BoundaryAssembler<T, Integrand, Kernel>,
+    assembler: &BoundaryAssembler<T, Integrand, K>,
     deriv_size: usize,
     shape: [usize; 2],
     trial_cell_type: ReferenceCellType,
@@ -470,33 +473,27 @@ impl BoundaryAssemblerOptions {
 pub struct BoundaryAssembler<
     T: RlstScalar + MatrixInverse,
     Integrand: BoundaryIntegrand<T = T>,
-    Kernel: KernelEvaluator<T = T>,
+    K: Kernel<T = T>,
 > {
     pub(crate) integrand: Integrand,
-    pub(crate) kernel: Kernel,
+    pub(crate) kernel: KernelEvaluator<T, K>,
     pub(crate) options: BoundaryAssemblerOptions,
     pub(crate) deriv_size: usize,
     pub(crate) table_derivs: usize,
 }
 
-unsafe impl<
-        T: RlstScalar + MatrixInverse,
-        Integrand: BoundaryIntegrand<T = T>,
-        Kernel: KernelEvaluator<T = T>,
-    > Sync for BoundaryAssembler<T, Integrand, Kernel>
+unsafe impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
+    Sync for BoundaryAssembler<T, Integrand, K>
 {
 }
 
-impl<
-        T: RlstScalar + MatrixInverse,
-        Integrand: BoundaryIntegrand<T = T>,
-        Kernel: KernelEvaluator<T = T>,
-    > BoundaryAssembler<T, Integrand, Kernel>
+impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
+    BoundaryAssembler<T, Integrand, K>
 {
     /// Create new
     pub fn new(
         integrand: Integrand,
-        kernel: Kernel,
+        kernel: KernelEvaluator<T, K>,
         options: BoundaryAssemblerOptions,
         deriv_size: usize,
         table_derivs: usize,
