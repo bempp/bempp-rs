@@ -1,6 +1,5 @@
 //! Green's function kernels
 use crate::assembly::common::GreenKernelEvalType;
-use crate::traits::KernelEvaluator as KernelEvaluatorTrait;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
 use rlst::RlstScalar;
 

@@ -1,6 +1,5 @@
 //! Traits for potential assembly
-use super::CellGeometry;
-use crate::assembly::common::RlstArray;
+use crate::assembly::common::{CellGeometry, RlstArray};
 use crate::traits::FunctionSpace;
 use rlst::{RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape};
 

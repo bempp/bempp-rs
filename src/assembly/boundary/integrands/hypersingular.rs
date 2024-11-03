@@ -1,6 +1,8 @@
 //! Hypersingular integrand
 use rlst::RlstScalar;
 
+use crate::assembly::common::CellGeometry;
+
 use super::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 
 /// Integrand for the curl curl term of a hypersingular boundary operator
@@ -105,8 +107,8 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
         test_basis_index: usize,
         trial_basis_index: usize,
         k: &crate::assembly::common::RlstArray<Self::T, 3>,
-        test_geometry: &impl crate::traits::CellGeometry<T = <Self::T as RlstScalar>::Real>,
-        trial_geometry: &impl crate::traits::CellGeometry<T = <Self::T as RlstScalar>::Real>,
+        test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
+        trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
     ) -> Self::T {
         self.evaluate(
             &super::NonSingularKernel::new(k, test_point_index, trial_point_index),
@@ -125,8 +127,8 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
         test_basis_index: usize,
         trial_basis_index: usize,
         k: &crate::assembly::common::RlstArray<Self::T, 2>,
-        test_geometry: &impl crate::traits::CellGeometry<T = <Self::T as RlstScalar>::Real>,
-        trial_geometry: &impl crate::traits::CellGeometry<T = <Self::T as RlstScalar>::Real>,
+        test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
+        trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
     ) -> Self::T {
         self.evaluate(
             &super::SingularKernel::new(k, point_index),

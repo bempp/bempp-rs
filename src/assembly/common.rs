@@ -1,8 +1,21 @@
 //! Common utility functions
-use crate::traits::CellGeometry;
 pub(crate) use green_kernels::types::GreenKernelEvalType;
 use ndgrid::traits::Grid;
 use rlst::{Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer};
+
+pub(crate) trait CellGeometry {
+    //! Cell geometry
+    /// Scalar type
+    type T: RlstScalar<Real = Self::T>;
+    /// Points
+    fn points(&self) -> &RlstArray<Self::T, 2>;
+    /// Normals
+    fn normals(&self) -> &RlstArray<Self::T, 2>;
+    /// Jacobians
+    fn jacobians(&self) -> &RlstArray<Self::T, 2>;
+    /// Determinants of jacobians
+    fn jdets(&self) -> &[Self::T];
+}
 
 pub(crate) type RlstArray<T, const DIM: usize> =
     Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;
