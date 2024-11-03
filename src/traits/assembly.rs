@@ -4,7 +4,7 @@ mod potential;
 use crate::assembly::common::RlstArray;
 use rlst::RlstScalar;
 
-pub use boundary::{Access1D, Access2D, BoundaryIntegrand, CellPairAssembler, GeometryAccess};
+pub use boundary::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 pub use potential::{CellAssembler, PotentialAssembly, PotentialIntegrand};
 
 pub trait CellGeometry {

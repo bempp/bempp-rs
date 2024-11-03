@@ -1,7 +1,7 @@
 //! Assemblers that assemble the contributions to the global matrix due to a single pair of cells
 
 use crate::assembly::common::{AssemblerGeometry, RlstArray};
-use crate::traits::{BoundaryIntegrand, CellPairAssembler, KernelEvaluator};
+use crate::traits::{BoundaryIntegrand, KernelEvaluator};
 use itertools::izip;
 use ndgrid::traits::GeometryMap;
 use num::Zero;
@@ -81,17 +81,8 @@ impl<
             trial_cell: 0,
         }
     }
-}
-impl<
-        'a,
-        T: RlstScalar,
-        I: BoundaryIntegrand<T = T>,
-        G: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
-    > CellPairAssembler for SingularCellPairAssembler<'a, T, I, G, K>
-{
-    type T = T;
-    fn set_test_cell(&mut self, test_cell: usize) {
+
+    pub fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = test_cell;
         self.test_evaluator
             .points(test_cell, self.test_mapped_pts.data_mut());
@@ -102,7 +93,7 @@ impl<
             self.test_normals.data_mut(),
         );
     }
-    fn set_trial_cell(&mut self, trial_cell: usize) {
+    pub fn set_trial_cell(&mut self, trial_cell: usize) {
         self.trial_cell = trial_cell;
         self.trial_evaluator
             .points(trial_cell, self.trial_mapped_pts.data_mut());
@@ -113,7 +104,7 @@ impl<
             self.trial_normals.data_mut(),
         );
     }
-    fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
+    pub fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
         self.kernel.assemble_pairwise_st(
             self.test_mapped_pts.data(),
             self.trial_mapped_pts.data(),
@@ -235,18 +226,8 @@ impl<
             trial_cell: 0,
         }
     }
-}
-impl<
-        'a,
-        T: RlstScalar,
-        I: BoundaryIntegrand<T = T>,
-        TestG: GeometryMap<T = T::Real>,
-        TrialG: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
-    > CellPairAssembler for NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
-{
-    type T = T;
-    fn set_test_cell(&mut self, test_cell: usize) {
+
+    pub fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = test_cell;
         self.test_evaluator
             .points(test_cell, self.test_mapped_pts.data_mut());
@@ -257,7 +238,8 @@ impl<
             self.test_normals.data_mut(),
         );
     }
-    fn set_trial_cell(&mut self, trial_cell: usize) {
+
+    pub fn set_trial_cell(&mut self, trial_cell: usize) {
         self.trial_cell = trial_cell;
         self.trial_evaluator
             .points(trial_cell, self.trial_mapped_pts.data_mut());
@@ -268,7 +250,7 @@ impl<
             self.trial_normals.data_mut(),
         );
     }
-    fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
+    pub fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
         self.kernel.assemble_st(
             self.test_mapped_pts.data(),
             self.trial_mapped_pts.data(),
@@ -439,20 +421,11 @@ impl<
     pub fn set_test_cell_from_index(&mut self, test_cell: usize) {
         self.test_cell = test_cell;
     }
-}
-impl<
-        'a,
-        T: RlstScalar,
-        I: BoundaryIntegrand<T = T>,
-        TrialG: GeometryMap<T = T::Real>,
-        K: KernelEvaluator<T = T>,
-    > CellPairAssembler for NonsingularCellPairAssemblerWithTestCaching<'a, T, I, TrialG, K>
-{
-    type T = T;
-    fn set_test_cell(&mut self, test_cell: usize) {
+
+    pub fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = self.test_indices[&test_cell];
     }
-    fn set_trial_cell(&mut self, trial_cell: usize) {
+    pub fn set_trial_cell(&mut self, trial_cell: usize) {
         self.trial_cell = trial_cell;
         self.trial_evaluator
             .points(trial_cell, self.trial_mapped_pts.data_mut());
@@ -463,7 +436,7 @@ impl<
             self.trial_normals.data_mut(),
         );
     }
-    fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
+    pub fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
         self.kernel.assemble_st(
             unsafe { self.test_mapped_pts.get_unchecked(self.test_cell).data() },
             self.trial_mapped_pts.data(),

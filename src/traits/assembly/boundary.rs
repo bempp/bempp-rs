@@ -13,18 +13,18 @@ use ndelement::types::ReferenceCellType;
 use rlst::{CsrMatrix, RandomAccessMut, RawAccessMut, RlstScalar, Shape};
 use std::collections::HashMap;
 
-pub trait CellPairAssembler {
-    //! Assembler for the contributions from a pair of cells
-    /// Scalar type
-    type T: RlstScalar;
+// pub trait CellPairAssembler {
+//     //! Assembler for the contributions from a pair of cells
+//     /// Scalar type
+//     type T: RlstScalar;
 
-    /// Assemble contributions into `local_mat`
-    fn assemble(&mut self, local_mat: &mut RlstArray<Self::T, 2>);
-    /// Set the test cell
-    fn set_test_cell(&mut self, test_cell: usize);
-    /// Set the trial cell
-    fn set_trial_cell(&mut self, trial_cell: usize);
-}
+//     /// Assemble contributions into `local_mat`
+//     fn assemble(&mut self, local_mat: &mut RlstArray<Self::T, 2>);
+//     /// Set the test cell
+//     fn set_test_cell(&mut self, test_cell: usize);
+//     /// Set the trial cell
+//     fn set_trial_cell(&mut self, trial_cell: usize);
+// }
 
 // pub trait BoundaryAssembly {
 //     //! Functions for boundary assembly
