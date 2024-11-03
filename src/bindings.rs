@@ -18,7 +18,7 @@ impl DType {
             0 => Some(DType::F32),
             1 => Some(DType::F64),
             2 => Some(DType::C32),
-            3 => Some(DType::C64),
+
             _ => None,
         }
     }
@@ -4334,1094 +4334,1094 @@ pub mod boundary_assembly {
     ) -> u8 {
         (*assembler).dtype as u8
     }
-
-    unsafe fn laplace_boundary_assembler_new_internal<T: RlstScalar + MatrixInverse>(
-        operator: BoundaryOperator,
-        dtype: DType,
-    ) -> *const BoundaryAssemblerWrapper {
-        Box::into_raw(Box::new(BoundaryAssemblerWrapper {
-            assembler: match operator {
-                BoundaryOperator::SingleLayer => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_laplace_single_layer(),
-                )) as *const c_void,
-                BoundaryOperator::DoubleLayer => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_laplace_double_layer(),
-                )) as *const c_void,
-                BoundaryOperator::AdjointDoubleLayer => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_laplace_adjoint_double_layer(),
-                )) as *const c_void,
-                BoundaryOperator::Hypersingular => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_laplace_hypersingular(),
-                )) as *const c_void,
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            itype: operator,
-            ktype: KernelType::Laplace,
-            dtype,
-        }))
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn laplace_boundary_assembler_new(
-        operator: u8,
-        dtype: u8,
-    ) -> *const BoundaryAssemblerWrapper {
-        let operator = BoundaryOperator::from(operator).unwrap();
-        let dtype = DType::from(dtype).unwrap();
-        match dtype {
-            DType::F32 => laplace_boundary_assembler_new_internal::<f32>(operator, dtype),
-            DType::F64 => laplace_boundary_assembler_new_internal::<f64>(operator, dtype),
-            _ => {
-                panic!("Invalid data type");
-            }
-        }
-    }
-
-    unsafe fn helmholtz_boundary_assembler_new_internal<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-    >(
-        wavenumber: T::Real,
-        operator: BoundaryOperator,
-        dtype: DType,
-    ) -> *const BoundaryAssemblerWrapper {
-        Box::into_raw(Box::new(BoundaryAssemblerWrapper {
-            assembler: match operator {
-                BoundaryOperator::SingleLayer => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_helmholtz_single_layer(wavenumber),
-                )) as *const c_void,
-                BoundaryOperator::DoubleLayer => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_helmholtz_double_layer(wavenumber),
-                )) as *const c_void,
-                BoundaryOperator::AdjointDoubleLayer => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_helmholtz_adjoint_double_layer(wavenumber),
-                )) as *const c_void,
-                BoundaryOperator::Hypersingular => Box::into_raw(Box::new(
-                    BoundaryAssembler::<T, _, _>::new_helmholtz_hypersingular(wavenumber),
-                )) as *const c_void,
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            itype: operator,
-            ktype: KernelType::Helmholtz,
-            dtype,
-        }))
-    }
-
-    #[no_mangle]
-    pub unsafe extern "C" fn helmholtz_boundary_assembler_new(
-        wavenumber: *const c_void,
-        operator: u8,
-        dtype: u8,
-    ) -> *const BoundaryAssemblerWrapper {
-        let operator = BoundaryOperator::from(operator).unwrap();
-        let dtype = DType::from(dtype).unwrap();
-        match dtype {
-            DType::C32 => helmholtz_boundary_assembler_new_internal::<c32>(
-                *(wavenumber as *const f32),
-                operator,
-                dtype,
-            ),
-            DType::C64 => helmholtz_boundary_assembler_new_internal::<c64>(
-                *(wavenumber as *const f64),
-                operator,
-                dtype,
-            ),
-            _ => {
-                panic!("Invalid data type");
-            }
-        }
-    }
 }
+//     unsafe fn laplace_boundary_assembler_new_internal<T: RlstScalar + MatrixInverse>(
+//         operator: BoundaryOperator,
+//         dtype: DType,
+//     ) -> *const BoundaryAssemblerWrapper {
+//         Box::into_raw(Box::new(BoundaryAssemblerWrapper {
+//             assembler: match operator {
+//                 BoundaryOperator::SingleLayer => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_laplace_single_layer(),
+//                 )) as *const c_void,
+//                 BoundaryOperator::DoubleLayer => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_laplace_double_layer(),
+//                 )) as *const c_void,
+//                 BoundaryOperator::AdjointDoubleLayer => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_laplace_adjoint_double_layer(),
+//                 )) as *const c_void,
+//                 BoundaryOperator::Hypersingular => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_laplace_hypersingular(),
+//                 )) as *const c_void,
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             itype: operator,
+//             ktype: KernelType::Laplace,
+//             dtype,
+//         }))
+//     }
 
-pub mod potential_assembly {
-    use super::boundary_assembly::KernelType;
-    use super::function::{extract_space, FunctionSpaceWrapper, GridType, SpaceType};
-    use super::DType;
-    use crate::{
-        assembly::kernels::KernelEvaluator,
-        assembly::potential::integrands::{
-            DoubleLayerPotentialIntegrand, SingleLayerPotentialIntegrand,
-        },
-        assembly::potential::PotentialAssembler,
-        function::SerialFunctionSpace,
-        traits::{
-            FunctionSpace, KernelEvaluator as KernelEvaluatorTrait, PotentialAssembly,
-            PotentialIntegrand,
-        },
-    };
-    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
-    use ndelement::{ciarlet::CiarletElement, types::ReferenceCellType};
-    use ndgrid::SingleElementGrid;
-    use rlst::{
-        c32, c64, rlst_array_from_slice2, rlst_array_from_slice_mut2, MatrixInverse, RlstScalar,
-    };
-    use std::ffi::c_void;
-    use std::slice::{from_raw_parts, from_raw_parts_mut};
+//     #[no_mangle]
+//     pub unsafe extern "C" fn laplace_boundary_assembler_new(
+//         operator: u8,
+//         dtype: u8,
+//     ) -> *const BoundaryAssemblerWrapper {
+//         let operator = BoundaryOperator::from(operator).unwrap();
+//         let dtype = DType::from(dtype).unwrap();
+//         match dtype {
+//             DType::F32 => laplace_boundary_assembler_new_internal::<f32>(operator, dtype),
+//             DType::F64 => laplace_boundary_assembler_new_internal::<f64>(operator, dtype),
+//             _ => {
+//                 panic!("Invalid data type");
+//             }
+//         }
+//     }
 
-    #[derive(Debug, PartialEq, Clone, Copy)]
-    #[repr(u8)]
-    pub enum PotentialOperator {
-        SingleLayer = 0,
-        DoubleLayer = 1,
-        ElectricField = 2,
-        MagneticField = 3,
-    }
+//     unsafe fn helmholtz_boundary_assembler_new_internal<
+//         T: RlstScalar<Complex = T> + MatrixInverse,
+//     >(
+//         wavenumber: T::Real,
+//         operator: BoundaryOperator,
+//         dtype: DType,
+//     ) -> *const BoundaryAssemblerWrapper {
+//         Box::into_raw(Box::new(BoundaryAssemblerWrapper {
+//             assembler: match operator {
+//                 BoundaryOperator::SingleLayer => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_helmholtz_single_layer(wavenumber),
+//                 )) as *const c_void,
+//                 BoundaryOperator::DoubleLayer => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_helmholtz_double_layer(wavenumber),
+//                 )) as *const c_void,
+//                 BoundaryOperator::AdjointDoubleLayer => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_helmholtz_adjoint_double_layer(wavenumber),
+//                 )) as *const c_void,
+//                 BoundaryOperator::Hypersingular => Box::into_raw(Box::new(
+//                     BoundaryAssembler::<T, _, _>::new_helmholtz_hypersingular(wavenumber),
+//                 )) as *const c_void,
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             itype: operator,
+//             ktype: KernelType::Helmholtz,
+//             dtype,
+//         }))
+//     }
 
-    impl PotentialOperator {
-        fn from(value: u8) -> Option<Self> {
-            match value {
-                0 => Some(PotentialOperator::SingleLayer),
-                1 => Some(PotentialOperator::DoubleLayer),
-                2 => Some(PotentialOperator::ElectricField),
-                3 => Some(PotentialOperator::MagneticField),
-                _ => None,
-            }
-        }
-    }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn helmholtz_boundary_assembler_new(
+//         wavenumber: *const c_void,
+//         operator: u8,
+//         dtype: u8,
+//     ) -> *const BoundaryAssemblerWrapper {
+//         let operator = BoundaryOperator::from(operator).unwrap();
+//         let dtype = DType::from(dtype).unwrap();
+//         match dtype {
+//             DType::C32 => helmholtz_boundary_assembler_new_internal::<c32>(
+//                 *(wavenumber as *const f32),
+//                 operator,
+//                 dtype,
+//             ),
+//             DType::C64 => helmholtz_boundary_assembler_new_internal::<c64>(
+//                 *(wavenumber as *const f64),
+//                 operator,
+//                 dtype,
+//             ),
+//             _ => {
+//                 panic!("Invalid data type");
+//             }
+//         }
+//     }
+// }
 
-    #[repr(C)]
-    pub struct PotentialAssemblerWrapper {
-        pub assembler: *const c_void,
-        pub itype: PotentialOperator,
-        pub ktype: KernelType,
-        pub dtype: DType,
-    }
-    impl Drop for PotentialAssemblerWrapper {
-        fn drop(&mut self) {
-            let Self {
-                assembler,
-                itype,
-                ktype,
-                dtype,
-            } = self;
-            match ktype {
-                KernelType::Laplace => match itype {
-                    PotentialOperator::SingleLayer => match dtype {
-                        DType::F32 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        f32,
-                                        SingleLayerPotentialIntegrand<f32>,
-                                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                                    >,
-                            )
-                        }),
-                        DType::F64 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        f64,
-                                        SingleLayerPotentialIntegrand<f64>,
-                                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                                    >,
-                            )
-                        }),
-                        _ => {
-                            panic!("Invalid data type");
-                        }
-                    },
-                    PotentialOperator::DoubleLayer => match dtype {
-                        DType::F32 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        f32,
-                                        DoubleLayerPotentialIntegrand<f32>,
-                                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                                    >,
-                            )
-                        }),
-                        DType::F64 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        f64,
-                                        DoubleLayerPotentialIntegrand<f64>,
-                                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                                    >,
-                            )
-                        }),
-                        _ => {
-                            panic!("Invalid data type");
-                        }
-                    },
-                    _ => {
-                        panic!("Invalid operator");
-                    }
-                },
-                KernelType::Helmholtz => match itype {
-                    PotentialOperator::SingleLayer => match dtype {
-                        DType::C32 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        c32,
-                                        SingleLayerPotentialIntegrand<c32>,
-                                        KernelEvaluator<c32, Laplace3dKernel<c32>>,
-                                    >,
-                            )
-                        }),
-                        DType::C64 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        c64,
-                                        SingleLayerPotentialIntegrand<c64>,
-                                        KernelEvaluator<c64, Laplace3dKernel<c64>>,
-                                    >,
-                            )
-                        }),
-                        _ => {
-                            panic!("Invalid data type");
-                        }
-                    },
-                    PotentialOperator::DoubleLayer => match dtype {
-                        DType::C32 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        c32,
-                                        DoubleLayerPotentialIntegrand<c32>,
-                                        KernelEvaluator<c32, Laplace3dKernel<c32>>,
-                                    >,
-                            )
-                        }),
-                        DType::C64 => drop(unsafe {
-                            Box::from_raw(
-                                *assembler
-                                    as *mut PotentialAssembler<
-                                        c64,
-                                        DoubleLayerPotentialIntegrand<c64>,
-                                        KernelEvaluator<c64, Laplace3dKernel<c64>>,
-                                    >,
-                            )
-                        }),
-                        _ => {
-                            panic!("Invalid data type");
-                        }
-                    },
-                    _ => {
-                        panic!("Invalid operator");
-                    }
-                },
-            }
-        }
-    }
+// pub mod potential_assembly {
+//     use super::boundary_assembly::KernelType;
+//     use super::function::{extract_space, FunctionSpaceWrapper, GridType, SpaceType};
+//     use super::DType;
+//     use crate::{
+//         assembly::kernels::KernelEvaluator,
+//         assembly::potential::integrands::{
+//             DoubleLayerPotentialIntegrand, SingleLayerPotentialIntegrand,
+//         },
+//         assembly::potential::PotentialAssembler,
+//         function::SerialFunctionSpace,
+//         traits::{
+//             FunctionSpace, KernelEvaluator as KernelEvaluatorTrait, PotentialAssembly,
+//             PotentialIntegrand,
+//         },
+//     };
+//     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
+//     use ndelement::{ciarlet::CiarletElement, types::ReferenceCellType};
+//     use ndgrid::SingleElementGrid;
+//     use rlst::{
+//         c32, c64, rlst_array_from_slice2, rlst_array_from_slice_mut2, MatrixInverse, RlstScalar,
+//     };
+//     use std::ffi::c_void;
+//     use std::slice::{from_raw_parts, from_raw_parts_mut};
 
-    #[no_mangle]
-    pub unsafe extern "C" fn free_potential_assembler(a: *mut PotentialAssemblerWrapper) {
-        assert!(!a.is_null());
-        unsafe { drop(Box::from_raw(a)) }
-    }
+//     #[derive(Debug, PartialEq, Clone, Copy)]
+//     #[repr(u8)]
+//     pub enum PotentialOperator {
+//         SingleLayer = 0,
+//         DoubleLayer = 1,
+//         ElectricField = 2,
+//         MagneticField = 3,
+//     }
 
-    pub(crate) unsafe fn extract_potential_assembler<
-        T: RlstScalar + MatrixInverse,
-        Integrand: PotentialIntegrand<T = T>,
-        Kernel: KernelEvaluatorTrait<T = T>,
-    >(
-        assembler: *const PotentialAssemblerWrapper,
-    ) -> *const PotentialAssembler<T, Integrand, Kernel> {
-        (*assembler).assembler as *const PotentialAssembler<T, Integrand, Kernel>
-    }
+//     impl PotentialOperator {
+//         fn from(value: u8) -> Option<Self> {
+//             match value {
+//                 0 => Some(PotentialOperator::SingleLayer),
+//                 1 => Some(PotentialOperator::DoubleLayer),
+//                 2 => Some(PotentialOperator::ElectricField),
+//                 3 => Some(PotentialOperator::MagneticField),
+//                 _ => None,
+//             }
+//         }
+//     }
 
-    pub(crate) unsafe fn extract_potential_assembler_mut<
-        T: RlstScalar + MatrixInverse,
-        Integrand: PotentialIntegrand<T = T>,
-        Kernel: KernelEvaluatorTrait<T = T>,
-    >(
-        assembler: *const PotentialAssemblerWrapper,
-    ) -> *mut PotentialAssembler<T, Integrand, Kernel> {
-        (*assembler).assembler as *mut PotentialAssembler<T, Integrand, Kernel>
-    }
+//     #[repr(C)]
+//     pub struct PotentialAssemblerWrapper {
+//         pub assembler: *const c_void,
+//         pub itype: PotentialOperator,
+//         pub ktype: KernelType,
+//         pub dtype: DType,
+//     }
+//     impl Drop for PotentialAssemblerWrapper {
+//         fn drop(&mut self) {
+//             let Self {
+//                 assembler,
+//                 itype,
+//                 ktype,
+//                 dtype,
+//             } = self;
+//             match ktype {
+//                 KernelType::Laplace => match itype {
+//                     PotentialOperator::SingleLayer => match dtype {
+//                         DType::F32 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         f32,
+//                                         SingleLayerPotentialIntegrand<f32>,
+//                                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                                     >,
+//                             )
+//                         }),
+//                         DType::F64 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         f64,
+//                                         SingleLayerPotentialIntegrand<f64>,
+//                                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                                     >,
+//                             )
+//                         }),
+//                         _ => {
+//                             panic!("Invalid data type");
+//                         }
+//                     },
+//                     PotentialOperator::DoubleLayer => match dtype {
+//                         DType::F32 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         f32,
+//                                         DoubleLayerPotentialIntegrand<f32>,
+//                                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                                     >,
+//                             )
+//                         }),
+//                         DType::F64 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         f64,
+//                                         DoubleLayerPotentialIntegrand<f64>,
+//                                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                                     >,
+//                             )
+//                         }),
+//                         _ => {
+//                             panic!("Invalid data type");
+//                         }
+//                     },
+//                     _ => {
+//                         panic!("Invalid operator");
+//                     }
+//                 },
+//                 KernelType::Helmholtz => match itype {
+//                     PotentialOperator::SingleLayer => match dtype {
+//                         DType::C32 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         c32,
+//                                         SingleLayerPotentialIntegrand<c32>,
+//                                         KernelEvaluator<c32, Laplace3dKernel<c32>>,
+//                                     >,
+//                             )
+//                         }),
+//                         DType::C64 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         c64,
+//                                         SingleLayerPotentialIntegrand<c64>,
+//                                         KernelEvaluator<c64, Laplace3dKernel<c64>>,
+//                                     >,
+//                             )
+//                         }),
+//                         _ => {
+//                             panic!("Invalid data type");
+//                         }
+//                     },
+//                     PotentialOperator::DoubleLayer => match dtype {
+//                         DType::C32 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         c32,
+//                                         DoubleLayerPotentialIntegrand<c32>,
+//                                         KernelEvaluator<c32, Laplace3dKernel<c32>>,
+//                                     >,
+//                             )
+//                         }),
+//                         DType::C64 => drop(unsafe {
+//                             Box::from_raw(
+//                                 *assembler
+//                                     as *mut PotentialAssembler<
+//                                         c64,
+//                                         DoubleLayerPotentialIntegrand<c64>,
+//                                         KernelEvaluator<c64, Laplace3dKernel<c64>>,
+//                                     >,
+//                             )
+//                         }),
+//                         _ => {
+//                             panic!("Invalid data type");
+//                         }
+//                     },
+//                     _ => {
+//                         panic!("Invalid operator");
+//                     }
+//                 },
+//             }
+//         }
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_has_quadrature_degree(
-        assembler: *mut PotentialAssemblerWrapper,
-        cell: u8,
-    ) -> bool {
-        let cell = ReferenceCellType::from(cell).unwrap();
-        match (*assembler).ktype {
-            KernelType::Laplace => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler::<
-                        f32,
-                        SingleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::F64 => (*extract_potential_assembler::<
-                        f64,
-                        SingleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler::<
-                        f32,
-                        DoubleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::F64 => (*extract_potential_assembler::<
-                        f64,
-                        DoubleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            KernelType::Helmholtz => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler::<
-                        c32,
-                        SingleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::C64 => (*extract_potential_assembler::<
-                        c64,
-                        SingleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler::<
-                        c32,
-                        DoubleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::C64 => (*extract_potential_assembler::<
-                        c64,
-                        DoubleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        }
-        .is_some()
-    }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn free_potential_assembler(a: *mut PotentialAssemblerWrapper) {
+//         assert!(!a.is_null());
+//         unsafe { drop(Box::from_raw(a)) }
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_set_quadrature_degree(
-        assembler: *mut PotentialAssemblerWrapper,
-        cell: u8,
-        degree: usize,
-    ) {
-        let cell = ReferenceCellType::from(cell).unwrap();
-        match (*assembler).ktype {
-            KernelType::Laplace => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler_mut::<
-                        f32,
-                        SingleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    DType::F64 => (*extract_potential_assembler_mut::<
-                        f64,
-                        SingleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler_mut::<
-                        f32,
-                        DoubleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    DType::F64 => (*extract_potential_assembler_mut::<
-                        f64,
-                        DoubleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            KernelType::Helmholtz => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler_mut::<
-                        c32,
-                        SingleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    DType::C64 => (*extract_potential_assembler_mut::<
-                        c64,
-                        SingleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler_mut::<
-                        c32,
-                        DoubleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    DType::C64 => (*extract_potential_assembler_mut::<
-                        c64,
-                        DoubleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .set_quadrature_degree(cell, degree),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        }
-    }
+//     pub(crate) unsafe fn extract_potential_assembler<
+//         T: RlstScalar + MatrixInverse,
+//         Integrand: PotentialIntegrand<T = T>,
+//         Kernel: KernelEvaluatorTrait<T = T>,
+//     >(
+//         assembler: *const PotentialAssemblerWrapper,
+//     ) -> *const PotentialAssembler<T, Integrand, Kernel> {
+//         (*assembler).assembler as *const PotentialAssembler<T, Integrand, Kernel>
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_quadrature_degree(
-        assembler: *mut PotentialAssemblerWrapper,
-        cell: u8,
-    ) -> usize {
-        let cell = ReferenceCellType::from(cell).unwrap();
-        match (*assembler).ktype {
-            KernelType::Laplace => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler::<
-                        f32,
-                        SingleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::F64 => (*extract_potential_assembler::<
-                        f64,
-                        SingleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler::<
-                        f32,
-                        DoubleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::F64 => (*extract_potential_assembler::<
-                        f64,
-                        DoubleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            KernelType::Helmholtz => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler::<
-                        c32,
-                        SingleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::C64 => (*extract_potential_assembler::<
-                        c64,
-                        SingleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler::<
-                        c32,
-                        DoubleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    DType::C64 => (*extract_potential_assembler::<
-                        c64,
-                        DoubleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .quadrature_degree(cell),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        }
-        .unwrap()
-    }
+//     pub(crate) unsafe fn extract_potential_assembler_mut<
+//         T: RlstScalar + MatrixInverse,
+//         Integrand: PotentialIntegrand<T = T>,
+//         Kernel: KernelEvaluatorTrait<T = T>,
+//     >(
+//         assembler: *const PotentialAssemblerWrapper,
+//     ) -> *mut PotentialAssembler<T, Integrand, Kernel> {
+//         (*assembler).assembler as *mut PotentialAssembler<T, Integrand, Kernel>
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_set_batch_size(
-        assembler: *mut PotentialAssemblerWrapper,
-        batch_size: usize,
-    ) {
-        match (*assembler).ktype {
-            KernelType::Laplace => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler_mut::<
-                        f32,
-                        SingleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    DType::F64 => (*extract_potential_assembler_mut::<
-                        f64,
-                        SingleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler_mut::<
-                        f32,
-                        DoubleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    DType::F64 => (*extract_potential_assembler_mut::<
-                        f64,
-                        DoubleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            KernelType::Helmholtz => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler_mut::<
-                        c32,
-                        SingleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    DType::C64 => (*extract_potential_assembler_mut::<
-                        c64,
-                        SingleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler_mut::<
-                        c32,
-                        DoubleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    DType::C64 => (*extract_potential_assembler_mut::<
-                        c64,
-                        DoubleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .set_batch_size(batch_size),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        }
-    }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_has_quadrature_degree(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         cell: u8,
+//     ) -> bool {
+//         let cell = ReferenceCellType::from(cell).unwrap();
+//         match (*assembler).ktype {
+//             KernelType::Laplace => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler::<
+//                         f32,
+//                         SingleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::F64 => (*extract_potential_assembler::<
+//                         f64,
+//                         SingleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler::<
+//                         f32,
+//                         DoubleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::F64 => (*extract_potential_assembler::<
+//                         f64,
+//                         DoubleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             KernelType::Helmholtz => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler::<
+//                         c32,
+//                         SingleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::C64 => (*extract_potential_assembler::<
+//                         c64,
+//                         SingleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler::<
+//                         c32,
+//                         DoubleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::C64 => (*extract_potential_assembler::<
+//                         c64,
+//                         DoubleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//         }
+//         .is_some()
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_batch_size(
-        assembler: *mut PotentialAssemblerWrapper,
-    ) -> usize {
-        match (*assembler).ktype {
-            KernelType::Laplace => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler::<
-                        f32,
-                        SingleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .batch_size(),
-                    DType::F64 => (*extract_potential_assembler::<
-                        f64,
-                        SingleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .batch_size(),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::F32 => (*extract_potential_assembler::<
-                        f32,
-                        DoubleLayerPotentialIntegrand<f32>,
-                        KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                    >(assembler))
-                    .batch_size(),
-                    DType::F64 => (*extract_potential_assembler::<
-                        f64,
-                        DoubleLayerPotentialIntegrand<f64>,
-                        KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                    >(assembler))
-                    .batch_size(),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            KernelType::Helmholtz => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler::<
-                        c32,
-                        SingleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .batch_size(),
-                    DType::C64 => (*extract_potential_assembler::<
-                        c64,
-                        SingleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .batch_size(),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::C32 => (*extract_potential_assembler::<
-                        c32,
-                        DoubleLayerPotentialIntegrand<c32>,
-                        KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                    >(assembler))
-                    .batch_size(),
-                    DType::C64 => (*extract_potential_assembler::<
-                        c64,
-                        DoubleLayerPotentialIntegrand<c64>,
-                        KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                    >(assembler))
-                    .batch_size(),
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        }
-    }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_set_quadrature_degree(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         cell: u8,
+//         degree: usize,
+//     ) {
+//         let cell = ReferenceCellType::from(cell).unwrap();
+//         match (*assembler).ktype {
+//             KernelType::Laplace => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler_mut::<
+//                         f32,
+//                         SingleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     DType::F64 => (*extract_potential_assembler_mut::<
+//                         f64,
+//                         SingleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler_mut::<
+//                         f32,
+//                         DoubleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     DType::F64 => (*extract_potential_assembler_mut::<
+//                         f64,
+//                         DoubleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             KernelType::Helmholtz => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler_mut::<
+//                         c32,
+//                         SingleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     DType::C64 => (*extract_potential_assembler_mut::<
+//                         c64,
+//                         SingleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler_mut::<
+//                         c32,
+//                         DoubleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     DType::C64 => (*extract_potential_assembler_mut::<
+//                         c64,
+//                         DoubleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .set_quadrature_degree(cell, degree),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//         }
+//     }
 
-    unsafe fn potential_assembler_assemble_into_dense_internal_real<
-        T: RlstScalar<Real = T> + MatrixInverse,
-        Integrand: PotentialIntegrand<T = T>,
-        Kernel: KernelEvaluatorTrait<T = T>,
-        Space: FunctionSpace<T = T> + Sync,
-    >(
-        assembler: *mut PotentialAssemblerWrapper,
-        output: *mut c_void,
-        space: *const FunctionSpaceWrapper,
-        points: *const c_void,
-        npts: usize,
-    ) {
-        let points = rlst_array_from_slice2!(
-            from_raw_parts(points as *const T::Real, 3 * npts),
-            [3, npts]
-        );
-        let dim = (*extract_space::<Space>(space)).global_size();
-        let mut output = rlst_array_from_slice_mut2!(
-            from_raw_parts_mut(output as *mut T, npts * dim),
-            [npts, dim]
-        );
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_quadrature_degree(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         cell: u8,
+//     ) -> usize {
+//         let cell = ReferenceCellType::from(cell).unwrap();
+//         match (*assembler).ktype {
+//             KernelType::Laplace => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler::<
+//                         f32,
+//                         SingleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::F64 => (*extract_potential_assembler::<
+//                         f64,
+//                         SingleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler::<
+//                         f32,
+//                         DoubleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::F64 => (*extract_potential_assembler::<
+//                         f64,
+//                         DoubleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             KernelType::Helmholtz => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler::<
+//                         c32,
+//                         SingleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::C64 => (*extract_potential_assembler::<
+//                         c64,
+//                         SingleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler::<
+//                         c32,
+//                         DoubleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     DType::C64 => (*extract_potential_assembler::<
+//                         c64,
+//                         DoubleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .quadrature_degree(cell),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//         }
+//         .unwrap()
+//     }
 
-        (*extract_potential_assembler::<T, Integrand, Kernel>(assembler)).assemble_into_dense(
-            &mut output,
-            &*extract_space::<Space>(space),
-            &points,
-        )
-    }
-    unsafe fn potential_assembler_assemble_into_dense_internal_complex<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-        Integrand: PotentialIntegrand<T = T>,
-        Kernel: KernelEvaluatorTrait<T = T>,
-        Space: FunctionSpace<T = T> + Sync,
-    >(
-        assembler: *mut PotentialAssemblerWrapper,
-        output: *mut c_void,
-        space: *const FunctionSpaceWrapper,
-        points: *const c_void,
-        npts: usize,
-    ) {
-        let points = rlst_array_from_slice2!(
-            from_raw_parts(points as *const T::Real, 3 * npts),
-            [3, npts]
-        );
-        let dim = (*extract_space::<Space>(space)).global_size();
-        let mut output = rlst_array_from_slice_mut2!(
-            from_raw_parts_mut(output as *mut T, npts * dim),
-            [npts, dim]
-        );
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_set_batch_size(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         batch_size: usize,
+//     ) {
+//         match (*assembler).ktype {
+//             KernelType::Laplace => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler_mut::<
+//                         f32,
+//                         SingleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     DType::F64 => (*extract_potential_assembler_mut::<
+//                         f64,
+//                         SingleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler_mut::<
+//                         f32,
+//                         DoubleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     DType::F64 => (*extract_potential_assembler_mut::<
+//                         f64,
+//                         DoubleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             KernelType::Helmholtz => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler_mut::<
+//                         c32,
+//                         SingleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     DType::C64 => (*extract_potential_assembler_mut::<
+//                         c64,
+//                         SingleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler_mut::<
+//                         c32,
+//                         DoubleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     DType::C64 => (*extract_potential_assembler_mut::<
+//                         c64,
+//                         DoubleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .set_batch_size(batch_size),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//         }
+//     }
 
-        (*extract_potential_assembler::<T, Integrand, Kernel>(assembler)).assemble_into_dense(
-            &mut output,
-            &*extract_space::<Space>(space),
-            &points,
-        )
-    }
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_assemble_into_dense(
-        assembler: *mut PotentialAssemblerWrapper,
-        output: *mut c_void,
-        space: *const FunctionSpaceWrapper,
-        points: *const c_void,
-        npts: usize,
-    ) {
-        match (*assembler).dtype {
-            DType::F32 => {
-                assert_eq!((*space).dtype, DType::F32);
-            }
-            DType::F64 => {
-                assert_eq!((*space).dtype, DType::F64);
-            }
-            DType::C32 => {
-                assert_eq!((*space).dtype, DType::F32);
-            }
-            DType::C64 => {
-                assert_eq!((*space).dtype, DType::F64);
-            }
-        }
-        match (*assembler).ktype {
-            KernelType::Laplace => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::F32 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_real::<
-                                    f32,
-                                    SingleLayerPotentialIntegrand<f32>,
-                                    KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                                    SerialFunctionSpace<
-                                        f32,
-                                        SingleElementGrid<f32, CiarletElement<f32>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    DType::F64 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_real::<
-                                    f64,
-                                    SingleLayerPotentialIntegrand<f64>,
-                                    KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                                    SerialFunctionSpace<
-                                        f64,
-                                        SingleElementGrid<f64, CiarletElement<f64>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::F32 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_real::<
-                                    f32,
-                                    DoubleLayerPotentialIntegrand<f32>,
-                                    KernelEvaluator<f32, Laplace3dKernel<f32>>,
-                                    SerialFunctionSpace<
-                                        f32,
-                                        SingleElementGrid<f32, CiarletElement<f32>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    DType::F64 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_real::<
-                                    f64,
-                                    DoubleLayerPotentialIntegrand<f64>,
-                                    KernelEvaluator<f64, Laplace3dKernel<f64>>,
-                                    SerialFunctionSpace<
-                                        f64,
-                                        SingleElementGrid<f64, CiarletElement<f64>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            KernelType::Helmholtz => match (*assembler).itype {
-                PotentialOperator::SingleLayer => match (*assembler).dtype {
-                    DType::C32 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_complex::<
-                                    c32,
-                                    SingleLayerPotentialIntegrand<c32>,
-                                    KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                                    SerialFunctionSpace<
-                                        c32,
-                                        SingleElementGrid<f32, CiarletElement<f32>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    DType::C64 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_complex::<
-                                    c64,
-                                    SingleLayerPotentialIntegrand<c64>,
-                                    KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                                    SerialFunctionSpace<
-                                        c64,
-                                        SingleElementGrid<f64, CiarletElement<f64>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                PotentialOperator::DoubleLayer => match (*assembler).dtype {
-                    DType::C32 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_complex::<
-                                    c32,
-                                    DoubleLayerPotentialIntegrand<c32>,
-                                    KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
-                                    SerialFunctionSpace<
-                                        c32,
-                                        SingleElementGrid<f32, CiarletElement<f32>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    DType::C64 => match (*space).stype {
-                        SpaceType::SerialFunctionSpace => match (*space).gtype {
-                            GridType::SerialSingleElementGrid => {
-                                potential_assembler_assemble_into_dense_internal_complex::<
-                                    c64,
-                                    DoubleLayerPotentialIntegrand<c64>,
-                                    KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
-                                    SerialFunctionSpace<
-                                        c64,
-                                        SingleElementGrid<f64, CiarletElement<f64>>,
-                                    >,
-                                >(
-                                    assembler, output, space, points, npts
-                                );
-                            }
-                        },
-                    },
-                    _ => {
-                        panic!("Invalid data type");
-                    }
-                },
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-        }
-    }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_batch_size(
+//         assembler: *mut PotentialAssemblerWrapper,
+//     ) -> usize {
+//         match (*assembler).ktype {
+//             KernelType::Laplace => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler::<
+//                         f32,
+//                         SingleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     DType::F64 => (*extract_potential_assembler::<
+//                         f64,
+//                         SingleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::F32 => (*extract_potential_assembler::<
+//                         f32,
+//                         DoubleLayerPotentialIntegrand<f32>,
+//                         KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     DType::F64 => (*extract_potential_assembler::<
+//                         f64,
+//                         DoubleLayerPotentialIntegrand<f64>,
+//                         KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             KernelType::Helmholtz => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler::<
+//                         c32,
+//                         SingleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     DType::C64 => (*extract_potential_assembler::<
+//                         c64,
+//                         SingleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::C32 => (*extract_potential_assembler::<
+//                         c32,
+//                         DoubleLayerPotentialIntegrand<c32>,
+//                         KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     DType::C64 => (*extract_potential_assembler::<
+//                         c64,
+//                         DoubleLayerPotentialIntegrand<c64>,
+//                         KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                     >(assembler))
+//                     .batch_size(),
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//         }
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn potential_assembler_dtype(
-        assembler: *mut PotentialAssemblerWrapper,
-    ) -> u8 {
-        (*assembler).dtype as u8
-    }
+//     unsafe fn potential_assembler_assemble_into_dense_internal_real<
+//         T: RlstScalar<Real = T> + MatrixInverse,
+//         Integrand: PotentialIntegrand<T = T>,
+//         Kernel: KernelEvaluatorTrait<T = T>,
+//         Space: FunctionSpace<T = T> + Sync,
+//     >(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         output: *mut c_void,
+//         space: *const FunctionSpaceWrapper,
+//         points: *const c_void,
+//         npts: usize,
+//     ) {
+//         let points = rlst_array_from_slice2!(
+//             from_raw_parts(points as *const T::Real, 3 * npts),
+//             [3, npts]
+//         );
+//         let dim = (*extract_space::<Space>(space)).global_size();
+//         let mut output = rlst_array_from_slice_mut2!(
+//             from_raw_parts_mut(output as *mut T, npts * dim),
+//             [npts, dim]
+//         );
 
-    unsafe fn laplace_potential_assembler_new_internal<T: RlstScalar + MatrixInverse>(
-        operator: PotentialOperator,
-        dtype: DType,
-    ) -> *const PotentialAssemblerWrapper {
-        Box::into_raw(Box::new(PotentialAssemblerWrapper {
-            assembler: match operator {
-                PotentialOperator::SingleLayer => {
-                    Box::into_raw(Box::new(
-                        PotentialAssembler::<T, _, _>::new_laplace_single_layer(),
-                    )) as *const c_void
-                }
-                PotentialOperator::DoubleLayer => {
-                    Box::into_raw(Box::new(
-                        PotentialAssembler::<T, _, _>::new_laplace_double_layer(),
-                    )) as *const c_void
-                }
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            itype: operator,
-            ktype: KernelType::Laplace,
-            dtype,
-        }))
-    }
+//         (*extract_potential_assembler::<T, Integrand, Kernel>(assembler)).assemble_into_dense(
+//             &mut output,
+//             &*extract_space::<Space>(space),
+//             &points,
+//         )
+//     }
+//     unsafe fn potential_assembler_assemble_into_dense_internal_complex<
+//         T: RlstScalar<Complex = T> + MatrixInverse,
+//         Integrand: PotentialIntegrand<T = T>,
+//         Kernel: KernelEvaluatorTrait<T = T>,
+//         Space: FunctionSpace<T = T> + Sync,
+//     >(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         output: *mut c_void,
+//         space: *const FunctionSpaceWrapper,
+//         points: *const c_void,
+//         npts: usize,
+//     ) {
+//         let points = rlst_array_from_slice2!(
+//             from_raw_parts(points as *const T::Real, 3 * npts),
+//             [3, npts]
+//         );
+//         let dim = (*extract_space::<Space>(space)).global_size();
+//         let mut output = rlst_array_from_slice_mut2!(
+//             from_raw_parts_mut(output as *mut T, npts * dim),
+//             [npts, dim]
+//         );
 
-    #[no_mangle]
-    pub unsafe extern "C" fn laplace_potential_assembler_new(
-        operator: u8,
-        dtype: u8,
-    ) -> *const PotentialAssemblerWrapper {
-        let operator = PotentialOperator::from(operator).unwrap();
-        let dtype = DType::from(dtype).unwrap();
-        match dtype {
-            DType::F32 => laplace_potential_assembler_new_internal::<f32>(operator, dtype),
-            DType::F64 => laplace_potential_assembler_new_internal::<f64>(operator, dtype),
-            _ => {
-                panic!("Invalid data type");
-            }
-        }
-    }
+//         (*extract_potential_assembler::<T, Integrand, Kernel>(assembler)).assemble_into_dense(
+//             &mut output,
+//             &*extract_space::<Space>(space),
+//             &points,
+//         )
+//     }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_assemble_into_dense(
+//         assembler: *mut PotentialAssemblerWrapper,
+//         output: *mut c_void,
+//         space: *const FunctionSpaceWrapper,
+//         points: *const c_void,
+//         npts: usize,
+//     ) {
+//         match (*assembler).dtype {
+//             DType::F32 => {
+//                 assert_eq!((*space).dtype, DType::F32);
+//             }
+//             DType::F64 => {
+//                 assert_eq!((*space).dtype, DType::F64);
+//             }
+//             DType::C32 => {
+//                 assert_eq!((*space).dtype, DType::F32);
+//             }
+//             DType::C64 => {
+//                 assert_eq!((*space).dtype, DType::F64);
+//             }
+//         }
+//         match (*assembler).ktype {
+//             KernelType::Laplace => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::F32 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_real::<
+//                                     f32,
+//                                     SingleLayerPotentialIntegrand<f32>,
+//                                     KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                                     SerialFunctionSpace<
+//                                         f32,
+//                                         SingleElementGrid<f32, CiarletElement<f32>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     DType::F64 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_real::<
+//                                     f64,
+//                                     SingleLayerPotentialIntegrand<f64>,
+//                                     KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                                     SerialFunctionSpace<
+//                                         f64,
+//                                         SingleElementGrid<f64, CiarletElement<f64>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::F32 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_real::<
+//                                     f32,
+//                                     DoubleLayerPotentialIntegrand<f32>,
+//                                     KernelEvaluator<f32, Laplace3dKernel<f32>>,
+//                                     SerialFunctionSpace<
+//                                         f32,
+//                                         SingleElementGrid<f32, CiarletElement<f32>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     DType::F64 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_real::<
+//                                     f64,
+//                                     DoubleLayerPotentialIntegrand<f64>,
+//                                     KernelEvaluator<f64, Laplace3dKernel<f64>>,
+//                                     SerialFunctionSpace<
+//                                         f64,
+//                                         SingleElementGrid<f64, CiarletElement<f64>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             KernelType::Helmholtz => match (*assembler).itype {
+//                 PotentialOperator::SingleLayer => match (*assembler).dtype {
+//                     DType::C32 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_complex::<
+//                                     c32,
+//                                     SingleLayerPotentialIntegrand<c32>,
+//                                     KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                                     SerialFunctionSpace<
+//                                         c32,
+//                                         SingleElementGrid<f32, CiarletElement<f32>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     DType::C64 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_complex::<
+//                                     c64,
+//                                     SingleLayerPotentialIntegrand<c64>,
+//                                     KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                                     SerialFunctionSpace<
+//                                         c64,
+//                                         SingleElementGrid<f64, CiarletElement<f64>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 PotentialOperator::DoubleLayer => match (*assembler).dtype {
+//                     DType::C32 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_complex::<
+//                                     c32,
+//                                     DoubleLayerPotentialIntegrand<c32>,
+//                                     KernelEvaluator<c32, Helmholtz3dKernel<c32>>,
+//                                     SerialFunctionSpace<
+//                                         c32,
+//                                         SingleElementGrid<f32, CiarletElement<f32>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     DType::C64 => match (*space).stype {
+//                         SpaceType::SerialFunctionSpace => match (*space).gtype {
+//                             GridType::SerialSingleElementGrid => {
+//                                 potential_assembler_assemble_into_dense_internal_complex::<
+//                                     c64,
+//                                     DoubleLayerPotentialIntegrand<c64>,
+//                                     KernelEvaluator<c64, Helmholtz3dKernel<c64>>,
+//                                     SerialFunctionSpace<
+//                                         c64,
+//                                         SingleElementGrid<f64, CiarletElement<f64>>,
+//                                     >,
+//                                 >(
+//                                     assembler, output, space, points, npts
+//                                 );
+//                             }
+//                         },
+//                     },
+//                     _ => {
+//                         panic!("Invalid data type");
+//                     }
+//                 },
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//         }
+//     }
 
-    unsafe fn helmholtz_potential_assembler_new_internal<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-    >(
-        wavenumber: T::Real,
-        operator: PotentialOperator,
-        dtype: DType,
-    ) -> *const PotentialAssemblerWrapper {
-        Box::into_raw(Box::new(PotentialAssemblerWrapper {
-            assembler: match operator {
-                PotentialOperator::SingleLayer => Box::into_raw(Box::new(
-                    PotentialAssembler::<T, _, _>::new_helmholtz_single_layer(wavenumber),
-                )) as *const c_void,
-                PotentialOperator::DoubleLayer => Box::into_raw(Box::new(
-                    PotentialAssembler::<T, _, _>::new_helmholtz_double_layer(wavenumber),
-                )) as *const c_void,
-                _ => {
-                    panic!("Invalid operator");
-                }
-            },
-            itype: operator,
-            ktype: KernelType::Helmholtz,
-            dtype,
-        }))
-    }
+//     #[no_mangle]
+//     pub unsafe extern "C" fn potential_assembler_dtype(
+//         assembler: *mut PotentialAssemblerWrapper,
+//     ) -> u8 {
+//         (*assembler).dtype as u8
+//     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn helmholtz_potential_assembler_new(
-        wavenumber: *const c_void,
-        operator: u8,
-        dtype: u8,
-    ) -> *const PotentialAssemblerWrapper {
-        let operator = PotentialOperator::from(operator).unwrap();
-        let dtype = DType::from(dtype).unwrap();
-        match dtype {
-            DType::C32 => helmholtz_potential_assembler_new_internal::<c32>(
-                *(wavenumber as *const f32),
-                operator,
-                dtype,
-            ),
-            DType::C64 => helmholtz_potential_assembler_new_internal::<c64>(
-                *(wavenumber as *const f64),
-                operator,
-                dtype,
-            ),
-            _ => {
-                panic!("Invalid data type");
-            }
-        }
-    }
-}
+//     unsafe fn laplace_potential_assembler_new_internal<T: RlstScalar + MatrixInverse>(
+//         operator: PotentialOperator,
+//         dtype: DType,
+//     ) -> *const PotentialAssemblerWrapper {
+//         Box::into_raw(Box::new(PotentialAssemblerWrapper {
+//             assembler: match operator {
+//                 PotentialOperator::SingleLayer => {
+//                     Box::into_raw(Box::new(
+//                         PotentialAssembler::<T, _, _>::new_laplace_single_layer(),
+//                     )) as *const c_void
+//                 }
+//                 PotentialOperator::DoubleLayer => {
+//                     Box::into_raw(Box::new(
+//                         PotentialAssembler::<T, _, _>::new_laplace_double_layer(),
+//                     )) as *const c_void
+//                 }
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             itype: operator,
+//             ktype: KernelType::Laplace,
+//             dtype,
+//         }))
+//     }
+
+//     #[no_mangle]
+//     pub unsafe extern "C" fn laplace_potential_assembler_new(
+//         operator: u8,
+//         dtype: u8,
+//     ) -> *const PotentialAssemblerWrapper {
+//         let operator = PotentialOperator::from(operator).unwrap();
+//         let dtype = DType::from(dtype).unwrap();
+//         match dtype {
+//             DType::F32 => laplace_potential_assembler_new_internal::<f32>(operator, dtype),
+//             DType::F64 => laplace_potential_assembler_new_internal::<f64>(operator, dtype),
+//             _ => {
+//                 panic!("Invalid data type");
+//             }
+//         }
+//     }
+
+//     unsafe fn helmholtz_potential_assembler_new_internal<
+//         T: RlstScalar<Complex = T> + MatrixInverse,
+//     >(
+//         wavenumber: T::Real,
+//         operator: PotentialOperator,
+//         dtype: DType,
+//     ) -> *const PotentialAssemblerWrapper {
+//         Box::into_raw(Box::new(PotentialAssemblerWrapper {
+//             assembler: match operator {
+//                 PotentialOperator::SingleLayer => Box::into_raw(Box::new(
+//                     PotentialAssembler::<T, _, _>::new_helmholtz_single_layer(wavenumber),
+//                 )) as *const c_void,
+//                 PotentialOperator::DoubleLayer => Box::into_raw(Box::new(
+//                     PotentialAssembler::<T, _, _>::new_helmholtz_double_layer(wavenumber),
+//                 )) as *const c_void,
+//                 _ => {
+//                     panic!("Invalid operator");
+//                 }
+//             },
+//             itype: operator,
+//             ktype: KernelType::Helmholtz,
+//             dtype,
+//         }))
+//     }
+
+//     #[no_mangle]
+//     pub unsafe extern "C" fn helmholtz_potential_assembler_new(
+//         wavenumber: *const c_void,
+//         operator: u8,
+//         dtype: u8,
+//     ) -> *const PotentialAssemblerWrapper {
+//         let operator = PotentialOperator::from(operator).unwrap();
+//         let dtype = DType::from(dtype).unwrap();
+//         match dtype {
+//             DType::C32 => helmholtz_potential_assembler_new_internal::<c32>(
+//                 *(wavenumber as *const f32),
+//                 operator,
+//                 dtype,
+//             ),
+//             DType::C64 => helmholtz_potential_assembler_new_internal::<c64>(
+//                 *(wavenumber as *const f64),
+//                 operator,
+//                 dtype,
+//             ),
+//             _ => {
+//                 panic!("Invalid data type");
+//             }
+//         }
+//     }
+// }

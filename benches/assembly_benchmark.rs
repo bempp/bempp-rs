@@ -1,7 +1,11 @@
-use bempp::assembly::boundary::BoundaryAssembler;
+use bempp::assembly::boundary::integrands::SingleLayerBoundaryIntegrand;
+use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
+use bempp::assembly::kernels::KernelEvaluator;
 use bempp::function::SerialFunctionSpace;
 use bempp::traits::{BoundaryAssembly, FunctionSpace};
 use criterion::{criterion_group, criterion_main, Criterion};
+use green_kernels::laplace_3d::Laplace3dKernel;
+use green_kernels::types::GreenKernelEvalType;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;
@@ -19,13 +23,21 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.cell_colouring();
-        let mut a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
-        a.set_quadrature_degree(ReferenceCellType::Triangle, 16);
-        a.set_singular_quadrature_degree(
+
+        let mut assembler = BoundaryAssembler::<f64, _, _>::new(
+            SingleLayerBoundaryIntegrand::new(),
+            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
+            BoundaryAssemblerOptions::default(),
+            1,
+            0,
+        );
+
+        assembler.set_quadrature_degree(ReferenceCellType::Triangle, 16);
+        assembler.set_singular_quadrature_degree(
             (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
             4,
         );
-        a.set_batch_size(128);
+        assembler.set_batch_size(128);
 
         group.bench_function(
             format!(
@@ -33,7 +45,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.global_size(),
                 space.global_size()
             ),
-            |b| b.iter(|| a.assemble_singular_into_dense(&mut matrix, &space, &space)),
+            |b| b.iter(|| assembler.assemble_singular_into_dense(&mut matrix, &space, &space)),
         );
         group.bench_function(
             format!(
@@ -43,7 +55,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
             ),
             |b| {
                 b.iter(|| {
-                    a.assemble_nonsingular_into_dense(
+                    assembler.assemble_nonsingular_into_dense(
                         &mut matrix,
                         &space,
                         &space,

@@ -1,8 +1,4 @@
 //! Boundary assemblers
-pub mod adjoint_double_layer;
-pub mod double_layer;
-pub mod hypersingular;
-pub mod single_layer;
 
 use super::cell_pair_assemblers::{
     NonsingularCellPairAssembler, NonsingularCellPairAssemblerWithTestCaching,
@@ -418,13 +414,14 @@ fn get_pairs_if_smallest(
 }
 
 /// Options for a boundary assembler
+#[derive(Clone)]
 pub struct BoundaryAssemblerOptions {
     /// Number of points used in quadrature for non-singular integrals
-    quadrature_degrees: HashMap<ReferenceCellType, usize>,
+    pub quadrature_degrees: HashMap<ReferenceCellType, usize>,
     /// Quadrature degrees to be used for singular integrals
-    singular_quadrature_degrees: HashMap<(ReferenceCellType, ReferenceCellType), usize>,
+    pub singular_quadrature_degrees: HashMap<(ReferenceCellType, ReferenceCellType), usize>,
     /// Maximum size of each batch of cells to send to an assembly function
-    batch_size: usize,
+    pub batch_size: usize,
 }
 
 impl Default for BoundaryAssemblerOptions {
@@ -440,6 +437,31 @@ impl Default for BoundaryAssemblerOptions {
             ]),
             batch_size: 128,
         }
+    }
+}
+
+impl BoundaryAssemblerOptions {
+    /// Set the regular quadrature order.
+    pub fn set_regular_quadrature_degree(&mut self, cell_type: ReferenceCellType, npoints: usize) {
+        self.quadrature_degrees
+            .entry(cell_type)
+            .and_modify(|x| *x = npoints);
+    }
+
+    /// Set the singular quadrature order.
+    pub fn set_singular_quadrature_degree(
+        &mut self,
+        cell_type: (ReferenceCellType, ReferenceCellType),
+        npoints: usize,
+    ) {
+        self.singular_quadrature_degrees
+            .entry(cell_type)
+            .and_modify(|x| *x = npoints);
+    }
+
+    /// Set the batch size.
+    pub fn set_batch_size(&mut self, batch_size: usize) {
+        self.batch_size = batch_size;
     }
 }
 
@@ -473,11 +495,17 @@ impl<
     > BoundaryAssembler<T, Integrand, Kernel>
 {
     /// Create new
-    fn new(integrand: Integrand, kernel: Kernel, deriv_size: usize, table_derivs: usize) -> Self {
+    pub fn new(
+        integrand: Integrand,
+        kernel: Kernel,
+        options: BoundaryAssemblerOptions,
+        deriv_size: usize,
+        table_derivs: usize,
+    ) -> Self {
         Self {
             integrand,
             kernel,
-            options: BoundaryAssemblerOptions::default(),
+            options,
             deriv_size,
             table_derivs,
         }

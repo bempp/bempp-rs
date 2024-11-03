@@ -3,14 +3,18 @@ mod assemblers;
 pub(crate) mod cell_pair_assemblers;
 pub mod integrands;
 
-pub use assemblers::BoundaryAssembler;
+pub use assemblers::{BoundaryAssembler, BoundaryAssemblerOptions};
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::assembly::kernels::KernelEvaluator;
     use crate::function::SerialFunctionSpace;
     use crate::traits::{BoundaryAssembly, FunctionSpace};
     use approx::*;
+    use green_kernels::laplace_3d::Laplace3dKernel;
+    use green_kernels::types::GreenKernelEvalType;
+    use integrands::SingleLayerBoundaryIntegrand;
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;
     use ndgrid::shapes::regular_sphere;
@@ -26,7 +30,14 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
+        let assembler = BoundaryAssembler::<f64, _, _>::new(
+            SingleLayerBoundaryIntegrand::new(),
+            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
+            BoundaryAssemblerOptions::default(),
+            1,
+            0,
+        );
+        // let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -52,7 +63,13 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-        let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
+        let assembler = BoundaryAssembler::<f64, _, _>::new(
+            SingleLayerBoundaryIntegrand::new(),
+            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
+            BoundaryAssemblerOptions::default(),
+            1,
+            0,
+        );
         assembler.assemble_singular_into_dense(&mut matrix, &space, &space);
         let csr = assembler.assemble_singular_into_csr(&space, &space);
 
@@ -81,7 +98,13 @@ mod test {
         let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
-        let assembler = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
+        let assembler = BoundaryAssembler::<f64, _, _>::new(
+            SingleLayerBoundaryIntegrand::new(),
+            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
+            BoundaryAssemblerOptions::default(),
+            1,
+            0,
+        );
         assembler.assemble_singular_into_dense(&mut matrix, &space0, &space1);
         let csr = assembler.assemble_singular_into_csr(&space0, &space1);
         let indptr = csr.indptr();

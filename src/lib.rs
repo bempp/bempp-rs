@@ -5,6 +5,8 @@
 pub mod assembly;
 pub mod bindings;
 pub mod function;
+pub mod helmholtz;
+pub mod laplace;
 pub mod traits;
 
 #[cfg(test)]

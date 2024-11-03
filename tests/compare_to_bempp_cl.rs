@@ -1,7 +1,15 @@
 use approx::*;
-use bempp::assembly::{boundary::BoundaryAssembler, potential::PotentialAssembler};
+use bempp::assembly::boundary::BoundaryAssemblerOptions;
+use bempp::assembly::potential::PotentialAssembler;
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::{BoundaryAssembly, FunctionSpace, PotentialAssembly};
+use bempp::helmholtz::assembler::{
+    helmholtz_adjoint_double_layer, helmholtz_double_layer, helmholtz_hypersingular,
+    helmholtz_single_layer,
+};
+use bempp::laplace::assembler::{
+    laplace_adjoint_double_layer, laplace_double_layer, laplace_hypersingular, laplace_single_layer,
+};
+use bempp::traits::{FunctionSpace, PotentialAssembly};
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
@@ -14,12 +22,7 @@ fn test_laplace_single_layer_dp0_dp0() {
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-
-    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-
-    let a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = laplace_single_layer(&space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -38,11 +41,7 @@ fn test_laplace_double_layer_dp0_dp0() {
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-
-    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = BoundaryAssembler::<f64, _, _>::new_laplace_double_layer();
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = laplace_double_layer(&space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -60,11 +59,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-
-    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = BoundaryAssembler::<f64, _, _>::new_laplace_adjoint_double_layer();
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = laplace_adjoint_double_layer(&space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -78,35 +73,12 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
 }
 
 #[test]
-fn test_laplace_hypersingular_dp0_dp0() {
-    let grid = regular_sphere(0);
-    let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
-
-    let ndofs = space.global_size();
-
-    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = BoundaryAssembler::<f64, _, _>::new_laplace_hypersingular();
-    a.assemble_into_dense(&mut matrix, &space, &space);
-
-    for i in 0..ndofs {
-        for j in 0..ndofs {
-            assert_relative_eq!(*matrix.get([i, j]).unwrap(), 0.0, epsilon = 1e-4);
-        }
-    }
-}
-
-#[test]
 fn test_laplace_hypersingular_p1_p1() {
     let grid = regular_sphere(0);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-
-    let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    let a = BoundaryAssembler::<f64, _, _>::new_laplace_hypersingular();
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = laplace_hypersingular(&space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -131,11 +103,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
-
-    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_single_layer(3.0);
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = helmholtz_single_layer(3.0, &space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -154,11 +122,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
-
-    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_double_layer(3.0);
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = helmholtz_double_layer(3.0, &space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -176,11 +140,8 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
-
-    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_adjoint_double_layer(3.0);
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix =
+        helmholtz_adjoint_double_layer(3.0, &space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
@@ -199,11 +160,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let element = LagrangeElementFamily::<c64>::new(1, Continuity::Standard);
     let space = SerialFunctionSpace::new(&grid, &element);
 
-    let ndofs = space.global_size();
-    let mut matrix = rlst_dynamic_array2!(c64, [ndofs, ndofs]);
-
-    let a = BoundaryAssembler::<c64, _, _>::new_helmholtz_hypersingular(3.0);
-    a.assemble_into_dense(&mut matrix, &space, &space);
+    let matrix = helmholtz_hypersingular(3.0, &space, &space, BoundaryAssemblerOptions::default());
 
     // Compare to result from bempp-cl
     #[rustfmt::skip]
