@@ -10,7 +10,7 @@ mod test {
     use super::*;
     use crate::assembly::kernels::KernelEvaluator;
     use crate::function::SerialFunctionSpace;
-    use crate::traits::{BoundaryAssembly, FunctionSpace};
+    use crate::traits::FunctionSpace;
     use approx::*;
     use green_kernels::laplace_3d::Laplace3dKernel;
     use green_kernels::types::GreenKernelEvalType;

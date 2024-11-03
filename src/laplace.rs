@@ -15,7 +15,7 @@ pub mod assembler {
             },
             kernels::KernelEvaluator,
         },
-        traits::{BoundaryAssembly, FunctionSpace},
+        traits::FunctionSpace,
     };
 
     /// Assembler for the Laplace single layer operator.

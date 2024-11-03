@@ -5,7 +5,6 @@ use super::cell_pair_assemblers::{
     SingularCellPairAssembler,
 };
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
-use crate::traits::BoundaryAssembly;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelBoundaryAssembly;
 #[cfg(feature = "mpi")]
@@ -977,16 +976,8 @@ impl<
             }
         }
     }
-}
 
-impl<
-        T: RlstScalar + MatrixInverse,
-        Integrand: BoundaryIntegrand<T = T>,
-        Kernel: KernelEvaluator<T = T>,
-    > BoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
-{
-    type T = T;
-    fn assemble_singular_into_dense<
+    pub fn assemble_singular_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
     >(
@@ -1004,7 +995,7 @@ impl<
         }
     }
 
-    fn assemble_singular_into_csr<Space: FunctionSpace<T = T> + Sync>(
+    pub fn assemble_singular_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -1021,7 +1012,7 @@ impl<
         .unwrap()
     }
 
-    fn assemble_singular_correction_into_dense<
+    pub fn assemble_singular_correction_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
     >(
@@ -1040,7 +1031,7 @@ impl<
         }
     }
 
-    fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = T> + Sync>(
+    pub fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -1057,7 +1048,7 @@ impl<
         .unwrap()
     }
 
-    fn assemble_into_dense<
+    pub fn assemble_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
     >(
@@ -1079,7 +1070,7 @@ impl<
         self.assemble_singular_into_dense(output, trial_space, test_space);
     }
 
-    fn assemble_nonsingular_into_dense<
+    pub fn assemble_nonsingular_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
     >(
@@ -1113,35 +1104,43 @@ impl<
         )
     }
 }
-#[cfg(feature = "mpi")]
-impl<
-        T: RlstScalar + MatrixInverse,
-        Integrand: BoundaryIntegrand<T = T>,
-        Kernel: KernelEvaluator<T = T>,
-    > ParallelBoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
-{
-    fn parallel_assemble_singular_into_csr<
-        C: Communicator,
-        Space: ParallelFunctionSpace<C, T = T>,
-    >(
-        &self,
-        trial_space: &Space,
-        test_space: &Space,
-    ) -> CsrMatrix<T> {
-        self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
-    }
 
-    fn parallel_assemble_singular_correction_into_csr<
-        C: Communicator,
-        Space: ParallelFunctionSpace<C, T = T>,
-    >(
-        &self,
-        trial_space: &Space,
-        test_space: &Space,
-    ) -> CsrMatrix<T> {
-        self.assemble_singular_correction_into_csr(
-            trial_space.local_space(),
-            test_space.local_space(),
-        )
-    }
-}
+// impl<
+//         T: RlstScalar + MatrixInverse,
+//         Integrand: BoundaryIntegrand<T = T>,
+//         Kernel: KernelEvaluator<T = T>,
+//     > BoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
+// {
+//     type T = T;
+// #[cfg(feature = "mpi")]
+// impl<
+//         T: RlstScalar + MatrixInverse,
+//         Integrand: BoundaryIntegrand<T = T>,
+//         Kernel: KernelEvaluator<T = T>,
+//     > ParallelBoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
+// {
+//     fn parallel_assemble_singular_into_csr<
+//         C: Communicator,
+//         Space: ParallelFunctionSpace<C, T = T>,
+//     >(
+//         &self,
+//         trial_space: &Space,
+//         test_space: &Space,
+//     ) -> CsrMatrix<T> {
+//         self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
+//     }
+
+//     fn parallel_assemble_singular_correction_into_csr<
+//         C: Communicator,
+//         Space: ParallelFunctionSpace<C, T = T>,
+//     >(
+//         &self,
+//         trial_space: &Space,
+//         test_space: &Space,
+//     ) -> CsrMatrix<T> {
+//         self.assemble_singular_correction_into_csr(
+//             trial_space.local_space(),
+//             test_space.local_space(),
+//         )
+//     }
+// }

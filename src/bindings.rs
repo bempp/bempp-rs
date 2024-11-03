@@ -683,10 +683,7 @@ pub mod boundary_assembly {
         assembly::boundary::BoundaryAssembler,
         assembly::kernels::KernelEvaluator,
         function::SerialFunctionSpace,
-        traits::{
-            BoundaryAssembly, BoundaryIntegrand, FunctionSpace,
-            KernelEvaluator as KernelEvaluatorTrait,
-        },
+        traits::{BoundaryIntegrand, FunctionSpace, KernelEvaluator as KernelEvaluatorTrait},
     };
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
     use ndelement::{ciarlet::CiarletElement, types::ReferenceCellType};
