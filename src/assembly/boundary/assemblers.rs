@@ -7,7 +7,7 @@ use super::cell_pair_assemblers::{
 use super::integrands::BoundaryIntegrand;
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::assembly::kernels::KernelEvaluator;
-use crate::traits::FunctionSpace;
+use crate::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelBoundaryAssembly;
 #[cfg(feature = "mpi")]

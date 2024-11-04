@@ -1,7 +1,7 @@
 //! FMM tools
 use crate::assembly::common::SparseMatrixData;
+use crate::function::FunctionSpace;
 use crate::function::SerialFunctionSpace;
-use crate::traits::FunctionSpace;
 use bempp_quadrature::simplex_rules::simplex_rule;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;

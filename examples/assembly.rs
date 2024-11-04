@@ -1,7 +1,7 @@
 use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
+use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
 use bempp::laplace::assembler::laplace_single_layer;
-use bempp::traits::FunctionSpace;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;

@@ -1,5 +1,6 @@
 use approx::*;
 use bempp::assembly::boundary::BoundaryAssemblerOptions;
+use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
 use bempp::helmholtz::assembler::{
     helmholtz_adjoint_double_layer, helmholtz_double_layer, helmholtz_hypersingular,
@@ -8,7 +9,6 @@ use bempp::helmholtz::assembler::{
 use bempp::laplace::assembler::{
     laplace_adjoint_double_layer, laplace_double_layer, laplace_hypersingular, laplace_single_layer,
 };
-use bempp::traits::FunctionSpace;
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;

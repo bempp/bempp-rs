@@ -17,7 +17,7 @@ pub mod assembler {
             },
             kernels::KernelEvaluator,
         },
-        traits::FunctionSpace,
+        function::FunctionSpace,
     };
 
     /// Assembler for the Helmholtz single layer operator.

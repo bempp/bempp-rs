@@ -1,8 +1,8 @@
 use bempp::assembly::boundary::integrands::SingleLayerBoundaryIntegrand;
 use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
 use bempp::assembly::kernels::KernelEvaluator;
+use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
-use bempp::traits::FunctionSpace;
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::types::GreenKernelEvalType;
