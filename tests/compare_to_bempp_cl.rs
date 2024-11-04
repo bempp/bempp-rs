@@ -8,7 +8,7 @@ use bempp::helmholtz::assembler::{
 use bempp::laplace::assembler::{
     laplace_adjoint_double_layer, laplace_double_layer, laplace_hypersingular, laplace_single_layer,
 };
-use bempp::traits::{FunctionSpace, PotentialAssembly};
+use bempp::traits::FunctionSpace;
 use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
