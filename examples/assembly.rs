@@ -1,11 +1,10 @@
-use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
-use bempp::function::FunctionSpace;
+use bempp::assembly::boundary::BoundaryAssemblerOptions;
 use bempp::function::SerialFunctionSpace;
 use bempp::laplace::assembler::laplace_single_layer;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;
-use rlst::{rlst_dynamic_array2, RandomAccessByRef, Shape};
+use rlst::{RandomAccessByRef, Shape};
 
 fn main() {
     // Create a grid, family of elements, and function space

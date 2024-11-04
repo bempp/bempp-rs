@@ -974,6 +974,7 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         }
     }
 
+    /// Assemble the sparse part into a dense matrix.
     pub fn assemble_singular_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
@@ -992,6 +993,7 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         }
     }
 
+    /// Assemble the singular part into a CSR matrix.
     pub fn assemble_singular_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
         trial_space: &Space,
@@ -1009,6 +1011,7 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         .unwrap()
     }
 
+    /// Assemble the singular correction into a dense matrix.
     pub fn assemble_singular_correction_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
@@ -1028,6 +1031,7 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         }
     }
 
+    /// Assemble the singular correction into a CSR matrix.
     pub fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
         trial_space: &Space,
@@ -1045,6 +1049,7 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         .unwrap()
     }
 
+    /// Assemble into a dense matrix.
     pub fn assemble_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
@@ -1067,6 +1072,7 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         self.assemble_singular_into_dense(output, trial_space, test_space);
     }
 
+    /// Assemble the nonsingular part into a dense matrix.
     pub fn assemble_nonsingular_into_dense<
         Space: FunctionSpace<T = T> + Sync,
         Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
