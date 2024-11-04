@@ -291,12 +291,12 @@ fn assemble_batch_nonadjacent<
     for trial_cell in trial_cells {
         a.set_trial_cell(*trial_cell);
         let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
-        for (i, test_cell) in test_cells.iter().enumerate() {
+        for test_cell in test_cells.iter() {
             if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
                 continue;
             }
 
-            a.set_test_cell_from_index(i);
+            a.set_test_cell(*test_cell);
             a.assemble(&mut local_mat);
 
             let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };

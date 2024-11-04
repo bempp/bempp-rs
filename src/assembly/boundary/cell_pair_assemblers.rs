@@ -423,10 +423,10 @@ impl<
         K: Kernel<T = T>,
     > NonsingularCellPairAssemblerWithTestCaching<'a, T, I, TrialG, K>
 {
-    // Set the test cell from the index in the test cell array
-    pub fn set_test_cell_from_index(&mut self, test_cell: usize) {
-        self.test_cell = test_cell;
-    }
+    // // Set the test cell from the index in the test cell array
+    // pub fn set_test_cell_from_index(&mut self, test_cell: usize) {
+    //     self.test_cell = test_cell;
+    // }
 
     pub fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = self.test_indices[&test_cell];
@@ -596,43 +596,21 @@ mod test {
             &trial_weights,
         );
 
-        let mut a2 = NonsingularCellPairAssemblerWithTestCaching::new(
-            npts_test,
-            npts_trial,
-            1,
-            &test_cells,
-            &integrand,
-            &kernel,
-            grid.geometry_map(ReferenceCellType::Triangle, test_points.data()),
-            grid.geometry_map(ReferenceCellType::Triangle, trial_points.data()),
-            &test_table,
-            &trial_table,
-            &test_weights,
-            &trial_weights,
-        );
-
         let mut result0 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
         let mut result1 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
-        let mut result2 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
 
-        for (test_i, test_cell) in test_cells.iter().enumerate() {
+        for test_cell in test_cells.iter() {
             a0.set_test_cell(*test_cell);
             a1.set_test_cell(*test_cell);
-            a2.set_test_cell_from_index(test_i);
             for trial_cell in &trial_cells {
                 a0.set_trial_cell(*trial_cell);
                 a1.set_trial_cell(*trial_cell);
-                a2.set_trial_cell(*trial_cell);
 
                 a0.assemble(&mut result0);
                 a1.assemble(&mut result1);
-                a2.assemble(&mut result2);
-                for (col0, col1, col2) in
-                    izip!(result0.col_iter(), result1.col_iter(), result2.col_iter())
-                {
-                    for (value0, value1, value2) in izip!(col0.iter(), col1.iter(), col2.iter()) {
+                for (col0, col1) in izip!(result0.col_iter(), result1.col_iter()) {
+                    for (value0, value1) in izip!(col0.iter(), col1.iter()) {
                         assert_relative_eq!(value0, value1);
-                        assert_relative_eq!(value0, value2);
                     }
                 }
             }

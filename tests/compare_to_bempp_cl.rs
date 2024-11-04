@@ -1,6 +1,5 @@
 use approx::*;
 use bempp::assembly::boundary::BoundaryAssemblerOptions;
-use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
 use bempp::helmholtz::assembler::{
     helmholtz_adjoint_double_layer, helmholtz_double_layer, helmholtz_hypersingular,
@@ -13,7 +12,7 @@ use cauchy::c64;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
 use ndgrid::shapes::regular_sphere;
-use rlst::{rlst_dynamic_array2, RandomAccessByRef, RandomAccessMut};
+use rlst::RandomAccessByRef;
 
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {

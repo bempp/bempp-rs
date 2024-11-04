@@ -1,5 +1,6 @@
 //! Helmholtz operators
 
+/// Assemblers for Helmholtz problems
 pub mod assembler {
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
     use rlst::{rlst_dynamic_array2, DynamicArray, MatrixInverse, RlstScalar};

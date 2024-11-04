@@ -1,6 +1,6 @@
 //! Green's function kernels
 use crate::assembly::common::GreenKernelEvalType;
-use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel};
+use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
 /// Kernel evaluator
@@ -15,6 +15,7 @@ impl<T: RlstScalar, K: Kernel<T = T>> KernelEvaluator<T, K> {
         Self { kernel, eval_type }
     }
 
+    /// Assemble pairwise.
     pub fn assemble_pairwise_st(
         &self,
         sources: &[<T as RlstScalar>::Real],
@@ -25,6 +26,7 @@ impl<T: RlstScalar, K: Kernel<T = T>> KernelEvaluator<T, K> {
             .assemble_pairwise_st(self.eval_type, sources, targets, result);
     }
 
+    /// Assemble all sources against all targets.
     pub fn assemble_st(
         &self,
         sources: &[<T as RlstScalar>::Real],

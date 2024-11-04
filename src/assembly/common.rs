@@ -3,7 +3,7 @@ pub(crate) use green_kernels::types::GreenKernelEvalType;
 use ndgrid::traits::Grid;
 use rlst::{Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer};
 
-pub(crate) trait CellGeometry {
+pub trait CellGeometry {
     //! Cell geometry
     /// Scalar type
     type T: RlstScalar<Real = Self::T>;

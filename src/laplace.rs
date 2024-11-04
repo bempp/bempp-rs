@@ -1,5 +1,6 @@
 //! Laplace operators
 
+/// Assemblers for Laplace problems.
 pub mod assembler {
     use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
     use rlst::{rlst_dynamic_array2, DynamicArray, MatrixInverse, RlstScalar};
