@@ -7,7 +7,6 @@ pub mod assembly;
 pub mod function;
 pub mod helmholtz;
 pub mod laplace;
-pub mod traits;
 
 #[cfg(test)]
 mod test {
