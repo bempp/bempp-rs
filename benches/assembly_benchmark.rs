@@ -34,7 +34,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let assembler = BoundaryAssembler::<f64, _, _>::new(
             SingleLayerBoundaryIntegrand::new(),
             KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
-            options.clone(),
+            &options,
             1,
             0,
         );

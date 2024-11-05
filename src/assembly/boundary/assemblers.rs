@@ -387,30 +387,31 @@ impl BoundaryAssemblerOptions {
 ///
 /// Assembles operators by processing batches of cells in parallel
 pub struct BoundaryAssembler<
+    'o,
     T: RlstScalar + MatrixInverse,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 > {
     pub(crate) integrand: Integrand,
     pub(crate) kernel: KernelEvaluator<T, K>,
-    pub(crate) options: BoundaryAssemblerOptions,
+    pub(crate) options: &'o BoundaryAssemblerOptions,
     pub(crate) deriv_size: usize,
     pub(crate) table_derivs: usize,
 }
 
-unsafe impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
-    Sync for BoundaryAssembler<T, Integrand, K>
+unsafe impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
+    Sync for BoundaryAssembler<'o, T, Integrand, K>
 {
 }
 
-impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
-    BoundaryAssembler<T, Integrand, K>
+impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
+    BoundaryAssembler<'o, T, Integrand, K>
 {
     /// Create new
     pub fn new(
         integrand: Integrand,
         kernel: KernelEvaluator<T, K>,
-        options: BoundaryAssemblerOptions,
+        options: &'o BoundaryAssemblerOptions,
         deriv_size: usize,
         table_derivs: usize,
     ) -> Self {

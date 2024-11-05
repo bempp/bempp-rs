@@ -26,7 +26,7 @@ pub mod assembler {
     >(
         trial_space: &Space,
         test_space: &Space,
-        options: BoundaryAssemblerOptions,
+        options: &BoundaryAssemblerOptions,
     ) -> DynamicArray<T, 2> {
         let nrows = trial_space.global_size();
         let ncols = test_space.global_size();
@@ -50,7 +50,7 @@ pub mod assembler {
     >(
         trial_space: &Space,
         test_space: &Space,
-        options: BoundaryAssemblerOptions,
+        options: &BoundaryAssemblerOptions,
     ) -> DynamicArray<T, 2> {
         let nrows = trial_space.global_size();
         let ncols = test_space.global_size();
@@ -74,7 +74,7 @@ pub mod assembler {
     >(
         trial_space: &Space,
         test_space: &Space,
-        options: BoundaryAssemblerOptions,
+        options: &BoundaryAssemblerOptions,
     ) -> DynamicArray<T, 2> {
         let nrows = trial_space.global_size();
         let ncols = test_space.global_size();
@@ -103,7 +103,7 @@ pub mod assembler {
     >(
         trial_space: &Space,
         test_space: &Space,
-        options: BoundaryAssemblerOptions,
+        options: &BoundaryAssemblerOptions,
     ) -> DynamicArray<T, 2> {
         let nrows = trial_space.global_size();
         let ncols = test_space.global_size();

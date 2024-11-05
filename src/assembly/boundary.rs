@@ -30,10 +30,11 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+        let options = BoundaryAssemblerOptions::default();
         let assembler = BoundaryAssembler::<f64, _, _>::new(
             SingleLayerBoundaryIntegrand::new(),
             KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
-            BoundaryAssemblerOptions::default(),
+            &options,
             1,
             0,
         );
@@ -63,10 +64,11 @@ mod test {
         let ndofs = space.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
+        let options = BoundaryAssemblerOptions::default();
         let assembler = BoundaryAssembler::<f64, _, _>::new(
             SingleLayerBoundaryIntegrand::new(),
             KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
-            BoundaryAssemblerOptions::default(),
+            &options,
             1,
             0,
         );
@@ -98,10 +100,11 @@ mod test {
         let ndofs1 = space1.global_size();
 
         let mut matrix = rlst_dynamic_array2!(f64, [ndofs1, ndofs0]);
+        let options = BoundaryAssemblerOptions::default();
         let assembler = BoundaryAssembler::<f64, _, _>::new(
             SingleLayerBoundaryIntegrand::new(),
             KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
-            BoundaryAssemblerOptions::default(),
+            &options,
             1,
             0,
         );
