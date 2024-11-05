@@ -32,35 +32,6 @@ use rlst::{
 };
 use std::collections::HashMap;
 
-fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
-    test_grid: &TestGrid,
-    trial_grid: &TrialGrid,
-    test_cell: usize,
-    trial_cell: usize,
-) -> bool {
-    if !equal_grids(test_grid, trial_grid) {
-        false
-    } else {
-        let test_vertices = trial_grid
-            .entity(2, test_cell)
-            .unwrap()
-            .topology()
-            .sub_entity_iter(0)
-            .collect::<Vec<_>>();
-        for v in trial_grid
-            .entity(2, trial_cell)
-            .unwrap()
-            .topology()
-            .sub_entity_iter(0)
-        {
-            if test_vertices.contains(&v) {
-                return true;
-            }
-        }
-        false
-    }
-}
-
 /// Options for a boundary assembler
 #[derive(Clone)]
 pub struct BoundaryAssemblerOptions {
@@ -129,15 +100,73 @@ pub struct BoundaryAssembler<
     pub(crate) table_derivs: usize,
 }
 
-unsafe impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
-    Sync for BoundaryAssembler<'o, T, Integrand, K>
-{
-}
-
 impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kernel<T = T>>
     BoundaryAssembler<'o, T, Integrand, K>
 {
-    /// Create new
+    /// Assemble the singular part into a CSR matrix.
+    pub fn assemble_singular<Space: FunctionSpace<T = T>>(
+        &self,
+        trial_space: &Space,
+        test_space: &Space,
+    ) -> CsrMatrix<T> {
+        let shape = [test_space.global_size(), trial_space.global_size()];
+        let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
+
+        CsrMatrix::<T>::from_aij(
+            sparse_matrix.shape,
+            &sparse_matrix.rows,
+            &sparse_matrix.cols,
+            &sparse_matrix.data,
+        )
+        .unwrap()
+    }
+
+    /// Assemble into a dense matrix.
+    pub fn assemble<
+        Space: FunctionSpace<T = T>,
+        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
+    >(
+        &self,
+        output: &mut Array2,
+        trial_space: &Space,
+        test_space: &Space,
+    ) {
+        let test_colouring = test_space.cell_colouring();
+        let trial_colouring = trial_space.cell_colouring();
+
+        if !trial_space.is_serial() || !test_space.is_serial() {
+            panic!("Dense assembly can only be used for function spaces stored in serial");
+        }
+        if output.shape()[0] != test_space.global_size()
+            || output.shape()[1] != trial_space.global_size()
+        {
+            panic!("Matrix has wrong shape");
+        }
+
+        let output_raw = RawData2D {
+            data: output.data_mut().as_mut_ptr(),
+            shape: output.shape(),
+        };
+
+        self.assemble_nonsingular_part(
+            &output_raw,
+            trial_space,
+            test_space,
+            &trial_colouring,
+            &test_colouring,
+        );
+
+        let sparse_matrix = self.assemble_singular_part(output.shape(), trial_space, test_space);
+
+        let data = sparse_matrix.data;
+        let rows = sparse_matrix.rows;
+        let cols = sparse_matrix.cols;
+        for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
+            *output.get_mut([*i, *j]).unwrap() += *value;
+        }
+    }
+
+    /// Create new Boundary assembler
     pub fn new(
         integrand: Integrand,
         kernel: KernelEvaluator<T, K>,
@@ -154,52 +183,8 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         }
     }
 
-    // /// Set (non-singular) quadrature degree for a cell type
-    // pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
-    //     *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
-    // }
-
-    // /// Get (non-singular) quadrature degree for a cell type
-    // pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
-    //     self.options.quadrature_degrees.get(&cell).copied()
-    // }
-
-    // /// Set singular quadrature degree for a pair of cell types
-    // pub fn set_singular_quadrature_degree(
-    //     &mut self,
-    //     cells: (ReferenceCellType, ReferenceCellType),
-    //     degree: usize,
-    // ) {
-    //     *self
-    //         .options
-    //         .singular_quadrature_degrees
-    //         .get_mut(&cells)
-    //         .unwrap() = degree;
-    // }
-
-    // /// Get singular quadrature degree for a pair of cell types
-    // pub fn singular_quadrature_degree(
-    //     &self,
-    //     cells: (ReferenceCellType, ReferenceCellType),
-    // ) -> Option<usize> {
-    //     self.options
-    //         .singular_quadrature_degrees
-    //         .get(&cells)
-    //         .copied()
-    // }
-
-    // /// Set the maximum size of a batch of cells to send to an assembly function
-    // pub fn set_batch_size(&mut self, size: usize) {
-    //     self.options.batch_size = size;
-    // }
-
-    // /// Get the maximum size of a batch of cells to send to an assembly function
-    // pub fn batch_size(&self) -> usize {
-    //     self.options.batch_size
-    // }
-
     /// Assemble the singular contributions
-    pub(crate) fn assemble_singular_part<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_singular_part<Space: FunctionSpace<T = T>>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -361,7 +346,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the non-singular contributions into a dense matrix
-    pub(crate) fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_nonsingular_part<Space: FunctionSpace<T = T>>(
         &self,
         output: &RawData2D<T>,
         trial_space: &Space,
@@ -486,89 +471,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
                 }
             }
         }
-    }
-
-    /// Assemble the singular part into a CSR matrix.
-    pub fn assemble_singular_into_csr<Space: FunctionSpace<T = T> + Sync>(
-        &self,
-        trial_space: &Space,
-        test_space: &Space,
-    ) -> CsrMatrix<T> {
-        let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
-
-        CsrMatrix::<T>::from_aij(
-            sparse_matrix.shape,
-            &sparse_matrix.rows,
-            &sparse_matrix.cols,
-            &sparse_matrix.data,
-        )
-        .unwrap()
-    }
-
-    /// Assemble into a dense matrix.
-    pub fn assemble_into_dense<
-        Space: FunctionSpace<T = T> + Sync,
-        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
-    >(
-        &self,
-        output: &mut Array2,
-        trial_space: &Space,
-        test_space: &Space,
-    ) {
-        let test_colouring = test_space.cell_colouring();
-        let trial_colouring = trial_space.cell_colouring();
-
-        self.assemble_nonsingular_into_dense(
-            output,
-            trial_space,
-            test_space,
-            &trial_colouring,
-            &test_colouring,
-        );
-
-        let sparse_matrix = self.assemble_singular_part(output.shape(), trial_space, test_space);
-        let data = sparse_matrix.data;
-        let rows = sparse_matrix.rows;
-        let cols = sparse_matrix.cols;
-        for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
-            *output.get_mut([*i, *j]).unwrap() += *value;
-        }
-    }
-
-    /// Assemble the nonsingular part into a dense matrix.
-    pub fn assemble_nonsingular_into_dense<
-        Space: FunctionSpace<T = T> + Sync,
-        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
-    >(
-        &self,
-        output: &mut Array2,
-        trial_space: &Space,
-        test_space: &Space,
-        trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
-        test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
-    ) {
-        if !trial_space.is_serial() || !test_space.is_serial() {
-            panic!("Dense assembly can only be used for function spaces stored in serial");
-        }
-        if output.shape()[0] != test_space.global_size()
-            || output.shape()[1] != trial_space.global_size()
-        {
-            panic!("Matrix has wrong shape");
-        }
-
-        let output_raw = RawData2D {
-            data: output.data_mut().as_mut_ptr(),
-            shape: output.shape(),
-        };
-
-        self.assemble_nonsingular(
-            &output_raw,
-            trial_space,
-            test_space,
-            trial_colouring,
-            test_colouring,
-        )
     }
 }
 
@@ -840,4 +742,33 @@ fn get_pairs_if_smallest(
         }
     }
     Some(pairs)
+}
+
+fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
+    test_grid: &TestGrid,
+    trial_grid: &TrialGrid,
+    test_cell: usize,
+    trial_cell: usize,
+) -> bool {
+    if !equal_grids(test_grid, trial_grid) {
+        false
+    } else {
+        let test_vertices = trial_grid
+            .entity(2, test_cell)
+            .unwrap()
+            .topology()
+            .sub_entity_iter(0)
+            .collect::<Vec<_>>();
+        for v in trial_grid
+            .entity(2, trial_cell)
+            .unwrap()
+            .topology()
+            .sub_entity_iter(0)
+        {
+            if test_vertices.contains(&v) {
+                return true;
+            }
+        }
+        false
+    }
 }

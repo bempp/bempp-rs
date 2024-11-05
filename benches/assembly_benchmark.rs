@@ -41,7 +41,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.global_size(),
                 space.global_size()
             ),
-            |b| b.iter(|| black_box(assembler.assemble_singular_into_csr(&space, &space))),
+            |b| b.iter(|| black_box(assembler.assemble_singular(&space, &space))),
         );
     }
     group.finish();

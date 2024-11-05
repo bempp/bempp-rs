@@ -175,7 +175,7 @@ impl<'a, T: RlstScalar, G: CellGeometry<T = T::Real>> GeometryAccess for Geometr
     }
 }
 
-pub unsafe trait BoundaryIntegrand {
+pub unsafe trait BoundaryIntegrand: Sync {
     //! Integrand
     //!
     //! # Safety

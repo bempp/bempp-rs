@@ -14,7 +14,7 @@ use rlst::RlstScalar;
 use std::collections::HashMap;
 
 /// A function space
-pub trait FunctionSpace {
+pub trait FunctionSpace: Sync {
     /// Scalar type
     type T: RlstScalar;
     /// The grid type

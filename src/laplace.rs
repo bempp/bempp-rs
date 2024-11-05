@@ -38,7 +38,7 @@ pub mod assembler {
         let assembler =
             BoundaryAssembler::new(SingleLayerBoundaryIntegrand::new(), kernel, options, 1, 0);
 
-        assembler.assemble_into_dense(&mut output, trial_space, test_space);
+        assembler.assemble(&mut output, trial_space, test_space);
 
         output
     }
@@ -62,7 +62,7 @@ pub mod assembler {
         let assembler =
             BoundaryAssembler::new(DoubleLayerBoundaryIntegrand::new(), kernel, options, 4, 0);
 
-        assembler.assemble_into_dense(&mut output, trial_space, test_space);
+        assembler.assemble(&mut output, trial_space, test_space);
 
         output
     }
@@ -91,7 +91,7 @@ pub mod assembler {
             0,
         );
 
-        assembler.assemble_into_dense(&mut output, trial_space, test_space);
+        assembler.assemble(&mut output, trial_space, test_space);
 
         output
     }
@@ -120,7 +120,7 @@ pub mod assembler {
             1,
         );
 
-        assembler.assemble_into_dense(&mut output, trial_space, test_space);
+        assembler.assemble(&mut output, trial_space, test_space);
 
         output
     }
