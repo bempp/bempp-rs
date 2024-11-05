@@ -163,7 +163,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Create new Boundary assembler
-    pub fn new(
+    pub(crate) fn new(
         integrand: Integrand,
         kernel: KernelEvaluator<T, K>,
         options: &'o BoundaryAssemblerOptions,

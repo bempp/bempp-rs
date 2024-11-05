@@ -1,7 +1,7 @@
 //! Assembly of boundary operators
 mod assemblers;
-pub(crate) mod cell_pair_assemblers;
-pub mod integrands;
+mod cell_pair_assemblers;
+pub(crate) mod integrands;
 
 pub use assemblers::{BoundaryAssembler, BoundaryAssemblerOptions};
 

@@ -1,8 +1,8 @@
-use bempp::assembly::boundary::integrands::SingleLayerBoundaryIntegrand;
 use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
 use bempp::assembly::kernels::KernelEvaluator;
 use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
+use bempp::laplace::assembler::laplace_single_layer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::types::GreenKernelEvalType;
@@ -27,13 +27,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
         options.set_batch_size(128);
 
-        let assembler = BoundaryAssembler::<f64, _, _>::new(
-            SingleLayerBoundaryIntegrand::new(),
-            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
-            &options,
-            1,
-            0,
-        );
+        let assembler = laplace_single_layer(&options);
 
         group.bench_function(
             format!(
