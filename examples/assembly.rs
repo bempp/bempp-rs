@@ -25,7 +25,7 @@ fn main() {
     );
 
     // Assemble the single layer Laplace boundary operator.
-    let matrix = laplace_single_layer(&space, &space, &options);
+    let matrix = laplace_single_layer(&options).assemble(&space, &space);
 
     // Print the entries of the matrix
     println!("Lagrange single layer matrix");

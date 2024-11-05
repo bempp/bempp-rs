@@ -27,8 +27,8 @@ use ndgrid::traits::{Entity, Grid, Topology};
 use ndgrid::types::Ownership;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array4, CsrMatrix, DefaultIterator, MatrixInverse,
-    RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
+    rlst_dynamic_array2, rlst_dynamic_array4, CsrMatrix, DefaultIterator, DynamicArray,
+    MatrixInverse, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
 };
 use std::collections::HashMap;
 
@@ -122,26 +122,20 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble<
-        Space: FunctionSpace<T = T>,
-        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
-    >(
+    pub fn assemble<Space: FunctionSpace<T = T>>(
         &self,
-        output: &mut Array2,
         trial_space: &Space,
         test_space: &Space,
-    ) {
+    ) -> DynamicArray<T, 2> {
         let test_colouring = test_space.cell_colouring();
         let trial_colouring = trial_space.cell_colouring();
 
         if !trial_space.is_serial() || !test_space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
-        if output.shape()[0] != test_space.global_size()
-            || output.shape()[1] != trial_space.global_size()
-        {
-            panic!("Matrix has wrong shape");
-        }
+
+        let mut output =
+            rlst_dynamic_array2!(T, [test_space.global_size(), trial_space.global_size()]);
 
         let output_raw = RawData2D {
             data: output.data_mut().as_mut_ptr(),
@@ -164,6 +158,8 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
             *output.get_mut([*i, *j]).unwrap() += *value;
         }
+
+        output
     }
 
     /// Create new Boundary assembler

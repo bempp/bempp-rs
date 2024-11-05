@@ -22,109 +22,63 @@ pub mod assembler {
     };
 
     /// Assembler for the Helmholtz single layer operator.
-    pub fn helmholtz_single_layer<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-        Space: FunctionSpace<T = T> + Sync,
-    >(
+    pub fn helmholtz_single_layer<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
-        trial_space: &Space,
-        test_space: &Space,
         options: &BoundaryAssemblerOptions,
-    ) -> DynamicArray<T, 2> {
-        let nrows = trial_space.global_size();
-        let ncols = test_space.global_size();
-
-        let mut output = rlst_dynamic_array2!(T, [nrows, ncols]);
-
+    ) -> BoundaryAssembler<T, SingleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::Value,
         );
 
-        let assembler =
-            BoundaryAssembler::new(SingleLayerBoundaryIntegrand::new(), kernel, options, 1, 0);
-
-        assembler.assemble(&mut output, trial_space, test_space);
-
-        output
+        BoundaryAssembler::new(SingleLayerBoundaryIntegrand::new(), kernel, options, 1, 0)
     }
 
     /// Assembler for the Helmholtz double layer operator.
-    pub fn helmholtz_double_layer<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-        Space: FunctionSpace<T = T> + Sync,
-    >(
+    pub fn helmholtz_double_layer<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
-        trial_space: &Space,
-        test_space: &Space,
         options: &BoundaryAssemblerOptions,
-    ) -> DynamicArray<T, 2> {
-        let nrows = trial_space.global_size();
-        let ncols = test_space.global_size();
-
-        let mut output = rlst_dynamic_array2!(T, [nrows, ncols]);
-
+    ) -> BoundaryAssembler<T, DoubleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::ValueDeriv,
         );
 
-        let assembler =
-            BoundaryAssembler::new(DoubleLayerBoundaryIntegrand::new(), kernel, options, 4, 0);
-
-        assembler.assemble(&mut output, trial_space, test_space);
-
-        output
+        BoundaryAssembler::new(DoubleLayerBoundaryIntegrand::new(), kernel, options, 4, 0)
     }
 
     /// Assembler for the Helmholtz adjoint double layer operator.
-    pub fn helmholtz_adjoint_double_layer<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-        Space: FunctionSpace<T = T> + Sync,
-    >(
+    pub fn helmholtz_adjoint_double_layer<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
-        trial_space: &Space,
-        test_space: &Space,
         options: &BoundaryAssemblerOptions,
-    ) -> DynamicArray<T, 2> {
-        let nrows = trial_space.global_size();
-        let ncols = test_space.global_size();
-
-        let mut output = rlst_dynamic_array2!(T, [nrows, ncols]);
-
+    ) -> BoundaryAssembler<T, AdjointDoubleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::ValueDeriv,
         );
 
-        let assembler = BoundaryAssembler::new(
+        BoundaryAssembler::new(
             AdjointDoubleLayerBoundaryIntegrand::new(),
             kernel,
             options,
             4,
             0,
-        );
-
-        assembler.assemble(&mut output, trial_space, test_space);
-
-        output
+        )
     }
 
     /// Assembler for the Helmholtz hypersingular operator.
-    pub fn helmholtz_hypersingular<
-        T: RlstScalar<Complex = T> + MatrixInverse,
-        Space: FunctionSpace<T = T> + Sync,
-    >(
+    pub fn helmholtz_hypersingular<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
-        trial_space: &Space,
-        test_space: &Space,
         options: &BoundaryAssemblerOptions,
-    ) -> DynamicArray<T, 2> {
-        let nrows = trial_space.global_size();
-        let ncols = test_space.global_size();
-
-        let mut output = rlst_dynamic_array2!(T, [nrows, ncols]);
-
+    ) -> BoundaryAssembler<
+        T,
+        BoundaryIntegrandSum<
+            T,
+            HypersingularCurlCurlBoundaryIntegrand<T>,
+            BoundaryIntegrandTimesScalar<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
+        >,
+        Helmholtz3dKernel<T>,
+    > {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::ValueDeriv,
@@ -138,10 +92,6 @@ pub mod assembler {
             ),
         );
 
-        let assembler = BoundaryAssembler::new(integrand, kernel, options, 4, 1);
-
-        assembler.assemble(&mut output, trial_space, test_space);
-
-        output
+        BoundaryAssembler::new(integrand, kernel, options, 4, 1)
     }
 }
