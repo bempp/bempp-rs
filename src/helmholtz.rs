@@ -2,19 +2,42 @@
 
 /// Assemblers for Helmholtz problems
 pub mod assembler {
+
+    /// Helmholtz single layer assembler type.
+    pub type HelmholtzSingleLayer3dAssembler<'o, T> =
+        BoundaryAssembler<'o, T, SingleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>>;
+
+    /// Helmholtz double layer assembler type.
+    pub type HelmholtzDoubleLayer3dAssembler<'o, T> =
+        BoundaryAssembler<'o, T, DoubleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>>;
+
+    /// Helmholtz adjoint double layer assembler type.
+    pub type HelmholtzAdjointDoubleLayer3dAssembler<'o, T> =
+        BoundaryAssembler<'o, T, AdjointDoubleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>>;
+
+    /// Helmholtz hypersingular double layer assembler type.
+    pub type HelmholtzHypersingular3dAssembler<'o, T> = BoundaryAssembler<
+        'o,
+        T,
+        BoundaryIntegrandSum<
+            T,
+            HypersingularCurlCurlBoundaryIntegrand<T>,
+            BoundaryIntegrandTimesScalar<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
+        >,
+        Helmholtz3dKernel<T>,
+    >;
+
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
-    use rlst::{rlst_dynamic_array2, DynamicArray, MatrixInverse, RlstScalar};
+    use rlst::{MatrixInverse, RlstScalar};
 
-    use crate::function::FunctionSpace;
-
-    use crate::assemblers::{
+    use crate::boundary_assemblers::{
+        helpers::KernelEvaluator,
         integrands::{
             AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandSum,
             BoundaryIntegrandTimesScalar, DoubleLayerBoundaryIntegrand,
             HypersingularCurlCurlBoundaryIntegrand, HypersingularNormalNormalBoundaryIntegrand,
             SingleLayerBoundaryIntegrand,
         },
-        kernels::KernelEvaluator,
         BoundaryAssembler, BoundaryAssemblerOptions,
     };
 
@@ -22,7 +45,7 @@ pub mod assembler {
     pub fn helmholtz_single_layer<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
         options: &BoundaryAssemblerOptions,
-    ) -> BoundaryAssembler<T, SingleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>> {
+    ) -> HelmholtzSingleLayer3dAssembler<T> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::Value,
@@ -35,7 +58,7 @@ pub mod assembler {
     pub fn helmholtz_double_layer<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
         options: &BoundaryAssemblerOptions,
-    ) -> BoundaryAssembler<T, DoubleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>> {
+    ) -> HelmholtzDoubleLayer3dAssembler<T> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::ValueDeriv,
@@ -48,7 +71,7 @@ pub mod assembler {
     pub fn helmholtz_adjoint_double_layer<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
         options: &BoundaryAssemblerOptions,
-    ) -> BoundaryAssembler<T, AdjointDoubleLayerBoundaryIntegrand<T>, Helmholtz3dKernel<T>> {
+    ) -> HelmholtzAdjointDoubleLayer3dAssembler<T> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::ValueDeriv,
@@ -67,15 +90,7 @@ pub mod assembler {
     pub fn helmholtz_hypersingular<T: RlstScalar<Complex = T> + MatrixInverse>(
         wavenumber: T::Real,
         options: &BoundaryAssemblerOptions,
-    ) -> BoundaryAssembler<
-        T,
-        BoundaryIntegrandSum<
-            T,
-            HypersingularCurlCurlBoundaryIntegrand<T>,
-            BoundaryIntegrandTimesScalar<T, HypersingularNormalNormalBoundaryIntegrand<T>>,
-        >,
-        Helmholtz3dKernel<T>,
-    > {
+    ) -> HelmholtzHypersingular3dAssembler<T> {
         let kernel = KernelEvaluator::new(
             Helmholtz3dKernel::new(wavenumber),
             GreenKernelEvalType::ValueDeriv,

@@ -1,14 +1,13 @@
 //! Boundary operator assembly
-pub mod cell_pair_assemblers;
-pub(crate) mod common;
-pub mod integrands;
-pub mod kernels;
+mod cell_pair_assemblers;
+pub(crate) mod helpers;
+pub(crate) mod integrands;
 
-use crate::assemblers::cell_pair_assemblers::{
+use crate::boundary_assemblers::cell_pair_assemblers::{
     NonsingularCellPairAssemblerWithTestCaching, SingularCellPairAssembler,
 };
-use crate::assemblers::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
-use crate::assemblers::kernels::KernelEvaluator;
+use crate::boundary_assemblers::helpers::KernelEvaluator;
+use crate::boundary_assemblers::helpers::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelBoundaryAssembly;

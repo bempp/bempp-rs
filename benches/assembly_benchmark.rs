@@ -1,11 +1,8 @@
-use bempp::assemblers::kernels::KernelEvaluator;
-use bempp::assemblers::{BoundaryAssembler, BoundaryAssemblerOptions};
+use bempp::boundary_assemblers::BoundaryAssemblerOptions;
 use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
 use bempp::laplace::assembler::laplace_single_layer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use green_kernels::laplace_3d::Laplace3dKernel;
-use green_kernels::types::GreenKernelEvalType;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;

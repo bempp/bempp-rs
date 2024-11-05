@@ -1,7 +1,7 @@
 //! Hypersingular integrand
 use rlst::RlstScalar;
 
-use crate::assemblers::common::CellGeometry;
+use crate::boundary_assemblers::helpers::CellGeometry;
 
 use super::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 
@@ -100,13 +100,13 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
 
     fn evaluate_nonsingular(
         &self,
-        test_table: &crate::assemblers::common::RlstArray<Self::T, 4>,
-        trial_table: &crate::assemblers::common::RlstArray<Self::T, 4>,
+        test_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
+        trial_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
         test_point_index: usize,
         trial_point_index: usize,
         test_basis_index: usize,
         trial_basis_index: usize,
-        k: &crate::assemblers::common::RlstArray<Self::T, 3>,
+        k: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 3>,
         test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
         trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
     ) -> Self::T {
@@ -121,12 +121,12 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
 
     fn evaluate_singular(
         &self,
-        test_table: &crate::assemblers::common::RlstArray<Self::T, 4>,
-        trial_table: &crate::assemblers::common::RlstArray<Self::T, 4>,
+        test_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
+        trial_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
         point_index: usize,
         test_basis_index: usize,
         trial_basis_index: usize,
-        k: &crate::assemblers::common::RlstArray<Self::T, 2>,
+        k: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 2>,
         test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
         trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
     ) -> Self::T {

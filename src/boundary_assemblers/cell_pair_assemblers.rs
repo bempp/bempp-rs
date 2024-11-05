@@ -1,9 +1,6 @@
 //! Assemblers that assemble the contributions to the global matrix due to a single pair of cells
 
-use crate::assemblers::{
-    common::{AssemblerGeometry, RlstArray},
-    kernels::KernelEvaluator,
-};
+use crate::boundary_assemblers::helpers::{AssemblerGeometry, KernelEvaluator, RlstArray};
 use green_kernels::traits::Kernel;
 use itertools::izip;
 use ndgrid::traits::GeometryMap;

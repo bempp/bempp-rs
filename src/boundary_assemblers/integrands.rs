@@ -13,7 +13,7 @@ pub use hypersingular::{
 };
 pub use single_layer::SingleLayerBoundaryIntegrand;
 
-use crate::assemblers::common::{CellGeometry, RlstArray};
+use crate::boundary_assemblers::helpers::{CellGeometry, RlstArray};
 use rlst::{RlstScalar, UnsafeRandomAccessByRef};
 
 /// 1D access

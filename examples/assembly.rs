@@ -1,4 +1,4 @@
-use bempp::assemblers::BoundaryAssemblerOptions;
+use bempp::boundary_assemblers::BoundaryAssemblerOptions;
 use bempp::function::SerialFunctionSpace;
 use bempp::laplace::assembler::laplace_single_layer;
 use ndelement::ciarlet::LagrangeElementFamily;
