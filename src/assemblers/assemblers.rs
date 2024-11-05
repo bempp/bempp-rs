@@ -1,11 +1,11 @@
 //! Boundary assemblers
 
-use super::cell_pair_assemblers::{
+use super::integrands::BoundaryIntegrand;
+use crate::assemblers::cell_pair_assemblers::{
     NonsingularCellPairAssemblerWithTestCaching, SingularCellPairAssembler,
 };
-use super::integrands::BoundaryIntegrand;
-use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
-use crate::assembly::kernels::KernelEvaluator;
+use crate::assemblers::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
+use crate::assemblers::kernels::KernelEvaluator;
 use crate::function::FunctionSpace;
 #[cfg(feature = "mpi")]
 use crate::traits::ParallelBoundaryAssembly;

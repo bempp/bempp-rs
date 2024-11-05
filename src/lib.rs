@@ -2,7 +2,7 @@
 #![cfg_attr(feature = "strict", deny(warnings), deny(unused_crate_dependencies))]
 #![warn(missing_docs)]
 
-pub mod assembly;
+pub mod assemblers;
 // pub mod bindings;
 pub mod function;
 pub mod helmholtz;

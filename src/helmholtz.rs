@@ -5,20 +5,17 @@ pub mod assembler {
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
     use rlst::{rlst_dynamic_array2, DynamicArray, MatrixInverse, RlstScalar};
 
-    use crate::{
-        assembly::{
-            boundary::{
-                integrands::{
-                    AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandSum,
-                    BoundaryIntegrandTimesScalar, DoubleLayerBoundaryIntegrand,
-                    HypersingularCurlCurlBoundaryIntegrand,
-                    HypersingularNormalNormalBoundaryIntegrand, SingleLayerBoundaryIntegrand,
-                },
-                BoundaryAssembler, BoundaryAssemblerOptions,
-            },
-            kernels::KernelEvaluator,
+    use crate::function::FunctionSpace;
+
+    use crate::assemblers::{
+        integrands::{
+            AdjointDoubleLayerBoundaryIntegrand, BoundaryIntegrandSum,
+            BoundaryIntegrandTimesScalar, DoubleLayerBoundaryIntegrand,
+            HypersingularCurlCurlBoundaryIntegrand, HypersingularNormalNormalBoundaryIntegrand,
+            SingleLayerBoundaryIntegrand,
         },
-        function::FunctionSpace,
+        kernels::KernelEvaluator,
+        BoundaryAssembler, BoundaryAssemblerOptions,
     };
 
     /// Assembler for the Helmholtz single layer operator.

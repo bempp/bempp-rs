@@ -5,18 +5,15 @@ pub mod assembler {
     use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
     use rlst::{rlst_dynamic_array2, DynamicArray, MatrixInverse, RlstScalar};
 
-    use crate::{
-        assembly::{
-            boundary::{
-                integrands::{
-                    AdjointDoubleLayerBoundaryIntegrand, DoubleLayerBoundaryIntegrand,
-                    HypersingularCurlCurlBoundaryIntegrand, SingleLayerBoundaryIntegrand,
-                },
-                BoundaryAssembler, BoundaryAssemblerOptions,
-            },
-            kernels::KernelEvaluator,
+    use crate::function::FunctionSpace;
+
+    use crate::assemblers::{
+        integrands::{
+            AdjointDoubleLayerBoundaryIntegrand, DoubleLayerBoundaryIntegrand,
+            HypersingularCurlCurlBoundaryIntegrand, SingleLayerBoundaryIntegrand,
         },
-        function::FunctionSpace,
+        kernels::KernelEvaluator,
+        BoundaryAssembler, BoundaryAssemblerOptions,
     };
 
     /// Assembler for the Laplace single layer operator.

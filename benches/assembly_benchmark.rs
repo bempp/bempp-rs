@@ -1,5 +1,5 @@
-use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
-use bempp::assembly::kernels::KernelEvaluator;
+use bempp::assemblers::kernels::KernelEvaluator;
+use bempp::assemblers::{BoundaryAssembler, BoundaryAssemblerOptions};
 use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
 use bempp::laplace::assembler::laplace_single_layer;

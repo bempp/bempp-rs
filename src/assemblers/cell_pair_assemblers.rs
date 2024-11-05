@@ -1,6 +1,6 @@
 //! Assemblers that assemble the contributions to the global matrix due to a single pair of cells
 
-use crate::assembly::{
+use crate::assemblers::{
     common::{AssemblerGeometry, RlstArray},
     kernels::KernelEvaluator,
 };

@@ -1,5 +1,5 @@
 use approx::*;
-use bempp::assembly::boundary::BoundaryAssemblerOptions;
+use bempp::assemblers::BoundaryAssemblerOptions;
 use bempp::function::SerialFunctionSpace;
 use bempp::helmholtz::assembler::{
     helmholtz_adjoint_double_layer, helmholtz_double_layer, helmholtz_hypersingular,

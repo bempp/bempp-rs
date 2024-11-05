@@ -1,5 +1,5 @@
 //! Green's function kernels
-use crate::assembly::common::GreenKernelEvalType;
+use crate::assemblers::common::GreenKernelEvalType;
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
