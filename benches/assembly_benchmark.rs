@@ -3,13 +3,12 @@ use bempp::assembly::boundary::{BoundaryAssembler, BoundaryAssemblerOptions};
 use bempp::assembly::kernels::KernelEvaluator;
 use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::types::GreenKernelEvalType;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;
-use rlst::rlst_dynamic_array2;
 
 pub fn assembly_parts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("assembly");
@@ -20,9 +19,6 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
 
         let space = SerialFunctionSpace::new(&grid, &element);
-        let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
-
-        let colouring = space.cell_colouring();
         let mut options = BoundaryAssemblerOptions::default();
         options.set_regular_quadrature_degree(ReferenceCellType::Triangle, 16);
         options.set_singular_quadrature_degree(
@@ -45,25 +41,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
                 space.global_size(),
                 space.global_size()
             ),
-            |b| b.iter(|| assembler.assemble_singular_into_dense(&mut matrix, &space, &space)),
-        );
-        group.bench_function(
-            format!(
-                "Assembly of non-singular terms of {}x{} matrix",
-                space.global_size(),
-                space.global_size()
-            ),
-            |b| {
-                b.iter(|| {
-                    assembler.assemble_nonsingular_into_dense(
-                        &mut matrix,
-                        &space,
-                        &space,
-                        &colouring,
-                        &colouring,
-                    )
-                })
-            },
+            |b| b.iter(|| black_box(assembler.assemble_singular_into_csr(&space, &space))),
         );
     }
     group.finish();

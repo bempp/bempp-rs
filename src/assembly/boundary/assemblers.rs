@@ -61,276 +61,6 @@ fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
     }
 }
 
-fn get_singular_quadrature_rule(
-    test_celltype: ReferenceCellType,
-    trial_celltype: ReferenceCellType,
-    pairs: &[(usize, usize)],
-    npoints: usize,
-) -> TestTrialNumericalQuadratureDefinition {
-    if pairs.is_empty() {
-        panic!("Non-singular rule requested.");
-    }
-    let con = CellToCellConnectivity {
-        connectivity_dimension: match pairs.len() {
-            1 => 0,
-            2 => 1,
-            _ => 2,
-        },
-        local_indices: pairs.to_vec(),
-    };
-    match test_celltype {
-        ReferenceCellType::Triangle => match trial_celltype {
-            ReferenceCellType::Triangle => triangle_duffy(&con, npoints).unwrap(),
-            ReferenceCellType::Quadrilateral => {
-                triangle_quadrilateral_duffy(&con, npoints).unwrap()
-            }
-            _ => {
-                unimplemented!("Only triangles and quadrilaterals are currently supported");
-            }
-        },
-        ReferenceCellType::Quadrilateral => match trial_celltype {
-            ReferenceCellType::Triangle => quadrilateral_triangle_duffy(&con, npoints).unwrap(),
-            ReferenceCellType::Quadrilateral => quadrilateral_duffy(&con, npoints).unwrap(),
-            _ => {
-                unimplemented!("Only triangles and quadrilaterals are currently supported");
-            }
-        },
-        _ => {
-            unimplemented!("Only triangles and quadrilaterals are currently supported");
-        }
-    }
-}
-
-fn make_cell_blocks<F>(
-    f: F,
-    size: usize,
-    grid: &impl Grid<EntityDescriptor = ReferenceCellType>,
-    batch_size: usize,
-) -> Vec<(usize, Vec<(usize, usize)>)>
-where
-    F: Fn(ReferenceCellType, ReferenceCellType, Vec<(usize, usize)>) -> usize,
-{
-    let mut cell_pairs = vec![vec![]; size];
-
-    for vertex in grid.entity_iter(0) {
-        for test_cell_index in vertex.topology().connected_entity_iter(2) {
-            let test_cell = grid.entity(2, test_cell_index).unwrap();
-            let test_cell_type = test_cell.entity_type();
-            if test_cell.ownership() == Ownership::Owned {
-                for trial_cell_index in vertex.topology().connected_entity_iter(2) {
-                    let trial_cell = grid.entity(2, trial_cell_index).unwrap();
-                    let trial_cell_type = trial_cell.entity_type();
-
-                    if let Some(pairs) =
-                        get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index())
-                    {
-                        cell_pairs[f(test_cell_type, trial_cell_type, pairs)]
-                            .push((test_cell_index, trial_cell_index));
-                    }
-                }
-            }
-        }
-    }
-    let mut cell_blocks = vec![];
-
-    for (i, cells) in cell_pairs.iter().enumerate() {
-        let mut start = 0;
-        while start < cells.len() {
-            let end = std::cmp::min(start + batch_size, cells.len());
-            cell_blocks.push((i, cells[start..end].to_vec()));
-            start = end;
-        }
-    }
-
-    cell_blocks
-}
-
-/// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
-#[allow(clippy::too_many_arguments)]
-fn assemble_batch_singular<
-    T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
-    Integrand: BoundaryIntegrand<T = T>,
-    K: Kernel<T = T>,
->(
-    assembler: &BoundaryAssembler<T, Integrand, K>,
-    deriv_size: usize,
-    shape: [usize; 2],
-    trial_cell_type: ReferenceCellType,
-    test_cell_type: ReferenceCellType,
-    trial_space: &Space,
-    test_space: &Space,
-    cell_pairs: &[(usize, usize)],
-    trial_points: &RlstArray<T::Real, 2>,
-    test_points: &RlstArray<T::Real, 2>,
-    weights: &[T::Real],
-    trial_table: &RlstArray<T, 4>,
-    test_table: &RlstArray<T, 4>,
-) -> SparseMatrixData<T> {
-    let mut output = SparseMatrixData::<T>::new_known_size(
-        shape,
-        cell_pairs.len()
-            * trial_space.element(trial_cell_type).dim()
-            * test_space.element(test_cell_type).dim(),
-    );
-    let npts = weights.len();
-    debug_assert!(weights.len() == npts);
-    debug_assert!(test_points.shape()[1] == npts);
-    debug_assert!(trial_points.shape()[1] == npts);
-
-    let grid = test_space.grid();
-    assert_eq!(grid.geometry_dim(), 3);
-    assert_eq!(grid.topology_dim(), 2);
-
-    let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
-    let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
-
-    let mut a = SingularCellPairAssembler::new(
-        npts,
-        deriv_size,
-        &assembler.integrand,
-        &assembler.kernel,
-        test_evaluator,
-        trial_evaluator,
-        test_table,
-        trial_table,
-        weights,
-    );
-
-    let mut local_mat = rlst_dynamic_array2!(
-        T,
-        [
-            test_space.element(test_cell_type).dim(),
-            trial_space.element(trial_cell_type).dim()
-        ]
-    );
-    for (test_cell, trial_cell) in cell_pairs {
-        a.set_test_cell(*test_cell);
-        a.set_trial_cell(*trial_cell);
-        a.assemble(&mut local_mat);
-
-        let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
-        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
-
-        for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
-            for (test_dof, entry) in izip!(test_dofs, col.iter()) {
-                output.rows.push(test_space.global_dof_index(*test_dof));
-                output.cols.push(trial_space.global_dof_index(*trial_dof));
-                output.data.push(entry);
-            }
-        }
-    }
-
-    output
-}
-
-/// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
-#[allow(clippy::too_many_arguments)]
-fn assemble_batch_nonadjacent<
-    T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
-    Integrand: BoundaryIntegrand<T = T>,
-    K: Kernel<T = T>,
->(
-    assembler: &BoundaryAssembler<T, Integrand, K>,
-    deriv_size: usize,
-    output: &RawData2D<T>,
-    trial_cell_type: ReferenceCellType,
-    test_cell_type: ReferenceCellType,
-    trial_space: &Space,
-    trial_cells: &[usize],
-    test_space: &Space,
-    test_cells: &[usize],
-    trial_points: &RlstArray<T::Real, 2>,
-    trial_weights: &[T::Real],
-    test_points: &RlstArray<T::Real, 2>,
-    test_weights: &[T::Real],
-    trial_table: &RlstArray<T, 4>,
-    test_table: &RlstArray<T, 4>,
-) -> usize {
-    let npts_test = test_weights.len();
-    let npts_trial = trial_weights.len();
-    debug_assert!(test_points.shape()[1] == npts_test);
-    debug_assert!(trial_points.shape()[1] == npts_trial);
-
-    let test_grid = test_space.grid();
-    let trial_grid = trial_space.grid();
-
-    assert_eq!(test_grid.geometry_dim(), 3);
-    assert_eq!(test_grid.topology_dim(), 2);
-    assert_eq!(trial_grid.geometry_dim(), 3);
-    assert_eq!(trial_grid.topology_dim(), 2);
-
-    let test_evaluator = test_grid.geometry_map(test_cell_type, test_points.data());
-    let trial_evaluator = trial_grid.geometry_map(trial_cell_type, trial_points.data());
-
-    let mut a = NonsingularCellPairAssemblerWithTestCaching::new(
-        npts_test,
-        npts_trial,
-        deriv_size,
-        test_cells,
-        &assembler.integrand,
-        &assembler.kernel,
-        test_evaluator,
-        trial_evaluator,
-        test_table,
-        trial_table,
-        test_weights,
-        trial_weights,
-    );
-
-    let mut local_mat = rlst_dynamic_array2!(
-        T,
-        [
-            test_space.element(test_cell_type).dim(),
-            trial_space.element(trial_cell_type).dim()
-        ]
-    );
-
-    for trial_cell in trial_cells {
-        a.set_trial_cell(*trial_cell);
-        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
-        for test_cell in test_cells.iter() {
-            if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
-                continue;
-            }
-
-            a.set_test_cell(*test_cell);
-            a.assemble(&mut local_mat);
-
-            let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
-
-            for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
-                for (test_dof, entry) in izip!(test_dofs, col.iter()) {
-                    unsafe {
-                        *output.data.add(*test_dof + output.shape[0] * *trial_dof) += entry;
-                    }
-                }
-            }
-        }
-    }
-    1
-}
-
-fn get_pairs_if_smallest(
-    test_cell: &impl Entity,
-    trial_cell: &impl Entity,
-    vertex: usize,
-) -> Option<Vec<(usize, usize)>> {
-    let mut pairs = vec![];
-    for (trial_i, trial_v) in trial_cell.topology().sub_entity_iter(0).enumerate() {
-        for (test_i, test_v) in test_cell.topology().sub_entity_iter(0).enumerate() {
-            if test_v == trial_v {
-                if test_v < vertex {
-                    return None;
-                }
-                pairs.push((test_i, trial_i));
-            }
-        }
-    }
-    Some(pairs)
-}
-
 /// Options for a boundary assembler
 #[derive(Clone)]
 pub struct BoundaryAssemblerOptions {
@@ -469,7 +199,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     // }
 
     /// Assemble the singular contributions
-    pub(crate) fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
+    pub(crate) fn assemble_singular_part<Space: FunctionSpace<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -758,25 +488,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         }
     }
 
-    /// Assemble the sparse part into a dense matrix.
-    pub fn assemble_singular_into_dense<
-        Space: FunctionSpace<T = T> + Sync,
-        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
-    >(
-        &self,
-        output: &mut Array2,
-        trial_space: &Space,
-        test_space: &Space,
-    ) {
-        let sparse_matrix = self.assemble_singular(output.shape(), trial_space, test_space);
-        let data = sparse_matrix.data;
-        let rows = sparse_matrix.rows;
-        let cols = sparse_matrix.cols;
-        for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
-            *output.get_mut([*i, *j]).unwrap() += *value;
-        }
-    }
-
     /// Assemble the singular part into a CSR matrix.
     pub fn assemble_singular_into_csr<Space: FunctionSpace<T = T> + Sync>(
         &self,
@@ -784,7 +495,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         test_space: &Space,
     ) -> CsrMatrix<T> {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular(shape, trial_space, test_space);
+        let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
 
         CsrMatrix::<T>::from_aij(
             sparse_matrix.shape,
@@ -815,7 +526,14 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             &trial_colouring,
             &test_colouring,
         );
-        self.assemble_singular_into_dense(output, trial_space, test_space);
+
+        let sparse_matrix = self.assemble_singular_part(output.shape(), trial_space, test_space);
+        let data = sparse_matrix.data;
+        let rows = sparse_matrix.rows;
+        let cols = sparse_matrix.cols;
+        for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
+            *output.get_mut([*i, *j]).unwrap() += *value;
+        }
     }
 
     /// Assemble the nonsingular part into a dense matrix.
@@ -852,4 +570,274 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             test_colouring,
         )
     }
+}
+
+fn get_singular_quadrature_rule(
+    test_celltype: ReferenceCellType,
+    trial_celltype: ReferenceCellType,
+    pairs: &[(usize, usize)],
+    npoints: usize,
+) -> TestTrialNumericalQuadratureDefinition {
+    if pairs.is_empty() {
+        panic!("Non-singular rule requested.");
+    }
+    let con = CellToCellConnectivity {
+        connectivity_dimension: match pairs.len() {
+            1 => 0,
+            2 => 1,
+            _ => 2,
+        },
+        local_indices: pairs.to_vec(),
+    };
+    match test_celltype {
+        ReferenceCellType::Triangle => match trial_celltype {
+            ReferenceCellType::Triangle => triangle_duffy(&con, npoints).unwrap(),
+            ReferenceCellType::Quadrilateral => {
+                triangle_quadrilateral_duffy(&con, npoints).unwrap()
+            }
+            _ => {
+                unimplemented!("Only triangles and quadrilaterals are currently supported");
+            }
+        },
+        ReferenceCellType::Quadrilateral => match trial_celltype {
+            ReferenceCellType::Triangle => quadrilateral_triangle_duffy(&con, npoints).unwrap(),
+            ReferenceCellType::Quadrilateral => quadrilateral_duffy(&con, npoints).unwrap(),
+            _ => {
+                unimplemented!("Only triangles and quadrilaterals are currently supported");
+            }
+        },
+        _ => {
+            unimplemented!("Only triangles and quadrilaterals are currently supported");
+        }
+    }
+}
+
+fn make_cell_blocks<F>(
+    f: F,
+    size: usize,
+    grid: &impl Grid<EntityDescriptor = ReferenceCellType>,
+    batch_size: usize,
+) -> Vec<(usize, Vec<(usize, usize)>)>
+where
+    F: Fn(ReferenceCellType, ReferenceCellType, Vec<(usize, usize)>) -> usize,
+{
+    let mut cell_pairs = vec![vec![]; size];
+
+    for vertex in grid.entity_iter(0) {
+        for test_cell_index in vertex.topology().connected_entity_iter(2) {
+            let test_cell = grid.entity(2, test_cell_index).unwrap();
+            let test_cell_type = test_cell.entity_type();
+            if test_cell.ownership() == Ownership::Owned {
+                for trial_cell_index in vertex.topology().connected_entity_iter(2) {
+                    let trial_cell = grid.entity(2, trial_cell_index).unwrap();
+                    let trial_cell_type = trial_cell.entity_type();
+
+                    if let Some(pairs) =
+                        get_pairs_if_smallest(&test_cell, &trial_cell, vertex.local_index())
+                    {
+                        cell_pairs[f(test_cell_type, trial_cell_type, pairs)]
+                            .push((test_cell_index, trial_cell_index));
+                    }
+                }
+            }
+        }
+    }
+    let mut cell_blocks = vec![];
+
+    for (i, cells) in cell_pairs.iter().enumerate() {
+        let mut start = 0;
+        while start < cells.len() {
+            let end = std::cmp::min(start + batch_size, cells.len());
+            cell_blocks.push((i, cells[start..end].to_vec()));
+            start = end;
+        }
+    }
+
+    cell_blocks
+}
+
+/// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_singular<
+    T: RlstScalar + MatrixInverse,
+    Space: FunctionSpace<T = T>,
+    Integrand: BoundaryIntegrand<T = T>,
+    K: Kernel<T = T>,
+>(
+    assembler: &BoundaryAssembler<T, Integrand, K>,
+    deriv_size: usize,
+    shape: [usize; 2],
+    trial_cell_type: ReferenceCellType,
+    test_cell_type: ReferenceCellType,
+    trial_space: &Space,
+    test_space: &Space,
+    cell_pairs: &[(usize, usize)],
+    trial_points: &RlstArray<T::Real, 2>,
+    test_points: &RlstArray<T::Real, 2>,
+    weights: &[T::Real],
+    trial_table: &RlstArray<T, 4>,
+    test_table: &RlstArray<T, 4>,
+) -> SparseMatrixData<T> {
+    let mut output = SparseMatrixData::<T>::new_known_size(
+        shape,
+        cell_pairs.len()
+            * trial_space.element(trial_cell_type).dim()
+            * test_space.element(test_cell_type).dim(),
+    );
+    let npts = weights.len();
+    debug_assert!(weights.len() == npts);
+    debug_assert!(test_points.shape()[1] == npts);
+    debug_assert!(trial_points.shape()[1] == npts);
+
+    let grid = test_space.grid();
+    assert_eq!(grid.geometry_dim(), 3);
+    assert_eq!(grid.topology_dim(), 2);
+
+    let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
+    let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
+
+    let mut a = SingularCellPairAssembler::new(
+        npts,
+        deriv_size,
+        &assembler.integrand,
+        &assembler.kernel,
+        test_evaluator,
+        trial_evaluator,
+        test_table,
+        trial_table,
+        weights,
+    );
+
+    let mut local_mat = rlst_dynamic_array2!(
+        T,
+        [
+            test_space.element(test_cell_type).dim(),
+            trial_space.element(trial_cell_type).dim()
+        ]
+    );
+    for (test_cell, trial_cell) in cell_pairs {
+        a.set_test_cell(*test_cell);
+        a.set_trial_cell(*trial_cell);
+        a.assemble(&mut local_mat);
+
+        let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
+        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
+
+        for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
+            for (test_dof, entry) in izip!(test_dofs, col.iter()) {
+                output.rows.push(test_space.global_dof_index(*test_dof));
+                output.cols.push(trial_space.global_dof_index(*trial_dof));
+                output.data.push(entry);
+            }
+        }
+    }
+
+    output
+}
+
+/// Assemble the contribution to the terms of a matrix for a batch of non-adjacent cells
+#[allow(clippy::too_many_arguments)]
+fn assemble_batch_nonadjacent<
+    T: RlstScalar + MatrixInverse,
+    Space: FunctionSpace<T = T>,
+    Integrand: BoundaryIntegrand<T = T>,
+    K: Kernel<T = T>,
+>(
+    assembler: &BoundaryAssembler<T, Integrand, K>,
+    deriv_size: usize,
+    output: &RawData2D<T>,
+    trial_cell_type: ReferenceCellType,
+    test_cell_type: ReferenceCellType,
+    trial_space: &Space,
+    trial_cells: &[usize],
+    test_space: &Space,
+    test_cells: &[usize],
+    trial_points: &RlstArray<T::Real, 2>,
+    trial_weights: &[T::Real],
+    test_points: &RlstArray<T::Real, 2>,
+    test_weights: &[T::Real],
+    trial_table: &RlstArray<T, 4>,
+    test_table: &RlstArray<T, 4>,
+) -> usize {
+    let npts_test = test_weights.len();
+    let npts_trial = trial_weights.len();
+    debug_assert!(test_points.shape()[1] == npts_test);
+    debug_assert!(trial_points.shape()[1] == npts_trial);
+
+    let test_grid = test_space.grid();
+    let trial_grid = trial_space.grid();
+
+    assert_eq!(test_grid.geometry_dim(), 3);
+    assert_eq!(test_grid.topology_dim(), 2);
+    assert_eq!(trial_grid.geometry_dim(), 3);
+    assert_eq!(trial_grid.topology_dim(), 2);
+
+    let test_evaluator = test_grid.geometry_map(test_cell_type, test_points.data());
+    let trial_evaluator = trial_grid.geometry_map(trial_cell_type, trial_points.data());
+
+    let mut a = NonsingularCellPairAssemblerWithTestCaching::new(
+        npts_test,
+        npts_trial,
+        deriv_size,
+        test_cells,
+        &assembler.integrand,
+        &assembler.kernel,
+        test_evaluator,
+        trial_evaluator,
+        test_table,
+        trial_table,
+        test_weights,
+        trial_weights,
+    );
+
+    let mut local_mat = rlst_dynamic_array2!(
+        T,
+        [
+            test_space.element(test_cell_type).dim(),
+            trial_space.element(trial_cell_type).dim()
+        ]
+    );
+
+    for trial_cell in trial_cells {
+        a.set_trial_cell(*trial_cell);
+        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
+        for test_cell in test_cells.iter() {
+            if neighbours(test_grid, trial_grid, *test_cell, *trial_cell) {
+                continue;
+            }
+
+            a.set_test_cell(*test_cell);
+            a.assemble(&mut local_mat);
+
+            let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
+
+            for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
+                for (test_dof, entry) in izip!(test_dofs, col.iter()) {
+                    unsafe {
+                        *output.data.add(*test_dof + output.shape[0] * *trial_dof) += entry;
+                    }
+                }
+            }
+        }
+    }
+    1
+}
+
+fn get_pairs_if_smallest(
+    test_cell: &impl Entity,
+    trial_cell: &impl Entity,
+    vertex: usize,
+) -> Option<Vec<(usize, usize)>> {
+    let mut pairs = vec![];
+    for (trial_i, trial_v) in trial_cell.topology().sub_entity_iter(0).enumerate() {
+        for (test_i, test_v) in test_cell.topology().sub_entity_iter(0).enumerate() {
+            if test_v == trial_v {
+                if test_v < vertex {
+                    return None;
+                }
+                pairs.push((test_i, trial_i));
+            }
+        }
+    }
+    Some(pairs)
 }
