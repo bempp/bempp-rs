@@ -423,49 +423,49 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         }
     }
 
-    /// Set (non-singular) quadrature degree for a cell type
-    pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
-        *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
-    }
+    // /// Set (non-singular) quadrature degree for a cell type
+    // pub fn set_quadrature_degree(&mut self, cell: ReferenceCellType, degree: usize) {
+    //     *self.options.quadrature_degrees.get_mut(&cell).unwrap() = degree;
+    // }
 
-    /// Get (non-singular) quadrature degree for a cell type
-    pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
-        self.options.quadrature_degrees.get(&cell).copied()
-    }
+    // /// Get (non-singular) quadrature degree for a cell type
+    // pub fn quadrature_degree(&self, cell: ReferenceCellType) -> Option<usize> {
+    //     self.options.quadrature_degrees.get(&cell).copied()
+    // }
 
-    /// Set singular quadrature degree for a pair of cell types
-    pub fn set_singular_quadrature_degree(
-        &mut self,
-        cells: (ReferenceCellType, ReferenceCellType),
-        degree: usize,
-    ) {
-        *self
-            .options
-            .singular_quadrature_degrees
-            .get_mut(&cells)
-            .unwrap() = degree;
-    }
+    // /// Set singular quadrature degree for a pair of cell types
+    // pub fn set_singular_quadrature_degree(
+    //     &mut self,
+    //     cells: (ReferenceCellType, ReferenceCellType),
+    //     degree: usize,
+    // ) {
+    //     *self
+    //         .options
+    //         .singular_quadrature_degrees
+    //         .get_mut(&cells)
+    //         .unwrap() = degree;
+    // }
 
-    /// Get singular quadrature degree for a pair of cell types
-    pub fn singular_quadrature_degree(
-        &self,
-        cells: (ReferenceCellType, ReferenceCellType),
-    ) -> Option<usize> {
-        self.options
-            .singular_quadrature_degrees
-            .get(&cells)
-            .copied()
-    }
+    // /// Get singular quadrature degree for a pair of cell types
+    // pub fn singular_quadrature_degree(
+    //     &self,
+    //     cells: (ReferenceCellType, ReferenceCellType),
+    // ) -> Option<usize> {
+    //     self.options
+    //         .singular_quadrature_degrees
+    //         .get(&cells)
+    //         .copied()
+    // }
 
-    /// Set the maximum size of a batch of cells to send to an assembly function
-    pub fn set_batch_size(&mut self, size: usize) {
-        self.options.batch_size = size;
-    }
+    // /// Set the maximum size of a batch of cells to send to an assembly function
+    // pub fn set_batch_size(&mut self, size: usize) {
+    //     self.options.batch_size = size;
+    // }
 
-    /// Get the maximum size of a batch of cells to send to an assembly function
-    pub fn batch_size(&self) -> usize {
-        self.options.batch_size
-    }
+    // /// Get the maximum size of a batch of cells to send to an assembly function
+    // pub fn batch_size(&self) -> usize {
+    //     self.options.batch_size
+    // }
 
     /// Assemble the singular contributions
     pub(crate) fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(

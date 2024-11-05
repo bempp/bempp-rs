@@ -23,21 +23,21 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let mut matrix = rlst_dynamic_array2!(f64, [space.global_size(), space.global_size()]);
 
         let colouring = space.cell_colouring();
-
-        let mut assembler = BoundaryAssembler::<f64, _, _>::new(
-            SingleLayerBoundaryIntegrand::new(),
-            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
-            BoundaryAssemblerOptions::default(),
-            1,
-            0,
-        );
-
-        assembler.set_quadrature_degree(ReferenceCellType::Triangle, 16);
-        assembler.set_singular_quadrature_degree(
+        let mut options = BoundaryAssemblerOptions::default();
+        options.set_regular_quadrature_degree(ReferenceCellType::Triangle, 16);
+        options.set_singular_quadrature_degree(
             (ReferenceCellType::Triangle, ReferenceCellType::Triangle),
             4,
         );
-        assembler.set_batch_size(128);
+        options.set_batch_size(128);
+
+        let assembler = BoundaryAssembler::<f64, _, _>::new(
+            SingleLayerBoundaryIntegrand::new(),
+            KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value),
+            options.clone(),
+            1,
+            0,
+        );
 
         group.bench_function(
             format!(
