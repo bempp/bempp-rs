@@ -1,8 +1,7 @@
 //! Boundary assemblers
 
 use super::cell_pair_assemblers::{
-    NonsingularCellPairAssembler, NonsingularCellPairAssemblerWithTestCaching,
-    SingularCellPairAssembler,
+    NonsingularCellPairAssemblerWithTestCaching, SingularCellPairAssembler,
 };
 use super::integrands::BoundaryIntegrand;
 use crate::assembly::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
@@ -311,89 +310,6 @@ fn assemble_batch_nonadjacent<
         }
     }
     1
-}
-
-/// Assemble the contribution to the terms of a matrix for a batch of pairs of adjacent cells if an (incorrect) non-singular quadrature rule was used
-#[allow(clippy::too_many_arguments)]
-fn assemble_batch_singular_correction<
-    T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
-    Integrand: BoundaryIntegrand<T = T>,
-    K: Kernel<T = T>,
->(
-    assembler: &BoundaryAssembler<T, Integrand, K>,
-    deriv_size: usize,
-    shape: [usize; 2],
-    trial_cell_type: ReferenceCellType,
-    test_cell_type: ReferenceCellType,
-    trial_space: &Space,
-    test_space: &Space,
-    cell_pairs: &[(usize, usize)],
-    trial_points: &RlstArray<T::Real, 2>,
-    trial_weights: &[T::Real],
-    test_points: &RlstArray<T::Real, 2>,
-    test_weights: &[T::Real],
-    trial_table: &RlstArray<T, 4>,
-    test_table: &RlstArray<T, 4>,
-) -> SparseMatrixData<T> {
-    let mut output = SparseMatrixData::<T>::new_known_size(
-        shape,
-        cell_pairs.len()
-            * trial_space.element(trial_cell_type).dim()
-            * test_space.element(test_cell_type).dim(),
-    );
-    let npts_test = test_weights.len();
-    let npts_trial = trial_weights.len();
-    debug_assert!(test_points.shape()[1] == npts_test);
-    debug_assert!(trial_points.shape()[1] == npts_trial);
-
-    let grid = test_space.grid();
-    assert_eq!(grid.geometry_dim(), 3);
-    assert_eq!(grid.topology_dim(), 2);
-
-    let test_evaluator = grid.geometry_map(test_cell_type, test_points.data());
-    let trial_evaluator = grid.geometry_map(trial_cell_type, trial_points.data());
-
-    let mut a = NonsingularCellPairAssembler::new(
-        npts_test,
-        npts_trial,
-        deriv_size,
-        &assembler.integrand,
-        &assembler.kernel,
-        test_evaluator,
-        trial_evaluator,
-        test_table,
-        trial_table,
-        test_weights,
-        trial_weights,
-    );
-
-    let mut local_mat = rlst_dynamic_array2!(
-        T,
-        [
-            test_space.element(test_cell_type).dim(),
-            trial_space.element(trial_cell_type).dim()
-        ]
-    );
-
-    for (test_cell, trial_cell) in cell_pairs {
-        a.set_test_cell(*test_cell);
-        a.set_trial_cell(*trial_cell);
-
-        a.assemble(&mut local_mat);
-
-        let test_dofs = unsafe { test_space.cell_dofs_unchecked(*test_cell) };
-        let trial_dofs = unsafe { trial_space.cell_dofs_unchecked(*trial_cell) };
-
-        for (trial_dof, col) in izip!(trial_dofs, local_mat.col_iter()) {
-            for (test_dof, entry) in izip!(test_dofs, col.iter()) {
-                output.rows.push(test_space.global_dof_index(*test_dof));
-                output.cols.push(trial_space.global_dof_index(*trial_dof));
-                output.data.push(entry);
-            }
-        }
-    }
-    output
 }
 
 fn get_pairs_if_smallest(
@@ -713,139 +629,6 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
             )
     }
 
-    /// Assemble the singular correction
-    ///
-    /// The singular correction is the contribution is the terms for adjacent cells are assembled using an (incorrect) non-singular quadrature rule
-    pub(crate) fn assemble_singular_correction<Space: FunctionSpace<T = T> + Sync>(
-        &self,
-        shape: [usize; 2],
-        trial_space: &Space,
-        test_space: &Space,
-    ) -> SparseMatrixData<T> {
-        if !equal_grids(test_space.grid(), trial_space.grid()) {
-            // If the test and trial grids are different, there are no neighbouring triangles
-            return SparseMatrixData::new(shape);
-        }
-
-        if !trial_space.is_serial() || !test_space.is_serial() {
-            panic!("Dense assembly can only be used for function spaces stored in serial");
-        }
-        if shape[0] != test_space.global_size() || shape[1] != trial_space.global_size() {
-            panic!("Matrix has wrong shape");
-        }
-
-        let grid = test_space.grid();
-
-        let mut qweights_test = vec![];
-        let mut qweights_trial = vec![];
-        let mut qpoints_test = vec![];
-        let mut qpoints_trial = vec![];
-        let mut test_tables = vec![];
-        let mut trial_tables = vec![];
-        let mut test_cell_types = vec![];
-        let mut trial_cell_types = vec![];
-
-        let mut cell_type_indices = HashMap::new();
-
-        for test_cell_type in grid.entity_types(2) {
-            let npts_test = self.options.quadrature_degrees[test_cell_type];
-            for trial_cell_type in grid.entity_types(2) {
-                let npts_trial = self.options.quadrature_degrees[trial_cell_type];
-                test_cell_types.push(*test_cell_type);
-                trial_cell_types.push(*trial_cell_type);
-                cell_type_indices.insert((*test_cell_type, *trial_cell_type), qweights_test.len());
-
-                let qrule_test = simplex_rule(*test_cell_type, npts_test).unwrap();
-                let mut test_pts = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_test]);
-                for i in 0..npts_test {
-                    for j in 0..2 {
-                        *test_pts.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <T as RlstScalar>::Real>(qrule_test.points[2 * i + j])
-                                .unwrap();
-                    }
-                }
-                qweights_test.push(
-                    qrule_test
-                        .weights
-                        .iter()
-                        .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
-                        .collect::<Vec<_>>(),
-                );
-                let test_element = test_space.element(*test_cell_type);
-                let mut test_table = rlst_dynamic_array4!(
-                    T,
-                    test_element.tabulate_array_shape(self.table_derivs, npts_test)
-                );
-                test_element.tabulate(&test_pts, self.table_derivs, &mut test_table);
-                test_tables.push(test_table);
-                qpoints_test.push(test_pts);
-
-                let qrule_trial = simplex_rule(*trial_cell_type, npts_trial).unwrap();
-                let mut trial_pts = rlst_dynamic_array2!(<T as RlstScalar>::Real, [2, npts_trial]);
-                for i in 0..npts_trial {
-                    for j in 0..2 {
-                        *trial_pts.get_mut([j, i]).unwrap() =
-                            num::cast::<f64, <T as RlstScalar>::Real>(
-                                qrule_trial.points[2 * i + j],
-                            )
-                            .unwrap();
-                    }
-                }
-                qweights_trial.push(
-                    qrule_trial
-                        .weights
-                        .iter()
-                        .map(|w| num::cast::<f64, <T as RlstScalar>::Real>(*w).unwrap())
-                        .collect::<Vec<_>>(),
-                );
-                let trial_element = trial_space.element(*trial_cell_type);
-                let mut trial_table = rlst_dynamic_array4!(
-                    T,
-                    trial_element.tabulate_array_shape(self.table_derivs, npts_trial)
-                );
-                trial_element.tabulate(&trial_pts, self.table_derivs, &mut trial_table);
-                trial_tables.push(trial_table);
-                qpoints_trial.push(trial_pts);
-            }
-        }
-
-        let cell_blocks = make_cell_blocks(
-            |test_cell_type, trial_cell_type, _pairs| {
-                cell_type_indices[&(test_cell_type, trial_cell_type)]
-            },
-            qweights_test.len(),
-            grid,
-            self.options.batch_size,
-        );
-
-        cell_blocks
-            .into_par_iter()
-            .map(|(i, cell_block)| {
-                assemble_batch_singular_correction(
-                    self,
-                    self.deriv_size,
-                    shape,
-                    trial_cell_types[i],
-                    test_cell_types[i],
-                    trial_space,
-                    test_space,
-                    &cell_block,
-                    &qpoints_trial[i],
-                    &qweights_trial[i],
-                    &qpoints_test[i],
-                    &qweights_test[i],
-                    &trial_tables[i],
-                    &test_tables[i],
-                )
-            })
-            .reduce(
-                || SparseMatrixData::<T>::new(shape),
-                |mut a, b| {
-                    a.add(b);
-                    a
-                },
-            )
-    }
     /// Assemble the non-singular contributions into a dense matrix
     pub(crate) fn assemble_nonsingular<Space: FunctionSpace<T = T> + Sync>(
         &self,
@@ -1011,44 +794,6 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         .unwrap()
     }
 
-    /// Assemble the singular correction into a dense matrix.
-    pub fn assemble_singular_correction_into_dense<
-        Space: FunctionSpace<T = T> + Sync,
-        Array2: RandomAccessMut<2, Item = T> + Shape<2> + RawAccessMut<Item = T>,
-    >(
-        &self,
-        output: &mut Array2,
-        trial_space: &Space,
-        test_space: &Space,
-    ) {
-        let sparse_matrix =
-            self.assemble_singular_correction(output.shape(), trial_space, test_space);
-        let data = sparse_matrix.data;
-        let rows = sparse_matrix.rows;
-        let cols = sparse_matrix.cols;
-        for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
-            *output.get_mut([*i, *j]).unwrap() += *value;
-        }
-    }
-
-    /// Assemble the singular correction into a CSR matrix.
-    pub fn assemble_singular_correction_into_csr<Space: FunctionSpace<T = T> + Sync>(
-        &self,
-        trial_space: &Space,
-        test_space: &Space,
-    ) -> CsrMatrix<T> {
-        let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular_correction(shape, trial_space, test_space);
-
-        CsrMatrix::<T>::from_aij(
-            sparse_matrix.shape,
-            &sparse_matrix.rows,
-            &sparse_matrix.cols,
-            &sparse_matrix.data,
-        )
-        .unwrap()
-    }
-
     /// Assemble into a dense matrix.
     pub fn assemble_into_dense<
         Space: FunctionSpace<T = T> + Sync,
@@ -1107,43 +852,3 @@ impl<T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: Kern
         )
     }
 }
-
-// impl<
-//         T: RlstScalar + MatrixInverse,
-//         Integrand: BoundaryIntegrand<T = T>,
-//         Kernel: KernelEvaluator<T = T>,
-//     > BoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
-// {
-//     type T = T;
-// #[cfg(feature = "mpi")]
-// impl<
-//         T: RlstScalar + MatrixInverse,
-//         Integrand: BoundaryIntegrand<T = T>,
-//         Kernel: KernelEvaluator<T = T>,
-//     > ParallelBoundaryAssembly for BoundaryAssembler<T, Integrand, Kernel>
-// {
-//     fn parallel_assemble_singular_into_csr<
-//         C: Communicator,
-//         Space: ParallelFunctionSpace<C, T = T>,
-//     >(
-//         &self,
-//         trial_space: &Space,
-//         test_space: &Space,
-//     ) -> CsrMatrix<T> {
-//         self.assemble_singular_into_csr(trial_space.local_space(), test_space.local_space())
-//     }
-
-//     fn parallel_assemble_singular_correction_into_csr<
-//         C: Communicator,
-//         Space: ParallelFunctionSpace<C, T = T>,
-//     >(
-//         &self,
-//         trial_space: &Space,
-//         test_space: &Space,
-//     ) -> CsrMatrix<T> {
-//         self.assemble_singular_correction_into_csr(
-//             trial_space.local_space(),
-//             test_space.local_space(),
-//         )
-//     }
-// }

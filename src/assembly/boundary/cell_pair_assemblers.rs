@@ -155,158 +155,158 @@ impl<
     }
 }
 
-/// Assembler for the contributions from pairs of non-neighbouring cells
-pub struct NonsingularCellPairAssembler<
-    'a,
-    T: RlstScalar,
-    I: BoundaryIntegrand<T = T>,
-    TestG: GeometryMap<T = T::Real>,
-    TrialG: GeometryMap<T = T::Real>,
-    K: Kernel<T = T>,
-> {
-    integrand: &'a I,
-    kernel: &'a KernelEvaluator<T, K>,
-    test_evaluator: TestG,
-    trial_evaluator: TrialG,
-    test_table: &'a RlstArray<T, 4>,
-    trial_table: &'a RlstArray<T, 4>,
-    k: RlstArray<T, 3>,
-    test_mapped_pts: RlstArray<T::Real, 2>,
-    trial_mapped_pts: RlstArray<T::Real, 2>,
-    test_normals: RlstArray<T::Real, 2>,
-    trial_normals: RlstArray<T::Real, 2>,
-    test_jacobians: RlstArray<T::Real, 2>,
-    trial_jacobians: RlstArray<T::Real, 2>,
-    test_jdet: Vec<T::Real>,
-    trial_jdet: Vec<T::Real>,
-    test_weights: &'a [T::Real],
-    trial_weights: &'a [T::Real],
-    test_cell: usize,
-    trial_cell: usize,
-}
+// /// Assembler for the contributions from pairs of non-neighbouring cells
+// pub struct NonsingularCellPairAssembler<
+//     'a,
+//     T: RlstScalar,
+//     I: BoundaryIntegrand<T = T>,
+//     TestG: GeometryMap<T = T::Real>,
+//     TrialG: GeometryMap<T = T::Real>,
+//     K: Kernel<T = T>,
+// > {
+//     integrand: &'a I,
+//     kernel: &'a KernelEvaluator<T, K>,
+//     test_evaluator: TestG,
+//     trial_evaluator: TrialG,
+//     test_table: &'a RlstArray<T, 4>,
+//     trial_table: &'a RlstArray<T, 4>,
+//     k: RlstArray<T, 3>,
+//     test_mapped_pts: RlstArray<T::Real, 2>,
+//     trial_mapped_pts: RlstArray<T::Real, 2>,
+//     test_normals: RlstArray<T::Real, 2>,
+//     trial_normals: RlstArray<T::Real, 2>,
+//     test_jacobians: RlstArray<T::Real, 2>,
+//     trial_jacobians: RlstArray<T::Real, 2>,
+//     test_jdet: Vec<T::Real>,
+//     trial_jdet: Vec<T::Real>,
+//     test_weights: &'a [T::Real],
+//     trial_weights: &'a [T::Real],
+//     test_cell: usize,
+//     trial_cell: usize,
+// }
 
-impl<
-        'a,
-        T: RlstScalar,
-        I: BoundaryIntegrand<T = T>,
-        TestG: GeometryMap<T = T::Real>,
-        TrialG: GeometryMap<T = T::Real>,
-        K: Kernel<T = T>,
-    > NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
-{
-    #[allow(clippy::too_many_arguments)]
-    /// Create new
-    pub fn new(
-        npts_test: usize,
-        npts_trial: usize,
-        deriv_size: usize,
-        integrand: &'a I,
-        kernel: &'a KernelEvaluator<T, K>,
-        test_evaluator: TestG,
-        trial_evaluator: TrialG,
-        test_table: &'a RlstArray<T, 4>,
-        trial_table: &'a RlstArray<T, 4>,
-        test_weights: &'a [T::Real],
-        trial_weights: &'a [T::Real],
-    ) -> Self {
-        Self {
-            integrand,
-            kernel,
-            test_evaluator,
-            trial_evaluator,
-            test_table,
-            trial_table,
-            k: rlst_dynamic_array3!(T, [deriv_size, npts_test, npts_trial]),
-            test_mapped_pts: rlst_dynamic_array2!(T::Real, [3, npts_test]),
-            trial_mapped_pts: rlst_dynamic_array2!(T::Real, [3, npts_trial]),
-            test_normals: rlst_dynamic_array2!(T::Real, [3, npts_test]),
-            trial_normals: rlst_dynamic_array2!(T::Real, [3, npts_trial]),
-            test_jacobians: rlst_dynamic_array2!(T::Real, [6, npts_test]),
-            trial_jacobians: rlst_dynamic_array2!(T::Real, [6, npts_trial]),
-            test_jdet: vec![T::Real::zero(); npts_test],
-            trial_jdet: vec![T::Real::zero(); npts_trial],
-            test_weights,
-            trial_weights,
-            test_cell: 0,
-            trial_cell: 0,
-        }
-    }
+// impl<
+//         'a,
+//         T: RlstScalar,
+//         I: BoundaryIntegrand<T = T>,
+//         TestG: GeometryMap<T = T::Real>,
+//         TrialG: GeometryMap<T = T::Real>,
+//         K: Kernel<T = T>,
+//     > NonsingularCellPairAssembler<'a, T, I, TestG, TrialG, K>
+// {
+//     #[allow(clippy::too_many_arguments)]
+//     /// Create new
+//     pub fn new(
+//         npts_test: usize,
+//         npts_trial: usize,
+//         deriv_size: usize,
+//         integrand: &'a I,
+//         kernel: &'a KernelEvaluator<T, K>,
+//         test_evaluator: TestG,
+//         trial_evaluator: TrialG,
+//         test_table: &'a RlstArray<T, 4>,
+//         trial_table: &'a RlstArray<T, 4>,
+//         test_weights: &'a [T::Real],
+//         trial_weights: &'a [T::Real],
+//     ) -> Self {
+//         Self {
+//             integrand,
+//             kernel,
+//             test_evaluator,
+//             trial_evaluator,
+//             test_table,
+//             trial_table,
+//             k: rlst_dynamic_array3!(T, [deriv_size, npts_test, npts_trial]),
+//             test_mapped_pts: rlst_dynamic_array2!(T::Real, [3, npts_test]),
+//             trial_mapped_pts: rlst_dynamic_array2!(T::Real, [3, npts_trial]),
+//             test_normals: rlst_dynamic_array2!(T::Real, [3, npts_test]),
+//             trial_normals: rlst_dynamic_array2!(T::Real, [3, npts_trial]),
+//             test_jacobians: rlst_dynamic_array2!(T::Real, [6, npts_test]),
+//             trial_jacobians: rlst_dynamic_array2!(T::Real, [6, npts_trial]),
+//             test_jdet: vec![T::Real::zero(); npts_test],
+//             trial_jdet: vec![T::Real::zero(); npts_trial],
+//             test_weights,
+//             trial_weights,
+//             test_cell: 0,
+//             trial_cell: 0,
+//         }
+//     }
 
-    pub fn set_test_cell(&mut self, test_cell: usize) {
-        self.test_cell = test_cell;
-        self.test_evaluator
-            .points(test_cell, self.test_mapped_pts.data_mut());
-        self.test_evaluator.jacobians_dets_normals(
-            test_cell,
-            self.test_jacobians.data_mut(),
-            &mut self.test_jdet,
-            self.test_normals.data_mut(),
-        );
-    }
+//     pub fn set_test_cell(&mut self, test_cell: usize) {
+//         self.test_cell = test_cell;
+//         self.test_evaluator
+//             .points(test_cell, self.test_mapped_pts.data_mut());
+//         self.test_evaluator.jacobians_dets_normals(
+//             test_cell,
+//             self.test_jacobians.data_mut(),
+//             &mut self.test_jdet,
+//             self.test_normals.data_mut(),
+//         );
+//     }
 
-    pub fn set_trial_cell(&mut self, trial_cell: usize) {
-        self.trial_cell = trial_cell;
-        self.trial_evaluator
-            .points(trial_cell, self.trial_mapped_pts.data_mut());
-        self.trial_evaluator.jacobians_dets_normals(
-            trial_cell,
-            self.trial_jacobians.data_mut(),
-            &mut self.trial_jdet,
-            self.trial_normals.data_mut(),
-        );
-    }
-    pub fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
-        self.kernel.assemble_st(
-            self.test_mapped_pts.data(),
-            self.trial_mapped_pts.data(),
-            self.k.data_mut(),
-        );
+//     pub fn set_trial_cell(&mut self, trial_cell: usize) {
+//         self.trial_cell = trial_cell;
+//         self.trial_evaluator
+//             .points(trial_cell, self.trial_mapped_pts.data_mut());
+//         self.trial_evaluator.jacobians_dets_normals(
+//             trial_cell,
+//             self.trial_jacobians.data_mut(),
+//             &mut self.trial_jdet,
+//             self.trial_normals.data_mut(),
+//         );
+//     }
+//     pub fn assemble(&mut self, local_mat: &mut RlstArray<T, 2>) {
+//         self.kernel.assemble_st(
+//             self.test_mapped_pts.data(),
+//             self.trial_mapped_pts.data(),
+//             self.k.data_mut(),
+//         );
 
-        let test_geometry = AssemblerGeometry::new(
-            &self.test_mapped_pts,
-            &self.test_normals,
-            &self.test_jacobians,
-            &self.test_jdet,
-        );
-        let trial_geometry = AssemblerGeometry::new(
-            &self.trial_mapped_pts,
-            &self.trial_normals,
-            &self.trial_jacobians,
-            &self.trial_jdet,
-        );
+//         let test_geometry = AssemblerGeometry::new(
+//             &self.test_mapped_pts,
+//             &self.test_normals,
+//             &self.test_jacobians,
+//             &self.test_jdet,
+//         );
+//         let trial_geometry = AssemblerGeometry::new(
+//             &self.trial_mapped_pts,
+//             &self.trial_normals,
+//             &self.trial_jacobians,
+//             &self.trial_jdet,
+//         );
 
-        for (trial_i, mut col) in local_mat.col_iter_mut().enumerate() {
-            for (test_i, entry) in col.iter_mut().enumerate() {
-                *entry = T::zero();
-                for (test_index, test_wt) in self.test_weights.iter().enumerate() {
-                    let test_integrand = unsafe {
-                        num::cast::<T::Real, T>(
-                            *test_wt * *self.test_jdet.get_unchecked(test_index),
-                        )
-                        .unwrap()
-                    };
-                    for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
-                        *entry += self.integrand.evaluate_nonsingular(
-                            self.test_table,
-                            self.trial_table,
-                            test_index,
-                            trial_index,
-                            test_i,
-                            trial_i,
-                            &self.k,
-                            &test_geometry,
-                            &trial_geometry,
-                        ) * num::cast::<T::Real, T>(
-                            *trial_wt * unsafe { *self.trial_jdet.get_unchecked(trial_index) },
-                        )
-                        .unwrap()
-                            * test_integrand;
-                    }
-                }
-            }
-        }
-    }
-}
+//         for (trial_i, mut col) in local_mat.col_iter_mut().enumerate() {
+//             for (test_i, entry) in col.iter_mut().enumerate() {
+//                 *entry = T::zero();
+//                 for (test_index, test_wt) in self.test_weights.iter().enumerate() {
+//                     let test_integrand = unsafe {
+//                         num::cast::<T::Real, T>(
+//                             *test_wt * *self.test_jdet.get_unchecked(test_index),
+//                         )
+//                         .unwrap()
+//                     };
+//                     for (trial_index, trial_wt) in self.trial_weights.iter().enumerate() {
+//                         *entry += self.integrand.evaluate_nonsingular(
+//                             self.test_table,
+//                             self.trial_table,
+//                             test_index,
+//                             trial_index,
+//                             test_i,
+//                             trial_i,
+//                             &self.k,
+//                             &test_geometry,
+//                             &trial_geometry,
+//                         ) * num::cast::<T::Real, T>(
+//                             *trial_wt * unsafe { *self.trial_jdet.get_unchecked(trial_index) },
+//                         )
+//                         .unwrap()
+//                             * test_integrand;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 /// Assembler for the contributions from pairs of non-neighbouring cells with test geometry caching
 pub struct NonsingularCellPairAssemblerWithTestCaching<
@@ -503,117 +503,100 @@ impl<
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::assembly::{
-        boundary::integrands::SingleLayerBoundaryIntegrand, common::GreenKernelEvalType,
-        kernels::KernelEvaluator,
-    };
-    use bempp_quadrature::simplex_rules::simplex_rule;
 
-    use approx::*;
-    use green_kernels::laplace_3d::Laplace3dKernel;
-    use itertools::izip;
-    use ndelement::{
-        ciarlet::LagrangeElementFamily,
-        traits::{ElementFamily, FiniteElement},
-        types::{Continuity, ReferenceCellType},
-    };
-    use ndgrid::{shapes::regular_sphere, traits::Grid};
-    use rlst::{rlst_dynamic_array4, DefaultIterator, RandomAccessMut};
+    // #[test]
+    // fn test_non_singular() {
+    //     let grid = regular_sphere::<f64>(2);
+    //     let family = LagrangeElementFamily::<f64>::new(2, Continuity::Standard);
+    //     let element = family.element(ReferenceCellType::Triangle);
 
-    #[test]
-    fn test_non_singular() {
-        let grid = regular_sphere::<f64>(2);
-        let family = LagrangeElementFamily::<f64>::new(2, Continuity::Standard);
-        let element = family.element(ReferenceCellType::Triangle);
+    //     let mut test_cells = vec![];
+    //     let mut trial_cells = vec![];
 
-        let mut test_cells = vec![];
-        let mut trial_cells = vec![];
+    //     for i in 0..grid.entity_count(ReferenceCellType::Triangle) {
+    //         if i % 2 == 0 {
+    //             test_cells.push(i);
+    //         } else {
+    //             trial_cells.push(i);
+    //         }
+    //     }
 
-        for i in 0..grid.entity_count(ReferenceCellType::Triangle) {
-            if i % 2 == 0 {
-                test_cells.push(i);
-            } else {
-                trial_cells.push(i);
-            }
-        }
+    //     let npts_test = 3;
+    //     let qrule_test = simplex_rule(ReferenceCellType::Triangle, npts_test).unwrap();
+    //     let mut test_points = rlst_dynamic_array2!(f64, [2, npts_test]);
+    //     for i in 0..npts_test {
+    //         for j in 0..2 {
+    //             *test_points.get_mut([j, i]).unwrap() = qrule_test.points[2 * i + j];
+    //         }
+    //     }
+    //     let test_weights = qrule_test.weights;
 
-        let npts_test = 3;
-        let qrule_test = simplex_rule(ReferenceCellType::Triangle, npts_test).unwrap();
-        let mut test_points = rlst_dynamic_array2!(f64, [2, npts_test]);
-        for i in 0..npts_test {
-            for j in 0..2 {
-                *test_points.get_mut([j, i]).unwrap() = qrule_test.points[2 * i + j];
-            }
-        }
-        let test_weights = qrule_test.weights;
+    //     let npts_trial = 6;
+    //     let qrule_trial = simplex_rule(ReferenceCellType::Triangle, npts_trial).unwrap();
+    //     let mut trial_points = rlst_dynamic_array2!(f64, [2, npts_trial]);
+    //     for i in 0..npts_trial {
+    //         for j in 0..2 {
+    //             *trial_points.get_mut([j, i]).unwrap() = qrule_trial.points[2 * i + j];
+    //         }
+    //     }
+    //     let trial_weights = qrule_trial.weights;
 
-        let npts_trial = 6;
-        let qrule_trial = simplex_rule(ReferenceCellType::Triangle, npts_trial).unwrap();
-        let mut trial_points = rlst_dynamic_array2!(f64, [2, npts_trial]);
-        for i in 0..npts_trial {
-            for j in 0..2 {
-                *trial_points.get_mut([j, i]).unwrap() = qrule_trial.points[2 * i + j];
-            }
-        }
-        let trial_weights = qrule_trial.weights;
+    //     let mut test_table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(0, npts_test));
+    //     element.tabulate(&test_points, 0, &mut test_table);
+    //     let mut trial_table =
+    //         rlst_dynamic_array4!(f64, element.tabulate_array_shape(0, npts_trial));
+    //     element.tabulate(&trial_points, 0, &mut trial_table);
 
-        let mut test_table = rlst_dynamic_array4!(f64, element.tabulate_array_shape(0, npts_test));
-        element.tabulate(&test_points, 0, &mut test_table);
-        let mut trial_table =
-            rlst_dynamic_array4!(f64, element.tabulate_array_shape(0, npts_trial));
-        element.tabulate(&trial_points, 0, &mut trial_table);
+    //     let integrand = SingleLayerBoundaryIntegrand::new();
+    //     let kernel = KernelEvaluator::new(Laplace3dKernel::default(), GreenKernelEvalType::Value);
 
-        let integrand = SingleLayerBoundaryIntegrand::new();
-        let kernel = KernelEvaluator::new(Laplace3dKernel::default(), GreenKernelEvalType::Value);
+    //     let mut a0 = NonsingularCellPairAssembler::new(
+    //         npts_test,
+    //         npts_trial,
+    //         1,
+    //         &integrand,
+    //         &kernel,
+    //         grid.geometry_map(ReferenceCellType::Triangle, test_points.data()),
+    //         grid.geometry_map(ReferenceCellType::Triangle, trial_points.data()),
+    //         &test_table,
+    //         &trial_table,
+    //         &test_weights,
+    //         &trial_weights,
+    //     );
 
-        let mut a0 = NonsingularCellPairAssembler::new(
-            npts_test,
-            npts_trial,
-            1,
-            &integrand,
-            &kernel,
-            grid.geometry_map(ReferenceCellType::Triangle, test_points.data()),
-            grid.geometry_map(ReferenceCellType::Triangle, trial_points.data()),
-            &test_table,
-            &trial_table,
-            &test_weights,
-            &trial_weights,
-        );
+    //     let mut a1 = NonsingularCellPairAssemblerWithTestCaching::new(
+    //         npts_test,
+    //         npts_trial,
+    //         1,
+    //         &test_cells,
+    //         &integrand,
+    //         &kernel,
+    //         grid.geometry_map(ReferenceCellType::Triangle, test_points.data()),
+    //         grid.geometry_map(ReferenceCellType::Triangle, trial_points.data()),
+    //         &test_table,
+    //         &trial_table,
+    //         &test_weights,
+    //         &trial_weights,
+    //     );
 
-        let mut a1 = NonsingularCellPairAssemblerWithTestCaching::new(
-            npts_test,
-            npts_trial,
-            1,
-            &test_cells,
-            &integrand,
-            &kernel,
-            grid.geometry_map(ReferenceCellType::Triangle, test_points.data()),
-            grid.geometry_map(ReferenceCellType::Triangle, trial_points.data()),
-            &test_table,
-            &trial_table,
-            &test_weights,
-            &trial_weights,
-        );
+    //     let mut result0 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
+    //     let mut result1 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
 
-        let mut result0 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
-        let mut result1 = rlst_dynamic_array2!(f64, [element.dim(), element.dim()]);
+    //     for test_cell in test_cells.iter() {
+    //         a0.set_test_cell(*test_cell);
+    //         a1.set_test_cell(*test_cell);
+    //         for trial_cell in &trial_cells {
+    //             a0.set_trial_cell(*trial_cell);
+    //             a1.set_trial_cell(*trial_cell);
 
-        for test_cell in test_cells.iter() {
-            a0.set_test_cell(*test_cell);
-            a1.set_test_cell(*test_cell);
-            for trial_cell in &trial_cells {
-                a0.set_trial_cell(*trial_cell);
-                a1.set_trial_cell(*trial_cell);
-
-                a0.assemble(&mut result0);
-                a1.assemble(&mut result1);
-                for (col0, col1) in izip!(result0.col_iter(), result1.col_iter()) {
-                    for (value0, value1) in izip!(col0.iter(), col1.iter()) {
-                        assert_relative_eq!(value0, value1);
-                    }
-                }
-            }
-        }
-    }
+    //             a0.assemble(&mut result0);
+    //             a1.assemble(&mut result1);
+    //             for (col0, col1) in izip!(result0.col_iter(), result1.col_iter()) {
+    //                 for (value0, value1) in izip!(col0.iter(), col1.iter()) {
+    //                     assert_relative_eq!(value0, value1);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
