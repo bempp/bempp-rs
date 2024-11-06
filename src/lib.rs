@@ -3,7 +3,6 @@
 #![warn(missing_docs)]
 
 pub mod boundary_assemblers;
-// pub mod bindings;
 pub mod function;
 pub mod helmholtz;
 pub mod laplace;
