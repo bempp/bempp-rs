@@ -1,7 +1,8 @@
 //! Parallel function space
 
-use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
-use crate::traits::{FunctionSpace, ParallelFunctionSpace as ParallelFunctionSpaceTrait};
+use crate::function::{
+    function_space::assign_dofs, FunctionSpace, ParallelFunctionSpaceTrait, SerialFunctionSpace,
+};
 use mpi::{
     point_to_point::{Destination, Source},
     request::WaitGuard,
@@ -76,7 +77,7 @@ pub struct ParallelFunctionSpace<
     'a,
     C: Communicator,
     T: RlstScalar + MatrixInverse,
-    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 > {
     grid: &'a GridImpl,
     local_space: LocalFunctionSpace<'a, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>>,
@@ -86,7 +87,7 @@ impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > ParallelFunctionSpace<'a, C, T, GridImpl>
 {
     /// Create new function space
@@ -232,7 +233,7 @@ impl<
         'g,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > ParallelFunctionSpaceTrait<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
 {
     type ParallelGrid = GridImpl;
@@ -258,7 +259,7 @@ impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     > FunctionSpace for ParallelFunctionSpace<'a, C, T, GridImpl>
 {
     type T = T;

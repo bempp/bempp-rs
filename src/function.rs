@@ -2,7 +2,9 @@
 
 mod function_space;
 
-pub use function_space::*;
+#[cfg(feature = "mpi")]
+pub use function_space::ParallelFunctionSpace;
+pub use function_space::SerialFunctionSpace;
 
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
@@ -64,7 +66,7 @@ pub trait FunctionSpace: Sync {
 
 #[cfg(feature = "mpi")]
 /// A function space in parallel
-pub trait ParallelFunctionSpace<C: Communicator>: FunctionSpace {
+pub trait ParallelFunctionSpaceTrait<C: Communicator>: FunctionSpace {
     /// Parallel grid type
     type ParallelGrid: ParallelGrid<C>
         + Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
