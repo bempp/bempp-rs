@@ -18,7 +18,7 @@ impl DType {
             0 => Some(DType::F32),
             1 => Some(DType::F64),
             2 => Some(DType::C32),
-
+            3 => Some(DType::C64),
             _ => None,
         }
     }
