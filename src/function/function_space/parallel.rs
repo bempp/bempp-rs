@@ -42,7 +42,7 @@ impl<
     type LocalSpace<'b> = LocalFunctionSpace<'b, T, GridImpl> where Self: 'b;
 
     fn local_space(&self) -> &Self::LocalSpace<'_> {
-        &self
+        self
     }
     fn grid(&self) -> &Self::Grid {
         self.serial_space.grid
