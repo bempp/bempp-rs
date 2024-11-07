@@ -9,20 +9,25 @@ pub use function_space::SerialFunctionSpace;
 #[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use ndelement::{traits::FiniteElement, types::ReferenceCellType};
-#[cfg(feature = "mpi")]
-use ndgrid::traits::ParallelGrid;
 use ndgrid::{traits::Grid, types::Ownership};
 use rlst::RlstScalar;
 use std::collections::HashMap;
 
 /// A function space
-pub trait FunctionSpace: Sync {
+pub trait FunctionSpace {
     /// Scalar type
     type T: RlstScalar;
     /// The grid type
     type Grid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
     /// The finite element type
     type FiniteElement: FiniteElement<T = Self::T> + Sync;
+    /// The local space type
+    type LocalSpace<'a>: FunctionSpace<T = Self::T> + Sync
+    where
+        Self: 'a;
+
+    /// Get the local space on the process
+    fn local_space(&self) -> &Self::LocalSpace<'_>;
 
     /// Get the grid that the element is defined on
     fn grid(&self) -> &Self::Grid;
@@ -66,21 +71,7 @@ pub trait FunctionSpace: Sync {
 
 #[cfg(feature = "mpi")]
 /// A function space in parallel
-pub trait ParallelFunctionSpaceTrait<C: Communicator>: FunctionSpace {
-    /// Parallel grid type
-    type ParallelGrid: ParallelGrid<C>
-        + Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
-    /// The type of the serial space on each process
-    type LocalSpace<'a>: FunctionSpace<T = Self::T> + Sync
-    where
-        Self: 'a;
-
+pub trait MPIFunctionSpace<C: Communicator>: FunctionSpace {
     /// MPI communicator
     fn comm(&self) -> &C;
-
-    /// Get the grid
-    fn grid(&self) -> &Self::ParallelGrid;
-
-    /// Get the local space on the process
-    fn local_space(&self) -> &Self::LocalSpace<'_>;
 }

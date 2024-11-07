@@ -195,6 +195,9 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             panic!("Matrix has wrong shape");
         }
 
+        let local_trial_space = trial_space.local_space();
+        let local_test_space = test_space.local_space();
+
         let grid = test_space.grid();
 
         let mut qweights = vec![];
@@ -319,8 +322,8 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
                     shape,
                     trial_cell_types[i],
                     test_cell_types[i],
-                    trial_space,
-                    test_space,
+                    local_trial_space,
+                    local_test_space,
                     &cell_block,
                     &trial_points[i],
                     &test_points[i],
@@ -355,6 +358,8 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         {
             panic!("Matrix has wrong shape");
         }
+        let local_trial_space = trial_space.local_space();
+        let local_test_space = test_space.local_space();
 
         let batch_size = self.options.batch_size;
 
@@ -446,9 +451,9 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
                                     output,
                                     *test_cell_type,
                                     *trial_cell_type,
-                                    trial_space,
+                                    local_trial_space,
                                     trial_cells[t],
-                                    test_space,
+                                    local_test_space,
                                     test_cells[t],
                                     &qpoints_trial,
                                     &qweights_trial,

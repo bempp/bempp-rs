@@ -1,6 +1,6 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
 use bempp::function::SerialFunctionSpace;
-use bempp::laplace::assembler::laplace_single_layer;
+use bempp::laplace::assembler::single_layer;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::shapes::regular_sphere;
@@ -25,7 +25,7 @@ fn main() {
     );
 
     // Assemble the single layer Laplace boundary operator.
-    let matrix = laplace_single_layer(&options).assemble(&space, &space);
+    let matrix = single_layer(&options).assemble(&space, &space);
 
     // Print the entries of the matrix
     println!("Lagrange single layer matrix");
@@ -36,43 +36,4 @@ fn main() {
         println!();
     }
     println!();
-
-    // // Assemble just the singular part
-    // let mut singular_matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    // a.assemble_singular_into_dense(&mut singular_matrix, &space, &space);
-    // println!("Lagrange single layer matrix (singular part)");
-    // for i in 0..ndofs {
-    //     for j in 0..ndofs {
-    //         print!("{:.4} ", singular_matrix.get([i, j]).unwrap());
-    //     }
-    //     println!();
-    // }
-    // println!();
-
-    // // For grids with a larger number of cells, the singular part will be sparse. It can be assembled as a CSR matrix as follows
-    // println!("Lagrange single layer matrix (singular part) as CSR matrix");
-    // let singular_sparse_matrix = a.assemble_singular_into_csr(&space, &space);
-    // println!("indices: {:?}", singular_sparse_matrix.indices());
-    // println!("indptr: {:?}", singular_sparse_matrix.indptr());
-    // println!("data: {:?}", singular_sparse_matrix.data());
-    // println!();
-
-    // // Assemble just the non-singular part
-    // let colouring = space.cell_colouring();
-    // let mut nonsingular_matrix = rlst_dynamic_array2!(f64, [ndofs, ndofs]);
-    // a.assemble_nonsingular_into_dense(
-    //     &mut nonsingular_matrix,
-    //     &space,
-    //     &space,
-    //     &colouring,
-    //     &colouring,
-    // );
-    // println!("Lagrange single layer matrix (nonsingular part)");
-    // for i in 0..ndofs {
-    //     for j in 0..ndofs {
-    //         print!("{:.4} ", nonsingular_matrix.get([i, j]).unwrap());
-    //     }
-    //     println!();
-    // }
-    // println!();
 }

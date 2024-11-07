@@ -66,7 +66,11 @@ impl<
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
+    type LocalSpace<'b> = SerialFunctionSpace<'b, T, GridImpl> where Self: 'b;
 
+    fn local_space(&self) -> &Self::LocalSpace<'_> {
+        &self
+    }
     fn grid(&self) -> &Self::Grid {
         self.grid
     }

@@ -15,42 +15,42 @@ pub mod assembler {
     };
 
     /// Laplace single layer assembler type.
-    pub type LaplaceSingleLayer3dAssembler<'o, T> =
+    pub type SingleLayer3dAssembler<'o, T> =
         BoundaryAssembler<'o, T, SingleLayerBoundaryIntegrand<T>, Laplace3dKernel<T>>;
 
     /// Laplace double layer assembler type.
-    pub type LaplaceDoubleLayer3dAssembler<'o, T> =
+    pub type DoubleLayer3dAssembler<'o, T> =
         BoundaryAssembler<'o, T, DoubleLayerBoundaryIntegrand<T>, Laplace3dKernel<T>>;
 
     /// Laplace adjoint double layer assembler type.
-    pub type LaplaceAdjointDoubleLayer3dAssembler<'o, T> =
+    pub type AdjointDoubleLayer3dAssembler<'o, T> =
         BoundaryAssembler<'o, T, AdjointDoubleLayerBoundaryIntegrand<T>, Laplace3dKernel<T>>;
 
     /// Laplace hypersingular double layer assembler type.
-    pub type LaplaceHypersingular3dAssembler<'o, T> =
+    pub type Hypersingular3dAssembler<'o, T> =
         BoundaryAssembler<'o, T, HypersingularCurlCurlBoundaryIntegrand<T>, Laplace3dKernel<T>>;
 
     /// Assembler for the Laplace single layer operator.
-    pub fn laplace_single_layer<T: RlstScalar<Real = T> + MatrixInverse>(
+    pub fn single_layer<T: RlstScalar<Real = T> + MatrixInverse>(
         options: &BoundaryAssemblerOptions,
-    ) -> LaplaceSingleLayer3dAssembler<T> {
+    ) -> SingleLayer3dAssembler<T> {
         let kernel = KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::Value);
         BoundaryAssembler::new(SingleLayerBoundaryIntegrand::new(), kernel, options, 1, 0)
     }
 
     /// Assembler for the Laplace double layer operator.
-    pub fn laplace_double_layer<T: RlstScalar<Real = T> + MatrixInverse>(
+    pub fn double_layer<T: RlstScalar<Real = T> + MatrixInverse>(
         options: &BoundaryAssemblerOptions,
-    ) -> LaplaceDoubleLayer3dAssembler<T> {
+    ) -> DoubleLayer3dAssembler<T> {
         let kernel = KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::ValueDeriv);
 
         BoundaryAssembler::new(DoubleLayerBoundaryIntegrand::new(), kernel, options, 4, 0)
     }
 
     /// Assembler for the Laplace adjoint double layer operator.
-    pub fn laplace_adjoint_double_layer<T: RlstScalar<Real = T> + MatrixInverse>(
+    pub fn adjoint_double_layer<T: RlstScalar<Real = T> + MatrixInverse>(
         options: &BoundaryAssemblerOptions,
-    ) -> LaplaceAdjointDoubleLayer3dAssembler<T> {
+    ) -> AdjointDoubleLayer3dAssembler<T> {
         let kernel = KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::ValueDeriv);
 
         BoundaryAssembler::new(
@@ -63,9 +63,9 @@ pub mod assembler {
     }
 
     /// Assembler for the Laplace hypersingular operator.
-    pub fn laplace_hypersingular<T: RlstScalar<Real = T> + MatrixInverse>(
+    pub fn hypersingular<T: RlstScalar<Real = T> + MatrixInverse>(
         options: &BoundaryAssemblerOptions,
-    ) -> LaplaceHypersingular3dAssembler<T> {
+    ) -> Hypersingular3dAssembler<T> {
         let kernel = KernelEvaluator::new(Laplace3dKernel::new(), GreenKernelEvalType::ValueDeriv);
 
         BoundaryAssembler::new(
