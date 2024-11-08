@@ -1,7 +1,7 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
 use bempp::function::FunctionSpace;
 use bempp::function::SerialFunctionSpace;
-use bempp::laplace::assembler::laplace_single_layer;
+use bempp::laplace::assembler::single_layer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
@@ -24,7 +24,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         );
         options.set_batch_size(128);
 
-        let assembler = laplace_single_layer(&options);
+        let assembler = single_layer(&options);
 
         group.bench_function(
             format!(
