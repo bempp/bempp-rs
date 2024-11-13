@@ -12,11 +12,11 @@ use crate::function::FunctionSpace;
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
-use bempp_quadrature::simplex_rules::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use green_kernels::traits::Kernel;
 use integrands::BoundaryIntegrand;
 use itertools::izip;
+use ndelement::quadrature::simplex_rule;
 use ndelement::reference_cell;
 use ndelement::traits::FiniteElement;
 use ndelement::types::ReferenceCellType;

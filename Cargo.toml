@@ -26,15 +26,15 @@ name = "bempp"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
+bempp-quadrature = { git = "https://github.com/bempp/quadrature.git" }
 itertools = "0.13.*"
 mpi = { version = "0.8.*", optional = true }
 num = "0.4"
-ndelement = { git = "https://github.com/bempp/ndelement", default-features = false }
+ndelement = { git = "https://github.com/bempp/ndelement.git", default-features = false }
 ndgrid = { git = "https://github.com/bempp/ndgrid.git", default-features = false }
 rayon = "1.9"
 rlst = { version = "0.2.1", default-features = false }
 green-kernels = { version = "0.2.2", default-features = false }
-bempp-quadrature = { git = "https://github.com/bempp/quadrature", default-features = false }
 
 [dev-dependencies]
 approx = "0.5"
