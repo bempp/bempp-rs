@@ -14,7 +14,7 @@ use crate::traits::ParallelFunctionSpace;
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
-use bempp_quadrature::simplex_rules::simplex_rule;
+use ndelement::quadrature::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use green_kernels::traits::Kernel;
 use itertools::izip;
