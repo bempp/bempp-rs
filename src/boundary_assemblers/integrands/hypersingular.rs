@@ -1,6 +1,9 @@
 //! Hypersingular integrand
-use crate::traits::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 use rlst::RlstScalar;
+
+use crate::boundary_assemblers::helpers::CellGeometry;
+
+use super::{Access1D, Access2D, BoundaryIntegrand, GeometryAccess};
 
 /// Integrand for the curl curl term of a hypersingular boundary operator
 pub struct HypersingularCurlCurlBoundaryIntegrand<T: RlstScalar> {
@@ -93,5 +96,46 @@ unsafe impl<T: RlstScalar> BoundaryIntegrand for HypersingularNormalNormalBounda
                 * test_table.get(0, 0)
                 * trial_table.get(0, 0)
         }
+    }
+
+    fn evaluate_nonsingular(
+        &self,
+        test_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
+        trial_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
+        test_point_index: usize,
+        trial_point_index: usize,
+        test_basis_index: usize,
+        trial_basis_index: usize,
+        k: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 3>,
+        test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
+        trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
+    ) -> Self::T {
+        self.evaluate(
+            &super::NonSingularKernel::new(k, test_point_index, trial_point_index),
+            &super::Table::new(test_table, test_point_index, test_basis_index),
+            &super::Table::new(trial_table, trial_point_index, trial_basis_index),
+            &super::Geometry::new(test_geometry, test_point_index),
+            &super::Geometry::new(trial_geometry, trial_point_index),
+        )
+    }
+
+    fn evaluate_singular(
+        &self,
+        test_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
+        trial_table: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 4>,
+        point_index: usize,
+        test_basis_index: usize,
+        trial_basis_index: usize,
+        k: &crate::boundary_assemblers::helpers::RlstArray<Self::T, 2>,
+        test_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
+        trial_geometry: &impl CellGeometry<T = <Self::T as RlstScalar>::Real>,
+    ) -> Self::T {
+        self.evaluate(
+            &super::SingularKernel::new(k, point_index),
+            &super::Table::new(test_table, point_index, test_basis_index),
+            &super::Table::new(trial_table, point_index, trial_basis_index),
+            &super::Geometry::new(test_geometry, point_index),
+            &super::Geometry::new(trial_geometry, point_index),
+        )
     }
 }

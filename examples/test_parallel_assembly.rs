@@ -4,9 +4,9 @@
 use approx::assert_relative_eq;
 #[cfg(feature = "mpi")]
 use bempp::{
-    assembly::boundary::BoundaryAssembler,
-    function::{ParallelFunctionSpace, SerialFunctionSpace},
-    traits::{BoundaryAssembly, FunctionSpace, ParallelBoundaryAssembly},
+    boundary_assemblers::BoundaryAssemblerOptions,
+    function::{FunctionSpace, ParallelFunctionSpace, SerialFunctionSpace},
+    laplace,
 };
 #[cfg(feature = "mpi")]
 use itertools::izip;
@@ -92,15 +92,16 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     let element = LagrangeElementFamily::<f64>::new(degree, cont);
     let space = ParallelFunctionSpace::new(&grid, &element);
 
-    let a = BoundaryAssembler::<f64, _, _>::new_laplace_single_layer();
+    let options = BoundaryAssemblerOptions::default();
+    let a = laplace::assembler::single_layer(&options);
 
-    let matrix = a.parallel_assemble_singular_into_csr(&space, &space);
+    let matrix = a.assemble_singular(&space, &space);
 
     if rank == 0 {
         // Compute the same matrix on a single process
         let serial_grid = example_single_element_grid_serial(n);
         let serial_space = SerialFunctionSpace::new(&serial_grid, &element);
-        let serial_matrix = a.assemble_singular_into_csr(&serial_space, &serial_space);
+        let serial_matrix = a.assemble_singular(&serial_space, &serial_space);
 
         // Dofs associated with each cell (by cell id)
         let mut serial_dofmap = HashMap::new();
@@ -251,5 +252,6 @@ fn main() {
         world.barrier();
     }
 }
+
 #[cfg(not(feature = "mpi"))]
 fn main() {}

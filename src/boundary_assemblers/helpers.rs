@@ -1,8 +1,57 @@
 //! Common utility functions
-use crate::traits::CellGeometry;
+use green_kernels::traits::Kernel;
 pub(crate) use green_kernels::types::GreenKernelEvalType;
 use ndgrid::traits::Grid;
 use rlst::{Array, BaseArray, MatrixInverse, RlstScalar, VectorContainer};
+
+/// Kernel evaluator
+pub struct KernelEvaluator<T: RlstScalar, K: Kernel<T = T>> {
+    pub(crate) kernel: K,
+    eval_type: GreenKernelEvalType,
+}
+
+impl<T: RlstScalar, K: Kernel<T = T>> KernelEvaluator<T, K> {
+    /// Create new
+    pub fn new(kernel: K, eval_type: GreenKernelEvalType) -> Self {
+        Self { kernel, eval_type }
+    }
+
+    /// Assemble pairwise.
+    pub fn assemble_pairwise_st(
+        &self,
+        sources: &[<T as RlstScalar>::Real],
+        targets: &[<T as RlstScalar>::Real],
+        result: &mut [T],
+    ) {
+        self.kernel
+            .assemble_pairwise_st(self.eval_type, sources, targets, result);
+    }
+
+    /// Assemble all sources against all targets.
+    pub fn assemble_st(
+        &self,
+        sources: &[<T as RlstScalar>::Real],
+        targets: &[<T as RlstScalar>::Real],
+        result: &mut [T],
+    ) {
+        self.kernel
+            .assemble_st(self.eval_type, sources, targets, result);
+    }
+}
+
+pub trait CellGeometry {
+    //! Cell geometry
+    /// Scalar type
+    type T: RlstScalar<Real = Self::T>;
+    /// Points
+    fn points(&self) -> &RlstArray<Self::T, 2>;
+    /// Normals
+    fn normals(&self) -> &RlstArray<Self::T, 2>;
+    /// Jacobians
+    fn jacobians(&self) -> &RlstArray<Self::T, 2>;
+    /// Determinants of jacobians
+    fn jdets(&self) -> &[Self::T];
+}
 
 pub(crate) type RlstArray<T, const DIM: usize> =
     Array<T, BaseArray<T, VectorContainer<T>, DIM>, DIM>;

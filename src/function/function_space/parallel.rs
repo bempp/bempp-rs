@@ -1,7 +1,8 @@
 //! Parallel function space
 
-use crate::function::{function_space::assign_dofs, SerialFunctionSpace};
-use crate::traits::{FunctionSpace, ParallelFunctionSpace as ParallelFunctionSpaceTrait};
+use crate::function::{
+    function_space::assign_dofs, FunctionSpace, MPIFunctionSpace, SerialFunctionSpace,
+};
 use mpi::{
     point_to_point::{Destination, Source},
     request::WaitGuard,
@@ -38,7 +39,11 @@ impl<
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
+    type LocalSpace<'b> = LocalFunctionSpace<'b, T, GridImpl> where Self: 'b;
 
+    fn local_space(&self) -> &Self::LocalSpace<'_> {
+        self
+    }
     fn grid(&self) -> &Self::Grid {
         self.serial_space.grid
     }
@@ -233,24 +238,10 @@ impl<
         C: Communicator,
         T: RlstScalar + MatrixInverse,
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > ParallelFunctionSpaceTrait<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
+    > MPIFunctionSpace<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
 {
-    type ParallelGrid = GridImpl;
-    type LocalSpace<'a> = LocalFunctionSpace<'a, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'g>> where Self: 'a;
-
     fn comm(&self) -> &C {
         self.grid.comm()
-    }
-
-    fn grid(&self) -> &GridImpl {
-        self.grid
-    }
-
-    /// Get the local space on the process
-    fn local_space(
-        &self,
-    ) -> &LocalFunctionSpace<'_, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'g>> {
-        &self.local_space
     }
 }
 
@@ -264,6 +255,13 @@ impl<
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
+    type LocalSpace<'b> = LocalFunctionSpace<'b, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>> where Self: 'b;
+
+    fn local_space(
+        &self,
+    ) -> &LocalFunctionSpace<'_, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>> {
+        &self.local_space
+    }
 
     fn grid(&self) -> &Self::Grid {
         self.grid
