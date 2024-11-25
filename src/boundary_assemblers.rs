@@ -313,32 +313,35 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             self.options.batch_size,
         );
 
-        cell_blocks
-            .into_par_iter()
-            .map(|(i, cell_block)| {
-                assemble_batch_singular(
-                    self,
-                    self.deriv_size,
-                    shape,
-                    trial_cell_types[i],
-                    test_cell_types[i],
-                    local_trial_space,
-                    local_test_space,
-                    &cell_block,
-                    &trial_points[i],
-                    &test_points[i],
-                    &qweights[i],
-                    &trial_tables[i],
-                    &test_tables[i],
-                )
-            })
-            .reduce(
-                || SparseMatrixData::<T>::new(shape),
-                |mut a, b| {
-                    a.add(b);
-                    a
-                },
+        let map = cell_blocks.into_par_iter().map(|(i, cell_block)| {
+            assemble_batch_singular(
+                self,
+                self.deriv_size,
+                shape,
+                trial_cell_types[i],
+                test_cell_types[i],
+                local_trial_space,
+                local_test_space,
+                &cell_block,
+                &trial_points[i],
+                &test_points[i],
+                &qweights[i],
+                &trial_tables[i],
+                &test_tables[i],
             )
+        });
+        // For some reason rust analyzer threw an error when simply writing
+        // map.reduce(...) even though the code compiled fine. Doing it this
+        // way allows rust analyer to see that the `reduce` method is from
+        // `ParallelIterator` and not from the std::core Iterator
+        ParallelIterator::reduce(
+            map,
+            || SparseMatrixData::<T>::new(shape),
+            |mut a, b| {
+                a.add(b);
+                a
+            },
+        )
     }
 
     /// Assemble the non-singular contributions into a dense matrix
