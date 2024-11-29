@@ -11,22 +11,12 @@ pub mod serial_function_space;
 pub struct SpaceT;
 
 pub mod ndelement {
-    use c_api_tools::{concretise_types, DType};
-
-    use rlst::prelude::{c32, c64};
+    use c_api_tools::DType;
 
     use ndelement::{
         bindings::{ciarlet as ciarlet_b, ciarlet::ElementFamilyT},
-        ciarlet::{
-            CiarletElement, LagrangeElementFamily, NedelecFirstKindElementFamily,
-            RaviartThomasElementFamily,
-        },
-        traits::ElementFamily,
-        types::{Continuity, ReferenceCellType},
+        types::Continuity,
     };
-
-    use ndgrid::{traits::Grid, types::RealScalar, SingleElementGrid};
-    use rlst::{MatrixInverse, RlstScalar};
 
     #[no_mangle]
     pub unsafe extern "C" fn element_family_t_free_bempp(ptr: *mut ElementFamilyT) {
@@ -67,13 +57,9 @@ pub mod ndelement {
 }
 
 pub mod ndgrid {
-    use c_api_tools::{concretise_types, DType};
-    use ndelement::{ciarlet::CiarletElement, types::ReferenceCellType};
-    use ndgrid::{
-        bindings::{grid::single_element_grid::single_element_grid_borrowed_create, GridT},
-        traits::Grid,
-        SingleElementGrid, SingleElementGridBorrowed,
-    };
+    use c_api_tools::DType;
+    use ndelement::types::ReferenceCellType;
+    use ndgrid::bindings::{grid::single_element_grid::single_element_grid_borrowed_create, GridT};
     use std::ffi::c_void;
 
     #[no_mangle]

@@ -1,16 +1,16 @@
 use c_api_tools::concretise_types;
 use ndelement::{
-    bindings::ciarlet::{CiarletElementT, ElementFamilyT},
+    bindings::ciarlet::ElementFamilyT,
     ciarlet::{
         CiarletElement, LagrangeElementFamily, NedelecFirstKindElementFamily,
         RaviartThomasElementFamily,
     },
-    traits::{ElementFamily, FiniteElement},
+    traits::ElementFamily,
     types::ReferenceCellType,
 };
 
 use ndgrid::{
-    bindings::GridT, traits::Grid, types::RealScalar, SingleElementGrid, SingleElementGridBorrowed,
+    bindings::GridT, traits::Grid, SingleElementGrid, SingleElementGridBorrowed,
 };
 use rlst::{c32, c64, MatrixInverse, RlstScalar};
 
@@ -29,14 +29,12 @@ use crate::function::SerialFunctionSpace;
 )]
 pub fn function_space<
     T: RlstScalar + MatrixInverse,
-    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
     F: ElementFamily<T = T, CellType = ReferenceCellType, FiniteElement = CiarletElement<T>>,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
 >(
     grid: &'static GridImpl,
     element_family: &'static F,
 ) -> *const SpaceT
-where
-    T::Real: RealScalar,
 {
     let wrapper = space_t_create();
     let inner = unsafe { space_t_unwrap(wrapper).unwrap() };
