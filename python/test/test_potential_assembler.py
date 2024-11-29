@@ -15,7 +15,6 @@ from ndelement.ciarlet import create_family, Family, Continuity
     ],
 )
 def test_create_assembler(otype):
-    pytest.xfail()
     a = create_laplace_assembler(otype)
 
     assert a.quadrature_degree(ReferenceCellType.Triangle) != 3
@@ -34,7 +33,6 @@ def test_create_assembler(otype):
 
 
 def test_single_layer_sphere0_dp0():
-    pytest.xfail()
     grid = regular_sphere(0)
     element = create_family(Family.Lagrange, 0, Continuity.Discontinuous)
     space = function_space(grid, element)
