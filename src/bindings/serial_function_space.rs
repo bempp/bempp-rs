@@ -9,9 +9,7 @@ use ndelement::{
     types::ReferenceCellType,
 };
 
-use ndgrid::{
-    bindings::GridT, traits::Grid, SingleElementGrid, SingleElementGridBorrowed,
-};
+use ndgrid::{bindings::GridT, traits::Grid, SingleElementGrid, SingleElementGridBorrowed};
 use rlst::{c32, c64, MatrixInverse, RlstScalar};
 
 use super::{space_t_create, space_t_unwrap, SpaceT};
@@ -34,8 +32,7 @@ pub fn function_space<
 >(
     grid: &'static GridImpl,
     element_family: &'static F,
-) -> *const SpaceT
-{
+) -> *const SpaceT {
     let wrapper = space_t_create();
     let inner = unsafe { space_t_unwrap(wrapper).unwrap() };
     *inner = Box::new(SerialFunctionSpace::new(grid, element_family));
