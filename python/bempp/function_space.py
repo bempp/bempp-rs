@@ -53,10 +53,17 @@ class FunctionSpace(object):
         """Delete."""
         if self._owned:
             _lib.space_t_free(self._rs_space)
-            _lib.element_family_t_free_bempp(self._family._bempp_rs_family)
-            del self._family._bempp_rs_family
-            _lib.grid_t_free_bempp(self._grid._bempp_rs_grid)
-            del self._grid._bempp_rs_grid
+
+            self._family._bempp_rs_family_refcount -= 1
+            if self._family._bempp_rs_family_refcount == 0:
+                _lib.element_family_t_free_bempp(self._family._bempp_rs_family)
+                del self._family._bempp_rs_family
+                del self._family._bempp_rs_family_refcount
+
+            self._grid._bempp_rs_grid_refcount -= 1
+            if self._grid._bempp_rs_grid_refcount == 0:
+                _lib.grid_t_free_bempp(self._grid._bempp_rs_grid)
+                del self._grid._bempp_rs_grid
 
     def element(self, entity: ReferenceCellType) -> CiarletElement:
         """Get the grid that this space is defined on."""
@@ -125,8 +132,12 @@ def function_space(grid: Grid, family: ElementFamily) -> FunctionSpace:
     """Create a function space."""
     if not hasattr(grid, "_bempp_rs_grid"):
         grid._bempp_rs_grid = recreate_grid(grid)
+        grid._bempp_rs_grid_refcount = 0
+    grid._bempp_rs_grid_refcount += 1
     if not hasattr(family, "_bempp_rs_family"):
         family._bempp_rs_family = recreate_element_family(family)
+        family._bempp_rs_family_refcount = 0
+    family._bempp_rs_family_refcount += 1
 
     return FunctionSpace(
         grid, family, _lib.function_space(grid._bempp_rs_grid, family._bempp_rs_family)
