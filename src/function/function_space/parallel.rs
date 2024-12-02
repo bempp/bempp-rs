@@ -57,6 +57,9 @@ impl<
         self.serial_space
             .get_local_dof_numbers(entity_dim, entity_number)
     }
+    fn is_serial(&self) -> bool {
+        false
+    }
     fn local_size(&self) -> usize {
         self.serial_space.local_size()
     }
@@ -278,6 +281,9 @@ impl<
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
         self.local_space
             .get_local_dof_numbers(entity_dim, entity_number)
+    }
+    fn is_serial(&self) -> bool {
+        false
     }
     fn local_size(&self) -> usize {
         self.local_space.local_size()
