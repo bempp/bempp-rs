@@ -127,7 +127,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
 
-        if sparse_matrix.data.len() == 0
+        if sparse_matrix.data.is_empty()
             || sparse_matrix
                 .data
                 .iter()
