@@ -31,7 +31,7 @@ itertools = "0.13.*"
 mpi = { version = "0.8.*", optional = true }
 num = "0.4"
 ndelement = { version = "0.2.0", default-features = false }
-ndgrid = { path="../ndgrid", version = "0.1.4-dev", default-features = false }
+ndgrid = { version = "0.1.5", default-features = false }
 rayon = "1.9"
 rlst = { version = "0.2.1", default-features = false }
 green-kernels = { version = "0.2.2", default-features = false }
