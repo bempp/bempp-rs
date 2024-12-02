@@ -31,10 +31,9 @@ pub struct LocalFunctionSpace<
 }
 
 impl<
-        'a,
         T: RlstScalar + MatrixInverse,
         GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
-    > FunctionSpace for LocalFunctionSpace<'a, T, GridImpl>
+    > FunctionSpace for LocalFunctionSpace<'_, T, GridImpl>
 {
     type T = T;
     type Grid = GridImpl;
@@ -240,11 +239,10 @@ impl<
 }
 
 impl<
-        'g,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > MPIFunctionSpace<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
+    > MPIFunctionSpace<C> for ParallelFunctionSpace<'_, C, T, GridImpl>
 {
     fn comm(&self) -> &C {
         self.grid.comm()
