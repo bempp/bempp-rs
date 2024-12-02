@@ -127,13 +127,31 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
 
-        CsrMatrix::<T>::from_aij(
-            sparse_matrix.shape,
-            &sparse_matrix.rows,
-            &sparse_matrix.cols,
-            &sparse_matrix.data,
-        )
-        .unwrap()
+        if sparse_matrix.data.len() == 0
+            || sparse_matrix
+                .data
+                .iter()
+                .map(|i| i.abs())
+                .filter(|i| *i > T::from(1e-10).unwrap().re())
+                .count()
+                == 0
+        {
+            // TODO: remove this hack once https://github.com/linalg-rs/rlst/pull/100 is merged and there a new release of RLST
+            CsrMatrix::<T>::new(
+                sparse_matrix.shape,
+                vec![],
+                vec![0; sparse_matrix.shape[0] + 1],
+                vec![],
+            )
+        } else {
+            CsrMatrix::<T>::from_aij(
+                sparse_matrix.shape,
+                &sparse_matrix.rows,
+                &sparse_matrix.cols,
+                &sparse_matrix.data,
+            )
+            .unwrap()
+        }
     }
 
     /// Assemble into a dense matrix.
