@@ -36,10 +36,7 @@ pub trait FunctionSpace {
     fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement;
 
     /// Check if the function space is stored in serial
-    fn is_serial(&self) -> bool {
-        // self.grid().is_serial()
-        true
-    }
+    fn is_serial(&self) -> bool;
 
     /// Get the DOF numbers on the local process associated with the given entity
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize];

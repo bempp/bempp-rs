@@ -64,6 +64,11 @@ impl BoundaryAssemblerOptions {
             .and_modify(|x| *x = npoints);
     }
 
+    /// Get the regular quadrature order.
+    pub fn get_regular_quadrature_degree(&self, cell_type: ReferenceCellType) -> Option<usize> {
+        self.quadrature_degrees.get(&cell_type).copied()
+    }
+
     /// Set the singular quadrature order.
     pub fn set_singular_quadrature_degree(
         &mut self,
@@ -75,9 +80,22 @@ impl BoundaryAssemblerOptions {
             .and_modify(|x| *x = npoints);
     }
 
+    /// Get the singular quadrature order.
+    pub fn get_singular_quadrature_degree(
+        &self,
+        cell_type: (ReferenceCellType, ReferenceCellType),
+    ) -> Option<usize> {
+        self.singular_quadrature_degrees.get(&cell_type).copied()
+    }
+
     /// Set the batch size.
     pub fn set_batch_size(&mut self, batch_size: usize) {
         self.batch_size = batch_size;
+    }
+
+    /// Set the batch size.
+    pub fn get_batch_size(&self) -> usize {
+        self.batch_size
     }
 }
 
@@ -109,13 +127,31 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         let shape = [test_space.global_size(), trial_space.global_size()];
         let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
 
-        CsrMatrix::<T>::from_aij(
-            sparse_matrix.shape,
-            &sparse_matrix.rows,
-            &sparse_matrix.cols,
-            &sparse_matrix.data,
-        )
-        .unwrap()
+        if sparse_matrix.data.is_empty()
+            || sparse_matrix
+                .data
+                .iter()
+                .map(|i| i.abs())
+                .filter(|i| *i > T::from(1e-10).unwrap().re())
+                .count()
+                == 0
+        {
+            // TODO: remove this hack once https://github.com/linalg-rs/rlst/pull/100 is merged and there a new release of RLST
+            CsrMatrix::<T>::new(
+                sparse_matrix.shape,
+                vec![],
+                vec![0; sparse_matrix.shape[0] + 1],
+                vec![],
+            )
+        } else {
+            CsrMatrix::<T>::from_aij(
+                sparse_matrix.shape,
+                &sparse_matrix.rows,
+                &sparse_matrix.cols,
+                &sparse_matrix.data,
+            )
+            .unwrap()
+        }
     }
 
     /// Assemble into a dense matrix.
@@ -124,9 +160,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         trial_space: &Space,
         test_space: &Space,
     ) -> DynamicArray<T, 2> {
-        let test_colouring = test_space.cell_colouring();
-        let trial_colouring = trial_space.cell_colouring();
-
         if !trial_space.is_serial() || !test_space.is_serial() {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
@@ -134,9 +167,32 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         let mut output =
             rlst_dynamic_array2!(T, [test_space.global_size(), trial_space.global_size()]);
 
+        self.assemble_into_memory(trial_space, test_space, output.data_mut());
+
+        output
+    }
+
+    /// Assemble into a dense matrix.
+    pub fn assemble_into_memory<Space: FunctionSpace<T = T>>(
+        &self,
+        trial_space: &Space,
+        test_space: &Space,
+        output: &mut [T],
+    ) {
+        assert_eq!(
+            output.len(),
+            test_space.global_size() * trial_space.global_size()
+        );
+        if !trial_space.is_serial() || !test_space.is_serial() {
+            panic!("Dense assembly can only be used for function spaces stored in serial");
+        }
+
+        let test_colouring = test_space.cell_colouring();
+        let trial_colouring = trial_space.cell_colouring();
+        let shape = [test_space.global_size(), trial_space.global_size()];
         let output_raw = RawData2D {
-            data: output.data_mut().as_mut_ptr(),
-            shape: output.shape(),
+            data: output.as_mut_ptr(),
+            shape,
         };
 
         self.assemble_nonsingular_part(
@@ -147,16 +203,14 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             &test_colouring,
         );
 
-        let sparse_matrix = self.assemble_singular_part(output.shape(), trial_space, test_space);
+        let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
 
         let data = sparse_matrix.data;
         let rows = sparse_matrix.rows;
         let cols = sparse_matrix.cols;
         for ((i, j), value) in rows.iter().zip(cols.iter()).zip(data.iter()) {
-            *output.get_mut([*i, *j]).unwrap() += *value;
+            *output.get_mut(*i + shape[0] * *j).unwrap() += *value;
         }
-
-        output
     }
 
     /// Create new Boundary assembler
@@ -313,32 +367,35 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             self.options.batch_size,
         );
 
-        cell_blocks
-            .into_par_iter()
-            .map(|(i, cell_block)| {
-                assemble_batch_singular(
-                    self,
-                    self.deriv_size,
-                    shape,
-                    trial_cell_types[i],
-                    test_cell_types[i],
-                    local_trial_space,
-                    local_test_space,
-                    &cell_block,
-                    &trial_points[i],
-                    &test_points[i],
-                    &qweights[i],
-                    &trial_tables[i],
-                    &test_tables[i],
-                )
-            })
-            .reduce(
-                || SparseMatrixData::<T>::new(shape),
-                |mut a, b| {
-                    a.add(b);
-                    a
-                },
+        let map = cell_blocks.into_par_iter().map(|(i, cell_block)| {
+            assemble_batch_singular(
+                self,
+                self.deriv_size,
+                shape,
+                trial_cell_types[i],
+                test_cell_types[i],
+                local_trial_space,
+                local_test_space,
+                &cell_block,
+                &trial_points[i],
+                &test_points[i],
+                &qweights[i],
+                &trial_tables[i],
+                &test_tables[i],
             )
+        });
+        // For some reason rust analyzer threw an error when simply writing
+        // map.reduce(...) even though the code compiled fine. Doing it this
+        // way allows rust analyer to see that the `reduce` method is from
+        // `ParallelIterator` and not from the std::core Iterator
+        ParallelIterator::reduce(
+            map,
+            || SparseMatrixData::<T>::new(shape),
+            |mut a, b| {
+                a.add(b);
+                a
+            },
+        )
     }
 
     /// Assemble the non-singular contributions into a dense matrix
@@ -896,9 +953,6 @@ mod test {
                     let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
                     let space = SerialFunctionSpace::new(&grid, &element);
 
-                    // let ndofs = space.global_size();
-                    // let mut matrix = rlst_dynamic_array2!([<$dtype>], [ndofs, ndofs]);
-
                     let options = BoundaryAssemblerOptions::default();
                     let a = helmholtz::assembler::[<$operator>]::<[<$dtype>]>(3.0, &options);
                     let _matrix = a.assemble(&space, &space);
@@ -915,9 +969,6 @@ mod test {
                     let grid = example_grid!($cell, $dtype);
                     let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
                     let space = SerialFunctionSpace::new(&grid, &element);
-
-                    // let ndofs = space.global_size();
-                    // let mut matrix = rlst_dynamic_array2!([<$dtype>], [ndofs, ndofs]);
 
                     let options = BoundaryAssemblerOptions::default();
                     let a = laplace::assembler::[<$operator>]::<[<$dtype>]>(&options);

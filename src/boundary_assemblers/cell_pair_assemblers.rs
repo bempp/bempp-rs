@@ -260,12 +260,11 @@ impl<
 }
 
 impl<
-        'a,
         T: RlstScalar,
         I: BoundaryIntegrand<T = T>,
         TrialG: GeometryMap<T = T::Real>,
         K: Kernel<T = T>,
-    > NonsingularCellPairAssemblerWithTestCaching<'a, T, I, TrialG, K>
+    > NonsingularCellPairAssemblerWithTestCaching<'_, T, I, TrialG, K>
 {
     pub fn set_test_cell(&mut self, test_cell: usize) {
         self.test_cell = self.test_indices[&test_cell];

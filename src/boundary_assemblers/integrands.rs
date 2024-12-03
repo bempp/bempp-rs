@@ -82,7 +82,7 @@ impl<'a, T: RlstScalar> NonSingularKernel<'a, T> {
     }
 }
 
-impl<'a, T: RlstScalar> Access1D for NonSingularKernel<'a, T> {
+impl<T: RlstScalar> Access1D for NonSingularKernel<'_, T> {
     type T = T;
 
     unsafe fn get(&self, i: usize) -> Self::T {
@@ -104,7 +104,7 @@ impl<'a, T: RlstScalar> SingularKernel<'a, T> {
     }
 }
 
-impl<'a, T: RlstScalar> Access1D for SingularKernel<'a, T> {
+impl<T: RlstScalar> Access1D for SingularKernel<'_, T> {
     type T = T;
 
     unsafe fn get(&self, i: usize) -> Self::T {
@@ -128,7 +128,7 @@ impl<'a, T: RlstScalar> Table<'a, T> {
         }
     }
 }
-impl<'a, T: RlstScalar> Access2D for Table<'a, T> {
+impl<T: RlstScalar> Access2D for Table<'_, T> {
     type T = T;
     unsafe fn get(&self, i: usize, j: usize) -> Self::T {
         *self
@@ -153,7 +153,7 @@ impl<'a, T: RlstScalar, G: CellGeometry<T = T::Real>> Geometry<'a, T, G> {
         }
     }
 }
-impl<'a, T: RlstScalar, G: CellGeometry<T = T::Real>> GeometryAccess for Geometry<'a, T, G> {
+impl<T: RlstScalar, G: CellGeometry<T = T::Real>> GeometryAccess for Geometry<'_, T, G> {
     type T = T;
     unsafe fn point(&self, i: usize) -> Self::T {
         T::from(*self.geometry.points().get_unchecked([i, self.point_index])).unwrap()

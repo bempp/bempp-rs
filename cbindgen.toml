@@ -5,3 +5,10 @@ exclude = []
 
 [enum]
 prefix_with_name = true
+
+[parse]
+parse_deps = true
+include = ["c-api-tools", "ndelement", "ndgrid", "bempp"]
+
+[parse.expand]
+crates = ["bempp"]

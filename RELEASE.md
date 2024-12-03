@@ -23,7 +23,7 @@ To make a new release of bempp, follow the following steps:
 
 4) Commit your changes and push to GitHub. Wait to see if the CI tests pass.
 
-5) [Create a release on GitHub](https://github.com/bempp/kifmm/releases/new) from the `main` branch.
+5) [Create a release on GitHub](https://github.com/bempp/bempp-rs/releases/new) from the `main` branch.
    The release tag and title should be `v[x].[y].[z]` (where `[x]`, `[y]` and `[z]` are as in step 2).
    In the "Describe this release" box, you should bullet point the main changes since the last
    release.

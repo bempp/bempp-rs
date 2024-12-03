@@ -139,7 +139,7 @@ impl<'a, T: RlstScalar<Real = T>> AssemblerGeometry<'a, T> {
     }
 }
 
-impl<'a, T: RlstScalar<Real = T>> CellGeometry for AssemblerGeometry<'a, T> {
+impl<T: RlstScalar<Real = T>> CellGeometry for AssemblerGeometry<'_, T> {
     type T = T;
     fn points(&self) -> &RlstArray<T, 2> {
         self.points

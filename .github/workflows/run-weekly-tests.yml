@@ -12,43 +12,38 @@ jobs:
       matrix:
         rust-version: ["stable", "beta", "nightly"]
         mpi: [ 'mpich', 'openmpi']
+        f_mpi: ["", "mpi,"]
+        f_strict: ["", "strict,"]
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
-          components: rustfmt
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
       - name: Install cargo-mpirun
         run: cargo install cargo-mpirun
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install LAPACK, OpenBLAS
         run:
           sudo apt-get install -y libopenblas-dev liblapack-dev
 
       - name: Build rust library
-        run: cargo build --features "strict"
+        run: cargo build --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Build rust library in release mode
-        run: cargo build --release --features "strict"
-      - name: Build rust library in release mode with mpi
-        run: cargo build --release --features "strict,mpi"
+        run: cargo build --features --release "${{matrix.f_mpi}}${{matrix.f_strict}}"
 
 
       - name: Run unit tests
-        run: cargo test --features "strict"
+        run: cargo test --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Run unit tests in release mode
-        run: cargo test --release --features "strict"
-      - name: Run unit tests with mpi enabled
-        run: cargo test --features "mpi,strict"
-      - name: Run unit tests in release mode with mpi enabled
-        run: cargo test --release --features "mpi,strict"
+        run: cargo test --release --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Run tests
-        run: cargo test --examples --release --features "mpi,strict"
+        run: cargo test --examples --release --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Test benchmarks build
-        run: cargo bench --no-run --features "mpi,strict"
+        run: cargo bench --no-run --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Run examples
         run: |
           python3 find_examples.py
@@ -56,7 +51,7 @@ jobs:
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "mpi,strict" --no-deps
+        run: cargo doc --features "${{matrix.f_mpi}}${{matrix.f_strict}}" --no-deps
 
   run-tests-python:
     name: Run Python tests
@@ -65,11 +60,15 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     steps:
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install uv
         run: pip install uv "maturin>=1.7"
       - name: Make virtual environment
@@ -79,7 +78,7 @@ jobs:
       - name: Install python package
         run: |
           source .venv/bin/activate
-          maturin develop --release
+          rustup run nightly maturin develop --release
       - name: Run Python tests
         run: |
           source .venv/bin/activate
