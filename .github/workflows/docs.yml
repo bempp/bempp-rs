@@ -20,7 +20,7 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: "mpich"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build docs
         run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "mpi,strict"
@@ -49,7 +49,7 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: "mpich"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build docs
         run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "mpi"
