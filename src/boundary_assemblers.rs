@@ -242,9 +242,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
             return SparseMatrixData::new(shape);
         }
 
-        if !trial_space.is_serial() || !test_space.is_serial() {
-            panic!("Dense assembly can only be used for function spaces stored in serial");
-        }
         if shape[0] != test_space.global_size() || shape[1] != trial_space.global_size() {
             panic!("Matrix has wrong shape");
         }
