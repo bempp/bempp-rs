@@ -18,7 +18,6 @@ You can install the latest release of bempp by running:
 pip3 install bempp-rs
 ```
 
-
 ## Documentation
 The latest documentation of the main branch of this repo is available at [bempp.github.io/bempp-rs/](https://bempp.github.io/bempp-rs/).
 
@@ -46,5 +45,3 @@ which is licensed under a CC BY 4.0 license.
 [1] F. D. Witherden, P.E. Vincent, *On the identification of symmetric quadrature rules for finite element methods*,
     Computers & Mathematics with Applications 69 (2015), 1232-1241,
     [doi.org/10.1016/j.camwa.2015.03.017](https://doi.org/10.1016/j.camwa.2015.03.017).
-
-

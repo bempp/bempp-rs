@@ -28,8 +28,8 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.rust-version }}
-          components: rustfmt
+          toolchain: nightly
+      - run: rustup default nightly
 
       - name: Install OpenBLAS, LAPACK, OpenSSL (yum)
         run: yum -y install openblas-devel lapack-devel openssl-devel
@@ -74,6 +74,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
           sccache: 'true'
+          rust-toolchain: nightly
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -88,6 +89,7 @@ jobs:
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
+          toolchain: nightly
           command: sdist
           args: --out dist
       - name: Upload sdist

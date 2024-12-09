@@ -58,15 +58,17 @@ impl<
 }
 
 impl<
-        'a,
         T: RlstScalar + MatrixInverse,
         GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
-    > FunctionSpace for SerialFunctionSpace<'a, T, GridImpl>
+    > FunctionSpace for SerialFunctionSpace<'_, T, GridImpl>
 {
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
-    type LocalSpace<'b> = SerialFunctionSpace<'b, T, GridImpl> where Self: 'b;
+    type LocalSpace<'b>
+        = SerialFunctionSpace<'b, T, GridImpl>
+    where
+        Self: 'b;
 
     fn local_space(&self) -> &Self::LocalSpace<'_> {
         self
@@ -79,6 +81,9 @@ impl<
     }
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
         &self.entity_dofs[entity_dim][entity_number]
+    }
+    fn is_serial(&self) -> bool {
+        true
     }
     fn local_size(&self) -> usize {
         self.size

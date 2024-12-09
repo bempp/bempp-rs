@@ -2,11 +2,9 @@ name: 🧪
 
 on:
   push:
-    branches:
-      - "**"
+    branches: ["**"]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   merge_group:
 
 jobs:
@@ -23,14 +21,13 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
-          components: rustfmt
       - name: Set up MPI
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
       - name: Install cargo-mpirun
         run: cargo install cargo-mpirun
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install LAPACK, OpenBLAS
         run:
           sudo apt-get install -y libopenblas-dev liblapack-dev
@@ -56,21 +53,50 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     steps:
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install uv
         run: pip install uv "maturin>=1.7"
       - name: Make virtual environment
         run: |
           uv venv .venv
           uv pip install pip pytest
+
+      - name: Clone ndelement
+        uses: actions/checkout@v4
+        with:
+          path: ./ndelement
+          repository: bempp/ndelement
+          ref: main
+      - name: Install ndelement
+        run: |
+          source .venv/bin/activate
+          cd ndelement
+          maturin develop --release
+
+      - name: Clone ndgrid
+        uses: actions/checkout@v4
+        with:
+          path: ./ndgrid
+          repository: bempp/ndgrid
+          ref: main
+      - name: Install ndgrid
+        run: |
+          source .venv/bin/activate
+          cd ndgrid
+          maturin develop --release
+
       - name: Install python package
         run: |
           source .venv/bin/activate
-          maturin develop --release
+          rustup run nightly maturin develop --release
       - name: Run Python tests
         run: |
           source .venv/bin/activate
@@ -87,10 +113,9 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
-          components: rustfmt
       - name: Install cargo-upgrades
         run: cargo install cargo-upgrades
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check that dependencies are up to date
         run:
           cargo upgrades

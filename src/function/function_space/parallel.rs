@@ -31,15 +31,17 @@ pub struct LocalFunctionSpace<
 }
 
 impl<
-        'a,
         T: RlstScalar + MatrixInverse,
         GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
-    > FunctionSpace for LocalFunctionSpace<'a, T, GridImpl>
+    > FunctionSpace for LocalFunctionSpace<'_, T, GridImpl>
 {
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
-    type LocalSpace<'b> = LocalFunctionSpace<'b, T, GridImpl> where Self: 'b;
+    type LocalSpace<'b>
+        = LocalFunctionSpace<'b, T, GridImpl>
+    where
+        Self: 'b;
 
     fn local_space(&self) -> &Self::LocalSpace<'_> {
         self
@@ -53,6 +55,9 @@ impl<
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
         self.serial_space
             .get_local_dof_numbers(entity_dim, entity_number)
+    }
+    fn is_serial(&self) -> bool {
+        false
     }
     fn local_size(&self) -> usize {
         self.serial_space.local_size()
@@ -234,11 +239,10 @@ impl<
 }
 
 impl<
-        'g,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > MPIFunctionSpace<C> for ParallelFunctionSpace<'g, C, T, GridImpl>
+    > MPIFunctionSpace<C> for ParallelFunctionSpace<'_, C, T, GridImpl>
 {
     fn comm(&self) -> &C {
         self.grid.comm()
@@ -255,7 +259,10 @@ impl<
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
-    type LocalSpace<'b> = LocalFunctionSpace<'b, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>> where Self: 'b;
+    type LocalSpace<'b>
+        = LocalFunctionSpace<'b, T, <GridImpl as ParallelGrid<C>>::LocalGrid<'a>>
+    where
+        Self: 'b;
 
     fn local_space(
         &self,
@@ -272,6 +279,9 @@ impl<
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
         self.local_space
             .get_local_dof_numbers(entity_dim, entity_number)
+    }
+    fn is_serial(&self) -> bool {
+        false
     }
     fn local_size(&self) -> usize {
         self.local_space.local_size()

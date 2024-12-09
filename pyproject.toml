@@ -25,7 +25,7 @@ dependencies = [
     "cffi",
     'patchelf; platform_system == "Linux"',
     "ndelement",
-    "ndgrid"
+    "ndgrid",
 ]
 packages = ["bempp", "bempp.assembly"]
 
