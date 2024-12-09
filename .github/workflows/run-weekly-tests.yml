@@ -35,7 +35,6 @@ jobs:
       - name: Build rust library in release mode
         run: cargo build --features --release "${{matrix.f_mpi}}${{matrix.f_strict}}"
 
-
       - name: Run unit tests
         run: cargo test --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Run unit tests in release mode
@@ -75,6 +74,31 @@ jobs:
         run: |
           uv venv .venv
           uv pip install pip pytest
+
+      - name: Clone ndelement
+        uses: actions/checkout@v4
+        with:
+          path: ./ndelement
+          repository: bempp/ndelement
+          ref: main
+      - name: Install ndelement
+        run: |
+          source .venv/bin/activate
+          cd ndelement
+          maturin develop --release
+
+      - name: Clone ndgrid
+        uses: actions/checkout@v4
+        with:
+          path: ./ndgrid
+          repository: bempp/ndgrid
+          ref: main
+      - name: Install ndgrid
+        run: |
+          source .venv/bin/activate
+          cd ndgrid
+          maturin develop --release
+
       - name: Install python package
         run: |
           source .venv/bin/activate
