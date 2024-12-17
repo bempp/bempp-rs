@@ -33,7 +33,7 @@ jobs:
       - name: Build rust library
         run: cargo build --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
       - name: Build rust library in release mode
-        run: cargo build --features --release "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo build --release --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
 
       - name: Run unit tests
         run: cargo test --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
