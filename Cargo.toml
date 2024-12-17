@@ -34,7 +34,7 @@ ndelement = { git="https://github.com/bempp/ndelement.git", default-features = f
 ndgrid = { git="https://github.com/bempp/ndgrid.git", default-features = false }
 rayon = "1.9"
 rlst = { git = "https://github.com/linalg-rs/rlst.git", default-features = false }
-green-kernels = { git = "https://github.com/bempp/green-kernels.git, default-features = false }
+green-kernels = { git = "https://github.com/bempp/green-kernels.git", default-features = false }
 c-api-tools = { version = "0.1.0" }
 
 [dev-dependencies]
