@@ -33,7 +33,7 @@ num = "0.4"
 ndelement = { git="https://github.com/bempp/ndelement.git", default-features = false }
 ndgrid = { git="https://github.com/bempp/ndgrid.git", default-features = false }
 rayon = "1.9"
-rlst = { version = "0.2.1", default-features = false }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", default-features = false }
 green-kernels = { version = "0.2.2", default-features = false }
 c-api-tools = { version = "0.1.0" }
 
