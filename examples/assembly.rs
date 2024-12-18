@@ -1,16 +1,17 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
-use bempp::function::SerialFunctionSpace;
+use bempp::function::DefaultFunctionSpace;
 use bempp::laplace::assembler::single_layer;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
-use ndgrid::shapes::regular_sphere;
 use rlst::{RandomAccessByRef, Shape};
 
 fn main() {
     // Create a grid, family of elements, and function space
-    let grid = regular_sphere(0);
+    let _ = mpi::initialize().unwrap();
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = DefaultFunctionSpace::new(&grid, &element);
 
     // Adjust the quadrature degree for non-singular integrals on a triangle.
     // This makes the integrals use a quadrature rule with 16 points

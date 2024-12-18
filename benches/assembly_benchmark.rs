@@ -1,21 +1,24 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
+use bempp::function::DefaultFunctionSpace;
 use bempp::function::FunctionSpace;
-use bempp::function::SerialFunctionSpace;
 use bempp::laplace::assembler::single_layer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use mpi;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
-use ndgrid::shapes::regular_sphere;
 
 pub fn assembly_parts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("assembly");
     group.sample_size(20);
 
+    let _ = mpi::initialize().unwrap();
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+
     for i in 3..5 {
-        let grid = regular_sphere(i);
+        let grid = bempp::shapes::regular_sphere(i, 1, &comm);
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
 
-        let space = SerialFunctionSpace::new(&grid, &element);
+        let space = DefaultFunctionSpace::new(&grid, &element);
         let mut options = BoundaryAssemblerOptions::default();
         options.set_regular_quadrature_degree(ReferenceCellType::Triangle, 16);
         options.set_singular_quadrature_degree(

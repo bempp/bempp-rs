@@ -7,9 +7,7 @@ use crate::assemblers::cell_pair_assemblers::{
 use crate::assemblers::common::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
 use crate::assemblers::kernels::KernelEvaluator;
 use crate::function::FunctionSpace;
-#[cfg(feature = "mpi")]
 use crate::traits::ParallelBoundaryAssembly;
-#[cfg(feature = "mpi")]
 use crate::traits::ParallelFunctionSpace;
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
@@ -18,7 +16,6 @@ use ndelement::quadrature::simplex_rule;
 use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratureDefinition};
 use green_kernels::traits::Kernel;
 use itertools::izip;
-#[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use ndelement::reference_cell;
 use ndelement::traits::FiniteElement;
