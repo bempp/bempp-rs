@@ -1,39 +1,30 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
-#[cfg(feature = "mpi")]
 use approx::assert_relative_eq;
-#[cfg(feature = "mpi")]
 use bempp::{
     boundary_assemblers::BoundaryAssemblerOptions,
     function::{FunctionSpace, ParallelFunctionSpace, SerialFunctionSpace},
     laplace,
 };
-#[cfg(feature = "mpi")]
 use itertools::izip;
-#[cfg(feature = "mpi")]
 use mpi::{
     collective::CommunicatorCollectives,
     environment::Universe,
     request::WaitGuard,
     traits::{Communicator, Destination, Source},
 };
-#[cfg(feature = "mpi")]
 use ndelement::{
     ciarlet::{CiarletElement, LagrangeElementFamily},
     types::{Continuity, ReferenceCellType},
 };
-#[cfg(feature = "mpi")]
 use ndgrid::{
     grid::parallel::ParallelGrid,
     traits::{Builder, Entity, Grid, ParallelBuilder},
     SingleElementGrid, SingleElementGridBuilder,
 };
-#[cfg(feature = "mpi")]
 use rlst::{CsrMatrix, Shape};
-#[cfg(feature = "mpi")]
 use std::collections::{hash_map::Entry, HashMap};
 
-#[cfg(feature = "mpi")]
 fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<f64>, n: usize) {
     for y in 0..n {
         for x in 0..n {
@@ -54,7 +45,6 @@ fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<f64>, n: usi
     }
 }
 
-#[cfg(feature = "mpi")]
 fn example_single_element_grid<C: Communicator>(
     comm: &C,
     n: usize,
@@ -71,14 +61,12 @@ fn example_single_element_grid<C: Communicator>(
     }
 }
 
-#[cfg(feature = "mpi")]
 fn example_single_element_grid_serial(n: usize) -> SingleElementGrid<f64, CiarletElement<f64>> {
     let mut b = SingleElementGridBuilder::<f64>::new(3, (ReferenceCellType::Quadrilateral, 1));
     create_single_element_grid_data(&mut b, n);
     b.create_grid()
 }
 
-#[cfg(feature = "mpi")]
 fn test_parallel_assembly_single_element_grid<C: Communicator>(
     comm: &C,
     degree: usize,
@@ -231,7 +219,6 @@ fn test_parallel_assembly_single_element_grid<C: Communicator>(
     }
 }
 
-#[cfg(feature = "mpi")]
 fn main() {
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
@@ -252,6 +239,3 @@ fn main() {
         world.barrier();
     }
 }
-
-#[cfg(not(feature = "mpi"))]
-fn main() {}

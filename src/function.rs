@@ -2,11 +2,9 @@
 
 mod function_space;
 
-#[cfg(feature = "mpi")]
 pub use function_space::ParallelFunctionSpace;
 pub use function_space::SerialFunctionSpace;
 
-#[cfg(feature = "mpi")]
 use mpi::traits::Communicator;
 use ndelement::{traits::FiniteElement, types::ReferenceCellType};
 use ndgrid::{traits::Grid, types::Ownership};
@@ -66,7 +64,6 @@ pub trait FunctionSpace {
     fn ownership(&self, local_dof_index: usize) -> Ownership;
 }
 
-#[cfg(feature = "mpi")]
 /// A function space in parallel
 pub trait MPIFunctionSpace<C: Communicator>: FunctionSpace {
     /// MPI communicator
