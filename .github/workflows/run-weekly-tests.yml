@@ -12,7 +12,6 @@ jobs:
       matrix:
         rust-version: ["stable", "beta", "nightly"]
         mpi: [ 'mpich', 'openmpi']
-        f_mpi: ["", "mpi,"]
         f_strict: ["", "strict,"]
     steps:
       - name: Set up Rust
@@ -31,18 +30,18 @@ jobs:
           sudo apt-get install -y libopenblas-dev liblapack-dev
 
       - name: Build rust library
-        run: cargo build --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo build --features "${{matrix.f_strict}}"
       - name: Build rust library in release mode
-        run: cargo build --release --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo build --release --features "${{matrix.f_strict}}"
 
       - name: Run unit tests
-        run: cargo test --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo test --features "${{matrix.f_strict}}"
       - name: Run unit tests in release mode
-        run: cargo test --release --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo test --release --features "${{matrix.f_strict}}"
       - name: Run tests
-        run: cargo test --examples --release --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo test --examples --release --features "${{matrix.f_strict}}"
       - name: Test benchmarks build
-        run: cargo bench --no-run --features "${{matrix.f_mpi}}${{matrix.f_strict}}"
+        run: cargo bench --no-run --features "${{matrix.f_strict}}"
       - name: Run examples
         run: |
           python3 find_examples.py
@@ -50,7 +49,7 @@ jobs:
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "${{matrix.f_mpi}}${{matrix.f_strict}}" --no-deps
+        run: cargo doc --features "${{matrix.f_strict}}" --no-deps
 
   run-tests-python:
     name: Run Python tests
