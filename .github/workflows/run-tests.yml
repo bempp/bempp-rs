@@ -25,8 +25,8 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
-      - name: Install cargo-mpirun
-        run: cargo install cargo-mpirun
+      # - name: Install cargo-mpirun
+      #   run: cargo install cargo-mpirun
       - uses: actions/checkout@v4
       - name: Install LAPACK, OpenBLAS
         run:
