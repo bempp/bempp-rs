@@ -113,9 +113,9 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
-      - name: Install cargo-upgrades
-        run: cargo install cargo-upgrades
-      - uses: actions/checkout@v4
+      # - name: Install cargo-upgrades
+      #   run: cargo install cargo-upgrades
+      # - uses: actions/checkout@v4
       - name: Check that dependencies are up to date
         run:
           cargo upgrades
