@@ -18,7 +18,7 @@ type DofList = Vec<Vec<usize>>;
 type OwnerData = Vec<(usize, usize, usize, usize)>;
 
 /// A function space
-pub trait FunctionSpace {
+pub trait FunctionSpaceTrait {
     /// Communicator
     type C: Communicator;
     /// Scalar type
@@ -70,7 +70,7 @@ pub trait FunctionSpace {
 }
 
 /// Implementation of a general function space.
-pub struct DefaultFunctionSpace<
+pub struct FunctionSpace<
     'a,
     C: Communicator,
     T: RlstScalar + MatrixInverse,
@@ -88,11 +88,10 @@ pub struct DefaultFunctionSpace<
 }
 
 unsafe impl<
-        'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > Sync for DefaultFunctionSpace<'a, C, T, GridImpl>
+    > Sync for FunctionSpace<'_, C, T, GridImpl>
 {
 }
 
@@ -101,7 +100,7 @@ impl<
         C: Communicator,
         T: RlstScalar + MatrixInverse,
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > DefaultFunctionSpace<'a, C, T, GridImpl>
+    > FunctionSpace<'a, C, T, GridImpl>
 {
     /// Create new function space
     pub fn new(
@@ -239,11 +238,10 @@ impl<
 }
 
 impl<
-        'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
         GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > FunctionSpace for DefaultFunctionSpace<'a, C, T, GridImpl>
+    > FunctionSpaceTrait for FunctionSpace<'_, C, T, GridImpl>
 {
     type T = T;
     type Grid = GridImpl;

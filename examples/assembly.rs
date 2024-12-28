@@ -1,5 +1,5 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
-use bempp::function::DefaultFunctionSpace;
+use bempp::function::FunctionSpace;
 use bempp::laplace::assembler::single_layer;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
@@ -11,7 +11,7 @@ fn main() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
 
     // Adjust the quadrature degree for non-singular integrals on a triangle.
     // This makes the integrals use a quadrature rule with 16 points

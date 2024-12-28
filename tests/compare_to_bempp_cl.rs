@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use approx::*;
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
-use bempp::function::DefaultFunctionSpace;
+use bempp::function::FunctionSpace;
 use bempp::{helmholtz, laplace};
 use cauchy::c64;
 use mpi::environment::Universe;
@@ -23,7 +23,7 @@ fn test_laplace_single_layer_dp0_dp0() {
 
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::single_layer(&options).assemble(&space, &space);
@@ -45,7 +45,7 @@ fn test_laplace_double_layer_dp0_dp0() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::double_layer(&options).assemble(&space, &space);
@@ -67,7 +67,7 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::adjoint_double_layer(&options).assemble(&space, &space);
@@ -90,7 +90,7 @@ fn test_laplace_hypersingular_p1_p1() {
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
 
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::hypersingular(&options).assemble(&space, &space);
@@ -118,7 +118,7 @@ fn test_helmholtz_single_layer_dp0_dp0() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::single_layer(3.0, &options).assemble(&space, &space);
@@ -140,7 +140,7 @@ fn test_helmholtz_double_layer_dp0_dp0() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::double_layer(3.0, &options).assemble(&space, &space);
@@ -161,7 +161,7 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::adjoint_double_layer(3.0, &options).assemble(&space, &space);
@@ -183,7 +183,7 @@ fn test_helmholtz_hypersingular_p1_p1() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(1, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::hypersingular(3.0, &options).assemble(&space, &space);

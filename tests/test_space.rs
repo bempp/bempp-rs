@@ -1,6 +1,5 @@
-use bempp::function::{assign_dofs, DefaultFunctionSpace, FunctionSpace};
+use bempp::function::{assign_dofs, FunctionSpace, FunctionSpaceTrait};
 use bempp::shapes::{regular_sphere, screen_triangles};
-use mpi::topology::SimpleCommunicator;
 use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
 use ndelement::types::{Continuity, ReferenceCellType};
 use ndgrid::traits::{Entity, Grid, Topology};
@@ -13,13 +12,6 @@ static MPI_UNIVERSE: LazyLock<Universe> = std::sync::LazyLock::new(|| {
         .unwrap()
         .0
 });
-
-fn get_comm() -> SimpleCommunicator {
-    use mpi;
-
-    let _ = mpi::initialize();
-    mpi::topology::SimpleCommunicator::self_comm()
-}
 
 fn run_test(
     grid: &(impl Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync),
@@ -149,7 +141,7 @@ fn test_dofmap_lagrange0() {
     let grid = regular_sphere::<f64, _>(2, 1, &comm);
     //let grid = regular_sphere::<f64, _>(2, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     assert_eq!(space.local_size(), space.global_size());
     assert_eq!(
         space.local_size(),
@@ -163,7 +155,7 @@ fn test_dofmap_lagrange1() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = regular_sphere::<f64, _>(2, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     assert_eq!(space.local_size(), space.global_size());
     assert_eq!(
         space.local_size(),
@@ -177,7 +169,7 @@ fn test_dofmap_lagrange2() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = regular_sphere::<f64, _>(2, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(2, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     assert_eq!(space.local_size(), space.global_size());
     assert_eq!(
         space.local_size(),
@@ -192,7 +184,7 @@ fn test_colouring_p1() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = regular_sphere::<f64, _>(2, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
     let cells = grid.entity_iter(2).collect::<Vec<_>>();
     let mut n = 0;
@@ -232,7 +224,7 @@ fn test_colouring_dp0() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = regular_sphere::<f64, _>(2, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
     let mut n = 0;
     for i in colouring {
@@ -259,7 +251,7 @@ fn test_colouring_rt1() {
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = regular_sphere::<f64, _>(2, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = DefaultFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
     let mut n = 0;
     for i in colouring {

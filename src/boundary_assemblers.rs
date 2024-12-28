@@ -8,7 +8,7 @@ use crate::boundary_assemblers::cell_pair_assemblers::{
 };
 use crate::boundary_assemblers::helpers::KernelEvaluator;
 use crate::boundary_assemblers::helpers::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
-use crate::function::FunctionSpace;
+use crate::function::FunctionSpaceTrait;
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
@@ -119,7 +119,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     BoundaryAssembler<'o, T, Integrand, K>
 {
     /// Assemble the singular part into a CSR matrix.
-    pub fn assemble_singular<Space: FunctionSpace<T = T> + Sync>(
+    pub fn assemble_singular<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -155,7 +155,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble<Space: FunctionSpace<T = T> + Sync>(
+    pub fn assemble<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -173,7 +173,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble_into_memory<Space: FunctionSpace<T = T> + Sync>(
+    pub fn assemble_into_memory<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -231,7 +231,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the singular contributions
-    fn assemble_singular_part<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_singular_part<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -393,7 +393,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular_part<Space: FunctionSpace<T = T> + Sync>(
+    fn assemble_nonsingular_part<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         output: &RawData2D<T>,
         trial_space: &Space,
@@ -609,7 +609,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
     T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
+    Space: FunctionSpaceTrait<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 >(
@@ -688,7 +688,7 @@ fn assemble_batch_singular<
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<
     T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
+    Space: FunctionSpaceTrait<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 >(

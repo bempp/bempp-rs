@@ -1,6 +1,6 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
-use bempp::function::DefaultFunctionSpace;
 use bempp::function::FunctionSpace;
+use bempp::function::FunctionSpaceTrait;
 use bempp::laplace::assembler::single_layer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mpi;
@@ -18,7 +18,7 @@ pub fn assembly_parts_benchmark(c: &mut Criterion) {
         let grid = bempp::shapes::regular_sphere(i, 1, &comm);
         let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
 
-        let space = DefaultFunctionSpace::new(&grid, &element);
+        let space = FunctionSpace::new(&grid, &element);
         let mut options = BoundaryAssemblerOptions::default();
         options.set_regular_quadrature_degree(ReferenceCellType::Triangle, 16);
         options.set_singular_quadrature_degree(
