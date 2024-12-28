@@ -30,7 +30,8 @@ itertools = "0.13.*"
 mpi = { version = "0.8.*"}
 num = "0.4"
 ndelement = { git="https://github.com/bempp/ndelement.git", features = ["mpi"]}
-ndgrid = { git="https://github.com/bempp/ndgrid.git", features = ["mpi"] }
+#ndgrid = { git="https://github.com/bempp/ndgrid.git", features = ["mpi"] }
+ndgrid = { path = "../ndgrid" }
 rayon = "1.9"
 rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"] }
 green-kernels = { git = "https://github.com/bempp/green-kernels.git", features = ["mpi"] }

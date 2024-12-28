@@ -106,9 +106,9 @@ pub fn regular_sphere<T: RealScalar + Equivalence, C: Communicator>(
             b.add_cell(i, v);
         }
 
-        b.create_parallel_grid(comm)
+        b.create_parallel_grid_root(comm)
     } else {
         SingleElementGridBuilder::new(3, (ReferenceCellType::Triangle, degree))
-            .receive_parallel_grid(comm, 0)
+            .create_parallel_grid(comm, 0)
     }
 }

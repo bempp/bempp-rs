@@ -18,9 +18,8 @@ use ndelement::{
     types::{Continuity, ReferenceCellType},
 };
 use ndgrid::{
-    grid::parallel::ParallelGrid,
     traits::{Builder, Entity, Grid, ParallelBuilder},
-    SingleElementGrid, SingleElementGridBuilder,
+    ParallelGrid, SingleElementGrid, SingleElementGridBuilder,
 };
 use rlst::{CsrMatrix, Shape};
 use std::collections::{hash_map::Entry, HashMap};
@@ -55,9 +54,9 @@ fn example_single_element_grid<C: Communicator>(
 
     if rank == 0 {
         create_single_element_grid_data(&mut b, n);
-        b.create_parallel_grid(comm)
+        b.create_parallel_grid_root(comm)
     } else {
-        b.receive_parallel_grid(comm, 0)
+        b.create_parallel_grid(comm, 0)
     }
 }
 
