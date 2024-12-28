@@ -1,70 +1,72 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
-use approx::assert_relative_eq;
-use bempp::{
-    boundary_assemblers::BoundaryAssemblerOptions,
-    function::{DefaultFunctionSpace, FunctionSpace},
-    laplace,
-};
-use itertools::izip;
-use mpi::{
-    collective::CommunicatorCollectives,
-    environment::Universe,
-    request::WaitGuard,
-    traits::{Communicator, Destination, Source},
-};
-use ndelement::{
-    ciarlet::{CiarletElement, LagrangeElementFamily},
-    types::{Continuity, ReferenceCellType},
-};
-use ndgrid::{
-    traits::{Builder, Entity, Grid, ParallelBuilder},
-    ParallelGrid, SingleElementGrid, SingleElementGridBuilder,
-};
-use rlst::{CsrMatrix, Shape};
-use std::collections::{hash_map::Entry, HashMap};
+fn main() {}
 
-fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<f64>, n: usize) {
-    for y in 0..n {
-        for x in 0..n {
-            b.add_point(
-                y * n + x,
-                &[x as f64 / (n - 1) as f64, y as f64 / (n - 1) as f64, 0.0],
-            );
-        }
-    }
+// use approx::assert_relative_eq;
+// use bempp::{
+//     boundary_assemblers::BoundaryAssemblerOptions,
+//     function::{DefaultFunctionSpace, FunctionSpace},
+//     laplace,
+// };
+// use itertools::izip;
+// use mpi::{
+//     collective::CommunicatorCollectives,
+//     environment::Universe,
+//     request::WaitGuard,
+//     traits::{Communicator, Destination, Source},
+// };
+// use ndelement::{
+//     ciarlet::{CiarletElement, LagrangeElementFamily},
+//     types::{Continuity, ReferenceCellType},
+// };
+// use ndgrid::{
+//     traits::{Builder, Entity, Grid, ParallelBuilder},
+//     ParallelGrid, SingleElementGrid, SingleElementGridBuilder,
+// };
+// use rlst::{CsrMatrix, Shape};
+// use std::collections::{hash_map::Entry, HashMap};
 
-    for i in 0..n - 1 {
-        for j in 0..n - 1 {
-            b.add_cell(
-                i * (n - 1) + j,
-                &[j * n + i, j * n + i + 1, j * n + i + n, j * n + i + n + 1],
-            );
-        }
-    }
-}
+// fn create_single_element_grid_data(b: &mut SingleElementGridBuilder<f64>, n: usize) {
+//     for y in 0..n {
+//         for x in 0..n {
+//             b.add_point(
+//                 y * n + x,
+//                 &[x as f64 / (n - 1) as f64, y as f64 / (n - 1) as f64, 0.0],
+//             );
+//         }
+//     }
 
-fn example_single_element_grid<C: Communicator>(
-    comm: &C,
-    n: usize,
-) -> ParallelGrid<'_, C, SingleElementGrid<f64, CiarletElement<f64>>> {
-    let rank = comm.rank();
+//     for i in 0..n - 1 {
+//         for j in 0..n - 1 {
+//             b.add_cell(
+//                 i * (n - 1) + j,
+//                 &[j * n + i, j * n + i + 1, j * n + i + n, j * n + i + n + 1],
+//             );
+//         }
+//     }
+// }
 
-    let mut b = SingleElementGridBuilder::<f64>::new(3, (ReferenceCellType::Quadrilateral, 1));
+// fn example_single_element_grid<C: Communicator>(
+//     comm: &C,
+//     n: usize,
+// ) -> ParallelGrid<'_, C, SingleElementGrid<f64, CiarletElement<f64>>> {
+//     let rank = comm.rank();
 
-    if rank == 0 {
-        create_single_element_grid_data(&mut b, n);
-        b.create_parallel_grid_root(comm)
-    } else {
-        b.create_parallel_grid(comm, 0)
-    }
-}
+//     let mut b = SingleElementGridBuilder::<f64>::new(3, (ReferenceCellType::Quadrilateral, 1));
 
-fn example_single_element_grid_serial(n: usize) -> SingleElementGrid<f64, CiarletElement<f64>> {
-    let mut b = SingleElementGridBuilder::<f64>::new(3, (ReferenceCellType::Quadrilateral, 1));
-    create_single_element_grid_data(&mut b, n);
-    b.create_grid()
-}
+//     if rank == 0 {
+//         create_single_element_grid_data(&mut b, n);
+//         b.create_parallel_grid_root(comm)
+//     } else {
+//         b.create_parallel_grid(comm, 0)
+//     }
+// }
+
+// fn example_single_element_grid_serial(n: usize) -> SingleElementGrid<f64, CiarletElement<f64>> {
+//     let mut b = SingleElementGridBuilder::<f64>::new(3, (ReferenceCellType::Quadrilateral, 1));
+//     create_single_element_grid_data(&mut b, n);
+//     b.create_grid()
+// }
 
 // fn test_parallel_assembly_single_element_grid<C: Communicator>(
 //     comm: &C,
@@ -218,23 +220,23 @@ fn example_single_element_grid_serial(n: usize) -> SingleElementGrid<f64, Ciarle
 //     }
 // }
 
-fn main() {
-    // let universe: Universe = mpi::initialize().unwrap();
-    // let world = universe.world();
-    // let rank = world.rank();
+// fn main() {
+// let universe: Universe = mpi::initialize().unwrap();
+// let world = universe.world();
+// let rank = world.rank();
 
-    // for degree in 0..4 {
-    //     if rank == 0 {
-    //         println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
-    //     }
-    //     test_parallel_assembly_single_element_grid(&world, degree, Continuity::Discontinuous);
-    //     world.barrier();
-    // }
-    // for degree in 1..4 {
-    //     if rank == 0 {
-    //         println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
-    //     }
-    //     test_parallel_assembly_single_element_grid(&world, degree, Continuity::Standard);
-    //     world.barrier();
-    // }
-}
+// for degree in 0..4 {
+//     if rank == 0 {
+//         println!("Testing assembly with DP{degree} using SingleElementGrid in parallel.");
+//     }
+//     test_parallel_assembly_single_element_grid(&world, degree, Continuity::Discontinuous);
+//     world.barrier();
+// }
+// for degree in 1..4 {
+//     if rank == 0 {
+//         println!("Testing assembly with P{degree} using SingleElementGrid in parallel.");
+//     }
+//     test_parallel_assembly_single_element_grid(&world, degree, Continuity::Standard);
+//     world.barrier();
+// }
+// }

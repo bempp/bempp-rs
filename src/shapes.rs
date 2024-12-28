@@ -112,3 +112,112 @@ pub fn regular_sphere<T: RealScalar + Equivalence, C: Communicator>(
             .create_parallel_grid(comm, 0)
     }
 }
+
+/// Create a square grid with triangle cells
+///
+/// Create a grid of the square \[0,1\]^2 with triangle cells. The input ncells is the number of cells
+/// along each side of the square.
+pub fn screen_triangles<T: RealScalar + Equivalence, C: Communicator>(
+    ncells: usize,
+    comm: &C,
+) -> ParallelGrid<C, SingleElementGrid<T, CiarletElement<T>>> {
+    if ncells == 0 {
+        panic!("Cannot create a grid with 0 cells");
+    }
+
+    if comm.rank() == 0 {
+        let mut b = SingleElementGridBuilder::new_with_capacity(
+            3,
+            (ncells + 1) * (ncells + 1),
+            2 * ncells * ncells,
+            (ReferenceCellType::Triangle, 1),
+        );
+
+        let zero = T::from(0.0).unwrap();
+        let n = T::from(ncells + 1).unwrap();
+        for y in 0..ncells + 1 {
+            for x in 0..ncells + 1 {
+                b.add_point(
+                    y * (ncells + 1) + x,
+                    &[T::from(x).unwrap() / n, T::from(y).unwrap() / n, zero],
+                );
+            }
+        }
+        for y in 0..ncells {
+            for x in 0..ncells {
+                b.add_cell(
+                    2 * y * ncells + 2 * x,
+                    &[
+                        y * (ncells + 1) + x,
+                        y * (ncells + 1) + x + 1,
+                        y * (ncells + 1) + x + ncells + 2,
+                    ],
+                );
+                b.add_cell(
+                    2 * y * ncells + 2 * x + 1,
+                    &[
+                        y * (ncells + 1) + x,
+                        y * (ncells + 1) + x + ncells + 2,
+                        y * (ncells + 1) + x + ncells + 1,
+                    ],
+                );
+            }
+        }
+
+        b.create_parallel_grid_root(comm)
+    } else {
+        SingleElementGridBuilder::new(3, (ReferenceCellType::Triangle, 1))
+            .create_parallel_grid(comm, 0)
+    }
+}
+
+/// Create a square grid with quadrilateral cells
+///
+/// Create a grid of the square \[0,1\]^2 with quadrilateral cells. The input ncells is the number of
+/// cells along each side of the square.
+pub fn screen_quadrilaterals<T: RealScalar + Equivalence, C: Communicator>(
+    ncells: usize,
+    comm: &C,
+) -> ParallelGrid<C, SingleElementGrid<T, CiarletElement<T>>> {
+    if ncells == 0 {
+        panic!("Cannot create a grid with 0 cells");
+    }
+
+    if comm.rank() == 0 {
+        let mut b = SingleElementGridBuilder::new_with_capacity(
+            3,
+            (ncells + 1) * (ncells + 1),
+            ncells * ncells,
+            (ReferenceCellType::Quadrilateral, 1),
+        );
+
+        let zero = T::from(0.0).unwrap();
+        let n = T::from(ncells + 1).unwrap();
+        for y in 0..ncells + 1 {
+            for x in 0..ncells + 1 {
+                b.add_point(
+                    y * (ncells + 1) + x,
+                    &[T::from(x).unwrap() / n, T::from(y).unwrap() / n, zero],
+                );
+            }
+        }
+        for y in 0..ncells {
+            for x in 0..ncells {
+                b.add_cell(
+                    y * ncells + x,
+                    &[
+                        y * (ncells + 1) + x,
+                        y * (ncells + 1) + x + 1,
+                        y * (ncells + 1) + x + ncells + 1,
+                        y * (ncells + 1) + x + ncells + 2,
+                    ],
+                );
+            }
+        }
+
+        b.create_parallel_grid_root(comm)
+    } else {
+        SingleElementGridBuilder::new(3, (ReferenceCellType::Quadrilateral, 1))
+            .create_parallel_grid(comm, 0)
+    }
+}

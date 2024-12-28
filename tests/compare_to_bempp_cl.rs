@@ -5,12 +5,9 @@ use bempp::boundary_assemblers::BoundaryAssemblerOptions;
 use bempp::function::DefaultFunctionSpace;
 use bempp::{helmholtz, laplace};
 use cauchy::c64;
-use itertools::Itertools;
 use mpi::environment::Universe;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
-use ndgrid::shapes::regular_sphere;
-use ndgrid::traits::{Entity, Geometry, Grid, Topology};
 use rlst::RandomAccessByRef;
 
 static MPI_UNIVERSE: LazyLock<Universe> = std::sync::LazyLock::new(|| {
