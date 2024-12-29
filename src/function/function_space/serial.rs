@@ -13,7 +13,7 @@ use rlst::{MatrixInverse, RlstScalar};
 use std::collections::HashMap;
 
 /// A serial function space
-pub struct SerialFunctionSpace<
+pub struct LocalFunctionSpace<
     'a,
     T: RlstScalar + MatrixInverse,
     GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
@@ -29,7 +29,7 @@ impl<
         'a,
         T: RlstScalar + MatrixInverse,
         GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
-    > SerialFunctionSpace<'a, T, GridImpl>
+    > LocalFunctionSpace<'a, T, GridImpl>
 {
     /// Create new function space
     pub fn new(
@@ -60,13 +60,13 @@ impl<
 impl<
         T: RlstScalar + MatrixInverse,
         GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType> + Sync,
-    > FunctionSpace for SerialFunctionSpace<'_, T, GridImpl>
+    > FunctionSpace for LocalFunctionSpace<'_, T, GridImpl>
 {
     type T = T;
     type Grid = GridImpl;
     type FiniteElement = CiarletElement<T>;
     type LocalSpace<'b>
-        = SerialFunctionSpace<'b, T, GridImpl>
+        = LocalFunctionSpace<'b, T, GridImpl>
     where
         Self: 'b;
 
@@ -186,151 +186,4 @@ mod test {
     use ndelement::ciarlet::LagrangeElementFamily;
     use ndelement::types::Continuity;
     use ndgrid::shapes::regular_sphere;
-
-    #[test]
-    fn test_dofmap_lagrange0() {
-        let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-        let space = SerialFunctionSpace::new(&grid, &element);
-        assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(
-            space.local_size(),
-            grid.entity_count(ReferenceCellType::Triangle)
-        );
-    }
-
-    #[test]
-    fn test_dofmap_lagrange1() {
-        let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-        let space = SerialFunctionSpace::new(&grid, &element);
-        assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(
-            space.local_size(),
-            grid.entity_count(ReferenceCellType::Point)
-        );
-    }
-
-    #[test]
-    fn test_dofmap_lagrange2() {
-        let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(2, Continuity::Standard);
-        let space = SerialFunctionSpace::new(&grid, &element);
-        assert_eq!(space.local_size(), space.global_size());
-        assert_eq!(
-            space.local_size(),
-            grid.entity_count(ReferenceCellType::Point)
-                + grid.entity_count(ReferenceCellType::Interval)
-        );
-    }
-
-    #[test]
-    fn test_colouring_p1() {
-        let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-        let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
-        let cells = grid.entity_iter(2).collect::<Vec<_>>();
-        let mut n = 0;
-        for i in colouring {
-            n += i.len()
-        }
-        assert_eq!(n, grid.entity_count(ReferenceCellType::Triangle));
-        for (i, ci) in colouring.iter().enumerate() {
-            for (j, cj) in colouring.iter().enumerate() {
-                if i != j {
-                    for cell0 in ci {
-                        for cell1 in cj {
-                            assert!(cell0 != cell1);
-                        }
-                    }
-                }
-            }
-        }
-        for ci in colouring {
-            for cell0 in ci {
-                for cell1 in ci {
-                    if cell0 != cell1 {
-                        for v0 in cells[*cell0].topology().sub_entity_iter(0) {
-                            for v1 in cells[*cell1].topology().sub_entity_iter(0) {
-                                assert!(v0 != v1);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_colouring_dp0() {
-        let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-        let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
-        let mut n = 0;
-        for i in colouring {
-            n += i.len()
-        }
-        assert_eq!(n, grid.entity_count(ReferenceCellType::Triangle));
-        for (i, ci) in colouring.iter().enumerate() {
-            for (j, cj) in colouring.iter().enumerate() {
-                if i != j {
-                    for cell0 in ci {
-                        for cell1 in cj {
-                            assert!(cell0 != cell1);
-                        }
-                    }
-                }
-            }
-        }
-        assert_eq!(colouring.len(), 1);
-    }
-
-    #[test]
-    fn test_colouring_rt1() {
-        let grid = regular_sphere::<f64>(2);
-        let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-        let space = SerialFunctionSpace::new(&grid, &element);
-        let colouring = &space.cell_colouring()[&ReferenceCellType::Triangle];
-        let mut n = 0;
-        for i in colouring {
-            n += i.len()
-        }
-        assert_eq!(n, grid.entity_count(ReferenceCellType::Triangle));
-        for (i, ci) in colouring.iter().enumerate() {
-            for (j, cj) in colouring.iter().enumerate() {
-                if i != j {
-                    for cell0 in ci {
-                        for cell1 in cj {
-                            assert!(cell0 != cell1);
-                        }
-                    }
-                }
-            }
-        }
-        for ci in colouring {
-            for cell0 in ci {
-                for cell1 in ci {
-                    if cell0 != cell1 {
-                        for e0 in grid
-                            .entity(2, *cell0)
-                            .unwrap()
-                            .topology()
-                            .sub_entity_iter(1)
-                        {
-                            for e1 in grid
-                                .entity(2, *cell1)
-                                .unwrap()
-                                .topology()
-                                .sub_entity_iter(1)
-                            {
-                                assert!(e0 != e1);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

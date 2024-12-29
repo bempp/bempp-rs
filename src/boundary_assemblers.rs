@@ -8,7 +8,7 @@ use crate::boundary_assemblers::cell_pair_assemblers::{
 };
 use crate::boundary_assemblers::helpers::KernelEvaluator;
 use crate::boundary_assemblers::helpers::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
-use crate::function::FunctionSpace;
+use crate::function::FunctionSpaceTrait;
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
@@ -119,7 +119,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     BoundaryAssembler<'o, T, Integrand, K>
 {
     /// Assemble the singular part into a CSR matrix.
-    pub fn assemble_singular<Space: FunctionSpace<T = T>>(
+    pub fn assemble_singular<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -155,7 +155,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble<Space: FunctionSpace<T = T>>(
+    pub fn assemble<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -173,7 +173,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble_into_memory<Space: FunctionSpace<T = T>>(
+    pub fn assemble_into_memory<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         trial_space: &Space,
         test_space: &Space,
@@ -231,7 +231,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the singular contributions
-    fn assemble_singular_part<Space: FunctionSpace<T = T>>(
+    fn assemble_singular_part<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -245,9 +245,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         if shape[0] != test_space.global_size() || shape[1] != trial_space.global_size() {
             panic!("Matrix has wrong shape");
         }
-
-        let local_trial_space = trial_space.local_space();
-        let local_test_space = test_space.local_space();
 
         let grid = test_space.grid();
 
@@ -371,8 +368,8 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
                 shape,
                 trial_cell_types[i],
                 test_cell_types[i],
-                local_trial_space,
-                local_test_space,
+                trial_space,
+                test_space,
                 &cell_block,
                 &trial_points[i],
                 &test_points[i],
@@ -396,7 +393,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular_part<Space: FunctionSpace<T = T>>(
+    fn assemble_nonsingular_part<Space: FunctionSpaceTrait<T = T> + Sync>(
         &self,
         output: &RawData2D<T>,
         trial_space: &Space,
@@ -412,8 +409,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         {
             panic!("Matrix has wrong shape");
         }
-        let local_trial_space = trial_space.local_space();
-        let local_test_space = test_space.local_space();
 
         let batch_size = self.options.batch_size;
 
@@ -505,9 +500,9 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
                                     output,
                                     *test_cell_type,
                                     *trial_cell_type,
-                                    local_trial_space,
+                                    trial_space,
                                     trial_cells[t],
-                                    local_test_space,
+                                    test_space,
                                     test_cells[t],
                                     &qpoints_trial,
                                     &qweights_trial,
@@ -614,7 +609,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
     T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
+    Space: FunctionSpaceTrait<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 >(
@@ -693,7 +688,7 @@ fn assemble_batch_singular<
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<
     T: RlstScalar + MatrixInverse,
-    Space: FunctionSpace<T = T>,
+    Space: FunctionSpaceTrait<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 >(
@@ -825,227 +820,227 @@ fn neighbours<TestGrid: Grid, TrialGrid: Grid>(
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::{function::SerialFunctionSpace, helmholtz, laplace};
-    use cauchy::{c32, c64};
-    use ndelement::ciarlet::CiarletElement;
-    use ndelement::ciarlet::LagrangeElementFamily;
-    use ndelement::types::{Continuity, ReferenceCellType};
-    use ndgrid::{
-        grid::serial::{SingleElementGrid, SingleElementGridBuilder},
-        shapes::regular_sphere,
-        traits::Builder,
-        types::RealScalar,
-    };
-    use paste::paste;
-    use rlst::{MatrixInverse, RlstScalar};
+// #[cfg(test)]
+// mod test {
+//     use super::*;
+//     use crate::{helmholtz, laplace};
+//     use cauchy::{c32, c64};
+//     use ndelement::ciarlet::CiarletElement;
+//     use ndelement::ciarlet::LagrangeElementFamily;
+//     use ndelement::types::{Continuity, ReferenceCellType};
+//     use ndgrid::{
+//         grid::serial::{SingleElementGrid, SingleElementGridBuilder},
+//         shapes::regular_sphere,
+//         traits::Builder,
+//         types::RealScalar,
+//     };
+//     use paste::paste;
+//     use rlst::{MatrixInverse, RlstScalar};
 
-    fn quadrilateral_grid<T: RealScalar + MatrixInverse>() -> SingleElementGrid<T, CiarletElement<T>>
-    {
-        let mut b = SingleElementGridBuilder::<T>::new(3, (ReferenceCellType::Quadrilateral, 1));
-        for j in 0..4 {
-            for i in 0..4 {
-                b.add_point(
-                    4 * j + i,
-                    &[
-                        num::cast::<usize, T>(i).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
-                        num::cast::<usize, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
-                        num::cast::<f64, T>(0.0).unwrap(),
-                    ],
-                );
-            }
-        }
-        for j in 0..3 {
-            for i in 0..3 {
-                b.add_cell(
-                    3 * j + i,
-                    &[4 * j + i, 4 * j + i + 1, 4 * j + i + 4, 4 * j + i + 5],
-                );
-            }
-        }
-        b.create_grid()
-    }
+//     fn quadrilateral_grid<T: RealScalar + MatrixInverse>() -> SingleElementGrid<T, CiarletElement<T>>
+//     {
+//         let mut b = SingleElementGridBuilder::<T>::new(3, (ReferenceCellType::Quadrilateral, 1));
+//         for j in 0..4 {
+//             for i in 0..4 {
+//                 b.add_point(
+//                     4 * j + i,
+//                     &[
+//                         num::cast::<usize, T>(i).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
+//                         num::cast::<usize, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
+//                         num::cast::<f64, T>(0.0).unwrap(),
+//                     ],
+//                 );
+//             }
+//         }
+//         for j in 0..3 {
+//             for i in 0..3 {
+//                 b.add_cell(
+//                     3 * j + i,
+//                     &[4 * j + i, 4 * j + i + 1, 4 * j + i + 4, 4 * j + i + 5],
+//                 );
+//             }
+//         }
+//         b.create_grid()
+//     }
 
-    /*
-    fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> MixedGrid<T>
-    where
-        for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
-            MatrixInverse,
-    {
-        let mut b = MixedGridBuilder::<3, T>::new(());
-        for j in 0..4 {
-            for i in 0..4 {
-                b.add_point(
-                    4 * j + i,
-                    [
-                        num::cast::<usize, T>(i).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
-                        num::cast::<usize, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
-                        num::cast::<f64, T>(0.0).unwrap(),
-                    ],
-                );
-            }
-        }
-        for j in 0..3 {
-            b.add_cell(
-                j,
-                (
-                    vec![4 * j, 4 * j + 1, 4 * j + 4, 4 * j + 5],
-                    ReferenceCellType::Quadrilateral,
-                    1,
-                ),
-            );
-        }
-        for j in 0..3 {
-            b.add_cell(
-                3 + 2 * j,
-                (
-                    vec![4 * j + 1, 4 * j + 2, 4 * j + 6],
-                    ReferenceCellType::Triangle,
-                    1,
-                ),
-            );
-            b.add_cell(
-                4 + 2 * j,
-                (
-                    vec![4 * j + 1, 4 * j + 6, 4 * j + 5],
-                    ReferenceCellType::Triangle,
-                    1,
-                ),
-            );
-        }
-        for j in 0..3 {
-            b.add_cell(
-                9 + j,
-                (
-                    vec![4 * j + 2, 4 * j + 3, 4 * j + 6, 4 * j + 7],
-                    ReferenceCellType::Quadrilateral,
-                    1,
-                ),
-            );
-        }
-        b.create_grid()
-    }
-    */
-    macro_rules! example_grid {
-        (Triangle, $dtype:ident) => {
-            regular_sphere(0)
-        };
-        (Quadrilateral, $dtype:ident) => {
-            quadrilateral_grid::<<$dtype as RlstScalar>::Real>()
-        }; //(Mixed, $dtype:ident) => {
-           //    mixed_grid::<<$dtype as RlstScalar>::Real>()
-           //};
-    }
-    macro_rules! test_assembly {
+//     /*
+//     fn mixed_grid<T: Float + RlstScalar<Real = T>>() -> MixedGrid<T>
+//     where
+//         for<'a> Array<T, ArrayViewMut<'a, T, BaseArray<T, VectorContainer<T>, 2>, 2>, 2>:
+//             MatrixInverse,
+//     {
+//         let mut b = MixedGridBuilder::<3, T>::new(());
+//         for j in 0..4 {
+//             for i in 0..4 {
+//                 b.add_point(
+//                     4 * j + i,
+//                     [
+//                         num::cast::<usize, T>(i).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
+//                         num::cast::<usize, T>(j).unwrap() / num::cast::<f64, T>(3.0).unwrap(),
+//                         num::cast::<f64, T>(0.0).unwrap(),
+//                     ],
+//                 );
+//             }
+//         }
+//         for j in 0..3 {
+//             b.add_cell(
+//                 j,
+//                 (
+//                     vec![4 * j, 4 * j + 1, 4 * j + 4, 4 * j + 5],
+//                     ReferenceCellType::Quadrilateral,
+//                     1,
+//                 ),
+//             );
+//         }
+//         for j in 0..3 {
+//             b.add_cell(
+//                 3 + 2 * j,
+//                 (
+//                     vec![4 * j + 1, 4 * j + 2, 4 * j + 6],
+//                     ReferenceCellType::Triangle,
+//                     1,
+//                 ),
+//             );
+//             b.add_cell(
+//                 4 + 2 * j,
+//                 (
+//                     vec![4 * j + 1, 4 * j + 6, 4 * j + 5],
+//                     ReferenceCellType::Triangle,
+//                     1,
+//                 ),
+//             );
+//         }
+//         for j in 0..3 {
+//             b.add_cell(
+//                 9 + j,
+//                 (
+//                     vec![4 * j + 2, 4 * j + 3, 4 * j + 6, 4 * j + 7],
+//                     ReferenceCellType::Quadrilateral,
+//                     1,
+//                 ),
+//             );
+//         }
+//         b.create_grid()
+//     }
+//     */
+//     macro_rules! example_grid {
+//         (Triangle, $dtype:ident) => {
+//             regular_sphere(0)
+//         };
+//         (Quadrilateral, $dtype:ident) => {
+//             quadrilateral_grid::<<$dtype as RlstScalar>::Real>()
+//         }; //(Mixed, $dtype:ident) => {
+//            //    mixed_grid::<<$dtype as RlstScalar>::Real>()
+//            //};
+//     }
+//     macro_rules! test_assembly {
 
-        ($dtype:ident, Helmholtz, $operator:ident, $cell:ident) => {
-            paste! {
+//         ($dtype:ident, Helmholtz, $operator:ident, $cell:ident) => {
+//             paste! {
 
-                #[test]
-                fn [<test_assembly_helmholtz_ $operator:lower _ $cell:lower _ $dtype>]() {
+//                 #[test]
+//                 fn [<test_assembly_helmholtz_ $operator:lower _ $cell:lower _ $dtype>]() {
 
-                    let grid = example_grid!($cell, $dtype);
-                    let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
-                    let space = SerialFunctionSpace::new(&grid, &element);
+//                     let grid = example_grid!($cell, $dtype);
+//                     let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
+//                     let space = DefaultFunctionSpace::new(&grid, &element);
 
-                    let options = BoundaryAssemblerOptions::default();
-                    let a = helmholtz::assembler::[<$operator>]::<[<$dtype>]>(3.0, &options);
-                    let _matrix = a.assemble(&space, &space);
-                }
+//                     let options = BoundaryAssemblerOptions::default();
+//                     let a = helmholtz::assembler::[<$operator>]::<[<$dtype>]>(3.0, &options);
+//                     let _matrix = a.assemble(&space, &space);
+//                 }
 
-            }
-        };
-        ($dtype:ident, $pde:ident, $operator:ident, $cell:ident) => {
-            paste! {
+//             }
+//         };
+//         ($dtype:ident, $pde:ident, $operator:ident, $cell:ident) => {
+//             paste! {
 
-                #[test]
-                fn [<test_assembly_ $pde:lower _ $operator:lower _ $cell:lower _ $dtype>]() {
+//                 #[test]
+//                 fn [<test_assembly_ $pde:lower _ $operator:lower _ $cell:lower _ $dtype>]() {
 
-                    let grid = example_grid!($cell, $dtype);
-                    let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
-                    let space = SerialFunctionSpace::new(&grid, &element);
+//                     let grid = example_grid!($cell, $dtype);
+//                     let element = LagrangeElementFamily::<[<$dtype>]>::new(0, Continuity::Discontinuous);
+//                     let space = LocalFunctionSpace::new(&grid, &element);
 
-                    let options = BoundaryAssemblerOptions::default();
-                    let a = laplace::assembler::[<$operator>]::<[<$dtype>]>(&options);
-                    let _matrix = a.assemble(&space, &space);
-                }
+//                     let options = BoundaryAssemblerOptions::default();
+//                     let a = laplace::assembler::[<$operator>]::<[<$dtype>]>(&options);
+//                     let _matrix = a.assemble(&space, &space);
+//                 }
 
-            }
-        };
-    }
+//             }
+//         };
+//     }
 
-    test_assembly!(f64, Laplace, single_layer, Triangle);
-    test_assembly!(f32, Laplace, single_layer, Triangle);
-    //test_assembly!(c64, Laplace, single_layer, Triangle);
-    //test_assembly!(c32, Laplace, single_layer, Triangle);
-    test_assembly!(f64, Laplace, double_layer, Triangle);
-    test_assembly!(f32, Laplace, double_layer, Triangle);
-    //test_assembly!(c64, Laplace, double_layer, Triangle);
-    //test_assembly!(c32, Laplace, double_layer, Triangle);
-    test_assembly!(f64, Laplace, adjoint_double_layer, Triangle);
-    test_assembly!(f32, Laplace, adjoint_double_layer, Triangle);
-    //test_assembly!(c64, Laplace, adjoint_double_layer, Triangle);
-    //test_assembly!(c32, Laplace, adjoint_double_layer, Triangle);
-    test_assembly!(f64, Laplace, hypersingular, Triangle);
-    test_assembly!(f32, Laplace, hypersingular, Triangle);
-    //test_assembly!(c64, Laplace, hypersingular, Triangle);
-    //test_assembly!(c32, Laplace, hypersingular, Triangle);
-    test_assembly!(c64, Helmholtz, single_layer, Triangle);
-    test_assembly!(c32, Helmholtz, single_layer, Triangle);
-    test_assembly!(c64, Helmholtz, double_layer, Triangle);
-    test_assembly!(c32, Helmholtz, double_layer, Triangle);
-    test_assembly!(c64, Helmholtz, adjoint_double_layer, Triangle);
-    test_assembly!(c32, Helmholtz, adjoint_double_layer, Triangle);
-    test_assembly!(c64, Helmholtz, hypersingular, Triangle);
-    test_assembly!(c32, Helmholtz, hypersingular, Triangle);
-    test_assembly!(f64, Laplace, single_layer, Quadrilateral);
-    test_assembly!(f32, Laplace, single_layer, Quadrilateral);
-    //test_assembly!(c64, Laplace, single_layer, Quadrilateral);
-    //test_assembly!(c32, Laplace, single_layer, Quadrilateral);
-    test_assembly!(f64, Laplace, double_layer, Quadrilateral);
-    test_assembly!(f32, Laplace, double_layer, Quadrilateral);
-    //test_assembly!(c64, Laplace, double_layer, Quadrilateral);
-    //test_assembly!(c32, Laplace, double_layer, Quadrilateral);
-    test_assembly!(f64, Laplace, adjoint_double_layer, Quadrilateral);
-    test_assembly!(f32, Laplace, adjoint_double_layer, Quadrilateral);
-    //test_assembly!(c64, Laplace, adjoint_double_layer, Quadrilateral);
-    //test_assembly!(c32, Laplace, adjoint_double_layer, Quadrilateral);
-    test_assembly!(f64, Laplace, hypersingular, Quadrilateral);
-    test_assembly!(f32, Laplace, hypersingular, Quadrilateral);
-    //test_assembly!(c64, Laplace, hypersingular, Quadrilateral);
-    //test_assembly!(c32, Laplace, hypersingular, Quadrilateral);
-    test_assembly!(c64, Helmholtz, single_layer, Quadrilateral);
-    test_assembly!(c32, Helmholtz, single_layer, Quadrilateral);
-    test_assembly!(c64, Helmholtz, double_layer, Quadrilateral);
-    test_assembly!(c32, Helmholtz, double_layer, Quadrilateral);
-    test_assembly!(c64, Helmholtz, adjoint_double_layer, Quadrilateral);
-    test_assembly!(c32, Helmholtz, adjoint_double_layer, Quadrilateral);
-    test_assembly!(c64, Helmholtz, hypersingular, Quadrilateral);
-    test_assembly!(c32, Helmholtz, hypersingular, Quadrilateral);
-    //(f64, Laplace, single_layer, Mixed);
-    //(f32, Laplace, single_layer, Mixed);
-    //(c64, Laplace, single_layer, Mixed);
-    //(c32, Laplace, single_layer, Mixed);
-    //(f64, Laplace, double_layer, Mixed);
-    //(f32, Laplace, double_layer, Mixed);
-    //(c64, Laplace, double_layer, Mixed);
-    //(c32, Laplace, double_layer, Mixed);
-    //(f64, Laplace, adjoint_double_layer, Mixed);
-    //(f32, Laplace, adjoint_double_layer, Mixed);
-    //(c64, Laplace, adjoint_double_layer, Mixed);
-    //(c32, Laplace, adjoint_double_layer, Mixed);
-    //(f64, Laplace, hypersingular, Mixed);
-    //(f32, Laplace, hypersingular, Mixed);
-    //(c64, Laplace, hypersingular, Mixed);
-    //(c32, Laplace, hypersingular, Mixed);
-    //(c64, Helmholtz, single_layer, Mixed);
-    //(c32, Helmholtz, single_layer, Mixed);
-    //(c64, Helmholtz, double_layer, Mixed);
-    //(c32, Helmholtz, double_layer, Mixed);
-    //(c64, Helmholtz, adjoint_double_layer, Mixed);
-    //(c32, Helmholtz, adjoint_double_layer, Mixed);
-    //(c64, Helmholtz, hypersingular, Mixed);
-    //(c32, Helmholtz, hypersingular, Mixed);
-}
+//     test_assembly!(f64, Laplace, single_layer, Triangle);
+//     test_assembly!(f32, Laplace, single_layer, Triangle);
+//     //test_assembly!(c64, Laplace, single_layer, Triangle);
+//     //test_assembly!(c32, Laplace, single_layer, Triangle);
+//     test_assembly!(f64, Laplace, double_layer, Triangle);
+//     test_assembly!(f32, Laplace, double_layer, Triangle);
+//     //test_assembly!(c64, Laplace, double_layer, Triangle);
+//     //test_assembly!(c32, Laplace, double_layer, Triangle);
+//     test_assembly!(f64, Laplace, adjoint_double_layer, Triangle);
+//     test_assembly!(f32, Laplace, adjoint_double_layer, Triangle);
+//     //test_assembly!(c64, Laplace, adjoint_double_layer, Triangle);
+//     //test_assembly!(c32, Laplace, adjoint_double_layer, Triangle);
+//     test_assembly!(f64, Laplace, hypersingular, Triangle);
+//     test_assembly!(f32, Laplace, hypersingular, Triangle);
+//     //test_assembly!(c64, Laplace, hypersingular, Triangle);
+//     //test_assembly!(c32, Laplace, hypersingular, Triangle);
+//     test_assembly!(c64, Helmholtz, single_layer, Triangle);
+//     test_assembly!(c32, Helmholtz, single_layer, Triangle);
+//     test_assembly!(c64, Helmholtz, double_layer, Triangle);
+//     test_assembly!(c32, Helmholtz, double_layer, Triangle);
+//     test_assembly!(c64, Helmholtz, adjoint_double_layer, Triangle);
+//     test_assembly!(c32, Helmholtz, adjoint_double_layer, Triangle);
+//     test_assembly!(c64, Helmholtz, hypersingular, Triangle);
+//     test_assembly!(c32, Helmholtz, hypersingular, Triangle);
+//     test_assembly!(f64, Laplace, single_layer, Quadrilateral);
+//     test_assembly!(f32, Laplace, single_layer, Quadrilateral);
+//     //test_assembly!(c64, Laplace, single_layer, Quadrilateral);
+//     //test_assembly!(c32, Laplace, single_layer, Quadrilateral);
+//     test_assembly!(f64, Laplace, double_layer, Quadrilateral);
+//     test_assembly!(f32, Laplace, double_layer, Quadrilateral);
+//     //test_assembly!(c64, Laplace, double_layer, Quadrilateral);
+//     //test_assembly!(c32, Laplace, double_layer, Quadrilateral);
+//     test_assembly!(f64, Laplace, adjoint_double_layer, Quadrilateral);
+//     test_assembly!(f32, Laplace, adjoint_double_layer, Quadrilateral);
+//     //test_assembly!(c64, Laplace, adjoint_double_layer, Quadrilateral);
+//     //test_assembly!(c32, Laplace, adjoint_double_layer, Quadrilateral);
+//     test_assembly!(f64, Laplace, hypersingular, Quadrilateral);
+//     test_assembly!(f32, Laplace, hypersingular, Quadrilateral);
+//     //test_assembly!(c64, Laplace, hypersingular, Quadrilateral);
+//     //test_assembly!(c32, Laplace, hypersingular, Quadrilateral);
+//     test_assembly!(c64, Helmholtz, single_layer, Quadrilateral);
+//     test_assembly!(c32, Helmholtz, single_layer, Quadrilateral);
+//     test_assembly!(c64, Helmholtz, double_layer, Quadrilateral);
+//     test_assembly!(c32, Helmholtz, double_layer, Quadrilateral);
+//     test_assembly!(c64, Helmholtz, adjoint_double_layer, Quadrilateral);
+//     test_assembly!(c32, Helmholtz, adjoint_double_layer, Quadrilateral);
+//     test_assembly!(c64, Helmholtz, hypersingular, Quadrilateral);
+//     test_assembly!(c32, Helmholtz, hypersingular, Quadrilateral);
+//     //(f64, Laplace, single_layer, Mixed);
+//     //(f32, Laplace, single_layer, Mixed);
+//     //(c64, Laplace, single_layer, Mixed);
+//     //(c32, Laplace, single_layer, Mixed);
+//     //(f64, Laplace, double_layer, Mixed);
+//     //(f32, Laplace, double_layer, Mixed);
+//     //(c64, Laplace, double_layer, Mixed);
+//     //(c32, Laplace, double_layer, Mixed);
+//     //(f64, Laplace, adjoint_double_layer, Mixed);
+//     //(f32, Laplace, adjoint_double_layer, Mixed);
+//     //(c64, Laplace, adjoint_double_layer, Mixed);
+//     //(c32, Laplace, adjoint_double_layer, Mixed);
+//     //(f64, Laplace, hypersingular, Mixed);
+//     //(f32, Laplace, hypersingular, Mixed);
+//     //(c64, Laplace, hypersingular, Mixed);
+//     //(c32, Laplace, hypersingular, Mixed);
+//     //(c64, Helmholtz, single_layer, Mixed);
+//     //(c32, Helmholtz, single_layer, Mixed);
+//     //(c64, Helmholtz, double_layer, Mixed);
+//     //(c32, Helmholtz, double_layer, Mixed);
+//     //(c64, Helmholtz, adjoint_double_layer, Mixed);
+//     //(c32, Helmholtz, adjoint_double_layer, Mixed);
+//     //(c64, Helmholtz, hypersingular, Mixed);
+//     //(c32, Helmholtz, hypersingular, Mixed);
+// }

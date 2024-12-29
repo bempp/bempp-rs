@@ -1,18 +1,29 @@
+use std::sync::LazyLock;
+
 use approx::*;
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
-use bempp::function::SerialFunctionSpace;
+use bempp::function::FunctionSpace;
 use bempp::{helmholtz, laplace};
 use cauchy::c64;
+use mpi::environment::Universe;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::Continuity;
-use ndgrid::shapes::regular_sphere;
 use rlst::RandomAccessByRef;
+
+static MPI_UNIVERSE: LazyLock<Universe> = std::sync::LazyLock::new(|| {
+    mpi::initialize_with_threading(mpi::Threading::Multiple)
+        .unwrap()
+        .0
+});
 
 #[test]
 fn test_laplace_single_layer_dp0_dp0() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::single_layer(&options).assemble(&space, &space);
@@ -30,9 +41,11 @@ fn test_laplace_single_layer_dp0_dp0() {
 
 #[test]
 fn test_laplace_double_layer_dp0_dp0() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::double_layer(&options).assemble(&space, &space);
@@ -47,11 +60,14 @@ fn test_laplace_double_layer_dp0_dp0() {
         }
     }
 }
+
 #[test]
 fn test_laplace_adjoint_double_layer_dp0_dp0() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::adjoint_double_layer(&options).assemble(&space, &space);
@@ -69,9 +85,12 @@ fn test_laplace_adjoint_double_layer_dp0_dp0() {
 
 #[test]
 fn test_laplace_hypersingular_p1_p1() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
+
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = laplace::assembler::hypersingular(&options).assemble(&space, &space);
@@ -95,9 +114,11 @@ fn test_laplace_hypersingular_p1_p1() {
 
 #[test]
 fn test_helmholtz_single_layer_dp0_dp0() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::single_layer(3.0, &options).assemble(&space, &space);
@@ -115,9 +136,11 @@ fn test_helmholtz_single_layer_dp0_dp0() {
 
 #[test]
 fn test_helmholtz_double_layer_dp0_dp0() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::double_layer(3.0, &options).assemble(&space, &space);
@@ -134,9 +157,11 @@ fn test_helmholtz_double_layer_dp0_dp0() {
 }
 #[test]
 fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(0, Continuity::Discontinuous);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::adjoint_double_layer(3.0, &options).assemble(&space, &space);
@@ -154,9 +179,11 @@ fn test_helmholtz_adjoint_double_layer_dp0_dp0() {
 
 #[test]
 fn test_helmholtz_hypersingular_p1_p1() {
-    let grid = regular_sphere(0);
+    let _ = *MPI_UNIVERSE;
+    let comm = mpi::topology::SimpleCommunicator::self_comm();
+    let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<c64>::new(1, Continuity::Standard);
-    let space = SerialFunctionSpace::new(&grid, &element);
+    let space = FunctionSpace::new(&grid, &element);
     let options = BoundaryAssemblerOptions::default();
 
     let matrix = helmholtz::assembler::hypersingular(3.0, &options).assemble(&space, &space);
@@ -180,7 +207,9 @@ fn test_helmholtz_hypersingular_p1_p1() {
 
 // #[test]
 // fn test_laplace_single_layer_potential_dp0() {
-//     let grid = regular_sphere(0);
+//     let _ = *MPI_UNIVERSE;
+//     let comm = mpi::topology::SimpleCommunicator::self_comm();
+//     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
 //     let element = LagrangeElementFamily::<f64>::new(0, Continuity::Discontinuous);
 //     let space = SerialFunctionSpace::new(&grid, &element);
 

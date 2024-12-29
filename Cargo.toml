@@ -1,5 +1,4 @@
 [features]
-mpi = ["dep:mpi", "ndelement/mpi", "ndgrid/mpi"]
 sleef = ["rlst/sleef", "green-kernels/sleef", "ndelement/sleef", "ndgrid/sleef"]
 strict = []
 default = ["sleef"]
@@ -28,18 +27,18 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 bempp-quadrature = { version = "0.1.0" }
 itertools = "0.13.*"
-mpi = { version = "0.8.*", optional = true }
+mpi = { version = "0.8.*"}
 num = "0.4"
-ndelement = { git="https://github.com/bempp/ndelement.git", default-features = false }
-ndgrid = { git="https://github.com/bempp/ndgrid.git", default-features = false }
+ndelement = { git="https://github.com/bempp/ndelement.git", features = ["mpi"]}
+ndgrid = { git="https://github.com/bempp/ndgrid.git", features = ["serde"] }
+# ndgrid = { path = "../ndgrid" }
 rayon = "1.9"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", default-features = false }
-green-kernels = { git = "https://github.com/bempp/green-kernels.git", default-features = false }
-c-api-tools = { version = "0.1.0" }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"] }
+green-kernels = { git = "https://github.com/bempp/green-kernels.git", features = ["mpi"] }
+# c-api-tools = { version = "0.1.0" }
 
 [dev-dependencies]
 approx = "0.5"
-paste = "1.*"
 cauchy = "0.4.*"
 criterion = { version = "0.5.*", features = ["html_reports"] }
 # kifmm = { version = "1.0" }

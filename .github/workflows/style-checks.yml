@@ -2,11 +2,9 @@ name: ✨
 
 on:
   push:
-    branches:
-      - "**"
+    branches: ["**"]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   merge_group:
 
 jobs:
@@ -15,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature-flags: ['--features "mpi,strict"', '']
+        feature-flags: ['--features "strict"']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -26,12 +24,12 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: mpich
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install LAPACK, OpenBLAS
         run:
           sudo apt-get install -y libopenblas-dev liblapack-dev
 
-      - name: Style checks
+      - name: Rust style checks
         run: |
           cargo fmt -- --check
           cargo clippy ${{ matrix.feature-flags }} -- -D warnings
