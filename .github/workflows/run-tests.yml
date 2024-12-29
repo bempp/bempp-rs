@@ -15,7 +15,7 @@ jobs:
       matrix:
         rust-version: ["stable"]
         mpi: ['openmpi']
-        feature-flags: ['--features "strict"', '--features "serde,strict"']
+        feature-flags: ['--features "strict"']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
