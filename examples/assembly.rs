@@ -7,7 +7,7 @@ use rlst::{RandomAccessByRef, Shape};
 
 fn main() {
     // Create a grid, family of elements, and function space
-    let _ = mpi::initialize().unwrap();
+    let _universe = mpi::initialize_with_threading(mpi::Threading::Multiple).unwrap();
     let comm = mpi::topology::SimpleCommunicator::self_comm();
     let grid = bempp::shapes::regular_sphere(0, 1, &comm);
     let element = LagrangeElementFamily::<f64>::new(1, Continuity::Standard);

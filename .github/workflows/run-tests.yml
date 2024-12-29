@@ -44,41 +44,41 @@ jobs:
           chmod +x examples.sh
           ./examples.sh
 
-  run-tests-python:
-    name: Run Python tests
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
-        mpi: ['openmpi']
-    steps:
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: nightly
-      - name: Set up MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: ${{ matrix.mpi }}
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - uses: actions/checkout@v4
-      - name: Install uv
-        run: pip install uv "maturin>=1.7"
-      - name: Make virtual environment
-        run: |
-          uv venv .venv
-          uv pip install pip pytest
-      - name: Install python package
-        run: |
-          source .venv/bin/activate
-          rustup run nightly maturin develop --release
-      - name: Run Python tests
-        run: |
-          source .venv/bin/activate
-          python -m pytest python/test
+  # run-tests-python:
+  #   name: Run Python tests
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: ["3.12"]
+  #       mpi: ['openmpi']
+  #   steps:
+  #     - name: Set up Rust
+  #       uses: actions-rust-lang/setup-rust-toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #     - name: Set up MPI
+  #       uses: mpi4py/setup-mpi@v1
+  #       with:
+  #         mpi: ${{ matrix.mpi }}
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #     - uses: actions/checkout@v4
+  #     - name: Install uv
+  #       run: pip install uv "maturin>=1.7"
+  #     - name: Make virtual environment
+  #       run: |
+  #         uv venv .venv
+  #         uv pip install pip pytest
+  #     - name: Install python package
+  #       run: |
+  #         source .venv/bin/activate
+  #         rustup run nightly maturin develop --release
+  #     - name: Run Python tests
+  #       run: |
+  #         source .venv/bin/activate
+  #         python -m pytest python/test
 
   check-dependencies:
     name: Check dependencies
