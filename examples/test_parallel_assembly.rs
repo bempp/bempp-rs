@@ -1,5 +1,3 @@
-//? mpirun -n {{NPROCESSES}} --features "mpi"
-
 fn main() {}
 
 // use approx::assert_relative_eq;
