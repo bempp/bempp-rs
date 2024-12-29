@@ -15,7 +15,7 @@ jobs:
       matrix:
         rust-version: ["stable"]
         mpi: ['openmpi']
-        feature-flags: ['--features "strict"']
+        feature-flags: ['--features "strict"', '--features "serde,strict"']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -38,8 +38,6 @@ jobs:
         run: cargo test --release ${{ matrix.feature-flags }}
       - name: Run tests
         run: cargo test --examples --release ${{ matrix.feature-flags }}
-      - name: Test benchmarks build
-        run: cargo bench --no-run --features "mpi,strict"
       - name: Run examples
         run: |
           python3 find_examples.py
@@ -51,12 +49,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.12"]
+        mpi: ['openmpi']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: ${{ matrix.mpi }}
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -68,31 +71,6 @@ jobs:
         run: |
           uv venv .venv
           uv pip install pip pytest
-
-      - name: Clone ndelement
-        uses: actions/checkout@v4
-        with:
-          path: ./ndelement
-          repository: bempp/ndelement
-          ref: main
-      - name: Install ndelement
-        run: |
-          source .venv/bin/activate
-          cd ndelement
-          maturin develop --release
-
-      - name: Clone ndgrid
-        uses: actions/checkout@v4
-        with:
-          path: ./ndgrid
-          repository: bempp/ndgrid
-          ref: main
-      - name: Install ndgrid
-        run: |
-          source .venv/bin/activate
-          cd ndgrid
-          maturin develop --release
-
       - name: Install python package
         run: |
           source .venv/bin/activate
@@ -113,9 +91,9 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
-      # - name: Install cargo-upgrades
-      #   run: cargo install cargo-upgrades
-      # - uses: actions/checkout@v4
+      - name: Install cargo-upgrades
+        run: cargo install cargo-upgrades
+      - uses: actions/checkout@v4
       - name: Check that dependencies are up to date
         run:
           cargo upgrades
