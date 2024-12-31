@@ -36,6 +36,9 @@ rayon = "1.9"
 rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"] }
 green-kernels = { git = "https://github.com/bempp/green-kernels.git", features = ["mpi"] }
 # c-api-tools = { version = "0.1.0" }
+kifmm = { git = "https://github.com/bempp/kifmm.git", features = ["mpi"] }
+bempp-distributed-tools = { git = "https://github.com/bempp/distributed_tools.git"}
+
 
 [dev-dependencies]
 approx = "0.5"
