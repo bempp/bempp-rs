@@ -1,13 +1,10 @@
 //! A dense evaluator for Green's functions.
 
-use green_kernels::{
-    traits::{DistributedKernelEvaluator, Kernel},
-    types::GreenKernelEvalType,
-};
+use green_kernels::{traits::DistributedKernelEvaluator, types::GreenKernelEvalType};
 use mpi::traits::{Communicator, Equivalence};
 use rlst::{
-    operator::interface::DistributedArrayVectorSpace, rlst_dynamic_array1, ArrayVectorSpace,
-    AsApply, Element, IndexLayout, OperatorBase, RawAccess, RawAccessMut, RlstScalar,
+    operator::interface::DistributedArrayVectorSpace, rlst_dynamic_array1, AsApply, Element,
+    IndexLayout, OperatorBase, RawAccess, RawAccessMut, RlstScalar,
 };
 
 /// Wrapper for a dense Green's function evaluator.

@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 use bempp_distributed_tools::{self, permutation::DataPermutation};
 
-use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
+use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
     traits::{
         fftw::{Dft, DftType},
@@ -18,20 +18,17 @@ use kifmm::{
             single_node::{AsComplex, Epsilon},
         },
     },
-    tree::{Domain, SortKind},
+    tree::SortKind,
     ChargeHandler, Evaluate, FftFieldTranslation, KiFmm, KiFmmMulti, MultiNodeBuilder,
 };
-use mpi::{
-    topology::SimpleCommunicator,
-    traits::{Communicator, Equivalence},
-};
+use mpi::traits::{Communicator, Equivalence};
 use num::Float;
-use rayon::range;
 use rlst::{
     operator::interface::DistributedArrayVectorSpace, rlst_dynamic_array1, AsApply, Element,
     IndexLayout, MatrixSvd, OperatorBase, RawAccess, RawAccessMut, RlstScalar,
 };
 
+/// This structure instantiates an FMM evaluator.
 pub struct KiFmmEvaluator<
     'a,
     C: Communicator,
@@ -44,16 +41,12 @@ pub struct KiFmmEvaluator<
     T: Dft + AsComplex + Epsilon + MatrixSvd + Float,
     KiFmmMulti<T, Laplace3dKernel<T>, FftFieldTranslation<T>>: SourceToTargetTranslationMetadata,
 {
-    sources: Vec<T::Real>,
-    targets: Vec<T::Real>,
-    eval_mode: GreenKernelEvalType,
     domain_space: &'a DistributedArrayVectorSpace<'a, SourceLayout, T>,
     range_space: &'a DistributedArrayVectorSpace<'a, TargetLayout, T>,
     source_permutation: DataPermutation<'a, SourceLayout>,
     target_permutation: DataPermutation<'a, TargetLayout>,
     n_permuted_sources: usize,
     n_permuted_targets: usize,
-    simple_comm: SimpleCommunicator,
     fmm: RefCell<KiFmmMulti<T, Laplace3dKernel<T>, FftFieldTranslation<T>>>,
 }
 
@@ -97,7 +90,6 @@ where
     pub fn new(
         sources: &[T::Real],
         targets: &[T::Real],
-        eval_mode: GreenKernelEvalType,
         local_tree_depth: usize,
         global_tree_depth: usize,
         expansion_order: usize,
@@ -166,16 +158,12 @@ where
         let target_permutation = DataPermutation::new(range_space.index_layout(), &target_indices);
 
         KiFmmEvaluator {
-            sources: sources.to_vec(),
-            targets: targets.to_vec(),
-            eval_mode,
             domain_space,
             range_space,
             source_permutation,
             target_permutation,
             n_permuted_sources: source_indices.len(),
             n_permuted_targets: target_indices.len(),
-            simple_comm,
             fmm: cell,
         }
     }
