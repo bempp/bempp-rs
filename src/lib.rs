@@ -4,7 +4,9 @@
 
 //pub mod bindings;
 pub mod boundary_assemblers;
+pub mod boundary_evaluators;
 pub mod function;
+pub mod greens_function_evaluators;
 pub mod helmholtz;
 pub mod laplace;
 pub mod shapes;
