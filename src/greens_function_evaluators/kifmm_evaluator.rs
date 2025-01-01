@@ -152,6 +152,7 @@ where
         );
 
         let source_indices = cell.borrow().tree.source_tree.global_indices.clone();
+
         let target_indices = cell.borrow().tree.target_tree.global_indices.clone();
 
         let source_permutation = DataPermutation::new(domain_space.index_layout(), &source_indices);
