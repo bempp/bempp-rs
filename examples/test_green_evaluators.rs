@@ -3,9 +3,12 @@
 use bempp::greens_function_evaluators::kifmm_evaluator::KiFmmEvaluator;
 use bempp_distributed_tools::IndexLayoutFromLocalCounts;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
+use mpi::traits::Communicator;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use rlst::{operator::interface::DistributedArrayVectorSpace, Element, LinearSpace};
+use rlst::{
+    operator::interface::DistributedArrayVectorSpace, AsApply, Element, LinearSpace, NormedSpace,
+};
 
 fn main() {
     // Number of points per process.
@@ -56,5 +59,23 @@ fn main() {
 
     // Create the FMM evaluator.
 
-    let fmm_evaluator = KiFmmEvaluator::new(&sources, &targets, 3, 2, 10, &space, &space);
+    let fmm_evaluator = KiFmmEvaluator::new(&sources, &targets, 3, 1, 5, &space, &space);
+
+    // Apply the dense evaluator.
+
+    let output_dense = dense_evaluator.apply(&charges);
+
+    // Apply the FMM evaluator
+
+    let output_fmm = fmm_evaluator.apply(&charges);
+
+    // Compare the results.
+
+    let dense_norm = space.norm(&output_dense);
+
+    let rel_diff = space.norm(&output_dense.sum(&output_fmm.neg())) / dense_norm;
+
+    if world.rank() == 0 {
+        println!("The relative error is: {}", rel_diff);
+    }
 }
