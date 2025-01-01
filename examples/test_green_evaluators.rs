@@ -45,10 +45,12 @@ fn main() {
 
     let mut charges = space.zero();
 
-    charges
-        .view_mut()
-        .local_mut()
-        .fill_from_equally_distributed(&mut rng);
+    // charges
+    //     .view_mut()
+    //     .local_mut()
+    //     .fill_from_equally_distributed(&mut rng);
+
+    charges.view_mut().local_mut().set_one();
 
     // Create the dense evaluator.
 
