@@ -17,29 +17,20 @@ use std::marker::PhantomData;
 type DofList = Vec<Vec<usize>>;
 type OwnerData = Vec<(usize, usize, usize, usize)>;
 
-/// A function space
-pub trait FunctionSpaceTrait {
-    /// Communicator
-    type C: Communicator;
+/// A local function space
+pub trait LocalFunctionSpaceTrait {
     /// Scalar type
     type T: RlstScalar;
     /// The grid type
-    type Grid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>
-        + ParallelGrid<Self::C>;
+    type LocalGrid: Grid<T = <Self::T as RlstScalar>::Real, EntityDescriptor = ReferenceCellType>;
     /// The finite element type
     type FiniteElement: FiniteElement<T = Self::T> + Sync;
 
-    /// Get the communicator
-    fn comm(&self) -> &Self::C;
-
     /// Get the grid that the element is defined on
-    fn grid(&self) -> &Self::Grid;
+    fn grid(&self) -> &Self::LocalGrid;
 
     /// Get the finite element used to define this function space
     fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement;
-
-    /// Check if the function space is stored in serial
-    fn is_serial(&self) -> bool;
 
     /// Get the DOF numbers on the local process associated with the given entity
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize];
@@ -69,12 +60,32 @@ pub trait FunctionSpaceTrait {
     fn ownership(&self, local_dof_index: usize) -> Ownership;
 }
 
-/// Implementation of a general function space.
-pub struct FunctionSpace<
+/// A function space
+pub trait FunctionSpaceTrait: LocalFunctionSpaceTrait {
+    /// Communicator
+    type C: Communicator;
+
+    /// The grid type
+    type Grid: ParallelGrid<Self::C, LocalGrid = Self::LocalGrid>;
+    /// Local Function Space
+    type LocalFunctionSpace: LocalFunctionSpaceTrait<
+        T = Self::T,
+        LocalGrid = Self::LocalGrid,
+        FiniteElement = Self::FiniteElement,
+    >;
+
+    /// Get the communicator
+    fn comm(&self) -> &Self::C;
+
+    /// Get the local function space
+    fn local_space(&self) -> &Self::LocalFunctionSpace;
+}
+
+/// Definition of a local function space.
+pub struct LocalFunctionSpace<
     'a,
-    C: Communicator,
     T: RlstScalar + MatrixInverse,
-    GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
 > {
     grid: &'a GridImpl,
     elements: HashMap<ReferenceCellType, CiarletElement<T>>,
@@ -84,23 +95,178 @@ pub struct FunctionSpace<
     global_size: usize,
     global_dof_numbers: Vec<usize>,
     ownership: Vec<Ownership>,
-    _marker: std::marker::PhantomData<C>,
 }
 
-unsafe impl<
-        C: Communicator,
+impl<
+        'a,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > Sync for FunctionSpace<'_, C, T, GridImpl>
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > LocalFunctionSpace<'a, T, GridImpl>
 {
+    /// Create new local function space
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        grid: &'a GridImpl,
+        elements: HashMap<ReferenceCellType, CiarletElement<T>>,
+        entity_dofs: [Vec<Vec<usize>>; 4],
+        cell_dofs: Vec<Vec<usize>>,
+        local_size: usize,
+        global_size: usize,
+        global_dof_numbers: Vec<usize>,
+        ownership: Vec<Ownership>,
+    ) -> Self {
+        Self {
+            grid,
+            elements,
+            entity_dofs,
+            cell_dofs,
+            local_size,
+            global_size,
+            global_dof_numbers,
+            ownership,
+        }
+    }
+}
+
+impl<
+        T: RlstScalar + MatrixInverse,
+        GridImpl: Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > LocalFunctionSpaceTrait for LocalFunctionSpace<'_, T, GridImpl>
+{
+    type T = T;
+
+    type LocalGrid = GridImpl;
+
+    type FiniteElement = CiarletElement<T>;
+
+    fn grid(&self) -> &Self::LocalGrid {
+        self.grid
+    }
+
+    fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement {
+        &self.elements[&cell_type]
+    }
+
+    fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
+        &self.entity_dofs[entity_dim][entity_number]
+    }
+
+    fn local_size(&self) -> usize {
+        self.local_size
+    }
+
+    fn global_size(&self) -> usize {
+        self.global_size
+    }
+    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
+        self.cell_dofs.get_unchecked(cell)
+    }
+    fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
+        if cell < self.cell_dofs.len() {
+            Some(unsafe { self.cell_dofs_unchecked(cell) })
+        } else {
+            None
+        }
+    }
+    fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
+        let mut colouring = HashMap::new();
+        //: HashMap<ReferenceCellType, Vec<Vec<usize>>>
+        for cell in self.grid.entity_types(2) {
+            colouring.insert(*cell, vec![]);
+        }
+        let mut edim = 0;
+        while self.elements[&self.grid.entity_types(2)[0]]
+            .entity_dofs(edim, 0)
+            .unwrap()
+            .is_empty()
+        {
+            edim += 1;
+        }
+
+        let mut entity_colours = vec![
+            vec![];
+            if edim == 0 {
+                self.grid.entity_count(ReferenceCellType::Point)
+            } else if edim == 1 {
+                self.grid.entity_count(ReferenceCellType::Interval)
+            } else if edim == 2 && self.grid.topology_dim() == 2 {
+                self.grid
+                    .entity_types(2)
+                    .iter()
+                    .map(|&i| self.grid.entity_count(i))
+                    .sum::<usize>()
+            } else {
+                unimplemented!();
+            }
+        ];
+
+        for cell in self.grid.entity_iter(2) {
+            let cell_type = cell.entity_type();
+            let indices = cell.topology().sub_entity_iter(edim).collect::<Vec<_>>();
+
+            let c = {
+                let mut c = 0;
+                while c < colouring[&cell_type].len() {
+                    let mut found = false;
+                    for v in &indices {
+                        if entity_colours[*v].contains(&c) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        break;
+                    }
+                    c += 1;
+                }
+                c
+            };
+            if c == colouring[&cell_type].len() {
+                for ct in self.grid.entity_types(2) {
+                    colouring.get_mut(ct).unwrap().push(if *ct == cell_type {
+                        vec![cell.local_index()]
+                    } else {
+                        vec![]
+                    });
+                }
+            } else {
+                colouring.get_mut(&cell_type).unwrap()[c].push(cell.local_index());
+            }
+            for v in &indices {
+                entity_colours[*v].push(c);
+            }
+        }
+        colouring
+    }
+    fn global_dof_index(&self, local_dof_index: usize) -> usize {
+        self.global_dof_numbers[local_dof_index]
+    }
+    fn ownership(&self, local_dof_index: usize) -> Ownership {
+        self.ownership[local_dof_index]
+    }
+}
+
+/// Implementation of a general function space.
+pub struct FunctionSpace<
+    'a,
+    C: Communicator,
+    T: RlstScalar + MatrixInverse,
+    GridImpl: ParallelGrid<C, T = T::Real, EntityDescriptor = ReferenceCellType>,
+> {
+    grid: &'a GridImpl,
+    local_space: LocalFunctionSpace<'a, T, GridImpl::LocalGrid>,
+    _marker: PhantomData<(C, T)>,
 }
 
 impl<
         'a,
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
+        GridImpl: ParallelGrid<C, T = T::Real, EntityDescriptor = ReferenceCellType>,
     > FunctionSpace<'a, C, T, GridImpl>
+where
+    GridImpl::LocalGrid: Sync,
 {
     /// Create new function space
     pub fn new(
@@ -225,139 +391,107 @@ impl<
 
         Self {
             grid,
-            elements,
-            entity_dofs,
-            cell_dofs,
-            local_size: dofmap_size,
-            global_size,
-            global_dof_numbers,
-            ownership,
+            local_space: LocalFunctionSpace::new(
+                grid.local_grid(),
+                elements,
+                entity_dofs,
+                cell_dofs,
+                dofmap_size,
+                global_size,
+                global_dof_numbers,
+                ownership,
+            ),
             _marker: PhantomData,
         }
+
+        // Self {
+        //     grid,
+        //     elements,
+        //     entity_dofs,
+        //     cell_dofs,
+        //     local_size: dofmap_size,
+        //     global_size,
+        //     global_dof_numbers,
+        //     ownership,
+        //     _marker: PhantomData,
+        // }
     }
 }
 
 impl<
         C: Communicator,
         T: RlstScalar + MatrixInverse,
-        GridImpl: ParallelGrid<C> + Grid<T = T::Real, EntityDescriptor = ReferenceCellType>,
-    > FunctionSpaceTrait for FunctionSpace<'_, C, T, GridImpl>
+        GridImpl: ParallelGrid<C, T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > LocalFunctionSpaceTrait for FunctionSpace<'_, C, T, GridImpl>
 {
     type T = T;
-    type Grid = GridImpl;
-    type FiniteElement = CiarletElement<T>;
-    type C = C;
 
-    fn grid(&self) -> &Self::Grid {
-        self.grid
+    type LocalGrid = GridImpl::LocalGrid;
+
+    type FiniteElement = CiarletElement<T>;
+
+    fn grid(&self) -> &Self::LocalGrid {
+        self.local_space.grid()
     }
-    fn element(&self, cell_type: ReferenceCellType) -> &CiarletElement<T> {
-        &self.elements[&cell_type]
+
+    fn element(&self, cell_type: ReferenceCellType) -> &Self::FiniteElement {
+        self.local_space.element(cell_type)
     }
 
     fn get_local_dof_numbers(&self, entity_dim: usize, entity_number: usize) -> &[usize] {
-        &self.entity_dofs[entity_dim][entity_number]
+        self.local_space
+            .get_local_dof_numbers(entity_dim, entity_number)
     }
-    fn is_serial(&self) -> bool {
-        self.grid.comm().size() == 1
-    }
+
     fn local_size(&self) -> usize {
-        self.local_size
+        self.local_space.local_size()
     }
 
     fn global_size(&self) -> usize {
-        self.global_size
+        self.local_space.global_size()
     }
-    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
-        self.cell_dofs.get_unchecked(cell)
-    }
+
     fn cell_dofs(&self, cell: usize) -> Option<&[usize]> {
-        if cell < self.cell_dofs.len() {
-            Some(unsafe { self.cell_dofs_unchecked(cell) })
-        } else {
-            None
-        }
+        self.local_space.cell_dofs(cell)
     }
+
+    unsafe fn cell_dofs_unchecked(&self, cell: usize) -> &[usize] {
+        self.local_space.cell_dofs_unchecked(cell)
+    }
+
     fn cell_colouring(&self) -> HashMap<ReferenceCellType, Vec<Vec<usize>>> {
-        let mut colouring = HashMap::new();
-        //: HashMap<ReferenceCellType, Vec<Vec<usize>>>
-        for cell in self.grid.entity_types(2) {
-            colouring.insert(*cell, vec![]);
-        }
-        let mut edim = 0;
-        while self.elements[&self.grid.entity_types(2)[0]]
-            .entity_dofs(edim, 0)
-            .unwrap()
-            .is_empty()
-        {
-            edim += 1;
-        }
-
-        let mut entity_colours = vec![
-            vec![];
-            if edim == 0 {
-                self.grid.entity_count(ReferenceCellType::Point)
-            } else if edim == 1 {
-                self.grid.entity_count(ReferenceCellType::Interval)
-            } else if edim == 2 && self.grid.topology_dim() == 2 {
-                self.grid
-                    .entity_types(2)
-                    .iter()
-                    .map(|&i| self.grid.entity_count(i))
-                    .sum::<usize>()
-            } else {
-                unimplemented!();
-            }
-        ];
-
-        for cell in self.grid.entity_iter(2) {
-            let cell_type = cell.entity_type();
-            let indices = cell.topology().sub_entity_iter(edim).collect::<Vec<_>>();
-
-            let c = {
-                let mut c = 0;
-                while c < colouring[&cell_type].len() {
-                    let mut found = false;
-                    for v in &indices {
-                        if entity_colours[*v].contains(&c) {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if !found {
-                        break;
-                    }
-                    c += 1;
-                }
-                c
-            };
-            if c == colouring[&cell_type].len() {
-                for ct in self.grid.entity_types(2) {
-                    colouring.get_mut(ct).unwrap().push(if *ct == cell_type {
-                        vec![cell.local_index()]
-                    } else {
-                        vec![]
-                    });
-                }
-            } else {
-                colouring.get_mut(&cell_type).unwrap()[c].push(cell.local_index());
-            }
-            for v in &indices {
-                entity_colours[*v].push(c);
-            }
-        }
-        colouring
+        self.local_space.cell_colouring()
     }
+
     fn global_dof_index(&self, local_dof_index: usize) -> usize {
-        self.global_dof_numbers[local_dof_index]
-    }
-    fn ownership(&self, local_dof_index: usize) -> Ownership {
-        self.ownership[local_dof_index]
+        self.local_space.global_dof_index(local_dof_index)
     }
 
+    fn ownership(&self, local_dof_index: usize) -> Ownership {
+        // Syntactical workaround as rust-analyzer mixed up this ownership with entity ownership.
+        LocalFunctionSpaceTrait::ownership(&self.local_space, local_dof_index)
+    }
+}
+
+impl<
+        'a,
+        C: Communicator,
+        T: RlstScalar + MatrixInverse,
+        GridImpl: ParallelGrid<C, T = T::Real, EntityDescriptor = ReferenceCellType>,
+    > FunctionSpaceTrait for FunctionSpace<'a, C, T, GridImpl>
+{
     fn comm(&self) -> &C {
         self.grid.comm()
+    }
+
+    type C = C;
+
+    type Grid = GridImpl;
+
+    type LocalFunctionSpace = LocalFunctionSpace<'a, T, GridImpl::LocalGrid>;
+
+    fn local_space(&self) -> &Self::LocalFunctionSpace {
+        &self.local_space
     }
 }
 

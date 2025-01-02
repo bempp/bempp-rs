@@ -1,9 +1,8 @@
 use bempp::boundary_assemblers::BoundaryAssemblerOptions;
 use bempp::function::FunctionSpace;
-use bempp::function::FunctionSpaceTrait;
+use bempp::function::LocalFunctionSpaceTrait;
 use bempp::laplace::assembler::single_layer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use mpi;
 use ndelement::ciarlet::LagrangeElementFamily;
 use ndelement::types::{Continuity, ReferenceCellType};
 

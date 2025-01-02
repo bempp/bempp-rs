@@ -51,12 +51,11 @@ pub struct KiFmmEvaluator<
 }
 
 impl<
-        'a,
         C: Communicator,
         T: RlstScalar + Equivalence,
         SourceLayout: IndexLayout<Comm = C>,
         TargetLayout: IndexLayout<Comm = C>,
-    > std::fmt::Debug for KiFmmEvaluator<'a, C, T, SourceLayout, TargetLayout>
+    > std::fmt::Debug for KiFmmEvaluator<'_, C, T, SourceLayout, TargetLayout>
 where
     T::Real: Equivalence,
     T: DftType<InputType = T, OutputType = <T as AsComplex>::ComplexType>,
@@ -197,12 +196,11 @@ where
 }
 
 impl<
-        'a,
         C: Communicator,
         T: RlstScalar<Real = T> + Equivalence,
         SourceLayout: IndexLayout<Comm = C>,
         TargetLayout: IndexLayout<Comm = C>,
-    > AsApply for KiFmmEvaluator<'a, C, T, SourceLayout, TargetLayout>
+    > AsApply for KiFmmEvaluator<'_, C, T, SourceLayout, TargetLayout>
 where
     T::Real: Equivalence,
     T: DftType<InputType = T, OutputType = <T as AsComplex>::ComplexType>,

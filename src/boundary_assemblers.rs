@@ -8,7 +8,7 @@ use crate::boundary_assemblers::cell_pair_assemblers::{
 };
 use crate::boundary_assemblers::helpers::KernelEvaluator;
 use crate::boundary_assemblers::helpers::{equal_grids, RawData2D, RlstArray, SparseMatrixData};
-use crate::function::FunctionSpaceTrait;
+use crate::function::{FunctionSpaceTrait, LocalFunctionSpaceTrait};
 use bempp_quadrature::duffy::{
     quadrilateral_duffy, quadrilateral_triangle_duffy, triangle_duffy, triangle_quadrilateral_duffy,
 };
@@ -16,6 +16,7 @@ use bempp_quadrature::types::{CellToCellConnectivity, TestTrialNumericalQuadratu
 use green_kernels::traits::Kernel;
 use integrands::BoundaryIntegrand;
 use itertools::izip;
+use mpi::traits::Communicator;
 use ndelement::quadrature::simplex_rule;
 use ndelement::reference_cell;
 use ndelement::traits::FiniteElement;
@@ -119,13 +120,17 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     BoundaryAssembler<'o, T, Integrand, K>
 {
     /// Assemble the singular part into a CSR matrix.
-    pub fn assemble_singular<Space: FunctionSpaceTrait<T = T> + Sync>(
+    pub fn assemble_singular<Space: FunctionSpaceTrait<T = T>>(
         &self,
         trial_space: &Space,
         test_space: &Space,
-    ) -> CsrMatrix<T> {
+    ) -> CsrMatrix<T>
+    where
+        Space::LocalFunctionSpace: Sync,
+    {
         let shape = [test_space.global_size(), trial_space.global_size()];
-        let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
+        let sparse_matrix =
+            self.assemble_singular_part(shape, trial_space.local_space(), test_space.local_space());
 
         if sparse_matrix.data.is_empty()
             || sparse_matrix
@@ -155,12 +160,15 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble<Space: FunctionSpaceTrait<T = T> + Sync>(
+    pub fn assemble<Space: FunctionSpaceTrait<T = T>>(
         &self,
         trial_space: &Space,
         test_space: &Space,
-    ) -> DynamicArray<T, 2> {
-        if !trial_space.is_serial() || !test_space.is_serial() {
+    ) -> DynamicArray<T, 2>
+    where
+        Space::LocalFunctionSpace: Sync,
+    {
+        if trial_space.comm().size() > 1 || test_space.comm().size() > 1 {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
 
@@ -173,17 +181,19 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble into a dense matrix.
-    pub fn assemble_into_memory<Space: FunctionSpaceTrait<T = T> + Sync>(
+    pub fn assemble_into_memory<Space: FunctionSpaceTrait<T = T>>(
         &self,
         trial_space: &Space,
         test_space: &Space,
         output: &mut [T],
-    ) {
+    ) where
+        Space::LocalFunctionSpace: Sync,
+    {
         assert_eq!(
             output.len(),
             test_space.global_size() * trial_space.global_size()
         );
-        if !trial_space.is_serial() || !test_space.is_serial() {
+        if trial_space.comm().size() > 1 || test_space.comm().size() > 1 {
             panic!("Dense assembly can only be used for function spaces stored in serial");
         }
 
@@ -197,13 +207,14 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
 
         self.assemble_nonsingular_part(
             &output_raw,
-            trial_space,
-            test_space,
+            trial_space.local_space(),
+            test_space.local_space(),
             &trial_colouring,
             &test_colouring,
         );
 
-        let sparse_matrix = self.assemble_singular_part(shape, trial_space, test_space);
+        let sparse_matrix =
+            self.assemble_singular_part(shape, trial_space.local_space(), test_space.local_space());
 
         let data = sparse_matrix.data;
         let rows = sparse_matrix.rows;
@@ -231,7 +242,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the singular contributions
-    fn assemble_singular_part<Space: FunctionSpaceTrait<T = T> + Sync>(
+    fn assemble_singular_part<Space: LocalFunctionSpaceTrait<T = T> + Sync>(
         &self,
         shape: [usize; 2],
         trial_space: &Space,
@@ -393,7 +404,7 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
     }
 
     /// Assemble the non-singular contributions into a dense matrix
-    fn assemble_nonsingular_part<Space: FunctionSpaceTrait<T = T> + Sync>(
+    fn assemble_nonsingular_part<Space: LocalFunctionSpaceTrait<T = T> + Sync>(
         &self,
         output: &RawData2D<T>,
         trial_space: &Space,
@@ -401,9 +412,6 @@ impl<'o, T: RlstScalar + MatrixInverse, Integrand: BoundaryIntegrand<T = T>, K: 
         trial_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
         test_colouring: &HashMap<ReferenceCellType, Vec<Vec<usize>>>,
     ) {
-        if !trial_space.is_serial() || !test_space.is_serial() {
-            panic!("Dense assembly can only be used for function spaces stored in serial");
-        }
         if output.shape[0] != test_space.global_size()
             || output.shape[1] != trial_space.global_size()
         {
@@ -609,7 +617,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_singular<
     T: RlstScalar + MatrixInverse,
-    Space: FunctionSpaceTrait<T = T>,
+    Space: LocalFunctionSpaceTrait<T = T> + Sync,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 >(
@@ -688,7 +696,7 @@ fn assemble_batch_singular<
 #[allow(clippy::too_many_arguments)]
 fn assemble_batch_nonadjacent<
     T: RlstScalar + MatrixInverse,
-    Space: FunctionSpaceTrait<T = T>,
+    Space: LocalFunctionSpaceTrait<T = T>,
     Integrand: BoundaryIntegrand<T = T>,
     K: Kernel<T = T>,
 >(

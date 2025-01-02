@@ -28,13 +28,12 @@ pub struct DenseEvaluator<
 }
 
 impl<
-        'a,
         C: Communicator,
         T: RlstScalar + Equivalence,
         SourceLayout: IndexLayout<Comm = C>,
         TargetLayout: IndexLayout<Comm = C>,
         K: DistributedKernelEvaluator<T = T>,
-    > std::fmt::Debug for DenseEvaluator<'a, C, T, SourceLayout, TargetLayout, K>
+    > std::fmt::Debug for DenseEvaluator<'_, C, T, SourceLayout, TargetLayout, K>
 where
     T::Real: Equivalence,
 {
@@ -138,13 +137,12 @@ where
 }
 
 impl<
-        'a,
         C: Communicator,
         T: RlstScalar + Equivalence,
         SourceLayout: IndexLayout<Comm = C>,
         TargetLayout: IndexLayout<Comm = C>,
         K: DistributedKernelEvaluator<T = T>,
-    > AsApply for DenseEvaluator<'a, C, T, SourceLayout, TargetLayout, K>
+    > AsApply for DenseEvaluator<'_, C, T, SourceLayout, TargetLayout, K>
 where
     T::Real: Equivalence,
 {

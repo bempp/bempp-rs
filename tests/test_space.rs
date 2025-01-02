@@ -1,8 +1,9 @@
-use bempp::function::{assign_dofs, FunctionSpace, FunctionSpaceTrait};
+use bempp::function::{assign_dofs, FunctionSpace, LocalFunctionSpaceTrait};
 use bempp::shapes::{regular_sphere, screen_triangles};
+use mpi::traits::Communicator;
 use ndelement::ciarlet::{LagrangeElementFamily, RaviartThomasElementFamily};
 use ndelement::types::{Continuity, ReferenceCellType};
-use ndgrid::traits::{Entity, Grid, Topology};
+use ndgrid::traits::{Entity, Grid, ParallelGrid, Topology};
 use std::sync::LazyLock;
 
 use mpi::environment::Universe;
@@ -13,13 +14,18 @@ static MPI_UNIVERSE: LazyLock<Universe> = std::sync::LazyLock::new(|| {
         .0
 });
 
-fn run_test(
-    grid: &(impl Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync),
+fn run_test<
+    C: Communicator,
+    GridImpl: ParallelGrid<C, T = f64, EntityDescriptor = ReferenceCellType>,
+>(
+    grid: &GridImpl,
     degree: usize,
     continuity: Continuity,
-) {
+) where
+    GridImpl::LocalGrid: Sync,
+{
     let family = LagrangeElementFamily::<f64>::new(degree, continuity);
-    let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
+    let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid.local_grid(), &family);
 
     for o in &owner_data {
         assert_eq!(o.0, 0);
@@ -41,13 +47,18 @@ fn run_test(
     }
 }
 
-fn run_test_rt(
-    grid: &(impl Grid<T = f64, EntityDescriptor = ReferenceCellType> + Sync),
+fn run_test_rt<
+    C: Communicator,
+    GridImpl: ParallelGrid<C, T = f64, EntityDescriptor = ReferenceCellType>,
+>(
+    grid: &GridImpl,
     degree: usize,
     continuity: Continuity,
-) {
+) where
+    GridImpl::LocalGrid: Sync,
+{
     let family = RaviartThomasElementFamily::<f64>::new(degree, continuity);
-    let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid, &family);
+    let (cell_dofs, entity_dofs, size, owner_data) = assign_dofs(0, grid.local_grid(), &family);
 
     for o in &owner_data {
         assert_eq!(o.0, 0);
