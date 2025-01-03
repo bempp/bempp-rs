@@ -12,7 +12,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rlst::{
     operator::interface::DistributedArrayVectorSpace, rlst_dynamic_array2, AsApply, Element,
-    LinearSpace, OperatorBase, RawAccess,
+    LinearSpace, RawAccess,
 };
 
 fn main() {
@@ -56,5 +56,5 @@ fn main() {
         .local_mut()
         .fill_from_equally_distributed(&mut rng);
 
-    //let res = evaluator.apply(&x);
+    let res = evaluator.apply(&x);
 }
